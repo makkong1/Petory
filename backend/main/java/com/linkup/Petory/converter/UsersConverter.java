@@ -17,13 +17,14 @@ public class UsersConverter {
 
     private final SocialUserConverter socialUserConverter;
 
-    // 단일 DTO 변환
+    // 단일 DTO 변환 (password 제외 - 보안상 이유)
     public UsersDTO toDTO(Users user) {
         return UsersDTO.builder()
                 .idx(user.getIdx())
                 .id(user.getId())
                 .username(user.getUsername())
                 .email(user.getEmail())
+                // password는 응답에 포함하지 않음
                 .role(user.getRole().name())
                 .location(user.getLocation())
                 .petInfo(user.getPetInfo())
@@ -34,13 +35,14 @@ public class UsersConverter {
                 .build();
     }
 
-    // DTO → Entity
+    // DTO → Entity (password는 Service에서 별도 처리)
     public Users toEntity(UsersDTO dto) {
         Users user = Users.builder()
                 .idx(dto.getIdx())
                 .id(dto.getId())
                 .username(dto.getUsername())
                 .email(dto.getEmail())
+                // password는 Service에서 암호화 후 설정
                 .role(Role.valueOf(dto.getRole()))
                 .location(dto.getLocation())
                 .petInfo(dto.getPetInfo())
