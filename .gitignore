@@ -1,10 +1,15 @@
-HELP.md
+# =====================
+# Spring Boot / Gradle
+# =====================
 .gradle
 build/
 !gradle/wrapper/gradle-wrapper.jar
-!**/src/main/**/build/
-!**/src/test/**/build/
+!**/backend/src/main/**/build/
+!**/backend/src/test/**/build/
 
+# =====================
+# IDEs
+# =====================
 ### STS ###
 .apt_generated
 .classpath
@@ -14,8 +19,8 @@ build/
 .springBeans
 .sts4-cache
 bin/
-!**/src/main/**/bin/
-!**/src/test/**/bin/
+!**/backend/src/main/**/bin/
+!**/backend/src/test/**/bin/
 
 ### IntelliJ IDEA ###
 .idea
@@ -23,8 +28,8 @@ bin/
 *.iml
 *.ipr
 out/
-!**/src/main/**/out/
-!**/src/test/**/out/
+!**/backend/src/main/**/out/
+!**/backend/src/test/**/out/
 
 ### NetBeans ###
 /nbproject/private/
@@ -36,5 +41,14 @@ out/
 ### VS Code ###
 .vscode/
 
+# =====================
+# Application config
+# =====================
 application.yml
 application.properties
+
+# =====================
+# React / Frontend
+# =====================
+/frontend/node_modules/
+/frontend/build/
