@@ -7,15 +7,15 @@ plugins {
 sourceSets {
     main {
         java {
-            srcDirs = ['backend/src/main/java']
+            srcDirs = ['backend/main/java']
         }
         resources {
-            srcDirs = ['backend/src/main/resources']
+            srcDirs = ['backend/main/resources']
         }
     }
     test {
         java {
-            srcDirs = ['backend/src/test/java']
+            srcDirs = ['backend/test/java']
         }
     }
 }
