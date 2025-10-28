@@ -14,26 +14,26 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class CareRequestConverter {
 
-    private final CareApplicationConverter careApplicationConverter;
-
+    // Entity → DTO
     public CareRequestDTO toDTO(CareRequest request) {
         return CareRequestDTO.builder()
                 .idx(request.getIdx())
-                .userId(request.getUser().getIdx())
-                .username(request.getUser().getUsername())
                 .title(request.getTitle())
                 .description(request.getDescription())
                 .date(request.getDate())
                 .status(request.getStatus().name())
-                .applications(request.getApplications() != null ? request.getApplications().stream()
-                        .map(careApplicationConverter::toDTO)
-                        .collect(Collectors.toList())
-                        : null)
+                .createdAt(request.getCreatedAt())
+                .userId(request.getUser().getIdx())
+                .username(request.getUser().getUsername())
+                .userLocation(request.getUser().getLocation())
+                .applicationCount(request.getApplications() != null ? request.getApplications().size() : 0)
                 .build();
     }
 
-    // 리스트 변환
+    // DTO 리스트 변환
     public List<CareRequestDTO> toDTOList(List<CareRequest> requests) {
-        return requests.stream().map(this::toDTO).collect(Collectors.toList());
+        return requests.stream()
+                .map(this::toDTO)
+                .collect(Collectors.toList());
     }
 }

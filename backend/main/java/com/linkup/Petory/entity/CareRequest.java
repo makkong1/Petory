@@ -34,6 +34,20 @@ public class CareRequest {
     @Builder.Default
     private CareRequestStatus status = CareRequestStatus.OPEN;
 
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+
     @OneToMany(mappedBy = "careRequest", cascade = CascadeType.ALL)
     private List<CareApplication> applications;
+
+    @PrePersist
+    protected void onCreate() {
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        this.updatedAt = LocalDateTime.now();
+    }
 }

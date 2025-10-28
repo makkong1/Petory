@@ -19,9 +19,7 @@ public class UsersController {
 
     @GetMapping
     public ResponseEntity<List<UsersDTO>> getAllUsers() {
-        System.out.println("=== API 호출됨: GET /api/users ===");
         List<UsersDTO> users = usersService.getAllUsers();
-        System.out.println("유저 목록 개수: " + users.size());
         return ResponseEntity.ok(users);
     }
 

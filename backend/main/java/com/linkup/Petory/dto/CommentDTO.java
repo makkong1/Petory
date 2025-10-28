@@ -1,7 +1,11 @@
 package com.linkup.Petory.dto;
 
-import lombok.*;
 import java.time.LocalDateTime;
+
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 
 @Data
 @NoArgsConstructor
@@ -9,9 +13,14 @@ import java.time.LocalDateTime;
 @Builder
 public class CommentDTO {
     private Long idx;
-    private Long boardId;
-    private Long userId;
-    private String username;
     private String content;
     private LocalDateTime createdAt;
+
+    // 게시글 정보
+    private Long boardId;
+
+    // 작성자 정보
+    private Long userId;
+    private String username;
+    private String userLocation;
 }

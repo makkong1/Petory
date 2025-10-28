@@ -1,6 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import styled, { createGlobalStyle } from 'styled-components';
+import { ThemeProvider } from './contexts/ThemeContext';
+import Navigation from './components/Layout/Navigation';
+import HomePage from './components/Home/HomePage';
 import UserList from './components/UserList';
+import CareRequestList from './components/CareRequest/CareRequestList';
+import CommunityBoard from './components/Community/CommunityBoard';
 
 const GlobalStyle = createGlobalStyle`
   * {
@@ -15,60 +20,72 @@ const GlobalStyle = createGlobalStyle`
       sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    background-color: #f8f9fa;
-    color: #333;
+    transition: background-color 0.3s ease, color 0.3s ease;
   }
 
   code {
     font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
       monospace;
   }
+
+  /* 스크롤바 스타일링 */
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: ${props => props.theme?.colors?.surface || '#f1f1f1'};
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: ${props => props.theme?.colors?.border || '#c1c1c1'};
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: ${props => props.theme?.colors?.primary || '#FF7E36'};
+  }
 `;
 
 const AppContainer = styled.div`
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-`;
-
-const Header = styled.header`
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
-  padding: 20px 0;
-  margin-bottom: 20px;
-  box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
-`;
-
-const HeaderContent = styled.div`
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 20px;
-`;
-
-const Logo = styled.h1`
-  color: #4a90e2;
-  font-size: 32px;
-  font-weight: bold;
-  text-align: center;
-  margin: 0;
+  background: ${props => props.theme.colors.background};
+  color: ${props => props.theme.colors.text};
+  transition: all 0.3s ease;
 `;
 
 const MainContent = styled.main`
-  min-height: calc(100vh - 120px);
+  min-height: calc(100vh - 80px);
 `;
 
 function App() {
+  const [activeTab, setActiveTab] = useState('home');
+
+  const renderContent = () => {
+    switch(activeTab) {
+      case 'home':
+        return <HomePage setActiveTab={setActiveTab} />;
+      case 'care-requests':
+        return <CareRequestList />;
+      case 'community':
+        return <CommunityBoard />;
+      case 'users':
+        return <UserList />;
+      default:
+        return <HomePage setActiveTab={setActiveTab} />;
+    }
+  };
+
   return (
-    <AppContainer>
-      <GlobalStyle />
-      <Header>
-        <HeaderContent>
-          <Logo>🐾 Petory</Logo>
-        </HeaderContent>
-      </Header>
-      <MainContent>
-        <UserList />
-      </MainContent>
-    </AppContainer>
+    <ThemeProvider>
+      <AppContainer>
+        <GlobalStyle />
+        <Navigation activeTab={activeTab} setActiveTab={setActiveTab} />
+        <MainContent>
+          {renderContent()}
+        </MainContent>
+      </AppContainer>
+    </ThemeProvider>
   );
 }
 

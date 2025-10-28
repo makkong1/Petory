@@ -66,9 +66,10 @@ const UserList = () => {
   return (
     <Container>
       <Header>
-        <Title>유저 관리</Title>
+        <Title>👥 사용자 관리</Title>
         <AddButton onClick={handleAddUser}>
-          + 새 유저 추가
+          <span>+</span>
+          새 유저 추가
         </AddButton>
       </Header>
 
@@ -151,7 +152,7 @@ export default UserList;
 
 
 const Container = styled.div`
-  padding: 20px;
+  padding: ${props => props.theme.spacing.xl} ${props => props.theme.spacing.lg};
   max-width: 1200px;
   margin: 0 auto;
 `;
@@ -164,23 +165,30 @@ const Header = styled.div`
 `;
 
 const Title = styled.h1`
-  color: #333;
-  font-size: 28px;
+  color: ${props => props.theme.colors.text};
+  font-size: ${props => props.theme.typography.h2.fontSize};
+  font-weight: ${props => props.theme.typography.h2.fontWeight};
   margin: 0;
 `;
 
 const AddButton = styled.button`
-  background: #4a90e2;
+  background: ${props => props.theme.colors.primary};
   color: white;
   border: none;
-  padding: 12px 24px;
-  border-radius: 8px;
-  font-size: 16px;
+  padding: ${props => props.theme.spacing.md} ${props => props.theme.spacing.lg};
+  border-radius: ${props => props.theme.borderRadius.lg};
+  font-size: ${props => props.theme.typography.body1.fontSize};
+  font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.3s ease;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: ${props => props.theme.spacing.sm};
   
   &:hover {
-    background: #357abd;
+    background: ${props => props.theme.colors.primaryDark};
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(255, 126, 54, 0.3);
   }
 `;
 
@@ -191,15 +199,17 @@ const UserGrid = styled.div`
 `;
 
 const UserCard = styled.div`
-  background: white;
-  border-radius: 12px;
-  padding: 20px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  background: ${props => props.theme.colors.surface};
+  border: 1px solid ${props => props.theme.colors.border};
+  border-radius: ${props => props.theme.borderRadius.lg};
+  padding: ${props => props.theme.spacing.lg};
+  box-shadow: 0 4px 6px ${props => props.theme.colors.shadow};
+  transition: all 0.3s ease;
   
   &:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px ${props => props.theme.colors.shadowHover};
+    border-color: ${props => props.theme.colors.primary};
   }
 `;
 
