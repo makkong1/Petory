@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import styled, { createGlobalStyle } from 'styled-components';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Navigation from './components/Layout/Navigation';
 import HomePage from './components/Home/HomePage';
 import UserList from './components/UserList';
 import CareRequestList from './components/CareRequest/CareRequestList';
 import CommunityBoard from './components/Community/CommunityBoard';
+import LoginForm from './components/Auth/LoginForm';
+import RegisterForm from './components/Auth/RegisterForm';
 
 const GlobalStyle = createGlobalStyle`
   * {
@@ -58,8 +61,57 @@ const MainContent = styled.main`
   min-height: calc(100vh - 80px);
 `;
 
-function App() {
+const AuthContainer = styled.div`
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: calc(100vh - 80px);
+  padding: 2rem;
+`;
+
+const LoadingContainer = styled.div`
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: calc(100vh - 80px);
+  font-size: 1.2rem;
+  color: ${props => props.theme.colors.text};
+`;
+
+function AppContent() {
+  const { user, loading, isAuthenticated } = useAuth();
   const [activeTab, setActiveTab] = useState('home');
+  const [authMode, setAuthMode] = useState('login'); // 'login' or 'register'
+
+  // 로딩 중일 때
+  if (loading) {
+    return (
+      <LoadingContainer>
+        로딩 중...
+      </LoadingContainer>
+    );
+  }
+
+  // 인증되지 않은 경우
+  if (!isAuthenticated) {
+    return (
+      <AuthContainer>
+        {authMode === 'login' ? (
+          <LoginForm 
+            onSwitchToRegister={() => setAuthMode('register')}
+          />
+        ) : (
+          <RegisterForm 
+            onRegisterSuccess={() => {
+              // 회원가입 성공 시 로그인 모드로 전환
+              setAuthMode('login');
+            }}
+            onSwitchToLogin={() => setAuthMode('login')}
+          />
+        )}
+      </AuthContainer>
+    );
+  }
 
   const renderContent = () => {
     switch(activeTab) {
@@ -77,14 +129,28 @@ function App() {
   };
 
   return (
+    <>
+      <Navigation 
+        activeTab={activeTab} 
+        setActiveTab={setActiveTab} 
+        user={user}
+      />
+      <MainContent>
+        {renderContent()}
+      </MainContent>
+    </>
+  );
+}
+
+function App() {
+  return (
     <ThemeProvider>
-      <AppContainer>
-        <GlobalStyle />
-        <Navigation activeTab={activeTab} setActiveTab={setActiveTab} />
-        <MainContent>
-          {renderContent()}
-        </MainContent>
-      </AppContainer>
+      <AuthProvider>
+        <AppContainer>
+          <GlobalStyle />
+          <AppContent />
+        </AppContainer>
+      </AuthProvider>
     </ThemeProvider>
   );
 }

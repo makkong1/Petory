@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import styled from 'styled-components';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useAuth } from '../../contexts/AuthContext';
 
 const NavContainer = styled.nav`
   background: ${props => props.theme.colors.background};
@@ -115,8 +116,33 @@ const RightSection = styled.div`
   gap: ${props => props.theme.spacing.md};
 `;
 
-const Navigation = ({ activeTab, setActiveTab }) => {
+const UserInfo = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${props => props.theme.spacing.sm};
+  color: ${props => props.theme.colors.text};
+  font-size: 14px;
+`;
+
+const LogoutButton = styled.button`
+  background: ${props => props.theme.colors.surface};
+  border: 1px solid ${props => props.theme.colors.border};
+  color: ${props => props.theme.colors.text};
+  padding: ${props => props.theme.spacing.sm} ${props => props.theme.spacing.md};
+  border-radius: ${props => props.theme.borderRadius.md};
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 14px;
+  
+  &:hover {
+    background: ${props => props.theme.colors.surfaceHover};
+    color: ${props => props.theme.colors.primary};
+  }
+`;
+
+const Navigation = ({ activeTab, setActiveTab, user }) => {
   const { isDarkMode, toggleTheme } = useTheme();
+  const { logout } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const menuItems = [
@@ -151,9 +177,21 @@ const Navigation = ({ activeTab, setActiveTab }) => {
         </NavMenu>
         
         <RightSection>
+          {user && (
+            <UserInfo>
+              <span>👤 {user.username}</span>
+            </UserInfo>
+          )}
+          
           <ThemeToggle onClick={toggleTheme}>
             {isDarkMode ? '🌙' : '☀️'}
           </ThemeToggle>
+          
+          {user && (
+            <LogoutButton onClick={logout}>
+              로그아웃
+            </LogoutButton>
+          )}
           
           <MobileMenuButton onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
             ☰

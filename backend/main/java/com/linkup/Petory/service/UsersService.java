@@ -36,6 +36,20 @@ public class UsersService {
         return usersConverter.toDTO(user);
     }
 
+    // username으로 조회
+    public UsersDTO getUserByUsername(String username) {
+        Users user = usersRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found with username: " + username));
+        return usersConverter.toDTO(user);
+    }
+
+    // id로 조회 (로그인용)
+    public UsersDTO getUserById(String id) {
+        Users user = usersRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
+        return usersConverter.toDTO(user);
+    }
+
     // 생성
     public UsersDTO createUser(UsersDTO dto) {
         Users user = usersConverter.toEntity(dto);

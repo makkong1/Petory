@@ -1,17 +1,25 @@
 package com.linkup.Petory.config;
 
+import com.linkup.Petory.filter.JwtAuthenticationFilter;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
 @EnableWebSecurity
+@RequiredArgsConstructor
 public class SecurityConfig {
+
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -25,12 +33,16 @@ public class SecurityConfig {
                 // 세션을 사용하지 않음 (REST API는 무상태)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-                // 모든 요청 허용 (개발 단계)
+                // JWT 필터 추가
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+
+                // 인증이 필요한 경로 설정
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/h2-console/**").permitAll() // H2 콘솔
-                        .requestMatchers("/api/**").permitAll() // 모든 API 허용
+                        .requestMatchers("/api/auth/**").permitAll() // 인증 관련 API 허용
+                        .requestMatchers("/api/users/register").permitAll() // 회원가입 허용
                         .requestMatchers("/error").permitAll() // 에러 페이지
-                        .anyRequest().permitAll() // 나머지 모두 허용
+                        .requestMatchers("/api/**").authenticated() // 나머지 API는 인증 필요
+                        .anyRequest().permitAll() // 기타 요청 허용
                 );
 
         return http.build();
@@ -39,6 +51,11 @@ public class SecurityConfig {
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
+        return config.getAuthenticationManager();
     }
 
     // CORS 설정을 위한 CorsConfigurationSource Bean 참조

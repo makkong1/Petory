@@ -21,14 +21,13 @@ public class UsersDetailsServiceImpl implements UserDetailsService {
     private final UsersRepository usersRepository;
 
     @Override
-    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        Users user = usersRepository.findAll().stream()
-                .filter(u -> u.getUsername().equals(username))
-                .findFirst()
-                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+    public UserDetails loadUserByUsername(String id) throws UsernameNotFoundException {
+        // username 파라미터는 실제로는 id (로그인용 아이디)를 의미함
+        Users user = usersRepository.findById(id)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found with id: " + id));
 
         return new org.springframework.security.core.userdetails.User(
-                user.getUsername(),
+                user.getId(), // 로그인용 아이디
                 user.getPassword(),
                 getAuthorities(user));
     }
