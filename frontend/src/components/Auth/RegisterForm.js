@@ -109,16 +109,17 @@ const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
         </InputGroup>
 
         <InputGroup>
-          <Label htmlFor="role">역할</Label>
+          <Label htmlFor="role">역할 *</Label>
           <Select
             id="role"
             name="role"
             value={formData.role}
             onChange={handleChange}
             disabled={loading}
+            required
           >
-            <option value="USER">일반 사용자</option>
-            <option value="ADMIN">관리자</option>
+            <option value="USER">🐾 일반 사용자 (펫케어 서비스 이용)</option>
+            <option value="SERVICE_PROVIDER">🏥 서비스 제공자 (펫케어 서비스 제공)</option>
           </Select>
         </InputGroup>
 
@@ -210,16 +211,16 @@ const Label = styled.label`
 `;
 
 const Input = styled.input`
-  padding: 1rem;
+  padding: 0.75rem;
   border: 2px solid #e1e5e9;
-  border-radius: 8px;
-  font-size: 1rem;
+  border-radius: 6px;
+  font-size: 0.95rem;
   transition: all 0.2s ease;
   
   &:focus {
     outline: none;
     border-color: #007bff;
-    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.1);
     transform: translateY(-1px);
   }
   
@@ -229,17 +230,17 @@ const Input = styled.input`
 `;
 
 const Select = styled.select`
-  padding: 1rem;
+  padding: 0.75rem;
   border: 2px solid #e1e5e9;
-  border-radius: 8px;
-  font-size: 1rem;
+  border-radius: 6px;
+  font-size: 0.95rem;
   background: white;
   transition: all 0.2s ease;
   
   &:focus {
     outline: none;
     border-color: #007bff;
-    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.1);
     transform: translateY(-1px);
   }
   
@@ -249,20 +250,20 @@ const Select = styled.select`
 `;
 
 const Button = styled.button`
-  padding: 1rem 2rem;
+  padding: 0.75rem 1.5rem;
   background: #28a745;
   color: white;
   border: none;
-  border-radius: 8px;
-  font-size: 1.1rem;
+  border-radius: 6px;
+  font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
   
   &:hover {
     background: #218838;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px rgba(40, 167, 69, 0.3);
   }
   
   &:disabled {

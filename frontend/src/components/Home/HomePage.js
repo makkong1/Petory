@@ -17,12 +17,6 @@ const HomePage = ({ setActiveTab }) => {
       action: () => setActiveTab('community')
     },
     {
-      icon: '📍',
-      title: '우리 동네',
-      description: '내 주변의 펫케어 서비스와 반려동물 친구들을 찾아보세요.',
-      action: () => setActiveTab('care-requests')
-    },
-    {
       icon: '⭐',
       title: '리뷰 시스템',
       description: '실제 이용 후기를 통해 믿을 수 있는 펫케어 서비스를 선택하세요.',
@@ -60,19 +54,19 @@ const HomePage = ({ setActiveTab }) => {
         </p>
         <StatsGrid>
           <StatItem>
-            <StatNumber>1,234</StatNumber>
+            <StatNumber>아직없음</StatNumber>
             <StatLabel>등록된 펫시터</StatLabel>
           </StatItem>
           <StatItem>
-            <StatNumber>5,678</StatNumber>
+            <StatNumber>아직없음</StatNumber>
             <StatLabel>완료된 펫케어</StatLabel>
           </StatItem>
           <StatItem>
-            <StatNumber>4.9</StatNumber>
+            <StatNumber>아직없음</StatNumber>
             <StatLabel>평균 만족도</StatLabel>
           </StatItem>
           <StatItem>
-            <StatNumber>98%</StatNumber>
+            <StatNumber>아직없음</StatNumber>
             <StatLabel>재이용율</StatLabel>
           </StatItem>
         </StatsGrid>

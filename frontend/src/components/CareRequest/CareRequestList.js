@@ -1,45 +1,31 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
+import { careRequestApi } from '../../api/careRequestApi';
 
 const CareRequestList = () => {
   const [careRequests, setCareRequests] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [activeFilter, setActiveFilter] = useState('ALL');
 
-  // 임시 데이터 (나중에 API 연동)
+  // API에서 케어 요청 데이터 가져오기
   useEffect(() => {
-    setTimeout(() => {
-      setCareRequests([
-        {
-          idx: 1,
-          title: '주말 강아지 돌봄 부탁드려요',
-          description: '2박 3일 출장으로 인해 우리 집 골든리트리버 *몽이*를 돌봐주실 분을 찾습니다. 산책과 밥 주기만 해주시면 됩니다.',
-          status: 'OPEN',
-          date: '2024-11-02',
-          user: { username: '김철수', location: '강남구' },
-          applications: 3
-        },
-        {
-          idx: 2,
-          title: '고양이 급식 도움 요청',
-          description: '1주일 여행 동안 고양이 밥과 화장실 청소를 도와주실 분을 찾습니다.',
-          status: 'IN_PROGRESS',
-          date: '2024-11-01',
-          user: { username: '이영희', location: '서초구' },
-          applications: 5
-        },
-        {
-          idx: 3,
-          title: '매일 강아지 산책 서비스',
-          description: '평일 저녁 시간대에 정기적으로 강아지 산책을 도와주실 분을 찾습니다.',
-          status: 'OPEN',
-          date: '2024-10-30',
-          user: { username: '박민수', location: '송파구' },
-          applications: 1
-        }
-      ]);
-      setLoading(false);
-    }, 1000);
+    const fetchCareRequests = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await careRequestApi.getAllCareRequests();
+        setCareRequests(response.data || []);
+      } catch (error) {
+        console.error('케어 요청 데이터 로딩 실패:', error);
+        setError('데이터를 불러오는데 실패했습니다.');
+        setCareRequests([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCareRequests();
   }, []);
 
   const filters = [
@@ -53,11 +39,29 @@ const CareRequestList = () => {
     ? careRequests 
     : careRequests.filter(request => request.status === activeFilter);
 
+  // 필터 변경 시 API 재호출
+  const handleFilterChange = async (filterKey) => {
+    setActiveFilter(filterKey);
+    try {
+      setLoading(true);
+      setError(null);
+      const params = filterKey === 'ALL' ? {} : { status: filterKey };
+      const response = await careRequestApi.getAllCareRequests(params);
+      setCareRequests(response.data || []);
+    } catch (error) {
+      console.error('필터링된 데이터 로딩 실패:', error);
+      setError('필터링된 데이터를 불러오는데 실패했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const getStatusLabel = (status) => {
     switch(status) {
       case 'OPEN': return '모집중';
       case 'IN_PROGRESS': return '진행중';
       case 'COMPLETED': return '완료';
+      case 'CANCELLED': return '취소';
       default: return status;
     }
   };
@@ -89,7 +93,7 @@ const CareRequestList = () => {
           <FilterButton
             key={filter.key}
             active={activeFilter === filter.key}
-            onClick={() => setActiveFilter(filter.key)}
+            onClick={() => handleFilterChange(filter.key)}
           >
             {filter.label} ({filter.count})
           </FilterButton>
@@ -97,7 +101,20 @@ const CareRequestList = () => {
       </FilterSection>
 
       <CareGrid>
-        {filteredRequests.length === 0 ? (
+        {loading ? (
+          <LoadingMessage>
+            <div className="spinner">⏳</div>
+            <h3>데이터를 불러오는 중...</h3>
+          </LoadingMessage>
+        ) : error ? (
+          <ErrorMessage>
+            <div className="icon">❌</div>
+            <h3>{error}</h3>
+            <button onClick={() => window.location.reload()}>
+              다시 시도
+            </button>
+          </ErrorMessage>
+        ) : filteredRequests.length === 0 ? (
           <EmptyMessage>
             <div className="icon">🐾</div>
             <h3>등록된 펫케어 요청이 없습니다</h3>
@@ -115,7 +132,7 @@ const CareRequestList = () => {
               
               <CardDescription>{request.description}</CardDescription>
               
-              <CardFooter>
+              {/* <CardFooter>
                 <UserInfo>
                   <UserAvatar>
                     {request.user.username.charAt(0)}
@@ -131,7 +148,7 @@ const CareRequestList = () => {
                   <div>{formatDate(request.date)}</div>
                   <div>지원 {request.applications}명</div>
                 </DateInfo>
-              </CardFooter>
+              </CardFooter> */}
             </CareCard>
           ))
         )}
@@ -323,7 +340,44 @@ const LoadingMessage = styled.div`
   text-align: center;
   padding: ${props => props.theme.spacing.xxl};
   color: ${props => props.theme.colors.textSecondary};
-  font-size: ${props => props.theme.typography.body1.fontSize};
+  grid-column: 1 / -1;
+  
+  .spinner {
+    font-size: 2rem;
+    margin-bottom: ${props => props.theme.spacing.md};
+    animation: spin 1s linear infinite;
+  }
+  
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+`;
+
+const ErrorMessage = styled.div`
+  text-align: center;
+  padding: ${props => props.theme.spacing.xxl};
+  color: ${props => props.theme.colors.error};
+  grid-column: 1 / -1;
+  
+  .icon {
+    font-size: 3rem;
+    margin-bottom: ${props => props.theme.spacing.md};
+  }
+  
+  button {
+    margin-top: ${props => props.theme.spacing.md};
+    padding: ${props => props.theme.spacing.sm} ${props => props.theme.spacing.md};
+    background: ${props => props.theme.colors.primary};
+    color: white;
+    border: none;
+    border-radius: ${props => props.theme.borderRadius.md};
+    cursor: pointer;
+    
+    &:hover {
+      background: ${props => props.theme.colors.primaryDark};
+    }
+  }
 `;
 
 const EmptyMessage = styled.div`
