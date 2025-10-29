@@ -37,7 +37,9 @@ const Logo = styled.div`
   }
 `;
 
-const NavMenu = styled.div`
+const NavMenu = styled.div.withConfig({
+  shouldForwardProp: (prop) => prop !== 'isOpen',
+})`
   display: flex;
   align-items: center;
   gap: ${props => props.theme.spacing.xl};
