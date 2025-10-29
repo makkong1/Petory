@@ -7,8 +7,91 @@ import HomePage from './components/Home/HomePage';
 import UserList from './components/UserList';
 import CareRequestList from './components/CareRequest/CareRequestList';
 import CommunityBoard from './components/Community/CommunityBoard';
+import LocationServiceMap from './components/LocationService/LocationServiceMap';
 import LoginForm from './components/Auth/LoginForm';
 import RegisterForm from './components/Auth/RegisterForm';
+
+
+function AppContent() {
+  const { user, loading, isAuthenticated } = useAuth();
+  const [activeTab, setActiveTab] = useState('home');
+  const [authMode, setAuthMode] = useState('login'); // 'login' or 'register'
+
+  // 로딩 중일 때
+  if (loading) {
+    return (
+      <LoadingContainer>
+        로딩 중...
+      </LoadingContainer>
+    );
+  }
+
+  // 인증되지 않은 경우
+  if (!isAuthenticated) {
+    return (
+      <AuthContainer>
+        {authMode === 'login' ? (
+          <LoginForm 
+            onSwitchToRegister={() => setAuthMode('register')}
+          />
+        ) : (
+          <RegisterForm 
+            onRegisterSuccess={() => {
+              // 회원가입 성공 시 로그인 모드로 전환
+              setAuthMode('login');
+            }}
+            onSwitchToLogin={() => setAuthMode('login')}
+          />
+        )}
+      </AuthContainer>
+    );
+  }
+
+  const renderContent = () => {
+    switch(activeTab) {
+      case 'home':
+        return <HomePage setActiveTab={setActiveTab} />;
+      case 'location-services':
+        return <LocationServiceMap />;
+      case 'care-requests':
+        return <CareRequestList />;
+      case 'community':
+        return <CommunityBoard />;
+      case 'users':
+        return <UserList />;
+      default:
+        return <HomePage setActiveTab={setActiveTab} />;
+    }
+  };
+
+  return (
+    <>
+      <Navigation 
+        activeTab={activeTab} 
+        setActiveTab={setActiveTab} 
+        user={user}
+      />
+      <MainContent>
+        {renderContent()}
+      </MainContent>
+    </>
+  );
+}
+
+function App() {
+  return (
+    <ThemeProvider>
+      <AuthProvider>
+        <AppContainer>
+          <GlobalStyle />
+          <AppContent />
+        </AppContainer>
+      </AuthProvider>
+    </ThemeProvider>
+  );
+}
+
+export default App;
 
 const GlobalStyle = createGlobalStyle`
   * {
@@ -77,82 +160,3 @@ const LoadingContainer = styled.div`
   font-size: 1.2rem;
   color: ${props => props.theme.colors.text};
 `;
-
-function AppContent() {
-  const { user, loading, isAuthenticated } = useAuth();
-  const [activeTab, setActiveTab] = useState('home');
-  const [authMode, setAuthMode] = useState('login'); // 'login' or 'register'
-
-  // 로딩 중일 때
-  if (loading) {
-    return (
-      <LoadingContainer>
-        로딩 중...
-      </LoadingContainer>
-    );
-  }
-
-  // 인증되지 않은 경우
-  if (!isAuthenticated) {
-    return (
-      <AuthContainer>
-        {authMode === 'login' ? (
-          <LoginForm 
-            onSwitchToRegister={() => setAuthMode('register')}
-          />
-        ) : (
-          <RegisterForm 
-            onRegisterSuccess={() => {
-              // 회원가입 성공 시 로그인 모드로 전환
-              setAuthMode('login');
-            }}
-            onSwitchToLogin={() => setAuthMode('login')}
-          />
-        )}
-      </AuthContainer>
-    );
-  }
-
-  const renderContent = () => {
-    switch(activeTab) {
-      case 'home':
-        return <HomePage setActiveTab={setActiveTab} />;
-      case 'care-requests':
-        return <CareRequestList />;
-      case 'community':
-        return <CommunityBoard />;
-      case 'users':
-        return <UserList />;
-      default:
-        return <HomePage setActiveTab={setActiveTab} />;
-    }
-  };
-
-  return (
-    <>
-      <Navigation 
-        activeTab={activeTab} 
-        setActiveTab={setActiveTab} 
-        user={user}
-      />
-      <MainContent>
-        {renderContent()}
-      </MainContent>
-    </>
-  );
-}
-
-function App() {
-  return (
-    <ThemeProvider>
-      <AuthProvider>
-        <AppContainer>
-          <GlobalStyle />
-          <AppContent />
-        </AppContainer>
-      </AuthProvider>
-    </ThemeProvider>
-  );
-}
-
-export default App;

@@ -147,6 +147,7 @@ const Navigation = ({ activeTab, setActiveTab, user }) => {
 
   const menuItems = [
     { id: 'home', label: '홈', icon: '🏠' },
+    { id: 'location-services', label: '주변 서비스', icon: '📍' },
     { id: 'care-requests', label: '펫케어 요청', icon: '🐾' },
     { id: 'community', label: '커뮤니티', icon: '💬' },
     { id: 'users', label: '사용자 관리', icon: '👥' },
