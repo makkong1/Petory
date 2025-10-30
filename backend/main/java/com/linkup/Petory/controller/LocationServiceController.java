@@ -4,9 +4,17 @@ import com.linkup.Petory.dto.LocationServiceDTO;
 import com.linkup.Petory.service.LocationServiceService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.client.RestTemplate;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -18,6 +26,9 @@ import java.util.Map;
 public class LocationServiceController {
 
     private final LocationServiceService serviceService;
+
+    @Value("${kakao.rest-api-key}")
+    private String kakaoKey; // application.properties 에 저장
 
     // 모든 서비스 조회
     @GetMapping
@@ -159,6 +170,13 @@ public class LocationServiceController {
     @PostMapping
     public ResponseEntity<Map<String, Object>> createService(@RequestBody LocationServiceDTO serviceDTO) {
         try {
+            // 주소에서 위도/경도 자동 설정
+            if (serviceDTO.getAddress() != null) {
+                Map<String, Double> latLng = geocodeAddress(serviceDTO.getAddress());
+                serviceDTO.setLatitude(latLng.get("latitude"));
+                serviceDTO.setLongitude(latLng.get("longitude"));
+            }
+
             LocationServiceDTO createdService = serviceService.createService(serviceDTO);
 
             Map<String, Object> response = new HashMap<>();
@@ -210,5 +228,36 @@ public class LocationServiceController {
             response.put("error", e.getMessage());
             return ResponseEntity.badRequest().body(response);
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    // 주소 → 위도/경도 조회
+    private Map<String, Double> geocodeAddress(String address) throws Exception {
+        System.err.println("현재 address: " + address);
+        RestTemplate restTemplate = new RestTemplate();
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "KakaoAK " + kakaoKey);
+        System.err.println("현재 headers: " + headers);
+        HttpEntity<String> entity = new HttpEntity<>(headers);
+
+        String url = "https://dapi.kakao.com/v2/local/search/address.json?query="
+                + URLEncoder.encode(address, StandardCharsets.UTF_8);
+
+        ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
+        Map<String, Object> body = response.getBody();
+
+        if (body != null && body.get("documents") != null) {
+            List<Map<String, Object>> docs = (List<Map<String, Object>>) body.get("documents");
+            if (!docs.isEmpty()) {
+                Map<String, Object> first = docs.get(0);
+                double lat = Double.parseDouble((String) first.get("y"));
+                double lng = Double.parseDouble((String) first.get("x"));
+                Map<String, Double> result = new HashMap<>();
+                result.put("latitude", lat);
+                result.put("longitude", lng);
+                return result;
+            }
+        }
+        throw new Exception("주소를 찾을 수 없습니다.");
     }
 }

@@ -16,67 +16,17 @@ const LocationServiceMap = () => {
   // 서비스 데이터 로드
   useEffect(() => {
     const loadServices = async () => {
-      console.log('loadServices 시작');
       try {
         setLoading(true);
         setError(null);
-        console.log('loading 상태를 true로 설정');
-        
-        // 임시 더미 데이터 (백엔드 API가 준비될 때까지)
-        const dummyServices = [
-          {
-            idx: 1,
-            name: '강남 펫병원',
-            category: '병원',
-            address: '서울시 강남구 테헤란로 123',
-            latitude: 37.5665,
-            longitude: 126.9780,
-            rating: 4.5,
-            phoneNumber: '02-1234-5678',
-            operatingHours: '09:00-18:00',
-            description: '24시간 응급실 운영'
-          },
-          {
-            idx: 2,
-            name: '펫샵 강남점',
-            category: '용품점',
-            address: '서울시 강남구 역삼동 456',
-            latitude: 37.5666,
-            longitude: 126.9781,
-            rating: 4.2,
-            phoneNumber: '02-2345-6789',
-            operatingHours: '10:00-20:00',
-            description: '다양한 펫용품 판매'
-          },
-          {
-            idx: 3,
-            name: '펫카페 강남',
-            category: '카페',
-            address: '서울시 강남구 논현동 789',
-            latitude: 37.5667,
-            longitude: 126.9782,
-            rating: 4.8,
-            phoneNumber: '02-3456-7890',
-            operatingHours: '08:00-22:00',
-            description: '반려동물과 함께하는 카페'
-          }
-        ];
-        
-        console.log('더미 데이터 설정:', dummyServices);
-        setServices(dummyServices);
-        
-        // 실제 API 호출 (주석 처리)
-        // const response = await locationServiceApi.getAllLocationServices();
-        // setServices(response.data || []);
+        const response = await locationServiceApi.getAllServices();
+        setServices(response.data?.services || []);
       } catch (error) {
-        console.error('데이터 로딩 에러:', error);
         setError('서비스 데이터를 불러오는데 실패했습니다.');
       } finally {
-        console.log('loading 상태를 false로 설정');
         setLoading(false);
       }
     };
-
     loadServices();
   }, []);
 

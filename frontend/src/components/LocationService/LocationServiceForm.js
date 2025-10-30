@@ -36,10 +36,30 @@ export default function LocationServiceForm({ show, onClose, onSuccess }) {
 
   // 주소검색 버튼 동작
   const handleAddressSearch = () => {
-    if (!window.daum?.Postcode) { alert('주소 검색 스크립트 로드중입니다. 잠시 후 다시 시도'); return; }
+    if (!window.daum?.Postcode) { 
+      alert('주소 검색 스크립트 로드중입니다. 잠시 후 다시 시도'); 
+      return; 
+    }
+    
     new window.daum.Postcode({
-      oncomplete: function(data) {
-        setFields(f => ({ ...f, address: data.roadAddress || data.jibunAddress }));
+      oncomplete: async function(data) {
+        const address = data.roadAddress || data.jibunAddress;
+        setFields(f => ({ ...f, address }));
+
+        try {
+          // 서버 프록시 호출 (axios via api client)
+          const res = await locationServiceApi.geocode(address);
+          const doc = res?.data?.documents && res.data.documents[0];
+          if (doc) {
+            const latitude = Number(doc.y);
+            const longitude = Number(doc.x);
+            if (!Number.isNaN(latitude) && !Number.isNaN(longitude)) {
+              setFields(f => ({ ...f, latitude, longitude }));
+            }
+          }
+        } catch(e) {
+          console.error('좌표 변환 실패', e);
+        }
       }
     }).open();
   };
@@ -53,12 +73,22 @@ export default function LocationServiceForm({ show, onClose, onSuccess }) {
     setLoading(true);
     setError(null);
     try {
-      await locationServiceApi.createService({
-        ...fields,
+      const payload = {
+        name: fields.name,
+        category: fields.category,
+        address: fields.address,
+        detailAddress: fields.detailAddress || '',
         latitude: Number(fields.latitude),
         longitude: Number(fields.longitude),
-      });
-      if (onSuccess) onSuccess({ ...fields });
+        description: fields.description,
+        phone: fields.phone,
+        openingTime: fields.opening_time || null,
+        closingTime: fields.closing_time || null,
+        imageUrl: fields.image_url || '',
+        website: fields.website || '',
+      };
+      await locationServiceApi.createService(payload);
+      if (onSuccess) onSuccess({ ...payload });
     } catch (err) {
       setError('등록 실패: ' + (err?.response?.data?.error || err.message));
     }
