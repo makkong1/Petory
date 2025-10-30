@@ -14,11 +14,15 @@ public class LocationServiceDTO {
     private String name;
     private String category;
     private String address;
+    private String detailAddress;
     private Double latitude;
     private Double longitude;
     private Double rating;
-    private String phoneNumber;
-    private String operatingHours;
+    private String phone;
+    private java.time.LocalTime openingTime;
+    private java.time.LocalTime closingTime;
+    private String imageUrl;
+    private String website;
     private String description;
     private Integer reviewCount; // 리뷰 개수
     private List<LocationServiceReviewDTO> reviews;

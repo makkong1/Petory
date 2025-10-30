@@ -29,11 +29,21 @@ public class LocationService {
 
     private Double rating;
 
-    private String phoneNumber; // 전화번호
+    private String phone;
 
-    private String operatingHours; // 운영시간
+    @Column(name = "opening_time")
+    private java.time.LocalTime openingTime;
+
+    @Column(name = "closing_time")
+    private java.time.LocalTime closingTime;
+
+    private String imageUrl;
+    private String website;
 
     private String description; // 서비스 설명
+
+    @Column(name = "detail_address")
+    private String detailAddress;
 
     @OneToMany(mappedBy = "service", cascade = CascadeType.ALL)
     private List<LocationServiceReview> reviews;

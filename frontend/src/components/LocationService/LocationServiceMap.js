@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import MapContainer from './MapContainer';
 import { locationServiceApi } from '../../api/locationServiceApi';
+import LocationServiceForm from './LocationServiceForm';
 
 const LocationServiceMap = () => {
   const [services, setServices] = useState([]);
@@ -10,6 +11,7 @@ const LocationServiceMap = () => {
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedService, setSelectedService] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showForm, setShowForm] = useState(false);
 
   // 서비스 데이터 로드
   useEffect(() => {
@@ -135,6 +137,7 @@ const LocationServiceMap = () => {
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
+        <button onClick={()=>setShowForm(true)} style={{marginLeft:'1rem',padding:'0.5rem 1rem',borderRadius:'1rem',background:'#28a745',color:'#fff',fontWeight:'bold',border:'none',cursor:'pointer'}}>+ 서비스 등록</button>
       </Header>
 
       <FilterSection>
@@ -172,6 +175,7 @@ const LocationServiceMap = () => {
           </ServiceDetailPanel>
         )}
       </MapArea>
+      <LocationServiceForm show={showForm} onClose={()=>setShowForm(false)} onSuccess={()=>setShowForm(false)} />
     </Container>
   );
 };

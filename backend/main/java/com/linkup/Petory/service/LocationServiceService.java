@@ -83,11 +83,13 @@ public class LocationServiceService {
                 .name(serviceDTO.getName())
                 .category(serviceDTO.getCategory())
                 .address(serviceDTO.getAddress())
+                .detailAddress(serviceDTO.getDetailAddress())
                 .latitude(serviceDTO.getLatitude())
                 .longitude(serviceDTO.getLongitude())
                 .rating(serviceDTO.getRating())
-                .phoneNumber(serviceDTO.getPhoneNumber())
-                .operatingHours(serviceDTO.getOperatingHours())
+                .phone(serviceDTO.getPhone())
+                .openingTime(serviceDTO.getOpeningTime())
+                .closingTime(serviceDTO.getClosingTime())
                 .description(serviceDTO.getDescription())
                 .build();
 
@@ -104,10 +106,12 @@ public class LocationServiceService {
         service.setName(serviceDTO.getName());
         service.setCategory(serviceDTO.getCategory());
         service.setAddress(serviceDTO.getAddress());
+        service.setDetailAddress(serviceDTO.getDetailAddress());
         service.setLatitude(serviceDTO.getLatitude());
         service.setLongitude(serviceDTO.getLongitude());
-        service.setPhoneNumber(serviceDTO.getPhoneNumber());
-        service.setOperatingHours(serviceDTO.getOperatingHours());
+        service.setPhone(serviceDTO.getPhone());
+        service.setOpeningTime(serviceDTO.getOpeningTime());
+        service.setClosingTime(serviceDTO.getClosingTime());
         service.setDescription(serviceDTO.getDescription());
 
         LocationService savedService = serviceRepository.save(service);
@@ -134,11 +138,13 @@ public class LocationServiceService {
                 .name(service.getName())
                 .category(service.getCategory())
                 .address(service.getAddress())
+                .detailAddress(service.getDetailAddress())
                 .latitude(service.getLatitude())
                 .longitude(service.getLongitude())
                 .rating(service.getRating())
-                .phoneNumber(service.getPhoneNumber())
-                .operatingHours(service.getOperatingHours())
+                .phone(service.getPhone())
+                .openingTime(service.getOpeningTime())
+                .closingTime(service.getClosingTime())
                 .description(service.getDescription())
                 .reviewCount(service.getReviews() != null ? service.getReviews().size() : 0)
                 .reviews(reviews)
