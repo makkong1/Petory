@@ -73,7 +73,4 @@ export const locationServiceApi = {
   
   // 서비스 삭제
   deleteService: (id) => api.delete(`/${id}`),
-
-  // 주소 -> 좌표 변환 (서버 프록시)
-  geocode: (address) => api.get('/geocode', { params: { address } }),
 };

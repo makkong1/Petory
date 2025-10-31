@@ -45,20 +45,41 @@ export default function LocationServiceForm({ show, onClose, onSuccess }) {
       oncomplete: async function(data) {
         const address = data.roadAddress || data.jibunAddress;
         setFields(f => ({ ...f, address }));
-
+        
+        // 카카오 주소 -> 좌표 변환 (프론트엔드에서 직접 호출)
         try {
-          // 서버 프록시 호출 (axios via api client)
-          const res = await locationServiceApi.geocode(address);
-          const doc = res?.data?.documents && res.data.documents[0];
-          if (doc) {
-            const latitude = Number(doc.y);
-            const longitude = Number(doc.x);
-            if (!Number.isNaN(latitude) && !Number.isNaN(longitude)) {
-              setFields(f => ({ ...f, latitude, longitude }));
+          const KAKAO_REST_API_KEY = 'ㅌㅌㅌ';
+          const encodedAddress = encodeURIComponent(address);
+          const apiUrl = `https://dapi.kakao.com/v2/local/search/address.json?query=${encodedAddress}`;
+          
+          const res = await fetch(apiUrl, {
+            headers: {
+              'Authorization': `KakaoAK ${KAKAO_REST_API_KEY}`
+            }
+          });
+          
+          if (!res.ok) {
+            throw new Error(`카카오 API 호출 실패: ${res.status} ${res.statusText}`);
+          }
+          
+          const json = await res.json();
+          
+          if (json.documents && json.documents.length > 0) {
+            const doc = json.documents[0];
+            // 좌표는 최상위, road_address, address 순으로 확인
+            let latitude = doc.y || (doc.road_address && doc.road_address.y) || (doc.address && doc.address.y);
+            let longitude = doc.x || (doc.road_address && doc.road_address.x) || (doc.address && doc.address.x);
+            
+            if (latitude && longitude) {
+              const lat = parseFloat(latitude);
+              const lng = parseFloat(longitude);
+              if (!isNaN(lat) && !isNaN(lng)) {
+                setFields(f => ({ ...f, latitude: lat, longitude: lng }));
+              }
             }
           }
-        } catch(e) {
-          console.error('좌표 변환 실패', e);
+        } catch (error) {
+          // 좌표 변환 실패해도 주소는 설정됨
         }
       }
     }).open();
@@ -78,8 +99,8 @@ export default function LocationServiceForm({ show, onClose, onSuccess }) {
         category: fields.category,
         address: fields.address,
         detailAddress: fields.detailAddress || '',
-        latitude: Number(fields.latitude),
-        longitude: Number(fields.longitude),
+        latitude: fields.latitude === '' || fields.latitude == null ? null : Number(fields.latitude),
+        longitude: fields.longitude === '' || fields.longitude == null ? null : Number(fields.longitude),
         description: fields.description,
         phone: fields.phone,
         openingTime: fields.opening_time || null,

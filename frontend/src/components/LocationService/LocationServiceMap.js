@@ -115,8 +115,10 @@ const LocationServiceMap = () => {
             <ServiceTitle>{selectedService.name}</ServiceTitle>
             <ServiceInfo>
               <div>📍 {selectedService.address}</div>
-              <div>📞 {selectedService.phoneNumber || '전화번호 없음'}</div>
-              <div>🕒 {selectedService.operatingHours || '운영시간 정보 없음'}</div>
+              <div>📞 {selectedService.phone || '전화번호 없음'}</div>
+              <div> 🕒 { selectedService.openingTime && selectedService.closingTime ? 
+              `오전: ${selectedService.openingTime.substring(0,5)} 
+              ~ 오후: ${selectedService.closingTime.substring(0,5)}` : '운영시간 정보 없음'}</div>
               {selectedService.rating && <div>⭐ {selectedService.rating.toFixed(1)}</div>}
             </ServiceInfo>
             {selectedService.description && (
