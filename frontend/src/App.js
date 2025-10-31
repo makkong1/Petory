@@ -10,6 +10,7 @@ import CommunityBoard from './components/Community/CommunityBoard';
 import LocationServiceMap from './components/LocationService/LocationServiceMap';
 import LoginForm from './components/Auth/LoginForm';
 import RegisterForm from './components/Auth/RegisterForm';
+import AdminPanel from './components/Admin/AdminPanel';
 
 
 function AppContent() {
@@ -57,6 +58,8 @@ function AppContent() {
         return <CommunityBoard />;
       case 'users':
         return <UserList />;
+      case 'admin':
+        return <AdminPanel />;
       case 'home':
       default:
         return <HomePage setActiveTab={setActiveTab} />;

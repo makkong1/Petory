@@ -220,10 +220,12 @@ public class LocationServiceDataLoader implements CommandLineRunner {
 
     /**
      * 수동으로 초기 데이터를 로드하는 메서드 (관리자용)
+     * 전체 최대 50개로 제한됩니다.
      */
     @Transactional
     public void loadInitialDataManually(String region, int maxResultsPerKeyword) {
-        log.info("수동으로 LocationService 초기 데이터를 로드합니다. 지역: {}, 키워드당 최대: {}", region, maxResultsPerKeyword);
+        final int MAX_TOTAL_RESULTS = 50; // 전체 최대 50개로 제한
+        log.info("수동으로 LocationService 초기 데이터를 로드합니다. 지역: {}, 전체 최대: {}개", region, MAX_TOTAL_RESULTS);
 
         List<String> keywords = Arrays.asList(
                 "반려동물카페",
@@ -240,15 +242,30 @@ public class LocationServiceDataLoader implements CommandLineRunner {
         List<LocationService> servicesToSave = new ArrayList<>();
 
         for (String keyword : keywords) {
+            // 이미 50개를 다 모았으면 중단
+            if (servicesToSave.size() >= MAX_TOTAL_RESULTS) {
+                log.info("전체 최대 개수({}개)에 도달했습니다. 검색을 중단합니다.", MAX_TOTAL_RESULTS);
+                break;
+            }
+
             try {
+                // 남은 개수만큼만 검색 (전체 제한을 고려)
+                int remainingSlots = MAX_TOTAL_RESULTS - servicesToSave.size();
+                int searchCount = Math.min(maxResultsPerKeyword, remainingSlots);
+
                 List<KakaoPlaceDTO.Document> places = kakaoMapService.searchPlaces(
                         keyword, 
                         null, 
                         region, 
-                        maxResultsPerKeyword
+                        searchCount
                 );
 
                 for (KakaoPlaceDTO.Document place : places) {
+                    // 50개 제한 체크
+                    if (servicesToSave.size() >= MAX_TOTAL_RESULTS) {
+                        break;
+                    }
+
                     if (locationServiceRepository.findByNameAndAddress(
                             place.getPlaceName(), 
                             place.getAddressName() != null ? place.getAddressName() : place.getRoadAddressName()
@@ -267,7 +284,9 @@ public class LocationServiceDataLoader implements CommandLineRunner {
 
         if (!servicesToSave.isEmpty()) {
             locationServiceRepository.saveAll(servicesToSave);
-            log.info("총 {}개의 LocationService 데이터를 저장했습니다.", servicesToSave.size());
+            log.info("총 {}개의 LocationService 데이터를 저장했습니다. (최대 제한: {}개)", servicesToSave.size(), MAX_TOTAL_RESULTS);
+        } else {
+            log.warn("저장할 LocationService 데이터가 없습니다.");
         }
     }
 }

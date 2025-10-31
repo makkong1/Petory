@@ -1,8 +1,10 @@
 import React from 'react';
 import styled from 'styled-components';
-
+import { useAuth } from '../../contexts/AuthContext';
 
 const HomePage = ({ setActiveTab }) => {
+  const { user } = useAuth();
+  const isAdmin = user && (user.role === 'ADMIN' || user.role === 'MASTER');
   const features = [
     {
       icon: '🗺️',
@@ -77,6 +79,31 @@ const HomePage = ({ setActiveTab }) => {
           </StatItem>
         </StatsGrid>
       </StatsSection>
+
+      {isAdmin && (
+        <AdminSection>
+          <AdminHeader>
+            <AdminTitle>🔧 관리자 기능</AdminTitle>
+            <AdminSubtitle>관리자 전용 기능을 이용하실 수 있습니다.</AdminSubtitle>
+          </AdminHeader>
+          <AdminCardGrid>
+            <AdminCard onClick={() => setActiveTab('admin')}>
+              <AdminCardIcon>📥</AdminCardIcon>
+              <AdminCardTitle>초기 데이터 로딩</AdminCardTitle>
+              <AdminCardDescription>
+                카카오맵 API를 사용하여 LocationService 초기 데이터를 로드합니다.
+              </AdminCardDescription>
+            </AdminCard>
+            <AdminCard onClick={() => setActiveTab('users')}>
+              <AdminCardIcon>👥</AdminCardIcon>
+              <AdminCardTitle>사용자 관리</AdminCardTitle>
+              <AdminCardDescription>
+                등록된 사용자 목록을 조회하고 관리할 수 있습니다.
+              </AdminCardDescription>
+            </AdminCard>
+          </AdminCardGrid>
+        </AdminSection>
+      )}
     </Container>
   );
 };
@@ -207,4 +234,67 @@ const CTAButton = styled.button`
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(255, 126, 54, 0.3);
   }
+`;
+
+const AdminSection = styled.div`
+  margin-top: ${props => props.theme.spacing.xxl};
+  padding-top: ${props => props.theme.spacing.xxl};
+  border-top: 2px solid ${props => props.theme.colors.border};
+`;
+
+const AdminHeader = styled.div`
+  text-align: center;
+  margin-bottom: ${props => props.theme.spacing.xl};
+`;
+
+const AdminTitle = styled.h2`
+  color: ${props => props.theme.colors.text};
+  font-size: ${props => props.theme.typography.h2.fontSize};
+  font-weight: ${props => props.theme.typography.h2.fontWeight};
+  margin-bottom: ${props => props.theme.spacing.sm};
+`;
+
+const AdminSubtitle = styled.p`
+  color: ${props => props.theme.colors.textSecondary};
+  font-size: ${props => props.theme.typography.body1.fontSize};
+`;
+
+const AdminCardGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: ${props => props.theme.spacing.xl};
+`;
+
+const AdminCard = styled.div`
+  background: ${props => props.theme.colors.surface};
+  border: 2px solid ${props => props.theme.colors.primary};
+  border-radius: ${props => props.theme.borderRadius.xl};
+  padding: ${props => props.theme.spacing.xl};
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px ${props => props.theme.colors.shadow};
+    border-color: ${props => props.theme.colors.primaryDark};
+  }
+`;
+
+const AdminCardIcon = styled.div`
+  font-size: 48px;
+  margin-bottom: ${props => props.theme.spacing.md};
+`;
+
+const AdminCardTitle = styled.h3`
+  color: ${props => props.theme.colors.text};
+  font-size: ${props => props.theme.typography.h4.fontSize};
+  font-weight: ${props => props.theme.typography.h4.fontWeight};
+  margin-bottom: ${props => props.theme.spacing.sm};
+`;
+
+const AdminCardDescription = styled.p`
+  color: ${props => props.theme.colors.textSecondary};
+  line-height: 1.6;
+  font-size: ${props => props.theme.typography.body2.fontSize};
 `;
