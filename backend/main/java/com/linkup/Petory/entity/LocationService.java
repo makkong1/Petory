@@ -45,6 +45,13 @@ public class LocationService {
     @Column(name = "detail_address")
     private String detailAddress;
 
+    @Column(name = "pet_friendly")
+    @Builder.Default
+    private Boolean petFriendly = false;
+
+    @Column(name = "pet_policy", length = 255)
+    private String petPolicy;
+
     @OneToMany(mappedBy = "service", cascade = CascadeType.ALL)
     private List<LocationServiceReview> reviews;
 }

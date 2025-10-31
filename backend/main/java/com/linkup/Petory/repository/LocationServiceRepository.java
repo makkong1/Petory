@@ -38,4 +38,7 @@ public interface LocationServiceRepository extends JpaRepository<LocationService
 
         // 특정 평점 이상의 서비스 조회
         List<LocationService> findByRatingGreaterThanEqualOrderByRatingDesc(Double minRating);
+
+        // 이름과 주소로 중복 체크
+        List<LocationService> findByNameAndAddress(String name, String address);
 }

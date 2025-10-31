@@ -49,8 +49,6 @@ function AppContent() {
 
   const renderContent = () => {
     switch(activeTab) {
-      case 'home':
-        return <HomePage setActiveTab={setActiveTab} />;
       case 'location-services':
         return <LocationServiceMap />;
       case 'care-requests':
@@ -59,6 +57,7 @@ function AppContent() {
         return <CommunityBoard />;
       case 'users':
         return <UserList />;
+      case 'home':
       default:
         return <HomePage setActiveTab={setActiveTab} />;
     }

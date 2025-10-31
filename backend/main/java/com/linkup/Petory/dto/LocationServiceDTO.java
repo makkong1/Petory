@@ -24,6 +24,8 @@ public class LocationServiceDTO {
     private String imageUrl;
     private String website;
     private String description;
+    private Boolean petFriendly;
+    private String petPolicy;
     private Integer reviewCount; // 리뷰 개수
     private List<LocationServiceReviewDTO> reviews;
 }

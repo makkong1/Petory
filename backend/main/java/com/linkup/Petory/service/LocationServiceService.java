@@ -91,6 +91,8 @@ public class LocationServiceService {
                 .openingTime(serviceDTO.getOpeningTime())
                 .closingTime(serviceDTO.getClosingTime())
                 .description(serviceDTO.getDescription())
+                .petFriendly(serviceDTO.getPetFriendly() != null ? serviceDTO.getPetFriendly() : false)
+                .petPolicy(serviceDTO.getPetPolicy())
                 .build();
 
         LocationService savedService = serviceRepository.save(service);
@@ -113,6 +115,12 @@ public class LocationServiceService {
         service.setOpeningTime(serviceDTO.getOpeningTime());
         service.setClosingTime(serviceDTO.getClosingTime());
         service.setDescription(serviceDTO.getDescription());
+        if (serviceDTO.getPetFriendly() != null) {
+            service.setPetFriendly(serviceDTO.getPetFriendly());
+        }
+        if (serviceDTO.getPetPolicy() != null) {
+            service.setPetPolicy(serviceDTO.getPetPolicy());
+        }
 
         LocationService savedService = serviceRepository.save(service);
         return convertToDTO(savedService);
@@ -146,6 +154,8 @@ public class LocationServiceService {
                 .openingTime(service.getOpeningTime())
                 .closingTime(service.getClosingTime())
                 .description(service.getDescription())
+                .petFriendly(service.getPetFriendly())
+                .petPolicy(service.getPetPolicy())
                 .reviewCount(service.getReviews() != null ? service.getReviews().size() : 0)
                 .reviews(reviews)
                 .build();

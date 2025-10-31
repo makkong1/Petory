@@ -24,6 +24,8 @@ public class LocationServiceConverter {
                 .closingTime(service.getClosingTime())
                 .imageUrl(service.getImageUrl())
                 .website(service.getWebsite())
+                .petFriendly(service.getPetFriendly())
+                .petPolicy(service.getPetPolicy())
                 .build();
     }
     // fromDTO 메서드도 detailAddress 옮김
@@ -43,6 +45,8 @@ public class LocationServiceConverter {
                 .closingTime(dto.getClosingTime())
                 .imageUrl(dto.getImageUrl())
                 .website(dto.getWebsite())
+                .petFriendly(dto.getPetFriendly())
+                .petPolicy(dto.getPetPolicy())
                 .build();
     }
 }

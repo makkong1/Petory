@@ -5,9 +5,21 @@ import styled from 'styled-components';
 const HomePage = ({ setActiveTab }) => {
   const features = [
     {
+      icon: '🗺️',
+      title: '위치 서비스',
+      description: '주변 펫케어 서비스 위치를 지도에서 확인하고 찾아보세요.',
+      action: () => setActiveTab('location-services')
+    },
+    {
       icon: '🐾',
       title: '펫케어 서비스',
       description: '믿을 수 있는 펫시터와 매칭하여 소중한 반려동물을 안전하게 맡기세요.',
+      action: () => setActiveTab('care-requests')
+    },
+    {
+      icon: '⭐',
+      title: '리뷰 시스템',
+      description: '실제 이용 후기를 통해 믿을 수 있는 펫케어 서비스를 선택하세요.',
       action: () => setActiveTab('care-requests')
     },
     {
@@ -15,12 +27,6 @@ const HomePage = ({ setActiveTab }) => {
       title: '커뮤니티',
       description: '반려동물 키우는 이웃들과 소통하고 유용한 정보를 나누세요.',
       action: () => setActiveTab('community')
-    },
-    {
-      icon: '⭐',
-      title: '리뷰 시스템',
-      description: '실제 이용 후기를 통해 믿을 수 있는 펫케어 서비스를 선택하세요.',
-      action: () => setActiveTab('care-requests')
     }
   ];
 
