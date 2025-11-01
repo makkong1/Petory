@@ -5,7 +5,6 @@ import com.linkup.Petory.dto.LocationServiceDTO;
 import com.linkup.Petory.dto.LocationServiceReviewDTO;
 import com.linkup.Petory.entity.LocationService;
 import com.linkup.Petory.repository.LocationServiceRepository;
-import com.linkup.Petory.service.KakaoMapService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -54,9 +53,17 @@ public class LocationServiceService {
                 .collect(Collectors.toList());
     }
 
-    // 키워드로 서비스 검색
+    // 키워드로 서비스 검색 (이름 또는 설명)
     public List<LocationServiceDTO> searchServicesByKeyword(String keyword) {
         return serviceRepository.findByNameContaining(keyword)
+                .stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
+
+    // 지역(주소)으로 서비스 검색
+    public List<LocationServiceDTO> searchServicesByAddress(String address) {
+        return serviceRepository.findByAddressContaining(address)
                 .stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());

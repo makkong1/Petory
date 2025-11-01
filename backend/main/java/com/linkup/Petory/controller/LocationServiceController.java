@@ -99,7 +99,7 @@ public class LocationServiceController {
         }
     }
 
-    // 키워드로 서비스 검색
+    // 키워드로 서비스 검색 (이름 또는 설명)
     @GetMapping("/search")
     public ResponseEntity<Map<String, Object>> searchServicesByKeyword(@RequestParam String keyword) {
         try {
@@ -112,6 +112,25 @@ public class LocationServiceController {
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             log.error("서비스 검색 실패: {}", e.getMessage());
+            Map<String, Object> response = new HashMap<>();
+            response.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    // 지역(주소)으로 서비스 검색
+    @GetMapping("/search/address")
+    public ResponseEntity<Map<String, Object>> searchServicesByAddress(@RequestParam String address) {
+        try {
+            List<LocationServiceDTO> services = serviceService.searchServicesByAddress(address);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("services", services);
+            response.put("count", services.size());
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("지역 검색 실패: {}", e.getMessage());
             Map<String, Object> response = new HashMap<>();
             response.put("error", e.getMessage());
             return ResponseEntity.badRequest().body(response);

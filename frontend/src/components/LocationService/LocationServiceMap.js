@@ -2,16 +2,42 @@ import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import MapContainer from './MapContainer';
 import { locationServiceApi } from '../../api/locationServiceApi';
+import { geocodingApi } from '../../api/geocodingApi';
+import { useAuth } from '../../contexts/AuthContext';
 import LocationServiceForm from './LocationServiceForm';
 
 const LocationServiceMap = () => {
+  const { user } = useAuth();
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedService, setSelectedService] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [locationSearch, setLocationSearch] = useState('');
+  const [userLocation, setUserLocation] = useState(null); // 사용자 위치 {lat, lng}
   const [showForm, setShowForm] = useState(false);
+  const [searchMode, setSearchMode] = useState('service'); // 'service' 또는 'location'
+
+  // 사용자 위치 로드
+  useEffect(() => {
+    const loadUserLocation = async () => {
+      if (user && user.location) {
+        try {
+          const response = await geocodingApi.addressToCoordinates(user.location);
+          if (response.success && response.latitude && response.longitude) {
+            setUserLocation({
+              lat: response.latitude,
+              lng: response.longitude
+            });
+          }
+        } catch (error) {
+          console.error('사용자 위치 변환 실패:', error);
+        }
+      }
+    };
+    loadUserLocation();
+  }, [user]);
 
   // 서비스 데이터 로드
   useEffect(() => {
@@ -30,13 +56,76 @@ const LocationServiceMap = () => {
     loadServices();
   }, []);
 
-  // 필터링된 서비스 목록
+  // 지역 검색 처리
+  const handleLocationSearch = async () => {
+    if (!locationSearch.trim()) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await locationServiceApi.searchServicesByAddress(locationSearch);
+      setServices(response.data?.services || []);
+      setSearchMode('location');
+    } catch (error) {
+      setError('지역 검색에 실패했습니다: ' + (error.response?.data?.error || error.message));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 서비스 이름 검색 처리
+  const handleServiceSearch = async () => {
+    if (!searchTerm.trim()) {
+      // 검색어가 없으면 전체 목록 다시 로드
+      try {
+        setLoading(true);
+        const response = await locationServiceApi.getAllServices();
+        setServices(response.data?.services || []);
+        setSearchMode('service');
+      } catch (error) {
+        setError('서비스 데이터를 불러오는데 실패했습니다.');
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await locationServiceApi.searchServicesByKeyword(searchTerm);
+      setServices(response.data?.services || []);
+      setSearchMode('service');
+    } catch (error) {
+      setError('서비스 검색에 실패했습니다: ' + (error.response?.data?.error || error.message));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 전체 목록 다시 로드
+  const handleResetSearch = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      setSearchTerm('');
+      setLocationSearch('');
+      const response = await locationServiceApi.getAllServices();
+      setServices(response.data?.services || []);
+      setSearchMode('service');
+    } catch (error) {
+      setError('서비스 데이터를 불러오는데 실패했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 필터링된 서비스 목록 (카테고리 필터만 적용)
   const filteredServices = services.filter(service => {
     const matchesCategory = !selectedCategory || service.category === selectedCategory;
-    const matchesSearch = !searchTerm || 
-      service.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      service.address.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesCategory && matchesSearch;
+    return matchesCategory;
   });
 
   const handleServiceClick = (service) => {
@@ -81,12 +170,48 @@ const LocationServiceMap = () => {
     <Container>
       <Header>
         <Title>지역 서비스 정보</Title>
-        <SearchBox
-          type="text"
-          placeholder="서비스 검색..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
+        <SearchSection>
+          <SearchTabs>
+            <SearchTab 
+              active={searchMode === 'service'} 
+              onClick={() => setSearchMode('service')}
+            >
+              서비스 검색
+            </SearchTab>
+            <SearchTab 
+              active={searchMode === 'location'} 
+              onClick={() => setSearchMode('location')}
+            >
+              지역 검색
+            </SearchTab>
+          </SearchTabs>
+          {searchMode === 'service' ? (
+            <LocationSearchBox>
+              <SearchBox
+                type="text"
+                placeholder="서비스 이름으로 검색..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleServiceSearch()}
+              />
+              <SearchButton onClick={handleServiceSearch}>검색</SearchButton>
+            </LocationSearchBox>
+          ) : (
+            <LocationSearchBox>
+              <SearchBox
+                type="text"
+                placeholder="지역명으로 검색 (예: 서울시 강남구)"
+                value={locationSearch}
+                onChange={(e) => setLocationSearch(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleLocationSearch()}
+              />
+              <SearchButton onClick={handleLocationSearch}>검색</SearchButton>
+            </LocationSearchBox>
+          )}
+          {(searchTerm || locationSearch) && (
+            <ResetButton onClick={handleResetSearch}>전체보기</ResetButton>
+          )}
+        </SearchSection>
         <button onClick={()=>setShowForm(true)} style={{marginLeft:'1rem',padding:'0.5rem 1rem',borderRadius:'1rem',background:'#28a745',color:'#fff',fontWeight:'bold',border:'none',cursor:'pointer'}}>+ 서비스 등록</button>
       </Header>
 
@@ -107,6 +232,7 @@ const LocationServiceMap = () => {
           services={filteredServices}
           selectedCategory={selectedCategory}
           onServiceClick={handleServiceClick}
+          userLocation={userLocation}
         />
         
         {selectedService && (
@@ -150,12 +276,46 @@ const Header = styled.div`
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
+  flex-wrap: wrap;
 `;
 
 const Title = styled.h1`
   margin: 0;
   color: #333;
   font-size: 1.5rem;
+`;
+
+const SearchSection = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+`;
+
+const SearchTabs = styled.div`
+  display: flex;
+  gap: 0.25rem;
+  border: 1px solid #ddd;
+  border-radius: 20px;
+  padding: 0.25rem;
+  background: #f8f9fa;
+`;
+
+const SearchTab = styled.button.withConfig({
+  shouldForwardProp: (prop) => prop !== 'active',
+})`
+  padding: 0.4rem 0.8rem;
+  border: none;
+  border-radius: 16px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  background: ${props => props.active ? '#007bff' : 'transparent'};
+  color: ${props => props.active ? 'white' : '#666'};
+  transition: all 0.2s;
+  
+  &:hover {
+    background: ${props => props.active ? '#0056b3' : '#e9ecef'};
+  }
 `;
 
 const SearchBox = styled.input`
@@ -168,6 +328,42 @@ const SearchBox = styled.input`
   &:focus {
     outline: none;
     border-color: #007bff;
+  }
+`;
+
+const LocationSearchBox = styled.div`
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+`;
+
+const SearchButton = styled.button`
+  padding: 0.5rem 1rem;
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.2s;
+  
+  &:hover {
+    background: #0056b3;
+  }
+`;
+
+const ResetButton = styled.button`
+  padding: 0.5rem 1rem;
+  background: #6c757d;
+  color: white;
+  border: none;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.2s;
+  
+  &:hover {
+    background: #5a6268;
   }
 `;
 

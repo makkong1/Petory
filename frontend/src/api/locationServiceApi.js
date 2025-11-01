@@ -56,8 +56,11 @@ export const locationServiceApi = {
   getServicesByLocation: (minLat, maxLat, minLng, maxLng) => 
     api.get('/location', { params: { minLat, maxLat, minLng, maxLng } }),
   
-  // 키워드로 서비스 검색
+  // 키워드로 서비스 검색 (이름 또는 설명)
   searchServicesByKeyword: (keyword) => api.get('/search', { params: { keyword } }),
+  
+  // 지역(주소)으로 서비스 검색
+  searchServicesByAddress: (address) => api.get('/search/address', { params: { address } }),
   
   // 평점순 서비스 조회
   getTopRatedServices: () => api.get('/top-rated'),
