@@ -30,8 +30,12 @@ api.interceptors.request.use(
 
 export const adminApi = {
   // 초기 데이터 로딩
-  loadInitialData: async (region = '서울특별시', maxResults = 50) => {
-    const response = await api.post(`/location-services/load-data?region=${region}&maxResults=${maxResults}`);
+  loadInitialData: async (region = '서울특별시', maxResultsPerKeyword = 10, customKeywords = null) => {
+    let url = `/location-services/load-data?region=${encodeURIComponent(region)}&maxResultsPerKeyword=${maxResultsPerKeyword}`;
+    if (customKeywords) {
+      url += `&customKeywords=${encodeURIComponent(customKeywords)}`;
+    }
+    const response = await api.post(url);
     return response.data;
   },
 };

@@ -4,7 +4,8 @@ import { adminApi } from '../../api/adminApi';
 
 const AdminPanel = () => {
   const [region, setRegion] = useState('서울특별시');
-  const [maxResults, setMaxResults] = useState(50);
+  const [maxResults, setMaxResults] = useState(10);
+  const [customKeywords, setCustomKeywords] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
@@ -21,7 +22,10 @@ const AdminPanel = () => {
   ];
 
   const handleLoadData = async () => {
-    if (!window.confirm(`정말로 ${region} 지역의 초기 데이터를 로드하시겠습니까?\n키워드당 최대 ${maxResults}개의 장소가 로드됩니다.`)) {
+    const keywordCount = customKeywords.trim() ? customKeywords.split(',').filter(k => k.trim()).length : 13; // 기본 키워드 13개
+    const estimatedTotal = keywordCount * maxResults;
+    
+    if (!window.confirm(`정말로 ${region} 지역의 초기 데이터를 로드하시겠습니까?\n키워드당 최대 ${maxResults}개씩 검색합니다.\n(전체 최대 50개로 제한됩니다)`)) {
       return;
     }
 
@@ -30,7 +34,7 @@ const AdminPanel = () => {
     setError(null);
 
     try {
-      const response = await adminApi.loadInitialData(region, maxResults);
+      const response = await adminApi.loadInitialData(region, maxResults, customKeywords.trim() || null);
       setMessage(response.message || '초기 데이터 로딩이 완료되었습니다.');
     } catch (err) {
       setError(err.response?.data?.error || err.message || '데이터 로딩에 실패했습니다.');
@@ -63,16 +67,28 @@ const AdminPanel = () => {
           </FormGroup>
 
           <FormGroup>
+            <Label>검색 키워드 (선택사항)</Label>
+            <Input
+              type="text"
+              placeholder="반려동물카페, 펫호텔, 강아지동반가능 (쉼표로 구분)"
+              value={customKeywords}
+              onChange={(e) => setCustomKeywords(e.target.value)}
+              disabled={loading}
+            />
+            <HelperText>입력하지 않으면 기본 키워드를 사용합니다. 쉼표로 여러 키워드를 입력하세요.</HelperText>
+          </FormGroup>
+
+          <FormGroup>
             <Label>키워드당 최대 검색 결과 수</Label>
             <Input
               type="number"
               min="1"
-              max="100"
+              max="50"
               value={maxResults}
-              onChange={(e) => setMaxResults(parseInt(e.target.value) || 50)}
+              onChange={(e) => setMaxResults(parseInt(e.target.value) || 10)}
               disabled={loading}
             />
-            <HelperText>각 키워드(반려동물카페, 펫호텔 등)당 검색할 최대 장소 수입니다. (전체는 최대 50개로 제한됩니다)</HelperText>
+            <HelperText>각 키워드당 검색할 최대 장소 수입니다. 여러 키워드를 사용하면 합쳐서 더 많이 저장될 수 있습니다. (전체는 최대 50개로 제한됩니다)</HelperText>
           </FormGroup>
 
           <ButtonGroup>

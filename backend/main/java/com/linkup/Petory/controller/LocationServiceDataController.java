@@ -23,19 +23,31 @@ public class LocationServiceDataController {
 
     /**
      * 특정 지역의 초기 데이터를 수동으로 로드
-     * 예: POST /api/admin/location-services/load-data?region=서울특별시&maxResults=50
+     * 예: POST /api/admin/location-services/load-data
+     * Body: { "region": "서울특별시", "maxResultsPerKeyword": 10, "customKeywords": ["키워드1", "키워드2"] }
      */
     @PostMapping("/load-data")
     public ResponseEntity<Map<String, Object>> loadInitialData(
             @RequestParam(required = false, defaultValue = "서울특별시") String region,
-            @RequestParam(required = false, defaultValue = "50") int maxResults) {
+            @RequestParam(required = false, defaultValue = "10") int maxResultsPerKeyword,
+            @RequestParam(required = false) String customKeywords) {
         try {
-            dataLoader.loadInitialDataManually(region, maxResults);
+            // 커스텀 키워드가 있으면 파싱, 없으면 null
+            java.util.List<String> keywords = null;
+            if (customKeywords != null && !customKeywords.trim().isEmpty()) {
+                keywords = java.util.Arrays.asList(customKeywords.split(","));
+                keywords = keywords.stream()
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .collect(java.util.stream.Collectors.toList());
+            }
+            
+            dataLoader.loadInitialDataManually(region, maxResultsPerKeyword, keywords);
             
             Map<String, Object> response = new HashMap<>();
             response.put("message", "초기 데이터 로딩이 완료되었습니다.");
             response.put("region", region);
-            response.put("maxResultsPerKeyword", maxResults);
+            response.put("maxResultsPerKeyword", maxResultsPerKeyword);
             
             return ResponseEntity.ok(response);
         } catch (Exception e) {

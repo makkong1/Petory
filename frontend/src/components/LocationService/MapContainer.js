@@ -7,6 +7,8 @@ const MapContainer = ({ services = [], onServiceClick, selectedCategory = null }
   const markersRef = useRef([]);
   const infoWindowsRef = useRef([]);
   const [mapLoaded, setMapLoaded] = useState(false);
+  const isInitialBoundsSetRef = useRef(false);
+  const prevSelectedCategoryRef = useRef(null);
 
   console.log('MapContainer 렌더링, services:', services);
 
@@ -130,6 +132,8 @@ const MapContainer = ({ services = [], onServiceClick, selectedCategory = null }
       window.kakao.maps.event.addListener(marker, 'click', () => {
         infoWindowsRef.current.forEach(iw => iw.close());
         infoWindow.open(mapInstanceRef.current, marker);
+        // 마커 클릭 시 해당 위치로 부드럽게 이동 (확대는 하지 않음)
+        mapInstanceRef.current.panTo(position);
         if (onServiceClick) {
           onServiceClick(service);
         }
@@ -140,17 +144,24 @@ const MapContainer = ({ services = [], onServiceClick, selectedCategory = null }
       bounds.extend(position);
     });
 
-    if (markersRef.current.length > 0) {
+    // 처음 한 번만 bounds 설정 (리로딩 방지)
+    if (markersRef.current.length > 0 && !isInitialBoundsSetRef.current) {
       mapInstanceRef.current.setBounds(bounds);
+      isInitialBoundsSetRef.current = true;
     }
   };
 
-  // 서비스 변경 시 마커 업데이트
+  // 서비스 변경 시 마커 업데이트 (필터 변경 시에만 bounds 재설정)
   useEffect(() => {
-    if (mapInstanceRef.current) {
+    if (mapInstanceRef.current && mapLoaded) {
+      // 필터가 변경된 경우에만 bounds 재설정
+      if (prevSelectedCategoryRef.current !== selectedCategory) {
+        isInitialBoundsSetRef.current = false;
+        prevSelectedCategoryRef.current = selectedCategory;
+      }
       updateMarkers();
     }
-  }, [services, selectedCategory]);
+  }, [services, selectedCategory, mapLoaded]);
 
   return (
     <MapDiv ref={mapRef}>

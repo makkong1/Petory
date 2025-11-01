@@ -215,21 +215,22 @@ const UserCard = styled.div`
 
 const UserInfo = styled.div`
   margin-bottom: 15px;
+  color: ${props => props.theme.colors.text};
 `;
 
 const UserName = styled.h3`
-  color: #333;
+  color: ${props => props.theme.colors.text};
   margin: 0 0 8px 0;
   font-size: 20px;
 `;
 
 const UserDetail = styled.p`
-  color: #666;
+  color: ${props => props.theme.colors.text};
   margin: 4px 0;
   font-size: 14px;
   
   strong {
-    color: #333;
+    color: ${props => props.theme.colors.text};
   }
 `;
 

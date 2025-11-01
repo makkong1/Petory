@@ -223,21 +223,34 @@ public class LocationServiceDataLoader implements CommandLineRunner {
      * 전체 최대 50개로 제한됩니다.
      */
     @Transactional
-    public void loadInitialDataManually(String region, int maxResultsPerKeyword) {
+    public void loadInitialDataManually(String region, int maxResultsPerKeyword, List<String> customKeywords) {
         final int MAX_TOTAL_RESULTS = 50; // 전체 최대 50개로 제한
-        log.info("수동으로 LocationService 초기 데이터를 로드합니다. 지역: {}, 전체 최대: {}개", region, MAX_TOTAL_RESULTS);
+        log.info("수동으로 LocationService 초기 데이터를 로드합니다. 지역: {}, 키워드당 최대: {}개, 전체 최대: {}개", 
+                 region, maxResultsPerKeyword, MAX_TOTAL_RESULTS);
 
-        List<String> keywords = Arrays.asList(
-                "반려동물카페",
-                "펫카페",
-                "강아지카페",
-                "고양이카페",
-                "펫호텔",
-                "동물병원",
-                "펫샵",
-                "반려동물용품",
-                "애견미용"
-        );
+        // 커스텀 키워드가 있으면 사용, 없으면 기본 키워드 사용
+        List<String> keywords;
+        if (customKeywords != null && !customKeywords.isEmpty()) {
+            keywords = customKeywords;
+            log.info("커스텀 키워드 사용: {}", keywords);
+        } else {
+            keywords = Arrays.asList(
+                    "반려동물카페",
+                    "펫카페",
+                    "강아지카페",
+                    "고양이카페",
+                    "펫호텔",
+                    "동물병원",
+                    "펫샵",
+                    "반려동물용품",
+                    "애견미용",
+                    "강아지동반가능",
+                    "애완동물동반가능",
+                    "펫동반가능",
+                    "반려동물동반가능"
+            );
+            log.info("기본 키워드 사용: {}", keywords);
+        }
 
         List<LocationService> servicesToSave = new ArrayList<>();
 
