@@ -3,6 +3,7 @@ package com.linkup.Petory.controller;
 import java.util.List;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import com.linkup.Petory.dto.BoardDTO;
@@ -31,21 +32,24 @@ public class BoardController {
         return ResponseEntity.ok(boardService.getBoard(id));
     }
 
-    // 게시글 생성
+    // 게시글 생성 (로그인 필요)
     @PostMapping
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<BoardDTO> createBoard(@RequestBody BoardDTO dto) {
         System.out.println("=== 게시글 생성: " + dto.getTitle() + " ===");
         return ResponseEntity.ok(boardService.createBoard(dto));
     }
 
-    // 게시글 수정
+    // 게시글 수정 (로그인 필요)
     @PutMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<BoardDTO> updateBoard(@PathVariable Long id, @RequestBody BoardDTO dto) {
         return ResponseEntity.ok(boardService.updateBoard(id, dto));
     }
 
-    // 게시글 삭제
+    // 게시글 삭제 (로그인 필요)
     @DeleteMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Void> deleteBoard(@PathVariable Long id) {
         boardService.deleteBoard(id);
         return ResponseEntity.noContent().build();

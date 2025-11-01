@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-
+import { usePermission } from '../../hooks/usePermission';
+import { useAuth } from '../../contexts/AuthContext';
 
 const CommunityBoard = () => {
+  const { requireLogin } = usePermission();
+  const { redirectToLogin } = useAuth();
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState('ALL');
@@ -84,6 +87,54 @@ const CommunityBoard = () => {
     return date.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' });
   };
 
+  // 게시글 작성 버튼 클릭 핸들러
+  const handleWriteClick = () => {
+    const { isLoggedIn, requiresRedirect } = requireLogin();
+    if (requiresRedirect) {
+      redirectToLogin();
+      return;
+    }
+    // TODO: 게시글 작성 모달/페이지로 이동
+    alert('게시글 작성 기능은 준비 중입니다.');
+  };
+
+  // 댓글 작성 핸들러
+  const handleCommentClick = (postIdx) => {
+    const { isLoggedIn, requiresRedirect } = requireLogin();
+    if (requiresRedirect) {
+      redirectToLogin();
+      return;
+    }
+    // TODO: 댓글 작성 모달 열기
+    alert('댓글 작성 기능은 준비 중입니다.');
+  };
+
+  // 게시글 신고 핸들러
+  const handlePostReport = (postIdx) => {
+    const { isLoggedIn, requiresRedirect } = requireLogin();
+    if (requiresRedirect) {
+      redirectToLogin();
+      return;
+    }
+    // TODO: 신고 기능 구현
+    if (window.confirm('이 게시글을 신고하시겠습니까?')) {
+      alert('신고 기능은 준비 중입니다.');
+    }
+  };
+
+  // 댓글 신고 핸들러
+  const handleCommentReport = (commentIdx) => {
+    const { isLoggedIn, requiresRedirect } = requireLogin();
+    if (requiresRedirect) {
+      redirectToLogin();
+      return;
+    }
+    // TODO: 신고 기능 구현
+    if (window.confirm('이 댓글을 신고하시겠습니까?')) {
+      alert('신고 기능은 준비 중입니다.');
+    }
+  };
+
   if (loading) {
     return <LoadingMessage>커뮤니티 게시글을 불러오는 중...</LoadingMessage>;
   }
@@ -92,7 +143,7 @@ const CommunityBoard = () => {
     <Container>
       <Header>
         <Title>💬 커뮤니티</Title>
-        <WriteButton>
+        <WriteButton onClick={handleWriteClick}>
           <span>✏️</span>
           글쓰기
         </WriteButton>
@@ -133,11 +184,18 @@ const CommunityBoard = () => {
                   </div>
                 </div>
               </AuthorInfo>
-              <PostStats>
-                <span>💬 {post.comments}</span>
-                <span>❤️ {post.likes}</span>
-                <span>{formatDate(post.createdAt)}</span>
-              </PostStats>
+              <PostActions>
+                <PostStats>
+                  <CommentButton onClick={() => handleCommentClick(post.idx)}>
+                    💬 {post.comments}
+                  </CommentButton>
+                  <span>❤️ {post.likes}</span>
+                  <span>{formatDate(post.createdAt)}</span>
+                </PostStats>
+                <ReportButton onClick={() => handlePostReport(post.idx)}>
+                  🚨
+                </ReportButton>
+              </PostActions>
             </PostFooter>
           </PostCard>
         ))}
@@ -310,11 +368,47 @@ const AuthorName = styled.span`
   font-weight: 500;
 `;
 
+const PostActions = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${props => props.theme.spacing.md};
+`;
+
 const PostStats = styled.div`
   display: flex;
   gap: ${props => props.theme.spacing.md};
   color: ${props => props.theme.colors.textLight};
   font-size: ${props => props.theme.typography.caption.fontSize};
+`;
+
+const CommentButton = styled.button`
+  background: none;
+  border: none;
+  color: ${props => props.theme.colors.textLight};
+  font-size: ${props => props.theme.typography.caption.fontSize};
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.2s ease;
+  
+  &:hover {
+    color: ${props => props.theme.colors.primary};
+  }
+`;
+
+const ReportButton = styled.button`
+  background: none;
+  border: none;
+  color: ${props => props.theme.colors.textLight};
+  font-size: ${props => props.theme.typography.caption.fontSize};
+  cursor: pointer;
+  padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.sm};
+  border-radius: ${props => props.theme.borderRadius.sm};
+  transition: all 0.2s ease;
+  
+  &:hover {
+    color: ${props => props.theme.colors.error || '#dc3545'};
+    background: ${props => props.theme.colors.surfaceHover || 'rgba(220, 53, 69, 0.1)'};
+  }
 `;
 
 const LoadingMessage = styled.div`

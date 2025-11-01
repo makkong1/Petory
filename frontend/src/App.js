@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styled, { createGlobalStyle } from 'styled-components';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -11,12 +11,52 @@ import LocationServiceMap from './components/LocationService/LocationServiceMap'
 import LoginForm from './components/Auth/LoginForm';
 import RegisterForm from './components/Auth/RegisterForm';
 import AdminPanel from './components/Admin/AdminPanel';
+import PermissionDeniedModal from './components/Common/PermissionDeniedModal';
+import { setupApiInterceptors } from './api/authApi';
 
 
 function AppContent() {
   const { user, loading, isAuthenticated } = useAuth();
   const [activeTab, setActiveTab] = useState('home');
   const [authMode, setAuthMode] = useState('login'); // 'login' or 'register'
+  const [redirectToLogin, setRedirectToLogin] = useState(false);
+  const [showGlobalPermissionModal, setShowGlobalPermissionModal] = useState(false);
+
+  // 로그인 페이지로 리다이렉트
+  useEffect(() => {
+    if (redirectToLogin && !isAuthenticated) {
+      setAuthMode('login');
+      setRedirectToLogin(false);
+    }
+  }, [redirectToLogin, isAuthenticated]);
+
+  // 전역 리다이렉트 함수 (window 객체에 등록)
+  useEffect(() => {
+    window.redirectToLogin = () => {
+      setRedirectToLogin(true);
+    };
+    return () => {
+      delete window.redirectToLogin;
+    };
+  }, []);
+
+  // 전역 권한 모달 이벤트 리스너
+  useEffect(() => {
+    const handleShowPermissionModal = () => {
+      setShowGlobalPermissionModal(true);
+    };
+
+    window.addEventListener('showPermissionModal', handleShowPermissionModal);
+    
+    return () => {
+      window.removeEventListener('showPermissionModal', handleShowPermissionModal);
+    };
+  }, []);
+
+  // API 인터셉터 설정 (앱 시작 시 한 번만)
+  useEffect(() => {
+    setupApiInterceptors();
+  }, []);
 
   // 로딩 중일 때
   if (loading) {
@@ -68,6 +108,10 @@ function AppContent() {
 
   return (
     <>
+      <PermissionDeniedModal 
+        isOpen={showGlobalPermissionModal}
+        onClose={() => setShowGlobalPermissionModal(false)}
+      />
       <Navigation 
         activeTab={activeTab} 
         setActiveTab={setActiveTab} 

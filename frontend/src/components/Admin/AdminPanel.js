@@ -1,14 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { adminApi } from '../../api/adminApi';
+import { usePermission } from '../../hooks/usePermission';
+import PermissionDeniedModal from '../Common/PermissionDeniedModal';
 
 const AdminPanel = () => {
+  const { requireAdmin } = usePermission();
   const [region, setRegion] = useState('서울특별시');
   const [maxResults, setMaxResults] = useState(10);
   const [customKeywords, setCustomKeywords] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
+  const [showPermissionModal, setShowPermissionModal] = useState(false);
+
+  // 권한 확인
+  useEffect(() => {
+    const { isAdmin, requiresModal } = requireAdmin();
+    if (requiresModal) {
+      setShowPermissionModal(true);
+    }
+  }, [requireAdmin]);
 
   const regions = [
     '서울특별시',
@@ -43,12 +55,33 @@ const AdminPanel = () => {
     }
   };
 
+  const { isAdmin } = requireAdmin();
+  
+  // 권한이 없으면 모달만 표시하고 내용은 숨김
+  if (!isAdmin) {
+    return (
+      <>
+        <PermissionDeniedModal 
+          isOpen={showPermissionModal}
+          onClose={() => setShowPermissionModal(false)}
+        />
+        <Container>
+          <Header>
+            <Title>🔧 관리자 패널</Title>
+            <Subtitle>접근 권한이 없습니다.</Subtitle>
+          </Header>
+        </Container>
+      </>
+    );
+  }
+
   return (
-    <Container>
-      <Header>
-        <Title>🔧 관리자 패널</Title>
-        <Subtitle>LocationService 초기 데이터 로딩</Subtitle>
-      </Header>
+    <>
+      <Container>
+        <Header>
+          <Title>🔧 관리자 패널</Title>
+          <Subtitle>LocationService 초기 데이터 로딩</Subtitle>
+        </Header>
 
       <Card>
         <SectionTitle>초기 데이터 로딩 설정</SectionTitle>
@@ -126,6 +159,7 @@ const AdminPanel = () => {
         </InfoList>
       </InfoCard>
     </Container>
+    </>
   );
 };
 

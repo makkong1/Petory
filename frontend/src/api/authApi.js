@@ -129,7 +129,15 @@ export const setupApiInterceptors = () => {
     (error) => {
       if (error.response?.status === 401) {
         removeToken();
-        window.location.href = '/login';
+        // App.js에서 처리하는 리다이렉트 함수 호출
+        if (typeof window !== 'undefined' && window.redirectToLogin) {
+          window.redirectToLogin();
+        }
+      } else if (error.response?.status === 403) {
+        // 403 에러 시 권한 모달 표시 이벤트 발생
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('showPermissionModal'));
+        }
       }
       return Promise.reject(error);
     }

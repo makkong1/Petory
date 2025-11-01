@@ -66,6 +66,13 @@ export const AuthProvider = ({ children }) => {
     setIsAuthenticated(false);
   };
 
+  // 로그인 페이지로 리다이렉트하는 함수
+  const redirectToLogin = () => {
+    if (typeof window !== 'undefined' && window.redirectToLogin) {
+      window.redirectToLogin();
+    }
+  };
+
   const value = {
     user,
     loading,
@@ -73,6 +80,7 @@ export const AuthProvider = ({ children }) => {
     login,
     register,
     logout,
+    redirectToLogin,
   };
 
   return (
