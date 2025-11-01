@@ -15,9 +15,6 @@ const MapContainer = ({ services = [], onServiceClick, selectedCategory = null }
   // 카카오맵 초기화 - useLayoutEffect 사용
   useLayoutEffect(() => {
     const initMap = () => {
-      console.log('카카오맵 초기화 시도...');
-      console.log('window.kakao:', window.kakao);
-      console.log('mapRef.current:', mapRef.current);
       
       if (window.kakao && window.kakao.maps && mapRef.current) {
         console.log('카카오맵 API 로드됨, 지도 초기화 시작');
@@ -42,8 +39,6 @@ const MapContainer = ({ services = [], onServiceClick, selectedCategory = null }
   }, []);
 
   const initializeMap = () => {
-    console.log('initializeMap 호출됨');
-    console.log('mapRef.current 재확인:', mapRef.current);
     
     if (!mapRef.current) {
       console.log('mapRef.current가 없음, 100ms 후 재시도');
@@ -77,8 +72,6 @@ const MapContainer = ({ services = [], onServiceClick, selectedCategory = null }
   const updateMarkers = () => {
     if (!mapInstanceRef.current) return;
 
-    console.log('updateMarkers 호출됨, services:', services);
-
     // 기존 마커와 인포윈도우 제거
     markersRef.current.forEach(marker => marker.setMap(null));
     infoWindowsRef.current.forEach(infoWindow => infoWindow.close());
@@ -90,7 +83,6 @@ const MapContainer = ({ services = [], onServiceClick, selectedCategory = null }
       return;
     }
 
-    console.log('마커 생성 시작, 서비스 개수:', services.length);
 
     const bounds = new window.kakao.maps.LatLngBounds();
 

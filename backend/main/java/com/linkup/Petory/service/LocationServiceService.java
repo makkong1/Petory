@@ -5,6 +5,7 @@ import com.linkup.Petory.dto.LocationServiceDTO;
 import com.linkup.Petory.dto.LocationServiceReviewDTO;
 import com.linkup.Petory.entity.LocationService;
 import com.linkup.Petory.repository.LocationServiceRepository;
+import com.linkup.Petory.service.KakaoMapService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,7 @@ public class LocationServiceService {
 
     private final LocationServiceRepository serviceRepository;
     private final LocationServiceReviewConverter reviewConverter;
+    private final KakaoMapService kakaoMapService;
 
     // 모든 서비스 조회
     public List<LocationServiceDTO> getAllServices() {
@@ -79,13 +81,58 @@ public class LocationServiceService {
     // 서비스 생성
     @Transactional
     public LocationServiceDTO createService(LocationServiceDTO serviceDTO) {
+        // 중복 체크: 같은 주소가 이미 등록되어 있는지 확인
+        if (serviceDTO.getAddress() != null && !serviceDTO.getAddress().trim().isEmpty()) {
+            String address = serviceDTO.getAddress().trim();
+            String detailAddress = serviceDTO.getDetailAddress() != null ? serviceDTO.getDetailAddress().trim() : "";
+
+            List<LocationService> existingServices;
+
+            // 상세주소가 있으면 주소+상세주소로 체크, 없으면 주소만으로 체크
+            if (!detailAddress.isEmpty()) {
+                existingServices = serviceRepository.findByAddressAndDetailAddress(address, detailAddress);
+            } else {
+                // 주소만 같은 것 중에서 상세주소도 비어있는 것 찾기
+                List<LocationService> byAddress = serviceRepository.findByAddress(address);
+                existingServices = byAddress.stream()
+                        .filter(ls -> ls.getDetailAddress() == null || ls.getDetailAddress().trim().isEmpty())
+                        .collect(Collectors.toList());
+            }
+
+            if (!existingServices.isEmpty()) {
+                String errorMessage = String.format("이미 등록된 주소입니다: %s", address);
+                if (!detailAddress.isEmpty()) {
+                    errorMessage += " " + detailAddress;
+                }
+                log.warn("서비스 등록 실패 - 중복 주소: {}", errorMessage);
+                throw new RuntimeException(errorMessage);
+            }
+        }
+
+        // 위도/경도가 없고 주소가 있으면 자동으로 변환
+        Double latitude = serviceDTO.getLatitude();
+        Double longitude = serviceDTO.getLongitude();
+
+        if ((latitude == null || longitude == null) && serviceDTO.getAddress() != null
+                && !serviceDTO.getAddress().trim().isEmpty()) {
+            log.info("주소를 위도/경도로 변환합니다: {}", serviceDTO.getAddress());
+            Double[] coordinates = kakaoMapService.addressToCoordinates(serviceDTO.getAddress());
+            if (coordinates != null && coordinates.length == 2) {
+                latitude = coordinates[0];
+                longitude = coordinates[1];
+                log.info("변환 성공: 위도={}, 경도={}", latitude, longitude);
+            } else {
+                log.warn("주소를 위도/경도로 변환하지 못했습니다: {}", serviceDTO.getAddress());
+            }
+        }
+
         LocationService service = LocationService.builder()
                 .name(serviceDTO.getName())
                 .category(serviceDTO.getCategory())
                 .address(serviceDTO.getAddress())
                 .detailAddress(serviceDTO.getDetailAddress())
-                .latitude(serviceDTO.getLatitude())
-                .longitude(serviceDTO.getLongitude())
+                .latitude(latitude)
+                .longitude(longitude)
                 .rating(serviceDTO.getRating())
                 .phone(serviceDTO.getPhone())
                 .openingTime(serviceDTO.getOpeningTime())
@@ -109,8 +156,6 @@ public class LocationServiceService {
         service.setCategory(serviceDTO.getCategory());
         service.setAddress(serviceDTO.getAddress());
         service.setDetailAddress(serviceDTO.getDetailAddress());
-        service.setLatitude(serviceDTO.getLatitude());
-        service.setLongitude(serviceDTO.getLongitude());
         service.setPhone(serviceDTO.getPhone());
         service.setOpeningTime(serviceDTO.getOpeningTime());
         service.setClosingTime(serviceDTO.getClosingTime());
@@ -121,6 +166,27 @@ public class LocationServiceService {
         if (serviceDTO.getPetPolicy() != null) {
             service.setPetPolicy(serviceDTO.getPetPolicy());
         }
+
+        // 위도/경도 설정 (주소 변경 시 자동 변환)
+        Double latitude = serviceDTO.getLatitude();
+        Double longitude = serviceDTO.getLongitude();
+
+        // 주소가 변경되었거나 위도/경도가 없으면 자동 변환
+        if ((latitude == null || longitude == null) && serviceDTO.getAddress() != null
+                && !serviceDTO.getAddress().trim().isEmpty()) {
+            if (!serviceDTO.getAddress().equals(service.getAddress()) || latitude == null || longitude == null) {
+                log.info("수정 시 주소를 위도/경도로 변환합니다: {}", serviceDTO.getAddress());
+                Double[] coordinates = kakaoMapService.addressToCoordinates(serviceDTO.getAddress());
+                if (coordinates != null && coordinates.length == 2) {
+                    latitude = coordinates[0];
+                    longitude = coordinates[1];
+                    log.info("변환 성공: 위도={}, 경도={}", latitude, longitude);
+                }
+            }
+        }
+
+        service.setLatitude(latitude);
+        service.setLongitude(longitude);
 
         LocationService savedService = serviceRepository.save(service);
         return convertToDTO(savedService);

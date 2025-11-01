@@ -1,5 +1,6 @@
 package com.linkup.Petory.service;
 
+import com.linkup.Petory.dto.KakaoAddressDTO;
 import com.linkup.Petory.dto.KakaoPlaceDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,6 +32,7 @@ public class KakaoMapService {
     private String kakaoRestApiKey;
 
     private static final String KAKAO_LOCAL_SEARCH_URL = "https://dapi.kakao.com/v2/local/search/keyword.json";
+    private static final String KAKAO_ADDRESS_SEARCH_URL = "https://dapi.kakao.com/v2/local/search/address.json";
 
     /**
      * 키워드로 장소를 검색합니다.
@@ -119,5 +121,77 @@ public class KakaoMapService {
         }
 
         return allPlaces;
+    }
+
+    /**
+     * 주소를 위도/경도로 변환 (Geocoding)
+     * 
+     * @param address 변환할 주소
+     * @return 위도, 경도 정보가 담긴 배열 [latitude, longitude], 변환 실패 시 null
+     */
+    public Double[] addressToCoordinates(String address) {
+        if (address == null || address.trim().isEmpty()) {
+            return null;
+        }
+
+        try {
+            URI uri = UriComponentsBuilder.fromUriString(KAKAO_ADDRESS_SEARCH_URL)
+                    .queryParam("query", address)
+                    .build()
+                    .encode(StandardCharsets.UTF_8)
+                    .toUri();
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("Authorization", "KakaoAK " + kakaoRestApiKey);
+
+            HttpEntity<String> entity = new HttpEntity<>(headers);
+            ResponseEntity<KakaoAddressDTO> response = restTemplate.exchange(
+                    uri,
+                    HttpMethod.GET,
+                    entity,
+                    KakaoAddressDTO.class);
+
+            KakaoAddressDTO responseBody = response.getBody();
+            if (responseBody == null || responseBody.getDocuments() == null || responseBody.getDocuments().isEmpty()) {
+                log.warn("주소 검색 결과가 없습니다: {}", address);
+                return null;
+            }
+
+            KakaoAddressDTO.Document doc = responseBody.getDocuments().get(0);
+
+            // 좌표는 최상위, road_address, address 순으로 확인
+            String latitudeStr = doc.getY();
+            String longitudeStr = doc.getX();
+
+            if (latitudeStr == null || longitudeStr == null) {
+                if (doc.getRoadAddress() != null) {
+                    latitudeStr = doc.getRoadAddress().getY();
+                    longitudeStr = doc.getRoadAddress().getX();
+                } else if (doc.getAddress() != null) {
+                    latitudeStr = doc.getAddress().getY();
+                    longitudeStr = doc.getAddress().getX();
+                }
+            }
+
+            if (latitudeStr != null && longitudeStr != null) {
+                try {
+                    Double latitude = Double.parseDouble(latitudeStr);
+                    Double longitude = Double.parseDouble(longitudeStr);
+                    log.info("주소 '{}' 변환 성공: ({}, {})", address, latitude, longitude);
+                    return new Double[] { latitude, longitude };
+                } catch (NumberFormatException e) {
+                    log.error("좌표 파싱 실패: latitude={}, longitude={}", latitudeStr, longitudeStr);
+                    return null;
+                }
+            }
+
+            return null;
+        } catch (org.springframework.web.client.HttpClientErrorException e) {
+            log.error("주소 검색 API 호출 중 HTTP 오류 발생: {} - {}", e.getStatusCode(), e.getResponseBodyAsString());
+            return null;
+        } catch (Exception e) {
+            log.error("주소를 좌표로 변환 중 오류 발생: {}", e.getMessage());
+            return null;
+        }
     }
 }
