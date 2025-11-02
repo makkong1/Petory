@@ -56,25 +56,39 @@ public class AuthService {
      */
     @Transactional
     public TokenResponse refreshAccessToken(String refreshToken) {
+        log.info("🔄 Access Token 재발급 요청 시작");
+        
         // Refresh Token 유효성 검증
         if (!jwtUtil.validateToken(refreshToken)) {
+            log.warn("❌ Refresh Token 유효성 검증 실패");
             throw new RuntimeException("유효하지 않은 Refresh Token");
         }
 
         // DB에서 Refresh Token 확인
         Users user = usersRepository.findByRefreshToken(refreshToken)
-                .orElseThrow(() -> new RuntimeException("Refresh Token을 찾을 수 없습니다"));
+                .orElseThrow(() -> {
+                    log.warn("❌ Refresh Token을 DB에서 찾을 수 없음");
+                    return new RuntimeException("Refresh Token을 찾을 수 없습니다");
+                });
 
         // 만료 시간 확인
         if (user.getRefreshExpiration() == null || 
             user.getRefreshExpiration().isBefore(LocalDateTime.now())) {
+            log.warn("❌ Refresh Token 만료됨: userId={}, 만료시간={}", 
+                    user.getId(), user.getRefreshExpiration());
+            // 만료된 Refresh Token 삭제
+            user.setRefreshToken(null);
+            user.setRefreshExpiration(null);
+            usersRepository.save(user);
+            log.info("🗑️ 만료된 Refresh Token 삭제 완료: userId={}", user.getId());
             throw new RuntimeException("Refresh Token이 만료되었습니다");
         }
 
         // 새로운 Access Token 생성
         String newAccessToken = jwtUtil.createAccessToken(user.getId());
-
-        log.info("Access Token 갱신 성공: {}", user.getId());
+        
+        log.info("✅ Access Token 재발급 성공: userId={}, 발급시간={}", 
+                user.getId(), LocalDateTime.now());
 
         UsersDTO userDTO = usersService.getUserById(user.getId());
 

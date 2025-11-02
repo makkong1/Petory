@@ -339,12 +339,20 @@ export const setupApiInterceptors = () => {
         }
 
         try {
+          console.log('🔄 Access Token 재발급 시도 중...');
+          
           // Refresh Token으로 Access Token 갱신
           const response = await axios.post('http://localhost:8080/api/auth/refresh', {
             refreshToken: refreshToken
           });
 
           const { accessToken, refreshToken: newRefreshToken } = response.data;
+          
+          console.log('✅ Access Token 재발급 성공:', {
+            timestamp: new Date().toISOString(),
+            hasNewAccessToken: !!accessToken,
+            hasNewRefreshToken: !!newRefreshToken
+          });
 
           // 새 토큰 저장
           setToken(accessToken);
@@ -363,10 +371,17 @@ export const setupApiInterceptors = () => {
           return axios(originalRequest);
         } catch (refreshError) {
           // Refresh Token도 만료되었거나 유효하지 않은 경우
+          console.error('❌ Access Token 재발급 실패:', {
+            error: refreshError.response?.data?.error || refreshError.message,
+            timestamp: new Date().toISOString()
+          });
+          
           removeAllTokens();
           processQueueGlobal(refreshError);
           isRefreshingGlobal = false;
+          
           if (typeof window !== 'undefined' && window.redirectToLogin) {
+            console.log('🔐 Refresh Token 만료로 인한 로그인 페이지 리다이렉트');
             window.redirectToLogin();
           }
           return Promise.reject(refreshError);
