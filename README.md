@@ -37,5 +37,4 @@
 - Spring Boot 3.X
 - MySQL 8.0
 - Redis
-- RabbitMQ
 - React 기타 등등
