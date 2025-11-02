@@ -10,7 +10,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -64,8 +67,35 @@ public class LocationServiceService {
 
     // 지역(주소)으로 서비스 검색
     public List<LocationServiceDTO> searchServicesByAddress(String address) {
-        return serviceRepository.findByAddressContaining(address)
-                .stream()
+        // 원본 주소로 검색
+        List<LocationService> results = serviceRepository.findByAddressContaining(address);
+        
+        // 검색어 정규화하여 추가 검색: "서울시" -> "서울", "경기도" -> "경기" 등
+        String normalizedAddress = address
+                .replace("시", "")
+                .replace("도", "")
+                .replace("특별시", "")
+                .replace("광역시", "")
+                .trim();
+        
+        // 정규화된 주소로도 검색 (중복 제거)
+        if (!normalizedAddress.equals(address) && !normalizedAddress.isEmpty()) {
+            List<LocationService> normalizedResults = serviceRepository.findByAddressContaining(normalizedAddress);
+            // 중복 제거를 위해 idx 기준으로 Map 사용
+            Map<Long, LocationService> uniqueResults = new HashMap<>();
+            results.forEach(service -> uniqueResults.put(service.getIdx(), service));
+            normalizedResults.forEach(service -> uniqueResults.put(service.getIdx(), service));
+            results = new ArrayList<>(uniqueResults.values());
+        }
+        
+        // 평점순 정렬
+        return results.stream()
+                .sorted((a, b) -> {
+                    if (a.getRating() == null && b.getRating() == null) return 0;
+                    if (a.getRating() == null) return 1;
+                    if (b.getRating() == null) return -1;
+                    return b.getRating().compareTo(a.getRating());
+                })
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }

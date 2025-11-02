@@ -65,18 +65,18 @@ const MapContainer = ({ services = [], onServiceClick, selectedCategory = null }
 
       const infoWindow = new window.kakao.maps.InfoWindow({
         content: `
-          <div style="padding: 10px; min-width: 200px;">
-            <h3 style="margin: 0 0 5px 0; font-size: 14px; font-weight: bold;">
+          <div style="padding: 10px; min-width: 200px; background: white !important; color: #000000 !important; color-scheme: light !important;">
+            <h3 style="margin: 0 0 5px 0; font-size: 14px; font-weight: bold; color: #000000 !important;">
               ${service.name}
             </h3>
-            <p style="margin: 5px 0; font-size: 12px; color: #666;">
+            <p style="margin: 5px 0; font-size: 12px; color: #333333 !important;">
               ${service.category || '카테고리 없음'}
             </p>
-            <p style="margin: 5px 0; font-size: 12px; color: #666;">
+            <p style="margin: 5px 0; font-size: 12px; color: #333333 !important;">
               ${service.address || '주소 없음'}
             </p>
             ${service.rating ? `
-              <p style="margin: 5px 0; font-size: 12px;">
+              <p style="margin: 5px 0; font-size: 12px; color: #000000 !important;">
                 ⭐ ${service.rating.toFixed(1)}
               </p>
             ` : ''}

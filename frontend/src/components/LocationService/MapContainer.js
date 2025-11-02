@@ -1,7 +1,7 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
 import styled from 'styled-components';
 
-const MapContainer = ({ services = [], onServiceClick, selectedCategory = null, userLocation = null }) => {
+const MapContainer = React.memo(React.forwardRef(({ services = [], onServiceClick, selectedCategory = null, userLocation = null, shouldFocusOnResults = false, onFocusComplete }, ref) => {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersRef = useRef([]);
@@ -9,8 +9,7 @@ const MapContainer = ({ services = [], onServiceClick, selectedCategory = null, 
   const [mapLoaded, setMapLoaded] = useState(false);
   const isInitialBoundsSetRef = useRef(false);
   const prevSelectedCategoryRef = useRef(null);
-
-  console.log('MapContainer 렌더링, services:', services);
+  const prevServicesLengthRef = useRef(0);
 
   // 카카오맵 초기화 - useLayoutEffect 사용
   useLayoutEffect(() => {
@@ -91,7 +90,7 @@ const MapContainer = ({ services = [], onServiceClick, selectedCategory = null, 
     }
   };
 
-  const updateMarkers = (shouldSetBounds = false) => {
+  const updateMarkers = useCallback((shouldSetBounds = false) => {
     if (!mapInstanceRef.current) return;
 
     // 기존 마커와 인포윈도우 제거
@@ -118,7 +117,42 @@ const MapContainer = ({ services = [], onServiceClick, selectedCategory = null, 
     // 서비스 마커 추가
     if (services && services.length > 0) {
       services.forEach((service) => {
-        if (selectedCategory && service.category !== selectedCategory) return;
+        // 카테고리 필터링
+        if (selectedCategory) {
+          let matchesCategory = service.category === selectedCategory;
+          
+          // 특수 케이스: "샵" 선택 시 "기타" 카테고리이면서 description에 "용품" 포함된 경우도 포함
+          if (!matchesCategory && selectedCategory === '샵') {
+            const description = service.description || '';
+            const categoryName = service.category || '';
+            if (categoryName === '기타' && (
+              description.includes('용품') || 
+              description.includes('반려동물용품') ||
+              description.includes('펫샵')
+            )) {
+              matchesCategory = true;
+            }
+          }
+          
+          // 특수 케이스: "유치원" 선택 시 "기타" 카테고리이면서 description에 "유치원" 포함된 경우도 포함
+          if (!matchesCategory && selectedCategory === '유치원') {
+            const description = service.description || '';
+            const categoryName = service.category || '';
+            if (categoryName === '기타' && (
+              description.includes('유치원') || 
+              description.includes('애견유치원') ||
+              description.includes('펫유치원') ||
+              description.includes('반려동물유치원') ||
+              description.includes('강아지유치원') ||
+              description.includes('견주유치원')
+            )) {
+              matchesCategory = true;
+            }
+          }
+          
+          if (!matchesCategory) return;
+        }
+        
         if (!service.latitude || !service.longitude) return;
 
         const position = new window.kakao.maps.LatLng(
@@ -133,18 +167,18 @@ const MapContainer = ({ services = [], onServiceClick, selectedCategory = null, 
 
         const infoWindow = new window.kakao.maps.InfoWindow({
           content: `
-            <div style="padding: 10px; min-width: 200px;">
-              <h3 style="margin: 0 0 5px 0; font-size: 14px; font-weight: bold;">
+            <div style="padding: 10px; min-width: 200px; background: white !important; color: #000000 !important; color-scheme: light !important;">
+              <h3 style="margin: 0 0 5px 0; font-size: 14px; font-weight: bold; color: #000000 !important;">
                 ${service.name}
               </h3>
-              <p style="margin: 5px 0; font-size: 12px; color: #666;">
+              <p style="margin: 5px 0; font-size: 12px; color: #333333 !important;">
                 ${service.category || '카테고리 없음'}
               </p>
-              <p style="margin: 5px 0; font-size: 12px; color: #666;">
+              <p style="margin: 5px 0; font-size: 12px; color: #333333 !important;">
                 ${service.address || '주소 없음'}
               </p>
               ${service.rating ? `
-                <p style="margin: 5px 0; font-size: 12px;">
+                <p style="margin: 5px 0; font-size: 12px; color: #000000 !important;">
                   ⭐ ${service.rating.toFixed(1)}
                 </p>
               ` : ''}
@@ -270,7 +304,7 @@ const MapContainer = ({ services = [], onServiceClick, selectedCategory = null, 
         // 사용자 위치가 없으면 bounds를 설정하지 않음 (사용자 위치 로드를 기다림)
         console.log('사용자 위치 없음 - bounds 설정 건너뜀');
       }
-  };
+  }, [userLocation, services, selectedCategory]);
 
   // 사용자 위치 변경 시 마커 및 bounds 업데이트
   useEffect(() => {
@@ -284,21 +318,57 @@ const MapContainer = ({ services = [], onServiceClick, selectedCategory = null, 
         }
       }
     }
-  }, [userLocation, mapLoaded]);
+  }, [userLocation, mapLoaded, updateMarkers]);
 
   // 서비스 변경 시 마커 업데이트 (필터 변경 시에는 bounds 재설정하지 않음)
   useEffect(() => {
     if (mapInstanceRef.current && mapLoaded) {
-      // 필터가 변경된 경우 마커만 업데이트 (bounds는 사용자 위치 기준으로 유지)
-      const categoryChanged = prevSelectedCategoryRef.current !== selectedCategory;
-      if (categoryChanged) {
+      // services 배열의 실제 변경 여부 확인 (참조 비교 + 길이 비교)
+      const servicesChanged = prevServicesLengthRef.current !== services.length || 
+        prevSelectedCategoryRef.current !== selectedCategory;
+      
+      if (servicesChanged) {
+        prevServicesLengthRef.current = services.length;
         prevSelectedCategoryRef.current = selectedCategory;
+        
+        // 마커 업데이트 먼저 수행
+        const shouldSetBounds = false; // 마커만 업데이트
+        updateMarkers(shouldSetBounds);
+        
+        // 검색 결과 포커스가 필요한 경우 bounds 설정
+        if (shouldFocusOnResults && services.length > 0) {
+          setTimeout(() => {
+            const bounds = new window.kakao.maps.LatLngBounds();
+            
+            // 검색 결과의 모든 마커를 bounds에 포함
+            services.forEach((service) => {
+              if (service.latitude && service.longitude) {
+                bounds.extend(new window.kakao.maps.LatLng(service.latitude, service.longitude));
+              }
+            });
+            
+            if (bounds && markersRef.current.length > 0) {
+              try {
+                mapInstanceRef.current.setBounds(bounds);
+                // 포커스 완료 알림
+                if (onFocusComplete) {
+                  setTimeout(() => onFocusComplete(), 100);
+                }
+              } catch (e) {
+                console.error('검색 결과 포커스 실패:', e);
+                if (onFocusComplete) {
+                  onFocusComplete();
+                }
+              }
+            } else if (onFocusComplete) {
+              onFocusComplete();
+            }
+          }, 200); // 마커 렌더링 대기
+        }
       }
-      // 사용자 위치가 있을 때만 bounds 재설정 (필터 변경 시에는 재설정하지 않음)
-      const shouldSetBounds = false; // 필터 변경 시에는 bounds 재설정 안 함
-      updateMarkers(shouldSetBounds);
     }
-  }, [services, selectedCategory, mapLoaded]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [services.length, selectedCategory, mapLoaded, shouldFocusOnResults]); // services.length만 비교하여 불필요한 실행 방지
 
   return (
     <MapDiv ref={mapRef}>
@@ -309,7 +379,25 @@ const MapContainer = ({ services = [], onServiceClick, selectedCategory = null, 
       )}
     </MapDiv>
   );
-};
+}), (prevProps, nextProps) => {
+  // 커스텀 비교 함수 - props가 실제로 변경되었을 때만 리렌더링
+  // services 배열 길이와 선택된 카테고리만 비교
+  if (prevProps.services?.length !== nextProps.services?.length) return false;
+  if (prevProps.selectedCategory !== nextProps.selectedCategory) return false;
+  if (prevProps.shouldFocusOnResults !== nextProps.shouldFocusOnResults) return false;
+  
+  // userLocation 객체 비교
+  if (prevProps.userLocation !== nextProps.userLocation) {
+    if (!prevProps.userLocation || !nextProps.userLocation) return false;
+    if (prevProps.userLocation.lat !== nextProps.userLocation.lat) return false;
+    if (prevProps.userLocation.lng !== nextProps.userLocation.lng) return false;
+  }
+  
+  // onServiceClick 함수는 보통 변경되지 않으므로 비교 제외
+  return true; // props가 같으면 리렌더링 방지
+});
+
+MapContainer.displayName = 'MapContainer';
 
 export default MapContainer;
 

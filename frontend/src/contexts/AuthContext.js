@@ -18,75 +18,128 @@ export const AuthProvider = ({ children }) => {
 
   // 앱 시작 시 토큰 검증
   useEffect(() => {
+    let isMounted = true; // 컴포넌트 언마운트 체크
+
     const checkAuth = async () => {
-      const token = authApi.getToken();
-      const refreshToken = authApi.getRefreshToken();
-      
-      // Access Token이 없고 Refresh Token이 있으면 갱신 시도
-      if (!token && refreshToken) {
-        try {
-          const response = await authApi.refreshAccessToken();
-          if (response.accessToken) {
-            setUser(response.user);
-            setIsAuthenticated(true);
-            setLoading(false);
+      try {
+        const token = authApi.getToken();
+        const refreshToken = authApi.getRefreshToken();
+        
+        // Access Token이 없고 Refresh Token이 있으면 갱신 시도
+        if (!token && refreshToken) {
+          try {
+            const response = await authApi.refreshAccessToken();
+            if (isMounted && response.accessToken) {
+              setUser(response.user);
+              setIsAuthenticated(true);
+              setLoading(false);
+              return;
+            }
+          } catch (error) {
+            console.error('Refresh Token 갱신 실패:', error);
+            if (isMounted) {
+              authApi.removeAllTokens();
+              setLoading(false);
+            }
             return;
           }
-        } catch (error) {
-          console.error('Refresh Token 갱신 실패:', error);
-          authApi.removeAllTokens();
-        }
-      } else if (token) {
-        // Access Token이 있으면 검증
-        try {
-          const response = await authApi.validateToken();
-          if (response.valid) {
-            setUser(response.user);
-            setIsAuthenticated(true);
-          } else {
-            // Access Token이 유효하지 않으면 Refresh Token으로 갱신 시도
-            if (refreshToken) {
-              try {
-                const refreshResponse = await authApi.refreshAccessToken();
-                if (refreshResponse.accessToken) {
-                  setUser(refreshResponse.user);
-                  setIsAuthenticated(true);
-                  setLoading(false);
-                  return;
-                }
-              } catch (refreshError) {
-                console.error('Refresh Token 갱신 실패:', refreshError);
-                authApi.removeAllTokens();
-              }
-            } else {
-              authApi.removeAllTokens();
-            }
-          }
-        } catch (error) {
-          console.error('토큰 검증 실패:', error);
-          // Refresh Token으로 갱신 시도
-          if (refreshToken) {
-            try {
-              const refreshResponse = await authApi.refreshAccessToken();
-              if (refreshResponse.accessToken) {
-                setUser(refreshResponse.user);
+        } else if (token) {
+          // Access Token이 있으면 검증
+          try {
+            const response = await authApi.validateToken();
+            if (isMounted) {
+              if (response.valid) {
+                setUser(response.user);
                 setIsAuthenticated(true);
                 setLoading(false);
                 return;
+              } else {
+                // Access Token이 유효하지 않으면 Refresh Token으로 갱신 시도
+                if (refreshToken) {
+                  try {
+                    const refreshResponse = await authApi.refreshAccessToken();
+                    if (isMounted && refreshResponse.accessToken) {
+                      setUser(refreshResponse.user);
+                      setIsAuthenticated(true);
+                      setLoading(false);
+                      return;
+                    }
+                  } catch (refreshError) {
+                    console.error('Refresh Token 갱신 실패:', refreshError);
+                    if (isMounted) {
+                      authApi.removeAllTokens();
+                      setLoading(false);
+                    }
+                    return;
+                  }
+                } else {
+                  if (isMounted) {
+                    authApi.removeAllTokens();
+                    setLoading(false);
+                  }
+                  return;
+                }
               }
-            } catch (refreshError) {
-              console.error('Refresh Token 갱신 실패:', refreshError);
-              authApi.removeAllTokens();
             }
-          } else {
-            authApi.removeAllTokens();
+          } catch (error) {
+            console.error('토큰 검증 실패:', error);
+            // 네트워크 에러나 서버 에러인 경우에는 Refresh Token으로 갱신 시도하지 않음
+            // (이미 인터셉터에서 처리됨)
+            if (isMounted) {
+              // 401 에러가 아닌 경우에만 처리
+              if (error.response?.status !== 401) {
+                if (refreshToken) {
+                  try {
+                    const refreshResponse = await authApi.refreshAccessToken();
+                    if (isMounted && refreshResponse.accessToken) {
+                      setUser(refreshResponse.user);
+                      setIsAuthenticated(true);
+                      setLoading(false);
+                      return;
+                    }
+                  } catch (refreshError) {
+                    console.error('Refresh Token 갱신 실패:', refreshError);
+                    if (isMounted) {
+                      authApi.removeAllTokens();
+                      setLoading(false);
+                    }
+                    return;
+                  }
+                } else {
+                  if (isMounted) {
+                    authApi.removeAllTokens();
+                    setLoading(false);
+                  }
+                  return;
+                }
+              } else {
+                // 401 에러는 인터셉터에서 처리되므로 그냥 로딩 종료
+                authApi.removeAllTokens();
+                setLoading(false);
+                return;
+              }
+            }
+          }
+        } else {
+          // 토큰이 아예 없는 경우
+          if (isMounted) {
+            setLoading(false);
           }
         }
+      } catch (error) {
+        console.error('인증 확인 중 오류:', error);
+        if (isMounted) {
+          authApi.removeAllTokens();
+          setLoading(false);
+        }
       }
-      setLoading(false);
     };
 
     checkAuth();
+
+    return () => {
+      isMounted = false; // 컴포넌트 언마운트 시 플래그 설정
+    };
   }, []);
 
   const login = async (username, password) => {

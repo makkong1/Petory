@@ -11,15 +11,21 @@ const api = axios.create({
 
 // Access Token 관리
 const getToken = () => {
-  return localStorage.getItem('accessToken');
+  // 기존 'token' 키도 확인 (하위 호환성)
+  return localStorage.getItem('accessToken') || localStorage.getItem('token');
 };
 
 const setToken = (token) => {
   localStorage.setItem('accessToken', token);
+  // 기존 'token' 키도 제거 (마이그레이션)
+  if (localStorage.getItem('token')) {
+    localStorage.removeItem('token');
+  }
 };
 
 const removeToken = () => {
   localStorage.removeItem('accessToken');
+  localStorage.removeItem('token'); // 기존 키도 제거
 };
 
 // Refresh Token 관리
@@ -251,6 +257,7 @@ export const authApi = {
 // 다른 API들도 토큰을 자동으로 포함하도록 설정
 let isRefreshingGlobal = false;
 let failedQueueGlobal = [];
+let interceptorsSetup = false; // 중복 설정 방지
 
 const processQueueGlobal = (error, token = null) => {
   failedQueueGlobal.forEach(prom => {
@@ -264,6 +271,12 @@ const processQueueGlobal = (error, token = null) => {
 };
 
 export const setupApiInterceptors = () => {
+  // 이미 설정되었으면 중복 설정 방지
+  if (interceptorsSetup) {
+    return;
+  }
+  interceptorsSetup = true;
+
   // 모든 axios 인스턴스에 토큰 인터셉터 적용
   axios.interceptors.request.use(
     (config) => {

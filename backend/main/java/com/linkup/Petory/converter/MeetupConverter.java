@@ -3,7 +3,6 @@ package com.linkup.Petory.converter;
 import com.linkup.Petory.dto.MeetupDTO;
 import com.linkup.Petory.dto.MeetupParticipantsDTO;
 import com.linkup.Petory.entity.Meetup;
-import com.linkup.Petory.entity.MeetupParticipants;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 

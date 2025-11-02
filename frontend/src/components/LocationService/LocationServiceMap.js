@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import styled from 'styled-components';
 import MapContainer from './MapContainer';
 import { locationServiceApi } from '../../api/locationServiceApi';
@@ -18,6 +18,8 @@ const LocationServiceMap = () => {
   const [userLocation, setUserLocation] = useState(null); // 사용자 위치 {lat, lng}
   const [showForm, setShowForm] = useState(false);
   const [searchMode, setSearchMode] = useState('service'); // 'service' 또는 'location'
+  const [shouldFocusOnResults, setShouldFocusOnResults] = useState(false);
+  const mapContainerRef = useRef(null);
 
   // 사용자 위치 로드
   useEffect(() => {
@@ -33,10 +35,13 @@ const LocationServiceMap = () => {
           }
         } catch (error) {
           console.error('사용자 위치 변환 실패:', error);
+          // 401 에러는 인터셉터에서 처리되므로 여기서는 조용히 실패
         }
       }
     };
-    loadUserLocation();
+    if (user) {
+      loadUserLocation();
+    }
   }, [user]);
 
   // 서비스 데이터 로드
@@ -48,7 +53,11 @@ const LocationServiceMap = () => {
         const response = await locationServiceApi.getAllServices();
         setServices(response.data?.services || []);
       } catch (error) {
-        setError('서비스 데이터를 불러오는데 실패했습니다.');
+        console.error('서비스 데이터 로드 실패:', error);
+        // 401 에러는 인터셉터에서 처리되므로 여기서는 에러만 표시
+        if (error.response?.status !== 401) {
+          setError('서비스 데이터를 불러오는데 실패했습니다: ' + (error.response?.data?.error || error.message));
+        }
       } finally {
         setLoading(false);
       }
@@ -66,8 +75,14 @@ const LocationServiceMap = () => {
       setLoading(true);
       setError(null);
       const response = await locationServiceApi.searchServicesByAddress(locationSearch);
-      setServices(response.data?.services || []);
+      const searchResults = response.data?.services || [];
+      setServices(searchResults);
       setSearchMode('location');
+      
+      // 검색 결과가 있으면 지도에 포커스
+      if (searchResults.length > 0) {
+        setShouldFocusOnResults(true);
+      }
     } catch (error) {
       setError('지역 검색에 실패했습니다: ' + (error.response?.data?.error || error.message));
     } finally {
@@ -84,6 +99,7 @@ const LocationServiceMap = () => {
         const response = await locationServiceApi.getAllServices();
         setServices(response.data?.services || []);
         setSearchMode('service');
+        setShouldFocusOnResults(false);
       } catch (error) {
         setError('서비스 데이터를 불러오는데 실패했습니다.');
       } finally {
@@ -96,8 +112,14 @@ const LocationServiceMap = () => {
       setLoading(true);
       setError(null);
       const response = await locationServiceApi.searchServicesByKeyword(searchTerm);
-      setServices(response.data?.services || []);
+      const searchResults = response.data?.services || [];
+      setServices(searchResults);
       setSearchMode('service');
+      
+      // 검색 결과가 있으면 지도에 포커스
+      if (searchResults.length > 0) {
+        setShouldFocusOnResults(true);
+      }
     } catch (error) {
       setError('서비스 검색에 실패했습니다: ' + (error.response?.data?.error || error.message));
     } finally {
@@ -122,11 +144,58 @@ const LocationServiceMap = () => {
     }
   };
 
-  // 필터링된 서비스 목록 (카테고리 필터만 적용)
-  const filteredServices = services.filter(service => {
-    const matchesCategory = !selectedCategory || service.category === selectedCategory;
-    return matchesCategory;
-  });
+  // 필터링된 서비스 목록 (카테고리 필터만 적용) - useMemo로 메모이제이션
+  const filteredServices = useMemo(() => {
+    const filtered = services.filter(service => {
+      if (!selectedCategory) return true;
+      
+      // 기본 카테고리 매칭
+      if (service.category === selectedCategory) return true;
+      
+      // 특수 케이스: "샵" 선택 시 "기타" 카테고리이면서 description에 "용품" 포함된 경우도 포함
+      if (selectedCategory === '샵') {
+        const description = service.description || '';
+        const categoryName = service.category || '';
+        if (categoryName === '기타' && (
+          description.includes('용품') || 
+          description.includes('반려동물용품') ||
+          description.includes('펫샵')
+        )) {
+          return true;
+        }
+      }
+      
+      // 특수 케이스: "유치원" 선택 시 "기타" 카테고리이면서 description에 "유치원" 포함된 경우도 포함
+      if (selectedCategory === '유치원') {
+        const description = service.description || '';
+        const categoryName = service.category || '';
+        if (categoryName === '기타' && (
+          description.includes('유치원') || 
+          description.includes('애견유치원') ||
+          description.includes('펫유치원') ||
+          description.includes('반려동물유치원') ||
+          description.includes('강아지유치원') ||
+          description.includes('견주유치원')
+        )) {
+          return true;
+        }
+      }
+      
+      return false;
+    });
+    
+    // 디버깅: 선택된 카테고리와 실제 서비스 카테고리 확인
+    if (selectedCategory) {
+      console.log('카테고리 필터링:', {
+        selectedCategory,
+        totalServices: services.length,
+        filteredCount: filtered.length,
+        categoriesInData: [...new Set(services.map(s => s.category))]
+      });
+    }
+    
+    return filtered;
+  }, [services, selectedCategory]);
 
   const handleServiceClick = (service) => {
     setSelectedService(service);
@@ -135,17 +204,14 @@ const LocationServiceMap = () => {
   const categories = [
     { value: '', label: '전체' },
     { value: '병원', label: '🏥 병원' },
-    { value: '용품점', label: '🛒 용품점' },
+    { value: '샵', label: '🛒 반려동물용품' },
     { value: '유치원', label: '🏫 유치원' },
     { value: '카페', label: '☕ 카페' },
     { value: '호텔', label: '🏨 호텔' },
-    { value: '미용실', label: '✂️ 미용실' },
+    { value: '미용', label: '✂️ 미용실' },
   ];
 
-  console.log('LocationServiceMap 렌더링, loading:', loading, 'services:', services);
-
   if (loading) {
-    console.log('loading이 true이므로 로딩 화면 표시');
     return (
       <Container>
         <LoadingMessage>
@@ -229,10 +295,13 @@ const LocationServiceMap = () => {
 
       <MapArea>
         <MapContainer
+          ref={mapContainerRef}
           services={filteredServices}
           selectedCategory={selectedCategory}
           onServiceClick={handleServiceClick}
           userLocation={userLocation}
+          shouldFocusOnResults={shouldFocusOnResults}
+          onFocusComplete={() => setShouldFocusOnResults(false)}
         />
         
         {selectedService && (
@@ -240,12 +309,37 @@ const LocationServiceMap = () => {
             <CloseButton onClick={() => setSelectedService(null)}>✕</CloseButton>
             <ServiceTitle>{selectedService.name}</ServiceTitle>
             <ServiceInfo>
-              <div>📍 {selectedService.address}</div>
+              <div>
+                <strong>📍 주소</strong>
+                <div style={{ marginTop: '0.25rem', marginLeft: '0.5rem' }}>
+                  {selectedService.address || '주소 정보 없음'}
+                  {selectedService.detailAddress && (
+                    <div style={{ marginTop: '0.25rem', fontSize: '0.85rem', color: '#666' }}>
+                      {selectedService.detailAddress}
+                    </div>
+                  )}
+                </div>
+              </div>
+              {selectedService.imageUrl && (
+                <div style={{ marginTop: '0.5rem' }}>
+                  <img 
+                    src={selectedService.imageUrl} 
+                    alt={selectedService.name}
+                    style={{ width: '100%', maxHeight: '200px', objectFit: 'cover', borderRadius: '8px' }}
+                    onError={(e) => { e.target.style.display = 'none'; }}
+                  />
+                </div>
+              )}
               <div>📞 {selectedService.phone || '전화번호 없음'}</div>
-              <div> 🕒 { selectedService.openingTime && selectedService.closingTime ? 
-              `오전: ${selectedService.openingTime.substring(0,5)} 
-              ~ 오후: ${selectedService.closingTime.substring(0,5)}` : '운영시간 정보 없음'}</div>
+              <div>🕒 {selectedService.openingTime && selectedService.closingTime ? 
+                `오전: ${selectedService.openingTime.substring(0,5)} 
+                ~ 오후: ${selectedService.closingTime.substring(0,5)}` : '운영시간 정보 없음'}</div>
               {selectedService.rating && <div>⭐ {selectedService.rating.toFixed(1)}</div>}
+              {selectedService.category && (
+                <div style={{ fontSize: '0.85rem', color: '#666', marginTop: '0.5rem' }}>
+                  카테고리: {selectedService.category}
+                </div>
+              )}
             </ServiceInfo>
             {selectedService.description && (
               <ServiceDescription>{selectedService.description}</ServiceDescription>

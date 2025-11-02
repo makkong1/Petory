@@ -68,9 +68,13 @@ public class LocationServiceDataLoader implements CommandLineRunner {
                 "애견미용",
                 "펫미용",
                 "강아지미용",
+                "애견유치원",
+                "펫유치원",
+                "반려동물유치원",
+                "강아지유치원",
+                "견주유치원",
                 "반려동물장례",
-                "펫장례"
-        );
+                "펫장례");
 
         // 지역 목록
         List<String> regions = Arrays.asList(
@@ -81,32 +85,30 @@ public class LocationServiceDataLoader implements CommandLineRunner {
                 "대구광역시",
                 "대전광역시",
                 "광주광역시",
-                "울산광역시"
-        );
+                "울산광역시");
 
         List<LocationService> servicesToSave = new ArrayList<>();
 
         // 각 지역별로 검색
         for (String region : regions) {
             log.info("{} 지역의 장소를 검색합니다...", region);
-            
+
             // 각 키워드로 검색 (지역당 최대 10개씩)
             for (String keyword : keywords) {
                 try {
                     List<KakaoPlaceDTO.Document> places = kakaoMapService.searchPlaces(
-                            keyword, 
+                            keyword,
                             null, // 카테고리 코드 (null이면 전체)
-                            region, 
-                            10
-                    );
+                            region,
+                            10);
 
                     for (KakaoPlaceDTO.Document place : places) {
                         // 중복 체크 (이름과 주소로)
                         if (locationServiceRepository.findByNameAndAddress(
-                                place.getPlaceName(), 
-                                place.getAddressName() != null ? place.getAddressName() : place.getRoadAddressName()
-                        ).isEmpty()) {
-                            
+                                place.getPlaceName(),
+                                place.getAddressName() != null ? place.getAddressName() : place.getRoadAddressName())
+                                .isEmpty()) {
+
                             LocationService service = convertKakaoPlaceToLocationService(place, keyword);
                             servicesToSave.add(service);
                         }
@@ -134,7 +136,7 @@ public class LocationServiceDataLoader implements CommandLineRunner {
     private LocationService convertKakaoPlaceToLocationService(KakaoPlaceDTO.Document place, String keyword) {
         // 카테고리 매핑
         String category = mapCategory(place.getCategoryGroupCode(), keyword);
-        
+
         // 좌표 변환 (String -> Double)
         Double longitude = null;
         Double latitude = null;
@@ -181,22 +183,40 @@ public class LocationServiceDataLoader implements CommandLineRunner {
      */
     private String mapCategory(String categoryGroupCode, String keyword) {
         if (categoryGroupCode == null) {
-            if (keyword.contains("카페")) return "카페";
-            if (keyword.contains("호텔")) return "호텔";
-            if (keyword.contains("병원")) return "병원";
-            if (keyword.contains("샵") || keyword.contains("용품")) return "샵";
-            if (keyword.contains("미용")) return "미용";
+            if (keyword.contains("카페"))
+                return "카페";
+            if (keyword.contains("호텔"))
+                return "호텔";
+            if (keyword.contains("병원"))
+                return "병원";
+            if (keyword.contains("샵") || keyword.contains("용품"))
+                return "샵";
+            if (keyword.contains("미용"))
+                return "미용";
+            if (keyword.contains("유치원"))
+                return "유치원";
             return "기타";
         }
 
         switch (categoryGroupCode) {
-            case "CE7": return "카페";
-            case "FD6": return "식당";
-            case "HP8": return "병원";
-            case "MT1": return "마트";
-            case "CS2": return "편의점";
-            case "PK1": return "주차장";
-            default: return "기타";
+            case "CE7":
+                return "카페";
+            case "FD6":
+                return "식당";
+            case "HP8":
+                return "병원";
+            case "MT1":
+                return "마트";
+            case "CS2":
+                return "편의점";
+            case "PK1":
+                return "주차장";
+            case "AC5":
+                return "유치원"; // 학원/교육시설 (카카오 API 코드)
+            case "SC4":
+                return "유치원"; // 학교 (카카오 API 코드)
+            default:
+                return "기타";
         }
     }
 
@@ -214,6 +234,8 @@ public class LocationServiceDataLoader implements CommandLineRunner {
             return "반려동물 전문 미용 서비스를 제공합니다. 예약 필수.";
         } else if (keyword.contains("샵") || keyword.contains("용품")) {
             return "반려동물 용품 전문 매장입니다.";
+        } else if (keyword.contains("유치원")) {
+            return "반려동물 전문 교육 및 돌봄 서비스를 제공합니다. 예약 필수.";
         }
         return "반려동물 관련 서비스를 제공합니다.";
     }
@@ -225,8 +247,8 @@ public class LocationServiceDataLoader implements CommandLineRunner {
     @Transactional
     public void loadInitialDataManually(String region, int maxResultsPerKeyword, List<String> customKeywords) {
         final int MAX_TOTAL_RESULTS = 50; // 전체 최대 50개로 제한
-        log.info("수동으로 LocationService 초기 데이터를 로드합니다. 지역: {}, 키워드당 최대: {}개, 전체 최대: {}개", 
-                 region, maxResultsPerKeyword, MAX_TOTAL_RESULTS);
+        log.info("수동으로 LocationService 초기 데이터를 로드합니다. 지역: {}, 키워드당 최대: {}개, 전체 최대: {}개",
+                region, maxResultsPerKeyword, MAX_TOTAL_RESULTS);
 
         // 커스텀 키워드가 있으면 사용, 없으면 기본 키워드 사용
         List<String> keywords;
@@ -247,8 +269,7 @@ public class LocationServiceDataLoader implements CommandLineRunner {
                     "강아지동반가능",
                     "애완동물동반가능",
                     "펫동반가능",
-                    "반려동물동반가능"
-            );
+                    "반려동물동반가능");
             log.info("기본 키워드 사용: {}", keywords);
         }
 
@@ -267,11 +288,10 @@ public class LocationServiceDataLoader implements CommandLineRunner {
                 int searchCount = Math.min(maxResultsPerKeyword, remainingSlots);
 
                 List<KakaoPlaceDTO.Document> places = kakaoMapService.searchPlaces(
-                        keyword, 
-                        null, 
-                        region, 
-                        searchCount
-                );
+                        keyword,
+                        null,
+                        region,
+                        searchCount);
 
                 for (KakaoPlaceDTO.Document place : places) {
                     // 50개 제한 체크
@@ -280,10 +300,10 @@ public class LocationServiceDataLoader implements CommandLineRunner {
                     }
 
                     if (locationServiceRepository.findByNameAndAddress(
-                            place.getPlaceName(), 
-                            place.getAddressName() != null ? place.getAddressName() : place.getRoadAddressName()
-                    ).isEmpty()) {
-                        
+                            place.getPlaceName(),
+                            place.getAddressName() != null ? place.getAddressName() : place.getRoadAddressName())
+                            .isEmpty()) {
+
                         LocationService service = convertKakaoPlaceToLocationService(place, keyword);
                         servicesToSave.add(service);
                     }
@@ -303,4 +323,3 @@ public class LocationServiceDataLoader implements CommandLineRunner {
         }
     }
 }
-

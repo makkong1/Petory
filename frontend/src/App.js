@@ -55,7 +55,9 @@ function AppContent() {
 
   // API 인터셉터 설정 (앱 시작 시 한 번만)
   useEffect(() => {
-    setupApiInterceptors();
+    if (typeof window !== 'undefined') {
+      setupApiInterceptors();
+    }
   }, []);
 
   // 로딩 중일 때

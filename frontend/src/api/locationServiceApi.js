@@ -2,9 +2,9 @@ import axios from 'axios';
 
 const BASE_URL = 'http://localhost:8080/api/location-services';
 
-// 토큰을 가져오는 함수
+// Access Token 가져오기 (전역 인터셉터에서 처리되지만 호환성을 위해)
 const getToken = () => {
-  return localStorage.getItem('token');
+  return localStorage.getItem('accessToken') || localStorage.getItem('token');
 };
 
 const api = axios.create({
@@ -14,11 +14,11 @@ const api = axios.create({
   },
 });
 
-// 요청 인터셉터 - 모든 요청에 토큰 자동 추가
+// 요청 인터셉터 - 모든 요청에 토큰 자동 추가 (전역 인터셉터와 중복되지만 안전을 위해 유지)
 api.interceptors.request.use(
   (config) => {
     const token = getToken();
-    if (token) {
+    if (token && !config.headers.Authorization) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
@@ -28,19 +28,8 @@ api.interceptors.request.use(
   }
 );
 
-// 응답 인터셉터 - 401 에러 시 토큰 제거 및 로그인 페이지로 리다이렉트
-api.interceptors.response.use(
-  (response) => {
-    return response;
-  },
-  (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      window.location.href = '/login';
-    }
-    return Promise.reject(error);
-  }
-);
+// 응답 인터셉터 제거 - 전역 인터셉터가 처리 (setupApiInterceptors)
+// 401 에러는 전역 인터셉터에서 refresh token으로 자동 처리됨
 
 export const locationServiceApi = {
   // 전체 서비스 조회
