@@ -16,4 +16,7 @@ public interface UsersRepository extends JpaRepository<Users, Long> {
     // Spring Data JPA는 필드명을 기반으로 처리하므로,
     // 엔티티의 id 필드(String 타입)를 조회함
     Optional<Users> findById(String id);
+
+    // Refresh Token으로 사용자 조회
+    Optional<Users> findByRefreshToken(String refreshToken);
 }

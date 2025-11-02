@@ -46,6 +46,10 @@ public class Users {
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
     private List<SocialUser> socialUsers;
 
+    // Refresh Token 관련 필드
+    private String refreshToken;
+    private LocalDateTime refreshExpiration;
+
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();

@@ -18,7 +18,6 @@ import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
-@Transactional
 public class CareRequestService {
 
     private final CareRequestRepository careRequestRepository;
@@ -26,6 +25,7 @@ public class CareRequestService {
     private final CareRequestConverter careRequestConverter;
 
     // 전체 케어 요청 조회 (필터링 포함)
+    @Transactional(readOnly = true)
     public List<CareRequestDTO> getAllCareRequests(String status, String location) {
         List<CareRequest> requests = careRequestRepository.findAll();
 
@@ -49,6 +49,7 @@ public class CareRequestService {
     }
 
     // 단일 케어 요청 조회
+    @Transactional(readOnly = true)
     public CareRequestDTO getCareRequest(Long idx) {
         CareRequest request = careRequestRepository.findById(idx)
                 .orElseThrow(() -> new RuntimeException("CareRequest not found"));
@@ -56,6 +57,7 @@ public class CareRequestService {
     }
 
     // 케어 요청 생성
+    @Transactional
     public CareRequestDTO createCareRequest(CareRequestDTO dto) {
         // 요청자 조회
         Users user = usersRepository.findById(dto.getUserId())
@@ -74,6 +76,7 @@ public class CareRequestService {
     }
 
     // 케어 요청 수정
+    @Transactional
     public CareRequestDTO updateCareRequest(Long idx, CareRequestDTO dto) {
         CareRequest request = careRequestRepository.findById(idx)
                 .orElseThrow(() -> new RuntimeException("CareRequest not found"));
@@ -90,11 +93,13 @@ public class CareRequestService {
     }
 
     // 케어 요청 삭제
+    @Transactional
     public void deleteCareRequest(Long idx) {
         careRequestRepository.deleteById(idx);
     }
 
     // 내 케어 요청 조회
+    @Transactional(readOnly = true)
     public List<CareRequestDTO> getMyCareRequests(Long userId) {
         Users user = usersRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
@@ -104,6 +109,7 @@ public class CareRequestService {
     }
 
     // 상태 변경
+    @Transactional
     public CareRequestDTO updateStatus(Long idx, String status) {
         CareRequest request = careRequestRepository.findById(idx)
                 .orElseThrow(() -> new RuntimeException("CareRequest not found"));

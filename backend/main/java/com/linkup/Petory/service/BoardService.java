@@ -16,7 +16,7 @@ import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
-@Transactional
+@Transactional(readOnly = true)
 public class BoardService {
 
     private final BoardRepository boardRepository;
@@ -44,6 +44,7 @@ public class BoardService {
     }
 
     // 게시글 생성
+    @Transactional
     public BoardDTO createBoard(BoardDTO dto) {
         Users user = usersRepository.findById(dto.getUserId())
                 .orElseThrow(() -> new RuntimeException("User not found"));
@@ -60,6 +61,7 @@ public class BoardService {
     }
 
     // 게시글 수정
+    @Transactional
     public BoardDTO updateBoard(Long idx, BoardDTO dto) {
         Board board = boardRepository.findById(idx)
                 .orElseThrow(() -> new RuntimeException("Board not found"));
@@ -76,6 +78,7 @@ public class BoardService {
     }
 
     // 게시글 삭제
+    @Transactional
     public void deleteBoard(Long idx) {
         boardRepository.deleteById(idx);
     }

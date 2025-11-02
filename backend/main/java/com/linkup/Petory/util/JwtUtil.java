@@ -13,11 +13,14 @@ import java.util.Date;
 @Component
 public class JwtUtil {
 
-    @Value("${jwt.secret:mySecretKey123456789012345678901234567890%!}")
+    @Value("${jwt.secret}")
     private String secret;
 
-    @Value("${jwt.expiration:86400000}") // 24시간 (밀리초)
+    @Value("${jwt.expiration}") // 24시간 (밀리초)
     private long expiration;
+
+    private static final long ACCESS_TOKEN_EXPIRE_TIME = 15 * 60 * 1000L; // 15분 (짧게 설정)
+    private static final long REFRESH_TOKEN_EXPIRE_TIME = 24 * 60 * 60 * 1000L; // 1일
 
     private SecretKey getSigningKey() {
         return Keys.hmacShaKeyFor(secret.getBytes());
@@ -32,6 +35,31 @@ public class JwtUtil {
 
         return Jwts.builder()
                 .subject(id) // id를 subject로 저장
+                .issuedAt(now)
+                .expiration(expiryDate)
+                .signWith(getSigningKey())
+                .compact();
+    }
+
+    // Access Token 생성 (id 기준)
+    public String createAccessToken(String id) {
+        Date now = new Date();
+        Date expiryDate = new Date(now.getTime() + ACCESS_TOKEN_EXPIRE_TIME);
+
+        return Jwts.builder()
+                .subject(id)
+                .issuedAt(now)
+                .expiration(expiryDate)
+                .signWith(getSigningKey())
+                .compact();
+    }
+
+    // Refresh Token 생성
+    public String createRefreshToken() {
+        Date now = new Date();
+        Date expiryDate = new Date(now.getTime() + REFRESH_TOKEN_EXPIRE_TIME);
+
+        return Jwts.builder()
                 .issuedAt(now)
                 .expiration(expiryDate)
                 .signWith(getSigningKey())
