@@ -19,6 +19,7 @@ public class BoardController {
     private final BoardService boardService;
 
     // 전체 게시글 조회
+    @PreAuthorize("permitAll()")
     @GetMapping
     public ResponseEntity<List<BoardDTO>> getAllBoards(
             @RequestParam(required = false) String category) {
@@ -27,6 +28,7 @@ public class BoardController {
     }
 
     // 단일 게시글 조회
+    @PreAuthorize("permitAll()")
     @GetMapping("/{id}")
     public ResponseEntity<BoardDTO> getBoard(@PathVariable Long id) {
         return ResponseEntity.ok(boardService.getBoard(id));

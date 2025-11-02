@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -41,6 +42,7 @@ public class LocationServiceController {
 
     // 특정 서비스 조회
     @GetMapping("/{serviceIdx}")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Map<String, Object>> getServiceById(@PathVariable Long serviceIdx) {
         try {
             LocationServiceDTO service = serviceService.getServiceById(serviceIdx);
@@ -59,6 +61,7 @@ public class LocationServiceController {
 
     // 카테고리별 서비스 조회
     @GetMapping("/category/{category}")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Map<String, Object>> getServicesByCategory(@PathVariable String category) {
         try {
             List<LocationServiceDTO> services = serviceService.getServicesByCategory(category);
@@ -78,6 +81,7 @@ public class LocationServiceController {
 
     // 지역별 서비스 조회
     @GetMapping("/location")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Map<String, Object>> getServicesByLocation(
             @RequestParam Double minLat,
             @RequestParam Double maxLat,
@@ -101,6 +105,7 @@ public class LocationServiceController {
 
     // 키워드로 서비스 검색 (이름 또는 설명)
     @GetMapping("/search")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Map<String, Object>> searchServicesByKeyword(@RequestParam String keyword) {
         try {
             List<LocationServiceDTO> services = serviceService.searchServicesByKeyword(keyword);
@@ -120,6 +125,7 @@ public class LocationServiceController {
 
     // 지역(주소)으로 서비스 검색
     @GetMapping("/search/address")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Map<String, Object>> searchServicesByAddress(@RequestParam String address) {
         try {
             List<LocationServiceDTO> services = serviceService.searchServicesByAddress(address);
@@ -139,6 +145,7 @@ public class LocationServiceController {
 
     // 평점순 서비스 조회
     @GetMapping("/top-rated")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Map<String, Object>> getTopRatedServices() {
         try {
             List<LocationServiceDTO> services = serviceService.getServicesByRating();
@@ -158,6 +165,7 @@ public class LocationServiceController {
 
     // 특정 평점 이상의 서비스 조회
     @GetMapping("/rating")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Map<String, Object>> getServicesByMinRating(@RequestParam Double minRating) {
         try {
             List<LocationServiceDTO> services = serviceService.getServicesByMinRating(minRating);
@@ -177,6 +185,7 @@ public class LocationServiceController {
 
     // 서비스 생성
     @PostMapping
+    @PreAuthorize("hasRole('MASTER')")
     public ResponseEntity<Map<String, Object>> createService(@RequestBody LocationServiceDTO serviceDTO) {
         try {
             LocationServiceDTO createdService = serviceService.createService(serviceDTO);
@@ -196,6 +205,7 @@ public class LocationServiceController {
 
     // 서비스 수정
     @PutMapping("/{serviceIdx}")
+    @PreAuthorize("hasRole('MASTER')")
     public ResponseEntity<Map<String, Object>> updateService(@PathVariable Long serviceIdx,
             @RequestBody LocationServiceDTO serviceDTO) {
         try {
@@ -216,6 +226,7 @@ public class LocationServiceController {
 
     // 서비스 삭제
     @DeleteMapping("/{serviceIdx}")
+    @PreAuthorize("hasRole('MASTER')")
     public ResponseEntity<Map<String, Object>> deleteService(@PathVariable Long serviceIdx) {
         try {
             serviceService.deleteService(serviceIdx);

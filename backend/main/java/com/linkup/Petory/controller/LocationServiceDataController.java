@@ -18,7 +18,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/admin/location-services")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('ADMIN', 'MASTER')")
+@PreAuthorize("hasAnyRole('MASTER')")
 public class LocationServiceDataController {
 
     private final LocationServiceDataLoader dataLoader;
