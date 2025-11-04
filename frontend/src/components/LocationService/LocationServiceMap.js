@@ -23,6 +23,7 @@ const LocationServiceMap = () => {
   const [selectedSido, setSelectedSido] = useState('');
   const [selectedSigungu, setSelectedSigungu] = useState('');
   const [selectedDong, setSelectedDong] = useState('');
+  const [sortBy, setSortBy] = useState('rating'); // 'rating', 'name', 'createdAt'
   const mapContainerRef = useRef(null);
 
   // 전국 시/도 목록
@@ -300,9 +301,9 @@ const LocationServiceMap = () => {
     }
   };
 
-  // 필터링된 서비스 목록 (카테고리 필터만 적용) - useMemo로 메모이제이션
+  // 필터링 및 정렬된 서비스 목록 - useMemo로 메모이제이션
   const filteredServices = useMemo(() => {
-    const filtered = services.filter(service => {
+    let filtered = services.filter(service => {
       if (!selectedCategory) return true;
       
       // 기본 카테고리 매칭
@@ -340,18 +341,26 @@ const LocationServiceMap = () => {
       return false;
     });
     
-    // 디버깅: 선택된 카테고리와 실제 서비스 카테고리 확인
-    if (selectedCategory) {
-      console.log('카테고리 필터링:', {
-        selectedCategory,
-        totalServices: services.length,
-        filteredCount: filtered.length,
-        categoriesInData: [...new Set(services.map(s => s.category))]
-      });
-    }
+    // 정렬 적용
+    const sorted = [...filtered].sort((a, b) => {
+      if (sortBy === 'rating') {
+        // 평점순 (높은 순)
+        const ratingA = a.rating || 0;
+        const ratingB = b.rating || 0;
+        return ratingB - ratingA;
+      } else if (sortBy === 'name') {
+        // 이름순 (가나다순)
+        return (a.name || '').localeCompare(b.name || '');
+      } else if (sortBy === 'createdAt') {
+        // 최신순 (최신이 먼저)
+        // createdAt이 없으면 기본값으로 처리
+        return 0; // createdAt 필드가 없으면 순서 유지
+      }
+      return 0;
+    });
     
-    return filtered;
-  }, [services, selectedCategory]);
+    return sorted;
+  }, [services, selectedCategory, sortBy]);
 
   const handleServiceClick = (service) => {
     setSelectedService(service);
@@ -510,18 +519,59 @@ const LocationServiceMap = () => {
             {category.label}
           </FilterButton>
         ))}
+        <SortSelect value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+          <option value="rating">⭐ 평점순</option>
+          <option value="name">🔤 이름순</option>
+        </SortSelect>
       </FilterSection>
 
       <MapArea>
-        <MapContainer
-          ref={mapContainerRef}
-          services={filteredServices}
-          selectedCategory={selectedCategory}
-          onServiceClick={handleServiceClick}
-          userLocation={userLocation}
-          shouldFocusOnResults={shouldFocusOnResults}
-          onFocusComplete={() => setShouldFocusOnResults(false)}
-        />
+        <MapWrapper>
+          <MapContainer
+            ref={mapContainerRef}
+            services={filteredServices}
+            selectedCategory={selectedCategory}
+            onServiceClick={handleServiceClick}
+            userLocation={userLocation}
+            shouldFocusOnResults={shouldFocusOnResults}
+            onFocusComplete={() => setShouldFocusOnResults(false)}
+          />
+        </MapWrapper>
+        
+        <ServiceListPanel>
+          <ServiceListHeader>
+            <ServiceListTitle>서비스 목록 ({filteredServices.length})</ServiceListTitle>
+          </ServiceListHeader>
+          <ServiceListContent>
+            {filteredServices.length === 0 ? (
+              <EmptyMessage>표시할 서비스가 없습니다.</EmptyMessage>
+            ) : (
+              filteredServices.map((service) => (
+                <ServiceListItem
+                  key={service.idx}
+                  onClick={() => handleServiceClick(service)}
+                  active={selectedService?.idx === service.idx}
+                >
+                  <ServiceListItemHeader>
+                    <ServiceListItemName>{service.name}</ServiceListItemName>
+                    {service.rating && (
+                      <ServiceListItemRating>⭐ {service.rating.toFixed(1)}</ServiceListItemRating>
+                    )}
+                  </ServiceListItemHeader>
+                  {service.category && (
+                    <ServiceListItemCategory>{service.category}</ServiceListItemCategory>
+                  )}
+                  {service.address && (
+                    <ServiceListItemAddress>📍 {service.address}</ServiceListItemAddress>
+                  )}
+                  {service.phone && (
+                    <ServiceListItemPhone>📞 {service.phone}</ServiceListItemPhone>
+                  )}
+                </ServiceListItem>
+              ))
+            )}
+          </ServiceListContent>
+        </ServiceListPanel>
         
         {selectedService && (
           <ServiceDetailPanel>
@@ -687,6 +737,22 @@ const FilterSection = styled.div`
   display: flex;
   gap: 0.5rem;
   flex-wrap: wrap;
+  align-items: center;
+`;
+
+const SortSelect = styled.select`
+  padding: 0.5rem 1rem;
+  border: 1px solid #ddd;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  background: white;
+  margin-left: auto;
+  
+  &:focus {
+    outline: none;
+    border-color: #007bff;
+  }
 `;
 
 const FilterButton = styled.button.withConfig({
@@ -710,18 +776,122 @@ const MapArea = styled.div`
   flex: 1;
   position: relative;
   background: #f0f0f0;
+  display: flex;
+  overflow: hidden;
+`;
+
+const MapWrapper = styled.div`
+  flex: 1;
+  position: relative;
+  min-width: 0;
+`;
+
+const ServiceListPanel = styled.div`
+  width: 350px;
+  background: white;
+  border-left: 1px solid #e9ecef;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  z-index: 100;
+`;
+
+const ServiceListHeader = styled.div`
+  padding: 1rem;
+  border-bottom: 1px solid #e9ecef;
+  background: #f8f9fa;
+`;
+
+const ServiceListTitle = styled.h3`
+  margin: 0;
+  font-size: 1rem;
+  color: #333;
+  font-weight: 600;
+`;
+
+const ServiceListContent = styled.div`
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.5rem;
+`;
+
+const ServiceListItem = styled.div.withConfig({
+  shouldForwardProp: (prop) => prop !== 'active',
+})`
+  padding: 1rem;
+  margin-bottom: 0.5rem;
+  border: 1px solid ${props => props.active ? '#007bff' : '#e9ecef'};
+  border-radius: 8px;
+  background: ${props => props.active ? '#f0f7ff' : 'white'};
+  cursor: pointer;
+  transition: all 0.2s;
+  
+  &:hover {
+    border-color: #007bff;
+    box-shadow: 0 2px 8px rgba(0, 123, 255, 0.15);
+    transform: translateY(-2px);
+  }
+`;
+
+const ServiceListItemHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+`;
+
+const ServiceListItemName = styled.div`
+  font-weight: 600;
+  font-size: 1rem;
+  color: #333;
+  flex: 1;
+`;
+
+const ServiceListItemRating = styled.div`
+  font-size: 0.9rem;
+  color: #ff9800;
+  font-weight: 600;
+`;
+
+const ServiceListItemCategory = styled.div`
+  font-size: 0.85rem;
+  color: #666;
+  margin-bottom: 0.25rem;
+`;
+
+const ServiceListItemAddress = styled.div`
+  font-size: 0.85rem;
+  color: #666;
+  margin-bottom: 0.25rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`;
+
+const ServiceListItemPhone = styled.div`
+  font-size: 0.85rem;
+  color: #666;
+`;
+
+const EmptyMessage = styled.div`
+  padding: 2rem;
+  text-align: center;
+  color: #999;
+  font-size: 0.9rem;
 `;
 
 const ServiceDetailPanel = styled.div`
   position: absolute;
   top: 1rem;
-  right: 1rem;
+  left: 1rem;
   width: 300px;
   background: white;
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   padding: 1rem;
   z-index: 1000;
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
 `;
 
 const CloseButton = styled.button`
