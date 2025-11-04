@@ -116,6 +116,37 @@ public class LocationServiceService {
                 .collect(Collectors.toList());
     }
 
+    // 반경 검색 (위도, 경도 기준 반경 미터 이내)
+    public List<LocationServiceDTO> getServicesByRadius(Double latitude, Double longitude, Double radiusInMeters) {
+        log.info("반경 검색 요청 - 위도: {}, 경도: {}, 반경: {}m", latitude, longitude, radiusInMeters);
+        // 위도는 -90 ~ 90, 경도는 -180 ~ 180 범위 확인
+        if (latitude == null || longitude == null || 
+            latitude < -90 || latitude > 90 || 
+            longitude < -180 || longitude > 180) {
+            throw new RuntimeException("유효하지 않은 좌표 값입니다. 위도: " + latitude + ", 경도: " + longitude);
+        }
+        return serviceRepository.findByRadius(latitude, longitude, radiusInMeters)
+                .stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
+
+    // 서울 구/동 검색
+    public List<LocationServiceDTO> getServicesBySeoulGuAndDong(String gu, String dong) {
+        return serviceRepository.findBySeoulGuAndDong(gu, dong)
+                .stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
+
+    // 전국 지역 검색 (시/도 > 시/군/구 > 동/면/리)
+    public List<LocationServiceDTO> getServicesByRegion(String sido, String sigungu, String dong) {
+        return serviceRepository.findByRegion(sido, sigungu, dong)
+                .stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
+
     // 서비스 생성
     @Transactional
     public LocationServiceDTO createService(LocationServiceDTO serviceDTO) {

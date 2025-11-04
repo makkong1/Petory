@@ -53,4 +53,32 @@ public interface LocationServiceRepository extends JpaRepository<LocationService
                         "ls.address LIKE %:address% " +
                         "ORDER BY ls.rating DESC")
         List<LocationService> findByAddressContaining(@Param("address") String address);
+
+        // 반경 검색 (ST_Distance_Sphere 사용) - 3km 이내
+        // POINT 형식: 이 데이터베이스에서는 POINT(위도 경도) = POINT(latitude longitude) 순서 사용
+        // ?1 = latitude, ?2 = longitude 이므로 POINT(?1 ?2) = POINT(위도 경도) 순서
+        @Query(value = "SELECT * FROM locationservice WHERE " +
+                        "ST_Distance_Sphere(coordinates, ST_GeomFromText(CONCAT('POINT(', ?1, ' ', ?2, ')'), 4326)) <= ?3 "
+                        +
+                        "ORDER BY rating DESC", nativeQuery = true)
+        List<LocationService> findByRadius(@Param("latitude") Double latitude,
+                        @Param("longitude") Double longitude,
+                        @Param("radiusInMeters") Double radiusInMeters);
+
+        // 서울 구/동 검색
+        @Query("SELECT ls FROM LocationService ls WHERE " +
+                        "ls.address LIKE CONCAT('%서울%', :gu, '%') " +
+                        "AND (:dong IS NULL OR ls.address LIKE CONCAT('%', :dong, '%')) " +
+                        "ORDER BY ls.rating DESC")
+        List<LocationService> findBySeoulGuAndDong(@Param("gu") String gu, @Param("dong") String dong);
+
+        // 전국 지역 검색 (시/도 > 시/군/구 > 동/면/리)
+        @Query("SELECT ls FROM LocationService ls WHERE " +
+                        "(:sido IS NULL OR ls.address LIKE CONCAT('%', :sido, '%')) " +
+                        "AND (:sigungu IS NULL OR ls.address LIKE CONCAT('%', :sigungu, '%')) " +
+                        "AND (:dong IS NULL OR ls.address LIKE CONCAT('%', :dong, '%')) " +
+                        "ORDER BY ls.rating DESC")
+        List<LocationService> findByRegion(@Param("sido") String sido,
+                        @Param("sigungu") String sigungu,
+                        @Param("dong") String dong);
 }

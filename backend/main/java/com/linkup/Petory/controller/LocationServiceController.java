@@ -183,6 +183,75 @@ public class LocationServiceController {
         }
     }
 
+    // 반경 검색 (위도, 경도 기준 반경 미터 이내)
+    @GetMapping("/radius")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Map<String, Object>> getServicesByRadius(
+            @RequestParam Double latitude,
+            @RequestParam Double longitude,
+            @RequestParam(defaultValue = "3000") Double radiusInMeters) {
+        try {
+            log.info("반경 검색 API 호출 - 위도: {}, 경도: {}, 반경: {}m", latitude, longitude, radiusInMeters);
+            List<LocationServiceDTO> services = serviceService.getServicesByRadius(latitude, longitude, radiusInMeters);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("services", services);
+            response.put("count", services.size());
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("반경 검색 실패: {}", e.getMessage());
+            Map<String, Object> response = new HashMap<>();
+            response.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    // 서울 구/동 검색
+    @GetMapping("/seoul")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Map<String, Object>> getServicesBySeoulGuAndDong(
+            @RequestParam String gu,
+            @RequestParam(required = false) String dong) {
+        try {
+            List<LocationServiceDTO> services = serviceService.getServicesBySeoulGuAndDong(gu, dong);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("services", services);
+            response.put("count", services.size());
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("서울 구/동 검색 실패: {}", e.getMessage());
+            Map<String, Object> response = new HashMap<>();
+            response.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    // 전국 지역 검색 (시/도 > 시/군/구 > 동/면/리)
+    @GetMapping("/region")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Map<String, Object>> getServicesByRegion(
+            @RequestParam(required = false) String sido,
+            @RequestParam(required = false) String sigungu,
+            @RequestParam(required = false) String dong) {
+        try {
+            List<LocationServiceDTO> services = serviceService.getServicesByRegion(sido, sigungu, dong);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("services", services);
+            response.put("count", services.size());
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("전국 지역 검색 실패: {}", e.getMessage());
+            Map<String, Object> response = new HashMap<>();
+            response.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
     // 서비스 생성
     @PostMapping
     @PreAuthorize("hasRole('MASTER')")

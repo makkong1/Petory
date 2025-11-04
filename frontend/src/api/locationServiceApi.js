@@ -57,6 +57,18 @@ export const locationServiceApi = {
   // 특정 평점 이상의 서비스 조회
   getServicesByMinRating: (minRating) => api.get('/rating', { params: { minRating } }),
   
+  // 반경 검색 (위도, 경도 기준 반경 미터 이내, 기본 3000m)
+  getServicesByRadius: (latitude, longitude, radiusInMeters = 3000) => 
+    api.get('/radius', { params: { latitude, longitude, radiusInMeters } }),
+  
+  // 서울 구/동 검색
+  getServicesBySeoulGuAndDong: (gu, dong) => 
+    api.get('/seoul', { params: { gu, ...(dong && { dong }) } }),
+  
+  // 전국 지역 검색 (시/도 > 시/군/구 > 동/면/리)
+  getServicesByRegion: (sido, sigungu, dong) => 
+    api.get('/region', { params: { ...(sido && { sido }), ...(sigungu && { sigungu }), ...(dong && { dong }) } }),
+  
   // 서비스 생성
   createService: (data) => api.post('', data),
   
