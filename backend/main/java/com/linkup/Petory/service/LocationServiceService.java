@@ -1,0 +1,298 @@
+package com.linkup.Petory.service;
+
+import com.linkup.Petory.converter.LocationServiceReviewConverter;
+import com.linkup.Petory.dto.LocationServiceDTO;
+import com.linkup.Petory.dto.LocationServiceReviewDTO;
+import com.linkup.Petory.entity.LocationService;
+import com.linkup.Petory.repository.LocationServiceRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class LocationServiceService {
+
+    private final LocationServiceRepository serviceRepository;
+    private final LocationServiceReviewConverter reviewConverter;
+    private final KakaoMapService kakaoMapService;
+
+    // 모든 서비스 조회
+    public List<LocationServiceDTO> getAllServices() {
+        return serviceRepository.findAll()
+                .stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
+
+    // 특정 서비스 조회
+    public LocationServiceDTO getServiceById(Long serviceIdx) {
+        LocationService service = serviceRepository.findById(serviceIdx)
+                .orElseThrow(() -> new RuntimeException("서비스를 찾을 수 없습니다."));
+        return convertToDTO(service);
+    }
+
+    // 카테고리별 서비스 조회
+    public List<LocationServiceDTO> getServicesByCategory(String category) {
+        return serviceRepository.findByCategoryOrderByRatingDesc(category)
+                .stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
+
+    // 지역별 서비스 조회
+    public List<LocationServiceDTO> getServicesByLocation(Double minLat, Double maxLat, Double minLng, Double maxLng) {
+        return serviceRepository.findByLocationRange(minLat, maxLat, minLng, maxLng)
+                .stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
+
+    // 키워드로 서비스 검색 (이름 또는 설명)
+    public List<LocationServiceDTO> searchServicesByKeyword(String keyword) {
+        return serviceRepository.findByNameContaining(keyword)
+                .stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
+
+    // 지역(주소)으로 서비스 검색
+    public List<LocationServiceDTO> searchServicesByAddress(String address) {
+        // 원본 주소로 검색
+        List<LocationService> results = serviceRepository.findByAddressContaining(address);
+        
+        // 검색어 정규화하여 추가 검색: "서울시" -> "서울", "경기도" -> "경기" 등
+        String normalizedAddress = address
+                .replace("시", "")
+                .replace("도", "")
+                .replace("특별시", "")
+                .replace("광역시", "")
+                .trim();
+        
+        // 정규화된 주소로도 검색 (중복 제거)
+        if (!normalizedAddress.equals(address) && !normalizedAddress.isEmpty()) {
+            List<LocationService> normalizedResults = serviceRepository.findByAddressContaining(normalizedAddress);
+            // 중복 제거를 위해 idx 기준으로 Map 사용
+            Map<Long, LocationService> uniqueResults = new HashMap<>();
+            results.forEach(service -> uniqueResults.put(service.getIdx(), service));
+            normalizedResults.forEach(service -> uniqueResults.put(service.getIdx(), service));
+            results = new ArrayList<>(uniqueResults.values());
+        }
+        
+        // 평점순 정렬
+        return results.stream()
+                .sorted((a, b) -> {
+                    if (a.getRating() == null && b.getRating() == null) return 0;
+                    if (a.getRating() == null) return 1;
+                    if (b.getRating() == null) return -1;
+                    return b.getRating().compareTo(a.getRating());
+                })
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
+
+    // 평점순 서비스 조회
+    public List<LocationServiceDTO> getServicesByRating() {
+        return serviceRepository.findByOrderByRatingDesc()
+                .stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
+
+    // 특정 평점 이상의 서비스 조회
+    public List<LocationServiceDTO> getServicesByMinRating(Double minRating) {
+        return serviceRepository.findByRatingGreaterThanEqualOrderByRatingDesc(minRating)
+                .stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
+
+    // 반경 검색 (위도, 경도 기준 반경 미터 이내)
+    public List<LocationServiceDTO> getServicesByRadius(Double latitude, Double longitude, Double radiusInMeters) {
+        log.info("반경 검색 요청 - 위도: {}, 경도: {}, 반경: {}m", latitude, longitude, radiusInMeters);
+        // 위도는 -90 ~ 90, 경도는 -180 ~ 180 범위 확인
+        if (latitude == null || longitude == null || 
+            latitude < -90 || latitude > 90 || 
+            longitude < -180 || longitude > 180) {
+            throw new RuntimeException("유효하지 않은 좌표 값입니다. 위도: " + latitude + ", 경도: " + longitude);
+        }
+        return serviceRepository.findByRadius(latitude, longitude, radiusInMeters)
+                .stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
+
+    // 서울 구/동 검색
+    public List<LocationServiceDTO> getServicesBySeoulGuAndDong(String gu, String dong) {
+        return serviceRepository.findBySeoulGuAndDong(gu, dong)
+                .stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
+
+    // 전국 지역 검색 (시/도 > 시/군/구 > 동/면/리)
+    public List<LocationServiceDTO> getServicesByRegion(String sido, String sigungu, String dong) {
+        return serviceRepository.findByRegion(sido, sigungu, dong)
+                .stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
+
+    // 서비스 생성
+    @Transactional
+    public LocationServiceDTO createService(LocationServiceDTO serviceDTO) {
+        // 중복 체크: 같은 주소가 이미 등록되어 있는지 확인
+        if (serviceDTO.getAddress() != null && !serviceDTO.getAddress().trim().isEmpty()) {
+            String address = serviceDTO.getAddress().trim();
+            String detailAddress = serviceDTO.getDetailAddress() != null ? serviceDTO.getDetailAddress().trim() : "";
+
+            List<LocationService> existingServices;
+
+            // 상세주소가 있으면 주소+상세주소로 체크, 없으면 주소만으로 체크
+            if (!detailAddress.isEmpty()) {
+                existingServices = serviceRepository.findByAddressAndDetailAddress(address, detailAddress);
+            } else {
+                // 주소만 같은 것 중에서 상세주소도 비어있는 것 찾기
+                List<LocationService> byAddress = serviceRepository.findByAddress(address);
+                existingServices = byAddress.stream()
+                        .filter(ls -> ls.getDetailAddress() == null || ls.getDetailAddress().trim().isEmpty())
+                        .collect(Collectors.toList());
+            }
+
+            if (!existingServices.isEmpty()) {
+                String errorMessage = String.format("이미 등록된 주소입니다: %s", address);
+                if (!detailAddress.isEmpty()) {
+                    errorMessage += " " + detailAddress;
+                }
+                log.warn("서비스 등록 실패 - 중복 주소: {}", errorMessage);
+                throw new RuntimeException(errorMessage);
+            }
+        }
+
+        // 위도/경도가 없고 주소가 있으면 자동으로 변환
+        Double latitude = serviceDTO.getLatitude();
+        Double longitude = serviceDTO.getLongitude();
+
+        if ((latitude == null || longitude == null) && serviceDTO.getAddress() != null
+                && !serviceDTO.getAddress().trim().isEmpty()) {
+            log.info("주소를 위도/경도로 변환합니다: {}", serviceDTO.getAddress());
+            Double[] coordinates = kakaoMapService.addressToCoordinates(serviceDTO.getAddress());
+            if (coordinates != null && coordinates.length == 2) {
+                latitude = coordinates[0];
+                longitude = coordinates[1];
+                log.info("변환 성공: 위도={}, 경도={}", latitude, longitude);
+            } else {
+                log.warn("주소를 위도/경도로 변환하지 못했습니다: {}", serviceDTO.getAddress());
+            }
+        }
+
+        LocationService service = LocationService.builder()
+                .name(serviceDTO.getName())
+                .category(serviceDTO.getCategory())
+                .address(serviceDTO.getAddress())
+                .detailAddress(serviceDTO.getDetailAddress())
+                .latitude(latitude)
+                .longitude(longitude)
+                .rating(serviceDTO.getRating())
+                .phone(serviceDTO.getPhone())
+                .openingTime(serviceDTO.getOpeningTime())
+                .closingTime(serviceDTO.getClosingTime())
+                .description(serviceDTO.getDescription())
+                .petFriendly(serviceDTO.getPetFriendly() != null ? serviceDTO.getPetFriendly() : false)
+                .petPolicy(serviceDTO.getPetPolicy())
+                .build();
+
+        LocationService savedService = serviceRepository.save(service);
+        return convertToDTO(savedService);
+    }
+
+    // 서비스 수정
+    @Transactional
+    public LocationServiceDTO updateService(Long serviceIdx, LocationServiceDTO serviceDTO) {
+        LocationService service = serviceRepository.findById(serviceIdx)
+                .orElseThrow(() -> new RuntimeException("서비스를 찾을 수 없습니다."));
+
+        service.setName(serviceDTO.getName());
+        service.setCategory(serviceDTO.getCategory());
+        service.setAddress(serviceDTO.getAddress());
+        service.setDetailAddress(serviceDTO.getDetailAddress());
+        service.setPhone(serviceDTO.getPhone());
+        service.setOpeningTime(serviceDTO.getOpeningTime());
+        service.setClosingTime(serviceDTO.getClosingTime());
+        service.setDescription(serviceDTO.getDescription());
+        if (serviceDTO.getPetFriendly() != null) {
+            service.setPetFriendly(serviceDTO.getPetFriendly());
+        }
+        if (serviceDTO.getPetPolicy() != null) {
+            service.setPetPolicy(serviceDTO.getPetPolicy());
+        }
+
+        // 위도/경도 설정 (주소 변경 시 자동 변환)
+        Double latitude = serviceDTO.getLatitude();
+        Double longitude = serviceDTO.getLongitude();
+
+        // 주소가 변경되었거나 위도/경도가 없으면 자동 변환
+        if ((latitude == null || longitude == null) && serviceDTO.getAddress() != null
+                && !serviceDTO.getAddress().trim().isEmpty()) {
+            if (!serviceDTO.getAddress().equals(service.getAddress()) || latitude == null || longitude == null) {
+                log.info("수정 시 주소를 위도/경도로 변환합니다: {}", serviceDTO.getAddress());
+                Double[] coordinates = kakaoMapService.addressToCoordinates(serviceDTO.getAddress());
+                if (coordinates != null && coordinates.length == 2) {
+                    latitude = coordinates[0];
+                    longitude = coordinates[1];
+                    log.info("변환 성공: 위도={}, 경도={}", latitude, longitude);
+                }
+            }
+        }
+
+        service.setLatitude(latitude);
+        service.setLongitude(longitude);
+
+        LocationService savedService = serviceRepository.save(service);
+        return convertToDTO(savedService);
+    }
+
+    // 서비스 삭제
+    @Transactional
+    public void deleteService(Long serviceIdx) {
+        serviceRepository.deleteById(serviceIdx);
+    }
+
+    // Entity를 DTO로 변환
+    private LocationServiceDTO convertToDTO(LocationService service) {
+        List<LocationServiceReviewDTO> reviews = null;
+        if (service.getReviews() != null) {
+            reviews = service.getReviews().stream()
+                    .map(reviewConverter::toDTO)
+                    .collect(Collectors.toList());
+        }
+
+        return LocationServiceDTO.builder()
+                .idx(service.getIdx())
+                .name(service.getName())
+                .category(service.getCategory())
+                .address(service.getAddress())
+                .detailAddress(service.getDetailAddress())
+                .latitude(service.getLatitude())
+                .longitude(service.getLongitude())
+                .rating(service.getRating())
+                .phone(service.getPhone())
+                .openingTime(service.getOpeningTime())
+                .closingTime(service.getClosingTime())
+                .description(service.getDescription())
+                .petFriendly(service.getPetFriendly())
+                .petPolicy(service.getPetPolicy())
+                .reviewCount(service.getReviews() != null ? service.getReviews().size() : 0)
+                .reviews(reviews)
+                .build();
+    }
+}
