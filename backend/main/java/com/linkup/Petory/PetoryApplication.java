@@ -3,11 +3,7 @@ package com.linkup.Petory;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationProperties;
-<<<<<<< HEAD
 
-@SpringBootApplication
-@ConfigurationProperties(prefix = "app")
-=======
 import org.springframework.boot.web.servlet.ServletComponentScan;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
@@ -23,7 +19,6 @@ import org.springframework.web.filter.HiddenHttpMethodFilter;
 @EnableAsync
 @EnableCaching
 @EnableMethodSecurity(prePostEnabled = true) // @PreAuthorize 작동 활성화
->>>>>>> dev
 public class PetoryApplication {
 
 	public static void main(String[] args) {
