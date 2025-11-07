@@ -43,21 +43,39 @@ public class KakaoMapService {
      * @param maxResults 최대 검색 결과 수
      * @return 장소 목록
      */
-    public List<KakaoPlaceDTO.Document> searchPlaces(String keyword, String category, String region, int maxResults) {
+    public List<KakaoPlaceDTO.Document> searchPlaces(String keyword,
+            String category,
+            String region,
+            Double latitude,
+            Double longitude,
+            Integer radius,
+            int maxResults) {
         List<KakaoPlaceDTO.Document> allPlaces = new ArrayList<>();
         int page = 1;
         int size = 15; // 카카오 API 최대 15개씩 반환
 
+        String effectiveQuery = buildQuery(keyword, region);
+        Integer safeRadius = resolveRadius(radius);
+
         try {
             while (allPlaces.size() < maxResults) {
                 UriComponentsBuilder uriBuilder = UriComponentsBuilder.fromUriString(KAKAO_LOCAL_SEARCH_URL)
-                        .queryParam("query", keyword)
+                        .queryParam("query", effectiveQuery)
                         .queryParam("page", page)
                         .queryParam("size", Math.min(size, maxResults - allPlaces.size()));
 
                 // null이거나 빈 값이 아닐 때만 파라미터 추가
                 if (category != null && !category.isEmpty()) {
                     uriBuilder.queryParam("category_group_code", category);
+                }
+
+                if (longitude != null && latitude != null) {
+                    uriBuilder.queryParam("x", longitude)
+                            .queryParam("y", latitude);
+
+                    if (safeRadius != null) {
+                        uriBuilder.queryParam("radius", safeRadius);
+                    }
                 }
 
                 URI uri = uriBuilder.encode(StandardCharsets.UTF_8).build().toUri();
@@ -81,6 +99,8 @@ public class KakaoMapService {
 
                 allPlaces.addAll(responseBody.getDocuments());
 
+                logPlaceDocuments(effectiveQuery, region, responseBody.getDocuments());
+
                 // 마지막 페이지인지 확인
                 if (responseBody.getMeta() != null && Boolean.TRUE.equals(responseBody.getMeta().getIsEnd())) {
                     break;
@@ -103,6 +123,65 @@ public class KakaoMapService {
         }
     }
 
+    private void logPlaceDocuments(String keyword, String region, List<KakaoPlaceDTO.Document> documents) {
+        if (documents == null || documents.isEmpty()) {
+            log.info("카카오 장소 검색 결과가 비어 있습니다. 키워드: {}, 지역: {}", keyword, region);
+            return;
+        }
+
+        for (KakaoPlaceDTO.Document doc : documents) {
+            log.info("카카오 장소 검색 결과 - 키워드: {}, 지역: {}\n"
+                    + "  · 이름: {}\n"
+                    + "  · 카테고리: {}\n"
+                    + "  · 주소: {}\n"
+                    + "  · 도로명 주소: {}\n"
+                    + "  · 전화번호: {}\n"
+                    + "  · 위도: {}\n"
+                    + "  · 경도: {}\n"
+                    + "  · 상세 페이지: {}",
+                    keyword,
+                    region,
+                    defaultString(doc.getPlaceName()),
+                    defaultString(doc.getCategoryName()),
+                    defaultString(doc.getAddressName()),
+                    defaultString(doc.getRoadAddressName()),
+                    defaultString(doc.getPhone()),
+                    defaultString(doc.getY()),
+                    defaultString(doc.getX()),
+                    defaultString(doc.getPlace_url()));
+        }
+    }
+
+    private String buildQuery(String keyword, String region) {
+        StringBuilder builder = new StringBuilder();
+
+        if (keyword != null) {
+            builder.append(keyword.trim());
+        }
+
+        if (region != null && !region.trim().isEmpty()) {
+            if (builder.length() > 0) {
+                builder.append(" ");
+            }
+            builder.append(region.trim());
+        }
+
+        return builder.length() > 0 ? builder.toString() : "반려동물";
+    }
+
+    private Integer resolveRadius(Integer radius) {
+        if (radius == null) {
+            return 3000;
+        }
+
+        int safeRadius = Math.max(100, Math.min(radius, 20000));
+        return safeRadius;
+    }
+
+    private String defaultString(String value) {
+        return value != null ? value : "";
+    }
+
     /**
      * 여러 키워드로 병렬 검색
      */
@@ -112,7 +191,9 @@ public class KakaoMapService {
 
         for (String keyword : keywords) {
             try {
-                List<KakaoPlaceDTO.Document> places = searchPlaces(keyword, category, region, maxResultsPerKeyword);
+                List<KakaoPlaceDTO.Document> places = searchPlaces(keyword, category, region,
+                        null, null, null,
+                        maxResultsPerKeyword);
                 allPlaces.addAll(places);
                 log.info("키워드 '{}'로 {}개의 장소를 검색했습니다.", keyword, places.size());
             } catch (Exception e) {

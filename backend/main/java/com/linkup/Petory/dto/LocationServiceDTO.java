@@ -11,6 +11,7 @@ import java.util.List;
 public class LocationServiceDTO {
 
     private Long idx;
+    private String externalId;
     private String name;
     private String category;
     private String address;
@@ -23,6 +24,7 @@ public class LocationServiceDTO {
     private java.time.LocalTime closingTime;
     private String imageUrl;
     private String website;
+    private String placeUrl;
     private String description;
     private Boolean petFriendly;
     private String petPolicy;
