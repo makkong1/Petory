@@ -1,6 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import styled from 'styled-components';
 import { missingPetApi } from '../../api/missingPetApi';
+import { useAuth } from '../../contexts/AuthContext';
+import MissingPetBoardForm from './MissingPetBoardForm';
+import MissingPetBoardDetail from './MissingPetBoardDetail';
 
 const STATUS_OPTIONS = [
   { value: 'ALL', label: '전체' },
@@ -16,13 +19,20 @@ const statusLabel = {
 };
 
 const MissingPetBoardPage = () => {
+  const { user } = useAuth();
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [boards, setBoards] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [formLoading, setFormLoading] = useState(false);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [activeBoardId, setActiveBoardId] = useState(null);
+  const [activeBoard, setActiveBoard] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
 
-  const fetchBoards = useMemo(() => async () => {
+  const fetchBoards = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -42,84 +52,216 @@ const MissingPetBoardPage = () => {
     fetchBoards();
   }, [fetchBoards]);
 
+  const loadBoardDetail = useCallback(
+    async (id) => {
+      if (!id) return;
+      try {
+        setDetailLoading(true);
+        const response = await missingPetApi.get(id);
+        setActiveBoard(response.data);
+      } catch (err) {
+        alert(err.response?.data?.error || err.message);
+      } finally {
+        setDetailLoading(false);
+      }
+    },
+    []
+  );
+
+  const refreshBoardDetail = useCallback(async () => {
+    await fetchBoards();
+    if (activeBoardId) {
+      await loadBoardDetail(activeBoardId);
+    }
+  }, [fetchBoards, loadBoardDetail, activeBoardId]);
+
+  const openCreateForm = () => {
+    if (!user) {
+      window.dispatchEvent(new Event('showPermissionModal'));
+      return;
+    }
+    setIsFormOpen(true);
+  };
+
+  const handleCreateBoard = async (form) => {
+    if (!user) {
+      window.dispatchEvent(new Event('showPermissionModal'));
+      return;
+    }
+
+    try {
+      setFormLoading(true);
+      const payload = {
+        ...form,
+        userId: user.idx,
+        lostDate: form.lostDate || null,
+        latitude:
+          form.latitude && !Number.isNaN(Number.parseFloat(form.latitude))
+            ? Number.parseFloat(form.latitude)
+            : null,
+        longitude:
+          form.longitude && !Number.isNaN(Number.parseFloat(form.longitude))
+            ? Number.parseFloat(form.longitude)
+            : null,
+      };
+
+      Object.keys(payload).forEach((key) => {
+        if (payload[key] === '' || payload[key] === undefined) {
+          payload[key] = null;
+        }
+      });
+
+      const response = await missingPetApi.create(payload);
+      setIsFormOpen(false);
+      await fetchBoards();
+
+      if (response?.data?.idx) {
+        const newId = response.data.idx;
+        setActiveBoardId(newId);
+        setIsDrawerOpen(true);
+        await loadBoardDetail(newId);
+      }
+    } catch (err) {
+      alert(err.response?.data?.error || err.message);
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const handleCardClick = (board) => {
+    setActiveBoardId(board.idx);
+    setIsDrawerOpen(true);
+    setActiveBoard(null);
+    loadBoardDetail(board.idx);
+  };
+
+  const closeDrawer = () => {
+    setIsDrawerOpen(false);
+    setActiveBoardId(null);
+    setActiveBoard(null);
+    setDetailLoading(false);
+  };
+
   return (
-    <Wrapper>
-      <Header>
-        <div>
-          <Title>실종 동물 제보</Title>
-          <Subtitle>실시간으로 공유되는 우리 동네 실종 동물 정보를 확인하세요.</Subtitle>
-        </div>
-        <Controls>
-          <StatusFilter>
-            {STATUS_OPTIONS.map((option) => (
-              <StatusButton
-                key={option.value}
-                type="button"
-                onClick={() => setStatusFilter(option.value)}
-                active={statusFilter === option.value}
-              >
-                {option.label}
-              </StatusButton>
+    <>
+      <Wrapper>
+        <Header>
+          <div>
+            <Title>실종 동물 제보</Title>
+            <Subtitle>실시간으로 공유되는 우리 동네 실종 동물 정보를 확인하세요.</Subtitle>
+          </div>
+          <Controls>
+            <StatusFilter>
+              {STATUS_OPTIONS.map((option) => (
+                <StatusButton
+                  key={option.value}
+                  type="button"
+                  onClick={() => setStatusFilter(option.value)}
+                  active={statusFilter === option.value}
+                >
+                  {option.label}
+                </StatusButton>
+              ))}
+            </StatusFilter>
+            <ControlRow>
+              <RefreshButton type="button" onClick={fetchBoards} disabled={loading}>
+                {loading ? '불러오는 중...' : '새로고침'}
+              </RefreshButton>
+              <CreateButton type="button" onClick={openCreateForm}>
+                + 실종 제보 등록
+              </CreateButton>
+            </ControlRow>
+          </Controls>
+        </Header>
+
+        {error && <ErrorBanner>{error}</ErrorBanner>}
+
+        {lastUpdated && (
+          <UpdatedAt>
+            마지막 업데이트:{' '}
+            {lastUpdated.toLocaleString('ko-KR', {
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+            })}
+          </UpdatedAt>
+        )}
+
+        {boards.length === 0 && !loading && !error ? (
+          <EmptyState>
+            <p>등록된 실종 신고가 없습니다.</p>
+            <span>새로운 제보가 등록되면 이곳에서 확인하실 수 있습니다.</span>
+            <EmptyAction type="button" onClick={openCreateForm}>
+              첫 제보 등록하기
+            </EmptyAction>
+          </EmptyState>
+        ) : (
+          <BoardGrid>
+            {boards.map((board) => (
+              <BoardCard key={board.idx} onClick={() => handleCardClick(board)}>
+                {board.imageUrl && (
+                  <CardImage>
+                    <img src={board.imageUrl} alt={board.title} />
+                  </CardImage>
+                )}
+                <CardBody>
+                  <CardHeader>
+                    <StatusBadge status={board.status}>
+                      {statusLabel[board.status] || board.status}
+                    </StatusBadge>
+                    <LostDate>
+                      {board.lostDate ? `실종일: ${board.lostDate}` : '실종일 정보 없음'}
+                    </LostDate>
+                  </CardHeader>
+                  <CardTitle>{board.title}</CardTitle>
+                  <MetaRow>
+                    {board.petName && <MetaItem>이름: {board.petName}</MetaItem>}
+                    {board.species && <MetaItem>종: {board.species}</MetaItem>}
+                    {board.breed && <MetaItem>품종: {board.breed}</MetaItem>}
+                    {board.color && <MetaItem>색상: {board.color}</MetaItem>}
+                    {board.gender && <MetaItem>성별: {board.gender === 'M' ? '수컷' : '암컷'}</MetaItem>}
+                  </MetaRow>
+                  {board.lostLocation && (
+                    <LostLocation>실종 위치: {board.lostLocation}</LostLocation>
+                  )}
+                  {board.content && <Description>{board.content}</Description>}
+                </CardBody>
+                <CardFooter>
+                  <Reporter>제보자: {board.username || '알 수 없음'}</Reporter>
+                  <CommentCount>댓글 {board.commentCount ?? 0}개</CommentCount>
+                </CardFooter>
+              </BoardCard>
             ))}
-          </StatusFilter>
-          <RefreshButton type="button" onClick={fetchBoards} disabled={loading}>
-            {loading ? '불러오는 중...' : '새로고침'}
-          </RefreshButton>
-        </Controls>
-      </Header>
+          </BoardGrid>
+        )}
+      </Wrapper>
 
-      {error && <ErrorBanner>{error}</ErrorBanner>}
+      <MissingPetBoardForm
+        isOpen={isFormOpen}
+        onClose={() => setIsFormOpen(false)}
+        onSubmit={handleCreateBoard}
+        loading={formLoading}
+      />
 
-      {lastUpdated && (
-        <UpdatedAt>
-          마지막 업데이트:{' '}
-          {lastUpdated.toLocaleString('ko-KR', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-          })}
-        </UpdatedAt>
+      {isDrawerOpen && (
+        <>
+          <DrawerBackdrop onClick={closeDrawer} />
+          {detailLoading && !activeBoard ? (
+            <DrawerLoader>상세 정보를 불러오는 중...</DrawerLoader>
+          ) : (
+            <MissingPetBoardDetail
+              board={activeBoard}
+              onClose={closeDrawer}
+              onRefresh={refreshBoardDetail}
+              currentUser={user}
+            />
+          )}
+        </>
       )}
-
-      {boards.length === 0 && !loading && !error ? (
-        <EmptyState>
-          <p>등록된 실종 신고가 없습니다.</p>
-          <span>새로운 제보가 등록되면 이곳에서 확인하실 수 있습니다.</span>
-        </EmptyState>
-      ) : (
-        <BoardGrid>
-          {boards.map((board) => (
-            <BoardCard key={board.idx}>
-              <CardHeader>
-                <StatusBadge status={board.status}>{statusLabel[board.status] || board.status}</StatusBadge>
-                <LostDate>
-                  {board.lostDate ? `실종일: ${board.lostDate}` : '실종일 정보 없음'}
-                </LostDate>
-              </CardHeader>
-              <CardTitle>{board.title}</CardTitle>
-              <MetaRow>
-                {board.petName && <MetaItem>이름: {board.petName}</MetaItem>}
-                {board.species && <MetaItem>종: {board.species}</MetaItem>}
-                {board.breed && <MetaItem>품종: {board.breed}</MetaItem>}
-                {board.color && <MetaItem>색상: {board.color}</MetaItem>}
-                {board.gender && <MetaItem>성별: {board.gender === 'M' ? '수컷' : '암컷'}</MetaItem>}
-              </MetaRow>
-              {board.lostLocation && (
-                <LostLocation>실종 위치: {board.lostLocation}</LostLocation>
-              )}
-              {board.content && <Description>{board.content}</Description>}
-              <CardFooter>
-                <Reporter>제보자: {board.username || '알 수 없음'}</Reporter>
-                <CommentCount>댓글 {board.commentCount ?? 0}개</CommentCount>
-              </CardFooter>
-            </BoardCard>
-          ))}
-        </BoardGrid>
-      )}
-    </Wrapper>
+    </>
   );
 };
 
@@ -215,6 +357,27 @@ const RefreshButton = styled.button`
   }
 `;
 
+const CreateButton = styled.button`
+  border: none;
+  background: ${(props) => props.theme.colors.primary};
+  color: #ffffff;
+  border-radius: ${(props) => props.theme.borderRadius.md};
+  padding: ${(props) => props.theme.spacing.sm} ${(props) => props.theme.spacing.lg};
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.1s ease;
+
+  &:hover {
+    background: ${(props) => props.theme.colors.primaryDark};
+    transform: translateY(-1px);
+  }
+`;
+
+const ControlRow = styled.div`
+  display: flex;
+  gap: ${(props) => props.theme.spacing.sm};
+`;
+
 const ErrorBanner = styled.div`
   background: #fdecea;
   color: #c0392b;
@@ -254,11 +417,36 @@ const BoardCard = styled.div`
   background: ${(props) => props.theme.colors.surface};
   border: 1px solid ${(props) => props.theme.colors.border};
   border-radius: ${(props) => props.theme.borderRadius.lg};
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  overflow: hidden;
+
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.14);
+  }
+`;
+
+const CardImage = styled.div`
+  width: 100%;
+  height: 180px;
+  background: ${(props) => props.theme.colors.surfaceHover};
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+`;
+
+const CardBody = styled.div`
   padding: ${(props) => props.theme.spacing.lg};
   display: flex;
   flex-direction: column;
   gap: ${(props) => props.theme.spacing.sm};
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
 `;
 
 const CardHeader = styled.div`
@@ -326,12 +514,12 @@ const Description = styled.p`
 `;
 
 const CardFooter = styled.div`
+  padding: 0 ${(props) => props.theme.spacing.lg} ${(props) => props.theme.spacing.lg};
   display: flex;
   justify-content: space-between;
   align-items: center;
   font-size: 0.9rem;
   color: ${(props) => props.theme.colors.textSecondary};
-  margin-top: ${(props) => props.theme.spacing.sm};
 `;
 
 const Reporter = styled.span`
@@ -343,5 +531,42 @@ const CommentCount = styled.span`
   display: inline-flex;
   align-items: center;
   gap: 4px;
+`;
+
+const EmptyAction = styled.button`
+  margin-top: ${(props) => props.theme.spacing.lg};
+  border: none;
+  background: ${(props) => props.theme.colors.primary};
+  color: #ffffff;
+  border-radius: ${(props) => props.theme.borderRadius.md};
+  padding: ${(props) => props.theme.spacing.sm} ${(props) => props.theme.spacing.lg};
+  font-weight: 600;
+  cursor: pointer;
+
+  &:hover {
+    background: ${(props) => props.theme.colors.primaryDark};
+  }
+`;
+
+const DrawerBackdrop = styled.div`
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.35);
+  backdrop-filter: blur(2px);
+  z-index: 900;
+`;
+
+const DrawerLoader = styled.div`
+  position: fixed;
+  top: 50%;
+  right: 50%;
+  transform: translate(50%, -50%);
+  background: ${(props) => props.theme.colors.surface};
+  border-radius: ${(props) => props.theme.borderRadius.lg};
+  padding: ${(props) => props.theme.spacing.lg} ${(props) => props.theme.spacing.xl};
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.2);
+  z-index: 1001;
+  font-weight: 600;
+  color: ${(props) => props.theme.colors.text};
 `;
 

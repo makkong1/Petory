@@ -123,6 +123,7 @@ const LocationServiceMap = () => {
     level: MAP_DEFAULT_LEVEL,
   });
   const fetchServicesRef = useRef(null);
+  const suppressNextFetchRef = useRef(false);
 
   useEffect(() => {
     mapStateRef.current = {
@@ -284,6 +285,12 @@ const LocationServiceMap = () => {
         return;
       }
 
+      if (suppressNextFetchRef.current) {
+        suppressNextFetchRef.current = false;
+        programmaticCenterRef.current = null;
+        return;
+      }
+
       const prevFetch = lastFetchedRef.current;
       if (prevFetch.lat != null && prevFetch.lng != null) {
         const movedDistance = calculateDistance(prevFetch.lat, prevFetch.lng, lat, lng);
@@ -425,6 +432,7 @@ const LocationServiceMap = () => {
     setSelectedService(service);
 
     if (service?.latitude && service?.longitude) {
+      suppressNextFetchRef.current = true;
       const center = { lat: service.latitude, lng: service.longitude };
       programmaticCenterRef.current = center;
       setMapCenter(center);
