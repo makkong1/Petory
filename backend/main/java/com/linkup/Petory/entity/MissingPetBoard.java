@@ -74,8 +74,10 @@ public class MissingPetBoard {
     @Column(name = "lost_location", length = 255)
     private String lostLocation;
 
+    @Column(precision = 15, scale = 12)
     private BigDecimal latitude;
 
+    @Column(precision = 15, scale = 12)
     private BigDecimal longitude;
 
     @Enumerated(EnumType.STRING)
