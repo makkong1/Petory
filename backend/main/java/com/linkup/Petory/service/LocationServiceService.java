@@ -63,9 +63,9 @@ public class LocationServiceService {
 
     private int resolveMaxResults(Integer maxResults) {
         if (maxResults == null || maxResults <= 0) {
-            return 10;
+            return 100;
         }
-        return Math.min(maxResults, 10);
+        return Math.min(maxResults, 100);
     }
 
     private LocationServiceDTO convertDocumentToDto(KakaoPlaceDTO.Document document) {

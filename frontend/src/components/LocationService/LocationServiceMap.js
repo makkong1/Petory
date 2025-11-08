@@ -159,7 +159,7 @@ const LocationServiceMap = () => {
           latitude: effectiveLatitude,
           longitude: effectiveLongitude,
           radius: effectiveRadius,
-          size: 10,
+          size: 100,
         });
 
         if (latestRequestRef.current !== requestId) {

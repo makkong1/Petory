@@ -1,5 +1,7 @@
 package com.linkup.Petory.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkup.Petory.dto.KakaoAddressDTO;
 import com.linkup.Petory.dto.KakaoPlaceDTO;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +32,8 @@ public class KakaoMapService {
 
     @Value("${kakao.rest-api-key}")
     private String kakaoRestApiKey;
+
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private static final String KAKAO_LOCAL_SEARCH_URL = "https://dapi.kakao.com/v2/local/search/keyword.json";
     private static final String KAKAO_ADDRESS_SEARCH_URL = "https://dapi.kakao.com/v2/local/search/address.json";
@@ -92,6 +96,7 @@ public class KakaoMapService {
                         KakaoPlaceDTO.class);
 
                 KakaoPlaceDTO responseBody = response.getBody();
+                logRawKakaoResponse(uri, responseBody);
                 if (responseBody == null || responseBody.getDocuments() == null
                         || responseBody.getDocuments().isEmpty()) {
                     break;
@@ -120,6 +125,19 @@ public class KakaoMapService {
         } catch (Exception e) {
             log.error("카카오맵 API 호출 중 오류 발생: {}", e.getMessage());
             return allPlaces;
+        }
+    }
+
+    private void logRawKakaoResponse(URI uri, KakaoPlaceDTO responseBody) {
+        if (!log.isInfoEnabled()) {
+            return;
+        }
+
+        try {
+            String payload = OBJECT_MAPPER.writeValueAsString(responseBody);
+            log.info("카카오 장소 검색 RAW 응답 - uri='{}', payload={}", uri, payload);
+        } catch (JsonProcessingException e) {
+            log.warn("카카오 장소 검색 RAW 응답 로깅 중 JSON 직렬화 실패: {}", e.getMessage());
         }
     }
 
