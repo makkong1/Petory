@@ -115,8 +115,21 @@ const LocationServiceMap = () => {
   const [userLocation, setUserLocation] = useState(null);
   const [mapCenter, setMapCenter] = useState(DEFAULT_CENTER);
   const [mapLevel, setMapLevel] = useState(MAP_DEFAULT_LEVEL);
-  const ignoreNextIdleRef = useRef(false);
+  const programmaticCenterRef = useRef(null);
   const latestRequestRef = useRef(0);
+  const lastFetchedRef = useRef({ lat: null, lng: null, level: null });
+  const mapStateRef = useRef({
+    center: DEFAULT_CENTER,
+    level: MAP_DEFAULT_LEVEL,
+  });
+  const fetchServicesRef = useRef(null);
+
+  useEffect(() => {
+    mapStateRef.current = {
+      center: mapCenter,
+      level: mapLevel,
+    };
+  }, [mapCenter, mapLevel]);
 
   const fetchServices = useCallback(
     async ({
@@ -124,7 +137,7 @@ const LocationServiceMap = () => {
       longitude,
       region,
       keywordOverride,
-      radius,
+      level,
     }) => {
       const requestId = Date.now();
       latestRequestRef.current = requestId;
@@ -133,11 +146,13 @@ const LocationServiceMap = () => {
       setStatusMessage('지도 데이터 불러오는 중...');
       setError(null);
 
-      try {
-        const effectiveLatitude = typeof latitude === 'number' ? latitude : mapCenter.lat;
-        const effectiveLongitude = typeof longitude === 'number' ? longitude : mapCenter.lng;
-        const effectiveRadius = typeof radius === 'number' ? radius : levelToRadius(mapLevel);
+      const { center, level: currentLevel } = mapStateRef.current;
+      const effectiveLatitude = typeof latitude === 'number' ? latitude : center.lat;
+      const effectiveLongitude = typeof longitude === 'number' ? longitude : center.lng;
+      const effectiveLevel = typeof level === 'number' ? level : currentLevel;
+      const effectiveRadius = levelToRadius(effectiveLevel);
 
+      try {
         const response = await locationServiceApi.searchPlaces({
           keyword: keywordOverride ?? keyword,
           region,
@@ -184,18 +199,27 @@ const LocationServiceMap = () => {
         if (latestRequestRef.current === requestId) {
           setLoading(false);
         }
+        lastFetchedRef.current = {
+          lat: effectiveLatitude,
+          lng: effectiveLongitude,
+          level: effectiveLevel,
+        };
       }
     },
-    [keyword, mapCenter.lat, mapCenter.lng, mapLevel]
+    [keyword]
   );
+
+  useEffect(() => {
+    fetchServicesRef.current = fetchServices;
+  }, [fetchServices]);
 
   useEffect(() => {
     const tryGeolocation = () => {
       if (!navigator.geolocation) {
-        fetchServices({
+        fetchServicesRef.current?.({
           latitude: DEFAULT_CENTER.lat,
           longitude: DEFAULT_CENTER.lng,
-          radius: DEFAULT_RADIUS,
+          level: MAP_DEFAULT_LEVEL,
         });
         return;
       }
@@ -208,23 +232,25 @@ const LocationServiceMap = () => {
           };
           setUserLocation(location);
           setMapCenter(location);
-          ignoreNextIdleRef.current = true;
-          fetchServices({
+          programmaticCenterRef.current = location;
+          fetchServicesRef.current?.({
             latitude: location.lat,
             longitude: location.lng,
+            level: MAP_DEFAULT_LEVEL,
           });
         },
         () => {
-          fetchServices({
+          fetchServicesRef.current?.({
             latitude: DEFAULT_CENTER.lat,
             longitude: DEFAULT_CENTER.lng,
+            level: MAP_DEFAULT_LEVEL,
           });
         }
       );
     };
 
     tryGeolocation();
-  }, [fetchServices]);
+  }, []);
 
   const handleMapDragStart = useCallback(() => {
     setStatusMessage('지도 조정 중...');
@@ -232,33 +258,71 @@ const LocationServiceMap = () => {
 
   const handleMapIdle = useCallback(
     ({ lat, lng, level }) => {
-      if (ignoreNextIdleRef.current) {
-        ignoreNextIdleRef.current = false;
+      const nextCenter = { lat, lng };
+
+      if (
+        !mapCenter ||
+        Math.abs(mapCenter.lat - lat) > 0.00001 ||
+        Math.abs(mapCenter.lng - lng) > 0.00001
+      ) {
+        setMapCenter(nextCenter);
+      }
+
+      if (mapLevel !== level) {
+        setMapLevel(level);
+      }
+
+      const plannedCenter = programmaticCenterRef.current;
+      const centersAreClose = (a, b) =>
+        a &&
+        b &&
+        Math.abs(a.lat - b.lat) < 0.00001 &&
+        Math.abs(a.lng - b.lng) < 0.00001;
+
+      if (centersAreClose(plannedCenter, nextCenter)) {
+        programmaticCenterRef.current = null;
         return;
       }
 
-      setMapCenter({ lat, lng });
-      setMapLevel(level);
+      const prevFetch = lastFetchedRef.current;
+      if (prevFetch.lat != null && prevFetch.lng != null) {
+        const movedDistance = calculateDistance(prevFetch.lat, prevFetch.lng, lat, lng);
+        if (movedDistance != null && movedDistance < 50 && prevFetch.level === level) {
+          programmaticCenterRef.current = null;
+          return;
+        }
+      }
+
+      lastFetchedRef.current = { lat, lng, level };
+      programmaticCenterRef.current = null;
       fetchServices({
         latitude: lat,
         longitude: lng,
-        radius: levelToRadius(level),
+        level,
       });
     },
-    [fetchServices]
+    [fetchServices, mapCenter, mapLevel]
   );
 
   const handleKeywordSubmit = useCallback(
     (event) => {
       event.preventDefault();
-      ignoreNextIdleRef.current = true;
+      if (mapCenter) {
+        programmaticCenterRef.current = { ...mapCenter };
+        lastFetchedRef.current = {
+          lat: mapCenter.lat,
+          lng: mapCenter.lng,
+          level: mapLevel,
+        };
+      }
       fetchServices({
         latitude: mapCenter.lat,
         longitude: mapCenter.lng,
         keywordOverride: keyword,
+        level: mapLevel,
       });
     },
-    [fetchServices, keyword, mapCenter.lat, mapCenter.lng]
+    [fetchServices, keyword, mapCenter, mapLevel]
   );
 
   const handleAddressSearch = useCallback(async () => {
@@ -282,13 +346,18 @@ const LocationServiceMap = () => {
       };
 
       setMapCenter(location);
-      setUserLocation(location);
-      ignoreNextIdleRef.current = true;
+      programmaticCenterRef.current = location;
+      lastFetchedRef.current = {
+        lat: location.lat,
+        lng: location.lng,
+        level: mapLevel,
+      };
 
       fetchServices({
         latitude: location.lat,
         longitude: location.lng,
         keywordOverride: keyword,
+        level: mapLevel,
         region: addressQuery.trim(),
       });
     } catch (err) {
@@ -296,7 +365,7 @@ const LocationServiceMap = () => {
       setError(`주소 검색에 실패했습니다: ${message}`);
       setStatusMessage('');
     }
-  }, [addressQuery, fetchServices, keyword]);
+  }, [addressQuery, fetchServices, keyword, mapLevel]);
 
   const handleRegionSearch = useCallback(async () => {
     if (!selectedSido) {
@@ -322,13 +391,18 @@ const LocationServiceMap = () => {
       };
 
       setMapCenter(location);
-      setUserLocation(location);
-      ignoreNextIdleRef.current = true;
+      programmaticCenterRef.current = location;
+      lastFetchedRef.current = {
+        lat: location.lat,
+        lng: location.lng,
+        level: mapLevel,
+      };
 
       fetchServices({
         latitude: location.lat,
         longitude: location.lng,
         keywordOverride: keyword,
+        level: mapLevel,
         region: targetRegion,
       });
     } catch (err) {
@@ -336,7 +410,7 @@ const LocationServiceMap = () => {
       setError(`지역 검색에 실패했습니다: ${message}`);
       setStatusMessage('');
     }
-  }, [fetchServices, keyword, selectedSido, selectedSigungu]);
+  }, [fetchServices, keyword, selectedSido, selectedSigungu, mapLevel]);
 
   const servicesWithDisplay = useMemo(() =>
     services.map((service, index) => ({
@@ -351,32 +425,62 @@ const LocationServiceMap = () => {
     setSelectedService(service);
 
     if (service?.latitude && service?.longitude) {
-      ignoreNextIdleRef.current = true;
-      setMapCenter({ lat: service.latitude, lng: service.longitude });
+      const center = { lat: service.latitude, lng: service.longitude };
+      programmaticCenterRef.current = center;
+      setMapCenter(center);
     }
   }, []);
+
+  const handleRecenterToUser = useCallback(() => {
+    if (!userLocation) {
+      return;
+    }
+
+    const center = { ...userLocation };
+    programmaticCenterRef.current = center;
+    setMapCenter(center);
+    lastFetchedRef.current = {
+      lat: center.lat,
+      lng: center.lng,
+      level: mapLevel,
+    };
+    fetchServices({
+      latitude: center.lat,
+      longitude: center.lng,
+      level: mapLevel,
+    });
+  }, [fetchServices, mapLevel, userLocation]);
 
   return (
     <Container>
       <Header>
         <HeaderTop>
           <Title>지도에서 반려동물 서비스 찾기</Title>
-          <SearchModeTabs>
-            <SearchModeButton
+          <HeaderActions>
+            <SearchModeTabs>
+              <SearchModeButton
+                type="button"
+                active={searchMode === 'keyword'}
+                onClick={() => setSearchMode('keyword')}
+              >
+                키워드 검색
+              </SearchModeButton>
+              <SearchModeButton
+                type="button"
+                active={searchMode === 'region'}
+                onClick={() => setSearchMode('region')}
+              >
+                지역 선택
+              </SearchModeButton>
+            </SearchModeTabs>
+            <CurrentLocationButton
               type="button"
-              active={searchMode === 'keyword'}
-              onClick={() => setSearchMode('keyword')}
+              onClick={handleRecenterToUser}
+              disabled={!userLocation}
             >
-              키워드 검색
-            </SearchModeButton>
-            <SearchModeButton
-              type="button"
-              active={searchMode === 'region'}
-              onClick={() => setSearchMode('region')}
-            >
-              지역 선택
-            </SearchModeButton>
-          </SearchModeTabs>
+              내 위치로 이동
+            </CurrentLocationButton>
+          </HeaderActions>
         </HeaderTop>
 
         {searchMode === 'keyword' ? (
@@ -569,6 +673,7 @@ const Container = styled.div`
   display: flex;
   flex-direction: column;
   background: #f4f6f9;
+  overflow: hidden;
 `;
 
 const Header = styled.div`
@@ -659,6 +764,14 @@ const SearchModeTabs = styled.div`
   gap: 0.25rem;
 `;
 
+const HeaderActions = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+`;
+
 const SearchModeButton = styled.button.withConfig({
   shouldForwardProp: (prop) => prop !== 'active',
 })`
@@ -674,6 +787,35 @@ const SearchModeButton = styled.button.withConfig({
 
   &:hover {
     background: ${(props) => (props.active ? '#1e40af' : '#d1d5db')};
+  }
+`;
+
+const CurrentLocationButton = styled.button`
+  padding: 0.45rem 1rem;
+  border: none;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: #10b981;
+  color: #ffffff;
+  transition: background 0.2s ease, transform 0.1s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+
+  &:hover:enabled {
+    background: #059669;
+  }
+
+  &:active:enabled {
+    transform: scale(0.97);
+  }
+
+  &:disabled {
+    background: #d1d5db;
+    color: #6b7280;
+    cursor: not-allowed;
   }
 `;
 
@@ -745,12 +887,14 @@ const MapArea = styled.div`
   position: relative;
   display: flex;
   background: #e5e7eb;
+  min-height: 0;
 `;
 
 const MapWrapper = styled.div`
   flex: 1;
   position: relative;
   min-width: 0;
+  min-height: 0;
 `;
 
 const LoadingOverlay = styled.div`
@@ -772,7 +916,9 @@ const ServiceListPanel = styled.div`
   display: flex;
   flex-direction: column;
   z-index: 150;
-  max-height: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 `;
 
 const ServiceListHeader = styled.div`
@@ -789,6 +935,7 @@ const ServiceListTitle = styled.h3`
 
 const ServiceListContent = styled.div`
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 0.75rem;
   padding-right: 0.35rem;

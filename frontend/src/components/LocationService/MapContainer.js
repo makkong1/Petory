@@ -1,159 +1,176 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
 
-const DEFAULT_CENTER = { lat: 37.5665, lng: 126.9780 };
+const DEFAULT_CENTER = { lat: 37.5665, lng: 126.978 };
 const DEFAULT_LEVEL = 4;
+const COORD_EPSILON = 0.00001;
 
-const MapContainer = React.forwardRef(({ services = [], onServiceClick, userLocation, mapCenter, onMapDragStart, onMapIdle }, ref) => {
-  const mapRef = useRef(null);
-  const mapInstanceRef = useRef(null);
-  const markersRef = useRef([]);
-  const userMarkerRef = useRef(null);
-  const lastCenterRef = useRef(null);
-  const [mapReady, setMapReady] = useState(false);
+const MapContainer = React.forwardRef(
+  ({ services = [], onServiceClick, userLocation, mapCenter, onMapDragStart, onMapIdle }, ref) => {
+    const mapRef = useRef(null);
+    const mapInstanceRef = useRef(null);
+    const markersRef = useRef([]);
+    const userMarkerRef = useRef(null);
+    const lastProgrammaticCenterRef = useRef(null);
+    const mapReadyRef = useRef(false);
+    const [mapReady, setMapReady] = useState(false);
 
-  const initializeMap = useCallback(() => {
-    if (!mapRef.current || !window.kakao || !window.kakao.maps) {
-      return;
-    }
+    const ensureMap = useCallback(() => {
+      if (mapInstanceRef.current || !mapRef.current || !window.kakao?.maps) {
+        return;
+      }
 
-    const initial = mapCenter || userLocation || DEFAULT_CENTER;
-    const options = {
-      center: new window.kakao.maps.LatLng(initial.lat, initial.lng),
-      level: DEFAULT_LEVEL,
-    };
+      const initial = mapCenter || userLocation || DEFAULT_CENTER;
+      const map = new window.kakao.maps.Map(mapRef.current, {
+        center: new window.kakao.maps.LatLng(initial.lat, initial.lng),
+        level: DEFAULT_LEVEL,
+      });
 
-    const map = new window.kakao.maps.Map(mapRef.current, options);
-    mapInstanceRef.current = map;
-    lastCenterRef.current = initial;
-    setMapReady(true);
-  }, [mapCenter, userLocation]);
+      mapInstanceRef.current = map;
+      lastProgrammaticCenterRef.current = initial;
+      mapReadyRef.current = true;
+      setMapReady(true);
+    }, [mapCenter, userLocation]);
 
-  useLayoutEffect(() => {
-    const load = () => {
-      if (window.kakao && window.kakao.maps) {
-        window.kakao.maps.load(() => {
-          initializeMap();
+    useEffect(() => {
+      const waitForKakao = () => {
+        if (window.kakao?.maps) {
+          window.kakao.maps.load(() => ensureMap());
+        } else {
+          setTimeout(waitForKakao, 100);
+        }
+      };
+
+      waitForKakao();
+    }, [ensureMap]);
+
+    const clearMarkers = useCallback(() => {
+      markersRef.current.forEach((marker) => marker.setMap(null));
+      markersRef.current = [];
+    }, []);
+
+    useEffect(() => {
+      if (!mapReadyRef.current || !mapInstanceRef.current) return;
+
+      clearMarkers();
+
+      services.forEach((service) => {
+        if (typeof service.latitude !== 'number' || typeof service.longitude !== 'number') {
+          return;
+        }
+
+        const position = new window.kakao.maps.LatLng(service.latitude, service.longitude);
+        const marker = new window.kakao.maps.Marker({
+          position,
+          map: mapInstanceRef.current,
+        });
+
+        window.kakao.maps.event.addListener(marker, 'click', () => {
+          if (mapInstanceRef.current) {
+            lastProgrammaticCenterRef.current = {
+              lat: service.latitude,
+              lng: service.longitude,
+            };
+            mapInstanceRef.current.panTo(position);
+          }
+          onServiceClick?.(service);
+        });
+
+        markersRef.current.push(marker);
+      });
+    }, [services, onServiceClick, clearMarkers]);
+
+    useEffect(() => {
+      if (!mapReadyRef.current || !mapInstanceRef.current || !mapCenter) return;
+
+      const last = lastProgrammaticCenterRef.current;
+      const isSame =
+        last &&
+        Math.abs(last.lat - mapCenter.lat) < COORD_EPSILON &&
+        Math.abs(last.lng - mapCenter.lng) < COORD_EPSILON;
+
+      if (!isSame) {
+        lastProgrammaticCenterRef.current = { ...mapCenter };
+        mapInstanceRef.current.panTo(new window.kakao.maps.LatLng(mapCenter.lat, mapCenter.lng));
+      }
+    }, [mapCenter]);
+
+    useEffect(() => {
+      if (!mapReadyRef.current || !mapInstanceRef.current || !userLocation) return;
+
+      const position = new window.kakao.maps.LatLng(userLocation.lat, userLocation.lng);
+
+      if (!userMarkerRef.current) {
+        userMarkerRef.current = new window.kakao.maps.Marker({
+          position,
+          map: mapInstanceRef.current,
         });
       } else {
-        setTimeout(load, 100);
+        userMarkerRef.current.setPosition(position);
       }
-    };
-    load();
-  }, [initializeMap]);
+    }, [userLocation]);
 
-  const clearMarkers = useCallback(() => {
-    markersRef.current.forEach((marker) => marker.setMap(null));
-    markersRef.current = [];
-  }, []);
+    useEffect(() => {
+      if (!mapReadyRef.current || !mapInstanceRef.current || !window.kakao?.maps) return;
 
-  const updateMarkers = useCallback(() => {
-    if (!mapInstanceRef.current) return;
+      const map = mapInstanceRef.current;
 
-    clearMarkers();
+      const handleDragStart = () => {
+        lastProgrammaticCenterRef.current = null;
+        onMapDragStart?.();
+      };
 
-    services.forEach((service) => {
-      if (!service.latitude || !service.longitude) return;
+      const handleIdle = () => {
+        const center = map.getCenter();
+        const planned = lastProgrammaticCenterRef.current;
 
-      const position = new window.kakao.maps.LatLng(service.latitude, service.longitude);
-      const marker = new window.kakao.maps.Marker({
-        position,
-        map: mapInstanceRef.current,
-      });
+        if (planned) {
+          const isSame =
+            Math.abs(planned.lat - center.getLat()) < COORD_EPSILON &&
+            Math.abs(planned.lng - center.getLng()) < COORD_EPSILON;
 
-      window.kakao.maps.event.addListener(marker, 'click', () => {
-        mapInstanceRef.current.panTo(position);
-        if (onServiceClick) {
-          onServiceClick(service);
+          if (isSame) {
+            lastProgrammaticCenterRef.current = null;
+            return;
+          }
+
+          lastProgrammaticCenterRef.current = null;
         }
-      });
 
-      markersRef.current.push(marker);
-    });
-  }, [services, onServiceClick, clearMarkers]);
+        onMapIdle?.({
+          lat: center.getLat(),
+          lng: center.getLng(),
+          level: map.getLevel(),
+        });
+      };
 
-  useEffect(() => {
-    if (mapReady) {
-      updateMarkers();
-    }
-  }, [mapReady, updateMarkers]);
+      window.kakao.maps.event.addListener(map, 'dragstart', handleDragStart);
+      window.kakao.maps.event.addListener(map, 'idle', handleIdle);
 
-  useEffect(() => {
-    if (!mapReady || !mapInstanceRef.current) return;
-    if (!mapCenter) return;
+      return () => {
+        window.kakao.maps.event.removeListener(map, 'dragstart', handleDragStart);
+        window.kakao.maps.event.removeListener(map, 'idle', handleIdle);
+      };
+    }, [onMapDragStart, onMapIdle]);
 
-    const previous = lastCenterRef.current;
-    if (!previous || previous.lat !== mapCenter.lat || previous.lng !== mapCenter.lng) {
-      const position = new window.kakao.maps.LatLng(mapCenter.lat, mapCenter.lng);
-      mapInstanceRef.current.panTo(position);
-      lastCenterRef.current = mapCenter;
-    }
-  }, [mapCenter, mapReady]);
+    useEffect(() => {
+      return () => {
+        clearMarkers();
+        if (userMarkerRef.current) {
+          userMarkerRef.current.setMap(null);
+        }
+      };
+    }, [clearMarkers]);
 
-  useEffect(() => {
-    if (!mapReady || !mapInstanceRef.current || !userLocation) return;
-
-    const position = new window.kakao.maps.LatLng(userLocation.lat, userLocation.lng);
-
-    if (!userMarkerRef.current) {
-      const marker = new window.kakao.maps.Marker({
-        position,
-        map: mapInstanceRef.current,
-      });
-      userMarkerRef.current = marker;
-    } else {
-      userMarkerRef.current.setMap(mapInstanceRef.current);
-      userMarkerRef.current.setPosition(position);
-    }
-  }, [userLocation, mapReady]);
-
-  useEffect(() => {
-    if (!mapReady || !mapInstanceRef.current || !window.kakao) return;
-
-    const map = mapInstanceRef.current;
-
-    const handleDragStart = () => {
-      if (onMapDragStart) {
-        onMapDragStart();
-      }
-    };
-
-    const emitCenterUpdate = () => {
-      if (!onMapIdle) return;
-      const center = map.getCenter();
-      onMapIdle({
-        lat: center.getLat(),
-        lng: center.getLng(),
-        level: map.getLevel(),
-      });
-    };
-
-    window.kakao.maps.event.addListener(map, 'dragstart', handleDragStart);
-    window.kakao.maps.event.addListener(map, 'dragend', emitCenterUpdate);
-    window.kakao.maps.event.addListener(map, 'zoom_changed', emitCenterUpdate);
-    window.kakao.maps.event.addListener(map, 'idle', emitCenterUpdate);
-
-    return () => {
-      window.kakao.maps.event.removeListener(map, 'dragstart', handleDragStart);
-      window.kakao.maps.event.removeListener(map, 'dragend', emitCenterUpdate);
-      window.kakao.maps.event.removeListener(map, 'zoom_changed', emitCenterUpdate);
-      window.kakao.maps.event.removeListener(map, 'idle', emitCenterUpdate);
-    };
-  }, [mapReady, onMapDragStart, onMapIdle]);
-
-  useEffect(() => () => clearMarkers(), [clearMarkers]);
-
-  return (
-    <MapDiv ref={mapRef}>
-      {!mapReady && (
-        <MapLoading>🗺️ 지도를 불러오는 중...</MapLoading>
-      )}
-    </MapDiv>
-  );
-});
+    return (
+      <MapDiv ref={mapRef}>
+        {!mapReady && <MapLoading>🗺️ 지도를 불러오는 중...</MapLoading>}
+      </MapDiv>
+    );
+  }
+);
 
 MapContainer.displayName = 'MapContainer';
-
 export default MapContainer;
 
 const MapDiv = styled.div`
