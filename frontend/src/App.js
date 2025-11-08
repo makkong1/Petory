@@ -12,6 +12,7 @@ import LoginForm from './components/Auth/LoginForm';
 import RegisterForm from './components/Auth/RegisterForm';
 import AdminPanel from './components/Admin/AdminPanel';
 import PermissionDeniedModal from './components/Common/PermissionDeniedModal';
+import MissingPetBoardPage from './components/MissingPet/MissingPetBoardPage';
 import { setupApiInterceptors } from './api/authApi';
 
 
@@ -98,6 +99,8 @@ function AppContent() {
         return <CareRequestList />;
       case 'community':
         return <CommunityBoard />;
+      case 'missing-pets':
+        return <MissingPetBoardPage />;
       case 'users':
         return <UserList />;
       case 'admin':

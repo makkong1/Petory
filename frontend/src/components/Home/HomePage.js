@@ -13,6 +13,12 @@ const HomePage = ({ setActiveTab }) => {
       action: () => setActiveTab('location-services')
     },
     {
+      icon: '🚨',
+      title: '실종 제보',
+      description: '우리 동네 실종 동물 정보를 모아 신속하게 공유하세요.',
+      action: () => setActiveTab('missing-pets')
+    },
+    {
       icon: '🐾',
       title: '펫케어 서비스',
       description: '믿을 수 있는 펫시터와 매칭하여 소중한 반려동물을 안전하게 맡기세요.',
