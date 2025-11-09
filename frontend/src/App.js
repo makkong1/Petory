@@ -4,7 +4,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Navigation from './components/Layout/Navigation';
 import HomePage from './components/Home/HomePage';
-import UserList from './components/UserList';
+import UserList from './components/User/UserList';
 import CareRequestList from './components/CareRequest/CareRequestList';
 import CommunityBoard from './components/Community/CommunityBoard';
 import LocationServiceMap from './components/LocationService/LocationServiceMap';
@@ -48,7 +48,7 @@ function AppContent() {
     };
 
     window.addEventListener('showPermissionModal', handleShowPermissionModal);
-    
+
     return () => {
       window.removeEventListener('showPermissionModal', handleShowPermissionModal);
     };
@@ -75,11 +75,11 @@ function AppContent() {
     return (
       <AuthContainer>
         {authMode === 'login' ? (
-          <LoginForm 
+          <LoginForm
             onSwitchToRegister={() => setAuthMode('register')}
           />
         ) : (
-          <RegisterForm 
+          <RegisterForm
             onRegisterSuccess={() => {
               // 회원가입 성공 시 로그인 모드로 전환
               setAuthMode('login');
@@ -92,7 +92,7 @@ function AppContent() {
   }
 
   const renderContent = () => {
-    switch(activeTab) {
+    switch (activeTab) {
       case 'location-services':
         return <LocationServiceMap />;
       case 'care-requests':
@@ -113,13 +113,13 @@ function AppContent() {
 
   return (
     <>
-      <PermissionDeniedModal 
+      <PermissionDeniedModal
         isOpen={showGlobalPermissionModal}
         onClose={() => setShowGlobalPermissionModal(false)}
       />
-      <Navigation 
-        activeTab={activeTab} 
-        setActiveTab={setActiveTab} 
+      <Navigation
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
         user={user}
       />
       <MainContent>

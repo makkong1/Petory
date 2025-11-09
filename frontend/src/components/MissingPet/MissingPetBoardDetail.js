@@ -14,6 +14,7 @@ const MissingPetBoardDetail = ({
   onRefresh,
   currentUser,
   onDeleteComment,
+  onDeleteBoard,
 }) => {
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -83,6 +84,23 @@ const MissingPetBoardDetail = ({
   };
 
   const canManageStatus = currentUser && currentUser.idx === board.userId;
+  const canDeleteBoard = currentUser && currentUser.idx === board.userId;
+
+  const handleDeleteBoard = async () => {
+    if (!canDeleteBoard) {
+      return;
+    }
+    if (!window.confirm('해당 실종 제보를 삭제하시겠습니까?')) {
+      return;
+    }
+    try {
+      await missingPetApi.delete(board.idx);
+      onDeleteBoard?.(board.idx);
+      onClose?.();
+    } catch (err) {
+      alert(err.response?.data?.error || err.message);
+    }
+  };
 
   return (
     <Drawer>
@@ -93,7 +111,14 @@ const MissingPetBoardDetail = ({
           </StatusBadge>
           <DrawerTitle>{board.title}</DrawerTitle>
         </HeaderLeft>
-        <CloseButton onClick={onClose}>✕</CloseButton>
+        <HeaderRight>
+          {canDeleteBoard && (
+            <DeleteBoardButton type="button" onClick={handleDeleteBoard}>
+              삭제
+            </DeleteBoardButton>
+          )}
+          <CloseButton onClick={onClose}>✕</CloseButton>
+        </HeaderRight>
       </DrawerHeader>
       <DrawerBody>
         <InfoCard>
@@ -285,6 +310,12 @@ const HeaderLeft = styled.div`
   gap: ${(props) => props.theme.spacing.sm};
 `;
 
+const HeaderRight = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${(props) => props.theme.spacing.sm};
+`;
+
 const DrawerTitle = styled.h2`
   margin: 0;
   font-size: 1.3rem;
@@ -299,6 +330,22 @@ const CloseButton = styled.button`
 
   &:hover {
     color: ${(props) => props.theme.colors.text};
+  }
+`;
+
+const DeleteBoardButton = styled.button`
+  border: 1px solid ${(props) => props.theme.colors.error || '#dc2626'};
+  background: transparent;
+  color: ${(props) => props.theme.colors.error || '#dc2626'};
+  border-radius: ${(props) => props.theme.borderRadius.md};
+  padding: ${(props) => props.theme.spacing.xs} ${(props) => props.theme.spacing.sm};
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: rgba(220, 38, 38, 0.1);
+    transform: translateY(-1px);
   }
 `;
 

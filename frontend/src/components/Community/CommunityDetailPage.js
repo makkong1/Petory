@@ -8,7 +8,15 @@ import { useAuth } from '../../contexts/AuthContext';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
-const CommunityDetailPage = ({ isOpen, boardId, onClose, onCommentAdded, onBoardReaction }) => {
+const CommunityDetailPage = ({
+  isOpen,
+  boardId,
+  onClose,
+  onCommentAdded,
+  onBoardReaction,
+  currentUser,
+  onBoardDeleted,
+}) => {
   const { requireLogin } = usePermission();
   const { user, redirectToLogin } = useAuth();
 
@@ -296,6 +304,43 @@ const CommunityDetailPage = ({ isOpen, boardId, onClose, onCommentAdded, onBoard
     [boardId, requireLogin, redirectToLogin, user]
   );
 
+  const handleDeleteBoard = useCallback(async () => {
+    if (!boardId || !currentUser || board?.userId !== currentUser.idx) {
+      return;
+    }
+    if (!window.confirm('이 게시글을 삭제하시겠습니까?')) {
+      return;
+    }
+    try {
+      await boardApi.deleteBoard(boardId);
+      onBoardDeleted?.(boardId);
+      onClose?.();
+    } catch (err) {
+      const message = err.response?.data?.error || err.message || '게시글 삭제에 실패했습니다.';
+      setBoardError(message);
+    }
+  }, [boardId, currentUser, board, onBoardDeleted, onClose]);
+
+  const handleDeleteComment = useCallback(
+    async (commentId) => {
+      if (!boardId || !currentUser) {
+        return;
+      }
+      if (!window.confirm('이 댓글을 삭제하시겠습니까?')) {
+        return;
+      }
+      try {
+        await commentApi.delete(boardId, commentId);
+        setComments((prev) => prev.filter((comment) => comment.idx !== commentId));
+        onCommentAdded?.();
+      } catch (err) {
+        const message = err.response?.data?.error || err.message || '댓글 삭제에 실패했습니다.';
+        setCommentError(message);
+      }
+    },
+    [boardId, currentUser, onCommentAdded]
+  );
+
   if (!isOpen) {
     return null;
   }
@@ -332,6 +377,11 @@ const CommunityDetailPage = ({ isOpen, boardId, onClose, onCommentAdded, onBoard
                 >
                   👎 {board?.dislikes ?? 0}
                 </HeaderActionButton>
+                {currentUser && board?.userId === currentUser.idx && (
+                  <HeaderActionButton type="button" onClick={handleDeleteBoard}>
+                    🗑 삭제
+                  </HeaderActionButton>
+                )}
                 <HeaderActionButton type="button" onClick={handleReportClick}>
                   🚨 신고
                 </HeaderActionButton>
@@ -436,6 +486,11 @@ const CommunityDetailPage = ({ isOpen, boardId, onClose, onCommentAdded, onBoard
                         <ReactionIcon>👎</ReactionIcon>
                         <ReactionCount>{comment.dislikeCount ?? 0}</ReactionCount>
                       </ReactionButton>
+                      {currentUser && comment.userId === currentUser.idx && (
+                        <DeleteCommentButton type="button" onClick={() => handleDeleteComment(comment.idx)}>
+                          삭제
+                        </DeleteCommentButton>
+                      )}
                     </CommentStats>
                   </CommentItem>
                 ))}
@@ -819,6 +874,25 @@ const ReactionIcon = styled.span`
 
 const ReactionCount = styled.span`
   font-size: 0.9rem;
+`;
+
+const DeleteCommentButton = styled.button`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: ${(props) => props.theme.spacing.xs} ${(props) => props.theme.spacing.md};
+  border-radius: ${(props) => props.theme.borderRadius.md};
+  border: 1px solid ${(props) => props.theme.colors.error || '#dc2626'};
+  background: transparent;
+  color: ${(props) => props.theme.colors.error || '#dc2626'};
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: rgba(220, 38, 38, 0.08);
+    transform: translateY(-1px);
+  }
 `;
 
 const CommentComposer = styled.div`

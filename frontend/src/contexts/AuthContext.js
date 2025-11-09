@@ -183,6 +183,18 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const updateUserProfile = (updatedUser) => {
+    setUser((prev) => {
+      if (!prev) {
+        return updatedUser || prev;
+      }
+      return {
+        ...prev,
+        ...updatedUser,
+      };
+    });
+  };
+
   const value = {
     user,
     loading,
@@ -191,6 +203,7 @@ export const AuthProvider = ({ children }) => {
     register,
     logout,
     redirectToLogin,
+    updateUserProfile,
   };
 
   return (

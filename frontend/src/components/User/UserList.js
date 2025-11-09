@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { userApi } from '../api/userApi';
+import { userApi } from '../../api/userApi';
 import UserModal from './UserModal';
 
 const UserList = () => {
@@ -79,7 +79,7 @@ const UserList = () => {
         <div>
           <ErrorMessage>{error}</ErrorMessage>
           <div style={{ textAlign: 'center', marginTop: '20px' }}>
-            <button 
+            <button
               onClick={fetchUsers}
               style={{
                 padding: '10px 20px',
@@ -97,9 +97,9 @@ const UserList = () => {
       ) : (
         <UserGrid>
           {users.length === 0 ? (
-            <div style={{ 
-              gridColumn: '1 / -1', 
-              textAlign: 'center', 
+            <div style={{
+              gridColumn: '1 / -1',
+              textAlign: 'center',
               padding: '40px',
               color: '#666',
               fontSize: '18px'
@@ -117,16 +117,16 @@ const UserList = () => {
                   {user.location && <UserDetail><strong>위치:</strong> {user.location}</UserDetail>}
                   {user.petInfo && <UserDetail><strong>펫 정보:</strong> {user.petInfo}</UserDetail>}
                 </UserInfo>
-                
+
                 <ButtonGroup>
-                  <ActionButton 
-                    variant="edit" 
+                  <ActionButton
+                    variant="edit"
                     onClick={() => handleEditUser(user)}
                   >
                     수정
                   </ActionButton>
-                  <ActionButton 
-                    variant="delete" 
+                  <ActionButton
+                    variant="delete"
                     onClick={() => handleDeleteUser(user.idx)}
                   >
                     삭제
@@ -236,7 +236,7 @@ const UserDetail = styled.p`
 
 const RoleBadge = styled.span`
   background: ${props => {
-    switch(props.role) {
+    switch (props.role) {
       case 'ADMIN': return '#e74c3c';
       case 'MASTER': return '#9b59b6';
       case 'SERVICE_PROVIDER': return '#f39c12';

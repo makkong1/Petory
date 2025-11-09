@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { careRequestApi } from '../../api/careRequestApi';
+import { useAuth } from '../../contexts/AuthContext';
 
 const CareRequestList = () => {
+  const { user } = useAuth();
   const [careRequests, setCareRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -38,6 +40,23 @@ const CareRequestList = () => {
   const filteredRequests = activeFilter === 'ALL' 
     ? careRequests 
     : careRequests.filter(request => request.status === activeFilter);
+
+  const handleDeleteRequest = async (requestId) => {
+    if (!user) {
+      window.dispatchEvent(new Event('showPermissionModal'));
+      return;
+    }
+    if (!window.confirm('해당 펫케어 요청을 삭제하시겠습니까?')) {
+      return;
+    }
+    try {
+      await careRequestApi.deleteCareRequest(requestId);
+      setCareRequests((prev) => prev.filter((request) => request.idx !== requestId));
+    } catch (err) {
+      const message = err.response?.data?.error || err.message || '삭제에 실패했습니다.';
+      alert(message);
+    }
+  };
 
   // 필터 변경 시 API 재호출
   const handleFilterChange = async (filterKey) => {
@@ -128,6 +147,11 @@ const CareRequestList = () => {
                 <StatusBadge status={request.status}>
                   {getStatusLabel(request.status)}
                 </StatusBadge>
+                {user && user.idx === request.userId && (
+                  <DeleteButton type="button" onClick={() => handleDeleteRequest(request.idx)}>
+                    삭제
+                  </DeleteButton>
+                )}
               </CardHeader>
               
               <CardDescription>{request.description}</CardDescription>
@@ -283,6 +307,22 @@ const StatusBadge = styled.span`
   font-size: ${props => props.theme.typography.caption.fontSize};
   font-weight: 600;
   text-transform: uppercase;
+`;
+
+const DeleteButton = styled.button`
+  margin-left: ${props => props.theme.spacing.sm};
+  background: none;
+  border: 1px solid ${props => props.theme.colors.error || '#dc2626'};
+  color: ${props => props.theme.colors.error || '#dc2626'};
+  border-radius: ${props => props.theme.borderRadius.md};
+  padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.sm};
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: rgba(220, 38, 38, 0.08);
+    transform: translateY(-1px);
+  }
 `;
 
 const CardDescription = styled.p`

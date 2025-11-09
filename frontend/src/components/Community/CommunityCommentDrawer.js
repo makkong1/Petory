@@ -124,6 +124,23 @@ const CommunityCommentDrawer = ({ isOpen, board, onClose, currentUser, onComment
     }
   };
 
+  const handleDeleteComment = async (commentId) => {
+    if (!board?.idx || !currentUser) {
+      return;
+    }
+    if (!window.confirm('이 댓글을 삭제하시겠습니까?')) {
+      return;
+    }
+    try {
+      await commentApi.delete(board.idx, commentId);
+      setComments((prev) => prev.filter((comment) => comment.idx !== commentId));
+      onCommentAdded?.();
+    } catch (err) {
+      const message = err.response?.data?.error || err.message;
+      setError(`댓글을 삭제하지 못했습니다: ${message}`);
+    }
+  };
+
   if (!isOpen) {
     return null;
   }
@@ -174,6 +191,13 @@ const CommunityCommentDrawer = ({ isOpen, board, onClose, currentUser, onComment
                     <CommentImage>
                       <img src={comment.commentFilePath} alt="댓글 이미지" />
                     </CommentImage>
+                  )}
+                  {currentUser && comment.userId === currentUser.idx && (
+                    <CommentActions>
+                      <CommentDeleteButton type="button" onClick={() => handleDeleteComment(comment.idx)}>
+                        삭제
+                      </CommentDeleteButton>
+                    </CommentActions>
                   )}
                 </CommentItem>
               ))}
@@ -394,6 +418,29 @@ const CommentContent = styled.p`
   color: ${(props) => props.theme.colors.text};
   white-space: pre-wrap;
   line-height: 1.5;
+`;
+
+const CommentActions = styled.div`
+  display: flex;
+  justify-content: flex-end;
+  margin-top: ${(props) => props.theme.spacing.xs};
+`;
+
+const CommentDeleteButton = styled.button`
+  padding: ${(props) => props.theme.spacing.xs} ${(props) => props.theme.spacing.md};
+  border-radius: ${(props) => props.theme.borderRadius.md};
+  border: 1px solid ${(props) => props.theme.colors.error || '#dc2626'};
+  background: transparent;
+  color: ${(props) => props.theme.colors.error || '#dc2626'};
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: rgba(220, 38, 38, 0.08);
+    transform: translateY(-1px);
+  }
 `;
 
 const CommentImage = styled.div`

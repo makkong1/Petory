@@ -135,12 +135,17 @@ const MissingPetBoardPage = () => {
     loadBoardDetail(board.idx);
   };
 
-  const closeDrawer = () => {
+  const closeDrawer = useCallback(() => {
     setIsDrawerOpen(false);
     setActiveBoardId(null);
     setActiveBoard(null);
     setDetailLoading(false);
-  };
+  }, []);
+
+  const handleBoardDeleted = useCallback(async () => {
+    await fetchBoards();
+    closeDrawer();
+  }, [fetchBoards, closeDrawer]);
 
   return (
     <>
@@ -258,6 +263,7 @@ const MissingPetBoardPage = () => {
               onClose={closeDrawer}
               onRefresh={refreshBoardDetail}
               currentUser={user}
+              onDeleteBoard={handleBoardDeleted}
             />
           )}
         </>

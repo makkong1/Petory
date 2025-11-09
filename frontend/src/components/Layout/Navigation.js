@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import styled from 'styled-components';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
+import UserProfileModal from '../User/UserProfileModal';
 
 const NavContainer = styled.nav`
   background: ${props => props.theme.colors.background};
@@ -118,12 +119,23 @@ const RightSection = styled.div`
   gap: ${props => props.theme.spacing.md};
 `;
 
-const UserInfo = styled.div`
-  display: flex;
+const UserInfo = styled.button`
+  display: inline-flex;
   align-items: center;
-  gap: ${props => props.theme.spacing.sm};
+  gap: ${props => props.theme.spacing.xs};
   color: ${props => props.theme.colors.text};
   font-size: 14px;
+  background: ${props => props.theme.colors.surface};
+  border: 1px solid ${props => props.theme.colors.border};
+  padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.sm};
+  border-radius: ${props => props.theme.borderRadius.md};
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: ${props => props.theme.colors.surfaceHover};
+    color: ${props => props.theme.colors.primary};
+  }
 `;
 
 const LogoutButton = styled.button`
@@ -144,8 +156,9 @@ const LogoutButton = styled.button`
 
 const Navigation = ({ activeTab, setActiveTab, user }) => {
   const { isDarkMode, toggleTheme } = useTheme();
-  const { logout } = useAuth();
+  const { logout, updateUserProfile } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   const isAdmin = user && (user.role === 'ADMIN' || user.role === 'MASTER');
   
@@ -162,52 +175,67 @@ const Navigation = ({ activeTab, setActiveTab, user }) => {
   ];
 
   return (
-    <NavContainer>
-      <NavContent>
-        <Logo onClick={() => setActiveTab('home')}>
-          <span className="icon">🦴</span>
-          <span>Petory</span>
-        </Logo>
-        
-        <NavMenu isOpen={isMobileMenuOpen}>
-          {menuItems.map(item => (
-            <NavItem
-              key={item.id}
-              className={activeTab === item.id ? 'active' : ''}
-              onClick={() => {
-                setActiveTab(item.id);
-                setIsMobileMenuOpen(false);
-              }}
-            >
-              <span style={{ marginRight: '8px' }}>{item.icon}</span>
-              {item.label}
-            </NavItem>
-          ))}
-        </NavMenu>
-        
-        <RightSection>
-          {user && (
-            <UserInfo>
-              <span>👤 {user.username}</span>
-            </UserInfo>
-          )}
+    <>
+      <NavContainer>
+        <NavContent>
+          <Logo onClick={() => setActiveTab('home')}>
+            <span className="icon">🦴</span>
+            <span>Petory</span>
+          </Logo>
           
-          <ThemeToggle onClick={toggleTheme}>
-            {isDarkMode ? '🌙' : '☀️'}
-          </ThemeToggle>
+          <NavMenu isOpen={isMobileMenuOpen}>
+            {menuItems.map(item => (
+              <NavItem
+                key={item.id}
+                className={activeTab === item.id ? 'active' : ''}
+                onClick={() => {
+                  setActiveTab(item.id);
+                  setIsMobileMenuOpen(false);
+                }}
+              >
+                <span style={{ marginRight: '8px' }}>{item.icon}</span>
+                {item.label}
+              </NavItem>
+            ))}
+          </NavMenu>
           
-          {user && (
-            <LogoutButton onClick={logout}>
-              로그아웃
-            </LogoutButton>
-          )}
-          
-          <MobileMenuButton onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
-            ☰
-          </MobileMenuButton>
-        </RightSection>
-      </NavContent>
-    </NavContainer>
+          <RightSection>
+            {user && (
+              <UserInfo type="button" onClick={() => setIsProfileOpen(true)}>
+                <span role="img" aria-label="user">
+                  👤
+                </span>
+                {user.username || '내 정보'}
+              </UserInfo>
+            )}
+            
+            <ThemeToggle onClick={toggleTheme}>
+              {isDarkMode ? '🌙' : '☀️'}
+            </ThemeToggle>
+            
+            {user && (
+              <LogoutButton onClick={logout}>
+                로그아웃
+              </LogoutButton>
+            )}
+            
+            <MobileMenuButton onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
+              ☰
+            </MobileMenuButton>
+          </RightSection>
+        </NavContent>
+      </NavContainer>
+      {user && (
+        <UserProfileModal
+          isOpen={isProfileOpen}
+          userId={user.idx}
+          onClose={() => setIsProfileOpen(false)}
+          onUpdated={(updated) => {
+            updateUserProfile?.(updated);
+          }}
+        />
+      )}
+    </>
   );
 };
 

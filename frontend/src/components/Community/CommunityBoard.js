@@ -154,6 +154,45 @@ const CommunityBoard = () => {
     fetchBoards();
   };
 
+  const handleDeletePost = async (postIdx, event) => {
+    event?.stopPropagation?.();
+    if (!user || postIdx == null) {
+      return;
+    }
+    const confirmDelete = window.confirm('해당 게시글을 삭제하시겠습니까?');
+    if (!confirmDelete) {
+      return;
+    }
+    try {
+      await boardApi.deleteBoard(postIdx);
+      setPosts((prev) => prev.filter((post) => post.idx !== postIdx));
+      if (selectedBoard?.idx === postIdx) {
+        handleCommentDrawerClose();
+      }
+      if (selectedBoardId === postIdx) {
+        handleDetailClose();
+      }
+      fetchBoards();
+    } catch (err) {
+      const message = err.response?.data?.error || err.message;
+      alert(`게시글을 삭제하지 못했습니다: ${message}`);
+    }
+  };
+
+  const handleBoardDeleted = useCallback(
+    (boardId) => {
+      setPosts((prev) => prev.filter((post) => post.idx !== boardId));
+      if (selectedBoard?.idx === boardId) {
+        handleCommentDrawerClose();
+      }
+      if (selectedBoardId === boardId) {
+        handleDetailClose();
+      }
+      fetchBoards();
+    },
+    [fetchBoards, selectedBoard, selectedBoardId]
+  );
+
   const reactToBoard = async (boardId, reactionType) => {
     const { requiresRedirect } = requireLogin();
     if (requiresRedirect) {
@@ -296,7 +335,7 @@ const CommunityBoard = () => {
                 <PostContent>{post.content}</PostContent>
 
                 <PostFooter>
-                  <AuthorInfo>
+                    <AuthorInfo>
                     <AuthorAvatar>
                       {post.username ? post.username.charAt(0).toUpperCase() : 'U'}
                     </AuthorAvatar>
@@ -320,7 +359,16 @@ const CommunityBoard = () => {
                       </StatItem>
                       <TimeAgo>{formatDate(post.createdAt)}</TimeAgo>
                     </PostStats>
-                    <ReportButton
+                    <PostActionsRight>
+                      {user && user.idx === post.userId && (
+                        <DeleteButton
+                          type="button"
+                          onClick={(event) => handleDeletePost(post.idx, event)}
+                        >
+                          삭제
+                        </DeleteButton>
+                      )}
+                      <ReportButton
                       onClick={(e) => {
                         e.stopPropagation();
                         handlePostReport(post.idx);
@@ -328,6 +376,7 @@ const CommunityBoard = () => {
                     >
                       <ReportIcon>🚨</ReportIcon>
                     </ReportButton>
+                    </PostActionsRight>
                   </PostActions>
                 </PostFooter>
               </PostCard>
@@ -358,6 +407,8 @@ const CommunityBoard = () => {
         onClose={handleDetailClose}
         onCommentAdded={handleCommentAdded}
         onBoardReaction={handleBoardReactionUpdate}
+        currentUser={user}
+        onBoardDeleted={handleBoardDeleted}
       />
     </Container>
   );
@@ -734,6 +785,27 @@ const ReportButton = styled.button`
     background: ${props => props.theme.colors.surfaceHover || 'rgba(220, 53, 69, 0.1)'};
     transform: scale(1.1);
   }
+`;
+
+const DeleteButton = styled.button`
+  background: none;
+  border: 1px solid ${props => props.theme.colors.error || '#dc2626'};
+  color: ${props => props.theme.colors.error || '#dc2626'};
+  cursor: pointer;
+  padding: ${props => props.theme.spacing.sm};
+  border-radius: ${props => props.theme.borderRadius.md};
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: rgba(220, 38, 38, 0.08);
+    transform: translateY(-1px);
+  }
+`;
+
+const PostActionsRight = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${props => props.theme.spacing.sm};
 `;
 
 const ReportIcon = styled.span`
