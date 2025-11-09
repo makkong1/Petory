@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { boardApi } from '../../api/boardApi';
 import CommunityPostModal from './CommunityPostModal';
 import CommunityCommentDrawer from './CommunityCommentDrawer';
+import CommunityDetailPage from './CommunityDetailPage';
 
 const CommunityBoard = () => {
   const { requireLogin } = usePermission();
@@ -17,6 +18,8 @@ const CommunityBoard = () => {
   const [isSubmittingPost, setIsSubmittingPost] = useState(false);
   const [isCommentDrawerOpen, setIsCommentDrawerOpen] = useState(false);
   const [selectedBoard, setSelectedBoard] = useState(null);
+  const [selectedBoardId, setSelectedBoardId] = useState(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
 
   const categories = [
     { key: 'ALL', label: '전체', icon: '📋', color: '#6366F1' },
@@ -104,7 +107,19 @@ const CommunityBoard = () => {
     }
   };
 
-  const handleCommentClick = (post) => {
+  const handlePostSelect = (post) => {
+    if (!post?.idx) return;
+    setSelectedBoardId(post.idx);
+    setIsDetailOpen(true);
+  };
+
+  const handleDetailClose = () => {
+    setIsDetailOpen(false);
+    setSelectedBoardId(null);
+  };
+
+  const handleCommentClick = (post, event) => {
+    event?.stopPropagation?.();
     const { requiresRedirect } = requireLogin();
     if (requiresRedirect) {
       redirectToLogin();
@@ -127,12 +142,7 @@ const CommunityBoard = () => {
 
   const handleLikeClick = (postIdx, e) => {
     e.stopPropagation();
-    const { requiresRedirect } = requireLogin();
-    if (requiresRedirect) {
-      redirectToLogin();
-      return;
-    }
-    alert('좋아요 기능은 준비 중입니다.');
+    reactToBoard(postIdx, 'LIKE');
   };
 
   const handleCommentDrawerClose = () => {
@@ -143,6 +153,78 @@ const CommunityBoard = () => {
   const handleCommentAdded = () => {
     fetchBoards();
   };
+
+  const reactToBoard = async (boardId, reactionType) => {
+    const { requiresRedirect } = requireLogin();
+    if (requiresRedirect) {
+      redirectToLogin();
+      return;
+    }
+    if (!user) {
+      redirectToLogin();
+      return;
+    }
+
+    try {
+      const response = await boardApi.reactToBoard(boardId, {
+        userId: user.idx,
+        reactionType,
+      });
+      const summary = response.data;
+      setPosts((prev) =>
+        prev.map((post) =>
+          post.idx === boardId
+            ? {
+                ...post,
+                likes: summary.likeCount,
+                dislikes: summary.dislikeCount,
+                userReaction: summary.userReaction,
+              }
+            : post
+        )
+      );
+      if (selectedBoard?.idx === boardId) {
+        setSelectedBoard((prev) =>
+          prev
+            ? {
+                ...prev,
+                likes: summary.likeCount,
+                dislikes: summary.dislikeCount,
+                userReaction: summary.userReaction,
+              }
+            : prev
+        );
+      }
+    } catch (err) {
+      const message = err.response?.data?.error || err.message;
+      alert(`반응 처리에 실패했습니다: ${message}`);
+    }
+  };
+
+  const handleBoardReactionUpdate = useCallback((boardId, summary) => {
+    setPosts((prev) =>
+      prev.map((post) =>
+        post.idx === boardId
+          ? {
+              ...post,
+              likes: summary.likeCount,
+              dislikes: summary.dislikeCount,
+              userReaction: summary.userReaction,
+            }
+          : post
+      )
+    );
+    setSelectedBoard((prev) =>
+      prev && prev.idx === boardId
+        ? {
+            ...prev,
+            likes: summary.likeCount,
+            dislikes: summary.dislikeCount,
+            userReaction: summary.userReaction,
+          }
+        : prev
+    );
+  }, []);
 
   if (loading && posts.length === 0) {
     return (
@@ -194,7 +276,7 @@ const CommunityBoard = () => {
           filteredPosts.map((post) => {
             const categoryInfo = getCategoryInfo(post.category);
             return (
-              <PostCard key={post.idx}>
+              <PostCard key={post.idx} onClick={() => handlePostSelect(post)}>
                 <PostHeader>
                   <PostTitleSection>
                     <PostTitle>{post.title}</PostTitle>
@@ -228,7 +310,7 @@ const CommunityBoard = () => {
                   </AuthorInfo>
                   <PostActions>
                     <PostStats>
-                      <StatItem onClick={() => handleCommentClick(post)}>
+                      <StatItem onClick={(e) => handleCommentClick(post, e)}>
                         <StatIcon>💬</StatIcon>
                         <StatValue>{post.commentCount ?? 0}</StatValue>
                       </StatItem>
@@ -238,7 +320,12 @@ const CommunityBoard = () => {
                       </StatItem>
                       <TimeAgo>{formatDate(post.createdAt)}</TimeAgo>
                     </PostStats>
-                    <ReportButton onClick={() => handlePostReport(post.idx)}>
+                    <ReportButton
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handlePostReport(post.idx);
+                      }}
+                    >
                       <ReportIcon>🚨</ReportIcon>
                     </ReportButton>
                   </PostActions>
@@ -263,6 +350,14 @@ const CommunityBoard = () => {
         onClose={handleCommentDrawerClose}
         currentUser={user}
         onCommentAdded={handleCommentAdded}
+      />
+
+      <CommunityDetailPage
+        isOpen={isDetailOpen}
+        boardId={selectedBoardId}
+        onClose={handleDetailClose}
+        onCommentAdded={handleCommentAdded}
+        onBoardReaction={handleBoardReactionUpdate}
       />
     </Container>
   );

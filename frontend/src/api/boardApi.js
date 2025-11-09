@@ -48,4 +48,10 @@ export const boardApi = {
   
   // 게시글 검색
   searchBoards: (keyword) => api.get('/search', { params: { keyword } }),
+
+  // 게시글 좋아요/싫어요 반응
+  reactToBoard: (boardId, data) => api.post(`/${boardId}/reactions`, data),
+
+  // 댓글 좋아요/싫어요 반응
+  reactToComment: (boardId, commentId, data) => api.post(`/${boardId}/comments/${commentId}/reactions`, data),
 };
