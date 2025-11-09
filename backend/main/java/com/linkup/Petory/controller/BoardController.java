@@ -74,12 +74,14 @@ public class BoardController {
 
     // 내 게시글 조회
     @GetMapping("/my-posts")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<BoardDTO>> getMyBoards(@RequestParam Long userId) {
         return ResponseEntity.ok(boardService.getMyBoards(userId));
     }
 
     // 게시글 검색
     @GetMapping("/search")
+    @PreAuthorize("permitAll()")
     public ResponseEntity<List<BoardDTO>> searchBoards(@RequestParam String keyword) {
         return ResponseEntity.ok(boardService.searchBoards(keyword));
     }
@@ -113,7 +115,8 @@ public class BoardController {
         if (request.getUserId() == null || request.getReactionType() == null) {
             throw new IllegalArgumentException("userId and reactionType are required");
         }
-        ReactionSummaryDTO summary = reactionService.reactToBoard(boardId, request.getUserId(), request.getReactionType());
+        ReactionSummaryDTO summary = reactionService.reactToBoard(boardId, request.getUserId(),
+                request.getReactionType());
         return ResponseEntity.ok(summary);
     }
 
@@ -126,7 +129,8 @@ public class BoardController {
         if (request.getUserId() == null || request.getReactionType() == null) {
             throw new IllegalArgumentException("userId and reactionType are required");
         }
-        ReactionSummaryDTO summary = reactionService.reactToComment(commentId, request.getUserId(), request.getReactionType());
+        ReactionSummaryDTO summary = reactionService.reactToComment(commentId, request.getUserId(),
+                request.getReactionType());
         return ResponseEntity.ok(summary);
     }
 }
