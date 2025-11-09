@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { careRequestApi } from '../../api/careRequestApi';
+import CareRequestForm from './CareRequestForm';
 import { useAuth } from '../../contexts/AuthContext';
 
 const CareRequestList = () => {
@@ -9,6 +10,8 @@ const CareRequestList = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeFilter, setActiveFilter] = useState('ALL');
+  const [isCreating, setIsCreating] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
 
   // API에서 케어 요청 데이터 가져오기
   useEffect(() => {
@@ -40,6 +43,22 @@ const CareRequestList = () => {
   const filteredRequests = activeFilter === 'ALL' 
     ? careRequests 
     : careRequests.filter(request => request.status === activeFilter);
+
+  const handleAddButtonClick = () => {
+    if (!user) {
+      window.dispatchEvent(new Event('showPermissionModal'));
+      return;
+    }
+    setIsCreating(true);
+    setSuccessMessage('');
+  };
+
+  const handleCareRequestCreated = (createdRequest) => {
+    setCareRequests((prev) => [createdRequest, ...prev]);
+    setActiveFilter('ALL');
+    setIsCreating(false);
+    setSuccessMessage('새 펫케어 요청이 등록되었습니다.');
+  };
 
   const handleDeleteRequest = async (requestId) => {
     if (!user) {
@@ -93,19 +112,40 @@ const CareRequestList = () => {
     });
   };
 
-  if (loading) {
+  if (loading && !isCreating) {
     return <LoadingMessage>펫케어 요청을 불러오는 중...</LoadingMessage>;
+  }
+
+  if (isCreating) {
+    return (
+      <Container>
+        <FormHeader>
+          <BackButton type="button" onClick={() => setIsCreating(false)}>
+            ← 목록으로 돌아가기
+          </BackButton>
+          <FormTitle>새 펫케어 요청 등록</FormTitle>
+          <FormSubtitle>필요한 도움 내용을 자세히 작성하면 매칭 확률이 높아져요.</FormSubtitle>
+        </FormHeader>
+
+        <CareRequestForm
+          onCancel={() => setIsCreating(false)}
+          onCreated={handleCareRequestCreated}
+        />
+      </Container>
+    );
   }
 
   return (
     <Container>
       <Header>
         <Title>🐾 펫케어 요청</Title>
-        <AddButton>
+        <AddButton type="button" onClick={handleAddButtonClick}>
           <span>+</span>
           새 요청 등록
         </AddButton>
       </Header>
+
+      {successMessage && <SuccessBanner>{successMessage}</SuccessBanner>}
 
       <FilterSection>
         {filters.map(filter => (
@@ -229,6 +269,17 @@ const AddButton = styled.button`
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(255, 126, 54, 0.3);
   }
+`;
+
+const SuccessBanner = styled.div`
+  margin-bottom: ${(props) => props.theme.spacing.lg};
+  padding: ${(props) => props.theme.spacing.sm} ${(props) => props.theme.spacing.md};
+  border-radius: ${(props) => props.theme.borderRadius.md};
+  background: rgba(34, 197, 94, 0.15);
+  color: ${(props) => props.theme.colors.success || '#166534'};
+  border: 1px solid rgba(34, 197, 94, 0.25);
+  font-weight: 500;
+  font-size: 0.95rem;
 `;
 
 const FilterSection = styled.div`
@@ -435,4 +486,42 @@ const EmptyMessage = styled.div`
     color: ${props => props.theme.colors.text};
     margin-bottom: ${props => props.theme.spacing.sm};
   }
+`;
+
+const FormHeader = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${(props) => props.theme.spacing.sm};
+  margin-bottom: ${(props) => props.theme.spacing.xl};
+`;
+
+const BackButton = styled.button`
+  align-self: flex-start;
+  background: none;
+  border: none;
+  color: ${(props) => props.theme.colors.textSecondary};
+  font-size: 0.95rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: ${(props) => props.theme.spacing.xs};
+  padding: ${(props) => props.theme.spacing.xs} 0;
+  transition: color 0.2s ease;
+
+  &:hover {
+    color: ${(props) => props.theme.colors.primary};
+  }
+`;
+
+const FormTitle = styled.h2`
+  margin: 0;
+  color: ${(props) => props.theme.colors.text};
+  font-size: ${(props) => props.theme.typography.h2.fontSize};
+  font-weight: ${(props) => props.theme.typography.h2.fontWeight};
+`;
+
+const FormSubtitle = styled.p`
+  margin: 0;
+  font-size: ${(props) => props.theme.typography.body2.fontSize};
+  color: ${(props) => props.theme.colors.textSecondary};
 `;
