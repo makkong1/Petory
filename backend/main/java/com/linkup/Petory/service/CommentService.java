@@ -10,8 +10,10 @@ import com.linkup.Petory.converter.CommentConverter;
 import com.linkup.Petory.dto.CommentDTO;
 import com.linkup.Petory.entity.Board;
 import com.linkup.Petory.entity.Comment;
+import com.linkup.Petory.entity.ReactionType;
 import com.linkup.Petory.entity.Users;
 import com.linkup.Petory.repository.BoardRepository;
+import com.linkup.Petory.repository.CommentReactionRepository;
 import com.linkup.Petory.repository.CommentRepository;
 import com.linkup.Petory.repository.UsersRepository;
 
@@ -25,6 +27,7 @@ public class CommentService {
     private final CommentRepository commentRepository;
     private final BoardRepository boardRepository;
     private final UsersRepository usersRepository;
+    private final CommentReactionRepository commentReactionRepository;
     private final CommentConverter commentConverter;
 
     public List<CommentDTO> getComments(Long boardId) {
@@ -32,7 +35,7 @@ public class CommentService {
                 .orElseThrow(() -> new IllegalArgumentException("Board not found"));
         List<Comment> comments = commentRepository.findByBoardOrderByCreatedAtAsc(board);
         return comments.stream()
-                .map(commentConverter::toDTO)
+                .map(this::mapWithReactionCounts)
                 .collect(Collectors.toList());
     }
 
@@ -54,7 +57,7 @@ public class CommentService {
         if (board.getComments() != null) {
             board.getComments().add(saved);
         }
-        return commentConverter.toDTO(saved);
+        return mapWithReactionCounts(saved);
     }
 
     @Transactional
@@ -68,8 +71,18 @@ public class CommentService {
             throw new IllegalArgumentException("Comment does not belong to the specified board");
         }
 
+        commentReactionRepository.deleteByComment(comment);
         commentRepository.delete(comment);
         board.getComments().removeIf(c -> c.getIdx().equals(commentId));
+    }
+
+    private CommentDTO mapWithReactionCounts(Comment comment) {
+        CommentDTO dto = commentConverter.toDTO(comment);
+        long likeCount = commentReactionRepository.countByCommentAndReactionType(comment, ReactionType.LIKE);
+        long dislikeCount = commentReactionRepository.countByCommentAndReactionType(comment, ReactionType.DISLIKE);
+        dto.setLikeCount(Math.toIntExact(likeCount));
+        dto.setDislikeCount(Math.toIntExact(dislikeCount));
+        return dto;
     }
 }
 

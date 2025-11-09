@@ -25,4 +25,6 @@ public class CommentDTO {
     private String userLocation;
 
     private String commentFilePath;
+    private Integer likeCount;
+    private Integer dislikeCount;
 }

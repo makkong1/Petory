@@ -28,7 +28,8 @@ public class BoardConverter {
                 .commentCount(board.getComments() != null ? board.getComments().size() : 0)
                 .boardFilePath(board.getBoardFilePath())
                 .commentFilePath(board.getCommentFilePath())
-                .likes(0) // 추후 구현
+                .likes(0)
+                .dislikes(0)
                 .views(0) // 추후 구현
                 .build();
     }

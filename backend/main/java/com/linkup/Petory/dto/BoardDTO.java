@@ -30,6 +30,7 @@ public class BoardDTO {
 
     // 통계 정보 (추후 확장용)
     private Integer likes;
+    private Integer dislikes;
     private Integer views;
 
     // 파일 경로 정보

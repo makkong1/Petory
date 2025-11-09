@@ -16,6 +16,8 @@ public class CommentConverter {
                 .username(comment.getUser().getUsername())
                 .userLocation(comment.getUser().getLocation())
                 .commentFilePath(comment.getCommentFilePath())
+                .likeCount(0)
+                .dislikeCount(0)
                 .content(comment.getContent())
                 .createdAt(comment.getCreatedAt())
                 .build();

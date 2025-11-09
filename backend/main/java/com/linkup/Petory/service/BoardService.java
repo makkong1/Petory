@@ -1,6 +1,7 @@
 package com.linkup.Petory.service;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -10,7 +11,10 @@ import com.linkup.Petory.dto.BoardDTO;
 import com.linkup.Petory.entity.Board;
 import com.linkup.Petory.entity.Users;
 import com.linkup.Petory.repository.BoardRepository;
+import com.linkup.Petory.repository.BoardReactionRepository;
+import com.linkup.Petory.repository.CommentReactionRepository;
 import com.linkup.Petory.repository.UsersRepository;
+import com.linkup.Petory.entity.ReactionType;
 
 import lombok.RequiredArgsConstructor;
 
@@ -21,6 +25,8 @@ public class BoardService {
 
     private final BoardRepository boardRepository;
     private final UsersRepository usersRepository;
+    private final BoardReactionRepository boardReactionRepository;
+    private final CommentReactionRepository commentReactionRepository;
     private final BoardConverter boardConverter;
 
     // 전체 게시글 조회 (카테고리 필터링 포함)
@@ -33,14 +39,16 @@ public class BoardService {
             boards = boardRepository.findAllByOrderByCreatedAtDesc();
         }
 
-        return boardConverter.toDTOList(boards);
+        return boards.stream()
+                .map(this::mapWithReactions)
+                .collect(Collectors.toList());
     }
 
     // 단일 게시글 조회
     public BoardDTO getBoard(Long idx) {
         Board board = boardRepository.findById(idx)
                 .orElseThrow(() -> new RuntimeException("Board not found"));
-        return boardConverter.toDTO(board);
+        return mapWithReactions(board);
     }
 
     // 게시글 생성
@@ -59,7 +67,7 @@ public class BoardService {
                 .build();
 
         Board saved = boardRepository.save(board);
-        return boardConverter.toDTO(saved);
+        return mapWithReactions(saved);
     }
 
     // 게시글 수정
@@ -80,13 +88,20 @@ public class BoardService {
             board.setCommentFilePath(dto.getCommentFilePath());
 
         Board updated = boardRepository.save(board);
-        return boardConverter.toDTO(updated);
+        return mapWithReactions(updated);
     }
 
     // 게시글 삭제
     @Transactional
     public void deleteBoard(Long idx) {
-        boardRepository.deleteById(idx);
+        Board board = boardRepository.findById(idx)
+                .orElseThrow(() -> new RuntimeException("Board not found"));
+
+        if (board.getComments() != null) {
+            board.getComments().forEach(commentReactionRepository::deleteByComment);
+        }
+        boardReactionRepository.deleteByBoard(board);
+        boardRepository.delete(board);
     }
 
     // 내 게시글 조회
@@ -95,13 +110,26 @@ public class BoardService {
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
         List<Board> boards = boardRepository.findByUserOrderByCreatedAtDesc(user);
-        return boardConverter.toDTOList(boards);
+        return boards.stream()
+                .map(this::mapWithReactions)
+                .collect(Collectors.toList());
     }
 
     // 게시글 검색
     public List<BoardDTO> searchBoards(String keyword) {
         List<Board> boards = boardRepository.findByTitleContainingOrContentContainingOrderByCreatedAtDesc(keyword,
                 keyword);
-        return boardConverter.toDTOList(boards);
+        return boards.stream()
+                .map(this::mapWithReactions)
+                .collect(Collectors.toList());
+    }
+
+    private BoardDTO mapWithReactions(Board board) {
+        BoardDTO dto = boardConverter.toDTO(board);
+        long likeCount = boardReactionRepository.countByBoardAndReactionType(board, ReactionType.LIKE);
+        long dislikeCount = boardReactionRepository.countByBoardAndReactionType(board, ReactionType.DISLIKE);
+        dto.setLikes(Math.toIntExact(likeCount));
+        dto.setDislikes(Math.toIntExact(dislikeCount));
+        return dto;
     }
 }

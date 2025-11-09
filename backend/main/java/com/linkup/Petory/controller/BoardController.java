@@ -16,6 +16,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.linkup.Petory.dto.BoardDTO;
 import com.linkup.Petory.dto.CommentDTO;
+import com.linkup.Petory.dto.ReactionRequest;
+import com.linkup.Petory.dto.ReactionSummaryDTO;
+import com.linkup.Petory.service.ReactionService;
 import com.linkup.Petory.service.BoardService;
 import com.linkup.Petory.service.CommentService;
 
@@ -28,6 +31,7 @@ public class BoardController {
 
     private final BoardService boardService;
     private final CommentService commentService;
+    private final ReactionService reactionService;
 
     // 전체 게시글 조회
     @PreAuthorize("permitAll()")
@@ -99,5 +103,30 @@ public class BoardController {
     public ResponseEntity<Void> deleteComment(@PathVariable Long boardId, @PathVariable Long commentId) {
         commentService.deleteComment(boardId, commentId);
         return ResponseEntity.noContent().build();
+    }
+
+    @PreAuthorize("isAuthenticated()")
+    @PostMapping("/{boardId}/reactions")
+    public ResponseEntity<ReactionSummaryDTO> reactToBoard(
+            @PathVariable Long boardId,
+            @RequestBody ReactionRequest request) {
+        if (request.getUserId() == null || request.getReactionType() == null) {
+            throw new IllegalArgumentException("userId and reactionType are required");
+        }
+        ReactionSummaryDTO summary = reactionService.reactToBoard(boardId, request.getUserId(), request.getReactionType());
+        return ResponseEntity.ok(summary);
+    }
+
+    @PreAuthorize("isAuthenticated()")
+    @PostMapping("/{boardId}/comments/{commentId}/reactions")
+    public ResponseEntity<ReactionSummaryDTO> reactToComment(
+            @PathVariable Long boardId,
+            @PathVariable Long commentId,
+            @RequestBody ReactionRequest request) {
+        if (request.getUserId() == null || request.getReactionType() == null) {
+            throw new IllegalArgumentException("userId and reactionType are required");
+        }
+        ReactionSummaryDTO summary = reactionService.reactToComment(commentId, request.getUserId(), request.getReactionType());
+        return ResponseEntity.ok(summary);
     }
 }
