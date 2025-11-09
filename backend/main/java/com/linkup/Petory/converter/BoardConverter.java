@@ -26,6 +26,8 @@ public class BoardConverter {
                 .username(board.getUser().getUsername())
                 .userLocation(board.getUser().getLocation())
                 .commentCount(board.getComments() != null ? board.getComments().size() : 0)
+                .boardFilePath(board.getBoardFilePath())
+                .commentFilePath(board.getCommentFilePath())
                 .likes(0) // 추후 구현
                 .views(0) // 추후 구현
                 .build();

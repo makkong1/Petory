@@ -5,7 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 const HomePage = ({ setActiveTab }) => {
   const { user } = useAuth();
   const isAdmin = user && (user.role === 'ADMIN' || user.role === 'MASTER');
-  const features = [
+  const features = [   
     {
       icon: '🗺️',
       title: '위치 서비스',

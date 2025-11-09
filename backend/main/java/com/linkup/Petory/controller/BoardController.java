@@ -4,10 +4,20 @@ import java.util.List;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import com.linkup.Petory.dto.BoardDTO;
+import com.linkup.Petory.dto.CommentDTO;
 import com.linkup.Petory.service.BoardService;
+import com.linkup.Petory.service.CommentService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -17,6 +27,7 @@ import lombok.RequiredArgsConstructor;
 public class BoardController {
 
     private final BoardService boardService;
+    private final CommentService commentService;
 
     // 전체 게시글 조회
     @PreAuthorize("permitAll()")
@@ -67,5 +78,26 @@ public class BoardController {
     @GetMapping("/search")
     public ResponseEntity<List<BoardDTO>> searchBoards(@RequestParam String keyword) {
         return ResponseEntity.ok(boardService.searchBoards(keyword));
+    }
+
+    @PreAuthorize("permitAll()")
+    @GetMapping("/{boardId}/comments")
+    public ResponseEntity<List<CommentDTO>> getComments(@PathVariable Long boardId) {
+        return ResponseEntity.ok(commentService.getComments(boardId));
+    }
+
+    @PreAuthorize("isAuthenticated()")
+    @PostMapping("/{boardId}/comments")
+    public ResponseEntity<CommentDTO> addComment(
+            @PathVariable Long boardId,
+            @RequestBody CommentDTO dto) {
+        return ResponseEntity.ok(commentService.addComment(boardId, dto));
+    }
+
+    @PreAuthorize("isAuthenticated()")
+    @DeleteMapping("/{boardId}/comments/{commentId}")
+    public ResponseEntity<Void> deleteComment(@PathVariable Long boardId, @PathVariable Long commentId) {
+        commentService.deleteComment(boardId, commentId);
+        return ResponseEntity.noContent().build();
     }
 }

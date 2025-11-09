@@ -1,63 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import styled from 'styled-components';
 import { usePermission } from '../../hooks/usePermission';
 import { useAuth } from '../../contexts/AuthContext';
+import { boardApi } from '../../api/boardApi';
+import CommunityPostModal from './CommunityPostModal';
+import CommunityCommentDrawer from './CommunityCommentDrawer';
 
 const CommunityBoard = () => {
   const { requireLogin } = usePermission();
-  const { redirectToLogin } = useAuth();
+  const { user, redirectToLogin } = useAuth();
   const [posts, setPosts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [activeCategory, setActiveCategory] = useState('ALL');
-
-  // 임시 데이터
-  useEffect(() => {
-    setTimeout(() => {
-      setPosts([
-        {
-          idx: 1,
-          title: '강아지 산책 매너에 대해 이야기해요',
-          content: '요즘 산책하다 보면 매너가 부족한 경우를 종종 봅니다. 우리 모두 서로 배려하는 산책 문화를 만들어가요!',
-          category: 'TIP',
-          user: { username: '멍멍맘', location: '강남구' },
-          createdAt: '2024-11-01T10:30:00',
-          comments: 12,
-          likes: 24
-        },
-        {
-          idx: 2,
-          title: '우리 동네 애견카페 추천해주세요',
-          content: '서초구 근처에 강아지와 함께 갈 수 있는 좋은 카페 있나요? 분위기 좋고 강아지 친화적인 곳으로...',
-          category: 'QUESTION',
-          user: { username: '골든러버', location: '서초구' },
-          createdAt: '2024-10-31T15:20:00',
-          comments: 8,
-          likes: 15
-        },
-        {
-          idx: 3,
-          title: '고양이 털 관리 팁 공유합니다',
-          content: '장모종 고양이 키우시는 분들을 위한 털 관리 꿀팁들을 정리해봤어요. 브러싱부터 목욕까지!',
-          category: 'TIP',
-          user: { username: '냥이집사', location: '송파구' },
-          createdAt: '2024-10-30T18:45:00',
-          comments: 6,
-          likes: 31
-        },
-        {
-          idx: 4,
-          title: '반려동물 응급처치 교육 후기',
-          content: '지난 주말에 참석한 반려동물 응급처치 교육이 정말 유익했어요. 모든 반려인분들께 추천드립니다!',
-          category: 'INFO',
-          user: { username: '안전제일', location: '마포구' },
-          createdAt: '2024-10-29T12:15:00',
-          comments: 4,
-          likes: 18
-        }
-      ]);
-      setLoading(false);
-    }, 1000);
-  }, []);
+  const [error, setError] = useState('');
+  const [isPostModalOpen, setIsPostModalOpen] = useState(false);
+  const [isSubmittingPost, setIsSubmittingPost] = useState(false);
+  const [isCommentDrawerOpen, setIsCommentDrawerOpen] = useState(false);
+  const [selectedBoard, setSelectedBoard] = useState(null);
 
   const categories = [
     { key: 'ALL', label: '전체', icon: '📋', color: '#6366F1' },
@@ -67,74 +26,125 @@ const CommunityBoard = () => {
     { key: 'STORY', label: '일상', icon: '📖', color: '#EC4899' }
   ];
 
-  const filteredPosts = activeCategory === 'ALL' 
-    ? posts 
-    : posts.filter(post => post.category === activeCategory);
+  const fetchBoards = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError('');
+      const params = activeCategory === 'ALL' ? {} : { category: activeCategory };
+      const response = await boardApi.getAllBoards(params);
+      setPosts(response.data || []);
+    } catch (err) {
+      const message = err.response?.data?.error || err.message;
+      setError(`커뮤니티 게시글을 불러오지 못했습니다: ${message}`);
+    } finally {
+      setLoading(false);
+    }
+  }, [activeCategory]);
+
+  useEffect(() => {
+    fetchBoards();
+  }, [fetchBoards]);
+
+  const filteredPosts = useMemo(() => {
+    if (activeCategory === 'ALL') {
+      return posts;
+    }
+    return posts.filter((post) => post.category === activeCategory);
+  }, [posts, activeCategory]);
 
   const getCategoryInfo = (category) => {
-    const cat = categories.find(c => c.key === category);
+    const cat = categories.find((c) => c.key === category);
     return cat || { label: category, icon: '📋', color: '#6366F1' };
   };
 
   const formatDate = (dateString) => {
+    if (!dateString) return '';
     const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return '';
     const now = new Date();
     const diff = now - date;
     const hours = Math.floor(diff / (1000 * 60 * 60));
-    
+
     if (hours < 1) return '방금 전';
     if (hours < 24) return `${hours}시간 전`;
     return date.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' });
   };
 
-  // 게시글 작성 버튼 클릭 핸들러
   const handleWriteClick = () => {
-    const { isLoggedIn, requiresRedirect } = requireLogin();
+    const { requiresRedirect } = requireLogin();
     if (requiresRedirect) {
       redirectToLogin();
       return;
     }
-    // TODO: 게시글 작성 모달/페이지로 이동
-    alert('게시글 작성 기능은 준비 중입니다.');
+    setIsPostModalOpen(true);
   };
 
-  // 댓글 작성 핸들러
-  const handleCommentClick = (postIdx) => {
-    const { isLoggedIn, requiresRedirect } = requireLogin();
+  const handlePostSubmit = async (form) => {
+    if (!user) {
+      redirectToLogin();
+      return;
+    }
+    try {
+      setIsSubmittingPost(true);
+      const payload = {
+        title: form.title,
+        content: form.content,
+        category: form.category,
+        boardFilePath: form.boardFilePath || null,
+        userId: user.idx,
+      };
+      await boardApi.createBoard(payload);
+      setIsPostModalOpen(false);
+      await fetchBoards();
+    } catch (err) {
+      const message = err.response?.data?.error || err.message;
+      alert(`게시글 등록에 실패했습니다: ${message}`);
+    } finally {
+      setIsSubmittingPost(false);
+    }
+  };
+
+  const handleCommentClick = (post) => {
+    const { requiresRedirect } = requireLogin();
     if (requiresRedirect) {
       redirectToLogin();
       return;
     }
-    // TODO: 댓글 작성 모달 열기
-    alert('댓글 작성 기능은 준비 중입니다.');
+    setSelectedBoard(post);
+    setIsCommentDrawerOpen(true);
   };
 
-  // 게시글 신고 핸들러
   const handlePostReport = (postIdx) => {
-    const { isLoggedIn, requiresRedirect } = requireLogin();
+    const { requiresRedirect } = requireLogin();
     if (requiresRedirect) {
       redirectToLogin();
       return;
     }
-    // TODO: 신고 기능 구현
     if (window.confirm('이 게시글을 신고하시겠습니까?')) {
       alert('신고 기능은 준비 중입니다.');
     }
   };
 
-  // 좋아요 토글 핸들러
   const handleLikeClick = (postIdx, e) => {
     e.stopPropagation();
-    const { isLoggedIn, requiresRedirect } = requireLogin();
+    const { requiresRedirect } = requireLogin();
     if (requiresRedirect) {
       redirectToLogin();
       return;
     }
-    // TODO: 좋아요 기능 구현
     alert('좋아요 기능은 준비 중입니다.');
   };
 
-  if (loading) {
+  const handleCommentDrawerClose = () => {
+    setIsCommentDrawerOpen(false);
+    setSelectedBoard(null);
+  };
+
+  const handleCommentAdded = () => {
+    fetchBoards();
+  };
+
+  if (loading && posts.length === 0) {
     return (
       <LoadingContainer>
         <LoadingSpinner />
@@ -158,7 +168,7 @@ const CommunityBoard = () => {
       </Header>
 
       <CategoryTabs>
-        {categories.map(category => (
+        {categories.map((category) => (
           <CategoryTab
             key={category.key}
             active={activeCategory === category.key}
@@ -171,6 +181,8 @@ const CommunityBoard = () => {
         ))}
       </CategoryTabs>
 
+      {error && <ErrorBanner>{error}</ErrorBanner>}
+
       <PostList>
         {filteredPosts.length === 0 ? (
           <EmptyState>
@@ -179,7 +191,7 @@ const CommunityBoard = () => {
             <EmptySubtext>첫 번째 게시글을 작성해보세요!</EmptySubtext>
           </EmptyState>
         ) : (
-          filteredPosts.map(post => {
+          filteredPosts.map((post) => {
             const categoryInfo = getCategoryInfo(post.category);
             return (
               <PostCard key={post.idx}>
@@ -192,31 +204,37 @@ const CommunityBoard = () => {
                     </CategoryBadge>
                   </PostTitleSection>
                 </PostHeader>
-                
+
+                {post.boardFilePath && (
+                  <PostImage>
+                    <img src={post.boardFilePath} alt={post.title} />
+                  </PostImage>
+                )}
+
                 <PostContent>{post.content}</PostContent>
-                
+
                 <PostFooter>
                   <AuthorInfo>
                     <AuthorAvatar>
-                      {post.user.username.charAt(0)}
+                      {post.username ? post.username.charAt(0).toUpperCase() : 'U'}
                     </AuthorAvatar>
                     <AuthorDetails>
-                      <AuthorName>{post.user.username}</AuthorName>
+                      <AuthorName>{post.username || '알 수 없음'}</AuthorName>
                       <AuthorLocation>
                         <LocationIcon>📍</LocationIcon>
-                        {post.user.location}
+                        {post.userLocation || '위치 정보 없음'}
                       </AuthorLocation>
                     </AuthorDetails>
                   </AuthorInfo>
                   <PostActions>
                     <PostStats>
-                      <StatItem onClick={() => handleCommentClick(post.idx)}>
+                      <StatItem onClick={() => handleCommentClick(post)}>
                         <StatIcon>💬</StatIcon>
-                        <StatValue>{post.comments}</StatValue>
+                        <StatValue>{post.commentCount ?? 0}</StatValue>
                       </StatItem>
                       <StatItem onClick={(e) => handleLikeClick(post.idx, e)}>
                         <StatIcon>❤️</StatIcon>
-                        <StatValue>{post.likes}</StatValue>
+                        <StatValue>{post.likes ?? 0}</StatValue>
                       </StatItem>
                       <TimeAgo>{formatDate(post.createdAt)}</TimeAgo>
                     </PostStats>
@@ -230,6 +248,22 @@ const CommunityBoard = () => {
           })
         )}
       </PostList>
+
+      <CommunityPostModal
+        isOpen={isPostModalOpen}
+        onClose={() => setIsPostModalOpen(false)}
+        onSubmit={handlePostSubmit}
+        loading={isSubmittingPost}
+        currentUser={user}
+      />
+
+      <CommunityCommentDrawer
+        isOpen={isCommentDrawerOpen}
+        board={selectedBoard}
+        onClose={handleCommentDrawerClose}
+        currentUser={user}
+        onCommentAdded={handleCommentAdded}
+      />
     </Container>
   );
 };
@@ -368,6 +402,16 @@ const PostList = styled.div`
   gap: ${props => props.theme.spacing.lg};
 `;
 
+const ErrorBanner = styled.div`
+  background: rgba(220, 38, 38, 0.1);
+  color: ${props => props.theme.colors.error || '#dc2626'};
+  border: 1px solid rgba(220, 38, 38, 0.2);
+  border-radius: ${props => props.theme.borderRadius.lg};
+  padding: ${props => props.theme.spacing.md} ${props => props.theme.spacing.lg};
+  margin-bottom: ${props => props.theme.spacing.lg};
+  font-size: 0.95rem;
+`;
+
 const PostCard = styled.div`
   background: ${props => props.theme.colors.surface};
   border: 1px solid ${props => props.theme.colors.border};
@@ -413,6 +457,20 @@ const PostTitleSection = styled.div`
   flex-direction: column;
   gap: ${props => props.theme.spacing.sm};
   flex: 1;
+`;
+
+const PostImage = styled.div`
+  margin: ${props => props.theme.spacing.md} 0;
+  border-radius: ${props => props.theme.borderRadius.lg};
+  overflow: hidden;
+  border: 1px solid ${props => props.theme.colors.border};
+
+  img {
+    width: 100%;
+    height: auto;
+    display: block;
+    object-fit: cover;
+  }
 `;
 
 const PostTitle = styled.h3`

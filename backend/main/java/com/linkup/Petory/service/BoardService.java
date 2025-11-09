@@ -54,6 +54,8 @@ public class BoardService {
                 .content(dto.getContent())
                 .category(dto.getCategory())
                 .user(user)
+                .boardFilePath(dto.getBoardFilePath())
+                .commentFilePath(dto.getCommentFilePath())
                 .build();
 
         Board saved = boardRepository.save(board);
@@ -72,6 +74,10 @@ public class BoardService {
             board.setContent(dto.getContent());
         if (dto.getCategory() != null)
             board.setCategory(dto.getCategory());
+        if (dto.getBoardFilePath() != null)
+            board.setBoardFilePath(dto.getBoardFilePath());
+        if (dto.getCommentFilePath() != null)
+            board.setCommentFilePath(dto.getCommentFilePath());
 
         Board updated = boardRepository.save(board);
         return boardConverter.toDTO(updated);

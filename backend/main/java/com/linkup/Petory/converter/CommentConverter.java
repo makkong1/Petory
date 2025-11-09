@@ -14,6 +14,8 @@ public class CommentConverter {
                 .boardId(comment.getBoard().getIdx())
                 .userId(comment.getUser().getIdx())
                 .username(comment.getUser().getUsername())
+                .userLocation(comment.getUser().getLocation())
+                .commentFilePath(comment.getCommentFilePath())
                 .content(comment.getContent())
                 .createdAt(comment.getCreatedAt())
                 .build();
