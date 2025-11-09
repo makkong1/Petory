@@ -31,6 +31,12 @@ public class Board {
 
     private LocalDateTime createdAt;
 
+    @Column(name = "board_file_path")
+    private String boardFilePath;
+
+    @Column(name = "comment_file_path")
+    private String commentFilePath;
+
     @OneToMany(mappedBy = "board", cascade = CascadeType.ALL)
     private List<Comment> comments;
 

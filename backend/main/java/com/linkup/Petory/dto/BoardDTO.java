@@ -31,4 +31,8 @@ public class BoardDTO {
     // 통계 정보 (추후 확장용)
     private Integer likes;
     private Integer views;
+
+    // 파일 경로 정보
+    private String boardFilePath;
+    private String commentFilePath;
 }

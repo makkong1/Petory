@@ -2,40 +2,27 @@ import React, { useEffect, useState } from 'react';
 import styled from 'styled-components';
 import { uploadApi } from '../../api/uploadApi';
 
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+
 const defaultForm = {
   title: '',
   content: '',
-  petName: '',
-  species: '',
-  breed: '',
-  gender: '',
-  age: '',
-  color: '',
-  lostDate: '',
-  lostLocation: '',
-  latitude: '',
-  longitude: '',
-  imageUrl: '',
+  category: 'STORY',
+  boardFilePath: '',
 };
 
-const MissingPetBoardForm = ({ isOpen, onClose, onSubmit, initialData, loading, currentUser }) => {
+const CommunityPostModal = ({ isOpen, onClose, onSubmit, loading, currentUser }) => {
   const [form, setForm] = useState(defaultForm);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
 
   useEffect(() => {
-    if (initialData) {
-      setForm({
-        ...defaultForm,
-        ...initialData,
-        lostDate: initialData.lostDate || '',
-      });
-    } else {
+    if (!isOpen) {
       setForm(defaultForm);
+      setUploadError('');
+      setIsUploading(false);
     }
-    setUploadError('');
-    setIsUploading(false);
-  }, [initialData, isOpen]);
+  }, [isOpen]);
 
   if (!isOpen) {
     return null;
@@ -47,19 +34,6 @@ const MissingPetBoardForm = ({ isOpen, onClose, onSubmit, initialData, loading, 
       ...prev,
       [name]: value,
     }));
-
-    if (name === 'imageUrl') {
-      setUploadError('');
-    }
-  };
-
-  const handleNumberChange = (e) => {
-    const { name, value } = e.target;
-    const numericValue = value.replace(/[^0-9.\-]/g, '');
-    setForm((prev) => ({
-      ...prev,
-      [name]: numericValue,
-    }));
   };
 
   const handleFileSelect = async (e) => {
@@ -68,19 +42,24 @@ const MissingPetBoardForm = ({ isOpen, onClose, onSubmit, initialData, loading, 
       return;
     }
 
+    if (file.size > MAX_FILE_SIZE) {
+      setUploadError('이미지 크기는 최대 5MB까지 가능합니다.');
+      e.target.value = '';
+      return;
+    }
+
     setUploadError('');
     setIsUploading(true);
 
     try {
       const data = await uploadApi.uploadImage(file, {
-        category: 'missing-pets',
+        category: 'community',
         ownerType: currentUser ? 'user' : 'guest',
         ownerId: currentUser?.idx ?? undefined,
-        entityId: initialData?.idx ?? undefined,
       });
       setForm((prev) => ({
         ...prev,
-        imageUrl: data.url,
+        boardFilePath: data.url,
       }));
     } catch (error) {
       const message =
@@ -99,7 +78,7 @@ const MissingPetBoardForm = ({ isOpen, onClose, onSubmit, initialData, loading, 
   const handleRemoveImage = () => {
     setForm((prev) => ({
       ...prev,
-      imageUrl: '',
+      boardFilePath: '',
     }));
     setUploadError('');
   };
@@ -113,173 +92,80 @@ const MissingPetBoardForm = ({ isOpen, onClose, onSubmit, initialData, loading, 
     <Overlay>
       <Modal>
         <ModalHeader>
-          <ModalTitle>실종 제보 등록</ModalTitle>
+          <ModalTitle>커뮤니티 글 작성</ModalTitle>
           <CloseButton type="button" onClick={onClose}>
             ✕
           </CloseButton>
         </ModalHeader>
         <ModalBody>
           <Form onSubmit={handleSubmit}>
-            <Section>
-              <SectionTitle>기본 정보</SectionTitle>
-              <FieldGrid columns={2}>
-                <Field>
-                  <Label>제목 *</Label>
-                  <Input
-                    name="title"
-                    value={form.title}
-                    onChange={handleChange}
-                    required
-                    placeholder="제보 제목을 입력하세요"
-                  />
-                </Field>
-                <Field>
-                  <Label>실종일</Label>
-                  <Input type="date" name="lostDate" value={form.lostDate} onChange={handleChange} />
-                </Field>
-                <Field>
-                  <Label>반려동물 이름</Label>
-                  <Input
-                    name="petName"
-                    value={form.petName}
-                    onChange={handleChange}
-                    placeholder="예: 초코"
-                  />
-                </Field>
-                <Field>
-                  <Label>동물 종</Label>
-                  <Input
-                    name="species"
-                    value={form.species}
-                    onChange={handleChange}
-                    placeholder="예: 개, 고양이"
-                  />
-                </Field>
-                <Field>
-                  <Label>품종</Label>
-                  <Input
-                    name="breed"
-                    value={form.breed}
-                    onChange={handleChange}
-                    placeholder="예: 말티즈"
-                  />
-                </Field>
-                <Field>
-                  <Label>색상</Label>
-                  <Input
-                    name="color"
-                    value={form.color}
-                    onChange={handleChange}
-                    placeholder="예: 크림색"
-                  />
-                </Field>
-                <Field>
-                  <Label>성별</Label>
-                  <Select name="gender" value={form.gender} onChange={handleChange}>
-                    <option value="">선택</option>
-                    <option value="M">수컷</option>
-                    <option value="F">암컷</option>
-                  </Select>
-                </Field>
-                <Field>
-                  <Label>나이</Label>
-                  <Input
-                    name="age"
-                    value={form.age}
-                    onChange={handleChange}
-                    placeholder="예: 3살 추정"
-                  />
-                </Field>
-              </FieldGrid>
-            </Section>
+            <Field>
+              <Label>제목 *</Label>
+              <Input
+                name="title"
+                value={form.title}
+                onChange={handleChange}
+                required
+                placeholder="제목을 입력하세요"
+              />
+            </Field>
 
-            <Section>
-              <SectionTitle>실종 위치</SectionTitle>
-              <FieldGrid columns={2}>
-                <Field>
-                  <Label>실종 위치</Label>
-                  <Input
-                    name="lostLocation"
-                    value={form.lostLocation}
-                    onChange={handleChange}
-                    placeholder="예: 서울시 강남구 테헤란로 123"
-                  />
-                </Field>
-                <Field>
-                  <Label>대표 이미지</Label>
-                  <UploadControls>
-                    <HiddenFileInput
-                      id="missing-pet-image-upload"
-                      type="file"
-                      accept="image/*"
-                      onChange={handleFileSelect}
-                    />
-                    <UploadButtonRow>
-                      <FileSelectButton htmlFor="missing-pet-image-upload" $disabled={isUploading}>
-                        {isUploading ? '업로드 중...' : '이미지 선택'}
-                      </FileSelectButton>
-                      {form.imageUrl && (
-                        <ClearImageButton type="button" onClick={handleRemoveImage}>
-                          이미지 삭제
-                        </ClearImageButton>
-                      )}
-                    </UploadButtonRow>
-                    <HelperText>
-                      이미지 파일을 업로드하거나 직접 링크를 입력할 수 있어요. (JPG, PNG 등)
-                    </HelperText>
-                    {uploadError && <ErrorText>{uploadError}</ErrorText>}
-                    <ManualUrlInput
-                      type="url"
-                      name="imageUrl"
-                      value={form.imageUrl}
-                      onChange={handleChange}
-                      placeholder="직접 이미지 링크 입력 (선택 사항)"
-                    />
-                  </UploadControls>
-                  {form.imageUrl && (
-                    <ImagePreview>
-                      <PreviewImage src={form.imageUrl} alt="대표 이미지 미리보기" />
-                    </ImagePreview>
-                  )}
-                </Field>
-                <Field>
-                  <Label>위도</Label>
-                  <Input
-                    name="latitude"
-                    value={form.latitude}
-                    onChange={handleNumberChange}
-                    placeholder="예: 37.5665"
-                  />
-                </Field>
-                <Field>
-                  <Label>경도</Label>
-                  <Input
-                    name="longitude"
-                    value={form.longitude}
-                    onChange={handleNumberChange}
-                    placeholder="예: 126.9780"
-                  />
-                </Field>
-              </FieldGrid>
-            </Section>
+            <Field>
+              <Label>카테고리 *</Label>
+              <Select name="category" value={form.category} onChange={handleChange}>
+                <option value="STORY">일상</option>
+                <option value="TIP">꿀팁</option>
+                <option value="QUESTION">질문</option>
+                <option value="INFO">정보</option>
+              </Select>
+            </Field>
 
-            <Section>
-              <SectionTitle>상세 설명 *</SectionTitle>
+            <Field>
+              <Label>내용 *</Label>
               <Textarea
                 name="content"
                 value={form.content}
                 onChange={handleChange}
-                placeholder="실종 당시 상황, 특징, 목격 정보 등 상세 내용을 작성해주세요."
                 required
                 rows={6}
+                placeholder="내용을 입력하세요"
               />
-            </Section>
+            </Field>
+
+            <Field>
+              <Label>대표 이미지</Label>
+              <UploadControls>
+                <HiddenFileInput
+                  id="community-post-image"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileSelect}
+                />
+                <UploadButtonRow>
+                  <FileSelectButton htmlFor="community-post-image" $disabled={isUploading}>
+                    {isUploading ? '업로드 중...' : '이미지 선택'}
+                  </FileSelectButton>
+                  {form.boardFilePath && (
+                    <ClearImageButton type="button" onClick={handleRemoveImage}>
+                      이미지 삭제
+                    </ClearImageButton>
+                  )}
+                </UploadButtonRow>
+                <HelperText>JPG, PNG, GIF, WEBP 형식의 이미지를 최대 5MB까지 업로드할 수 있어요.</HelperText>
+                {uploadError && <ErrorText>{uploadError}</ErrorText>}
+              </UploadControls>
+              {form.boardFilePath && (
+                <ImagePreview>
+                  <PreviewImage src={form.boardFilePath} alt="게시글 이미지 미리보기" />
+                </ImagePreview>
+              )}
+            </Field>
 
             <ButtonRow>
               <SecondaryButton type="button" onClick={onClose}>
                 취소
               </SecondaryButton>
-              <PrimaryButton type="submit" disabled={loading}>
+              <PrimaryButton type="submit" disabled={loading || isUploading}>
                 {loading ? '등록 중...' : '등록'}
               </PrimaryButton>
             </ButtonRow>
@@ -290,7 +176,7 @@ const MissingPetBoardForm = ({ isOpen, onClose, onSubmit, initialData, loading, 
   );
 };
 
-export default MissingPetBoardForm;
+export default CommunityPostModal;
 
 const Overlay = styled.div`
   position: fixed;
@@ -300,16 +186,16 @@ const Overlay = styled.div`
   align-items: flex-start;
   justify-content: center;
   overflow-y: auto;
-  z-index: 1000;
+  z-index: 1100;
   padding: 3rem 1rem;
 `;
 
 const Modal = styled.div`
   background: ${(props) => props.theme.colors.surface};
   border-radius: ${(props) => props.theme.borderRadius.xl};
-  max-width: 880px;
+  max-width: 640px;
   width: 100%;
-  box-shadow: 0 25px 80px rgba(15, 23, 42, 0.25);
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.25);
 `;
 
 const ModalHeader = styled.div`
@@ -322,7 +208,7 @@ const ModalHeader = styled.div`
 
 const ModalTitle = styled.h2`
   margin: 0;
-  font-size: 1.6rem;
+  font-size: 1.4rem;
 `;
 
 const CloseButton = styled.button`
@@ -344,31 +230,7 @@ const ModalBody = styled.div`
 const Form = styled.form`
   display: flex;
   flex-direction: column;
-  gap: ${(props) => props.theme.spacing.xl};
-`;
-
-const Section = styled.div`
-  display: flex;
-  flex-direction: column;
   gap: ${(props) => props.theme.spacing.lg};
-`;
-
-const SectionTitle = styled.h3`
-  margin: 0;
-  font-size: 1.2rem;
-  color: ${(props) => props.theme.colors.text};
-`;
-
-const FieldGrid = styled.div.withConfig({
-  shouldForwardProp: (prop) => prop !== 'columns',
-})`
-  display: grid;
-  grid-template-columns: repeat(${(props) => props.columns || 1}, minmax(0, 1fr));
-  gap: ${(props) => props.theme.spacing.lg};
-
-  @media (max-width: 768px) {
-    grid-template-columns: 1fr;
-  }
 `;
 
 const Field = styled.div`
@@ -417,6 +279,7 @@ const Textarea = styled.textarea`
   background: ${(props) => props.theme.colors.surfaceElevated};
   font-size: 0.95rem;
   resize: vertical;
+  min-height: 160px;
 
   &:focus {
     outline: none;
@@ -489,10 +352,6 @@ const HelperText = styled.span`
 const ErrorText = styled.span`
   font-size: 0.85rem;
   color: ${(props) => props.theme.colors.error || '#e11d48'};
-`;
-
-const ManualUrlInput = styled(Input)`
-  width: 100%;
 `;
 
 const ImagePreview = styled.div`

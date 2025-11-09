@@ -244,6 +244,7 @@ const MissingPetBoardPage = () => {
         onClose={() => setIsFormOpen(false)}
         onSubmit={handleCreateBoard}
         loading={formLoading}
+        currentUser={user}
       />
 
       {isDrawerOpen && (
