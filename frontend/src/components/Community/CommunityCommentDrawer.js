@@ -148,16 +148,16 @@ const CommunityCommentDrawer = ({ isOpen, board, onClose, currentUser, onComment
   return (
     <>
       <Backdrop onClick={onClose} />
-      <Drawer>
-        <DrawerHeader>
-          <DrawerTitle>댓글 ({comments.length})</DrawerTitle>
-          <DrawerSubtitle>{boardTitle}</DrawerSubtitle>
-          <DrawerCloseButton type="button" onClick={onClose}>
+      <Modal role="dialog" aria-modal="true">
+        <ModalHeader>
+          <ModalTitle>댓글 ({comments.length})</ModalTitle>
+          <ModalSubtitle>{boardTitle}</ModalSubtitle>
+          <ModalCloseButton type="button" onClick={onClose} aria-label="닫기">
             ✕
-          </DrawerCloseButton>
-        </DrawerHeader>
+          </ModalCloseButton>
+        </ModalHeader>
 
-        <DrawerBody>
+        <ModalBody>
           {loading ? (
             <LoadingState>댓글을 불러오는 중...</LoadingState>
           ) : error ? (
@@ -203,9 +203,9 @@ const CommunityCommentDrawer = ({ isOpen, board, onClose, currentUser, onComment
               ))}
             </CommentList>
           )}
-        </DrawerBody>
+        </ModalBody>
 
-        <DrawerFooter>
+        <ModalFooter>
           {!currentUser ? (
             <LoginNotice>댓글을 작성하려면 로그인이 필요합니다.</LoginNotice>
           ) : (
@@ -250,8 +250,8 @@ const CommunityCommentDrawer = ({ isOpen, board, onClose, currentUser, onComment
               </SubmitButton>
             </CommentForm>
           )}
-        </DrawerFooter>
-      </Drawer>
+        </ModalFooter>
+      </Modal>
     </>
   );
 };
@@ -265,20 +265,23 @@ const Backdrop = styled.div`
   z-index: 1090;
 `;
 
-const Drawer = styled.div`
+const Modal = styled.div`
   position: fixed;
-  right: 0;
-  top: 0;
-  bottom: 0;
-  width: min(420px, 100%);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(620px, calc(100% - 2rem));
+  max-height: 90vh;
   background: ${(props) => props.theme.colors.surface};
-  box-shadow: -12px 0 32px rgba(15, 23, 42, 0.2);
+  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.25);
+  border-radius: ${(props) => props.theme.borderRadius.xl};
   display: flex;
   flex-direction: column;
   z-index: 1100;
+  overflow: hidden;
 `;
 
-const DrawerHeader = styled.div`
+const ModalHeader = styled.div`
   position: relative;
   padding: ${(props) => props.theme.spacing.lg} ${(props) => props.theme.spacing.xl};
   border-bottom: 1px solid ${(props) => props.theme.colors.border};
@@ -287,17 +290,17 @@ const DrawerHeader = styled.div`
   gap: ${(props) => props.theme.spacing.xs};
 `;
 
-const DrawerTitle = styled.h2`
+const ModalTitle = styled.h2`
   margin: 0;
   font-size: 1.4rem;
 `;
 
-const DrawerSubtitle = styled.span`
+const ModalSubtitle = styled.span`
   font-size: 0.9rem;
   color: ${(props) => props.theme.colors.textSecondary};
 `;
 
-const DrawerCloseButton = styled.button`
+const ModalCloseButton = styled.button`
   position: absolute;
   top: 16px;
   right: 20px;
@@ -312,16 +315,32 @@ const DrawerCloseButton = styled.button`
   }
 `;
 
-const DrawerBody = styled.div`
+const ModalBody = styled.div`
   flex: 1;
   overflow-y: auto;
   padding: ${(props) => props.theme.spacing.lg} ${(props) => props.theme.spacing.xl};
   display: flex;
   flex-direction: column;
   gap: ${(props) => props.theme.spacing.md};
+  scrollbar-width: thin;
+  scrollbar-color: ${(props) => props.theme.colors.primary}33 ${(props) => props.theme.colors.surfaceElevated};
+
+  &::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: ${(props) => props.theme.colors.surfaceElevated};
+    border-radius: 999px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: ${(props) => props.theme.colors.primary}55;
+    border-radius: 999px;
+  }
 `;
 
-const DrawerFooter = styled.div`
+const ModalFooter = styled.div`
   padding: ${(props) => props.theme.spacing.lg} ${(props) => props.theme.spacing.xl};
   border-top: 1px solid ${(props) => props.theme.colors.border};
   background: ${(props) => props.theme.colors.surfaceElevated};

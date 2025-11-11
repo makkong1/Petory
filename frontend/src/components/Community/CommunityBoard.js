@@ -214,11 +214,11 @@ const CommunityBoard = () => {
         prev.map((post) =>
           post.idx === boardId
             ? {
-                ...post,
-                likes: summary.likeCount,
-                dislikes: summary.dislikeCount,
-                userReaction: summary.userReaction,
-              }
+              ...post,
+              likes: summary.likeCount,
+              dislikes: summary.dislikeCount,
+              userReaction: summary.userReaction,
+            }
             : post
         )
       );
@@ -226,11 +226,11 @@ const CommunityBoard = () => {
         setSelectedBoard((prev) =>
           prev
             ? {
-                ...prev,
-                likes: summary.likeCount,
-                dislikes: summary.dislikeCount,
-                userReaction: summary.userReaction,
-              }
+              ...prev,
+              likes: summary.likeCount,
+              dislikes: summary.dislikeCount,
+              userReaction: summary.userReaction,
+            }
             : prev
         );
       }
@@ -245,22 +245,22 @@ const CommunityBoard = () => {
       prev.map((post) =>
         post.idx === boardId
           ? {
-              ...post,
-              likes: summary.likeCount,
-              dislikes: summary.dislikeCount,
-              userReaction: summary.userReaction,
-            }
+            ...post,
+            likes: summary.likeCount,
+            dislikes: summary.dislikeCount,
+            userReaction: summary.userReaction,
+          }
           : post
       )
     );
     setSelectedBoard((prev) =>
       prev && prev.idx === boardId
         ? {
-            ...prev,
-            likes: summary.likeCount,
-            dislikes: summary.dislikeCount,
-            userReaction: summary.userReaction,
-          }
+          ...prev,
+          likes: summary.likeCount,
+          dislikes: summary.dislikeCount,
+          userReaction: summary.userReaction,
+        }
         : prev
     );
   }, []);
@@ -304,7 +304,7 @@ const CommunityBoard = () => {
 
       {error && <ErrorBanner>{error}</ErrorBanner>}
 
-      <PostList>
+      <PostGrid>
         {filteredPosts.length === 0 ? (
           <EmptyState>
             <EmptyIcon>📭</EmptyIcon>
@@ -335,7 +335,7 @@ const CommunityBoard = () => {
                 <PostContent>{post.content}</PostContent>
 
                 <PostFooter>
-                    <AuthorInfo>
+                  <AuthorInfo>
                     <AuthorAvatar>
                       {post.username ? post.username.charAt(0).toUpperCase() : 'U'}
                     </AuthorAvatar>
@@ -369,13 +369,13 @@ const CommunityBoard = () => {
                         </DeleteButton>
                       )}
                       <ReportButton
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handlePostReport(post.idx);
-                      }}
-                    >
-                      <ReportIcon>🚨</ReportIcon>
-                    </ReportButton>
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePostReport(post.idx);
+                        }}
+                      >
+                        <ReportIcon>🚨</ReportIcon>
+                      </ReportButton>
                     </PostActionsRight>
                   </PostActions>
                 </PostFooter>
@@ -383,7 +383,7 @@ const CommunityBoard = () => {
             );
           })
         )}
-      </PostList>
+      </PostGrid>
 
       <CommunityPostModal
         isOpen={isPostModalOpen}
@@ -509,7 +509,7 @@ const CategoryTabs = styled.div`
 `;
 
 const CategoryTab = styled.button`
-  background: ${props => props.active 
+  background: ${props => props.active
     ? `linear-gradient(135deg, ${props.categoryColor} 0%, ${props.categoryColor}dd 100%)`
     : props.theme.colors.surface};
   color: ${props => props.active ? 'white' : props.theme.colors.text};
@@ -523,18 +523,18 @@ const CategoryTab = styled.button`
   display: flex;
   align-items: center;
   gap: ${props => props.theme.spacing.xs};
-  box-shadow: ${props => props.active 
+  box-shadow: ${props => props.active
     ? `0 4px 12px ${props.categoryColor}40`
     : 'none'};
   
   &:hover {
-    background: ${props => props.active 
-      ? `linear-gradient(135deg, ${props.categoryColor}dd 0%, ${props.categoryColor}cc 100%)`
-      : props.theme.colors.surfaceHover};
+    background: ${props => props.active
+    ? `linear-gradient(135deg, ${props.categoryColor}dd 0%, ${props.categoryColor}cc 100%)`
+    : props.theme.colors.surfaceHover};
     transform: translateY(-2px);
-    box-shadow: ${props => props.active 
-      ? `0 6px 16px ${props.categoryColor}50`
-      : `0 4px 8px ${props.theme.colors.shadow}`};
+    box-shadow: ${props => props.active
+    ? `0 6px 16px ${props.categoryColor}50`
+    : `0 4px 8px ${props.theme.colors.shadow}`};
   }
 `;
 
@@ -542,10 +542,10 @@ const CategoryIcon = styled.span`
   font-size: 16px;
 `;
 
-const PostList = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: ${props => props.theme.spacing.lg};
+const PostGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: ${(props) => props.theme.spacing.lg};
 `;
 
 const ErrorBanner = styled.div`
@@ -559,35 +559,23 @@ const ErrorBanner = styled.div`
 `;
 
 const PostCard = styled.div`
-  background: ${props => props.theme.colors.surface};
-  border: 1px solid ${props => props.theme.colors.border};
-  border-radius: ${props => props.theme.borderRadius.xl};
-  padding: ${props => props.theme.spacing.xl};
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  background: ${(props) => props.theme.colors.surface};
+  border: 1px solid ${(props) => props.theme.colors.borderLight};
+  border-radius: ${(props) => props.theme.borderRadius.xl};
+  padding: ${(props) => props.theme.spacing.xl};
+  transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
   cursor: pointer;
-  position: relative;
-  overflow: hidden;
-  
-  &::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 4px;
-    background: ${props => props.theme.colors.gradient};
-    transform: scaleX(0);
-    transition: transform 0.3s ease;
-  }
-  
+  display: flex;
+  flex-direction: column;
+  gap: ${(props) => props.theme.spacing.md};
+  min-height: 320px;
+  background-image: linear-gradient(135deg, ${(props) =>
+    props.theme.colors.surface} 0%, ${(props) => props.theme.colors.surfaceElevated} 100%);
+
   &:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 12px 32px ${props => props.theme.colors.shadow};
-    border-color: ${props => props.theme.colors.primary};
-    
-    &::before {
-      transform: scaleX(1);
-    }
+    transform: translateY(-8px);
+    box-shadow: 0 16px 36px ${(props) => props.theme.colors.shadow};
+    border-color: ${(props) => props.theme.colors.primary}55;
   }
 `;
 
@@ -652,36 +640,35 @@ const PostContent = styled.p`
   margin: ${props => props.theme.spacing.md} 0;
   overflow: hidden;
   display: -webkit-box;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 4;
   -webkit-box-orient: vertical;
+  flex: 1;
+  min-height: 3.6em;
 `;
 
 const PostFooter = styled.div`
   display: flex;
-  justify-content: space-between;
+  flex-wrap: wrap;
   align-items: center;
-  margin-top: ${props => props.theme.spacing.lg};
-  padding-top: ${props => props.theme.spacing.md};
-  border-top: 1px solid ${props => props.theme.colors.borderLight};
-  
-  @media (max-width: 768px) {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: ${props => props.theme.spacing.md};
-  }
+  justify-content: space-between;
+  gap: ${(props) => props.theme.spacing.md};
+  margin-top: auto;
+  padding-top: ${(props) => props.theme.spacing.md};
+  border-top: 1px solid ${(props) => props.theme.colors.borderLight};
 `;
 
 const AuthorInfo = styled.div`
   display: flex;
   align-items: center;
-  gap: ${props => props.theme.spacing.md};
+  gap: ${(props) => props.theme.spacing.md};
+  min-width: 0;
 `;
 
 const AuthorAvatar = styled.div`
-  width: 48px;
-  height: 48px;
-  border-radius: ${props => props.theme.borderRadius.full};
-  background: ${props => props.theme.colors.gradient};
+  width: 46px;
+  height: 46px;
+  border-radius: ${(props) => props.theme.borderRadius.full};
+  background: ${(props) => props.theme.colors.gradient};
   display: flex;
   align-items: center;
   justify-content: center;
@@ -694,21 +681,29 @@ const AuthorAvatar = styled.div`
 const AuthorDetails = styled.div`
   display: flex;
   flex-direction: column;
-  gap: ${props => props.theme.spacing.xs};
+  gap: ${(props) => props.theme.spacing.xs};
+  min-width: 0;
 `;
 
 const AuthorName = styled.span`
-  color: ${props => props.theme.colors.text};
-  font-size: ${props => props.theme.typography.body1.fontSize};
+  color: ${(props) => props.theme.colors.text};
+  font-size: ${(props) => props.theme.typography.body1.fontSize};
   font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 `;
 
 const AuthorLocation = styled.div`
   display: flex;
   align-items: center;
-  gap: ${props => props.theme.spacing.xs};
-  color: ${props => props.theme.colors.textSecondary};
-  font-size: ${props => props.theme.typography.caption.fontSize};
+  gap: ${(props) => props.theme.spacing.xs};
+  color: ${(props) => props.theme.colors.textSecondary};
+  font-size: ${(props) => props.theme.typography.caption.fontSize};
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.9;
 `;
 
 const LocationIcon = styled.span`
@@ -718,20 +713,18 @@ const LocationIcon = styled.span`
 const PostActions = styled.div`
   display: flex;
   align-items: center;
-  gap: ${props => props.theme.spacing.lg};
-  
-  @media (max-width: 768px) {
-    width: 100%;
-    justify-content: space-between;
-  }
+  gap: ${(props) => props.theme.spacing.md};
+  flex-wrap: wrap;
+  min-width: 0;
 `;
 
 const PostStats = styled.div`
   display: flex;
   align-items: center;
-  gap: ${props => props.theme.spacing.lg};
-  color: ${props => props.theme.colors.textSecondary};
-  font-size: ${props => props.theme.typography.body2.fontSize};
+  gap: ${(props) => props.theme.spacing.md};
+  flex-wrap: wrap;
+  color: ${(props) => props.theme.colors.textSecondary};
+  font-size: ${(props) => props.theme.typography.body2.fontSize};
 `;
 
 const StatItem = styled.button`
@@ -739,13 +732,14 @@ const StatItem = styled.button`
   align-items: center;
   gap: ${props => props.theme.spacing.xs};
   background: none;
-  border: none;
-  color: ${props => props.theme.colors.textSecondary};
+  border: 2px solid ${props => props.theme.colors.border};
+  color: ${(props) => props.theme.colors.textSecondary};
   cursor: pointer;
   padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.sm};
   border-radius: ${props => props.theme.borderRadius.md};
   transition: all 0.2s ease;
-  
+  min-width: fit-content;
+
   &:hover {
     background: ${props => props.theme.colors.surfaceHover};
     color: ${props => props.theme.colors.primary};
@@ -763,9 +757,10 @@ const StatValue = styled.span`
 `;
 
 const TimeAgo = styled.span`
-  color: ${props => props.theme.colors.textLight};
-  font-size: ${props => props.theme.typography.caption.fontSize};
+  color: ${(props) => props.theme.colors.textLight};
+  font-size: ${(props) => props.theme.typography.caption.fontSize};
   white-space: nowrap;
+  opacity: 0.85;
 `;
 
 const ReportButton = styled.button`
@@ -805,7 +800,8 @@ const DeleteButton = styled.button`
 const PostActionsRight = styled.div`
   display: flex;
   align-items: center;
-  gap: ${props => props.theme.spacing.sm};
+  gap: ${(props) => props.theme.spacing.sm};
+  flex-wrap: wrap;
 `;
 
 const ReportIcon = styled.span`
