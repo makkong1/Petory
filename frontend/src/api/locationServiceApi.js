@@ -26,7 +26,7 @@ api.interceptors.request.use(
 );
 
 export const locationServiceApi = {
-  searchPlaces: ({ keyword, region, latitude, longitude, radius, size } = {}) =>
+  searchPlaces: ({ keyword, region, latitude, longitude, radius, size, categoryType } = {}) =>
     api.get('/search', {
       params: {
         ...(keyword && { keyword }),
@@ -35,6 +35,7 @@ export const locationServiceApi = {
         ...(typeof longitude === 'number' && { longitude }),
         ...(typeof radius === 'number' && { radius }),
         ...(typeof size === 'number' && { size }),
+        ...(categoryType && { categoryType }),
       },
     }),
 };

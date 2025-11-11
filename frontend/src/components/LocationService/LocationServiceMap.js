@@ -8,6 +8,18 @@ const DEFAULT_CENTER = { lat: 37.5665, lng: 126.9780 }; // 서울 시청
 const DEFAULT_RADIUS = 3000;
 const MAP_DEFAULT_LEVEL = 4;
 
+const CATEGORY_DEFAULT = 'all';
+const CATEGORY_CUSTOM = 'custom';
+
+const CATEGORY_PRESETS = {
+  [CATEGORY_DEFAULT]: { label: '전체', keyword: '반려동물', categoryType: undefined },
+  hospital: { label: '병원', keyword: '동물병원', categoryType: 'hospital' },
+  cafe: { label: '애견카페', keyword: '애견카페', categoryType: 'cafe' },
+  playground: { label: '놀이터', keyword: '반려견 놀이터', categoryType: 'playground' },
+};
+
+const CATEGORY_BUTTONS = ['hospital', 'cafe', 'playground'];
+
 const SIDOS = [
   '서울특별시',
   '부산광역시',
@@ -108,6 +120,7 @@ const LocationServiceMap = () => {
   const [statusMessage, setStatusMessage] = useState('지도 준비 중...');
   const [keyword, setKeyword] = useState('반려동물');
   const [addressQuery, setAddressQuery] = useState('');
+  const [categoryType, setCategoryType] = useState(CATEGORY_DEFAULT);
   const [searchMode, setSearchMode] = useState('keyword');
   const [selectedSido, setSelectedSido] = useState('');
   const [selectedSigungu, setSelectedSigungu] = useState('');
@@ -139,6 +152,7 @@ const LocationServiceMap = () => {
       region,
       keywordOverride,
       level,
+      categoryOverride,
     }) => {
       const requestId = Date.now();
       latestRequestRef.current = requestId;
@@ -152,6 +166,13 @@ const LocationServiceMap = () => {
       const effectiveLongitude = typeof longitude === 'number' ? longitude : center.lng;
       const effectiveLevel = typeof level === 'number' ? level : currentLevel;
       const effectiveRadius = levelToRadius(effectiveLevel);
+      const effectiveCategoryType = categoryOverride ?? categoryType;
+      const apiCategoryType =
+        effectiveCategoryType &&
+        effectiveCategoryType !== CATEGORY_DEFAULT &&
+        effectiveCategoryType !== CATEGORY_CUSTOM
+          ? effectiveCategoryType
+          : undefined;
 
       try {
         const response = await locationServiceApi.searchPlaces({
@@ -161,6 +182,7 @@ const LocationServiceMap = () => {
           longitude: effectiveLongitude,
           radius: effectiveRadius,
           size: 100,
+          categoryType: apiCategoryType,
         });
 
         if (latestRequestRef.current !== requestId) {
@@ -207,7 +229,7 @@ const LocationServiceMap = () => {
         };
       }
     },
-    [keyword]
+    [keyword, categoryType]
   );
 
   useEffect(() => {
@@ -322,11 +344,13 @@ const LocationServiceMap = () => {
           level: mapLevel,
         };
       }
+      setCategoryType(CATEGORY_CUSTOM);
       fetchServices({
         latitude: mapCenter.lat,
         longitude: mapCenter.lng,
         keywordOverride: keyword,
         level: mapLevel,
+        categoryOverride: CATEGORY_CUSTOM,
       });
     },
     [fetchServices, keyword, mapCenter, mapLevel]
@@ -366,13 +390,14 @@ const LocationServiceMap = () => {
         keywordOverride: keyword,
         level: mapLevel,
         region: addressQuery.trim(),
+        categoryOverride: categoryType,
       });
     } catch (err) {
       const message = err.response?.data?.error || err.message;
       setError(`주소 검색에 실패했습니다: ${message}`);
       setStatusMessage('');
     }
-  }, [addressQuery, fetchServices, keyword, mapLevel]);
+  }, [addressQuery, categoryType, fetchServices, keyword, mapLevel]);
 
   const handleRegionSearch = useCallback(async () => {
     if (!selectedSido) {
@@ -411,13 +436,45 @@ const LocationServiceMap = () => {
         keywordOverride: keyword,
         level: mapLevel,
         region: targetRegion,
+        categoryOverride: categoryType,
       });
     } catch (err) {
       const message = err.response?.data?.error || err.message;
       setError(`지역 검색에 실패했습니다: ${message}`);
       setStatusMessage('');
     }
-  }, [fetchServices, keyword, selectedSido, selectedSigungu, mapLevel]);
+  }, [categoryType, fetchServices, keyword, selectedSido, selectedSigungu, mapLevel]);
+
+  const handleCategorySelect = useCallback(
+    (nextCategory) => {
+      if (!nextCategory || !CATEGORY_PRESETS[nextCategory]) {
+        return;
+      }
+
+      const preset = CATEGORY_PRESETS[nextCategory];
+      setCategoryType(nextCategory);
+      if (preset.keyword) {
+        setKeyword(preset.keyword);
+      }
+
+      const targetCenter = mapCenter || DEFAULT_CENTER;
+      programmaticCenterRef.current = { ...targetCenter };
+      lastFetchedRef.current = {
+        lat: targetCenter.lat,
+        lng: targetCenter.lng,
+        level: mapLevel,
+      };
+
+      fetchServices({
+        latitude: targetCenter.lat,
+        longitude: targetCenter.lng,
+        keywordOverride: preset.keyword ?? keyword,
+        level: mapLevel,
+        categoryOverride: nextCategory,
+      });
+    },
+    [fetchServices, keyword, mapCenter, mapLevel]
+  );
 
   const servicesWithDisplay = useMemo(() =>
     services.map((service, index) => ({
@@ -496,7 +553,10 @@ const LocationServiceMap = () => {
             <SearchBar onSubmit={handleKeywordSubmit}>
               <SearchInput
                 value={keyword}
-                onChange={(e) => setKeyword(e.target.value)}
+                onChange={(e) => {
+                  setKeyword(e.target.value);
+                  setCategoryType(CATEGORY_CUSTOM);
+                }}
                 placeholder="검색어 (예: 반려동물카페, 동물병원 등)"
               />
               <SearchButton type="submit">검색</SearchButton>
@@ -549,6 +609,21 @@ const LocationServiceMap = () => {
             </RegionSearchButton>
           </RegionControls>
         )}
+        <CategoryFilterBar>
+          {CATEGORY_BUTTONS.map((buttonType) => {
+            const preset = CATEGORY_PRESETS[buttonType];
+            return (
+              <CategoryButton
+                key={buttonType}
+                type="button"
+                active={categoryType === buttonType}
+                onClick={() => handleCategorySelect(buttonType)}
+              >
+                {preset.label}
+              </CategoryButton>
+            );
+          })}
+        </CategoryFilterBar>
       </Header>
 
       {statusMessage && (
@@ -691,6 +766,35 @@ const Header = styled.div`
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
+`;
+
+const CategoryFilterBar = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+`;
+
+const CategoryButton = styled.button.withConfig({
+  shouldForwardProp: (prop) => prop !== 'active',
+})`
+  padding: 0.5rem 1.1rem;
+  border-radius: 999px;
+  border: 1px solid ${(props) => (props.active ? '#1d4ed8' : '#d1d5db')};
+  background: ${(props) => (props.active ? '#1d4ed8' : '#ffffff')};
+  color: ${(props) => (props.active ? '#ffffff' : '#374151')};
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+
+  &:hover {
+    border-color: #1d4ed8;
+    color: ${(props) => (props.active ? '#ffffff' : '#1d4ed8')};
+  }
+
+  &:active {
+    transform: scale(0.97);
+  }
 `;
 
 const HeaderTop = styled.div`

@@ -83,16 +83,19 @@ const MapContainer = React.forwardRef(
     useEffect(() => {
       if (!mapReadyRef.current || !mapInstanceRef.current || !mapCenter) return;
 
-      const last = lastProgrammaticCenterRef.current;
-      const isSame =
-        last &&
-        Math.abs(last.lat - mapCenter.lat) < COORD_EPSILON &&
-        Math.abs(last.lng - mapCenter.lng) < COORD_EPSILON;
+      const map = mapInstanceRef.current;
+      const currentCenter = map.getCenter();
+      const isAlreadyAtCenter =
+        Math.abs(currentCenter.getLat() - mapCenter.lat) < COORD_EPSILON &&
+        Math.abs(currentCenter.getLng() - mapCenter.lng) < COORD_EPSILON;
 
-      if (!isSame) {
-        lastProgrammaticCenterRef.current = { ...mapCenter };
-        mapInstanceRef.current.panTo(new window.kakao.maps.LatLng(mapCenter.lat, mapCenter.lng));
+      if (isAlreadyAtCenter) {
+        lastProgrammaticCenterRef.current = null;
+        return;
       }
+
+      lastProgrammaticCenterRef.current = { ...mapCenter };
+      map.panTo(new window.kakao.maps.LatLng(mapCenter.lat, mapCenter.lng));
     }, [mapCenter]);
 
     useEffect(() => {

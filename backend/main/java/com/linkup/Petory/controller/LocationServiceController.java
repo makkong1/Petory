@@ -29,7 +29,8 @@ public class LocationServiceController {
             @RequestParam(required = false) Double latitude,
             @RequestParam(required = false) Double longitude,
             @RequestParam(required = false) Integer radius,
-            @RequestParam(required = false) Integer size) {
+            @RequestParam(required = false) Integer size,
+            @RequestParam(required = false) String categoryType) {
         try {
             List<LocationServiceDTO> services = locationServiceService.searchKakaoPlaces(
                     keyword,
@@ -37,7 +38,8 @@ public class LocationServiceController {
                     latitude,
                     longitude,
                     radius,
-                    size);
+                    size,
+                    categoryType);
 
             Map<String, Object> response = new HashMap<>();
             response.put("services", services);
