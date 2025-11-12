@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import styled from 'styled-components';
 import { missingPetApi } from '../../api/missingPetApi';
+import AddressMapSelector from './AddressMapSelector';
 
 const statusLabel = {
   MISSING: '실종',
@@ -17,6 +18,10 @@ const MissingPetBoardDetail = ({
   onDeleteBoard,
 }) => {
   const [comment, setComment] = useState('');
+  const [commentAddress, setCommentAddress] = useState('');
+  const [commentLat, setCommentLat] = useState(null);
+  const [commentLng, setCommentLng] = useState(null);
+  const [showAddressMap, setShowAddressMap] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [statusUpdating, setStatusUpdating] = useState(false);
 
@@ -41,8 +46,15 @@ const MissingPetBoardDetail = ({
         boardId: board.idx,
         userId: currentUser.idx,
         content: comment.trim(),
+        address: commentAddress || null,
+        latitude: commentLat || null,
+        longitude: commentLng || null,
       });
       setComment('');
+      setCommentAddress('');
+      setCommentLat(null);
+      setCommentLng(null);
+      setShowAddressMap(false);
       onRefresh();
     } catch (err) {
       alert(err.response?.data?.error || err.message);
@@ -245,6 +257,11 @@ const MissingPetBoardDetail = ({
                     </CommentDate>
                   </CommentHeader>
                   <CommentContent>{item.content}</CommentContent>
+                  {item.address && (
+                    <CommentLocation>
+                      📍 목격 위치: {item.address}
+                    </CommentLocation>
+                  )}
                   {currentUser && (currentUser.idx === item.userId || currentUser.idx === board.userId) && (
                     <CommentActions>
                       <CommentDeleteButton onClick={() => handleDeleteComment(item.idx)}>
@@ -271,6 +288,31 @@ const MissingPetBoardDetail = ({
               rows={3}
               disabled={!currentUser || submitting}
             />
+            {currentUser && (
+              <>
+                <AddressToggleButton
+                  type="button"
+                  onClick={() => setShowAddressMap(!showAddressMap)}
+                  disabled={submitting}
+                >
+                  {showAddressMap ? '📍 주소 입력 숨기기' : '📍 목격 위치 추가하기'}
+                </AddressToggleButton>
+                {showAddressMap && (
+                  <AddressMapContainer>
+                    <AddressMapSelector
+                      onAddressSelect={(location) => {
+                        setCommentAddress(location.address);
+                        setCommentLat(location.latitude);
+                        setCommentLng(location.longitude);
+                      }}
+                      initialAddress={commentAddress}
+                      initialLat={commentLat}
+                      initialLng={commentLng}
+                    />
+                  </AddressMapContainer>
+                )}
+              </>
+            )}
             <CommentSubmit type="submit" disabled={!currentUser || submitting || !comment.trim()}>
               {submitting ? '등록 중...' : '댓글 등록'}
             </CommentSubmit>
@@ -589,6 +631,48 @@ const CommentTextArea = styled.textarea`
     border-color: ${(props) => props.theme.colors.primary};
     box-shadow: 0 0 0 3px rgba(255, 126, 54, 0.2);
   }
+`;
+
+const CommentLocation = styled.div`
+  margin-top: ${(props) => props.theme.spacing.xs};
+  padding: ${(props) => props.theme.spacing.xs} ${(props) => props.theme.spacing.sm};
+  background: ${(props) => props.theme.colors.surfaceHover};
+  border-radius: ${(props) => props.theme.borderRadius.sm};
+  font-size: 0.9rem;
+  color: ${(props) => props.theme.colors.text};
+  font-weight: 500;
+`;
+
+const AddressToggleButton = styled.button`
+  align-self: flex-start;
+  background: ${(props) => props.theme.colors.surfaceElevated};
+  color: ${(props) => props.theme.colors.text};
+  border: 1px solid ${(props) => props.theme.colors.border};
+  border-radius: ${(props) => props.theme.borderRadius.md};
+  padding: ${(props) => props.theme.spacing.xs} ${(props) => props.theme.spacing.md};
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.9rem;
+
+  &:hover:not(:disabled) {
+    background: ${(props) => props.theme.colors.surfaceHover};
+    border-color: ${(props) => props.theme.colors.primary};
+    color: ${(props) => props.theme.colors.primary};
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+`;
+
+const AddressMapContainer = styled.div`
+  margin-top: ${(props) => props.theme.spacing.md};
+  padding: ${(props) => props.theme.spacing.md};
+  background: ${(props) => props.theme.colors.surfaceElevated};
+  border-radius: ${(props) => props.theme.borderRadius.lg};
+  border: 1px solid ${(props) => props.theme.colors.border};
 `;
 
 const CommentSubmit = styled.button`

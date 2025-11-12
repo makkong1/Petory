@@ -59,6 +59,9 @@ public class MissingPetConverter {
                 .userId(comment.getUser().getIdx())
                 .username(comment.getUser().getUsername())
                 .content(comment.getContent())
+                .address(comment.getAddress())
+                .latitude(comment.getLatitude())
+                .longitude(comment.getLongitude())
                 .createdAt(comment.getCreatedAt())
                 .build();
     }

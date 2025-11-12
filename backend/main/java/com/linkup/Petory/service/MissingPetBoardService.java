@@ -151,6 +151,9 @@ public class MissingPetBoardService {
                 .board(board)
                 .user(user)
                 .content(dto.getContent())
+                .address(dto.getAddress())
+                .latitude(dto.getLatitude())
+                .longitude(dto.getLongitude())
                 .build();
 
         MissingPetComment saved = commentRepository.save(comment);
