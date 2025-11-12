@@ -23,6 +23,7 @@ public class MissingPetBoardDTO {
     private String username;
     private String title;
     private String content;
+    private String phoneNumber;
     private String petName;
     private String species;
     private String breed;
@@ -40,4 +41,3 @@ public class MissingPetBoardDTO {
     private List<MissingPetCommentDTO> comments;
     private Integer commentCount;
 }
-

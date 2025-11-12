@@ -24,6 +24,7 @@ public class UsersConverter {
                 .id(user.getId())
                 .username(user.getUsername())
                 .email(user.getEmail())
+                .phone(user.getPhone())
                 // password는 응답에 포함하지 않음
                 .role(user.getRole().name())
                 .location(user.getLocation())
@@ -42,6 +43,7 @@ public class UsersConverter {
                 .id(dto.getId())
                 .username(dto.getUsername())
                 .email(dto.getEmail())
+                .phone(dto.getPhone())
                 // password는 Service에서 암호화 후 설정
                 .role(Role.valueOf(dto.getRole()))
                 .location(dto.getLocation())

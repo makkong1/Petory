@@ -36,7 +36,9 @@ const MissingPetBoardDetail = ({
       return;
     }
 
-    if (!comment.trim()) {
+    // 댓글 내용이나 위치 중 하나는 있어야 함
+    if (!comment.trim() && !commentAddress) {
+      alert('댓글 내용 또는 목격 위치를 입력해주세요.');
       return;
     }
 
@@ -151,7 +153,13 @@ const MissingPetBoardDetail = ({
               <InfoItem>
                 <InfoLabel>연락처</InfoLabel>
                 <InfoValue>
-                  {board.phone || '댓글로 제보해주세요'}
+                  {board.phoneNumber ? (
+                    <a href={`tel:${board.phoneNumber}`} style={{ color: 'inherit', textDecoration: 'none' }}>
+                      {board.phoneNumber}
+                    </a>
+                  ) : (
+                    '댓글로 제보해주세요'
+                  )}
                 </InfoValue>
               </InfoItem>
             </InfoGrid>
@@ -313,7 +321,7 @@ const MissingPetBoardDetail = ({
                 )}
               </>
             )}
-            <CommentSubmit type="submit" disabled={!currentUser || submitting || !comment.trim()}>
+            <CommentSubmit type="submit" disabled={!currentUser || submitting || (!comment.trim() && !commentAddress)}>
               {submitting ? '등록 중...' : '댓글 등록'}
             </CommentSubmit>
           </CommentForm>
@@ -330,7 +338,7 @@ const Drawer = styled.aside`
   top: 0;
   right: 0;
   bottom: 0;
-  width: min(480px, 100%);
+  width: min(580px, 100%);
   background: ${(props) => props.theme.colors.surface};
   box-shadow: -10px 0 40px rgba(15, 23, 42, 0.2);
   display: flex;
@@ -350,6 +358,8 @@ const HeaderLeft = styled.div`
   display: flex;
   align-items: center;
   gap: ${(props) => props.theme.spacing.sm};
+  flex: 1;
+  min-width: 0;
 `;
 
 const HeaderRight = styled.div`
@@ -361,6 +371,11 @@ const HeaderRight = styled.div`
 const DrawerTitle = styled.h2`
   margin: 0;
   font-size: 1.3rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
 `;
 
 const CloseButton = styled.button`
@@ -405,7 +420,6 @@ const InfoCard = styled.div`
   grid-template-columns: minmax(0, 1fr);
   background: ${(props) => props.theme.colors.surfaceElevated};
   border-radius: ${(props) => props.theme.borderRadius.xl};
-  overflow: hidden;
   border: 1px solid ${(props) => props.theme.colors.border};
 
   @media (min-width: 720px) {
@@ -418,6 +432,9 @@ const InfoContent = styled.div`
   display: flex;
   flex-direction: column;
   gap: ${(props) => props.theme.spacing.lg};
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
 `;
 
 const InfoGrid = styled.div.withConfig({
@@ -426,12 +443,16 @@ const InfoGrid = styled.div.withConfig({
   display: grid;
   gap: ${(props) => props.theme.spacing.md};
   grid-template-columns: repeat(${(props) => props.columns || 1}, minmax(0, 1fr));
+  width: 100%;
+  box-sizing: border-box;
 `;
 
 const InfoItem = styled.div`
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
+  width: 100%;
 `;
 
 const InfoLabel = styled.span`
@@ -445,6 +466,9 @@ const InfoValue = styled.span`
   font-size: 1rem;
   color: ${(props) => props.theme.colors.text};
   font-weight: 600;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  line-height: 1.5;
 `;
 
 const Divider = styled.hr`
@@ -483,6 +507,10 @@ const ContentBox = styled.div`
   line-height: 1.6;
   color: ${(props) => props.theme.colors.textSecondary};
   white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  width: 100%;
+  box-sizing: border-box;
 `;
 
 const StatusBadge = styled.span.withConfig({
@@ -584,6 +612,9 @@ const CommentContent = styled.p`
   margin: 0;
   color: ${(props) => props.theme.colors.textSecondary};
   white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  line-height: 1.6;
 `;
 
 const CommentActions = styled.div`

@@ -25,6 +25,7 @@ public class MissingPetConverter {
                 .idx(board.getIdx())
                 .userId(board.getUser().getIdx())
                 .username(board.getUser().getUsername())
+                .phoneNumber(board.getUser().getPhone())
                 .title(board.getTitle())
                 .content(board.getContent())
                 .petName(board.getPetName())
@@ -72,4 +73,3 @@ public class MissingPetConverter {
                 .collect(Collectors.toList());
     }
 }
-
