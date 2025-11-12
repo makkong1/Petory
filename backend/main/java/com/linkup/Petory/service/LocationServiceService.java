@@ -55,15 +55,6 @@ public class LocationServiceService {
             String categoryType) {
 
         String effectiveKeyword = buildEffectiveKeyword(keyword, categoryType);
-        log.info("카카오 장소 검색 요청 수신 - keyword='{}', region='{}', latitude={}, longitude={}, radius={}, size={}, categoryType={}",
-                effectiveKeyword,
-                region,
-                latitude,
-                longitude,
-                radius,
-                maxResults,
-                categoryType);
-
         int safeMaxResults = resolveMaxResults(maxResults);
 
         List<KakaoPlaceDTO.Document> documents = kakaoMapService.searchPlaces(
@@ -80,16 +71,6 @@ public class LocationServiceService {
                 .filter(document -> matchesCategory(document, categoryType))
                 .map(this::convertDocumentToDto)
                 .collect(Collectors.toList());
-
-        log.info("카카오 장소 검색 완료 - 응답 {}건", results.size());
-
-        if (log.isDebugEnabled()) {
-            results.forEach(dto -> log.debug("카카오 장소 결과 - id={}, name='{}', address='{}', placeUrl='{}'",
-                    dto.getExternalId(),
-                    dto.getName(),
-                    dto.getAddress(),
-                    dto.getPlaceUrl()));
-        }
 
         return results;
     }
@@ -206,16 +187,7 @@ public class LocationServiceService {
             return false;
         }
 
-        boolean petFriendly = containsAnyPetKeyword(combined.toString());
-
-        if (!petFriendly && log.isDebugEnabled()) {
-            log.debug("필터링된 장소 (반려동물 관련 키워드 없음): id={}, name='{}', category='{}'",
-                    document.getId(),
-                    document.getPlaceName(),
-                    document.getCategoryName());
-        }
-
-        return petFriendly;
+        return containsAnyPetKeyword(combined.toString());
     }
 
     private void appendIfHasText(StringBuilder builder, String value) {
@@ -269,7 +241,6 @@ public class LocationServiceService {
         try {
             return Double.parseDouble(value);
         } catch (NumberFormatException ex) {
-            log.warn("좌표 값을 Double로 변환하지 못했습니다. value={}", value);
             return null;
         }
     }

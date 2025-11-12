@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import styled from 'styled-components';
 import { missingPetApi } from '../../api/missingPetApi';
+import AddressMapSelector from './AddressMapSelector';
 
 const statusLabel = {
   MISSING: '실종',
@@ -17,6 +18,10 @@ const MissingPetBoardDetail = ({
   onDeleteBoard,
 }) => {
   const [comment, setComment] = useState('');
+  const [commentAddress, setCommentAddress] = useState('');
+  const [commentLat, setCommentLat] = useState(null);
+  const [commentLng, setCommentLng] = useState(null);
+  const [showAddressMap, setShowAddressMap] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [statusUpdating, setStatusUpdating] = useState(false);
 
@@ -31,7 +36,9 @@ const MissingPetBoardDetail = ({
       return;
     }
 
-    if (!comment.trim()) {
+    // 댓글 내용이나 위치 중 하나는 있어야 함
+    if (!comment.trim() && !commentAddress) {
+      alert('댓글 내용 또는 목격 위치를 입력해주세요.');
       return;
     }
 
@@ -41,8 +48,15 @@ const MissingPetBoardDetail = ({
         boardId: board.idx,
         userId: currentUser.idx,
         content: comment.trim(),
+        address: commentAddress || null,
+        latitude: commentLat || null,
+        longitude: commentLng || null,
       });
       setComment('');
+      setCommentAddress('');
+      setCommentLat(null);
+      setCommentLng(null);
+      setShowAddressMap(false);
       onRefresh();
     } catch (err) {
       alert(err.response?.data?.error || err.message);
@@ -139,7 +153,13 @@ const MissingPetBoardDetail = ({
               <InfoItem>
                 <InfoLabel>연락처</InfoLabel>
                 <InfoValue>
-                  {board.phone || '댓글로 제보해주세요'}
+                  {board.phoneNumber ? (
+                    <a href={`tel:${board.phoneNumber}`} style={{ color: 'inherit', textDecoration: 'none' }}>
+                      {board.phoneNumber}
+                    </a>
+                  ) : (
+                    '댓글로 제보해주세요'
+                  )}
                 </InfoValue>
               </InfoItem>
             </InfoGrid>
@@ -245,6 +265,11 @@ const MissingPetBoardDetail = ({
                     </CommentDate>
                   </CommentHeader>
                   <CommentContent>{item.content}</CommentContent>
+                  {item.address && (
+                    <CommentLocation>
+                      📍 목격 위치: {item.address}
+                    </CommentLocation>
+                  )}
                   {currentUser && (currentUser.idx === item.userId || currentUser.idx === board.userId) && (
                     <CommentActions>
                       <CommentDeleteButton onClick={() => handleDeleteComment(item.idx)}>
@@ -271,7 +296,32 @@ const MissingPetBoardDetail = ({
               rows={3}
               disabled={!currentUser || submitting}
             />
-            <CommentSubmit type="submit" disabled={!currentUser || submitting || !comment.trim()}>
+            {currentUser && (
+              <>
+                <AddressToggleButton
+                  type="button"
+                  onClick={() => setShowAddressMap(!showAddressMap)}
+                  disabled={submitting}
+                >
+                  {showAddressMap ? '📍 주소 입력 숨기기' : '📍 목격 위치 추가하기'}
+                </AddressToggleButton>
+                {showAddressMap && (
+                  <AddressMapContainer>
+                    <AddressMapSelector
+                      onAddressSelect={(location) => {
+                        setCommentAddress(location.address);
+                        setCommentLat(location.latitude);
+                        setCommentLng(location.longitude);
+                      }}
+                      initialAddress={commentAddress}
+                      initialLat={commentLat}
+                      initialLng={commentLng}
+                    />
+                  </AddressMapContainer>
+                )}
+              </>
+            )}
+            <CommentSubmit type="submit" disabled={!currentUser || submitting || (!comment.trim() && !commentAddress)}>
               {submitting ? '등록 중...' : '댓글 등록'}
             </CommentSubmit>
           </CommentForm>
@@ -288,7 +338,7 @@ const Drawer = styled.aside`
   top: 0;
   right: 0;
   bottom: 0;
-  width: min(480px, 100%);
+  width: min(580px, 100%);
   background: ${(props) => props.theme.colors.surface};
   box-shadow: -10px 0 40px rgba(15, 23, 42, 0.2);
   display: flex;
@@ -308,6 +358,8 @@ const HeaderLeft = styled.div`
   display: flex;
   align-items: center;
   gap: ${(props) => props.theme.spacing.sm};
+  flex: 1;
+  min-width: 0;
 `;
 
 const HeaderRight = styled.div`
@@ -319,6 +371,11 @@ const HeaderRight = styled.div`
 const DrawerTitle = styled.h2`
   margin: 0;
   font-size: 1.3rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
 `;
 
 const CloseButton = styled.button`
@@ -363,7 +420,6 @@ const InfoCard = styled.div`
   grid-template-columns: minmax(0, 1fr);
   background: ${(props) => props.theme.colors.surfaceElevated};
   border-radius: ${(props) => props.theme.borderRadius.xl};
-  overflow: hidden;
   border: 1px solid ${(props) => props.theme.colors.border};
 
   @media (min-width: 720px) {
@@ -376,6 +432,9 @@ const InfoContent = styled.div`
   display: flex;
   flex-direction: column;
   gap: ${(props) => props.theme.spacing.lg};
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
 `;
 
 const InfoGrid = styled.div.withConfig({
@@ -384,12 +443,16 @@ const InfoGrid = styled.div.withConfig({
   display: grid;
   gap: ${(props) => props.theme.spacing.md};
   grid-template-columns: repeat(${(props) => props.columns || 1}, minmax(0, 1fr));
+  width: 100%;
+  box-sizing: border-box;
 `;
 
 const InfoItem = styled.div`
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
+  width: 100%;
 `;
 
 const InfoLabel = styled.span`
@@ -403,6 +466,9 @@ const InfoValue = styled.span`
   font-size: 1rem;
   color: ${(props) => props.theme.colors.text};
   font-weight: 600;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  line-height: 1.5;
 `;
 
 const Divider = styled.hr`
@@ -441,6 +507,10 @@ const ContentBox = styled.div`
   line-height: 1.6;
   color: ${(props) => props.theme.colors.textSecondary};
   white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  width: 100%;
+  box-sizing: border-box;
 `;
 
 const StatusBadge = styled.span.withConfig({
@@ -497,7 +567,7 @@ const StatusButton = styled.button.withConfig({
 
   &:hover:not(:disabled) {
     background: ${(props) =>
-      props.active ? props.theme.colors.primaryDark : props.theme.colors.surfaceHover};
+    props.active ? props.theme.colors.primaryDark : props.theme.colors.surfaceHover};
   }
 
   &:disabled {
@@ -542,6 +612,9 @@ const CommentContent = styled.p`
   margin: 0;
   color: ${(props) => props.theme.colors.textSecondary};
   white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  line-height: 1.6;
 `;
 
 const CommentActions = styled.div`
@@ -589,6 +662,55 @@ const CommentTextArea = styled.textarea`
     border-color: ${(props) => props.theme.colors.primary};
     box-shadow: 0 0 0 3px rgba(255, 126, 54, 0.2);
   }
+`;
+
+const CommentLocation = styled.div`
+  margin-top: ${(props) => props.theme.spacing.xs};
+  padding: ${(props) => props.theme.spacing.xs} ${(props) => props.theme.spacing.sm};
+  background: ${(props) => props.theme.colors.surfaceHover};
+  border-radius: ${(props) => props.theme.borderRadius.sm};
+  font-size: 0.9rem;
+  color: ${(props) => props.theme.colors.text};
+  font-weight: 500;
+`;
+
+const AddressToggleButton = styled.button`
+  align-self: flex-start;
+  background: ${(props) => props.theme.colors.surface};
+  color: ${(props) => props.theme.colors.text};
+  border: 1.5px solid ${(props) => props.theme.colors.border};
+  border-radius: ${(props) => props.theme.borderRadius.md};
+  padding: ${(props) => props.theme.spacing.sm} ${(props) => props.theme.spacing.lg};
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.9rem;
+  margin-top: ${(props) => props.theme.spacing.xs};
+
+  &:hover:not(:disabled) {
+    background: ${(props) => props.theme.colors.surfaceHover};
+    border-color: ${(props) => props.theme.colors.primary};
+    color: ${(props) => props.theme.colors.primary};
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(0);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+`;
+
+const AddressMapContainer = styled.div`
+  margin-top: ${(props) => props.theme.spacing.md};
+  padding: ${(props) => props.theme.spacing.md};
+  background: ${(props) => props.theme.colors.surfaceElevated};
+  border-radius: ${(props) => props.theme.borderRadius.lg};
+  border: 1px solid ${(props) => props.theme.colors.border};
 `;
 
 const CommentSubmit = styled.button`

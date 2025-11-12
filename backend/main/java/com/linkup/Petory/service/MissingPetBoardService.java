@@ -37,7 +37,7 @@ public class MissingPetBoardService {
     }
 
     public MissingPetBoardDTO getBoard(Long id) {
-        MissingPetBoard board = boardRepository.findById(id)
+        MissingPetBoard board = boardRepository.findByIdWithUser(id)
                 .orElseThrow(() -> new IllegalArgumentException("Missing pet board not found"));
         return missingPetConverter.toBoardDTO(board);
     }
@@ -151,6 +151,9 @@ public class MissingPetBoardService {
                 .board(board)
                 .user(user)
                 .content(dto.getContent())
+                .address(dto.getAddress())
+                .latitude(dto.getLatitude())
+                .longitude(dto.getLongitude())
                 .build();
 
         MissingPetComment saved = commentRepository.save(comment);
@@ -173,4 +176,3 @@ public class MissingPetBoardService {
         commentRepository.delete(comment);
     }
 }
-

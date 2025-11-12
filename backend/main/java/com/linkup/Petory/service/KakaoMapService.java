@@ -1,7 +1,5 @@
 package com.linkup.Petory.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkup.Petory.dto.KakaoAddressDTO;
 import com.linkup.Petory.dto.KakaoPlaceDTO;
 import lombok.RequiredArgsConstructor;
@@ -32,8 +30,6 @@ public class KakaoMapService {
 
     @Value("${kakao.rest-api-key}")
     private String kakaoRestApiKey;
-
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private static final String KAKAO_LOCAL_SEARCH_URL = "https://dapi.kakao.com/v2/local/search/keyword.json";
     private static final String KAKAO_ADDRESS_SEARCH_URL = "https://dapi.kakao.com/v2/local/search/address.json";
@@ -96,15 +92,12 @@ public class KakaoMapService {
                         KakaoPlaceDTO.class);
 
                 KakaoPlaceDTO responseBody = response.getBody();
-                logRawKakaoResponse(uri, responseBody);
                 if (responseBody == null || responseBody.getDocuments() == null
                         || responseBody.getDocuments().isEmpty()) {
                     break;
                 }
 
                 allPlaces.addAll(responseBody.getDocuments());
-
-                logPlaceDocuments(effectiveQuery, region, responseBody.getDocuments());
 
                 // 마지막 페이지인지 확인
                 if (responseBody.getMeta() != null && Boolean.TRUE.equals(responseBody.getMeta().getIsEnd())) {
@@ -119,54 +112,8 @@ public class KakaoMapService {
 
             return allPlaces.subList(0, Math.min(allPlaces.size(), maxResults));
 
-        } catch (org.springframework.web.client.HttpClientErrorException e) {
-            log.error("카카오맵 API 호출 중 HTTP 오류 발생: {} - {}", e.getStatusCode(), e.getResponseBodyAsString());
-            return allPlaces;
         } catch (Exception e) {
-            log.error("카카오맵 API 호출 중 오류 발생: {}", e.getMessage());
             return allPlaces;
-        }
-    }
-
-    private void logRawKakaoResponse(URI uri, KakaoPlaceDTO responseBody) {
-        if (!log.isInfoEnabled()) {
-            return;
-        }
-
-        try {
-            String payload = OBJECT_MAPPER.writeValueAsString(responseBody);
-            log.info("카카오 장소 검색 RAW 응답 - uri='{}', payload={}", uri, payload);
-        } catch (JsonProcessingException e) {
-            log.warn("카카오 장소 검색 RAW 응답 로깅 중 JSON 직렬화 실패: {}", e.getMessage());
-        }
-    }
-
-    private void logPlaceDocuments(String keyword, String region, List<KakaoPlaceDTO.Document> documents) {
-        if (documents == null || documents.isEmpty()) {
-            log.info("카카오 장소 검색 결과가 비어 있습니다. 키워드: {}, 지역: {}", keyword, region);
-            return;
-        }
-
-        for (KakaoPlaceDTO.Document doc : documents) {
-            log.info("카카오 장소 검색 결과 - 키워드: {}, 지역: {}\n"
-                    + "  · 이름: {}\n"
-                    + "  · 카테고리: {}\n"
-                    + "  · 주소: {}\n"
-                    + "  · 도로명 주소: {}\n"
-                    + "  · 전화번호: {}\n"
-                    + "  · 위도: {}\n"
-                    + "  · 경도: {}\n"
-                    + "  · 상세 페이지: {}",
-                    keyword,
-                    region,
-                    defaultString(doc.getPlaceName()),
-                    defaultString(doc.getCategoryName()),
-                    defaultString(doc.getAddressName()),
-                    defaultString(doc.getRoadAddressName()),
-                    defaultString(doc.getPhone()),
-                    defaultString(doc.getY()),
-                    defaultString(doc.getX()),
-                    defaultString(doc.getPlace_url()));
         }
     }
 
@@ -196,10 +143,6 @@ public class KakaoMapService {
         return safeRadius;
     }
 
-    private String defaultString(String value) {
-        return value != null ? value : "";
-    }
-
     /**
      * 여러 키워드로 병렬 검색
      */
@@ -213,9 +156,8 @@ public class KakaoMapService {
                         null, null, null,
                         maxResultsPerKeyword);
                 allPlaces.addAll(places);
-                log.info("키워드 '{}'로 {}개의 장소를 검색했습니다.", keyword, places.size());
             } catch (Exception e) {
-                log.error("키워드 '{}' 검색 중 오류 발생: {}", keyword, e.getMessage());
+                // 에러 무시
             }
         }
 
@@ -252,7 +194,6 @@ public class KakaoMapService {
 
             KakaoAddressDTO responseBody = response.getBody();
             if (responseBody == null || responseBody.getDocuments() == null || responseBody.getDocuments().isEmpty()) {
-                log.warn("주소 검색 결과가 없습니다: {}", address);
                 return null;
             }
 
@@ -276,20 +217,14 @@ public class KakaoMapService {
                 try {
                     Double latitude = Double.parseDouble(latitudeStr);
                     Double longitude = Double.parseDouble(longitudeStr);
-                    log.info("주소 '{}' 변환 성공: ({}, {})", address, latitude, longitude);
                     return new Double[] { latitude, longitude };
                 } catch (NumberFormatException e) {
-                    log.error("좌표 파싱 실패: latitude={}, longitude={}", latitudeStr, longitudeStr);
                     return null;
                 }
             }
 
             return null;
-        } catch (org.springframework.web.client.HttpClientErrorException e) {
-            log.error("주소 검색 API 호출 중 HTTP 오류 발생: {} - {}", e.getStatusCode(), e.getResponseBodyAsString());
-            return null;
         } catch (Exception e) {
-            log.error("주소를 좌표로 변환 중 오류 발생: {}", e.getMessage());
             return null;
         }
     }

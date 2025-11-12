@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import styled from 'styled-components';
 import { uploadApi } from '../../api/uploadApi';
+import AddressMapSelector from './AddressMapSelector';
 
 const defaultForm = {
   title: '',
@@ -195,14 +196,21 @@ const MissingPetBoardForm = ({ isOpen, onClose, onSubmit, initialData, loading, 
 
             <Section>
               <SectionTitle>실종 위치</SectionTitle>
-              <FieldGrid columns={2}>
+              <FieldGrid columns={1}>
                 <Field>
-                  <Label>실종 위치</Label>
-                  <Input
-                    name="lostLocation"
-                    value={form.lostLocation}
-                    onChange={handleChange}
-                    placeholder="예: 서울시 강남구 테헤란로 123"
+                  <Label>실종 위치 (지도에서 선택)</Label>
+                  <AddressMapSelector
+                    onAddressSelect={(location) => {
+                      setForm((prev) => ({
+                        ...prev,
+                        lostLocation: location.address,
+                        latitude: location.latitude,
+                        longitude: location.longitude,
+                      }));
+                    }}
+                    initialAddress={form.lostLocation}
+                    initialLat={form.latitude}
+                    initialLng={form.longitude}
                   />
                 </Field>
                 <Field>
@@ -241,24 +249,6 @@ const MissingPetBoardForm = ({ isOpen, onClose, onSubmit, initialData, loading, 
                       <PreviewImage src={form.imageUrl} alt="대표 이미지 미리보기" />
                     </ImagePreview>
                   )}
-                </Field>
-                <Field>
-                  <Label>위도</Label>
-                  <Input
-                    name="latitude"
-                    value={form.latitude}
-                    onChange={handleNumberChange}
-                    placeholder="예: 37.5665"
-                  />
-                </Field>
-                <Field>
-                  <Label>경도</Label>
-                  <Input
-                    name="longitude"
-                    value={form.longitude}
-                    onChange={handleNumberChange}
-                    placeholder="예: 126.9780"
-                  />
                 </Field>
               </FieldGrid>
             </Section>

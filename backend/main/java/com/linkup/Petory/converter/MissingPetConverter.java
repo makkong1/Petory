@@ -25,6 +25,7 @@ public class MissingPetConverter {
                 .idx(board.getIdx())
                 .userId(board.getUser().getIdx())
                 .username(board.getUser().getUsername())
+                .phoneNumber(board.getUser() != null ? board.getUser().getPhone() : null)
                 .title(board.getTitle())
                 .content(board.getContent())
                 .petName(board.getPetName())
@@ -59,6 +60,9 @@ public class MissingPetConverter {
                 .userId(comment.getUser().getIdx())
                 .username(comment.getUser().getUsername())
                 .content(comment.getContent())
+                .address(comment.getAddress())
+                .latitude(comment.getLatitude())
+                .longitude(comment.getLongitude())
                 .createdAt(comment.getCreatedAt())
                 .build();
     }
@@ -69,4 +73,3 @@ public class MissingPetConverter {
                 .collect(Collectors.toList());
     }
 }
-
