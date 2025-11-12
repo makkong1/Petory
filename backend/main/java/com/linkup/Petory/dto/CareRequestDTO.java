@@ -28,4 +28,8 @@ public class CareRequestDTO {
     // 지원자 정보
     private List<CareApplicationDTO> applications;
     private Integer applicationCount;
+
+    // 댓글 정보
+    private List<CareRequestCommentDTO> comments;
+    private Integer commentCount;
 }

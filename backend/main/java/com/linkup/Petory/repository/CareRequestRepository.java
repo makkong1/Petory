@@ -1,8 +1,11 @@
 package com.linkup.Petory.repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.linkup.Petory.entity.CareRequest;
@@ -23,4 +26,11 @@ public interface CareRequestRepository extends JpaRepository<CareRequest, Long> 
 
     // 제목이나 설명에 키워드 포함된 케어 요청 검색
     List<CareRequest> findByTitleContainingOrDescriptionContaining(String titleKeyword, String descKeyword);
+
+    // 날짜가 지났고 특정 상태인 요청 조회 (스케줄러용)
+    @Query("SELECT cr FROM CareRequest cr WHERE cr.date < :now AND cr.status IN :statuses")
+    List<CareRequest> findByDateBeforeAndStatusIn(
+            @Param("now") LocalDateTime now,
+            @Param("statuses") List<CareRequestStatus> statuses
+    );
 }

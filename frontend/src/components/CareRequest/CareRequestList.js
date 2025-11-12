@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { careRequestApi } from '../../api/careRequestApi';
 import CareRequestForm from './CareRequestForm';
+import CareRequestDetailPage from './CareRequestDetailPage';
 import { useAuth } from '../../contexts/AuthContext';
 
 const CareRequestList = () => {
@@ -12,24 +13,25 @@ const CareRequestList = () => {
   const [activeFilter, setActiveFilter] = useState('ALL');
   const [isCreating, setIsCreating] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const [selectedCareRequestId, setSelectedCareRequestId] = useState(null);
 
   // API에서 케어 요청 데이터 가져오기
-  useEffect(() => {
-    const fetchCareRequests = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const response = await careRequestApi.getAllCareRequests();
-        setCareRequests(response.data || []);
-      } catch (error) {
-        console.error('케어 요청 데이터 로딩 실패:', error);
-        setError('데이터를 불러오는데 실패했습니다.');
-        setCareRequests([]);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const fetchCareRequests = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await careRequestApi.getAllCareRequests();
+      setCareRequests(response.data || []);
+    } catch (error) {
+      console.error('케어 요청 데이터 로딩 실패:', error);
+      setError('데이터를 불러오는데 실패했습니다.');
+      setCareRequests([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchCareRequests();
   }, []);
 
@@ -181,14 +183,23 @@ const CareRequestList = () => {
           </EmptyMessage>
         ) : (
           filteredRequests.map(request => (
-            <CareCard key={request.idx}>
+            <CareCard 
+              key={request.idx}
+              onClick={() => setSelectedCareRequestId(request.idx)}
+            >
               <CardHeader>
                 <CardTitle>{request.title}</CardTitle>
                 <StatusBadge status={request.status}>
                   {getStatusLabel(request.status)}
                 </StatusBadge>
                 {user && user.idx === request.userId && (
-                  <DeleteButton type="button" onClick={() => handleDeleteRequest(request.idx)}>
+                  <DeleteButton 
+                    type="button" 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteRequest(request.idx);
+                    }}
+                  >
                     삭제
                   </DeleteButton>
                 )}
@@ -217,6 +228,20 @@ const CareRequestList = () => {
           ))
         )}
       </CareGrid>
+
+      <CareRequestDetailPage
+        isOpen={selectedCareRequestId !== null}
+        careRequestId={selectedCareRequestId}
+        onClose={() => setSelectedCareRequestId(null)}
+        onCommentAdded={() => {
+          fetchCareRequests();
+        }}
+        currentUser={user}
+        onCareRequestDeleted={(deletedId) => {
+          setCareRequests((prev) => prev.filter((request) => request.idx !== deletedId));
+          setSelectedCareRequestId(null);
+        }}
+      />
     </Container>
   );
 };

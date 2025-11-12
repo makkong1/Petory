@@ -40,6 +40,9 @@ public class CareRequest {
     @OneToMany(mappedBy = "careRequest", cascade = CascadeType.ALL)
     private List<CareApplication> applications;
 
+    @OneToMany(mappedBy = "careRequest", cascade = CascadeType.ALL)
+    private List<CareRequestComment> comments;
+
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();

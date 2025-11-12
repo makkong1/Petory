@@ -52,4 +52,9 @@ export const careRequestApi = {
   
   // 상태 변경
   updateStatus: (id, status) => api.patch(`/${id}/status`, null, { params: { status } }),
+
+  // 댓글 관련
+  getComments: (careRequestId) => api.get(`/${careRequestId}/comments`),
+  createComment: (careRequestId, payload) => api.post(`/${careRequestId}/comments`, payload),
+  deleteComment: (careRequestId, commentId) => api.delete(`/${careRequestId}/comments/${commentId}`),
 };
