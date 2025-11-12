@@ -25,7 +25,7 @@ public class MissingPetConverter {
                 .idx(board.getIdx())
                 .userId(board.getUser().getIdx())
                 .username(board.getUser().getUsername())
-                .phoneNumber(board.getUser().getPhone())
+                .phoneNumber(board.getUser() != null ? board.getUser().getPhone() : null)
                 .title(board.getTitle())
                 .content(board.getContent())
                 .petName(board.getPetName())
