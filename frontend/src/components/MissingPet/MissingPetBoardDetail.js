@@ -539,7 +539,7 @@ const StatusButton = styled.button.withConfig({
 
   &:hover:not(:disabled) {
     background: ${(props) =>
-      props.active ? props.theme.colors.primaryDark : props.theme.colors.surfaceHover};
+    props.active ? props.theme.colors.primaryDark : props.theme.colors.surfaceHover};
   }
 
   &:disabled {
@@ -645,20 +645,27 @@ const CommentLocation = styled.div`
 
 const AddressToggleButton = styled.button`
   align-self: flex-start;
-  background: ${(props) => props.theme.colors.surfaceElevated};
+  background: ${(props) => props.theme.colors.surface};
   color: ${(props) => props.theme.colors.text};
-  border: 1px solid ${(props) => props.theme.colors.border};
+  border: 1.5px solid ${(props) => props.theme.colors.border};
   border-radius: ${(props) => props.theme.borderRadius.md};
-  padding: ${(props) => props.theme.spacing.xs} ${(props) => props.theme.spacing.md};
+  padding: ${(props) => props.theme.spacing.sm} ${(props) => props.theme.spacing.lg};
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
   font-size: 0.9rem;
+  margin-top: ${(props) => props.theme.spacing.xs};
 
   &:hover:not(:disabled) {
     background: ${(props) => props.theme.colors.surfaceHover};
     border-color: ${(props) => props.theme.colors.primary};
     color: ${(props) => props.theme.colors.primary};
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(0);
   }
 
   &:disabled {
