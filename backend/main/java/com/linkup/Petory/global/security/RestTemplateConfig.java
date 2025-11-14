@@ -1,4 +1,4 @@
-package com.linkup.Petory.config;
+package com.linkup.Petory.global.security;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

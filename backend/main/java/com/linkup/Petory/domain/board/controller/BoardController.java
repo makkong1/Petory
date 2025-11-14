@@ -18,9 +18,12 @@ import com.linkup.Petory.domain.board.dto.BoardDTO;
 import com.linkup.Petory.domain.board.dto.CommentDTO;
 import com.linkup.Petory.domain.board.dto.ReactionRequest;
 import com.linkup.Petory.domain.board.dto.ReactionSummaryDTO;
+import com.linkup.Petory.domain.board.dto.BoardPopularitySnapshotDTO;
 import com.linkup.Petory.domain.board.service.ReactionService;
 import com.linkup.Petory.domain.board.service.BoardService;
 import com.linkup.Petory.domain.board.service.CommentService;
+import com.linkup.Petory.domain.board.service.BoardPopularityService;
+import com.linkup.Petory.domain.board.entity.PopularityPeriodType;
 
 import lombok.RequiredArgsConstructor;
 
@@ -32,6 +35,7 @@ public class BoardController {
     private final BoardService boardService;
     private final CommentService commentService;
     private final ReactionService reactionService;
+    private final BoardPopularityService boardPopularityService;
 
     // 전체 게시글 조회
     @PreAuthorize("permitAll()")
@@ -45,8 +49,17 @@ public class BoardController {
     // 단일 게시글 조회
     @PreAuthorize("permitAll()")
     @GetMapping("/{id}")
-    public ResponseEntity<BoardDTO> getBoard(@PathVariable Long id) {
-        return ResponseEntity.ok(boardService.getBoard(id));
+    public ResponseEntity<BoardDTO> getBoard(
+            @PathVariable Long id,
+            @RequestParam(required = false) Long viewerId) {
+        return ResponseEntity.ok(boardService.getBoard(id, viewerId));
+    }
+
+    @PreAuthorize("permitAll()")
+    @GetMapping("/popular")
+    public ResponseEntity<List<BoardPopularitySnapshotDTO>> getPopularBoards(
+            @RequestParam(name = "period", defaultValue = "WEEKLY") PopularityPeriodType periodType) {
+        return ResponseEntity.ok(boardPopularityService.getPopularBoards(periodType));
     }
 
     // 게시글 생성 (로그인 필요)

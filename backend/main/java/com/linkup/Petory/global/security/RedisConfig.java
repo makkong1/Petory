@@ -1,4 +1,4 @@
-package com.linkup.Petory.config;
+package com.linkup.Petory.global.security;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.CacheManager;

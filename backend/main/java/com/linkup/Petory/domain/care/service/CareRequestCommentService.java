@@ -15,6 +15,8 @@ import com.linkup.Petory.domain.care.repository.CareRequestRepository;
 import com.linkup.Petory.domain.user.entity.Role;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
+import com.linkup.Petory.domain.file.entity.FileTargetType;
+import com.linkup.Petory.domain.file.service.AttachmentFileService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -27,13 +29,19 @@ public class CareRequestCommentService {
         private final CareRequestRepository careRequestRepository;
         private final UsersRepository usersRepository;
         private final CareRequestCommentConverter commentConverter;
+        private final AttachmentFileService attachmentFileService;
 
         public List<CareRequestCommentDTO> getComments(Long careRequestId) {
                 CareRequest careRequest = careRequestRepository.findById(careRequestId)
                                 .orElseThrow(() -> new IllegalArgumentException("CareRequest not found"));
                 List<CareRequestComment> comments = commentRepository.findByCareRequestOrderByCreatedAtAsc(careRequest);
                 return comments.stream()
-                                .map(commentConverter::toDTO)
+                                .map(comment -> {
+                                        CareRequestCommentDTO dto = commentConverter.toDTO(comment);
+                                        dto.setAttachments(attachmentFileService
+                                                        .getAttachments(FileTargetType.CARE_COMMENT, comment.getIdx()));
+                                        return dto;
+                                })
                                 .collect(Collectors.toList());
         }
 
@@ -57,7 +65,12 @@ public class CareRequestCommentService {
                                 .build();
 
                 CareRequestComment saved = commentRepository.save(comment);
-                return commentConverter.toDTO(saved);
+                attachmentFileService.syncSingleAttachment(FileTargetType.CARE_COMMENT, saved.getIdx(),
+                                dto.getCommentFilePath(), null);
+                CareRequestCommentDTO response = commentConverter.toDTO(saved);
+                response.setAttachments(attachmentFileService
+                                .getAttachments(FileTargetType.CARE_COMMENT, saved.getIdx()));
+                return response;
         }
 
         @Transactional
@@ -71,6 +84,7 @@ public class CareRequestCommentService {
                         throw new IllegalArgumentException("Comment does not belong to the specified care request");
                 }
 
+                attachmentFileService.deleteAll(FileTargetType.CARE_COMMENT, comment.getIdx());
                 commentRepository.delete(comment);
         }
 }
