@@ -88,9 +88,15 @@ const CommunityPostModal = ({ isOpen, onClose, onSubmit, loading, currentUser })
     onSubmit(form);
   };
 
+  const handleOverlayClick = (event) => {
+    if (event.target === event.currentTarget) {
+      onClose();
+    }
+  };
+
   return (
-    <Overlay>
-      <Modal>
+    <Overlay onClick={handleOverlayClick}>
+      <Modal onClick={(event) => event.stopPropagation()}>
         <ModalHeader>
           <ModalTitle>커뮤니티 글 작성</ModalTitle>
           <CloseButton type="button" onClick={onClose}>
@@ -183,7 +189,7 @@ const Overlay = styled.div`
   inset: 0;
   background: rgba(15, 23, 42, 0.45);
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
   overflow-y: auto;
   z-index: 1100;
@@ -193,7 +199,7 @@ const Overlay = styled.div`
 const Modal = styled.div`
   background: ${(props) => props.theme.colors.surface};
   border-radius: ${(props) => props.theme.borderRadius.xl};
-  max-width: 640px;
+  max-width: 832px;
   width: 100%;
   box-shadow: 0 20px 60px rgba(15, 23, 42, 0.25);
 `;

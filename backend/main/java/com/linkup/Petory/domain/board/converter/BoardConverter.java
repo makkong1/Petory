@@ -1,0 +1,49 @@
+package com.linkup.Petory.domain.board.converter;
+
+import java.util.List;
+import java.util.stream.Collectors;
+
+import org.springframework.stereotype.Component;
+
+import com.linkup.Petory.domain.board.dto.BoardDTO;
+import com.linkup.Petory.domain.board.entity.Board;
+
+import lombok.RequiredArgsConstructor;
+
+@Component
+@RequiredArgsConstructor
+public class BoardConverter {
+
+    // Entity → DTO
+    public BoardDTO toDTO(Board board) {
+        Integer aggregatedCommentCount = board.getCommentCount();
+        if (aggregatedCommentCount == null && board.getComments() != null) {
+            aggregatedCommentCount = board.getComments().size();
+        }
+
+        return BoardDTO.builder()
+                .idx(board.getIdx())
+                .title(board.getTitle())
+                .content(board.getContent())
+                .category(board.getCategory())
+                .createdAt(board.getCreatedAt())
+                .userId(board.getUser().getIdx())
+                .username(board.getUser().getUsername())
+                .userLocation(board.getUser().getLocation())
+                .commentCount(aggregatedCommentCount != null ? aggregatedCommentCount : 0)
+                .boardFilePath(board.getBoardFilePath())
+                .commentFilePath(board.getCommentFilePath())
+                .likes(board.getLikeCount() != null ? board.getLikeCount() : 0)
+                .dislikes(0)
+                .views(board.getViewCount() != null ? board.getViewCount() : 0)
+                .lastReactionAt(board.getLastReactionAt())
+                .build();
+    }
+
+    // DTO 리스트 변환
+    public List<BoardDTO> toDTOList(List<Board> boards) {
+        return boards.stream()
+                .map(this::toDTO)
+                .collect(Collectors.toList());
+    }
+}
