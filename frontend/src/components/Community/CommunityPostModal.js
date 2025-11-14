@@ -120,6 +120,7 @@ const CommunityPostModal = ({ isOpen, onClose, onSubmit, loading, currentUser })
               <Label>카테고리 *</Label>
               <Select name="category" value={form.category} onChange={handleChange}>
                 <option value="STORY">일상</option>
+                <option value="PRIDE">자랑</option>
                 <option value="TIP">꿀팁</option>
                 <option value="QUESTION">질문</option>
                 <option value="INFO">정보</option>

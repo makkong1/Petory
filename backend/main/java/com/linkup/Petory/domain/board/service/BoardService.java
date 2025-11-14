@@ -14,7 +14,11 @@ import com.linkup.Petory.domain.board.entity.Board;
 import com.linkup.Petory.domain.board.repository.BoardRepository;
 import com.linkup.Petory.domain.board.repository.BoardReactionRepository;
 import com.linkup.Petory.domain.board.repository.CommentReactionRepository;
+import com.linkup.Petory.domain.board.repository.BoardViewLogRepository;
 import com.linkup.Petory.domain.board.entity.ReactionType;
+import com.linkup.Petory.domain.board.entity.BoardViewLog;
+import com.linkup.Petory.domain.file.entity.FileTargetType;
+import com.linkup.Petory.domain.file.service.AttachmentFileService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -27,6 +31,8 @@ public class BoardService {
     private final UsersRepository usersRepository;
     private final BoardReactionRepository boardReactionRepository;
     private final CommentReactionRepository commentReactionRepository;
+    private final BoardViewLogRepository boardViewLogRepository;
+    private final AttachmentFileService attachmentFileService;
     private final BoardConverter boardConverter;
 
     // 전체 게시글 조회 (카테고리 필터링 포함)
@@ -44,10 +50,16 @@ public class BoardService {
                 .collect(Collectors.toList());
     }
 
-    // 단일 게시글 조회
-    public BoardDTO getBoard(Long idx) {
+    // 단일 게시글 조회 + 조회수 증가
+    @Transactional
+    public BoardDTO getBoard(Long idx, Long viewerId) {
         Board board = boardRepository.findById(idx)
                 .orElseThrow(() -> new RuntimeException("Board not found"));
+
+        if (shouldIncrementView(board, viewerId)) {
+            incrementViewCount(board);
+        }
+
         return mapWithReactions(board);
     }
 
@@ -67,6 +79,7 @@ public class BoardService {
                 .build();
 
         Board saved = boardRepository.save(board);
+        attachmentFileService.syncSingleAttachment(FileTargetType.BOARD, saved.getIdx(), board.getBoardFilePath(), null);
         return mapWithReactions(saved);
     }
 
@@ -88,6 +101,7 @@ public class BoardService {
             board.setCommentFilePath(dto.getCommentFilePath());
 
         Board updated = boardRepository.save(board);
+        attachmentFileService.syncSingleAttachment(FileTargetType.BOARD, updated.getIdx(), updated.getBoardFilePath(), null);
         return mapWithReactions(updated);
     }
 
@@ -101,6 +115,7 @@ public class BoardService {
             board.getComments().forEach(commentReactionRepository::deleteByComment);
         }
         boardReactionRepository.deleteByBoard(board);
+        attachmentFileService.deleteAll(FileTargetType.BOARD, board.getIdx());
         boardRepository.delete(board);
     }
 
@@ -130,6 +145,36 @@ public class BoardService {
         long dislikeCount = boardReactionRepository.countByBoardAndReactionType(board, ReactionType.DISLIKE);
         dto.setLikes(Math.toIntExact(likeCount));
         dto.setDislikes(Math.toIntExact(dislikeCount));
+        dto.setAttachments(attachmentFileService.getAttachments(FileTargetType.BOARD, board.getIdx()));
         return dto;
+    }
+
+    private void incrementViewCount(Board board) {
+        Integer current = board.getViewCount();
+        board.setViewCount((current == null ? 0 : current) + 1);
+        boardRepository.save(board);
+    }
+
+    private boolean shouldIncrementView(Board board, Long viewerId) {
+        if (viewerId == null) {
+            return true;
+        }
+
+        Users viewer = usersRepository.findById(viewerId).orElse(null);
+        if (viewer == null) {
+            return true;
+        }
+
+        boolean alreadyViewed = boardViewLogRepository.existsByBoardAndUser(board, viewer);
+        if (alreadyViewed) {
+            return false;
+        }
+
+        BoardViewLog log = BoardViewLog.builder()
+                .board(board)
+                .user(viewer)
+                .build();
+        boardViewLogRepository.save(log);
+        return true;
     }
 }

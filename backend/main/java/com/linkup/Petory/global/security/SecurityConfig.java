@@ -1,4 +1,4 @@
-package com.linkup.Petory.config;
+package com.linkup.Petory.global.security;
 
 import com.linkup.Petory.filter.JwtAuthenticationFilter;
 import jakarta.servlet.http.HttpServletResponse;

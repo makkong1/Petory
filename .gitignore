@@ -52,3 +52,8 @@ application.properties
 # =====================
 /frontend/node_modules/
 /frontend/build/
+
+# =====================
+# Application uploads
+# =====================
+/uploads/

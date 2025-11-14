@@ -1,6 +1,9 @@
 package com.linkup.Petory.domain.care.dto;
 
 import java.time.LocalDateTime;
+import java.util.List;
+
+import com.linkup.Petory.domain.file.dto.FileDTO;
 
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -26,4 +29,5 @@ public class CareRequestCommentDTO {
     private String userRole; // SERVICE_PROVIDER 체크용
 
     private String commentFilePath;
+    private List<FileDTO> attachments;
 }
