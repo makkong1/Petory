@@ -3,6 +3,8 @@ package com.linkup.Petory.domain.board.dto;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import com.linkup.Petory.domain.file.dto.FileDTO;
+
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
@@ -27,6 +29,7 @@ public class BoardDTO {
     // 댓글 정보
     private List<CommentDTO> comments;
     private Integer commentCount;
+    private List<FileDTO> attachments;
 
     // 통계 정보
     private Integer likes;

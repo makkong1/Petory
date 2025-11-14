@@ -25,5 +25,8 @@ public class BoardPopularitySnapshotDTO {
     private Integer likeCount;
     private Integer commentCount;
     private Integer viewCount;
+    private String boardTitle;
+    private String boardCategory;
+    private String boardFilePath;
     private LocalDateTime createdAt;
 }

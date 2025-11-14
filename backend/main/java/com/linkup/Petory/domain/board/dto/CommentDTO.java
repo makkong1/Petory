@@ -1,6 +1,9 @@
 package com.linkup.Petory.domain.board.dto;
 
 import java.time.LocalDateTime;
+import java.util.List;
+
+import com.linkup.Petory.domain.file.dto.FileDTO;
 
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -27,4 +30,5 @@ public class CommentDTO {
     private String commentFilePath;
     private Integer likeCount;
     private Integer dislikeCount;
+    private List<FileDTO> attachments;
 }

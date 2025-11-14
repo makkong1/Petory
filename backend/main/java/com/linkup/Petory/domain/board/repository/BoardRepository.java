@@ -1,5 +1,6 @@
 package com.linkup.Petory.domain.board.repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -23,4 +24,7 @@ public interface BoardRepository extends JpaRepository<Board, Long> {
     // 제목이나 내용에 키워드 포함된 게시글 검색 (최신순)
     List<Board> findByTitleContainingOrContentContainingOrderByCreatedAtDesc(String titleKeyword,
             String contentKeyword);
+
+    // 카테고리 + 기간별 조회
+    List<Board> findByCategoryAndCreatedAtBetween(String category, LocalDateTime start, LocalDateTime end);
 }

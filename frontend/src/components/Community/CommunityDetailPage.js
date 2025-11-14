@@ -14,11 +14,13 @@ const CommunityDetailPage = ({
   onClose,
   onCommentAdded,
   onBoardReaction,
+  onBoardViewUpdate,
   currentUser,
   onBoardDeleted,
 }) => {
   const { requireLogin } = usePermission();
   const { user, redirectToLogin } = useAuth();
+  const viewerId = user?.idx;
 
   const [board, setBoard] = useState(null);
   const [loadingBoard, setLoadingBoard] = useState(false);
@@ -43,6 +45,7 @@ const CommunityDetailPage = ({
       TIP: { label: '꿀팁', icon: '💡', color: '#F59E0B' },
       QUESTION: { label: '질문', icon: '❓', color: '#3B82F6' },
       INFO: { label: '정보', icon: '📢', color: '#10B981' },
+      PRIDE: { label: '자랑', icon: '🐾', color: '#F472B6' },
       STORY: { label: '일상', icon: '📖', color: '#EC4899' },
     };
 
@@ -87,15 +90,19 @@ const CommunityDetailPage = ({
     try {
       setLoadingBoard(true);
       setBoardError('');
-      const response = await boardApi.getBoard(boardId);
-      setBoard(response.data || null);
+      const response = await boardApi.getBoard(boardId, viewerId);
+      const boardData = response.data || null;
+      setBoard(boardData);
+      if (boardData) {
+        onBoardViewUpdate?.(boardId, boardData.views ?? 0);
+      }
     } catch (err) {
       const message = err.response?.data?.error || err.message || '게시글을 불러오지 못했습니다.';
       setBoardError(message);
     } finally {
       setLoadingBoard(false);
     }
-  }, [boardId]);
+  }, [boardId, viewerId, onBoardViewUpdate]);
 
   const fetchComments = useCallback(async () => {
     if (!boardId) {

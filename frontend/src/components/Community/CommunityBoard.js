@@ -20,12 +20,17 @@ const CommunityBoard = () => {
   const [selectedBoard, setSelectedBoard] = useState(null);
   const [selectedBoardId, setSelectedBoardId] = useState(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [popularPeriod, setPopularPeriod] = useState('WEEKLY');
+  const [popularPosts, setPopularPosts] = useState([]);
+  const [popularLoading, setPopularLoading] = useState(false);
+  const [popularError, setPopularError] = useState('');
 
   const categories = [
     { key: 'ALL', label: '전체', icon: '📋', color: '#6366F1' },
     { key: 'TIP', label: '꿀팁', icon: '💡', color: '#F59E0B' },
     { key: 'QUESTION', label: '질문', icon: '❓', color: '#3B82F6' },
     { key: 'INFO', label: '정보', icon: '📢', color: '#10B981' },
+    { key: 'PRIDE', label: '자랑', icon: '🐾', color: '#F472B6' },
     { key: 'STORY', label: '일상', icon: '📖', color: '#EC4899' }
   ];
 
@@ -44,9 +49,31 @@ const CommunityBoard = () => {
     }
   }, [activeCategory]);
 
+  const fetchPopularPosts = useCallback(async () => {
+    if (activeCategory !== 'PRIDE') {
+      return;
+    }
+    try {
+      setPopularLoading(true);
+      setPopularError('');
+      const response = await boardApi.getPopularBoards(popularPeriod);
+      setPopularPosts(response.data || []);
+    } catch (err) {
+      const message = err.response?.data?.error || err.message;
+      setPopularError(`인기 자랑 게시글을 불러오지 못했습니다: ${message}`);
+      setPopularPosts([]);
+    } finally {
+      setPopularLoading(false);
+    }
+  }, [activeCategory, popularPeriod]);
+
   useEffect(() => {
     fetchBoards();
   }, [fetchBoards]);
+
+  useEffect(() => {
+    fetchPopularPosts();
+  }, [fetchPopularPosts]);
 
   const filteredPosts = useMemo(() => {
     if (activeCategory === 'ALL') {
@@ -110,6 +137,12 @@ const CommunityBoard = () => {
   const handlePostSelect = (post) => {
     if (!post?.idx) return;
     setSelectedBoardId(post.idx);
+    setIsDetailOpen(true);
+  };
+
+  const handlePopularCardClick = (snapshot) => {
+    if (!snapshot?.boardId) return;
+    setSelectedBoardId(snapshot.boardId);
     setIsDetailOpen(true);
   };
 
@@ -265,6 +298,28 @@ const CommunityBoard = () => {
     );
   }, []);
 
+  const handleBoardViewUpdate = useCallback((boardId, views) => {
+    setPosts((prev) =>
+      prev.map((post) =>
+        post.idx === boardId
+          ? {
+              ...post,
+              views,
+            }
+          : post
+      )
+    );
+
+    setSelectedBoard((prev) =>
+      prev && prev.idx === boardId
+        ? {
+            ...prev,
+            views,
+          }
+        : prev
+    );
+  }, []);
+
   if (loading && posts.length === 0) {
     return (
       <LoadingContainer>
@@ -301,6 +356,64 @@ const CommunityBoard = () => {
           </CategoryTab>
         ))}
       </CategoryTabs>
+
+      {activeCategory === 'PRIDE' && (
+        <PopularSection>
+          <PopularHeader>
+            <PopularTitle>인기 반려동물 자랑 TOP 30</PopularTitle>
+            <PopularTabs>
+              <PopularTab
+                type="button"
+                active={popularPeriod === 'WEEKLY'}
+                onClick={() => setPopularPeriod('WEEKLY')}
+              >
+                주간
+              </PopularTab>
+              <PopularTab
+                type="button"
+                active={popularPeriod === 'MONTHLY'}
+                onClick={() => setPopularPeriod('MONTHLY')}
+              >
+                월간
+              </PopularTab>
+            </PopularTabs>
+          </PopularHeader>
+
+          {popularError && <ErrorBanner>{popularError}</ErrorBanner>}
+
+          {popularLoading ? (
+            <LoadingContainer>
+              <LoadingSpinner />
+              <LoadingMessage>인기 게시글을 불러오는 중...</LoadingMessage>
+            </LoadingContainer>
+          ) : (
+            <PopularGrid>
+              {popularPosts.length === 0 ? (
+                <EmptyPopularMessage>아직 인기 자랑글이 없어요.</EmptyPopularMessage>
+              ) : (
+                popularPosts.slice(0, 6).map((snapshot) => (
+                  <PopularCard type="button" key={`${snapshot.periodType}-${snapshot.boardId}-${snapshot.ranking}`} onClick={() => handlePopularCardClick(snapshot)}>
+                    <PopularRank>{snapshot.ranking}</PopularRank>
+                    <PopularContent>
+                      <PopularTitleText>{snapshot.boardTitle || '제목 없음'}</PopularTitleText>
+                      <PopularStats>
+                        <PopularStat>❤️ {snapshot.likeCount ?? 0}</PopularStat>
+                        <PopularStat>💬 {snapshot.commentCount ?? 0}</PopularStat>
+                        <PopularStat>👁️ {snapshot.viewCount ?? 0}</PopularStat>
+                      </PopularStats>
+                    </PopularContent>
+                    {snapshot.boardFilePath && (
+                      <PopularThumb>
+                        <img src={snapshot.boardFilePath} alt={snapshot.boardTitle} />
+                      </PopularThumb>
+                    )}
+                  </PopularCard>
+                ))
+              )}
+            </PopularGrid>
+          )}
+        </PopularSection>
+      )}
 
       {error && <ErrorBanner>{error}</ErrorBanner>}
 
@@ -357,6 +470,10 @@ const CommunityBoard = () => {
                         <StatIcon>❤️</StatIcon>
                         <StatValue>{post.likes ?? 0}</StatValue>
                       </StatItem>
+                      <StatInfo>
+                        <StatIcon>👁️</StatIcon>
+                        <StatValue>{post.views ?? 0}</StatValue>
+                      </StatInfo>
                       <TimeAgo>{formatDate(post.createdAt)}</TimeAgo>
                     </PostStats>
                     <PostActionsRight>
@@ -407,6 +524,7 @@ const CommunityBoard = () => {
         onClose={handleDetailClose}
         onCommentAdded={handleCommentAdded}
         onBoardReaction={handleBoardReactionUpdate}
+        onBoardViewUpdate={handleBoardViewUpdate}
         currentUser={user}
         onBoardDeleted={handleBoardDeleted}
       />
@@ -747,6 +865,18 @@ const StatItem = styled.button`
   }
 `;
 
+const StatInfo = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${props => props.theme.spacing.xs};
+  background: ${props => props.theme.colors.surfaceElevated};
+  border: 2px solid ${props => props.theme.colors.border};
+  color: ${(props) => props.theme.colors.textSecondary};
+  padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.sm};
+  border-radius: ${props => props.theme.borderRadius.md};
+  min-width: fit-content;
+`;
+
 const StatIcon = styled.span`
   font-size: 16px;
 `;
@@ -806,6 +936,134 @@ const PostActionsRight = styled.div`
 
 const ReportIcon = styled.span`
   font-size: 18px;
+`;
+
+const PopularSection = styled.section`
+  margin-bottom: ${(props) => props.theme.spacing.xxl};
+  padding: ${(props) => props.theme.spacing.xl};
+  border: 1px solid ${(props) => props.theme.colors.borderLight};
+  border-radius: ${(props) => props.theme.borderRadius.xl};
+  background: ${(props) => props.theme.colors.surfaceElevated};
+`;
+
+const PopularHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: ${(props) => props.theme.spacing.md};
+  margin-bottom: ${(props) => props.theme.spacing.lg};
+
+  @media (max-width: 768px) {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+`;
+
+const PopularTitle = styled.h2`
+  margin: 0;
+  font-size: 1.4rem;
+  color: ${(props) => props.theme.colors.text};
+`;
+
+const PopularTabs = styled.div`
+  display: inline-flex;
+  background: ${(props) => props.theme.colors.surface};
+  border-radius: ${(props) => props.theme.borderRadius.full};
+  border: 1px solid ${(props) => props.theme.colors.borderLight};
+  overflow: hidden;
+`;
+
+const PopularTab = styled.button`
+  padding: ${(props) => props.theme.spacing.sm} ${(props) => props.theme.spacing.lg};
+  border: none;
+  background: ${(props) => (props.active ? props.theme.colors.primary : 'transparent')};
+  color: ${(props) => (props.active ? '#fff' : props.theme.colors.textSecondary)};
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.2s ease;
+
+  &:hover {
+    background: ${(props) => (props.active ? props.theme.colors.primaryDark : props.theme.colors.surfaceHover)};
+  }
+`;
+
+const PopularGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: ${(props) => props.theme.spacing.md};
+`;
+
+const PopularCard = styled.button`
+  display: flex;
+  align-items: center;
+  gap: ${(props) => props.theme.spacing.md};
+  padding: ${(props) => props.theme.spacing.md};
+  border: 1px solid ${(props) => props.theme.colors.borderLight};
+  border-radius: ${(props) => props.theme.borderRadius.lg};
+  background: ${(props) => props.theme.colors.surface};
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  text-align: left;
+
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 20px rgba(15, 23, 42, 0.1);
+  }
+`;
+
+const PopularRank = styled.span`
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: ${(props) => props.theme.colors.primary};
+  min-width: 24px;
+`;
+
+const PopularContent = styled.div`
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: ${(props) => props.theme.spacing.xs};
+`;
+
+const PopularTitleText = styled.span`
+  font-weight: 600;
+  color: ${(props) => props.theme.colors.text};
+  line-height: 1.3;
+`;
+
+const PopularStats = styled.div`
+  display: flex;
+  gap: ${(props) => props.theme.spacing.sm};
+  color: ${(props) => props.theme.colors.textSecondary};
+  font-size: 0.85rem;
+  flex-wrap: wrap;
+`;
+
+const PopularStat = styled.span`
+  display: inline-flex;
+  align-items: center;
+  gap: ${(props) => props.theme.spacing.xs};
+`;
+
+const PopularThumb = styled.div`
+  width: 64px;
+  height: 64px;
+  border-radius: ${(props) => props.theme.borderRadius.md};
+  overflow: hidden;
+  border: 1px solid ${(props) => props.theme.colors.border};
+  flex-shrink: 0;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+`;
+
+const EmptyPopularMessage = styled.div`
+  padding: ${(props) => props.theme.spacing.lg};
+  text-align: center;
+  color: ${(props) => props.theme.colors.textSecondary};
 `;
 
 const LoadingContainer = styled.div`

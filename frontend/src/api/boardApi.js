@@ -31,8 +31,20 @@ export const boardApi = {
   // 전체 게시글 조회
   getAllBoards: (params = {}) => api.get('', { params }),
   
-  // 단일 게시글 조회
-  getBoard: (id) => api.get(`/${id}`),
+  // 단일 게시글 조회 (옵션 viewerId)
+  getBoard: (id, viewerId) => {
+    const params = {};
+    if (viewerId) {
+      params.viewerId = viewerId;
+    }
+    return api.get(`/${id}`, { params });
+  },
+
+  // 인기 자랑 게시글 조회
+  getPopularBoards: (period = 'WEEKLY') => {
+    const normalized = (period || 'WEEKLY').toUpperCase();
+    return api.get('/popular', { params: { period: normalized } });
+  },
   
   // 게시글 생성
   createBoard: (data) => api.post('', data),

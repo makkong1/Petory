@@ -16,6 +16,8 @@ import com.linkup.Petory.domain.board.entity.ReactionType;
 import com.linkup.Petory.domain.board.repository.BoardRepository;
 import com.linkup.Petory.domain.board.repository.CommentReactionRepository;
 import com.linkup.Petory.domain.board.repository.CommentRepository;
+import com.linkup.Petory.domain.file.entity.FileTargetType;
+import com.linkup.Petory.domain.file.service.AttachmentFileService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -29,6 +31,7 @@ public class CommentService {
     private final UsersRepository usersRepository;
     private final CommentReactionRepository commentReactionRepository;
     private final CommentConverter commentConverter;
+    private final AttachmentFileService attachmentFileService;
 
     public List<CommentDTO> getComments(Long boardId) {
         Board board = boardRepository.findById(boardId)
@@ -57,6 +60,7 @@ public class CommentService {
         if (board.getComments() != null) {
             board.getComments().add(saved);
         }
+        attachmentFileService.syncSingleAttachment(FileTargetType.COMMENT, saved.getIdx(), dto.getCommentFilePath(), null);
         return mapWithReactionCounts(saved);
     }
 
@@ -72,6 +76,7 @@ public class CommentService {
         }
 
         commentReactionRepository.deleteByComment(comment);
+        attachmentFileService.deleteAll(FileTargetType.COMMENT, comment.getIdx());
         commentRepository.delete(comment);
         board.getComments().removeIf(c -> c.getIdx().equals(commentId));
     }
@@ -82,6 +87,7 @@ public class CommentService {
         long dislikeCount = commentReactionRepository.countByCommentAndReactionType(comment, ReactionType.DISLIKE);
         dto.setLikeCount(Math.toIntExact(likeCount));
         dto.setDislikeCount(Math.toIntExact(dislikeCount));
+        dto.setAttachments(attachmentFileService.getAttachments(FileTargetType.COMMENT, comment.getIdx()));
         return dto;
     }
 }
