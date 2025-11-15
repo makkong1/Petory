@@ -3,6 +3,7 @@ import styled from 'styled-components';
 import { usePermission } from '../../hooks/usePermission';
 import { useAuth } from '../../contexts/AuthContext';
 import { boardApi } from '../../api/boardApi';
+import { reportApi } from '../../api/reportApi';
 import CommunityPostModal from './CommunityPostModal';
 import CommunityCommentDrawer from './CommunityCommentDrawer';
 import CommunityDetailPage from './CommunityDetailPage';
@@ -162,14 +163,33 @@ const CommunityBoard = () => {
     setIsCommentDrawerOpen(true);
   };
 
-  const handlePostReport = (postIdx) => {
+  const handlePostReport = async (postIdx) => {
     const { requiresRedirect } = requireLogin();
     if (requiresRedirect) {
       redirectToLogin();
       return;
     }
-    if (window.confirm('이 게시글을 신고하시겠습니까?')) {
-      alert('신고 기능은 준비 중입니다.');
+    if (!user || !postIdx) {
+      return;
+    }
+    if (!window.confirm('이 게시글을 신고하시겠습니까?')) {
+      return;
+    }
+    const reason = window.prompt('신고 사유를 입력해주세요.');
+    if (!reason || !reason.trim()) {
+      return;
+    }
+    try {
+      await reportApi.submit({
+        targetType: 'BOARD',
+        targetIdx: postIdx,
+        reporterId: user.idx,
+        reason: reason.trim(),
+      });
+      alert('신고가 접수되었습니다.');
+    } catch (err) {
+      const message = err.response?.data?.error || err.message || '신고 처리에 실패했습니다.';
+      alert(message);
     }
   };
 
