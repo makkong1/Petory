@@ -81,10 +81,7 @@ public class FileStorageService {
 
     public Resource loadAsResource(String relativePath) {
         try {
-            Path filePath = uploadLocation.resolve(relativePath).normalize();
-            if (!filePath.startsWith(uploadLocation)) {
-                throw new IllegalArgumentException("잘못된 파일 경로 요청입니다.");
-            }
+            Path filePath = resolveStoragePath(relativePath);
             Resource resource = new UrlResource(filePath.toUri());
             if (resource.exists() && resource.isReadable()) {
                 return resource;
@@ -93,6 +90,17 @@ public class FileStorageService {
             log.error("파일 로드에 실패했습니다. path={}", relativePath, ex);
         }
         throw new IllegalArgumentException("요청한 파일을 찾을 수 없습니다: " + relativePath);
+    }
+
+    public Path resolveStoragePath(String relativePath) {
+        if (!StringUtils.hasText(relativePath)) {
+            throw new IllegalArgumentException("파일 경로가 비어 있습니다.");
+        }
+        Path filePath = uploadLocation.resolve(relativePath).normalize();
+        if (!filePath.startsWith(uploadLocation)) {
+            throw new IllegalArgumentException("잘못된 파일 경로 요청입니다.");
+        }
+        return filePath;
     }
 
     private String generateFileName(String extension) {

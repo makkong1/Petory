@@ -31,8 +31,6 @@ public class BoardConverter {
                 .username(board.getUser().getUsername())
                 .userLocation(board.getUser().getLocation())
                 .commentCount(aggregatedCommentCount != null ? aggregatedCommentCount : 0)
-                .boardFilePath(board.getBoardFilePath())
-                .commentFilePath(board.getCommentFilePath())
                 .likes(board.getLikeCount() != null ? board.getLikeCount() : 0)
                 .dislikes(0)
                 .views(board.getViewCount() != null ? board.getViewCount() : 0)
