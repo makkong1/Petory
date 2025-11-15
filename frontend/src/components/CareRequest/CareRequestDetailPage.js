@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import styled from 'styled-components';
 import { careRequestApi } from '../../api/careRequestApi';
 import { uploadApi } from '../../api/uploadApi';
+import { reportApi } from '../../api/reportApi';
 import { usePermission } from '../../hooks/usePermission';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -227,6 +228,39 @@ const CareRequestDetailPage = ({
     [careRequestId, currentUser, onCommentAdded]
   );
 
+  const handleReportProvider = useCallback(
+    async (providerId) => {
+      const { requiresRedirect } = requireLogin();
+      if (requiresRedirect) {
+        redirectToLogin();
+        return;
+      }
+      if (!user || !providerId) {
+        return;
+      }
+      if (!window.confirm('해당 서비스 제공자를 신고하시겠습니까?')) {
+        return;
+      }
+      const reason = window.prompt('신고 사유를 입력해주세요.');
+      if (!reason || !reason.trim()) {
+        return;
+      }
+      try {
+        await reportApi.submit({
+          targetType: 'PET_CARE_PROVIDER',
+          targetIdx: providerId,
+          reporterId: user.idx,
+          reason: reason.trim(),
+        });
+        alert('신고가 접수되었습니다.');
+      } catch (err) {
+        const message = err.response?.data?.error || err.message || '신고 처리에 실패했습니다.';
+        alert(message);
+      }
+    },
+    [requireLogin, redirectToLogin, user]
+  );
+
   const handleDeleteCareRequest = useCallback(async () => {
     if (!careRequestId || !currentUser || careRequest?.userId !== currentUser.idx) {
       return;
@@ -365,13 +399,20 @@ const CareRequestDetailPage = ({
                         <img src={comment.commentFilePath} alt="댓글 이미지" />
                       </CommentImage>
                     )}
-                    {currentUser && comment.userId === currentUser.idx && (
-                      <CommentActions>
+                    <CommentActions>
+                      {currentUser && comment.userId === currentUser.idx && (
                         <DeleteCommentButton type="button" onClick={() => handleDeleteComment(comment.idx)}>
                           삭제
                         </DeleteCommentButton>
-                      </CommentActions>
-                    )}
+                      )}
+                      {currentUser &&
+                        comment.userRole === 'SERVICE_PROVIDER' &&
+                        comment.userId !== currentUser.idx && (
+                          <ReportProviderButton type="button" onClick={() => handleReportProvider(comment.userId)}>
+                            신고
+                          </ReportProviderButton>
+                        )}
+                    </CommentActions>
                   </CommentItem>
                 ))}
               </CommentList>
@@ -758,6 +799,25 @@ const DeleteCommentButton = styled.button`
 
   &:hover {
     background: rgba(220, 38, 38, 0.08);
+    transform: translateY(-1px);
+  }
+`;
+
+const ReportProviderButton = styled.button`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: ${(props) => props.theme.spacing.xs} ${(props) => props.theme.spacing.md};
+  border-radius: ${(props) => props.theme.borderRadius.md};
+  border: 1px solid ${(props) => props.theme.colors.warning || '#f97316'};
+  background: transparent;
+  color: ${(props) => props.theme.colors.warning || '#f97316'};
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: rgba(249, 115, 22, 0.12);
     transform: translateY(-1px);
   }
 `;

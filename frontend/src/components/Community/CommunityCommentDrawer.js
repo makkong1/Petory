@@ -141,6 +141,32 @@ const CommunityCommentDrawer = ({ isOpen, board, onClose, currentUser, onComment
     }
   };
 
+  const handleReportComment = async (commentId) => {
+    if (!currentUser) {
+      window.dispatchEvent(new Event('showPermissionModal'));
+      return;
+    }
+    if (!window.confirm('해당 댓글을 신고하시겠습니까?')) {
+      return;
+    }
+    const reason = window.prompt('신고 사유를 입력해주세요.');
+    if (!reason || !reason.trim()) {
+      return;
+    }
+    try {
+      await reportApi.submit({
+        targetType: 'COMMENT',
+        targetIdx: commentId,
+        reporterId: currentUser.idx,
+        reason: reason.trim(),
+      });
+      alert('신고가 접수되었습니다.');
+    } catch (err) {
+      const message = err.response?.data?.error || err.message || '신고 처리에 실패했습니다.';
+      alert(message);
+    }
+  };
+
   if (!isOpen) {
     return null;
   }
@@ -192,11 +218,17 @@ const CommunityCommentDrawer = ({ isOpen, board, onClose, currentUser, onComment
                       <img src={comment.commentFilePath} alt="댓글 이미지" />
                     </CommentImage>
                   )}
-                  {currentUser && comment.userId === currentUser.idx && (
+                  {currentUser && (
                     <CommentActions>
-                      <CommentDeleteButton type="button" onClick={() => handleDeleteComment(comment.idx)}>
-                        삭제
-                      </CommentDeleteButton>
+                      {comment.userId === currentUser.idx ? (
+                        <CommentDeleteButton type="button" onClick={() => handleDeleteComment(comment.idx)}>
+                          삭제
+                        </CommentDeleteButton>
+                      ) : (
+                        <CommentReportButton type="button" onClick={() => handleReportComment(comment.idx)}>
+                          신고
+                        </CommentReportButton>
+                      )}
                     </CommentActions>
                   )}
                 </CommentItem>
@@ -458,6 +490,23 @@ const CommentDeleteButton = styled.button`
 
   &:hover {
     background: rgba(220, 38, 38, 0.08);
+    transform: translateY(-1px);
+  }
+`;
+
+const CommentReportButton = styled.button`
+  padding: ${(props) => props.theme.spacing.xs} ${(props) => props.theme.spacing.md};
+  border-radius: ${(props) => props.theme.borderRadius.md};
+  border: 1px solid ${(props) => props.theme.colors.warning || '#f97316'};
+  background: transparent;
+  color: ${(props) => props.theme.colors.warning || '#f97316'};
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: rgba(249, 115, 22, 0.12);
     transform: translateY(-1px);
   }
 `;
