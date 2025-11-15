@@ -4,6 +4,7 @@ public enum FileTargetType {
     BOARD,
     COMMENT,
     CARE_COMMENT,
-    MISSING_PET
+    MISSING_PET,
+    MISSING_PET_COMMENT
 }
 
