@@ -3,16 +3,28 @@ package com.linkup.Petory.domain.board.converter;
 import com.linkup.Petory.domain.board.dto.BoardPopularitySnapshotDTO;
 import com.linkup.Petory.domain.board.entity.BoardPopularitySnapshot;
 import com.linkup.Petory.domain.board.entity.Board;
+import com.linkup.Petory.domain.file.dto.FileDTO;
+import com.linkup.Petory.domain.file.entity.FileTargetType;
+import com.linkup.Petory.domain.file.service.AttachmentFileService;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.springframework.util.StringUtils;
+
+import lombok.RequiredArgsConstructor;
+
 @Component
+@RequiredArgsConstructor
 public class BoardPopularitySnapshotConverter {
+
+    private final AttachmentFileService attachmentFileService;
 
     public BoardPopularitySnapshotDTO toDTO(BoardPopularitySnapshot snapshot) {
         Board board = snapshot.getBoard();
+        String boardFilePath = resolvePrimaryFileUrl(board);
+
         return BoardPopularitySnapshotDTO.builder()
                 .snapshotId(snapshot.getSnapshotId())
                 .boardId(board != null ? board.getIdx() : null)
@@ -26,7 +38,7 @@ public class BoardPopularitySnapshotConverter {
                 .viewCount(snapshot.getViewCount())
                 .boardTitle(board != null ? board.getTitle() : null)
                 .boardCategory(board != null ? board.getCategory() : null)
-                .boardFilePath(board != null ? board.getBoardFilePath() : null)
+                .boardFilePath(boardFilePath)
                 .createdAt(snapshot.getCreatedAt())
                 .build();
     }
@@ -50,5 +62,23 @@ public class BoardPopularitySnapshotConverter {
         return snapshots.stream()
                 .map(this::toDTO)
                 .collect(Collectors.toList());
+    }
+
+    private String resolvePrimaryFileUrl(Board board) {
+        if (board == null) {
+            return null;
+        }
+        List<FileDTO> attachments = attachmentFileService.getAttachments(FileTargetType.BOARD, board.getIdx());
+        if (attachments == null || attachments.isEmpty()) {
+            return null;
+        }
+        FileDTO primary = attachments.get(0);
+        if (primary == null) {
+            return null;
+        }
+        if (StringUtils.hasText(primary.getDownloadUrl())) {
+            return primary.getDownloadUrl();
+        }
+        return attachmentFileService.buildDownloadUrl(primary.getFilePath());
     }
 }

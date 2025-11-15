@@ -39,7 +39,6 @@ public class MissingPetConverter {
                 .latitude(board.getLatitude())
                 .longitude(board.getLongitude())
                 .status(board.getStatus())
-                .imageUrl(board.getImageUrl())
                 .createdAt(board.getCreatedAt())
                 .updatedAt(board.getUpdatedAt())
                 .comments(commentDTOs)

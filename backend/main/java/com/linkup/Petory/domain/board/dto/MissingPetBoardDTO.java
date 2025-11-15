@@ -7,6 +7,7 @@ import java.util.List;
 
 import com.linkup.Petory.domain.board.entity.MissingPetGender;
 import com.linkup.Petory.domain.board.entity.MissingPetStatus;
+import com.linkup.Petory.domain.file.dto.FileDTO;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -40,4 +41,5 @@ public class MissingPetBoardDTO {
     private LocalDateTime updatedAt;
     private List<MissingPetCommentDTO> comments;
     private Integer commentCount;
+    private List<FileDTO> attachments;
 }

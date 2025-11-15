@@ -31,9 +31,6 @@ public class Comment {
 
     private LocalDateTime createdAt;
 
-    @Column(name = "comment_file_path")
-    private String commentFilePath;
-
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();

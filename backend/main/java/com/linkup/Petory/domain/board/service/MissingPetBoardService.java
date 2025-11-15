@@ -1,6 +1,7 @@
 package com.linkup.Petory.domain.board.service;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,6 +15,9 @@ import com.linkup.Petory.domain.board.entity.MissingPetComment;
 import com.linkup.Petory.domain.board.entity.MissingPetStatus;
 import com.linkup.Petory.domain.board.repository.MissingPetBoardRepository;
 import com.linkup.Petory.domain.board.repository.MissingPetCommentRepository;
+import com.linkup.Petory.domain.file.dto.FileDTO;
+import com.linkup.Petory.domain.file.entity.FileTargetType;
+import com.linkup.Petory.domain.file.service.AttachmentFileService;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 
@@ -28,18 +32,21 @@ public class MissingPetBoardService {
     private final MissingPetCommentRepository commentRepository;
     private final UsersRepository usersRepository;
     private final MissingPetConverter missingPetConverter;
+    private final AttachmentFileService attachmentFileService;
 
     public List<MissingPetBoardDTO> getBoards(MissingPetStatus status) {
         List<MissingPetBoard> boards = status == null
                 ? boardRepository.findAllByOrderByCreatedAtDesc()
                 : boardRepository.findByStatusOrderByCreatedAtDesc(status);
-        return missingPetConverter.toBoardDTOList(boards);
+        return boards.stream()
+                .map(this::mapBoardWithAttachments)
+                .collect(Collectors.toList());
     }
 
     public MissingPetBoardDTO getBoard(Long id) {
         MissingPetBoard board = boardRepository.findByIdWithUser(id)
                 .orElseThrow(() -> new IllegalArgumentException("Missing pet board not found"));
-        return missingPetConverter.toBoardDTO(board);
+        return mapBoardWithAttachments(board);
     }
 
     @Transactional
@@ -62,11 +69,13 @@ public class MissingPetBoardService {
                 .latitude(dto.getLatitude())
                 .longitude(dto.getLongitude())
                 .status(dto.getStatus())
-                .imageUrl(dto.getImageUrl())
                 .build();
 
         MissingPetBoard saved = boardRepository.save(board);
-        return missingPetConverter.toBoardDTO(saved);
+        if (dto.getImageUrl() != null) {
+            attachmentFileService.syncSingleAttachment(FileTargetType.MISSING_PET, saved.getIdx(), dto.getImageUrl(), null);
+        }
+        return mapBoardWithAttachments(saved);
     }
 
     @Transactional
@@ -114,10 +123,10 @@ public class MissingPetBoardService {
             board.setStatus(dto.getStatus());
         }
         if (dto.getImageUrl() != null) {
-            board.setImageUrl(dto.getImageUrl());
+            attachmentFileService.syncSingleAttachment(FileTargetType.MISSING_PET, board.getIdx(), dto.getImageUrl(), null);
         }
 
-        return missingPetConverter.toBoardDTO(board);
+        return mapBoardWithAttachments(board);
     }
 
     @Transactional
@@ -125,19 +134,28 @@ public class MissingPetBoardService {
         MissingPetBoard board = boardRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Missing pet board not found"));
         board.setStatus(status);
-        return missingPetConverter.toBoardDTO(board);
+        return mapBoardWithAttachments(board);
     }
 
     @Transactional
     public void deleteBoard(Long id) {
-        boardRepository.deleteById(id);
+        MissingPetBoard board = boardRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Missing pet board not found"));
+        if (board.getComments() != null) {
+            board.getComments().forEach(comment -> attachmentFileService.deleteAll(FileTargetType.MISSING_PET_COMMENT,
+                    comment.getIdx()));
+        }
+        attachmentFileService.deleteAll(FileTargetType.MISSING_PET, board.getIdx());
+        boardRepository.delete(board);
     }
 
     public List<MissingPetCommentDTO> getComments(Long boardId) {
         MissingPetBoard board = boardRepository.findById(boardId)
                 .orElseThrow(() -> new IllegalArgumentException("Missing pet board not found"));
         List<MissingPetComment> comments = commentRepository.findByBoardOrderByCreatedAtAsc(board);
-        return missingPetConverter.toCommentDTOList(comments);
+        return comments.stream()
+                .map(this::mapCommentWithAttachments)
+                .collect(Collectors.toList());
     }
 
     @Transactional
@@ -157,8 +175,14 @@ public class MissingPetBoardService {
                 .build();
 
         MissingPetComment saved = commentRepository.save(comment);
-        board.getComments().add(saved);
-        return missingPetConverter.toCommentDTO(saved);
+        if (board.getComments() != null) {
+            board.getComments().add(saved);
+        }
+        if (dto.getImageUrl() != null) {
+            attachmentFileService.syncSingleAttachment(FileTargetType.MISSING_PET_COMMENT, saved.getIdx(),
+                    dto.getImageUrl(), null);
+        }
+        return mapCommentWithAttachments(saved);
     }
 
     @Transactional
@@ -173,6 +197,39 @@ public class MissingPetBoardService {
         }
 
         board.getComments().removeIf(c -> c.getIdx().equals(commentId));
+        attachmentFileService.deleteAll(FileTargetType.MISSING_PET_COMMENT, comment.getIdx());
         commentRepository.delete(comment);
     }
+
+    private MissingPetBoardDTO mapBoardWithAttachments(MissingPetBoard board) {
+        MissingPetBoardDTO dto = missingPetConverter.toBoardDTO(board);
+        List<FileDTO> attachments = attachmentFileService.getAttachments(FileTargetType.MISSING_PET, board.getIdx());
+        dto.setAttachments(attachments);
+        dto.setImageUrl(extractPrimaryFileUrl(attachments));
+        return dto;
+    }
+
+    private MissingPetCommentDTO mapCommentWithAttachments(MissingPetComment comment) {
+        MissingPetCommentDTO dto = missingPetConverter.toCommentDTO(comment);
+        List<FileDTO> attachments = attachmentFileService.getAttachments(FileTargetType.MISSING_PET_COMMENT,
+                comment.getIdx());
+        dto.setAttachments(attachments);
+        dto.setImageUrl(extractPrimaryFileUrl(attachments));
+        return dto;
+    }
+
+    private String extractPrimaryFileUrl(List<FileDTO> attachments) {
+        if (attachments == null || attachments.isEmpty()) {
+            return null;
+        }
+        FileDTO primary = attachments.get(0);
+        if (primary == null) {
+            return null;
+        }
+        if (StringUtils.hasText(primary.getDownloadUrl())) {
+            return primary.getDownloadUrl();
+        }
+        return attachmentFileService.buildDownloadUrl(primary.getFilePath());
+    }
+
 }
