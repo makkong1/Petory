@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import styled from 'styled-components';
 import { boardApi } from '../../api/boardApi';
 import { commentApi } from '../../api/commentApi';
+import { reportApi } from '../../api/reportApi';
 import { uploadApi } from '../../api/uploadApi';
 import { usePermission } from '../../hooks/usePermission';
 import { useAuth } from '../../contexts/AuthContext';
@@ -172,16 +173,68 @@ const CommunityDetailPage = ({
     [boardId, requireLogin, redirectToLogin, user, onBoardReaction]
   );
 
-  const handleReportClick = useCallback(() => {
+  const handleReportClick = useCallback(async () => {
     const { requiresRedirect } = requireLogin();
     if (requiresRedirect) {
       redirectToLogin();
       return;
     }
-    if (window.confirm('이 게시글을 신고하시겠습니까?')) {
-      alert('신고 기능은 준비 중입니다.');
+    if (!user || !boardId) {
+      return;
     }
-  }, [requireLogin, redirectToLogin]);
+    if (!window.confirm('이 게시글을 신고하시겠습니까?')) {
+      return;
+    }
+    const reason = window.prompt('신고 사유를 입력해주세요.');
+    if (!reason || !reason.trim()) {
+      return;
+    }
+    try {
+      await reportApi.submit({
+        targetType: 'BOARD',
+        targetIdx: boardId,
+        reporterId: user.idx,
+        reason: reason.trim(),
+      });
+      alert('신고가 접수되었습니다.');
+    } catch (err) {
+      const message = err.response?.data?.error || err.message || '신고 처리에 실패했습니다.';
+      alert(message);
+    }
+  }, [requireLogin, redirectToLogin, user, boardId]);
+
+  const handleCommentReport = useCallback(
+    async (commentId) => {
+      const { requiresRedirect } = requireLogin();
+      if (requiresRedirect) {
+        redirectToLogin();
+        return;
+      }
+      if (!user || !commentId) {
+        return;
+      }
+      if (!window.confirm('해당 댓글을 신고하시겠습니까?')) {
+        return;
+      }
+      const reason = window.prompt('신고 사유를 입력해주세요.');
+      if (!reason || !reason.trim()) {
+        return;
+      }
+      try {
+        await reportApi.submit({
+          targetType: 'COMMENT',
+          targetIdx: commentId,
+          reporterId: user.idx,
+          reason: reason.trim(),
+        });
+        alert('신고가 접수되었습니다.');
+      } catch (err) {
+        const message = err.response?.data?.error || err.message || '신고 처리에 실패했습니다.';
+        alert(message);
+      }
+    },
+    [requireLogin, redirectToLogin, user]
+  );
 
   const handleFileSelect = async (event) => {
     const file = event.target.files?.[0];
@@ -493,11 +546,16 @@ const CommunityDetailPage = ({
                         <ReactionIcon>👎</ReactionIcon>
                         <ReactionCount>{comment.dislikeCount ?? 0}</ReactionCount>
                       </ReactionButton>
-                      {currentUser && comment.userId === currentUser.idx && (
-                        <DeleteCommentButton type="button" onClick={() => handleDeleteComment(comment.idx)}>
-                          삭제
-                        </DeleteCommentButton>
-                      )}
+                      {currentUser &&
+                        (comment.userId === currentUser.idx ? (
+                          <DeleteCommentButton type="button" onClick={() => handleDeleteComment(comment.idx)}>
+                            삭제
+                          </DeleteCommentButton>
+                        ) : (
+                          <ReportCommentButton type="button" onClick={() => handleCommentReport(comment.idx)}>
+                            신고
+                          </ReportCommentButton>
+                        ))}
                     </CommentStats>
                   </CommentItem>
                 ))}
@@ -898,6 +956,25 @@ const DeleteCommentButton = styled.button`
 
   &:hover {
     background: rgba(220, 38, 38, 0.08);
+    transform: translateY(-1px);
+  }
+`;
+
+const ReportCommentButton = styled.button`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: ${(props) => props.theme.spacing.xs} ${(props) => props.theme.spacing.md};
+  border-radius: ${(props) => props.theme.borderRadius.md};
+  border: 1px solid ${(props) => props.theme.colors.warning || '#f97316'};
+  background: transparent;
+  color: ${(props) => props.theme.colors.warning || '#f97316'};
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: rgba(249, 115, 22, 0.1);
     transform: translateY(-1px);
   }
 `;

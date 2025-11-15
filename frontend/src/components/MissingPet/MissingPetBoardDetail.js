@@ -116,6 +116,56 @@ const MissingPetBoardDetail = ({
     }
   };
 
+  const handleReportBoard = async () => {
+    if (!currentUser) {
+      window.dispatchEvent(new Event('showPermissionModal'));
+      return;
+    }
+    if (!window.confirm('이 실종 제보를 신고하시겠습니까?')) {
+      return;
+    }
+    const reason = window.prompt('신고 사유를 입력해주세요.');
+    if (!reason || !reason.trim()) {
+      return;
+    }
+    try {
+      await reportApi.submit({
+        targetType: 'MISSING_PET',
+        targetIdx: board.idx,
+        reporterId: currentUser.idx,
+        reason: reason.trim(),
+      });
+      alert('신고가 접수되었습니다.');
+    } catch (err) {
+      alert(err.response?.data?.error || err.message || '신고 처리에 실패했습니다.');
+    }
+  };
+
+  const handleReportComment = async (commentId) => {
+    if (!currentUser) {
+      window.dispatchEvent(new Event('showPermissionModal'));
+      return;
+    }
+    if (!window.confirm('해당 제보 댓글을 신고하시겠습니까?')) {
+      return;
+    }
+    const reason = window.prompt('신고 사유를 입력해주세요.');
+    if (!reason || !reason.trim()) {
+      return;
+    }
+    try {
+      await reportApi.submit({
+        targetType: 'COMMENT',
+        targetIdx: commentId,
+        reporterId: currentUser.idx,
+        reason: reason.trim(),
+      });
+      alert('신고가 접수되었습니다.');
+    } catch (err) {
+      alert(err.response?.data?.error || err.message || '신고 처리에 실패했습니다.');
+    }
+  };
+
   return (
     <Drawer>
       <DrawerHeader>
@@ -130,6 +180,11 @@ const MissingPetBoardDetail = ({
             <DeleteBoardButton type="button" onClick={handleDeleteBoard}>
               삭제
             </DeleteBoardButton>
+          )}
+          {currentUser && currentUser.idx !== board.userId && (
+            <ReportBoardButton type="button" onClick={handleReportBoard}>
+              신고
+            </ReportBoardButton>
           )}
           <CloseButton onClick={onClose}>✕</CloseButton>
         </HeaderRight>
@@ -270,11 +325,17 @@ const MissingPetBoardDetail = ({
                       📍 목격 위치: {item.address}
                     </CommentLocation>
                   )}
-                  {currentUser && (currentUser.idx === item.userId || currentUser.idx === board.userId) && (
+                  {currentUser && (
                     <CommentActions>
-                      <CommentDeleteButton onClick={() => handleDeleteComment(item.idx)}>
-                        삭제
-                      </CommentDeleteButton>
+                      {currentUser.idx === item.userId || currentUser.idx === board.userId ? (
+                        <CommentDeleteButton onClick={() => handleDeleteComment(item.idx)}>
+                          삭제
+                        </CommentDeleteButton>
+                      ) : (
+                        <CommentReportButton type="button" onClick={() => handleReportComment(item.idx)}>
+                          신고
+                        </CommentReportButton>
+                      )}
                     </CommentActions>
                   )}
                 </CommentItem>
@@ -402,6 +463,22 @@ const DeleteBoardButton = styled.button`
 
   &:hover {
     background: rgba(220, 38, 38, 0.1);
+    transform: translateY(-1px);
+  }
+`;
+
+const ReportBoardButton = styled.button`
+  border: 1px solid ${(props) => props.theme.colors.warning || '#f97316'};
+  background: transparent;
+  color: ${(props) => props.theme.colors.warning || '#f97316'};
+  border-radius: ${(props) => props.theme.borderRadius.md};
+  padding: ${(props) => props.theme.spacing.xs} ${(props) => props.theme.spacing.sm};
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: rgba(249, 115, 22, 0.1);
     transform: translateY(-1px);
   }
 `;
@@ -631,6 +708,22 @@ const CommentDeleteButton = styled.button`
 
   &:hover {
     text-decoration: underline;
+  }
+`;
+
+const CommentReportButton = styled.button`
+  border: none;
+  background: transparent;
+  color: ${(props) => props.theme.colors.warning || '#f97316'};
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.1rem 0.4rem;
+  border-radius: ${(props) => props.theme.borderRadius.sm};
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: rgba(249, 115, 22, 0.1);
   }
 `;
 
