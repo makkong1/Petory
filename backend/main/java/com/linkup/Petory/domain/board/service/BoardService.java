@@ -17,8 +17,10 @@ import com.linkup.Petory.domain.board.repository.CommentReactionRepository;
 import com.linkup.Petory.domain.board.repository.BoardViewLogRepository;
 import com.linkup.Petory.domain.board.entity.ReactionType;
 import com.linkup.Petory.domain.board.entity.BoardViewLog;
+import com.linkup.Petory.domain.file.dto.FileDTO;
 import com.linkup.Petory.domain.file.entity.FileTargetType;
 import com.linkup.Petory.domain.file.service.AttachmentFileService;
+import org.springframework.util.StringUtils;
 
 import lombok.RequiredArgsConstructor;
 
@@ -74,12 +76,12 @@ public class BoardService {
                 .content(dto.getContent())
                 .category(dto.getCategory())
                 .user(user)
-                .boardFilePath(dto.getBoardFilePath())
-                .commentFilePath(dto.getCommentFilePath())
                 .build();
 
         Board saved = boardRepository.save(board);
-        attachmentFileService.syncSingleAttachment(FileTargetType.BOARD, saved.getIdx(), board.getBoardFilePath(), null);
+        if (dto.getBoardFilePath() != null) {
+            attachmentFileService.syncSingleAttachment(FileTargetType.BOARD, saved.getIdx(), dto.getBoardFilePath(), null);
+        }
         return mapWithReactions(saved);
     }
 
@@ -95,13 +97,10 @@ public class BoardService {
             board.setContent(dto.getContent());
         if (dto.getCategory() != null)
             board.setCategory(dto.getCategory());
-        if (dto.getBoardFilePath() != null)
-            board.setBoardFilePath(dto.getBoardFilePath());
-        if (dto.getCommentFilePath() != null)
-            board.setCommentFilePath(dto.getCommentFilePath());
-
         Board updated = boardRepository.save(board);
-        attachmentFileService.syncSingleAttachment(FileTargetType.BOARD, updated.getIdx(), updated.getBoardFilePath(), null);
+        if (dto.getBoardFilePath() != null) {
+            attachmentFileService.syncSingleAttachment(FileTargetType.BOARD, updated.getIdx(), dto.getBoardFilePath(), null);
+        }
         return mapWithReactions(updated);
     }
 
@@ -145,7 +144,9 @@ public class BoardService {
         long dislikeCount = boardReactionRepository.countByBoardAndReactionType(board, ReactionType.DISLIKE);
         dto.setLikes(Math.toIntExact(likeCount));
         dto.setDislikes(Math.toIntExact(dislikeCount));
-        dto.setAttachments(attachmentFileService.getAttachments(FileTargetType.BOARD, board.getIdx()));
+        List<FileDTO> attachments = attachmentFileService.getAttachments(FileTargetType.BOARD, board.getIdx());
+        dto.setAttachments(attachments);
+        dto.setBoardFilePath(extractPrimaryFileUrl(attachments));
         return dto;
     }
 
@@ -176,5 +177,19 @@ public class BoardService {
                 .build();
         boardViewLogRepository.save(log);
         return true;
+    }
+
+    private String extractPrimaryFileUrl(List<? extends FileDTO> attachments) {
+        if (attachments == null || attachments.isEmpty()) {
+            return null;
+        }
+        FileDTO primary = attachments.get(0);
+        if (primary == null) {
+            return null;
+        }
+        if (StringUtils.hasText(primary.getDownloadUrl())) {
+            return primary.getDownloadUrl();
+        }
+        return attachmentFileService.buildDownloadUrl(primary.getFilePath());
     }
 }

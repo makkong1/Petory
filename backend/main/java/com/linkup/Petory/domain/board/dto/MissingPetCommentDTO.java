@@ -1,6 +1,9 @@
 package com.linkup.Petory.domain.board.dto;
 
 import java.time.LocalDateTime;
+import java.util.List;
+
+import com.linkup.Petory.domain.file.dto.FileDTO;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -21,4 +24,6 @@ public class MissingPetCommentDTO {
     private Double latitude; // 목격 위치 위도
     private Double longitude; // 목격 위치 경도
     private LocalDateTime createdAt;
+    private String imageUrl;
+    private List<FileDTO> attachments;
 }

@@ -32,12 +32,6 @@ public class Board {
 
     private LocalDateTime createdAt;
 
-    @Column(name = "board_file_path")
-    private String boardFilePath;
-
-    @Column(name = "comment_file_path")
-    private String commentFilePath;
-
     @Builder.Default
     @Column(name = "view_count")
     private Integer viewCount = 0;

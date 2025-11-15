@@ -30,13 +30,20 @@ public class FileStorageService {
             "image/png",
             "image/gif",
             "image/webp");
+    private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
+            ".jpg",
+            ".jpeg",
+            ".png",
+            ".gif",
+            ".webp",
+            ".jfif");
 
     public FileStorageService(@Value("${file.upload-dir:uploads}") String uploadDir) {
         this.uploadLocation = Paths.get(uploadDir).toAbsolutePath().normalize();
         try {
             Files.createDirectories(this.uploadLocation);
         } catch (IOException ex) {
-            throw new IllegalStateException("Could not initialize upload directory", ex);
+            throw new IllegalStateException("업로드 디렉터리를 초기화할 수 없습니다.", ex);
         }
     }
 
@@ -45,20 +52,19 @@ public class FileStorageService {
             throw new IllegalArgumentException("File must not be empty");
         }
 
-        validateFile(file);
-
         String rawFilename = file.getOriginalFilename();
         String originalFilename = rawFilename != null
                 ? StringUtils.cleanPath(rawFilename)
                 : "image";
         String extension = extractExtension(originalFilename);
+        validateFile(file, extension);
 
         Path targetDirectory;
         try {
             targetDirectory = resolveTargetDirectory(pathSegments);
         } catch (IOException ex) {
-            log.error("Failed to create directories for upload path", ex);
-            throw new RuntimeException("Failed to prepare upload directory.", ex);
+            log.error("업로드 경로 디렉터리 생성에 실패했습니다.", ex);
+            throw new RuntimeException("업로드 디렉터리를 준비하지 못했습니다.", ex);
         }
         String filename = generateFileName(extension);
         Path targetLocation = targetDirectory.resolve(filename);
@@ -68,25 +74,33 @@ public class FileStorageService {
             Path relativePath = uploadLocation.relativize(targetLocation);
             return normalizeRelativePath(relativePath);
         } catch (IOException ex) {
-            log.error("Failed to store file {}", originalFilename, ex);
-            throw new RuntimeException("Failed to store file. Please try again later.", ex);
+            log.error("파일 저장에 실패했습니다. filename={}", originalFilename, ex);
+            throw new RuntimeException("파일 저장에 실패했습니다. 잠시 후 다시 시도해주세요.", ex);
         }
     }
 
     public Resource loadAsResource(String relativePath) {
         try {
-            Path filePath = uploadLocation.resolve(relativePath).normalize();
-            if (!filePath.startsWith(uploadLocation)) {
-                throw new IllegalArgumentException("Invalid file path");
-            }
+            Path filePath = resolveStoragePath(relativePath);
             Resource resource = new UrlResource(filePath.toUri());
             if (resource.exists() && resource.isReadable()) {
                 return resource;
             }
         } catch (MalformedURLException ex) {
-            log.error("Failed to load file {}", relativePath, ex);
+            log.error("파일 로드에 실패했습니다. path={}", relativePath, ex);
         }
-        throw new IllegalArgumentException("Requested file not found: " + relativePath);
+        throw new IllegalArgumentException("요청한 파일을 찾을 수 없습니다: " + relativePath);
+    }
+
+    public Path resolveStoragePath(String relativePath) {
+        if (!StringUtils.hasText(relativePath)) {
+            throw new IllegalArgumentException("파일 경로가 비어 있습니다.");
+        }
+        Path filePath = uploadLocation.resolve(relativePath).normalize();
+        if (!filePath.startsWith(uploadLocation)) {
+            throw new IllegalArgumentException("잘못된 파일 경로 요청입니다.");
+        }
+        return filePath;
     }
 
     private String generateFileName(String extension) {
@@ -133,13 +147,16 @@ public class FileStorageService {
         return path.replace("\\", "/");
     }
 
-    private void validateFile(MultipartFile file) {
+    private void validateFile(MultipartFile file, String extension) {
         if (file.getSize() > MAX_FILE_SIZE_BYTES) {
             throw new IllegalArgumentException("파일은 최대 5MB까지 업로드할 수 있습니다.");
         }
         String contentType = file.getContentType();
         if (contentType == null || !ALLOWED_CONTENT_TYPES.contains(contentType.toLowerCase())) {
             throw new IllegalArgumentException("이미지 파일(jpg, png, gif, webp)만 업로드할 수 있습니다.");
+        }
+        if (!StringUtils.hasText(extension) || !ALLOWED_EXTENSIONS.contains(extension.toLowerCase())) {
+            throw new IllegalArgumentException("허용되지 않은 이미지 확장자입니다.");
         }
     }
 }

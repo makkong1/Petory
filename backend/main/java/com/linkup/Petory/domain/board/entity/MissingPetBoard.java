@@ -86,9 +86,6 @@ public class MissingPetBoard {
     @Builder.Default
     private MissingPetStatus status = MissingPetStatus.MISSING;
 
-    @Column(name = "image_url", length = 255)
-    private String imageUrl;
-
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 

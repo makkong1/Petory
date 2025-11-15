@@ -9,8 +9,16 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
+import java.io.IOException;
+import java.net.URI;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -19,13 +27,16 @@ public class AttachmentFileService {
 
     private final AttachmentFileRepository fileRepository;
     private final FileConverter fileConverter;
+    private final FileStorageService fileStorageService;
 
     public List<FileDTO> getAttachments(FileTargetType targetType, Long targetIdx) {
         if (targetType == null || targetIdx == null) {
             return List.of();
         }
         List<AttachmentFile> files = fileRepository.findByTargetTypeAndTargetIdx(targetType, targetIdx);
-        return fileConverter.toDTOList(files);
+        return fileConverter.toDTOList(files).stream()
+                .map(this::withDownloadUrl)
+                .collect(Collectors.toList());
     }
 
     @Transactional
@@ -36,12 +47,14 @@ public class AttachmentFileService {
 
         fileRepository.deleteByTargetTypeAndTargetIdx(targetType, targetIdx);
 
-        if (StringUtils.hasText(filePath)) {
+        String normalizedPath = normalizeFilePath(filePath);
+        if (StringUtils.hasText(normalizedPath)) {
+            String resolvedFileType = resolveMimeType(normalizedPath, fileType);
             AttachmentFile attachment = AttachmentFile.builder()
                     .targetType(targetType)
                     .targetIdx(targetIdx)
-                    .filePath(filePath)
-                    .fileType(fileType)
+                    .filePath(normalizedPath)
+                    .fileType(resolvedFileType)
                     .build();
             fileRepository.save(attachment);
         }
@@ -54,5 +67,97 @@ public class AttachmentFileService {
         }
         fileRepository.deleteByTargetTypeAndTargetIdx(targetType, targetIdx);
     }
-}
 
+    public String normalizeFilePath(String rawPath) {
+        if (!StringUtils.hasText(rawPath)) {
+            return null;
+        }
+
+        String trimmed = rawPath.trim();
+        String decoded = decodeIfNecessary(extractRelativePath(trimmed));
+        if (!StringUtils.hasText(decoded)) {
+            return null;
+        }
+        return decoded.replace("\\", "/");
+    }
+
+    private String extractRelativePath(String value) {
+        try {
+            URI uri = URI.create(value);
+            String query = uri.getRawQuery();
+            if (StringUtils.hasText(query)) {
+                for (String param : query.split("&")) {
+                    int idx = param.indexOf('=');
+                    if (idx > -1) {
+                        String key = param.substring(0, idx);
+                        if ("path".equals(key)) {
+                            return param.substring(idx + 1);
+                        }
+                    }
+                }
+            }
+
+            String uriPath = uri.getPath();
+            if (StringUtils.hasText(uriPath)) {
+                String marker = "/uploads/";
+                int markerIndex = uriPath.indexOf(marker);
+                if (markerIndex >= 0) {
+                    return uriPath.substring(markerIndex + marker.length());
+                }
+                if (uriPath.startsWith("/")) {
+                    return uriPath.substring(1);
+                }
+                return uriPath;
+            }
+        } catch (IllegalArgumentException ignored) {
+            // treat as plain string
+        }
+        return value;
+    }
+
+    private String decodeIfNecessary(String value) {
+        if (!StringUtils.hasText(value)) {
+            return value;
+        }
+        try {
+            return URLDecoder.decode(value, StandardCharsets.UTF_8);
+        } catch (IllegalArgumentException ex) {
+            return value;
+        }
+    }
+
+    private String resolveMimeType(String relativePath, String providedType) {
+        if (StringUtils.hasText(providedType)) {
+            return providedType.toLowerCase();
+        }
+        try {
+            Path storagePath = fileStorageService.resolveStoragePath(relativePath);
+            if (Files.exists(storagePath)) {
+                String detected = Files.probeContentType(storagePath);
+                if (StringUtils.hasText(detected)) {
+                    return detected.toLowerCase();
+                }
+            }
+        } catch (IOException | IllegalArgumentException ignored) {
+        }
+        return null;
+    }
+
+    private FileDTO withDownloadUrl(FileDTO dto) {
+        if (dto == null) {
+            return null;
+        }
+        dto.setDownloadUrl(buildDownloadUrl(dto.getFilePath()));
+        return dto;
+    }
+
+    public String buildDownloadUrl(String relativePath) {
+        if (!StringUtils.hasText(relativePath)) {
+            return null;
+        }
+        return ServletUriComponentsBuilder.fromCurrentContextPath()
+                .path("/api/uploads/file")
+                .queryParam("path", relativePath)
+                .toUriString();
+    }
+}

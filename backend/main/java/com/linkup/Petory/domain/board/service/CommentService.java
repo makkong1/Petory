@@ -16,8 +16,10 @@ import com.linkup.Petory.domain.board.entity.ReactionType;
 import com.linkup.Petory.domain.board.repository.BoardRepository;
 import com.linkup.Petory.domain.board.repository.CommentReactionRepository;
 import com.linkup.Petory.domain.board.repository.CommentRepository;
+import com.linkup.Petory.domain.file.dto.FileDTO;
 import com.linkup.Petory.domain.file.entity.FileTargetType;
 import com.linkup.Petory.domain.file.service.AttachmentFileService;
+import org.springframework.util.StringUtils;
 
 import lombok.RequiredArgsConstructor;
 
@@ -53,14 +55,16 @@ public class CommentService {
                 .board(board)
                 .user(user)
                 .content(dto.getContent())
-                .commentFilePath(dto.getCommentFilePath())
                 .build();
 
         Comment saved = commentRepository.save(comment);
         if (board.getComments() != null) {
             board.getComments().add(saved);
         }
-        attachmentFileService.syncSingleAttachment(FileTargetType.COMMENT, saved.getIdx(), dto.getCommentFilePath(), null);
+        if (dto.getCommentFilePath() != null) {
+            attachmentFileService.syncSingleAttachment(FileTargetType.COMMENT, saved.getIdx(), dto.getCommentFilePath(),
+                    null);
+        }
         return mapWithReactionCounts(saved);
     }
 
@@ -87,7 +91,23 @@ public class CommentService {
         long dislikeCount = commentReactionRepository.countByCommentAndReactionType(comment, ReactionType.DISLIKE);
         dto.setLikeCount(Math.toIntExact(likeCount));
         dto.setDislikeCount(Math.toIntExact(dislikeCount));
-        dto.setAttachments(attachmentFileService.getAttachments(FileTargetType.COMMENT, comment.getIdx()));
+        List<FileDTO> attachments = attachmentFileService.getAttachments(FileTargetType.COMMENT, comment.getIdx());
+        dto.setAttachments(attachments);
+        dto.setCommentFilePath(extractPrimaryFileUrl(attachments));
         return dto;
+    }
+
+    private String extractPrimaryFileUrl(List<FileDTO> attachments) {
+        if (attachments == null || attachments.isEmpty()) {
+            return null;
+        }
+        FileDTO primary = attachments.get(0);
+        if (primary == null) {
+            return null;
+        }
+        if (StringUtils.hasText(primary.getDownloadUrl())) {
+            return primary.getDownloadUrl();
+        }
+        return attachmentFileService.buildDownloadUrl(primary.getFilePath());
     }
 }
