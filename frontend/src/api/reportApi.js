@@ -37,5 +37,8 @@ export const reportApi = {
     if (status && status !== 'ALL') params.status = status;
     return api.get('', { params });
   },
+  getDetail: (id) => api.get(`/${id}`),
+  handle: (id, { status, actionTaken, adminNote }) =>
+    api.post(`/${id}/handle`, { status, actionTaken, adminNote }),
 };
 

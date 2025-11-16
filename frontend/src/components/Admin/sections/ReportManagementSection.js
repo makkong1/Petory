@@ -1,29 +1,39 @@
 import React, { useEffect, useState } from 'react';
 import styled from 'styled-components';
 import { reportApi } from '../../../api/reportApi';
+import ReportDetailModal from './ReportDetailModal';
 
 const ReportManagementSection = () => {
-  const [activeStatus, setActiveStatus] = useState('PENDING');
+  const [activeTargetType, setActiveTargetType] = useState('BOARD');
+  const [statusFilter, setStatusFilter] = useState('PENDING');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [reports, setReports] = useState([]);
+  const [selectedReportId, setSelectedReportId] = useState(null);
 
-  const statusTabs = [
+  const targetTypeTabs = [
+    { key: 'BOARD', label: '게시글 신고' },
+    { key: 'COMMENT', label: '댓글 신고' },
+    { key: 'MISSING_PET', label: '실종 제보 신고' },
+    { key: 'PET_CARE_PROVIDER', label: '펫케어 제공자 신고' },
+  ];
+
+  const statusOptions = [
     { key: 'ALL', label: '전체' },
     { key: 'PENDING', label: '미처리(PENDING)' },
     { key: 'RESOLVED', label: '처리완료(RESOLVED)' },
     { key: 'REJECTED', label: '반려(REJECTED)' },
   ];
 
-  // 게시글(BOARD) 신고 기준으로만 가져오되, 상태는 탭에 따라 변경
+  // 대상 타입 + 상태 조합으로 신고 목록 조회
   useEffect(() => {
     const fetchReports = async () => {
       try {
         setLoading(true);
         setError(null);
         const response = await reportApi.getReports({
-          targetType: 'BOARD',
-          status: activeStatus,
+          targetType: activeTargetType,
+          status: statusFilter,
         });
         setReports(response.data || []);
       } catch (err) {
@@ -35,39 +45,67 @@ const ReportManagementSection = () => {
     };
 
     fetchReports();
-  }, [activeStatus]);
+  }, [activeTargetType, statusFilter]);
+
+  const formatDateTime = (value) => {
+    if (!value) return '-';
+    try {
+      const d = new Date(value);
+      if (Number.isNaN(d.getTime())) return String(value);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      const hh = String(d.getHours()).padStart(2, '0');
+      const mi = String(d.getMinutes()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd} ${hh}:${mi}`;
+    } catch {
+      return String(value);
+    }
+  };
 
   return (
     <Wrapper>
       <Header>
         <Title>신고 관리</Title>
         <Subtitle>
-          신고 테이블의 <Code>status</Code> 컬럼(PENDING / RESOLVED / REJECTED)을 기준으로 신고를 관리합니다.
+          신고 테이블의 <Code>target_type</Code> (BOARD / COMMENT / MISSING_PET / PET_CARE_PROVIDER)와{' '}
+          <Code>status</Code> (PENDING / RESOLVED / REJECTED)를 기준으로 신고를 관리합니다.
         </Subtitle>
       </Header>
 
       <TabsWrapper>
-        {statusTabs.map(tab => (
+        {targetTypeTabs.map(tab => (
           <StatusTab
             key={tab.key}
-            $active={tab.key === activeStatus}
-            onClick={() => setActiveStatus(tab.key)}
+            $active={tab.key === activeTargetType}
+            onClick={() => setActiveTargetType(tab.key)}
           >
             {tab.label}
           </StatusTab>
         ))}
       </TabsWrapper>
 
+      <FilterBar>
+        <FilterLabel>상태 필터</FilterLabel>
+        <FilterSelect
+          value={statusFilter}
+          onChange={e => setStatusFilter(e.target.value)}
+        >
+          {statusOptions.map(opt => (
+            <option key={opt.key} value={opt.key}>
+              {opt.label}
+            </option>
+          ))}
+        </FilterSelect>
+      </FilterBar>
+
       <Card>
         <SectionHeader>
           <SectionTitle>
-            {activeStatus === 'ALL' && '전체 신고 목록'}
-            {activeStatus === 'PENDING' && '미처리 신고 목록'}
-            {activeStatus === 'RESOLVED' && '처리 완료된 신고 목록'}
-            {activeStatus === 'REJECTED' && '반려된 신고 목록'}
+            {targetTypeTabs.find(t => t.key === activeTargetType)?.label || '신고 목록'}
           </SectionTitle>
           <SectionSubtitle>
-            1단계에서는 상태별 탭과 테이블 헤더 구조만 구성합니다. 이후 실제 신고 데이터, 상세 모달, 처리 액션을 연동합니다.
+            상단 탭에서 신고 대상을 선택하고, 우측 상태 필터로 PENDING / RESOLVED / REJECTED 등을 조합해 확인할 수 있습니다.
           </SectionSubtitle>
         </SectionHeader>
 
@@ -89,6 +127,7 @@ const ReportManagementSection = () => {
                 <th>처리자</th>
                 <th>처리일시</th>
                 <th>생성일</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -103,15 +142,40 @@ const ReportManagementSection = () => {
                   </td>
                   <td>{report.reason}</td>
                   <td>{report.status}</td>
-                  <td>{report.handledBy ?? '-'}</td>
-                  <td>{report.handledAt ?? '-'}</td>
-                  <td>{report.createdAt ?? '-'}</td>
+                  <td>{report.handledByName || '-'}</td>
+                  <td>{formatDateTime(report.handledAt)}</td>
+                  <td>{formatDateTime(report.createdAt)}</td>
+                  <td>
+                    <ViewButton onClick={() => setSelectedReportId(report.idx)}>보기</ViewButton>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </Table>
         )}
       </Card>
+
+      {selectedReportId && (
+        <ReportDetailModal
+          reportId={selectedReportId}
+          onClose={() => setSelectedReportId(null)}
+          onHandled={() => {
+            // 처리 후 목록 새로고침
+            (async () => {
+              try {
+                setLoading(true);
+                const response = await reportApi.getReports({
+                  targetType: activeTargetType,
+                  status: statusFilter,
+                });
+                setReports(response.data || []);
+              } finally {
+                setLoading(false);
+              }
+            })();
+          }}
+        />
+      )}
     </Wrapper>
   );
 };
@@ -191,6 +255,27 @@ const SectionSubtitle = styled.p`
   font-size: ${props => props.theme.typography.caption.fontSize};
 `;
 
+const FilterBar = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${props => props.theme.spacing.sm};
+  margin-bottom: ${props => props.theme.spacing.md};
+`;
+
+const FilterLabel = styled.span`
+  font-size: ${props => props.theme.typography.caption.fontSize};
+  color: ${props => props.theme.colors.textSecondary};
+`;
+
+const FilterSelect = styled.select`
+  padding: 6px 10px;
+  border-radius: ${props => props.theme.borderRadius.md};
+  border: 1px solid ${props => props.theme.colors.border};
+  background: ${props => props.theme.colors.surface};
+  color: ${props => props.theme.colors.text};
+  font-size: ${props => props.theme.typography.caption.fontSize};
+`;
+
 const Table = styled.table`
   width: 100%;
   border-collapse: collapse;
@@ -215,6 +300,18 @@ const Table = styled.table`
   }
 `;
 
+const ViewButton = styled.button`
+  padding: 6px 10px;
+  border-radius: ${props => props.theme.borderRadius.sm};
+  border: 1px solid ${props => props.theme.colors.border};
+  background: ${props => props.theme.colors.surface};
+  cursor: pointer;
+  font-size: ${props => props.theme.typography.caption.fontSize};
+
+  &:hover {
+    background: ${props => props.theme.colors.surfaceHover};
+  }
+`;
 const TableMessage = styled.div`
   padding: ${props => props.theme.spacing.lg};
   text-align: center;

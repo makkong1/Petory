@@ -21,6 +21,7 @@ public class ReportDTO {
     ReportStatus status;
     ReportActionType actionTaken;
     Long handledBy;
+    String handledByName;
     LocalDateTime handledAt;
     String adminNote;
     LocalDateTime createdAt;
