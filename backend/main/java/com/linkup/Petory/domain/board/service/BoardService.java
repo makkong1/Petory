@@ -34,7 +34,7 @@ public class BoardService {
     private final BoardRepository boardRepository;
     private final UsersRepository usersRepository;
     private final BoardReactionRepository boardReactionRepository;
-    private final CommentReactionRepository commentReactionRepository;
+    // private final CommentReactionRepository commentReactionRepository;
     private final BoardViewLogRepository boardViewLogRepository;
     private final AttachmentFileService attachmentFileService;
     private final BoardConverter boardConverter;
@@ -143,9 +143,7 @@ public class BoardService {
 
     // 게시글 검색
     public List<BoardDTO> searchBoards(String keyword) {
-        List<Board> boards = boardRepository
-                .findByTitleContainingIgnoreCaseOrContentContainingIgnoreCaseAndIsDeletedFalseOrderByCreatedAtDesc(
-                        keyword, keyword);
+        List<Board> boards = boardRepository.searchByKeyword(keyword);
         return boards.stream()
                 .map(this::mapWithReactions)
                 .collect(Collectors.toList());
