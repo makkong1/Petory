@@ -96,6 +96,13 @@ public class MissingPetBoard {
     @Builder.Default
     private List<MissingPetComment> comments = new ArrayList<>();
 
+    @Column(name = "is_deleted")
+    @Builder.Default
+    private Boolean isDeleted = false;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
     @PrePersist
     protected void onCreate() {
         LocalDateTime now = LocalDateTime.now();

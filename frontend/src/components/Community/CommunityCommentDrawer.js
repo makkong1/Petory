@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import styled from 'styled-components';
 import { commentApi } from '../../api/commentApi';
 import { uploadApi } from '../../api/uploadApi';
+import { reportApi } from '../../api/reportApi';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 

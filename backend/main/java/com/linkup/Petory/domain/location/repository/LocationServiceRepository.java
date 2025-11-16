@@ -43,6 +43,10 @@ public interface LocationServiceRepository extends JpaRepository<LocationService
         // 이름과 주소로 중복 체크
         List<LocationService> findByNameAndAddress(String name, String address);
 
+        boolean existsByNameAndAddress(String name, String address);
+
+        boolean existsByNameAndDetailAddress(String name, String detailAddress);
+
         // 주소로 중복 체크
         List<LocationService> findByAddress(String address);
 

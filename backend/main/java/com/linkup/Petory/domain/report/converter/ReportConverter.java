@@ -22,6 +22,7 @@ public class ReportConverter {
                 .status(report.getStatus())
                 .actionTaken(report.getActionTaken())
                 .handledBy(report.getHandledBy() != null ? report.getHandledBy().getIdx() : null)
+                .handledByName(report.getHandledBy() != null ? report.getHandledBy().getUsername() : null)
                 .handledAt(report.getHandledAt())
                 .adminNote(report.getAdminNote())
                 .createdAt(report.getCreatedAt())

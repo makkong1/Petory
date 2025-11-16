@@ -39,6 +39,8 @@ public class MissingPetBoardDTO {
     private String imageUrl;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private Boolean deleted;
+    private LocalDateTime deletedAt;
     private List<MissingPetCommentDTO> comments;
     private Integer commentCount;
     private List<FileDTO> attachments;

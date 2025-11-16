@@ -18,6 +18,9 @@ public class CareRequestCommentDTO {
     private Long idx;
     private String content;
     private LocalDateTime createdAt;
+    private String status;          // ACTIVE / BLINDED / DELETED
+    private Boolean deleted;
+    private LocalDateTime deletedAt;
 
     // 펫케어 요청 정보
     private Long careRequestId;

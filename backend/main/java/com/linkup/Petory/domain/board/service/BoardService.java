@@ -1,5 +1,6 @@
 package com.linkup.Petory.domain.board.service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -7,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.linkup.Petory.domain.board.converter.BoardConverter;
+import com.linkup.Petory.domain.common.ContentStatus;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 import com.linkup.Petory.domain.board.dto.BoardDTO;
@@ -42,9 +44,9 @@ public class BoardService {
         List<Board> boards;
 
         if (category != null && !category.equals("ALL")) {
-            boards = boardRepository.findByCategoryOrderByCreatedAtDesc(category);
+            boards = boardRepository.findByCategoryAndIsDeletedFalseOrderByCreatedAtDesc(category);
         } else {
-            boards = boardRepository.findAllByOrderByCreatedAtDesc();
+            boards = boardRepository.findAllByIsDeletedFalseOrderByCreatedAtDesc();
         }
 
         return boards.stream()
@@ -80,7 +82,8 @@ public class BoardService {
 
         Board saved = boardRepository.save(board);
         if (dto.getBoardFilePath() != null) {
-            attachmentFileService.syncSingleAttachment(FileTargetType.BOARD, saved.getIdx(), dto.getBoardFilePath(), null);
+            attachmentFileService.syncSingleAttachment(FileTargetType.BOARD, saved.getIdx(), dto.getBoardFilePath(),
+                    null);
         }
         return mapWithReactions(saved);
     }
@@ -99,7 +102,8 @@ public class BoardService {
             board.setCategory(dto.getCategory());
         Board updated = boardRepository.save(board);
         if (dto.getBoardFilePath() != null) {
-            attachmentFileService.syncSingleAttachment(FileTargetType.BOARD, updated.getIdx(), dto.getBoardFilePath(), null);
+            attachmentFileService.syncSingleAttachment(FileTargetType.BOARD, updated.getIdx(), dto.getBoardFilePath(),
+                    null);
         }
         return mapWithReactions(updated);
     }
@@ -110,12 +114,20 @@ public class BoardService {
         Board board = boardRepository.findById(idx)
                 .orElseThrow(() -> new RuntimeException("Board not found"));
 
+        // Soft delete: mark as DELETED and keep related data for audit/hard-delete
+        // later
+        board.setStatus(ContentStatus.DELETED);
+        board.setIsDeleted(true);
+        board.setDeletedAt(LocalDateTime.now());
+        // Optionally mark child comments as deleted as well
         if (board.getComments() != null) {
-            board.getComments().forEach(commentReactionRepository::deleteByComment);
+            board.getComments().forEach(c -> {
+                c.setStatus(ContentStatus.DELETED);
+                c.setIsDeleted(true);
+                c.setDeletedAt(LocalDateTime.now());
+            });
         }
-        boardReactionRepository.deleteByBoard(board);
-        attachmentFileService.deleteAll(FileTargetType.BOARD, board.getIdx());
-        boardRepository.delete(board);
+        boardRepository.saveAndFlush(board);
     }
 
     // 내 게시글 조회
@@ -123,7 +135,7 @@ public class BoardService {
         Users user = usersRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        List<Board> boards = boardRepository.findByUserOrderByCreatedAtDesc(user);
+        List<Board> boards = boardRepository.findByUserAndIsDeletedFalseOrderByCreatedAtDesc(user);
         return boards.stream()
                 .map(this::mapWithReactions)
                 .collect(Collectors.toList());
@@ -131,8 +143,9 @@ public class BoardService {
 
     // 게시글 검색
     public List<BoardDTO> searchBoards(String keyword) {
-        List<Board> boards = boardRepository.findByTitleContainingOrContentContainingOrderByCreatedAtDesc(keyword,
-                keyword);
+        List<Board> boards = boardRepository
+                .findByTitleContainingIgnoreCaseOrContentContainingIgnoreCaseAndIsDeletedFalseOrderByCreatedAtDesc(
+                        keyword, keyword);
         return boards.stream()
                 .map(this::mapWithReactions)
                 .collect(Collectors.toList());
@@ -191,5 +204,26 @@ public class BoardService {
             return primary.getDownloadUrl();
         }
         return attachmentFileService.buildDownloadUrl(primary.getFilePath());
+    }
+
+    @Transactional
+    public BoardDTO updateBoardStatus(Long id, com.linkup.Petory.domain.common.ContentStatus status) {
+        Board board = boardRepository.findById(id).orElseThrow(() -> new RuntimeException("Board not found"));
+        // do not change isDeleted here
+        board.setStatus(status);
+        Board saved = boardRepository.save(board);
+        return mapWithReactions(saved);
+    }
+
+    @Transactional
+    public BoardDTO restoreBoard(Long id) {
+        Board board = boardRepository.findById(id).orElseThrow(() -> new RuntimeException("Board not found"));
+        board.setIsDeleted(false);
+        board.setDeletedAt(null);
+        if (board.getStatus() == com.linkup.Petory.domain.common.ContentStatus.DELETED) {
+            board.setStatus(com.linkup.Petory.domain.common.ContentStatus.ACTIVE);
+        }
+        Board saved = boardRepository.save(board);
+        return mapWithReactions(saved);
     }
 }

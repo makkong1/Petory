@@ -41,6 +41,8 @@ public class MissingPetConverter {
                 .status(board.getStatus())
                 .createdAt(board.getCreatedAt())
                 .updatedAt(board.getUpdatedAt())
+                .deleted(board.getIsDeleted())
+                .deletedAt(board.getDeletedAt())
                 .comments(commentDTOs)
                 .commentCount(commentDTOs.size())
                 .build();
@@ -63,6 +65,9 @@ public class MissingPetConverter {
                 .latitude(comment.getLatitude())
                 .longitude(comment.getLongitude())
                 .createdAt(comment.getCreatedAt())
+                .status(comment.getStatus() != null ? comment.getStatus().name() : null)
+                .deleted(comment.getIsDeleted())
+                .deletedAt(comment.getDeletedAt())
                 .build();
     }
 

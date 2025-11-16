@@ -27,7 +27,9 @@ public class CareRequestService {
     // 전체 케어 요청 조회 (필터링 포함)
     @Transactional(readOnly = true)
     public List<CareRequestDTO> getAllCareRequests(String status, String location) {
-        List<CareRequest> requests = careRequestRepository.findAll();
+        List<CareRequest> requests = careRequestRepository.findAll().stream()
+                .filter(r -> !Boolean.TRUE.equals(r.getIsDeleted()))
+                .collect(Collectors.toList());
 
         // 상태 필터링
         if (status != null && !status.equals("ALL")) {
@@ -53,6 +55,9 @@ public class CareRequestService {
     public CareRequestDTO getCareRequest(Long idx) {
         CareRequest request = careRequestRepository.findById(idx)
                 .orElseThrow(() -> new RuntimeException("CareRequest not found"));
+        if (Boolean.TRUE.equals(request.getIsDeleted())) {
+            throw new RuntimeException("CareRequest not found");
+        }
         return careRequestConverter.toDTO(request);
     }
 
@@ -95,7 +100,11 @@ public class CareRequestService {
     // 케어 요청 삭제
     @Transactional
     public void deleteCareRequest(Long idx) {
-        careRequestRepository.deleteById(idx);
+        CareRequest request = careRequestRepository.findById(idx)
+                .orElseThrow(() -> new RuntimeException("CareRequest not found"));
+        request.setIsDeleted(true);
+        request.setDeletedAt(java.time.LocalDateTime.now());
+        careRequestRepository.save(request);
     }
 
     // 내 케어 요청 조회
@@ -104,7 +113,7 @@ public class CareRequestService {
         Users user = usersRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        List<CareRequest> requests = careRequestRepository.findByUserOrderByCreatedAtDesc(user);
+        List<CareRequest> requests = careRequestRepository.findByUserAndIsDeletedFalseOrderByCreatedAtDesc(user);
         return careRequestConverter.toDTOList(requests);
     }
 

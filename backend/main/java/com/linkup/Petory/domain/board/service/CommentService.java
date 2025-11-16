@@ -1,5 +1,6 @@
 package com.linkup.Petory.domain.board.service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -16,6 +17,7 @@ import com.linkup.Petory.domain.board.entity.ReactionType;
 import com.linkup.Petory.domain.board.repository.BoardRepository;
 import com.linkup.Petory.domain.board.repository.CommentReactionRepository;
 import com.linkup.Petory.domain.board.repository.CommentRepository;
+import com.linkup.Petory.domain.common.ContentStatus;
 import com.linkup.Petory.domain.file.dto.FileDTO;
 import com.linkup.Petory.domain.file.entity.FileTargetType;
 import com.linkup.Petory.domain.file.service.AttachmentFileService;
@@ -38,7 +40,7 @@ public class CommentService {
     public List<CommentDTO> getComments(Long boardId) {
         Board board = boardRepository.findById(boardId)
                 .orElseThrow(() -> new IllegalArgumentException("Board not found"));
-        List<Comment> comments = commentRepository.findByBoardOrderByCreatedAtAsc(board);
+        List<Comment> comments = commentRepository.findByBoardAndIsDeletedFalseOrderByCreatedAtAsc(board);
         return comments.stream()
                 .map(this::mapWithReactionCounts)
                 .collect(Collectors.toList());
@@ -79,10 +81,12 @@ public class CommentService {
             throw new IllegalArgumentException("Comment does not belong to the specified board");
         }
 
-        commentReactionRepository.deleteByComment(comment);
-        attachmentFileService.deleteAll(FileTargetType.COMMENT, comment.getIdx());
-        commentRepository.delete(comment);
-        board.getComments().removeIf(c -> c.getIdx().equals(commentId));
+        // Soft delete instead of physical delete
+        comment.setStatus(ContentStatus.DELETED);
+        comment.setIsDeleted(true);
+        comment.setDeletedAt(LocalDateTime.now());
+        commentRepository.save(comment);
+        // keep attachments and reactions for audit/possible restore
     }
 
     private CommentDTO mapWithReactionCounts(Comment comment) {
@@ -109,5 +113,39 @@ public class CommentService {
             return primary.getDownloadUrl();
         }
         return attachmentFileService.buildDownloadUrl(primary.getFilePath());
+    }
+
+    @Transactional
+    public CommentDTO updateCommentStatus(Long boardId, Long commentId, com.linkup.Petory.domain.common.ContentStatus status) {
+        Board board = boardRepository.findById(boardId)
+                .orElseThrow(() -> new IllegalArgumentException("Board not found"));
+        Comment comment = commentRepository.findById(commentId)
+                .orElseThrow(() -> new IllegalArgumentException("Comment not found"));
+        if (!comment.getBoard().getIdx().equals(board.getIdx())) {
+            throw new IllegalArgumentException("Comment does not belong to the specified board");
+        }
+        if (!Boolean.TRUE.equals(comment.getIsDeleted())) {
+            comment.setStatus(status);
+        }
+        Comment saved = commentRepository.save(comment);
+        return mapWithReactionCounts(saved);
+    }
+
+    @Transactional
+    public CommentDTO restoreComment(Long boardId, Long commentId) {
+        Board board = boardRepository.findById(boardId)
+                .orElseThrow(() -> new IllegalArgumentException("Board not found"));
+        Comment comment = commentRepository.findById(commentId)
+                .orElseThrow(() -> new IllegalArgumentException("Comment not found"));
+        if (!comment.getBoard().getIdx().equals(board.getIdx())) {
+            throw new IllegalArgumentException("Comment does not belong to the specified board");
+        }
+        comment.setIsDeleted(false);
+        comment.setDeletedAt(null);
+        if (comment.getStatus() == com.linkup.Petory.domain.common.ContentStatus.DELETED) {
+            comment.setStatus(com.linkup.Petory.domain.common.ContentStatus.ACTIVE);
+        }
+        Comment saved = commentRepository.save(comment);
+        return mapWithReactionCounts(saved);
     }
 }
