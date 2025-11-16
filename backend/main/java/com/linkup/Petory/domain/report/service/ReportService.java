@@ -1,5 +1,7 @@
 package com.linkup.Petory.domain.report.service;
 
+import java.util.List;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -12,6 +14,7 @@ import com.linkup.Petory.domain.report.converter.ReportConverter;
 import com.linkup.Petory.domain.report.dto.ReportDTO;
 import com.linkup.Petory.domain.report.dto.ReportRequestDTO;
 import com.linkup.Petory.domain.report.entity.Report;
+import com.linkup.Petory.domain.report.entity.ReportStatus;
 import com.linkup.Petory.domain.report.entity.ReportTargetType;
 import com.linkup.Petory.domain.report.repository.ReportRepository;
 import com.linkup.Petory.domain.user.entity.Role;
@@ -69,6 +72,24 @@ public class ReportService {
 
         Report saved = reportRepository.save(report);
         return reportConverter.toDTO(saved);
+    }
+
+    public List<ReportDTO> getReports(ReportTargetType targetType, ReportStatus status) {
+        List<Report> reports;
+
+        if (targetType != null && status != null) {
+            reports = reportRepository.findByTargetTypeAndStatusOrderByCreatedAtDesc(targetType, status);
+        } else if (targetType != null) {
+            reports = reportRepository.findByTargetTypeOrderByCreatedAtDesc(targetType);
+        } else if (status != null) {
+            reports = reportRepository.findByStatusOrderByCreatedAtDesc(status);
+        } else {
+            reports = reportRepository.findAllByOrderByCreatedAtDesc();
+        }
+
+        return reports.stream()
+                .map(reportConverter::toDTO)
+                .toList();
     }
 
     private void validateTarget(ReportTargetType targetType, Long targetIdx) {

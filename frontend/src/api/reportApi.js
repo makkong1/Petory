@@ -26,5 +26,16 @@ api.interceptors.request.use(
 
 export const reportApi = {
   submit: (payload) => api.post('', payload),
+  /**
+   * 신고 목록 조회 (관리자용)
+   * - targetType: 'BOARD' | 'COMMENT' | 'MISSING_PET' | 'PET_CARE_PROVIDER'
+   * - status: 'PENDING' | 'RESOLVED' | 'REJECTED'
+   */
+  getReports: ({ targetType, status } = {}) => {
+    const params = {};
+    if (targetType) params.targetType = targetType;
+    if (status && status !== 'ALL') params.status = status;
+    return api.get('', { params });
+  },
 };
 

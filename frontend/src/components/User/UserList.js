@@ -153,7 +153,7 @@ export default UserList;
 
 const Container = styled.div`
   padding: ${props => props.theme.spacing.xl} ${props => props.theme.spacing.lg};
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
 `;
 

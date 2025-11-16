@@ -16,7 +16,7 @@ const NavContainer = styled.nav`
 `;
 
 const NavContent = styled.div`
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
   padding: 0 ${props => props.theme.spacing.lg};
   display: flex;
@@ -170,7 +170,6 @@ const Navigation = ({ activeTab, setActiveTab, user }) => {
     { id: 'community', label: '커뮤니티', icon: '💬' },
     ...(isAdmin ? [
       { id: 'admin', label: '관리자', icon: '🔧' },
-      { id: 'users', label: '사용자 관리', icon: '👥' },
     ] : []),
   ];
 
