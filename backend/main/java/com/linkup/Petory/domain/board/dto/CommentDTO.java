@@ -18,6 +18,9 @@ public class CommentDTO {
     private Long idx;
     private String content;
     private LocalDateTime createdAt;
+    private String status;          // ACTIVE / BLINDED / DELETED
+    private Boolean deleted;
+    private LocalDateTime deletedAt;
 
     // 게시글 정보
     private Long boardId;

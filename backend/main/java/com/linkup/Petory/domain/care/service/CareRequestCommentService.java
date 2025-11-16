@@ -34,7 +34,7 @@ public class CareRequestCommentService {
         public List<CareRequestCommentDTO> getComments(Long careRequestId) {
                 CareRequest careRequest = careRequestRepository.findById(careRequestId)
                                 .orElseThrow(() -> new IllegalArgumentException("CareRequest not found"));
-                List<CareRequestComment> comments = commentRepository.findByCareRequestOrderByCreatedAtAsc(careRequest);
+        List<CareRequestComment> comments = commentRepository.findByCareRequestAndIsDeletedFalseOrderByCreatedAtAsc(careRequest);
                 return comments.stream()
                                 .map(comment -> {
                                         CareRequestCommentDTO dto = commentConverter.toDTO(comment);
@@ -84,7 +84,10 @@ public class CareRequestCommentService {
                         throw new IllegalArgumentException("Comment does not belong to the specified care request");
                 }
 
-                attachmentFileService.deleteAll(FileTargetType.CARE_COMMENT, comment.getIdx());
-                commentRepository.delete(comment);
+        // soft delete instead of physical delete
+        comment.setStatus(com.linkup.Petory.domain.common.ContentStatus.DELETED);
+        comment.setIsDeleted(true);
+        comment.setDeletedAt(java.time.LocalDateTime.now());
+        commentRepository.save(comment);
         }
 }

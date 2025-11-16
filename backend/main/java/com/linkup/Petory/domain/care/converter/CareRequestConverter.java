@@ -23,6 +23,8 @@ public class CareRequestConverter {
                 .date(request.getDate())
                 .status(request.getStatus().name())
                 .createdAt(request.getCreatedAt())
+                .deleted(request.getIsDeleted())
+                .deletedAt(request.getDeletedAt())
                 .userId(request.getUser().getIdx())
                 .username(request.getUser().getUsername())
                 .userLocation(request.getUser().getLocation())

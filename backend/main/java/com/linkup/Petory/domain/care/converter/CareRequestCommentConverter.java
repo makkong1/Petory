@@ -6,9 +6,9 @@ import com.linkup.Petory.domain.care.dto.CareRequestCommentDTO;
 import com.linkup.Petory.domain.care.entity.CareRequestComment;
 
 @Component
-public class CareRequestCommentConverter {
+    public class CareRequestCommentConverter {
 
-    public CareRequestCommentDTO toDTO(CareRequestComment comment) {
+        public CareRequestCommentDTO toDTO(CareRequestComment comment) {
         return CareRequestCommentDTO.builder()
                 .idx(comment.getIdx())
                 .careRequestId(comment.getCareRequest().getIdx())
@@ -19,6 +19,9 @@ public class CareRequestCommentConverter {
                 .commentFilePath(comment.getCommentFilePath())
                 .content(comment.getContent())
                 .createdAt(comment.getCreatedAt())
+                .status(comment.getStatus() != null ? comment.getStatus().name() : null)
+                .deleted(comment.getIsDeleted())
+                .deletedAt(comment.getDeletedAt())
                 .build();
     }
 }

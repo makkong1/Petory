@@ -10,4 +10,7 @@ import com.linkup.Petory.domain.board.entity.Comment;
 public interface CommentRepository extends JpaRepository<Comment, Long> {
 
     List<Comment> findByBoardOrderByCreatedAtAsc(Board board);
+
+    // 삭제되지 않은 댓글만 조회
+    List<Comment> findByBoardAndIsDeletedFalseOrderByCreatedAtAsc(Board board);
 }

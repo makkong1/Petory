@@ -19,7 +19,10 @@ public class BoardDTO {
     private String title;
     private String content;
     private String category;
+    private String status;          // ACTIVE / BLINDED / DELETED
     private LocalDateTime createdAt;
+    private Boolean deleted;
+    private LocalDateTime deletedAt;
 
     // 작성자 정보
     private Long userId;

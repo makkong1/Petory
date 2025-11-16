@@ -10,4 +10,7 @@ import com.linkup.Petory.domain.board.entity.MissingPetComment;
 public interface MissingPetCommentRepository extends JpaRepository<MissingPetComment, Long> {
 
     List<MissingPetComment> findByBoardOrderByCreatedAtAsc(MissingPetBoard board);
+
+    // soft-deleted 제외
+    List<MissingPetComment> findByBoardAndIsDeletedFalseOrderByCreatedAtAsc(MissingPetBoard board);
 }

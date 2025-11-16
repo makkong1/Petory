@@ -39,6 +39,13 @@ public class CareRequest {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
+    @Column(name = "is_deleted")
+    @Builder.Default
+    private Boolean isDeleted = false;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
     @OneToMany(mappedBy = "careRequest", cascade = CascadeType.ALL)
     private List<CareApplication> applications;
 

@@ -19,6 +19,8 @@ public class CareRequestDTO {
     private LocalDateTime date;
     private String status; // OPEN, IN_PROGRESS, COMPLETED, CANCELLED
     private LocalDateTime createdAt;
+    private Boolean deleted;
+    private LocalDateTime deletedAt;
 
     // 요청자 정보
     private Long userId;

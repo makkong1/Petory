@@ -10,6 +10,7 @@ const UserManagementSection = () => {
         <Subtitle>전체 사용자 목록 및 권한/정지 관리를 수행합니다.</Subtitle>
       </Header>
       <Content>
+        {/* 이미있는 페이지를 여기로 가져옴 */}
         <UserList />
       </Content>
     </Wrapper>

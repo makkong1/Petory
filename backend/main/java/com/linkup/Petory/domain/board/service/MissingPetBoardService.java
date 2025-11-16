@@ -141,18 +141,23 @@ public class MissingPetBoardService {
     public void deleteBoard(Long id) {
         MissingPetBoard board = boardRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Missing pet board not found"));
+        // soft delete board and related comments
+        board.setIsDeleted(true);
+        board.setDeletedAt(java.time.LocalDateTime.now());
         if (board.getComments() != null) {
-            board.getComments().forEach(comment -> attachmentFileService.deleteAll(FileTargetType.MISSING_PET_COMMENT,
-                    comment.getIdx()));
+            for (MissingPetComment c : board.getComments()) {
+                c.setStatus(com.linkup.Petory.domain.common.ContentStatus.DELETED);
+                c.setIsDeleted(true);
+                c.setDeletedAt(java.time.LocalDateTime.now());
+            }
         }
-        attachmentFileService.deleteAll(FileTargetType.MISSING_PET, board.getIdx());
-        boardRepository.delete(board);
+        boardRepository.saveAndFlush(board);
     }
 
     public List<MissingPetCommentDTO> getComments(Long boardId) {
         MissingPetBoard board = boardRepository.findById(boardId)
                 .orElseThrow(() -> new IllegalArgumentException("Missing pet board not found"));
-        List<MissingPetComment> comments = commentRepository.findByBoardOrderByCreatedAtAsc(board);
+        List<MissingPetComment> comments = commentRepository.findByBoardAndIsDeletedFalseOrderByCreatedAtAsc(board);
         return comments.stream()
                 .map(this::mapCommentWithAttachments)
                 .collect(Collectors.toList());
@@ -195,10 +200,11 @@ public class MissingPetBoardService {
         if (!comment.getBoard().getIdx().equals(board.getIdx())) {
             throw new IllegalArgumentException("Comment does not belong to the specified board");
         }
-
-        board.getComments().removeIf(c -> c.getIdx().equals(commentId));
-        attachmentFileService.deleteAll(FileTargetType.MISSING_PET_COMMENT, comment.getIdx());
-        commentRepository.delete(comment);
+        // soft delete comment
+        comment.setStatus(com.linkup.Petory.domain.common.ContentStatus.DELETED);
+        comment.setIsDeleted(true);
+        comment.setDeletedAt(java.time.LocalDateTime.now());
+        commentRepository.save(comment);
     }
 
     private MissingPetBoardDTO mapBoardWithAttachments(MissingPetBoard board) {
