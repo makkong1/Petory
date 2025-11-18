@@ -14,6 +14,7 @@ import com.linkup.Petory.domain.care.repository.CareRequestCommentRepository;
 import com.linkup.Petory.domain.care.repository.CareRequestRepository;
 import com.linkup.Petory.domain.user.entity.Role;
 import com.linkup.Petory.domain.user.entity.Users;
+import com.linkup.Petory.domain.file.dto.FileDTO;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 import com.linkup.Petory.domain.file.entity.FileTargetType;
 import com.linkup.Petory.domain.file.service.AttachmentFileService;
@@ -34,7 +35,8 @@ public class CareRequestCommentService {
         public List<CareRequestCommentDTO> getComments(Long careRequestId) {
                 CareRequest careRequest = careRequestRepository.findById(careRequestId)
                                 .orElseThrow(() -> new IllegalArgumentException("CareRequest not found"));
-        List<CareRequestComment> comments = commentRepository.findByCareRequestAndIsDeletedFalseOrderByCreatedAtAsc(careRequest);
+                List<CareRequestComment> comments = commentRepository
+                                .findByCareRequestAndIsDeletedFalseOrderByCreatedAtAsc(careRequest);
                 return comments.stream()
                                 .map(comment -> {
                                         CareRequestCommentDTO dto = commentConverter.toDTO(comment);
@@ -89,10 +91,10 @@ public class CareRequestCommentService {
                         throw new IllegalArgumentException("Comment does not belong to the specified care request");
                 }
 
-        // soft delete instead of physical delete
-        comment.setStatus(com.linkup.Petory.domain.common.ContentStatus.DELETED);
-        comment.setIsDeleted(true);
-        comment.setDeletedAt(java.time.LocalDateTime.now());
-        commentRepository.save(comment);
+                // soft delete instead of physical delete
+                comment.setStatus(com.linkup.Petory.domain.common.ContentStatus.DELETED);
+                comment.setIsDeleted(true);
+                comment.setDeletedAt(java.time.LocalDateTime.now());
+                commentRepository.save(comment);
         }
 }

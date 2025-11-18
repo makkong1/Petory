@@ -64,4 +64,10 @@ public class CareRequestController {
         System.out.println("=== 상태 변경: " + id + " -> " + status + " ===");
         return ResponseEntity.ok(careRequestService.updateStatus(id, status));
     }
+
+    // 케어 요청 검색
+    @GetMapping("/search")
+    public ResponseEntity<List<CareRequestDTO>> searchCareRequests(@RequestParam String keyword) {
+        return ResponseEntity.ok(careRequestService.searchCareRequests(keyword));
+    }
 }

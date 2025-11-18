@@ -127,4 +127,16 @@ public class CareRequestService {
         CareRequest updated = careRequestRepository.save(request);
         return careRequestConverter.toDTO(updated);
     }
+
+    // 검색 기능
+    @Transactional(readOnly = true)
+    public List<CareRequestDTO> searchCareRequests(String keyword) {
+        if (keyword == null || keyword.trim().isEmpty()) {
+            return getAllCareRequests(null, null);
+        }
+        List<CareRequest> requests = careRequestRepository
+                .findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCaseAndIsDeletedFalse(
+                        keyword.trim(), keyword.trim());
+        return careRequestConverter.toDTOList(requests);
+    }
 }

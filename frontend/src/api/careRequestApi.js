@@ -57,4 +57,7 @@ export const careRequestApi = {
   getComments: (careRequestId) => api.get(`/${careRequestId}/comments`),
   createComment: (careRequestId, payload) => api.post(`/${careRequestId}/comments`, payload),
   deleteComment: (careRequestId, commentId) => api.delete(`/${careRequestId}/comments/${commentId}`),
+
+  // 검색
+  searchCareRequests: (keyword) => api.get('/search', { params: { keyword } }),
 };

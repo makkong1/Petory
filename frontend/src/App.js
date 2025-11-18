@@ -13,6 +13,7 @@ import RegisterForm from './components/Auth/RegisterForm';
 import AdminPanel from './components/Admin/AdminPanel';
 import PermissionDeniedModal from './components/Common/PermissionDeniedModal';
 import MissingPetBoardPage from './components/MissingPet/MissingPetBoardPage';
+import ActivityPage from './components/Activity/ActivityPage';
 import { setupApiInterceptors } from './api/authApi';
 
 
@@ -105,6 +106,8 @@ function AppContent() {
         return <UserList />;
       case 'admin':
         return <AdminPanel />;
+      case 'activity':
+        return <ActivityPage />;
       case 'home':
       default:
         return <HomePage setActiveTab={setActiveTab} />;

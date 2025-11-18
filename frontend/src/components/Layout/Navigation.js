@@ -168,6 +168,9 @@ const Navigation = ({ activeTab, setActiveTab, user }) => {
     { id: 'care-requests', label: '펫케어 요청', icon: '🐾' },
     { id: 'missing-pets', label: '실종 제보', icon: '🚨' },
     { id: 'community', label: '커뮤니티', icon: '💬' },
+    ...(user ? [
+      { id: 'activity', label: '내 활동', icon: '📋' },
+    ] : []),
     ...(isAdmin ? [
       { id: 'admin', label: '관리자', icon: '🔧' },
     ] : []),

@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import com.linkup.Petory.domain.care.entity.CareRequest;
 import com.linkup.Petory.domain.care.entity.CareRequestComment;
+import com.linkup.Petory.domain.user.entity.Users;
 
 public interface CareRequestCommentRepository extends JpaRepository<CareRequestComment, Long> {
 
@@ -13,4 +14,7 @@ public interface CareRequestCommentRepository extends JpaRepository<CareRequestC
 
     // soft-deleted 제외
     List<CareRequestComment> findByCareRequestAndIsDeletedFalseOrderByCreatedAtAsc(CareRequest careRequest);
+
+    // 사용자별 댓글 조회 (삭제되지 않은 것만, 최신순)
+    List<CareRequestComment> findByUserAndIsDeletedFalseOrderByCreatedAtDesc(Users user);
 }

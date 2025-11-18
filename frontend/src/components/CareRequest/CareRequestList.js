@@ -14,6 +14,8 @@ const CareRequestList = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [selectedCareRequestId, setSelectedCareRequestId] = useState(null);
+  const [searchKeyword, setSearchKeyword] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
 
   // API에서 케어 요청 데이터 가져오기
   const fetchCareRequests = async () => {
@@ -82,6 +84,8 @@ const CareRequestList = () => {
   // 필터 변경 시 API 재호출
   const handleFilterChange = async (filterKey) => {
     setActiveFilter(filterKey);
+    setSearchKeyword(''); // 검색어 초기화
+    setIsSearching(false);
     try {
       setLoading(true);
       setError(null);
@@ -94,6 +98,38 @@ const CareRequestList = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // 검색 기능
+  const handleSearch = async (e) => {
+    e.preventDefault();
+    if (!searchKeyword.trim()) {
+      setIsSearching(false);
+      fetchCareRequests();
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      setIsSearching(true);
+      const response = await careRequestApi.searchCareRequests(searchKeyword.trim());
+      setCareRequests(response.data || []);
+      setActiveFilter('ALL'); // 검색 시 필터 초기화
+    } catch (error) {
+      console.error('검색 실패:', error);
+      setError('검색 중 오류가 발생했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 검색어 초기화
+  const handleClearSearch = () => {
+    setSearchKeyword('');
+    setIsSearching(false);
+    fetchCareRequests();
+    setActiveFilter('ALL');
   };
 
   const getStatusLabel = (status) => {
@@ -148,6 +184,28 @@ const CareRequestList = () => {
       </Header>
 
       {successMessage && <SuccessBanner>{successMessage}</SuccessBanner>}
+
+      <SearchSection>
+        <SearchForm onSubmit={handleSearch}>
+          <SearchInput
+            type="text"
+            placeholder="제목 또는 내용으로 검색..."
+            value={searchKeyword}
+            onChange={(e) => setSearchKeyword(e.target.value)}
+          />
+          <SearchButton type="submit">🔍 검색</SearchButton>
+          {isSearching && (
+            <ClearButton type="button" onClick={handleClearSearch}>
+              ✕ 초기화
+            </ClearButton>
+          )}
+        </SearchForm>
+        {isSearching && (
+          <SearchResultInfo>
+            "{searchKeyword}" 검색 결과: {careRequests.length}개
+          </SearchResultInfo>
+        )}
+      </SearchSection>
 
       <FilterSection>
         {filters.map(filter => (
@@ -549,4 +607,82 @@ const FormSubtitle = styled.p`
   margin: 0;
   font-size: ${(props) => props.theme.typography.body2.fontSize};
   color: ${(props) => props.theme.colors.textSecondary};
+`;
+
+const SearchSection = styled.div`
+  margin-bottom: ${props => props.theme.spacing.lg};
+`;
+
+const SearchForm = styled.form`
+  display: flex;
+  gap: ${props => props.theme.spacing.sm};
+  margin-bottom: ${props => props.theme.spacing.sm};
+  
+  @media (max-width: 768px) {
+    flex-direction: column;
+  }
+`;
+
+const SearchInput = styled.input`
+  flex: 1;
+  padding: ${props => props.theme.spacing.md};
+  border: 1px solid ${props => props.theme.colors.border};
+  border-radius: ${props => props.theme.borderRadius.md};
+  font-size: ${props => props.theme.typography.body1.fontSize};
+  background: ${props => props.theme.colors.surface};
+  color: ${props => props.theme.colors.text};
+  transition: border-color 0.2s ease;
+
+  &:focus {
+    outline: none;
+    border-color: ${props => props.theme.colors.primary};
+  }
+
+  &::placeholder {
+    color: ${props => props.theme.colors.textLight};
+  }
+`;
+
+const SearchButton = styled.button`
+  padding: ${props => props.theme.spacing.md} ${props => props.theme.spacing.lg};
+  background: ${props => props.theme.colors.primary};
+  color: white;
+  border: none;
+  border-radius: ${props => props.theme.borderRadius.md};
+  font-size: ${props => props.theme.typography.body1.fontSize};
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+
+  &:hover {
+    background: ${props => props.theme.colors.primaryDark};
+    transform: translateY(-1px);
+  }
+`;
+
+const ClearButton = styled.button`
+  padding: ${props => props.theme.spacing.md} ${props => props.theme.spacing.lg};
+  background: ${props => props.theme.colors.surface};
+  color: ${props => props.theme.colors.text};
+  border: 1px solid ${props => props.theme.colors.border};
+  border-radius: ${props => props.theme.borderRadius.md};
+  font-size: ${props => props.theme.typography.body1.fontSize};
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+
+  &:hover {
+    background: ${props => props.theme.colors.surfaceHover};
+    border-color: ${props => props.theme.colors.primary};
+  }
+`;
+
+const SearchResultInfo = styled.div`
+  padding: ${props => props.theme.spacing.sm} ${props => props.theme.spacing.md};
+  background: ${props => props.theme.colors.surface};
+  border: 1px solid ${props => props.theme.colors.border};
+  border-radius: ${props => props.theme.borderRadius.md};
+  color: ${props => props.theme.colors.textSecondary};
+  font-size: ${props => props.theme.typography.body2.fontSize};
 `;

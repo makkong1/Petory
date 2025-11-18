@@ -25,7 +25,12 @@ public interface CareRequestRepository extends JpaRepository<CareRequest, Long> 
     List<CareRequest> findByUser_LocationContaining(String location);
 
     // 제목이나 설명에 키워드 포함된 케어 요청 검색
-    List<CareRequest> findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCaseAndIsDeletedFalse(String titleKeyword, String descKeyword);
+    @Query("SELECT cr FROM CareRequest cr WHERE cr.isDeleted = false AND " +
+           "(LOWER(cr.title) LIKE LOWER(CONCAT('%', :titleKeyword, '%')) OR " +
+           "LOWER(CAST(cr.description AS string)) LIKE LOWER(CONCAT('%', :descKeyword, '%')))")
+    List<CareRequest> findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCaseAndIsDeletedFalse(
+            @Param("titleKeyword") String titleKeyword, 
+            @Param("descKeyword") String descKeyword);
 
     // 날짜가 지났고 특정 상태인 요청 조회 (스케줄러용)
     @Query("SELECT cr FROM CareRequest cr WHERE cr.date < :now AND cr.status IN :statuses")
