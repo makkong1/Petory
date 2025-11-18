@@ -146,7 +146,6 @@ public class MissingPetBoardService {
         board.setDeletedAt(java.time.LocalDateTime.now());
         if (board.getComments() != null) {
             for (MissingPetComment c : board.getComments()) {
-                c.setStatus(com.linkup.Petory.domain.common.ContentStatus.DELETED);
                 c.setIsDeleted(true);
                 c.setDeletedAt(java.time.LocalDateTime.now());
             }
@@ -201,7 +200,6 @@ public class MissingPetBoardService {
             throw new IllegalArgumentException("Comment does not belong to the specified board");
         }
         // soft delete comment
-        comment.setStatus(com.linkup.Petory.domain.common.ContentStatus.DELETED);
         comment.setIsDeleted(true);
         comment.setDeletedAt(java.time.LocalDateTime.now());
         commentRepository.save(comment);

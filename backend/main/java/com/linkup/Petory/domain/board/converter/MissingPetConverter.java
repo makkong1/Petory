@@ -65,7 +65,7 @@ public class MissingPetConverter {
                 .latitude(comment.getLatitude())
                 .longitude(comment.getLongitude())
                 .createdAt(comment.getCreatedAt())
-                .status(comment.getStatus() != null ? comment.getStatus().name() : null)
+                .status(comment.getIsDeleted() ? "DELETED" : "ACTIVE")
                 .deleted(comment.getIsDeleted())
                 .deletedAt(comment.getDeletedAt())
                 .build();

@@ -18,7 +18,7 @@ import com.linkup.Petory.domain.care.entity.CareRequestComment;
                 .userRole(comment.getUser().getRole().name())
                 .content(comment.getContent())
                 .createdAt(comment.getCreatedAt())
-                .status(comment.getStatus() != null ? comment.getStatus().name() : null)
+                .status(comment.getIsDeleted() ? "DELETED" : "ACTIVE")
                 .deleted(comment.getIsDeleted())
                 .deletedAt(comment.getDeletedAt())
                 .build();

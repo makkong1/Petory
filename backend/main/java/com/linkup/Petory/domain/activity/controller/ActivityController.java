@@ -22,7 +22,7 @@ public class ActivityController {
 
     @GetMapping("/my")
     public ResponseEntity<List<ActivityDTO>> getMyActivities(@RequestParam Long userId) {
+        System.out.println("=== [ActivityController] /api/activities/my 호출됨 - userId: " + userId + " ===");
         return ResponseEntity.ok(activityService.getUserActivities(userId));
     }
 }
-

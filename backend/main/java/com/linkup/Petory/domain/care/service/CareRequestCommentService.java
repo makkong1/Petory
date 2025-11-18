@@ -92,7 +92,6 @@ public class CareRequestCommentService {
                 }
 
                 // soft delete instead of physical delete
-                comment.setStatus(com.linkup.Petory.domain.common.ContentStatus.DELETED);
                 comment.setIsDeleted(true);
                 comment.setDeletedAt(java.time.LocalDateTime.now());
                 commentRepository.save(comment);

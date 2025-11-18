@@ -4,7 +4,6 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
 
-import com.linkup.Petory.domain.common.ContentStatus;
 import com.linkup.Petory.domain.user.entity.Users;
 
 @Entity
@@ -31,11 +30,6 @@ public class CareRequestComment {
     @Lob
     private String content;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
-    @Builder.Default
-    private ContentStatus status = ContentStatus.ACTIVE;
-
     private LocalDateTime createdAt;
 
     @Column(name = "is_deleted")
@@ -48,8 +42,5 @@ public class CareRequestComment {
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
-        if (this.status == null) {
-            this.status = ContentStatus.ACTIVE;
-        }
     }
 }

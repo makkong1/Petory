@@ -2,13 +2,10 @@ package com.linkup.Petory.domain.board.entity;
 
 import java.time.LocalDateTime;
 
-import com.linkup.Petory.domain.common.ContentStatus;
 import com.linkup.Petory.domain.user.entity.Users;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -53,11 +50,6 @@ public class MissingPetComment {
 
     private Double longitude; // 목격 위치 경도
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
-    @Builder.Default
-    private ContentStatus status = ContentStatus.ACTIVE;
-
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
@@ -71,8 +63,5 @@ public class MissingPetComment {
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
-        if (this.status == null) {
-            this.status = ContentStatus.ACTIVE;
-        }
     }
 }
