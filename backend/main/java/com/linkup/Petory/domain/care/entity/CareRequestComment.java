@@ -38,9 +38,6 @@ public class CareRequestComment {
 
     private LocalDateTime createdAt;
 
-    @Column(name = "comment_file_path")
-    private String commentFilePath;
-
     @Column(name = "is_deleted")
     @Builder.Default
     private Boolean isDeleted = false;

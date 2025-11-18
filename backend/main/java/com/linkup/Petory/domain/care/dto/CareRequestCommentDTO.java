@@ -31,6 +31,5 @@ public class CareRequestCommentDTO {
     private String userLocation;
     private String userRole; // SERVICE_PROVIDER 체크용
 
-    private String commentFilePath;
     private List<FileDTO> attachments;
 }

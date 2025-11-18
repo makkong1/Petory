@@ -16,7 +16,6 @@ import com.linkup.Petory.domain.care.entity.CareRequestComment;
                 .username(comment.getUser().getUsername())
                 .userLocation(comment.getUser().getLocation())
                 .userRole(comment.getUser().getRole().name())
-                .commentFilePath(comment.getCommentFilePath())
                 .content(comment.getContent())
                 .createdAt(comment.getCreatedAt())
                 .status(comment.getStatus() != null ? comment.getStatus().name() : null)

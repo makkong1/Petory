@@ -61,12 +61,17 @@ public class CareRequestCommentService {
                                 .careRequest(careRequest)
                                 .user(user)
                                 .content(dto.getContent())
-                                .commentFilePath(dto.getCommentFilePath())
                                 .build();
 
                 CareRequestComment saved = commentRepository.save(comment);
-                attachmentFileService.syncSingleAttachment(FileTargetType.CARE_COMMENT, saved.getIdx(),
-                                dto.getCommentFilePath(), null);
+                if (dto.getAttachments() != null && !dto.getAttachments().isEmpty()) {
+                        // 첫 번째 파일만 저장 (syncSingleAttachment는 단일 파일만 지원)
+                        FileDTO firstFile = dto.getAttachments().get(0);
+                        if (firstFile != null && firstFile.getFilePath() != null) {
+                                attachmentFileService.syncSingleAttachment(FileTargetType.CARE_COMMENT, saved.getIdx(),
+                                                firstFile.getFilePath(), firstFile.getFileType());
+                        }
+                }
                 CareRequestCommentDTO response = commentConverter.toDTO(saved);
                 response.setAttachments(attachmentFileService
                                 .getAttachments(FileTargetType.CARE_COMMENT, saved.getIdx()));

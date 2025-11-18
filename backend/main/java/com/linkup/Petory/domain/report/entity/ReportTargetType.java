@@ -5,5 +5,5 @@ public enum ReportTargetType {
     COMMENT,
     MISSING_PET,
     PET_CARE_PROVIDER
+    // pet_care_provider = 펫 케어 제공자
 }
-
