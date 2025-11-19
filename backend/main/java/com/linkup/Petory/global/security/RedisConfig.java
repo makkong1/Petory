@@ -15,6 +15,11 @@ import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSeriali
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.jsontype.PolymorphicTypeValidator;
+import com.fasterxml.jackson.databind.jsontype.impl.LaissezFaireSubTypeValidator;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+
 import java.time.Duration;
 
 @Configuration
@@ -32,6 +37,30 @@ public class RedisConfig {
 
         @Value("${spring.redis.database:0}")
         private int redisDatabase;
+
+        /**
+         * Jackson ObjectMapper 설정 (Java 8 날짜/시간 타입 지원)
+         * 타입 정보를 포함하여 역직렬화 시 정확한 타입으로 변환 가능하도록 설정
+         */
+        private ObjectMapper createObjectMapper() {
+                ObjectMapper mapper = new ObjectMapper();
+                mapper.registerModule(new JavaTimeModule());
+                mapper.disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+                // 타입 정보 활성화 (역직렬화 시 정확한 타입으로 변환)
+                PolymorphicTypeValidator ptv = LaissezFaireSubTypeValidator.instance;
+                mapper.activateDefaultTyping(
+                                ptv,
+                                com.fasterxml.jackson.databind.ObjectMapper.DefaultTyping.NON_FINAL,
+                                com.fasterxml.jackson.annotation.JsonTypeInfo.As.PROPERTY);
+                return mapper;
+        }
+
+        /**
+         * Java 8 날짜/시간 타입을 지원하는 GenericJackson2JsonRedisSerializer 생성
+         */
+        private GenericJackson2JsonRedisSerializer createJsonRedisSerializer() {
+                return new GenericJackson2JsonRedisSerializer(createObjectMapper());
+        }
 
         /**
          * Redis 연결 설정
@@ -75,9 +104,9 @@ public class RedisConfig {
                 RedisTemplate<String, Object> template = new RedisTemplate<>();
                 template.setConnectionFactory(connectionFactory);
                 template.setKeySerializer(new StringRedisSerializer());
-                template.setValueSerializer(new GenericJackson2JsonRedisSerializer());
+                template.setValueSerializer(createJsonRedisSerializer());
                 template.setHashKeySerializer(new StringRedisSerializer());
-                template.setHashValueSerializer(new GenericJackson2JsonRedisSerializer());
+                template.setHashValueSerializer(createJsonRedisSerializer());
                 template.afterPropertiesSet();
                 return template;
         }
@@ -92,9 +121,9 @@ public class RedisConfig {
                 RedisTemplate<String, Object> template = new RedisTemplate<>();
                 template.setConnectionFactory(connectionFactory);
                 template.setKeySerializer(new StringRedisSerializer());
-                template.setValueSerializer(new GenericJackson2JsonRedisSerializer());
+                template.setValueSerializer(createJsonRedisSerializer());
                 template.setHashKeySerializer(new StringRedisSerializer());
-                template.setHashValueSerializer(new GenericJackson2JsonRedisSerializer());
+                template.setHashValueSerializer(createJsonRedisSerializer());
                 template.afterPropertiesSet();
                 return template;
         }
@@ -109,7 +138,7 @@ public class RedisConfig {
                 RedisTemplate<String, Long> template = new RedisTemplate<>();
                 template.setConnectionFactory(connectionFactory);
                 template.setKeySerializer(new StringRedisSerializer());
-                template.setValueSerializer(new GenericJackson2JsonRedisSerializer());
+                template.setValueSerializer(createJsonRedisSerializer());
                 template.afterPropertiesSet();
                 return template;
         }
@@ -120,13 +149,15 @@ public class RedisConfig {
          */
         @Bean
         public CacheManager cacheManager(RedisConnectionFactory connectionFactory) {
+                GenericJackson2JsonRedisSerializer jsonSerializer = createJsonRedisSerializer();
+                
                 RedisCacheConfiguration defaultConfig = RedisCacheConfiguration.defaultCacheConfig()
                                 .entryTtl(Duration.ofMinutes(30)) // 기본 TTL: 30분
                                 .serializeKeysWith(
                                                 RedisSerializationContext.SerializationPair
                                                                 .fromSerializer(new StringRedisSerializer()))
                                 .serializeValuesWith(RedisSerializationContext.SerializationPair
-                                                .fromSerializer(new GenericJackson2JsonRedisSerializer()))
+                                                .fromSerializer(jsonSerializer))
                                 .disableCachingNullValues(); // null 값 캐싱 방지
 
                 // 게시글 목록 캐시: 10분
@@ -136,7 +167,7 @@ public class RedisConfig {
                                                 RedisSerializationContext.SerializationPair
                                                                 .fromSerializer(new StringRedisSerializer()))
                                 .serializeValuesWith(RedisSerializationContext.SerializationPair
-                                                .fromSerializer(new GenericJackson2JsonRedisSerializer()))
+                                                .fromSerializer(jsonSerializer))
                                 .disableCachingNullValues();
 
                 // 게시글 상세 캐시: 1시간
@@ -146,7 +177,7 @@ public class RedisConfig {
                                                 RedisSerializationContext.SerializationPair
                                                                 .fromSerializer(new StringRedisSerializer()))
                                 .serializeValuesWith(RedisSerializationContext.SerializationPair
-                                                .fromSerializer(new GenericJackson2JsonRedisSerializer()))
+                                                .fromSerializer(jsonSerializer))
                                 .disableCachingNullValues();
 
                 // 사용자 정보 캐시: 1시간
@@ -156,7 +187,7 @@ public class RedisConfig {
                                                 RedisSerializationContext.SerializationPair
                                                                 .fromSerializer(new StringRedisSerializer()))
                                 .serializeValuesWith(RedisSerializationContext.SerializationPair
-                                                .fromSerializer(new GenericJackson2JsonRedisSerializer()))
+                                                .fromSerializer(jsonSerializer))
                                 .disableCachingNullValues();
 
                 return RedisCacheManager.builder(connectionFactory)

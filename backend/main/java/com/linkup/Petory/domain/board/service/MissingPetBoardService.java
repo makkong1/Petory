@@ -18,6 +18,8 @@ import com.linkup.Petory.domain.board.repository.MissingPetCommentRepository;
 import com.linkup.Petory.domain.file.dto.FileDTO;
 import com.linkup.Petory.domain.file.entity.FileTargetType;
 import com.linkup.Petory.domain.file.service.AttachmentFileService;
+import com.linkup.Petory.domain.notification.entity.NotificationType;
+import com.linkup.Petory.domain.notification.service.NotificationService;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 
@@ -33,6 +35,7 @@ public class MissingPetBoardService {
     private final UsersRepository usersRepository;
     private final MissingPetConverter missingPetConverter;
     private final AttachmentFileService attachmentFileService;
+    private final NotificationService notificationService;
 
     public List<MissingPetBoardDTO> getBoards(MissingPetStatus status) {
         List<MissingPetBoard> boards = status == null
@@ -186,6 +189,22 @@ public class MissingPetBoardService {
             attachmentFileService.syncSingleAttachment(FileTargetType.MISSING_PET_COMMENT, saved.getIdx(),
                     dto.getImageUrl(), null);
         }
+
+        // 알림 발송: 댓글 작성자가 게시글 작성자가 아닌 경우에만 알림 발송
+        Long boardOwnerId = board.getUser().getIdx();
+        if (!boardOwnerId.equals(user.getIdx())) {
+            notificationService.createNotification(
+                    boardOwnerId,
+                    NotificationType.MISSING_PET_COMMENT,
+                    "실종 제보 게시글에 새로운 댓글이 달렸습니다",
+                    String.format("%s님이 댓글을 남겼습니다: %s", user.getUsername(),
+                            dto.getContent() != null && dto.getContent().length() > 50
+                                    ? dto.getContent().substring(0, 50) + "..."
+                                    : dto.getContent()),
+                    board.getIdx(),
+                    "MISSING_PET");
+        }
+
         return mapCommentWithAttachments(saved);
     }
 

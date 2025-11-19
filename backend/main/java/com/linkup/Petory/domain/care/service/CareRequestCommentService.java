@@ -18,6 +18,8 @@ import com.linkup.Petory.domain.file.dto.FileDTO;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 import com.linkup.Petory.domain.file.entity.FileTargetType;
 import com.linkup.Petory.domain.file.service.AttachmentFileService;
+import com.linkup.Petory.domain.notification.entity.NotificationType;
+import com.linkup.Petory.domain.notification.service.NotificationService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -31,6 +33,7 @@ public class CareRequestCommentService {
         private final UsersRepository usersRepository;
         private final CareRequestCommentConverter commentConverter;
         private final AttachmentFileService attachmentFileService;
+        private final NotificationService notificationService;
 
         public List<CareRequestCommentDTO> getComments(Long careRequestId) {
                 CareRequest careRequest = careRequestRepository.findById(careRequestId)
@@ -77,6 +80,21 @@ public class CareRequestCommentService {
                 CareRequestCommentDTO response = commentConverter.toDTO(saved);
                 response.setAttachments(attachmentFileService
                                 .getAttachments(FileTargetType.CARE_COMMENT, saved.getIdx()));
+
+                // 알림 발송: 댓글 작성자가 게시글 작성자가 아닌 경우에만 알림 발송
+                Long requestOwnerId = careRequest.getUser().getIdx();
+                if (!requestOwnerId.equals(user.getIdx())) {
+                        notificationService.createNotification(
+                                        requestOwnerId,
+                                        NotificationType.CARE_REQUEST_COMMENT,
+                                        "펫케어 요청글에 새로운 댓글이 달렸습니다",
+                                        String.format("%s님이 댓글을 남겼습니다: %s", user.getUsername(),
+                                                        dto.getContent().length() > 50 ? dto.getContent().substring(0, 50) + "..."
+                                                                        : dto.getContent()),
+                                        careRequest.getIdx(),
+                                        "CARE_REQUEST");
+                }
+
                 return response;
         }
 

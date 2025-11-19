@@ -41,5 +41,15 @@ export const adminApi = {
     const response = await api.post(url);
     return response.data;
   },
+
+  // 일별 통계 조회
+  fetchDailyStatistics: async (startDate, endDate) => {
+    const params = {};
+    if (startDate) params.startDate = startDate;
+    if (endDate) params.endDate = endDate;
+    
+    const response = await api.get('/statistics/daily', { params });
+    return response.data;
+  },
 };
 
