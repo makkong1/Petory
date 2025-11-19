@@ -66,4 +66,3 @@ public class Notification {
         this.createdAt = LocalDateTime.now();
     }
 }
-
