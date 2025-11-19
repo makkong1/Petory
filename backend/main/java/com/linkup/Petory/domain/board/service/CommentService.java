@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,6 +47,7 @@ public class CommentService {
                 .collect(Collectors.toList());
     }
 
+    @CacheEvict(value = "boardDetail", key = "#boardId")
     @Transactional
     public CommentDTO addComment(Long boardId, CommentDTO dto) {
         Board board = boardRepository.findById(boardId)
@@ -70,6 +72,7 @@ public class CommentService {
         return mapWithReactionCounts(saved);
     }
 
+    @CacheEvict(value = "boardDetail", key = "#boardId")
     @Transactional
     public void deleteComment(Long boardId, Long commentId) {
         Board board = boardRepository.findById(boardId)
@@ -115,6 +118,7 @@ public class CommentService {
         return attachmentFileService.buildDownloadUrl(primary.getFilePath());
     }
 
+    @CacheEvict(value = "boardDetail", key = "#boardId")
     @Transactional
     public CommentDTO updateCommentStatus(Long boardId, Long commentId, com.linkup.Petory.domain.common.ContentStatus status) {
         Board board = boardRepository.findById(boardId)
@@ -131,6 +135,7 @@ public class CommentService {
         return mapWithReactionCounts(saved);
     }
 
+    @CacheEvict(value = "boardDetail", key = "#boardId")
     @Transactional
     public CommentDTO restoreComment(Long boardId, Long commentId) {
         Board board = boardRepository.findById(boardId)

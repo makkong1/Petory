@@ -4,6 +4,9 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,6 +43,7 @@ public class BoardService {
     private final BoardConverter boardConverter;
 
     // 전체 게시글 조회 (카테고리 필터링 포함)
+    @Cacheable(value = "boardList", key = "#category != null ? #category : 'ALL'")
     public List<BoardDTO> getAllBoards(String category) {
         List<Board> boards;
 
@@ -55,6 +59,7 @@ public class BoardService {
     }
 
     // 단일 게시글 조회 + 조회수 증가
+    @Cacheable(value = "boardDetail", key = "#idx")
     @Transactional
     public BoardDTO getBoard(Long idx, Long viewerId) {
         Board board = boardRepository.findById(idx)
@@ -68,6 +73,7 @@ public class BoardService {
     }
 
     // 게시글 생성
+    @CacheEvict(value = "boardList", key = "#dto.category != null ? #dto.category : 'ALL'")
     @Transactional
     public BoardDTO createBoard(BoardDTO dto) {
         Users user = usersRepository.findById(dto.getUserId())
@@ -89,6 +95,10 @@ public class BoardService {
     }
 
     // 게시글 수정
+    @Caching(evict = {
+            @CacheEvict(value = "boardDetail", key = "#idx"),
+            @CacheEvict(value = "boardList", allEntries = true) // 카테고리 변경 가능하므로 안전하게 전체 무효화
+    })
     @Transactional
     public BoardDTO updateBoard(Long idx, BoardDTO dto) {
         Board board = boardRepository.findById(idx)
@@ -109,6 +119,10 @@ public class BoardService {
     }
 
     // 게시글 삭제
+    @Caching(evict = {
+            @CacheEvict(value = "boardDetail", key = "#idx"),
+            @CacheEvict(value = "boardList", allEntries = true) // 해당 카테고리 캐시 무효화를 위해 전체 무효화
+    })
     @Transactional
     public void deleteBoard(Long idx) {
         Board board = boardRepository.findById(idx)
@@ -204,6 +218,10 @@ public class BoardService {
         return attachmentFileService.buildDownloadUrl(primary.getFilePath());
     }
 
+    @Caching(evict = {
+            @CacheEvict(value = "boardDetail", key = "#id"),
+            @CacheEvict(value = "boardList", allEntries = true)
+    })
     @Transactional
     public BoardDTO updateBoardStatus(Long id, com.linkup.Petory.domain.common.ContentStatus status) {
         Board board = boardRepository.findById(id).orElseThrow(() -> new RuntimeException("Board not found"));
@@ -213,6 +231,10 @@ public class BoardService {
         return mapWithReactions(saved);
     }
 
+    @Caching(evict = {
+            @CacheEvict(value = "boardDetail", key = "#id"),
+            @CacheEvict(value = "boardList", allEntries = true)
+    })
     @Transactional
     public BoardDTO restoreBoard(Long id) {
         Board board = boardRepository.findById(id).orElseThrow(() -> new RuntimeException("Board not found"));
