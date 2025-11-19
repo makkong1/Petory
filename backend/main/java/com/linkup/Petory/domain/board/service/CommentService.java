@@ -22,6 +22,8 @@ import com.linkup.Petory.domain.common.ContentStatus;
 import com.linkup.Petory.domain.file.dto.FileDTO;
 import com.linkup.Petory.domain.file.entity.FileTargetType;
 import com.linkup.Petory.domain.file.service.AttachmentFileService;
+import com.linkup.Petory.domain.notification.entity.NotificationType;
+import com.linkup.Petory.domain.notification.service.NotificationService;
 import org.springframework.util.StringUtils;
 
 import lombok.RequiredArgsConstructor;
@@ -37,6 +39,7 @@ public class CommentService {
     private final CommentReactionRepository commentReactionRepository;
     private final CommentConverter commentConverter;
     private final AttachmentFileService attachmentFileService;
+    private final NotificationService notificationService;
 
     public List<CommentDTO> getComments(Long boardId) {
         Board board = boardRepository.findById(boardId)
@@ -69,6 +72,21 @@ public class CommentService {
             attachmentFileService.syncSingleAttachment(FileTargetType.COMMENT, saved.getIdx(), dto.getCommentFilePath(),
                     null);
         }
+
+        // 알림 발송: 댓글 작성자가 게시글 작성자가 아닌 경우에만 알림 발송
+        Long boardOwnerId = board.getUser().getIdx();
+        if (!boardOwnerId.equals(user.getIdx())) {
+            notificationService.createNotification(
+                    boardOwnerId,
+                    NotificationType.BOARD_COMMENT,
+                    "내 게시글에 새로운 댓글이 달렸습니다",
+                    String.format("%s님이 댓글을 남겼습니다: %s", user.getUsername(),
+                            dto.getContent().length() > 50 ? dto.getContent().substring(0, 50) + "..."
+                                    : dto.getContent()),
+                    board.getIdx(),
+                    "BOARD");
+        }
+
         return mapWithReactionCounts(saved);
     }
 
@@ -120,7 +138,8 @@ public class CommentService {
 
     @CacheEvict(value = "boardDetail", key = "#boardId")
     @Transactional
-    public CommentDTO updateCommentStatus(Long boardId, Long commentId, com.linkup.Petory.domain.common.ContentStatus status) {
+    public CommentDTO updateCommentStatus(Long boardId, Long commentId,
+            com.linkup.Petory.domain.common.ContentStatus status) {
         Board board = boardRepository.findById(boardId)
                 .orElseThrow(() -> new IllegalArgumentException("Board not found"));
         Comment comment = commentRepository.findById(commentId)

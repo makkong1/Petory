@@ -39,6 +39,28 @@ public class AttachmentFileService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * 여러 타겟의 첨부파일을 한 번에 조회 (배치 조회)
+     * 반환값: Map<TargetIdx, List<FileDTO>>
+     */
+    public java.util.Map<Long, List<FileDTO>> getAttachmentsBatch(FileTargetType targetType, List<Long> targetIndices) {
+        if (targetType == null || targetIndices == null || targetIndices.isEmpty()) {
+            return java.util.Collections.emptyMap();
+        }
+        
+        List<AttachmentFile> files = fileRepository.findByTargetTypeAndTargetIdxIn(targetType, targetIndices);
+        
+        // AttachmentFile을 targetIdx별로 그룹화한 후 FileDTO로 변환
+        return files.stream()
+                .collect(Collectors.groupingBy(
+                    AttachmentFile::getTargetIdx,
+                    Collectors.mapping(
+                        file -> withDownloadUrl(fileConverter.toDTO(file)),
+                        Collectors.toList()
+                    )
+                ));
+    }
+
     @Transactional
     public void syncSingleAttachment(FileTargetType targetType, Long targetIdx, String filePath, String fileType) {
         if (targetType == null || targetIdx == null) {

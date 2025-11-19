@@ -1,7 +1,10 @@
 package com.linkup.Petory.domain.board.service;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.springframework.cache.annotation.CacheEvict;
@@ -53,9 +56,12 @@ public class BoardService {
             boards = boardRepository.findAllByIsDeletedFalseOrderByCreatedAtDesc();
         }
 
-        return boards.stream()
-                .map(this::mapWithReactions)
-                .collect(Collectors.toList());
+        if (boards.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        // 배치 조회로 N+1 문제 해결
+        return mapBoardsWithReactionsBatch(boards);
     }
 
     // 단일 게시글 조회 + 조회수 증가
@@ -150,19 +156,30 @@ public class BoardService {
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
         List<Board> boards = boardRepository.findByUserAndIsDeletedFalseOrderByCreatedAtDesc(user);
-        return boards.stream()
-                .map(this::mapWithReactions)
-                .collect(Collectors.toList());
+
+        if (boards.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        // 배치 조회로 N+1 문제 해결
+        return mapBoardsWithReactionsBatch(boards);
     }
 
     // 게시글 검색
     public List<BoardDTO> searchBoards(String keyword) {
         List<Board> boards = boardRepository.searchByKeyword(keyword);
-        return boards.stream()
-                .map(this::mapWithReactions)
-                .collect(Collectors.toList());
+
+        if (boards.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        // 배치 조회로 N+1 문제 해결
+        return mapBoardsWithReactionsBatch(boards);
     }
 
+    /**
+     * 단일 게시글에 반응 정보 매핑 (단일 조회용)
+     */
     private BoardDTO mapWithReactions(Board board) {
         BoardDTO dto = boardConverter.toDTO(board);
         long likeCount = boardReactionRepository.countByBoardAndReactionType(board, ReactionType.LIKE);
@@ -173,6 +190,74 @@ public class BoardService {
         dto.setAttachments(attachments);
         dto.setBoardFilePath(extractPrimaryFileUrl(attachments));
         return dto;
+    }
+
+    /**
+     * 여러 게시글에 반응 정보를 배치로 매핑 (목록 조회용 - N+1 문제 해결)
+     */
+    private List<BoardDTO> mapBoardsWithReactionsBatch(List<Board> boards) {
+        if (boards.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        // 게시글 ID 목록 추출
+        List<Long> boardIds = boards.stream()
+                .map(Board::getIdx)
+                .collect(Collectors.toList());
+
+        // 1. 좋아요/싫어요 카운트 배치 조회
+        Map<Long, Map<ReactionType, Long>> reactionCountsMap = getReactionCountsBatch(boardIds);
+
+        // 2. 첨부파일 배치 조회
+        Map<Long, List<FileDTO>> attachmentsMap = attachmentFileService.getAttachmentsBatch(
+                FileTargetType.BOARD, boardIds);
+
+        // 3. 게시글 DTO 변환 및 반응 정보 매핑
+        return boards.stream()
+                .map(board -> {
+                    BoardDTO dto = boardConverter.toDTO(board);
+
+                    // 좋아요/싫어요 카운트 설정
+                    Map<ReactionType, Long> counts = reactionCountsMap.getOrDefault(
+                            board.getIdx(), new HashMap<>());
+                    dto.setLikes(Math.toIntExact(counts.getOrDefault(ReactionType.LIKE, 0L)));
+                    dto.setDislikes(Math.toIntExact(counts.getOrDefault(ReactionType.DISLIKE, 0L)));
+
+                    // 첨부파일 설정
+                    List<FileDTO> attachments = attachmentsMap.getOrDefault(
+                            board.getIdx(), new ArrayList<>());
+                    dto.setAttachments(attachments);
+                    dto.setBoardFilePath(extractPrimaryFileUrl(attachments));
+
+                    return dto;
+                })
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 여러 게시글의 좋아요/싫어요 카운트를 배치로 조회
+     * 반환값: Map<BoardId, Map<ReactionType, Count>>
+     */
+    private Map<Long, Map<ReactionType, Long>> getReactionCountsBatch(List<Long> boardIds) {
+        if (boardIds.isEmpty()) {
+            return new HashMap<>();
+        }
+
+        List<Object[]> results = boardReactionRepository.countByBoardsGroupByReactionType(boardIds);
+
+        // 결과를 Map으로 변환: Map<BoardId, Map<ReactionType, Count>>
+        Map<Long, Map<ReactionType, Long>> countsMap = new HashMap<>();
+
+        for (Object[] result : results) {
+            Long boardId = ((Number) result[0]).longValue();
+            ReactionType reactionType = (ReactionType) result[1];
+            Long count = ((Number) result[2]).longValue();
+
+            countsMap.computeIfAbsent(boardId, k -> new HashMap<>())
+                    .put(reactionType, count);
+        }
+
+        return countsMap;
     }
 
     private void incrementViewCount(Board board) {
