@@ -228,9 +228,14 @@ const Input = styled.input`
 const Refresh = styled.button`
   padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.md};
   border: 1px solid ${props => props.theme.colors.border};
-  background: ${props => props.theme.colors.surface};
+  background: ${props => props.theme.colors.background};
+  color: ${props => props.theme.colors.text};
   border-radius: ${props => props.theme.borderRadius.sm};
   cursor: pointer;
+  
+  &:hover {
+    background: ${props => props.theme.colors.surfaceHover};
+  }
 `;
 
 const Card = styled.div`
@@ -263,9 +268,14 @@ const Actions = styled.div`
 const Btn = styled.button`
   padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.sm};
   border: 1px solid ${props => props.theme.colors.border};
-  background: ${props => props.theme.colors.surface};
+  background: ${props => props.theme.colors.background};
+  color: ${props => props.theme.colors.text};
   border-radius: ${props => props.theme.borderRadius.sm};
   cursor: pointer;
+  
+  &:hover {
+    background: ${props => props.theme.colors.surfaceHover};
+  }
 `;
 
 const Danger = styled.button`

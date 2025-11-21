@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import styled from 'styled-components';
 import { reportApi } from '../../../api/reportApi';
+import { communityAdminApi } from '../../../api/communityAdminApi';
 
 const ReportDetailModal = ({ reportId, onClose, onHandled }) => {
   const [loading, setLoading] = useState(true);
@@ -11,6 +12,9 @@ const ReportDetailModal = ({ reportId, onClose, onHandled }) => {
   const [adminNote, setAdminNote] = useState('');
   const [readOnly, setReadOnly] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [targetStatus, setTargetStatus] = useState(null);
+  const [targetDeleted, setTargetDeleted] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
     const fetchDetail = async () => {
@@ -28,6 +32,20 @@ const ReportDetailModal = ({ reportId, onClose, onHandled }) => {
           setStatus(data.report.status);
           setActionTaken(data.report.actionTaken || 'NONE');
           setAdminNote(data.report.adminNote || '');
+        }
+        
+        // 게시글 상태 확인 (BOARD 타입일 때만)
+        if (data?.report?.targetType === 'BOARD' && data?.target?.id) {
+          try {
+            const boardRes = await communityAdminApi.listBoards({ status: 'ALL' });
+            const board = boardRes.data?.find(b => b.idx === data.target.id);
+            if (board) {
+              setTargetStatus(board.status);
+              setTargetDeleted(board.deleted || false);
+            }
+          } catch (e) {
+            console.error('게시글 상태 확인 실패:', e);
+          }
         }
       } catch (e) {
         setError('신고 상세를 불러오지 못했습니다.');
@@ -48,6 +66,78 @@ const ReportDetailModal = ({ reportId, onClose, onHandled }) => {
       alert('신고 처리에 실패했습니다.');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleBlind = async () => {
+    if (!detail?.target?.id || detail?.report?.targetType !== 'BOARD') return;
+    if (!window.confirm('이 게시글을 블라인드 처리하시겠습니까?')) return;
+    try {
+      setActionLoading(true);
+      await communityAdminApi.blindBoard(detail.target.id);
+      setTargetStatus('BLINDED');
+      alert('블라인드 처리되었습니다.');
+      // 상세 정보 새로고침
+      const res = await reportApi.getDetail(reportId);
+      setDetail(res.data);
+    } catch (e) {
+      alert('블라인드 처리에 실패했습니다.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleUnblind = async () => {
+    if (!detail?.target?.id || detail?.report?.targetType !== 'BOARD') return;
+    if (!window.confirm('이 게시글의 블라인드를 해제하시겠습니까?')) return;
+    try {
+      setActionLoading(true);
+      await communityAdminApi.unblindBoard(detail.target.id);
+      setTargetStatus('ACTIVE');
+      alert('블라인드가 해제되었습니다.');
+      // 상세 정보 새로고침
+      const res = await reportApi.getDetail(reportId);
+      setDetail(res.data);
+    } catch (e) {
+      alert('블라인드 해제에 실패했습니다.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!detail?.target?.id || detail?.report?.targetType !== 'BOARD') return;
+    if (!window.confirm('이 게시글을 삭제(소프트 삭제)하시겠습니까?')) return;
+    try {
+      setActionLoading(true);
+      await communityAdminApi.deleteBoard(detail.target.id);
+      setTargetDeleted(true);
+      alert('삭제되었습니다.');
+      // 상세 정보 새로고침
+      const res = await reportApi.getDetail(reportId);
+      setDetail(res.data);
+    } catch (e) {
+      alert('삭제에 실패했습니다.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRestore = async () => {
+    if (!detail?.target?.id || detail?.report?.targetType !== 'BOARD') return;
+    if (!window.confirm('이 게시글을 복구하시겠습니까?')) return;
+    try {
+      setActionLoading(true);
+      await communityAdminApi.restoreBoard(detail.target.id);
+      setTargetDeleted(false);
+      alert('복구되었습니다.');
+      // 상세 정보 새로고침
+      const res = await reportApi.getDetail(reportId);
+      setDetail(res.data);
+    } catch (e) {
+      alert('복구에 실패했습니다.');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -86,7 +176,36 @@ const ReportDetailModal = ({ reportId, onClose, onHandled }) => {
                 {detail?.target?.authorName && (
                   <PreviewMeta>작성자: {detail?.target?.authorName}</PreviewMeta>
                 )}
+                {targetStatus && (
+                  <PreviewMeta>상태: {targetStatus} {targetDeleted ? '(삭제됨)' : ''}</PreviewMeta>
+                )}
               </PreviewCard>
+              {detail?.report?.targetType === 'BOARD' && detail?.target?.id && (
+                <BoardActions>
+                  <ActionLabel>게시글 조치</ActionLabel>
+                  <ActionButtons>
+                    {targetStatus !== 'BLINDED' && !targetDeleted && (
+                      <ActionButton onClick={handleBlind} disabled={actionLoading}>
+                        블라인드
+                      </ActionButton>
+                    )}
+                    {targetStatus === 'BLINDED' && !targetDeleted && (
+                      <ActionButton onClick={handleUnblind} disabled={actionLoading}>
+                        블라인드 해제
+                      </ActionButton>
+                    )}
+                    {!targetDeleted ? (
+                      <DangerButton onClick={handleDelete} disabled={actionLoading}>
+                        삭제
+                      </DangerButton>
+                    ) : (
+                      <ActionButton onClick={handleRestore} disabled={actionLoading}>
+                        복구
+                      </ActionButton>
+                    )}
+                  </ActionButtons>
+                </BoardActions>
+              )}
             </Section>
             <Section>
               <SectionTitle>관리자 처리</SectionTitle>
@@ -277,6 +396,54 @@ const Message = styled.div`
   padding: ${props => props.theme.spacing.lg};
   text-align: center;
   color: ${props => props.theme.colors.textSecondary};
+`;
+
+const BoardActions = styled.div`
+  margin-top: ${props => props.theme.spacing.md};
+  padding-top: ${props => props.theme.spacing.md};
+  border-top: 1px solid ${props => props.theme.colors.border};
+`;
+
+const ActionLabel = styled.div`
+  color: ${props => props.theme.colors.textSecondary};
+  font-size: ${props => props.theme.typography.caption.fontSize};
+  margin-bottom: ${props => props.theme.spacing.xs};
+`;
+
+const ActionButtons = styled.div`
+  display: flex;
+  gap: ${props => props.theme.spacing.xs};
+  flex-wrap: wrap;
+`;
+
+const ActionButton = styled.button`
+  padding: 6px 12px;
+  border-radius: ${props => props.theme.borderRadius.sm};
+  border: 1px solid ${props => props.theme.colors.border};
+  background: ${props => props.theme.colors.background};
+  color: ${props => props.theme.colors.text};
+  cursor: pointer;
+  font-size: ${props => props.theme.typography.caption.fontSize};
+  
+  &:hover:not(:disabled) {
+    background: ${props => props.theme.colors.surfaceHover};
+  }
+  
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+`;
+
+const DangerButton = styled(ActionButton)`
+  border-color: ${props => props.theme.colors.error};
+  color: ${props => props.theme.colors.error};
+  background: transparent;
+  
+  &:hover:not(:disabled) {
+    background: ${props => props.theme.colors.error};
+    color: white;
+  }
 `;
 
 

@@ -30,7 +30,7 @@ public class UsersService {
     }
 
     // 단일 조회
-    public UsersDTO getUser(Long idx) {
+    public UsersDTO getUser(long idx) {
         Users user = usersRepository.findById(idx)
                 .orElseThrow(() -> new RuntimeException("User not found"));
         return usersConverter.toDTO(user);
@@ -64,7 +64,7 @@ public class UsersService {
     }
 
     // 수정
-    public UsersDTO updateUser(Long idx, UsersDTO dto) {
+    public UsersDTO updateUser(long idx, UsersDTO dto) {
         Users user = usersRepository.findById(idx)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
@@ -92,8 +92,8 @@ public class UsersService {
         return usersConverter.toDTO(updated);
     }
 
-    // 삭제
-    public void deleteUser(Long idx) {
+    // 탈퇴
+    public void deleteUser(long idx) {
         usersRepository.deleteById(idx);
     }
 }
