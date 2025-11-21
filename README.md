@@ -64,12 +64,12 @@
 >
 > **Solution**: **[Daily Summary Pattern]**
 > 매일 자정 배치 작업을 통해 전날의 데이터를 집계하여 `DailyStatistics` 테이블에 요약 저장합니다. 이를 통해 데이터 양이 늘어나도 대시보드 조회 성능을 일정하게 유지합니다.
-> ([상세 전략 문서 보기](./ADMIN_STATISTICS_STRATEGY.md))
+> ([상세 전략 문서 보기](./md//ADMIN_STATISTICS_STRATEGY.md))
 
 ### 🔔 알림 시스템 아키텍처
 > **Strategy**: 알림은 생성 직후 조회가 빈번하고, 일정 시간이 지나면 조회 빈도가 낮아지는 특성이 있습니다.
 > 따라서 Redis를 캐시로 사용하여 최신 알림 조회 성능을 높이고, DB 부하를 분산시키는 구조를 채택했습니다.
-> ([상세 전략 문서 보기](./NOTIFICATION_STRATEGY.md))
+> ([상세 전략 문서 보기](./md/NOTIFICATION_STRATEGY.md))
 
 ---
 
