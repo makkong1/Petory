@@ -53,6 +53,9 @@ public class Users {
     private String refreshToken;
     private LocalDateTime refreshExpiration;
 
+    // 통계용: 마지막 로그인 시간
+    private LocalDateTime lastLoginAt;
+
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();

@@ -43,6 +43,14 @@ const CommunityDetailPage = ({
 
     const mapping = {
       ALL: { label: '전체', icon: '📋', color: '#6366F1' },
+      일상: { label: '일상', icon: '📖', color: '#EC4899' },
+      자랑: { label: '자랑', icon: '🐾', color: '#F472B6' },
+      질문: { label: '질문', icon: '❓', color: '#3B82F6' },
+      정보: { label: '정보', icon: '📢', color: '#10B981' },
+      후기: { label: '후기', icon: '📝', color: '#8B5CF6' },
+      모임: { label: '모임', icon: '🤝', color: '#F59E0B' },
+      공지: { label: '공지', icon: '📢', color: '#EF4444' },
+      // Legacy mappings for backward compatibility
       TIP: { label: '꿀팁', icon: '💡', color: '#F59E0B' },
       QUESTION: { label: '질문', icon: '❓', color: '#3B82F6' },
       INFO: { label: '정보', icon: '📢', color: '#10B981' },

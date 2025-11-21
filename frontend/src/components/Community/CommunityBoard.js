@@ -1,9 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import styled from 'styled-components';
-import { usePermission } from '../../hooks/usePermission';
-import { useAuth } from '../../contexts/AuthContext';
 import { boardApi } from '../../api/boardApi';
 import { reportApi } from '../../api/reportApi';
+import { usePermission } from '../../hooks/usePermission';
+import { useAuth } from '../../contexts/AuthContext';
 import CommunityPostModal from './CommunityPostModal';
 import CommunityCommentDrawer from './CommunityCommentDrawer';
 import CommunityDetailPage from './CommunityDetailPage';
@@ -11,95 +11,146 @@ import CommunityDetailPage from './CommunityDetailPage';
 const CommunityBoard = () => {
   const { requireLogin } = usePermission();
   const { user, redirectToLogin } = useAuth();
+
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [activeCategory, setActiveCategory] = useState('ALL');
   const [error, setError] = useState('');
+  const [activeCategory, setActiveCategory] = useState('ALL');
   const [isPostModalOpen, setIsPostModalOpen] = useState(false);
   const [isSubmittingPost, setIsSubmittingPost] = useState(false);
-  const [isCommentDrawerOpen, setIsCommentDrawerOpen] = useState(false);
   const [selectedBoard, setSelectedBoard] = useState(null);
+  const [isCommentDrawerOpen, setIsCommentDrawerOpen] = useState(false);
   const [selectedBoardId, setSelectedBoardId] = useState(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
-  const [popularPeriod, setPopularPeriod] = useState('WEEKLY');
   const [popularPosts, setPopularPosts] = useState([]);
   const [popularLoading, setPopularLoading] = useState(false);
   const [popularError, setPopularError] = useState('');
+  const [popularPeriod, setPopularPeriod] = useState('WEEKLY');
 
   const categories = [
     { key: 'ALL', label: '전체', icon: '📋', color: '#6366F1' },
-    { key: 'TIP', label: '꿀팁', icon: '💡', color: '#F59E0B' },
-    { key: 'QUESTION', label: '질문', icon: '❓', color: '#3B82F6' },
-    { key: 'INFO', label: '정보', icon: '📢', color: '#10B981' },
-    { key: 'PRIDE', label: '자랑', icon: '🐾', color: '#F472B6' },
-    { key: 'STORY', label: '일상', icon: '📖', color: '#EC4899' }
+    { key: '일상', label: '일상', icon: '📖', color: '#EC4899' },
+    { key: '자랑', label: '자랑', icon: '🐾', color: '#F472B6' },
+    { key: '질문', label: '질문', icon: '❓', color: '#3B82F6' },
+    { key: '정보', label: '정보', icon: '📢', color: '#10B981' },
+    { key: '후기', label: '후기', icon: '📝', color: '#8B5CF6' },
+    { key: '모임', label: '모임', icon: '🤝', color: '#F59E0B' },
+    { key: '공지', label: '공지', icon: '📢', color: '#EF4444' },
   ];
 
+  const getCategoryInfo = (category) => {
+    const mapping = {
+      ALL: { label: '전체', icon: '📋', color: '#6366F1' },
+      일상: { label: '일상', icon: '📖', color: '#EC4899' },
+      자랑: { label: '자랑', icon: '🐾', color: '#F472B6' },
+      질문: { label: '질문', icon: '❓', color: '#3B82F6' },
+      정보: { label: '정보', icon: '📢', color: '#10B981' },
+      후기: { label: '후기', icon: '📝', color: '#8B5CF6' },
+      모임: { label: '모임', icon: '🤝', color: '#F59E0B' },
+      공지: { label: '공지', icon: '📢', color: '#EF4444' },
+      PRIDE: { label: '자랑', icon: '🐾', color: '#F472B6' }, // 레거시 호환
+    };
+    return mapping[category] || { label: category || '전체', icon: '📋', color: '#6366F1' };
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return '-';
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return '-';
+    const now = new Date();
+    const diff = now - date;
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+
+    if (minutes < 1) return '방금 전';
+    if (minutes < 60) return `${minutes}분 전`;
+    if (hours < 24) return `${hours}시간 전`;
+    if (days < 7) return `${days}일 전`;
+    return date.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' });
+  };
+
+  // 전체 게시글을 한 번만 가져오기 (카테고리 변경 시 재호출하지 않음)
   const fetchBoards = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
-      const params = activeCategory === 'ALL' ? {} : { category: activeCategory };
-      const response = await boardApi.getAllBoards(params);
-      setPosts(response.data || []);
+      // 항상 전체 게시글을 가져옴 (카테고리는 프론트엔드에서 필터링)
+      const response = await boardApi.getAllBoards({});
+      const boards = response.data || [];
+      setPosts(boards);
     } catch (err) {
-      const message = err.response?.data?.error || err.message;
-      setError(`커뮤니티 게시글을 불러오지 못했습니다: ${message}`);
+      console.error('게시글 조회 실패:', err);
+      const message = err.response?.data?.error || err.message || '게시글을 불러오지 못했습니다.';
+      setError(message);
     } finally {
       setLoading(false);
     }
-  }, [activeCategory]);
+  }, []); // activeCategory 의존성 제거
 
-  const fetchPopularPosts = useCallback(async () => {
-    if (activeCategory !== 'PRIDE') {
-      return;
-    }
+  const fetchPopularBoards = useCallback(async () => {
+    // 자랑 카테고리일 때만 인기 게시글 조회
+    if (activeCategory !== '자랑' && activeCategory !== 'PRIDE') return;
     try {
       setPopularLoading(true);
       setPopularError('');
+      console.log('🔥 인기 게시글 조회 시작:', popularPeriod);
       const response = await boardApi.getPopularBoards(popularPeriod);
-      setPopularPosts(response.data || []);
+      const popularData = response.data || [];
+      console.log(`🔥 ${popularPeriod} 인기 게시글 수:`, popularData.length);
+      console.log(`🔥 ${popularPeriod} 인기 게시글 목록:`, popularData.map(p => ({ ranking: p.ranking, title: p.boardTitle, periodType: p.periodType })));
+      setPopularPosts(popularData);
     } catch (err) {
-      const message = err.response?.data?.error || err.message;
-      setPopularError(`인기 자랑 게시글을 불러오지 못했습니다: ${message}`);
-      setPopularPosts([]);
+      console.error(`❌ ${popularPeriod} 인기 게시글 조회 실패:`, err);
+      console.error('❌ 에러 상세:', err.response?.data);
+      const message = err.response?.data?.error || err.response?.data?.message || err.message || '인기 게시글을 불러오지 못했습니다.';
+      setPopularError(message);
     } finally {
       setPopularLoading(false);
     }
   }, [activeCategory, popularPeriod]);
 
+  // 컴포넌트 마운트 시 한 번만 전체 게시글 로드
   useEffect(() => {
     fetchBoards();
-  }, [fetchBoards]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // 빈 배열로 마운트 시 한 번만 실행
 
   useEffect(() => {
-    fetchPopularPosts();
-  }, [fetchPopularPosts]);
+    fetchPopularBoards();
+  }, [fetchPopularBoards]);
 
   const filteredPosts = useMemo(() => {
+    // 백엔드에서 이미 삭제된 게시글은 필터링되어 오므로, 프론트엔드에서는 최소한만 필터링
+    // deleted가 명시적으로 true인 경우만 제외 (null이나 undefined는 통과)
+    let result = posts.filter((post) => {
+      // 명시적으로 삭제된 게시글만 제외
+      if (post.deleted === true) {
+        return false;
+      }
+      // status가 명시적으로 DELETED인 경우만 제외
+      if (post.status === 'DELETED') {
+        return false;
+      }
+      // 블라인드된 게시글도 제외 (일반 사용자는 볼 수 없음)
+      if (post.status === 'BLINDED') {
+        return false;
+      }
+      return true;
+    });
+
+
+    // 카테고리 필터링
     if (activeCategory === 'ALL') {
-      return posts;
+      return result;
     }
-    return posts.filter((post) => post.category === activeCategory);
+    // 자랑 카테고리는 일반 게시글과 인기 게시글 모두 표시
+    const categoryFiltered = result.filter((post) => {
+      const matches = post.category === activeCategory || (activeCategory === '자랑' && (post.category === '자랑' || post.category === 'PRIDE'));
+      return matches;
+    });
+    return categoryFiltered;
   }, [posts, activeCategory]);
-
-  const getCategoryInfo = (category) => {
-    const cat = categories.find((c) => c.key === category);
-    return cat || { label: category, icon: '📋', color: '#6366F1' };
-  };
-
-  const formatDate = (dateString) => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    if (Number.isNaN(date.getTime())) return '';
-    const now = new Date();
-    const diff = now - date;
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-
-    if (hours < 1) return '방금 전';
-    if (hours < 24) return `${hours}시간 전`;
-    return date.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' });
-  };
 
   const handleWriteClick = () => {
     const { requiresRedirect } = requireLogin();
@@ -111,8 +162,13 @@ const CommunityBoard = () => {
   };
 
   const handlePostSubmit = async (form) => {
-    if (!user) {
+    const { requiresRedirect } = requireLogin();
+    if (requiresRedirect) {
       redirectToLogin();
+      return;
+    }
+    if (!user) {
+      alert('로그인이 필요합니다.');
       return;
     }
     try {
@@ -124,10 +180,12 @@ const CommunityBoard = () => {
         boardFilePath: form.boardFilePath || null,
         userId: user.idx,
       };
-      await boardApi.createBoard(payload);
+      const response = await boardApi.createBoard(payload);
       setIsPostModalOpen(false);
+      // 게시글 작성 후 강제로 새로고침 (캐시 무시)
       await fetchBoards();
     } catch (err) {
+      console.error('❌ 게시글 생성 실패:', err);
       const message = err.response?.data?.error || err.message;
       alert(`게시글 등록에 실패했습니다: ${message}`);
     } finally {
@@ -135,10 +193,9 @@ const CommunityBoard = () => {
     }
   };
 
-  const handlePostSelect = (post) => {
-    if (!post?.idx) return;
-    setSelectedBoardId(post.idx);
-    setIsDetailOpen(true);
+  const handleDetailClose = () => {
+    setIsDetailOpen(false);
+    setSelectedBoardId(null);
   };
 
   const handlePopularCardClick = (snapshot) => {
@@ -147,13 +204,16 @@ const CommunityBoard = () => {
     setIsDetailOpen(true);
   };
 
-  const handleDetailClose = () => {
-    setIsDetailOpen(false);
-    setSelectedBoardId(null);
+  const handleCommentClick = (post, e) => {
+    e.stopPropagation();
+    handlePostSelect(post);
   };
 
-  const handleCommentClick = (post, event) => {
+  const handlePostSelect = (post, event) => {
+    if (!post?.idx) return;
     event?.stopPropagation?.();
+    setSelectedBoardId(post.idx);
+    setIsDetailOpen(true);
     const { requiresRedirect } = requireLogin();
     if (requiresRedirect) {
       redirectToLogin();
@@ -323,9 +383,9 @@ const CommunityBoard = () => {
       prev.map((post) =>
         post.idx === boardId
           ? {
-              ...post,
-              views,
-            }
+            ...post,
+            views,
+          }
           : post
       )
     );
@@ -333,9 +393,9 @@ const CommunityBoard = () => {
     setSelectedBoard((prev) =>
       prev && prev.idx === boardId
         ? {
-            ...prev,
-            views,
-          }
+          ...prev,
+          views,
+        }
         : prev
     );
   }, []);
@@ -377,7 +437,7 @@ const CommunityBoard = () => {
         ))}
       </CategoryTabs>
 
-      {activeCategory === 'PRIDE' && (
+      {activeCategory === '자랑' && (
         <PopularSection>
           <PopularHeader>
             <PopularTitle>인기 반려동물 자랑 TOP 30</PopularTitle>
@@ -404,12 +464,16 @@ const CommunityBoard = () => {
           {popularLoading ? (
             <LoadingContainer>
               <LoadingSpinner />
-              <LoadingMessage>인기 게시글을 불러오는 중...</LoadingMessage>
+              <LoadingMessage>{popularPeriod === 'WEEKLY' ? '주간' : '월간'} 인기 게시글을 불러오는 중...</LoadingMessage>
             </LoadingContainer>
           ) : (
             <PopularGrid>
               {popularPosts.length === 0 ? (
-                <EmptyPopularMessage>아직 인기 자랑글이 없어요.</EmptyPopularMessage>
+                <EmptyPopularMessage>
+                  {popularPeriod === 'WEEKLY'
+                    ? '아직 주간 인기 자랑글이 없어요.'
+                    : '아직 월간 인기 자랑글이 없어요.'}
+                </EmptyPopularMessage>
               ) : (
                 popularPosts.slice(0, 6).map((snapshot) => (
                   <PopularCard type="button" key={`${snapshot.periodType}-${snapshot.boardId}-${snapshot.ranking}`} onClick={() => handlePopularCardClick(snapshot)}>

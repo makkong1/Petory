@@ -7,6 +7,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -38,5 +39,11 @@ public class StatisticsController {
         }
 
         return ResponseEntity.ok(statisticsService.getDailyStatistics(startDate, endDate));
+    }
+
+    @PostMapping("/init")
+    public ResponseEntity<String> initStatistics(@RequestParam(defaultValue = "30") int days) {
+        statisticsService.initStatistics(days);
+        return ResponseEntity.ok("지난 " + days + "일간의 통계 집계가 완료되었습니다.");
     }
 }
