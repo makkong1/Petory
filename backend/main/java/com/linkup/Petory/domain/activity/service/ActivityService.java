@@ -38,7 +38,7 @@ public class ActivityService {
         private final MissingPetCommentRepository missingPetCommentRepository;
         private final UsersRepository usersRepository;
 
-        public List<ActivityDTO> getUserActivities(Long userId) {
+        public List<ActivityDTO> getUserActivities(long userId) {
                 System.out.println("=== [ActivityService] getUserActivities 호출됨 - userId: " + userId + " ===");
                 Users user = usersRepository.findById(userId)
                                 .orElseThrow(() -> new IllegalArgumentException("User not found"));

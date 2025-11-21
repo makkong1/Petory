@@ -21,7 +21,7 @@ import com.linkup.Petory.domain.board.dto.BoardDTO;
 import com.linkup.Petory.domain.board.entity.Board;
 import com.linkup.Petory.domain.board.repository.BoardRepository;
 import com.linkup.Petory.domain.board.repository.BoardReactionRepository;
-import com.linkup.Petory.domain.board.repository.CommentReactionRepository;
+// import com.linkup.Petory.domain.board.repository.CommentReactionRepository;
 import com.linkup.Petory.domain.board.repository.BoardViewLogRepository;
 import com.linkup.Petory.domain.board.entity.ReactionType;
 import com.linkup.Petory.domain.board.entity.BoardViewLog;
@@ -67,7 +67,7 @@ public class BoardService {
     // 단일 게시글 조회 + 조회수 증가
     @Cacheable(value = "boardDetail", key = "#idx")
     @Transactional
-    public BoardDTO getBoard(Long idx, Long viewerId) {
+    public BoardDTO getBoard(long idx, Long viewerId) {
         Board board = boardRepository.findById(idx)
                 .orElseThrow(() -> new RuntimeException("Board not found"));
 
@@ -106,7 +106,7 @@ public class BoardService {
             @CacheEvict(value = "boardList", allEntries = true) // 카테고리 변경 가능하므로 안전하게 전체 무효화
     })
     @Transactional
-    public BoardDTO updateBoard(Long idx, BoardDTO dto) {
+    public BoardDTO updateBoard(long idx, BoardDTO dto) {
         Board board = boardRepository.findById(idx)
                 .orElseThrow(() -> new RuntimeException("Board not found"));
 
@@ -130,7 +130,7 @@ public class BoardService {
             @CacheEvict(value = "boardList", allEntries = true) // 해당 카테고리 캐시 무효화를 위해 전체 무효화
     })
     @Transactional
-    public void deleteBoard(Long idx) {
+    public void deleteBoard(long idx) {
         Board board = boardRepository.findById(idx)
                 .orElseThrow(() -> new RuntimeException("Board not found"));
 
@@ -151,7 +151,7 @@ public class BoardService {
     }
 
     // 내 게시글 조회
-    public List<BoardDTO> getMyBoards(Long userId) {
+    public List<BoardDTO> getMyBoards(long userId) {
         Users user = usersRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
@@ -308,7 +308,7 @@ public class BoardService {
             @CacheEvict(value = "boardList", allEntries = true)
     })
     @Transactional
-    public BoardDTO updateBoardStatus(Long id, com.linkup.Petory.domain.common.ContentStatus status) {
+    public BoardDTO updateBoardStatus(long id, com.linkup.Petory.domain.common.ContentStatus status) {
         Board board = boardRepository.findById(id).orElseThrow(() -> new RuntimeException("Board not found"));
         // do not change isDeleted here
         board.setStatus(status);
@@ -321,7 +321,7 @@ public class BoardService {
             @CacheEvict(value = "boardList", allEntries = true)
     })
     @Transactional
-    public BoardDTO restoreBoard(Long id) {
+    public BoardDTO restoreBoard(long id) {
         Board board = boardRepository.findById(id).orElseThrow(() -> new RuntimeException("Board not found"));
         board.setIsDeleted(false);
         board.setDeletedAt(null);

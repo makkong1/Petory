@@ -1,85 +1,98 @@
-# 🐾 Petory
+# 🐾 Petory (페토리)
+> **데이터 기반의 반려동물 케어 & 커뮤니티 통합 플랫폼**
 
-> **종합 반려동물 케어 & 정보 & 커뮤니티 플랫폼**
-
----
-
-## 🌟 프로젝트 소개
-
-**Petory**는 반려동물을 키우는 보호자들을 위한 **통합형 웹 플랫폼**입니다.  
-늘어나는 반려동물 인구에 맞춰, **돌봄·정보·소통**을 한곳에서 해결할 수 있도록 설계했습니다.
+![Project Status](https://img.shields.io/badge/Status-Active-success) ![Java](https://img.shields.io/badge/Java-17-orange) ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.7-green) ![React](https://img.shields.io/badge/React-19-blue)
 
 ---
 
-## 🎯 주요 목표
-
-- 반려동물 보호자와 케어 제공자를 연결하는 **매칭 시스템**
-- 주변의 병원, 펫샵, 카페 등 **지역 기반 반려동물 서비스 지도**
-- **소통 중심 커뮤니티**와 **실시간 알림 시스템** 구축
+## 📖 프로젝트 소개
+**Petory**는 반려동물 보호자를 위한 **O2O(Online to Offline) 통합 플랫폼**입니다.
+단순한 정보 공유를 넘어, **위치 기반 서비스 매칭**, **실시간 케어 요청**, 그리고 **데이터 기반의 관리자 대시보드**를 통해 체계적인 반려동물 생태계를 구축하는 것을 목표로 합니다.
 
 ---
 
-## 🧩 핵심 기능
+## 🛠 Tech Stack
 
-### 1️⃣ 펫시터 / 케어 매칭 서비스
-- 유저가 “하루/이틀 케어 요청” 게시글 등록  
-- 케어 제공자가 신청 → 수락 후 **실시간 채팅(소켓 기반)** 진행  
-- 거래 종료 후 **리뷰 및 평점 기능** 제공  
-- 제공자의 **예약 일정 / 달력 표시 기능**  
-- 펫시터 **신고 기능** 지원  
+### Backend
+- **Core**: Java 17, Spring Boot 3.5.7
+- **Database**: MySQL 8.0 (JPA/Hibernate)
+- **Cache & Session**: Redis (Global Cache, Notification Buffer)
+- **Security**: Spring Security, JWT
+- **Build**: Gradle
 
----
+### Frontend
+- **Framework**: React 19
+- **Styling**: Styled-components
+- **HTTP Client**: Axios
+- **Visualization**: Recharts (Admin Dashboard)
 
-### 2️⃣ 지역 서비스 정보 (메인 서비스)
-- **지도 기반** 반려동물 관련 서비스 위치 표시 (예: 병원, 카페, 미용샵 등)  
-- 거리 / 평점 기반 **필터 기능**  
-- (예정) 리뷰/댓글 기반 추천 알고리즘  
-
----
-
-### 3️⃣ 커뮤니티
-- **Q&A 게시판**, **자유 게시판** 등 커뮤니티 운영  
-- 회원 간 **게시글 작성 / 수정 / 삭제 / 댓글 기능**  
+### Infrastructure (Planned)
+- **Messaging**: RabbitMQ (Event-driven Architecture)
 
 ---
 
-### 4️⃣ 알림 & 매칭 시스템 (구현 예정)
+## 🌟 핵심 기능 (Key Features)
 
-- **목표:** 케어 요청자 ↔ 제공자 매칭 알림, 예약 상태 알림
-- **예정 기술**
-  - RabbitMQ: 비동기 알림 큐 처리
-  - Redis: 실시간 알림 캐싱 / 사용자별 알림 관리
-  - WebSocket: 실시간 채팅 / 알림 푸시
-- **현재 상태:** 아직 백엔드/프론트 통합 구현 전
+### 위치 기반 서비스 (LBS)
+- **공간 인덱스(Spatial Index)**: MySQL `POINT` 타입과 SRID 4326을 활용하여 반경 검색 성능 최적화
+- **서비스 맵**: 내 주변 동물병원, 펫샵, 카페 정보를 거리순/평점순으로 필터링 제공
+
+### 펫 케어 & 매칭 (Pet Care)
+- **생애주기 관리**: 요청 -> 지원 -> 매칭 -> 케어 수행 -> 리뷰로 이어지는 전체 프로세스 구현
+- **신뢰 시스템**: 상호 리뷰 및 평점 시스템을 통한 펫시터 검증
+
+### 커뮤니티 & 실종 제보
+- **블라인드 처리**: 신고 누적 시 자동으로 콘텐츠를 가리는 유해 콘텐츠 필터링 로직
+- **실종 골든타임**: 지도 기반의 직관적인 실종/목격 위치 공유
+
+### 관리자 대시보드 & 통계 시스템 (Admin Dashboard)
+- **효율적인 데이터 집계**: 실시간 쿼리 부하를 줄이기 위해 `DailyStatistics` 테이블을 설계하여 일별 핵심 지표(가입자, 매출, 게시글 등)를 요약 저장
+- **시각화**: Recharts를 활용하여 일별 성장 추이(Line Chart) 및 서비스 활성화 지표(Bar Chart) 시각화
+- **통합 관리**: 신고(Report), 유저, 콘텐츠, 케어 서비스를 한곳에서 제어하는 중앙 집중형 관리자 페이지
+
+### 알림 시스템 (Notification System)
+- **이중 저장소 전략**:
+    - **Redis**: 최근 24시간 내의 알림을 캐싱하여 실시간 조회 속도 극대화 (TTL 적용)
+    - **MySQL**: 모든 알림을 영구 저장하여 이력 관리 및 안정성 보장
+- **다양한 알림 유형**: 댓글, 케어 요청, 실종 제보 등 도메인별 이벤트 트리거 구현
+---
+
+## 🏗️ System Architecture & Strategy
+
+### 📊 통계 데이터 처리 전략
+> **Problem**: 데이터가 누적될수록 `COUNT(*)` 기반의 실시간 통계 쿼리는 DB 성능에 영향을 줄 수 있습니다.
+>
+> **Solution**: **[Daily Summary Pattern]**
+> 매일 자정 배치 작업을 통해 전날의 데이터를 집계하여 `DailyStatistics` 테이블에 요약 저장합니다. 이를 통해 데이터 양이 늘어나도 대시보드 조회 성능을 일정하게 유지합니다.
+> ([상세 전략 문서 보기](./ADMIN_STATISTICS_STRATEGY.md))
+
+### 🔔 알림 시스템 아키텍처
+> **Strategy**: 알림은 생성 직후 조회가 빈번하고, 일정 시간이 지나면 조회 빈도가 낮아지는 특성이 있습니다.
+> 따라서 Redis를 캐시로 사용하여 최신 알림 조회 성능을 높이고, DB 부하를 분산시키는 구조를 채택했습니다.
+> ([상세 전략 문서 보기](./NOTIFICATION_STRATEGY.md))
 
 ---
 
-### 5️⃣ 실종신고 서비스
-- 실종 반려동물 등록 및 제보 기능  
-- 지도 기반 위치 표시  
+## 📂 Project Structure
+```
+Petory
+├── backend
+│   ├── domain
+│   │   ├── statistics   # 통계/대시보드 도메인
+│   │   ├── notification # 알림 시스템
+│   │   ├── report       # 신고 관리
+│   │   ├── care         # 펫 케어 서비스
+│   │   └── ...
+│   └── global           # 전역 설정 (Security, Config)
+└── frontend
+    ├── src
+    │   ├── components
+    │   │   └── Admin    # 관리자 페이지 컴포넌트
+    │   └── api          # Axios API 모듈
+    └── ...
+```
 
 ---
 
-## ⚙️ 기술 스택
-
-| 구분 | 기술 |
-|------|------|
-| **Backend** | Java 17, Spring Boot 3.x, Spring Security, JPA, REST API |
-| **Database** | MySQL 8.0 |
-| **Cache / Message Broker** | Redis (캐시 & 세션 관리), RabbitMQ (알림/이벤트 처리) |
-| **Frontend** | React |
-
----
-
-## 🚀 확장 고려사항
-
-- **Redis 캐시**  
-  → 인기 지역 서비스 / 추천 게시글  
-
-- **RabbitMQ**  
-  → 알림 큐 기반 비동기 메시지 처리 (예약/매칭 알림 등)  
-
----
-
-
-
+## 📝 API Documentation
+*(API 명세서 링크 또는 Swagger URL 예정)*

@@ -68,6 +68,11 @@ public class CommentService {
         if (board.getComments() != null) {
             board.getComments().add(saved);
         }
+
+        // commentCount 실시간 업데이트
+        incrementBoardCommentCount(board);
+        boardRepository.save(board);
+
         if (dto.getCommentFilePath() != null) {
             attachmentFileService.syncSingleAttachment(FileTargetType.COMMENT, saved.getIdx(), dto.getCommentFilePath(),
                     null);
@@ -107,6 +112,10 @@ public class CommentService {
         comment.setIsDeleted(true);
         comment.setDeletedAt(LocalDateTime.now());
         commentRepository.save(comment);
+
+        // commentCount 실시간 업데이트 (삭제된 댓글은 카운트에서 제외)
+        decrementBoardCommentCount(board);
+        boardRepository.save(board);
         // keep attachments and reactions for audit/possible restore
     }
 
@@ -170,6 +179,27 @@ public class CommentService {
             comment.setStatus(com.linkup.Petory.domain.common.ContentStatus.ACTIVE);
         }
         Comment saved = commentRepository.save(comment);
+
+        // commentCount 실시간 업데이트 (복구된 댓글은 카운트에 포함)
+        incrementBoardCommentCount(board);
+        boardRepository.save(board);
+
         return mapWithReactionCounts(saved);
+    }
+
+    /**
+     * 게시글의 commentCount를 증가시킴
+     */
+    private void incrementBoardCommentCount(Board board) {
+        Integer currentCount = board.getCommentCount() != null ? board.getCommentCount() : 0;
+        board.setCommentCount(currentCount + 1);
+    }
+
+    /**
+     * 게시글의 commentCount를 감소시킴
+     */
+    private void decrementBoardCommentCount(Board board) {
+        Integer currentCount = board.getCommentCount() != null ? board.getCommentCount() : 0;
+        board.setCommentCount(Math.max(0, currentCount - 1));
     }
 }
