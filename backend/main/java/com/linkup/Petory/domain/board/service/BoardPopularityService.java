@@ -30,16 +30,52 @@ public class BoardPopularityService {
     @Transactional
     public List<BoardPopularitySnapshotDTO> getPopularBoards(PopularityPeriodType periodType) {
         PeriodRange range = calculateRange(periodType);
+        
+        System.out.println("=== 인기 게시글 조회 시작 ===");
+        System.out.println("PeriodType: " + periodType);
+        System.out.println("조회 기간: " + range.periodStart() + " ~ " + range.periodEnd());
+        
+        // 1. 정확한 날짜 매칭으로 조회 시도
         List<BoardPopularitySnapshot> snapshots = snapshotRepository
                 .findByPeriodTypeAndPeriodStartDateAndPeriodEndDateOrderByRankingAsc(
                         periodType,
                         range.periodStart(),
                         range.periodEnd());
+        System.out.println("1. 정확한 날짜 매칭 결과: " + snapshots.size() + "개");
 
+        // 2. 정확한 매칭이 없으면 기간이 겹치는 스냅샷 조회 시도
+        // 기간이 겹치는 조건: 스냅샷 시작일 <= 조회 종료일 AND 스냅샷 종료일 >= 조회 시작일
         if (snapshots.isEmpty()) {
-            snapshots = generateSnapshots(periodType, range);
+            snapshots = snapshotRepository
+                    .findByPeriodTypeAndPeriodStartDateLessThanEqualAndPeriodEndDateGreaterThanEqualOrderByRankingAsc(
+                            periodType,
+                            range.periodEnd(),    // periodStartDate <= 이 값 (조회 종료일)
+                            range.periodStart()); // periodEndDate >= 이 값 (조회 시작일)
+            System.out.println("2. 기간 겹치는 스냅샷 조회 결과: " + snapshots.size() + "개");
+            System.out.println("   조회 조건: periodStartDate <= " + range.periodEnd() + " AND periodEndDate >= " + range.periodStart());
+            if (!snapshots.isEmpty()) {
+                System.out.println("   첫 번째 스냅샷 기간: " + snapshots.get(0).getPeriodStartDate() + " ~ " + snapshots.get(0).getPeriodEndDate());
+            }
         }
 
+        // 3. 그래도 없으면 가장 최근 스냅샷 조회 시도
+        if (snapshots.isEmpty()) {
+            snapshots = snapshotRepository
+                    .findTop30ByPeriodTypeOrderByPeriodEndDateDescRankingAsc(periodType);
+            System.out.println("3. 가장 최근 스냅샷 조회 결과: " + snapshots.size() + "개");
+            if (!snapshots.isEmpty()) {
+                System.out.println("   가장 최근 스냅샷 기간: " + snapshots.get(0).getPeriodStartDate() + " ~ " + snapshots.get(0).getPeriodEndDate());
+            }
+        }
+
+        // 4. 모든 시도가 실패하면 새로 생성
+        if (snapshots.isEmpty()) {
+            System.out.println("4. 새 스냅샷 생성 시작");
+            snapshots = generateSnapshots(periodType, range);
+            System.out.println("   생성된 스냅샷 수: " + snapshots.size() + "개");
+        }
+
+        System.out.println("=== 최종 반환 스냅샷 수: " + snapshots.size() + "개 ===");
         return snapshotConverter.toDTOList(snapshots);
     }
 

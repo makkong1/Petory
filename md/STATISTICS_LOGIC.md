@@ -1,0 +1,70 @@
+# 통계 집계 로직 구현 명세 (Statistics Implementation Logic)
+
+본 문서는 Petory 서비스의 일일 통계 집계 및 DAU(Daily Active Users) 추적 로직의 구현 상세 내용을 기술합니다.
+
+## 1. 개요 (Overview)
+통계 시스템은 **하이브리드 방식**을 채택하여 구현되었습니다.
+- **과거 데이터**: 매일 자정에 스케줄러가 전날의 데이터를 집계하여 DB(`DailyStatistics`)에 저장합니다.
+- **오늘 데이터**: 관리자 조회 시점에 실시간으로 DB를 카운트하여 과거 데이터와 합쳐서 제공합니다.
+
+---
+
+## 2. 주요 컴포넌트 (Components)
+
+### 2.1. `StatisticsScheduler`
+- **역할**: 정기적인 통계 집계 및 과거 데이터 초기화 담당
+- **위치**: `com.linkup.Petory.domain.statistics.service.StatisticsScheduler`
+- **실행 주기**: 매일 자정 00:00:00 (`cron = "0 0 0 * * ?"`)
+- **로직**:
+    1. 어제 날짜(`LocalDate.now().minusDays(1)`)를 기준으로 00:00:00 ~ 23:59:59 범위 설정.
+    2. 각 리포지토리(`Users`, `Board`, `CareRequest`)에서 해당 기간의 `count` 조회.
+    3. `DailyStatistics` 엔티티 생성 및 저장.
+    4. 이미 해당 날짜의 데이터가 존재하면 중복 집계 방지를 위해 스킵.
+
+### 2.2. `StatisticsService`
+- **역할**: 통계 데이터 조회 및 실시간 데이터 병합
+- **위치**: `com.linkup.Petory.domain.statistics.service.StatisticsService`
+- **로직**:
+    - `getDailyStatistics(start, end)` 호출 시 DB에서 저장된 통계를 먼저 조회.
+    - 조회 기간에 **'오늘'**이 포함되어 있다면, `calculateTodayStatistics()`를 호출하여 실시간 집계 수행.
+    - 실시간 집계된 데이터를 리스트에 추가하여 반환.
+
+### 2.3. `AuthService` & `Users`
+- **역할**: DAU(일일 활성 사용자) 추적을 위한 기반 데이터 생성
+- **변경 사항**:
+    - `Users` 엔티티: `lastLoginAt` (마지막 로그인 시간) 필드 추가.
+    - `AuthService.login()`: 로그인 성공 시 `user.setLastLoginAt(LocalDateTime.now())` 실행.
+
+---
+
+## 3. 지표별 집계 로직 (Aggregation Details)
+
+| 지표 (Metric) | 설명 | 집계 방법 (Repository Method) |
+| :--- | :--- | :--- |
+| **신규 가입자** (`newUsers`) | 해당 일자에 가입한 유저 수 | `usersRepository.countByCreatedAtBetween` |
+| **새 게시글** (`newPosts`) | 해당 일자에 작성된 게시글 수 | `boardRepository.countByCreatedAtBetween` |
+| **새 케어 요청** (`newCareRequests`) | 해당 일자에 생성된 케어 요청 수 | `careRequestRepository.countByCreatedAtBetween` |
+| **완료된 케어** (`completedCares`) | 해당 일자에 케어 날짜가 속하고, 상태가 `COMPLETED`인 요청 수 | `careRequestRepository.countByDateBetweenAndStatus` |
+| **매출** (`totalRevenue`) | 일 매출 (현재 미구현) | 현재 `0`으로 고정 (추후 결제 연동 시 구현) |
+| **DAU** (`activeUsers`) | 해당 일자에 로그인을 수행한 유저 수 | `usersRepository.countByLastLoginAtBetween` |
+
+---
+
+## 4. 데이터 초기화 (Backfill)
+
+스케줄러가 실행되기 전의 과거 데이터를 생성하기 위한 수동 초기화 기능을 제공합니다.
+
+### API 엔드포인트
+- **URL**: `POST /api/admin/statistics/init`
+- **파라미터**: `days` (int, default=30) - 오늘 기준 며칠 전까지 집계할지 설정
+- **예시**: `/api/admin/statistics/init?days=30` (지난 30일간의 통계 생성)
+
+### 사용 시나리오
+1. 서버 배포 직후 `dailystatistics` 테이블이 비어있을 때.
+2. 통계 로직이 변경되어 과거 데이터를 재집계해야 할 때 (기존 데이터 삭제 후 호출 필요).
+
+---
+
+## 5. 참고 사항
+- **매출(Revenue)**: 현재 `CareRequest`에 가격 정보가 없어 0으로 처리됩니다. 추후 가격 필드가 추가되면 `sum` 쿼리로 변경해야 합니다.
+- **DAU 정확도**: `lastLoginAt`은 마지막 로그인 시간만 저장하므로, 하루에 여러 번 로그인해도 1회로 카운트됩니다(정상). 단, 로그인 상태 유지(Refresh Token)로 인해 API만 호출하는 경우는 카운트되지 않을 수 있습니다(로그인 행위 기준).

@@ -38,6 +38,7 @@ public class AuthService {
         // DB에 refresh token 저장
         user.setRefreshToken(refreshToken);
         user.setRefreshExpiration(LocalDateTime.now().plusDays(1));
+        user.setLastLoginAt(LocalDateTime.now()); // 통계용: 마지막 로그인 시간 업데이트
         usersRepository.save(user);
 
         log.info("로그인 성공: {}, Refresh Token 저장 완료", id);

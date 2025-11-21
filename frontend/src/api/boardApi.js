@@ -28,8 +28,11 @@ api.interceptors.request.use(
 );
 
 export const boardApi = {
-  // 전체 게시글 조회
-  getAllBoards: (params = {}) => api.get('', { params }),
+  // 전체 게시글 조회 (캐시 무시)
+  getAllBoards: (params = {}) => api.get('', { 
+    params: { ...params, _t: Date.now() }, // 캐시 무시를 위한 타임스탬프 추가
+    headers: { 'Cache-Control': 'no-cache' }
+  }),
   
   // 단일 게시글 조회 (옵션 viewerId)
   getBoard: (id, viewerId) => {

@@ -21,9 +21,11 @@ const CommunityManagementSection = () => {
         category: category === 'ALL' ? undefined : category,
         q: q || undefined,
       });
-      setRows(res.data || []);
+      // axios response 구조: res.data가 실제 데이터
+      setRows(Array.isArray(res.data) ? res.data : []);
     } catch (e) {
-      setError('목록을 불러오지 못했습니다.');
+      console.error('게시글 목록 조회 실패:', e);
+      setError(e.response?.data?.message || '목록을 불러오지 못했습니다.');
     } finally {
       setLoading(false);
     }
@@ -35,36 +37,56 @@ const CommunityManagementSection = () => {
   }, [status, deleted, category, q]);
 
   const onBlind = async (row) => {
+    if (!row?.idx) {
+      alert('게시글 정보가 올바르지 않습니다.');
+      return;
+    }
     try {
       await communityAdminApi.blindBoard(row.idx);
       fetchBoards();
-    } catch {
-      alert('블라인드 처리 실패');
+    } catch (e) {
+      console.error('블라인드 처리 실패:', e);
+      alert(e.response?.data?.message || '블라인드 처리 실패');
     }
   };
   const onUnblind = async (row) => {
+    if (!row?.idx) {
+      alert('게시글 정보가 올바르지 않습니다.');
+      return;
+    }
     try {
       await communityAdminApi.unblindBoard(row.idx);
       fetchBoards();
-    } catch {
-      alert('해제 실패');
+    } catch (e) {
+      console.error('블라인드 해제 실패:', e);
+      alert(e.response?.data?.message || '해제 실패');
     }
   };
   const onDeleteSoft = async (row) => {
+    if (!row?.idx) {
+      alert('게시글 정보가 올바르지 않습니다.');
+      return;
+    }
     if (!window.confirm('이 게시글을 삭제(소프트 삭제)하시겠습니까?')) return;
     try {
       await communityAdminApi.deleteBoard(row.idx);
       fetchBoards();
-    } catch {
-      alert('삭제 실패');
+    } catch (e) {
+      console.error('삭제 실패:', e);
+      alert(e.response?.data?.message || '삭제 실패');
     }
   };
   const onRestore = async (row) => {
+    if (!row?.idx) {
+      alert('게시글 정보가 올바르지 않습니다.');
+      return;
+    }
     try {
       await communityAdminApi.restoreBoard(row.idx);
       fetchBoards();
-    } catch {
-      alert('복구 실패');
+    } catch (e) {
+      console.error('복구 실패:', e);
+      alert(e.response?.data?.message || '복구 실패');
     }
   };
 
@@ -97,9 +119,13 @@ const CommunityManagementSection = () => {
           <Label>카테고리</Label>
           <Select value={category} onChange={e => setCategory(e.target.value)}>
             <option value="ALL">전체</option>
-            <option value="FREE">FREE</option>
-            <option value="TIP">TIP</option>
-            <option value="QNA">QNA</option>
+            <option value="일상">일상</option>
+            <option value="자랑">자랑</option>
+            <option value="질문">질문</option>
+            <option value="정보">정보</option>
+            <option value="후기">후기</option>
+            <option value="모임">모임</option>
+            <option value="공지">공지</option>
           </Select>
         </Group>
         <Group style={{ flex: 1 }}>

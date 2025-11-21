@@ -46,7 +46,8 @@ public class BoardService {
     private final BoardConverter boardConverter;
 
     // 전체 게시글 조회 (카테고리 필터링 포함)
-    @Cacheable(value = "boardList", key = "#category != null ? #category : 'ALL'")
+    // 캐시 임시 비활성화 - 개발 중 데이터 동기화 문제 해결
+    // @Cacheable(value = "boardList", key = "#category != null ? #category : 'ALL'")
     public List<BoardDTO> getAllBoards(String category) {
         List<Board> boards;
 
@@ -79,7 +80,7 @@ public class BoardService {
     }
 
     // 게시글 생성
-    @CacheEvict(value = "boardList", key = "#dto.category != null ? #dto.category : 'ALL'")
+    @CacheEvict(value = "boardList", allEntries = true) // 전체 리스트 캐시 무효화 (전체/카테고리 모두)
     @Transactional
     public BoardDTO createBoard(BoardDTO dto) {
         Users user = usersRepository.findById(dto.getUserId())

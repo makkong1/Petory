@@ -20,7 +20,7 @@ import lombok.RequiredArgsConstructor;
 @RequestMapping("/api/admin")
 @RequiredArgsConstructor
 @PreAuthorize("hasAnyRole('ADMIN','MASTER')")
-public class AdminCommunityController {
+public class AdminBoardController {
 
     private final BoardService boardService;
     private final CommentService commentService;

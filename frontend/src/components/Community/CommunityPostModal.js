@@ -7,7 +7,7 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const defaultForm = {
   title: '',
   content: '',
-  category: 'STORY',
+  category: '일상',
   boardFilePath: '',
 };
 
@@ -119,11 +119,13 @@ const CommunityPostModal = ({ isOpen, onClose, onSubmit, loading, currentUser })
             <Field>
               <Label>카테고리 *</Label>
               <Select name="category" value={form.category} onChange={handleChange}>
-                <option value="STORY">일상</option>
-                <option value="PRIDE">자랑</option>
-                <option value="TIP">꿀팁</option>
-                <option value="QUESTION">질문</option>
-                <option value="INFO">정보</option>
+                <option value="일상">일상</option>
+                <option value="자랑">자랑</option>
+                <option value="질문">질문</option>
+                <option value="정보">정보</option>
+                <option value="후기">후기</option>
+                <option value="모임">모임</option>
+                <option value="공지">공지</option>
               </Select>
             </Field>
 
