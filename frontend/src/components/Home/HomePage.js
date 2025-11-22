@@ -5,7 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 const HomePage = ({ setActiveTab }) => {
   const { user } = useAuth();
   const isAdmin = user && (user.role === 'ADMIN' || user.role === 'MASTER');
-  const features = [   
+  const features = [
     {
       icon: '🗺️',
       title: '위치 서비스',
@@ -31,6 +31,12 @@ const HomePage = ({ setActiveTab }) => {
       action: () => setActiveTab('care-requests')
     },
     {
+      icon: '🐾',
+      title: '산책 모임',
+      description: '주변 반려동물 산책 모임을 찾아 함께 산책하며 친구를 만나보세요.',
+      action: () => setActiveTab('meetup')
+    },
+    {
       icon: '💬',
       title: '커뮤니티',
       description: '반려동물 키우는 이웃들과 소통하고 유용한 정보를 나누세요.',
@@ -41,13 +47,13 @@ const HomePage = ({ setActiveTab }) => {
   return (
     <Container>
       <HeroSection>
-        <HeroTitle>우리 동네 펫케어 서비스</HeroTitle>
+        <HeroTitle>우리 동네 펫토리 서비스</HeroTitle>
         <HeroSubtitle>
-          안전하고 믿을 수 있는 펫시터와 매칭하여<br />
-          소중한 반려동물을 맡기세요
+          주변 펫케어 서비스 위치를 지도에서 확인하고<br />
+          가장 가까운 펫케어 서비스를 찾아보세요
         </HeroSubtitle>
-        <CTAButton onClick={() => setActiveTab('care-requests')}>
-          펫케어 서비스 시작하기
+        <CTAButton onClick={() => setActiveTab('location-services')}>
+          지도 서비스 시작하기
         </CTAButton>
       </HeroSection>
 

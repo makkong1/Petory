@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { userApi } from '../../api/userApi';
+import { userApi, adminUserApi } from '../../api/userApi';
 
 const UserModal = ({ user, onClose }) => {
   const [formData, setFormData] = useState({
@@ -82,17 +82,44 @@ const UserModal = ({ user, onClose }) => {
     try {
       if (user) {
         // 수정
-        await userApi.updateUser(user.idx, formData);
-        alert('유저가 성공적으로 수정되었습니다.');
+        const originalRole = user.role;
+        const newRole = formData.role;
+        
+        // 역할이 ADMIN으로 변경되는 경우 (일반 사용자 -> ADMIN)
+        if (originalRole !== 'ADMIN' && originalRole !== 'MASTER' && newRole === 'ADMIN') {
+          // 일반 사용자를 ADMIN으로 승격
+          await adminUserApi.promoteToAdmin(user.idx);
+          // 나머지 정보는 일반 업데이트로 처리 (역할 제외)
+          const { role, ...updateData } = formData;
+          if (Object.keys(updateData).length > 0) {
+            await userApi.updateUser(user.idx, updateData);
+          }
+          alert('유저가 ADMIN으로 승격되었습니다.');
+        } else if (newRole === 'ADMIN' || newRole === 'MASTER') {
+          // ADMIN/MASTER 역할 변경 시도 시 에러
+          alert('관리자 역할 변경은 별도 엔드포인트를 사용해주세요.');
+          setLoading(false);
+          return;
+        } else {
+          // 일반 정보 수정 (역할 변경 없음)
+          await userApi.updateUser(user.idx, formData);
+          alert('유저가 성공적으로 수정되었습니다.');
+        }
       } else {
-        // 생성
+        // 생성 - ADMIN/MASTER 생성 불가
+        if (formData.role === 'ADMIN' || formData.role === 'MASTER') {
+          alert('관리자 계정은 별도 엔드포인트를 사용해주세요.');
+          setLoading(false);
+          return;
+        }
         await userApi.createUser(formData);
         alert('유저가 성공적으로 생성되었습니다.');
       }
       onClose();
     } catch (error) {
       console.error('Error saving user:', error);
-      alert('유저 저장에 실패했습니다.');
+      const errorMessage = error.response?.data?.message || error.message || '유저 저장에 실패했습니다.';
+      alert(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -169,12 +196,21 @@ const UserModal = ({ user, onClose }) => {
               name="role"
               value={formData.role}
               onChange={handleChange}
+              disabled={user && (user.role === 'ADMIN' || user.role === 'MASTER')}
             >
               <option value="USER">일반 사용자</option>
               <option value="SERVICE_PROVIDER">서비스 제공자</option>
-              <option value="ADMIN">관리자</option>
-              <option value="MASTER">마스터</option>
+              <option value="ADMIN">관리자 (승격 가능)</option>
+              {user && (user.role === 'ADMIN' || user.role === 'MASTER') && (
+                <option value={user.role} disabled>{user.role === 'MASTER' ? '마스터 (변경 불가)' : '관리자 (변경 불가)'}</option>
+              )}
             </Select>
+            {user && (user.role === 'ADMIN' || user.role === 'MASTER') && (
+              <HelperText>관리자 권한은 변경할 수 없습니다.</HelperText>
+            )}
+            {user && user.role !== 'ADMIN' && user.role !== 'MASTER' && formData.role === 'ADMIN' && (
+              <HelperText>일반 사용자를 ADMIN으로 승격합니다.</HelperText>
+            )}
           </FormGroup>
 
           <FormGroup>
@@ -364,4 +400,11 @@ const ErrorMessage = styled.div`
   color: #e74c3c;
   font-size: 14px;
   margin-top: 4px;
+`;
+
+const HelperText = styled.div`
+  color: #666;
+  font-size: 12px;
+  margin-top: 4px;
+  font-style: italic;
 `;

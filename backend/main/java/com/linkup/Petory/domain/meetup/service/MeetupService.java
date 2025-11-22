@@ -1,9 +1,12 @@
 package com.linkup.Petory.domain.meetup.service;
 
 import com.linkup.Petory.domain.meetup.converter.MeetupConverter;
+import com.linkup.Petory.domain.meetup.converter.MeetupParticipantsConverter;
 import com.linkup.Petory.domain.meetup.dto.MeetupDTO;
+import com.linkup.Petory.domain.meetup.dto.MeetupParticipantsDTO;
 import com.linkup.Petory.domain.meetup.entity.Meetup;
 import com.linkup.Petory.domain.meetup.repository.MeetupRepository;
+import com.linkup.Petory.domain.meetup.repository.MeetupParticipantsRepository;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 
@@ -23,8 +26,10 @@ import java.util.stream.Collectors;
 public class MeetupService {
 
     private final MeetupRepository meetupRepository;
+    private final MeetupParticipantsRepository meetupParticipantsRepository;
     private final UsersRepository usersRepository;
     private final MeetupConverter converter;
+    private final MeetupParticipantsConverter participantsConverter;
 
     // 모임 생성
     @Transactional
@@ -79,11 +84,28 @@ public class MeetupService {
                 .collect(Collectors.toList());
     }
 
-    // 특정 모임 조회
+    // 특정 모임 조회 (참가자 목록 포함)
     public MeetupDTO getMeetupById(Long meetupIdx) {
         Meetup meetup = meetupRepository.findById(meetupIdx)
                 .orElseThrow(() -> new RuntimeException("모임을 찾을 수 없습니다."));
         return converter.toDTO(meetup);
+    }
+
+    // 반경 기반 모임 조회 (마커 표시용)
+    public List<MeetupDTO> getNearbyMeetups(Double lat, Double lng, Double radiusKm) {
+        LocalDateTime now = LocalDateTime.now();
+        return meetupRepository.findNearbyMeetups(lat, lng, radiusKm, now)
+                .stream()
+                .map(converter::toDTO)
+                .collect(Collectors.toList());
+    }
+
+    // 특정 모임의 참가자 목록 조회
+    public List<MeetupParticipantsDTO> getMeetupParticipants(Long meetupIdx) {
+        return meetupParticipantsRepository.findByMeetupIdxOrderByJoinedAtAsc(meetupIdx)
+                .stream()
+                .map(participantsConverter::toDTO)
+                .collect(Collectors.toList());
     }
 
     // 지역별 모임 조회

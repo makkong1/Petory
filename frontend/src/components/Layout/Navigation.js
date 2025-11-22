@@ -73,54 +73,95 @@ const Navigation = ({ activeTab, setActiveTab, user, onNavigateToBoard }) => {
     const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
     if (!token) return;
 
-    // SSE 연결 (토큰을 쿼리 파라미터로 전달)
-    const eventSource = new EventSource(
-      `http://localhost:8080/api/notifications/stream?userId=${userId}&token=${encodeURIComponent(token)}`,
-      { withCredentials: true }
-    );
+    let eventSource = null;
+    let fallbackInterval = null;
+    let isConnected = false;
 
-    // 알림 수신 시 처리
-    eventSource.addEventListener('notification', (event) => {
-      try {
-        const notification = JSON.parse(event.data);
-        console.log('새 알림 수신:', notification);
-
-        // 알림 목록에 추가 (드롭다운이 열려있을 때만)
-        setNotifications((prev) => {
-          // 중복 제거
-          const exists = prev.some(n => n.idx === notification.idx);
-          if (exists) return prev;
-          return [notification, ...prev];
-        });
-
-        // 읽지 않은 알림 개수 증가
-        setUnreadCount((prev) => prev + 1);
-      } catch (err) {
-        console.error('알림 파싱 실패:', err);
+    // SSE 연결 함수
+    const connectSSE = () => {
+      if (eventSource) {
+        eventSource.close();
       }
-    });
 
-    // 읽지 않은 알림 개수 업데이트
-    eventSource.addEventListener('unreadCount', (event) => {
-      try {
-        const count = parseInt(event.data, 10);
-        setUnreadCount(count);
-      } catch (err) {
-        console.error('알림 개수 파싱 실패:', err);
-      }
-    });
+      // SSE 연결 (토큰을 쿼리 파라미터로 전달)
+      eventSource = new EventSource(
+        `http://localhost:8080/api/notifications/stream?userId=${userId}&token=${encodeURIComponent(token)}`,
+        { withCredentials: true }
+      );
 
-    // 연결 오류 처리
-    eventSource.onerror = (error) => {
-      console.error('SSE 연결 오류:', error);
-      // 연결이 끊어지면 재연결 시도 (EventSource가 자동으로 재연결)
+      // 연결 성공
+      eventSource.onopen = () => {
+        console.log('SSE 연결 성공');
+        isConnected = true;
+        // 연결 성공 시 폴백 폴링 중지
+        if (fallbackInterval) {
+          clearInterval(fallbackInterval);
+          fallbackInterval = null;
+        }
+      };
+
+      // 알림 수신 시 처리
+      eventSource.addEventListener('notification', (event) => {
+        try {
+          const notification = JSON.parse(event.data);
+          console.log('새 알림 수신 (SSE):', notification);
+
+          // 알림 목록에 추가
+          setNotifications((prev) => {
+            // 중복 제거
+            const exists = prev.some(n => n.idx === notification.idx);
+            if (exists) return prev;
+            return [notification, ...prev];
+          });
+
+          // 읽지 않은 알림 개수 증가
+          setUnreadCount((prev) => prev + 1);
+        } catch (err) {
+          console.error('알림 파싱 실패:', err);
+        }
+      });
+
+      // 읽지 않은 알림 개수 업데이트
+      eventSource.addEventListener('unreadCount', (event) => {
+        try {
+          const count = parseInt(event.data, 10);
+          setUnreadCount(count);
+        } catch (err) {
+          console.error('알림 개수 파싱 실패:', err);
+        }
+      });
+
+      // 연결 오류 처리
+      eventSource.onerror = (error) => {
+        console.error('SSE 연결 오류:', error);
+        isConnected = false;
+
+        // 연결이 끊어지면 폴백 폴링 시작 (5분마다)
+        if (!fallbackInterval) {
+          console.log('SSE 연결 실패, 폴백 폴링 시작');
+          fallbackInterval = setInterval(() => {
+            updateUnreadCount();
+          }, 300000); // 5분마다
+        }
+
+        // EventSource가 자동으로 재연결을 시도하지만, 
+        // 재연결이 실패하면 폴백 폴링이 작동함
+      };
     };
+
+    // 초기 연결
+    connectSSE();
 
     // 초기 알림 개수 로드
     updateUnreadCount();
 
     return () => {
-      eventSource.close();
+      if (eventSource) {
+        eventSource.close();
+      }
+      if (fallbackInterval) {
+        clearInterval(fallbackInterval);
+      }
     };
   }, [user, updateUnreadCount]);
 
@@ -157,6 +198,7 @@ const Navigation = ({ activeTab, setActiveTab, user, onNavigateToBoard }) => {
     { id: 'location-services', label: '주변 서비스', icon: '📍' },
     { id: 'care-requests', label: '펫케어 요청', icon: '🐾' },
     { id: 'missing-pets', label: '실종 제보', icon: '🚨' },
+    { id: 'meetup', label: '산책 모임', icon: '🐾' },
     { id: 'community', label: '커뮤니티', icon: '💬' },
     ...(user ? [
       { id: 'activity', label: '내 활동', icon: '📋' },

@@ -22,6 +22,7 @@ public class MeetupDTO {
     private String organizerName; // 주최자명
     private Integer maxParticipants;
     private Integer currentParticipants; // 현재 참여자 수
+    private String status; // 모임 상태: RECRUITING, CLOSED, COMPLETED
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private List<MeetupParticipantsDTO> participants;

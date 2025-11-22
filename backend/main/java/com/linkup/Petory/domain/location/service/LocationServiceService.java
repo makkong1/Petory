@@ -21,6 +21,7 @@ import java.util.stream.Collectors;
 public class LocationServiceService {
 
     private final KakaoMapService kakaoMapService;
+    private final com.linkup.Petory.domain.location.converter.LocationServiceConverter locationServiceConverter;
 
     private static final List<String> PET_KEYWORDS = Arrays.asList(
             "반려", "애완", "애견", "펫", "pet", "도그", "캣", "dog", "cat",
@@ -70,7 +71,7 @@ public class LocationServiceService {
         List<LocationServiceDTO> results = documents.stream()
                 .filter(this::isLikelyPetFriendly)
                 .filter(document -> matchesCategory(document, categoryType))
-                .map(this::convertDocumentToDto)
+                .map(locationServiceConverter::fromKakaoDocument)
                 .collect(Collectors.toList());
 
         return results;
@@ -202,47 +203,8 @@ public class LocationServiceService {
 
     private int resolveMaxResults(Integer maxResults) {
         if (maxResults == null || maxResults <= 0) {
-            return 100;
+            return 200; // 기본값을 200으로 증가
         }
-        return Math.min(maxResults, 100);
-    }
-
-    private LocationServiceDTO convertDocumentToDto(KakaoPlaceDTO.Document document) {
-        Double latitude = parseDoubleOrNull(document.getY());
-        Double longitude = parseDoubleOrNull(document.getX());
-
-        return LocationServiceDTO.builder()
-                .idx(null)
-                .externalId(document.getId())
-                .name(document.getPlaceName())
-                .category(document.getCategoryName())
-                .address(document.getAddressName())
-                .detailAddress(document.getRoadAddressName())
-                .latitude(latitude)
-                .longitude(longitude)
-                .rating(null)
-                .phone(document.getPhone())
-                .openingTime(null)
-                .closingTime(null)
-                .imageUrl(null)
-                .website(document.getPlace_url())
-                .placeUrl(document.getPlace_url())
-                .description(document.getCategoryName())
-                .petFriendly(true)
-                .petPolicy(null)
-                .reviewCount(null)
-                .reviews(null)
-                .build();
-    }
-
-    private Double parseDoubleOrNull(String value) {
-        if (!StringUtils.hasText(value)) {
-            return null;
-        }
-        try {
-            return Double.parseDouble(value);
-        } catch (NumberFormatException ex) {
-            return null;
-        }
+        return Math.min(maxResults, 200); // 최대값을 200으로 증가
     }
 }

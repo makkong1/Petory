@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const BASE_URL = 'http://localhost:8080/api/users';
+const BASE_URL = 'http://localhost:8080/api/admin/users';
 
 // 토큰을 가져오는 함수
 const getToken = () => {
@@ -46,4 +46,31 @@ export const userApi = {
   
   // 유저 삭제
   deleteUser: (id) => api.delete(`/${id}`),
+};
+
+// MASTER 전용: ADMIN 계정 관리 API
+const masterApi = axios.create({
+  baseURL: 'http://localhost:8080/api/master/admin-users',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// 요청 인터셉터 - 모든 요청에 토큰 자동 추가
+masterApi.interceptors.request.use(
+  (config) => {
+    const token = getToken();
+    if (token && !config.headers.Authorization) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+export const adminUserApi = {
+  // 일반 사용자를 ADMIN으로 승격
+  promoteToAdmin: (id) => masterApi.patch(`/${id}/promote-to-admin`),
 };

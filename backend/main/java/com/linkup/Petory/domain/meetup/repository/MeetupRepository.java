@@ -6,6 +6,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.linkup.Petory.domain.meetup.entity.Meetup;
+import com.linkup.Petory.domain.meetup.entity.MeetupStatus;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -41,4 +42,20 @@ public interface MeetupRepository extends JpaRepository<Meetup, Long> {
                         "AND m.date > :currentDate " +
                         "ORDER BY m.date ASC")
         List<Meetup> findAvailableMeetups(@Param("currentDate") LocalDateTime currentDate);
+
+        // 반경 기반 모임 조회 (Haversine 공식 사용)
+        // 시간 지난 모임 제외, COMPLETED 상태 제외
+        @Query(value = "SELECT m.*, " +
+                        "(6371 * acos(cos(radians(:lat)) * cos(radians(m.latitude)) * " +
+                        "cos(radians(m.longitude) - radians(:lng)) + " +
+                        "sin(radians(:lat)) * sin(radians(m.latitude)))) AS distance " +
+                        "FROM meetup m " +
+                        "WHERE m.date > :currentDate " +
+                        "AND m.status != 'COMPLETED' " +
+                        "HAVING distance <= :radius " +
+                        "ORDER BY distance ASC, m.date ASC", nativeQuery = true)
+        List<Meetup> findNearbyMeetups(@Param("lat") Double lat, 
+                                       @Param("lng") Double lng, 
+                                       @Param("radius") Double radius,
+                                       @Param("currentDate") LocalDateTime currentDate);
 }
