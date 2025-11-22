@@ -45,5 +45,14 @@ export const meetupApi = {
 
   // 모임 삭제
   deleteMeetup: (meetupIdx) => api.delete(`/${meetupIdx}`),
+
+  // 모임 참가
+  joinMeetup: (meetupIdx) => api.post(`/${meetupIdx}/participants`),
+
+  // 모임 참가 취소
+  cancelParticipation: (meetupIdx) => api.delete(`/${meetupIdx}/participants`),
+
+  // 참가 여부 확인
+  checkParticipation: (meetupIdx) => api.get(`/${meetupIdx}/participants/check`),
 };
 

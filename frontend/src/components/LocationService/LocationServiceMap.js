@@ -716,7 +716,7 @@ const LocationServiceMap = () => {
               servicesWithDisplay.map((service) => (
                 <ServiceListItem
                   key={service.key}
-                  active={selectedService?.key === service.key}
+                  isSelected={selectedService?.key === service.key}
                   onClick={() => handleServiceSelect(service)}
                 >
                   <ServiceListItemHeader>
@@ -800,17 +800,17 @@ export default LocationServiceMap;
 
 const Container = styled.div`
   width: 100%;
-  height: 100vh;
+  height: calc(100vh - 80px);
   display: flex;
   flex-direction: column;
-  background: #f4f6f9;
+  background: ${props => props.theme.colors.background};
   overflow: hidden;
 `;
 
 const Header = styled.div`
-  padding: 1rem 1.5rem;
-  background: #ffffff;
-  border-bottom: 1px solid #e5e7eb;
+  padding: 1rem 2rem;
+  background: ${props => props.theme.colors.surface};
+  border-bottom: 1px solid ${props => props.theme.colors.border};
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
@@ -825,23 +825,21 @@ const CategoryFilterBar = styled.div`
 const CategoryButton = styled.button.withConfig({
   shouldForwardProp: (prop) => prop !== 'active',
 })`
-  padding: 0.5rem 1.1rem;
-  border-radius: 999px;
-  border: 1px solid ${(props) => (props.active ? '#1d4ed8' : '#d1d5db')};
-  background: ${(props) => (props.active ? '#1d4ed8' : '#ffffff')};
-  color: ${(props) => (props.active ? '#ffffff' : '#374151')};
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  border: 1px solid ${(props) => (props.active ? props.theme.colors.primary : props.theme.colors.border)};
+  background: ${(props) => (props.active ? props.theme.colors.primary : props.theme.colors.surface)};
+  color: ${(props) => (props.active ? '#ffffff' : props.theme.colors.text)};
   font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+  transition: all 0.2s;
 
   &:hover {
-    border-color: #1d4ed8;
-    color: ${(props) => (props.active ? '#ffffff' : '#1d4ed8')};
-  }
-
-  &:active {
-    transform: scale(0.97);
+    border-color: ${props => props.theme.colors.primary};
+    background: ${(props) => (props.active ? props.theme.colors.primary + 'dd' : props.theme.colors.primary)};
+    color: white;
+    transform: translateY(-1px);
   }
 `;
 
@@ -855,7 +853,7 @@ const HeaderTop = styled.div`
 
 const Title = styled.h1`
   margin: 0;
-  color: #1f2933;
+  color: ${props => props.theme.colors.text};
   font-size: 1.5rem;
   font-weight: 700;
 `;
@@ -884,43 +882,46 @@ const SearchInput = styled.input`
   flex: 1;
   min-width: 220px;
   padding: 0.6rem 1rem;
-  border: 1px solid #d1d5db;
-  border-radius: 999px;
+  border: 1px solid ${props => props.theme.colors.border};
+  border-radius: 8px;
   font-size: 0.95rem;
-  color: #1f2933;
+  color: ${props => props.theme.colors.text};
+  background: ${props => props.theme.colors.surface};
 
   &:focus {
     outline: none;
-    border-color: #2563eb;
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    border-color: ${props => props.theme.colors.primary};
+    box-shadow: 0 0 0 3px ${props => props.theme.colors.primary}33;
   }
 `;
 
 const SearchButton = styled.button`
   padding: 0.55rem 1.2rem;
-  background: #2563eb;
-  color: #ffffff;
+  background: ${props => props.theme.colors.primary};
+  color: white;
   border: none;
-  border-radius: 999px;
+  border-radius: 8px;
   font-size: 0.95rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.2s ease;
+  transition: all 0.2s;
 
   &:hover {
-    background: #1d4ed8;
+    background: ${props => props.theme.colors.primary}dd;
+    transform: translateY(-1px);
   }
 
   &:active {
-    background: #1e40af;
+    background: ${props => props.theme.colors.primary};
   }
 `;
 
 const SearchModeTabs = styled.div`
   display: inline-flex;
   padding: 0.35rem;
-  border-radius: 999px;
-  background: #e5e7eb;
+  border-radius: 8px;
+  background: ${props => props.theme.colors.background};
+  border: 1px solid ${props => props.theme.colors.border};
   gap: 0.25rem;
 `;
 
@@ -937,45 +938,45 @@ const SearchModeButton = styled.button.withConfig({
 })`
   padding: 0.4rem 0.9rem;
   border: none;
-  border-radius: 999px;
+  border-radius: 8px;
   font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
-  background: ${(props) => (props.active ? '#1d4ed8' : 'transparent')};
-  color: ${(props) => (props.active ? '#ffffff' : '#374151')};
-  transition: background 0.2s ease, color 0.2s ease;
+  background: ${(props) => (props.active ? props.theme.colors.primary : 'transparent')};
+  color: ${(props) => (props.active ? '#ffffff' : props.theme.colors.text)};
+  transition: all 0.2s;
 
   &:hover {
-    background: ${(props) => (props.active ? '#1e40af' : '#d1d5db')};
+    background: ${(props) => (props.active ? props.theme.colors.primary + 'dd' : props.theme.colors.primary + '20')};
   }
 `;
 
 const CurrentLocationButton = styled.button`
-  padding: 0.45rem 1rem;
-  border: none;
-  border-radius: 999px;
+  padding: 0.5rem 1rem;
+  border: 1px solid ${props => props.theme.colors.border};
+  border-radius: 8px;
   font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
-  background: #10b981;
-  color: #ffffff;
-  transition: background 0.2s ease, transform 0.1s ease;
+  background: ${props => props.disabled ? props.theme.colors.border : props.theme.colors.surface};
+  color: ${props => props.disabled ? props.theme.colors.textSecondary : props.theme.colors.text};
+  transition: all 0.2s;
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
 
   &:hover:enabled {
-    background: #059669;
+    background: ${props => props.theme.colors.primary};
+    color: white;
   }
 
   &:active:enabled {
-    transform: scale(0.97);
+    transform: translateY(-1px);
   }
 
   &:disabled {
-    background: #d1d5db;
-    color: #6b7280;
     cursor: not-allowed;
+    opacity: 0.6;
   }
 `;
 
@@ -987,23 +988,24 @@ const RegionControls = styled.div`
 `;
 
 const RegionSelect = styled.select`
-  padding: 0.55rem 1rem;
-  border: 1px solid #d1d5db;
-  border-radius: 999px;
-  font-size: 0.95rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid ${props => props.theme.colors.border};
+  border-radius: 8px;
+  font-size: 0.9rem;
   min-width: 200px;
-  background: #ffffff;
-  color: #1f2933;
+  background: ${props => props.theme.colors.surface};
+  color: ${props => props.theme.colors.text};
+  cursor: pointer;
 
   &:focus {
     outline: none;
-    border-color: #2563eb;
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    border-color: ${props => props.theme.colors.primary};
+    box-shadow: 0 0 0 3px ${props => props.theme.colors.primary}33;
   }
 
   &:disabled {
-    background: #f3f4f6;
-    color: #9ca3af;
+    background: ${props => props.theme.colors.background};
+    color: ${props => props.theme.colors.textSecondary};
     cursor: not-allowed;
   }
 `;
@@ -1016,18 +1018,18 @@ const RegionSearchButton = styled(SearchButton)`
 
 const StatusBanner = styled.div`
   padding: 0.75rem 1.5rem;
-  background: #fff3cd;
-  color: #856404;
+  background: ${props => props.theme.colors.warning || '#fff3cd'};
+  color: ${props => props.theme.colors.text || '#856404'};
   font-size: 0.95rem;
-  border-bottom: 1px solid #ffeeba;
+  border-bottom: 1px solid ${props => props.theme.colors.border};
 `;
 
 const ErrorBanner = styled.div`
   padding: 0.75rem 1.5rem;
-  background: #fdecea;
-  color: #c0392b;
+  background: ${props => props.theme.colors.error || '#fdecea'};
+  color: ${props => props.theme.colors.text || '#c0392b'};
   font-size: 0.95rem;
-  border-bottom: 1px solid #f5c6cb;
+  border-bottom: 1px solid ${props => props.theme.colors.border};
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -1046,7 +1048,7 @@ const MapArea = styled.div`
   flex: 1;
   position: relative;
   display: flex;
-  background: #e5e7eb;
+  background: ${props => props.theme.colors.background};
   min-height: 0;
 `;
 
@@ -1065,14 +1067,14 @@ const LoadingOverlay = styled.div`
   align-items: center;
   justify-content: center;
   font-weight: 600;
-  color: #2563eb;
+  color: ${props => props.theme.colors.primary};
   z-index: 200;
 `;
 
 const ServiceListPanel = styled.div`
-  width: 360px;
-  background: #ffffff;
-  border-left: 1px solid #d1d5db;
+  width: 350px;
+  background: ${props => props.theme.colors.surface};
+  border-left: 1px solid ${props => props.theme.colors.border};
   display: flex;
   flex-direction: column;
   z-index: 150;
@@ -1082,60 +1084,38 @@ const ServiceListPanel = styled.div`
 `;
 
 const ServiceListHeader = styled.div`
-  padding: 1rem 1.25rem;
-  border-bottom: 1px solid #e5e7eb;
-  background: #f9fafb;
+  padding: 1rem;
+  border-bottom: 1px solid ${props => props.theme.colors.border};
+  background: ${props => props.theme.colors.surface};
 `;
 
 const ServiceListTitle = styled.h3`
   margin: 0;
   font-size: 1rem;
-  color: #111827;
+  font-weight: 600;
+  color: ${props => props.theme.colors.text};
 `;
 
 const ServiceListContent = styled.div`
   flex: 1;
-  min-height: 0;
   overflow-y: auto;
-  padding: 0.75rem;
-  padding-right: 0.35rem;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(37, 99, 235, 0.45) rgba(226, 232, 240, 0.7);
-
-  &::-webkit-scrollbar {
-    width: 8px;
-  }
-
-  &::-webkit-scrollbar-track {
-    background: rgba(226, 232, 240, 0.6);
-    border-radius: 999px;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: rgba(37, 99, 235, 0.45);
-    border-radius: 999px;
-  }
-
-  &::-webkit-scrollbar-thumb:hover {
-    background: rgba(37, 99, 235, 0.65);
-  }
+  padding: 0.5rem;
 `;
 
 const ServiceListItem = styled.div.withConfig({
   shouldForwardProp: (prop) => prop !== 'active',
 })`
-  padding: 0.9rem 1rem;
-  margin-bottom: 0.6rem;
-  border: 1px solid ${props => (props.active ? '#2563eb' : '#e5e7eb')};
-  border-radius: 10px;
-  background: ${props => (props.active ? '#eef2ff' : '#ffffff')};
+  padding: 1rem;
+  margin-bottom: 0.5rem;
+  background: ${props => props.isSelected ? props.theme.colors.primary + '20' : props.theme.colors.background};
+  border: 1px solid ${props => props.isSelected ? props.theme.colors.primary : props.theme.colors.border};
+  border-radius: 8px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.2s;
 
   &:hover {
-    border-color: #2563eb;
-    box-shadow: 0 8px 16px rgba(37, 99, 235, 0.12);
-    transform: translateY(-2px);
+    background: ${props => props.theme.colors.primary + '10'};
+    border-color: ${props => props.theme.colors.primary};
   }
 `;
 
@@ -1149,25 +1129,25 @@ const ServiceListItemHeader = styled.div`
 const ServiceListItemName = styled.div`
   font-weight: 600;
   font-size: 1rem;
-  color: #1f2937;
-  flex: 1;
+  margin-bottom: 0.5rem;
+  color: ${props => props.theme.colors.text};
 `;
 
 const ServiceDistance = styled.span`
   font-size: 0.85rem;
-  color: #2563eb;
+  color: ${props => props.theme.colors.primary};
   font-weight: 600;
 `;
 
 const ServiceListItemCategory = styled.div`
   font-size: 0.85rem;
-  color: #4b5563;
+  color: ${props => props.theme.colors.textSecondary};
   margin-bottom: 0.25rem;
 `;
 
 const ServiceListItemAddress = styled.div`
   font-size: 0.85rem;
-  color: #6b7280;
+  color: ${props => props.theme.colors.textSecondary};
   margin-bottom: 0.4rem;
   line-height: 1.4;
 `;
@@ -1178,11 +1158,11 @@ const ServiceActions = styled.div`
   align-items: center;
   gap: 0.5rem;
   font-size: 0.85rem;
-  color: #4b5563;
+  color: ${props => props.theme.colors.textSecondary};
 `;
 
 const ServiceLink = styled.a`
-  color: #2563eb;
+  color: ${props => props.theme.colors.primary};
   font-weight: 600;
   text-decoration: none;
 
@@ -1194,7 +1174,7 @@ const ServiceLink = styled.a`
 const EmptyMessage = styled.div`
   padding: 2rem 1rem;
   text-align: center;
-  color: #6b7280;
+  color: ${props => props.theme.colors.textSecondary};
   font-size: 0.95rem;
 `;
 
@@ -1203,9 +1183,9 @@ const ServiceDetailPanel = styled.div`
   top: 1rem;
   left: 1rem;
   width: 320px;
-  background: #ffffff;
+  background: ${props => props.theme.colors.surface};
   border-radius: 12px;
-  box-shadow: 0 15px 35px rgba(30, 41, 59, 0.2);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
   padding: 1.25rem;
   z-index: 300;
   max-height: calc(100vh - 2rem);
@@ -1220,17 +1200,19 @@ const CloseButton = styled.button`
   border: none;
   font-size: 1.2rem;
   cursor: pointer;
-  color: #6b7280;
+  color: ${props => props.theme.colors.textSecondary};
+  line-height: 1;
 
   &:hover {
-    color: #111827;
+    color: ${props => props.theme.colors.text};
   }
 `;
 
 const ServiceTitle = styled.h3`
   margin: 0 0 1rem 0;
-  color: #111827;
+  color: ${props => props.theme.colors.text};
   font-size: 1.25rem;
+  font-weight: 600;
 `;
 
 const ServiceInfo = styled.div`
@@ -1238,7 +1220,7 @@ const ServiceInfo = styled.div`
   flex-direction: column;
   gap: 0.6rem;
   font-size: 0.95rem;
-  color: #374151;
+  color: ${props => props.theme.colors.text};
 `;
 
 const ServiceInfoItem = styled.div`
@@ -1247,13 +1229,13 @@ const ServiceInfoItem = styled.div`
   gap: 0.25rem;
 
   strong {
-    color: #6b7280;
+    color: ${props => props.theme.colors.textSecondary};
     font-size: 0.85rem;
     font-weight: 600;
   }
 
   span {
-    color: #1f2937;
+    color: ${props => props.theme.colors.text};
   }
 `;
 
@@ -1262,13 +1244,15 @@ const DetailLink = styled.a`
   margin-top: 1.25rem;
   text-align: center;
   padding: 0.6rem 1rem;
-  background: #2563eb;
-  color: #ffffff;
-  border-radius: 999px;
+  background: ${props => props.theme.colors.primary};
+  color: white;
+  border-radius: 8px;
   text-decoration: none;
   font-weight: 600;
+  transition: all 0.2s;
 
   &:hover {
-    background: #1d4ed8;
+    background: ${props => props.theme.colors.primary}dd;
+    transform: translateY(-1px);
   }
 `;

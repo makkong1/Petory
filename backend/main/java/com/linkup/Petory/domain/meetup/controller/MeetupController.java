@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -25,9 +26,16 @@ public class MeetupController {
 
     // 모임 생성
     @PostMapping
-    public ResponseEntity<Map<String, Object>> createMeetup(@RequestBody MeetupDTO meetupDTO) {
+    public ResponseEntity<Map<String, Object>> createMeetup(
+            @RequestBody MeetupDTO meetupDTO,
+            Authentication authentication) {
         try {
-            MeetupDTO createdMeetup = meetupService.createMeetup(meetupDTO);
+            String userId = authentication != null ? authentication.getName() : null;
+            if (userId == null) {
+                throw new RuntimeException("인증된 사용자 정보를 찾을 수 없습니다.");
+            }
+
+            MeetupDTO createdMeetup = meetupService.createMeetup(meetupDTO, userId);
 
             Map<String, Object> response = new HashMap<>();
             response.put("meetup", createdMeetup);
@@ -232,6 +240,82 @@ public class MeetupController {
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             log.error("참가자 목록 조회 실패: {}", e.getMessage());
+            Map<String, Object> response = new HashMap<>();
+            response.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    // 모임 참가
+    @PostMapping("/{meetupIdx}/participants")
+    public ResponseEntity<Map<String, Object>> joinMeetup(
+            @PathVariable Long meetupIdx,
+            Authentication authentication) {
+        try {
+            String userId = authentication != null ? authentication.getName() : null;
+            if (userId == null) {
+                throw new RuntimeException("인증된 사용자 정보를 찾을 수 없습니다.");
+            }
+
+            MeetupParticipantsDTO participant = meetupService.joinMeetup(meetupIdx, userId);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("participant", participant);
+            response.put("message", "모임에 참가했습니다.");
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("모임 참가 실패: {}", e.getMessage());
+            Map<String, Object> response = new HashMap<>();
+            response.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    // 모임 참가 취소
+    @DeleteMapping("/{meetupIdx}/participants")
+    public ResponseEntity<Map<String, Object>> cancelMeetupParticipation(
+            @PathVariable Long meetupIdx,
+            Authentication authentication) {
+        try {
+            String userId = authentication != null ? authentication.getName() : null;
+            if (userId == null) {
+                throw new RuntimeException("인증된 사용자 정보를 찾을 수 없습니다.");
+            }
+
+            meetupService.cancelMeetupParticipation(meetupIdx, userId);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "모임 참가를 취소했습니다.");
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("모임 참가 취소 실패: {}", e.getMessage());
+            Map<String, Object> response = new HashMap<>();
+            response.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    // 사용자가 특정 모임에 참가했는지 확인
+    @GetMapping("/{meetupIdx}/participants/check")
+    public ResponseEntity<Map<String, Object>> checkParticipation(
+            @PathVariable Long meetupIdx,
+            Authentication authentication) {
+        try {
+            String userId = authentication != null ? authentication.getName() : null;
+            if (userId == null) {
+                throw new RuntimeException("인증된 사용자 정보를 찾을 수 없습니다.");
+            }
+
+            boolean isParticipating = meetupService.isUserParticipating(meetupIdx, userId);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("isParticipating", isParticipating);
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("참가 여부 확인 실패: {}", e.getMessage());
             Map<String, Object> response = new HashMap<>();
             response.put("error", e.getMessage());
             return ResponseEntity.badRequest().body(response);
