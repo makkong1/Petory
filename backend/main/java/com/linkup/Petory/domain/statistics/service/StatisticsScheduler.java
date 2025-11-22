@@ -28,9 +28,9 @@ public class StatisticsScheduler {
     private final CareRequestRepository careRequestRepository;
 
     /**
-     * 매일 자정(00:00:00)에 실행되어 '어제'의 통계를 집계
+     * 매일 오후 6시 30분(18:30:00)에 실행되어 '어제'의 통계를 집계
      */
-    @Scheduled(cron = "0 0 0 * * ?")
+    @Scheduled(cron = "0 30 18 * * ?")
     @Transactional
     public void aggregateDailyStatistics() {
         LocalDate yesterday = LocalDate.now().minusDays(1);

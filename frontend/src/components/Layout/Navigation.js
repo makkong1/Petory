@@ -5,6 +5,348 @@ import { useAuth } from '../../contexts/AuthContext';
 import UserProfileModal from '../User/UserProfileModal';
 import { notificationApi } from '../../api/notificationApi';
 
+const Navigation = ({ activeTab, setActiveTab, user, onNavigateToBoard }) => {
+  const { isDarkMode, toggleTheme } = useTheme();
+  const { logout, updateUserProfile } = useAuth();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
+
+  const isAdmin = user && (user.role === 'ADMIN' || user.role === 'MASTER');
+
+  // 알림 조회
+  const fetchNotifications = useCallback(async () => {
+    const userId = user?.idx || user?.id;
+    if (!userId) {
+      console.warn('알림 조회 실패: user 정보가 없습니다.', user);
+      return;
+    }
+    try {
+      setLoadingNotifications(true);
+      const [notificationsRes, countRes] = await Promise.all([
+        notificationApi.getUserNotifications(userId),
+        notificationApi.getUnreadCount(userId),
+      ]);
+      setNotifications(notificationsRes.data || []);
+      setUnreadCount(countRes.data || 0);
+    } catch (err) {
+      console.error('알림 조회 실패:', {
+        error: err,
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status,
+        url: err.config?.url
+      });
+    } finally {
+      setLoadingNotifications(false);
+    }
+  }, [user]);
+
+  // 알림 목록 열 때 조회
+  useEffect(() => {
+    const userId = user?.idx || user?.id;
+    if (isNotificationOpen && userId) {
+      fetchNotifications();
+    }
+  }, [isNotificationOpen, user, fetchNotifications]);
+  // 알림 개수 업데이트 함수
+  const updateUnreadCount = useCallback(async () => {
+    const userId = user?.idx || user?.id;
+    if (!userId) return;
+    try {
+      const res = await notificationApi.getUnreadCount(userId);
+      setUnreadCount(res.data || 0);
+    } catch (err) {
+      console.error('알림 개수 조회 실패:', err);
+    }
+  }, [user]);
+
+  // Server-Sent Events를 통한 실시간 알림 구독
+  useEffect(() => {
+    const userId = user?.idx || user?.id;
+    if (!userId) return;
+
+    // 토큰 가져오기
+    const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
+    if (!token) return;
+
+    let eventSource = null;
+    let fallbackInterval = null;
+    let isConnected = false;
+
+    // SSE 연결 함수
+    const connectSSE = () => {
+      if (eventSource) {
+        eventSource.close();
+      }
+
+      // SSE 연결 (토큰을 쿼리 파라미터로 전달)
+      eventSource = new EventSource(
+        `http://localhost:8080/api/notifications/stream?userId=${userId}&token=${encodeURIComponent(token)}`,
+        { withCredentials: true }
+      );
+
+      // 연결 성공
+      eventSource.onopen = () => {
+        console.log('SSE 연결 성공');
+        isConnected = true;
+        // 연결 성공 시 폴백 폴링 중지
+        if (fallbackInterval) {
+          clearInterval(fallbackInterval);
+          fallbackInterval = null;
+        }
+      };
+
+      // 알림 수신 시 처리
+      eventSource.addEventListener('notification', (event) => {
+        try {
+          const notification = JSON.parse(event.data);
+          console.log('새 알림 수신 (SSE):', notification);
+
+          // 알림 목록에 추가
+          setNotifications((prev) => {
+            // 중복 제거
+            const exists = prev.some(n => n.idx === notification.idx);
+            if (exists) return prev;
+            return [notification, ...prev];
+          });
+
+          // 읽지 않은 알림 개수 증가
+          setUnreadCount((prev) => prev + 1);
+        } catch (err) {
+          console.error('알림 파싱 실패:', err);
+        }
+      });
+
+      // 읽지 않은 알림 개수 업데이트
+      eventSource.addEventListener('unreadCount', (event) => {
+        try {
+          const count = parseInt(event.data, 10);
+          setUnreadCount(count);
+        } catch (err) {
+          console.error('알림 개수 파싱 실패:', err);
+        }
+      });
+
+      // 연결 오류 처리
+      eventSource.onerror = (error) => {
+        console.error('SSE 연결 오류:', error);
+        isConnected = false;
+
+        // 연결이 끊어지면 폴백 폴링 시작 (5분마다)
+        if (!fallbackInterval) {
+          console.log('SSE 연결 실패, 폴백 폴링 시작');
+          fallbackInterval = setInterval(() => {
+            updateUnreadCount();
+          }, 300000); // 5분마다
+        }
+
+        // EventSource가 자동으로 재연결을 시도하지만, 
+        // 재연결이 실패하면 폴백 폴링이 작동함
+      };
+    };
+
+    // 초기 연결
+    connectSSE();
+
+    // 초기 알림 개수 로드
+    updateUnreadCount();
+
+    return () => {
+      if (eventSource) {
+        eventSource.close();
+      }
+      if (fallbackInterval) {
+        clearInterval(fallbackInterval);
+      }
+    };
+  }, [user, updateUnreadCount]);
+
+  // 알림 읽음 처리
+  const handleMarkAsRead = async (notificationId) => {
+    const userId = user?.idx || user?.id;
+    if (!userId) return;
+    try {
+      await notificationApi.markAsRead(notificationId, userId);
+      setNotifications(prev =>
+        prev.map(n => n.idx === notificationId ? { ...n, isRead: true } : n)
+      );
+      setUnreadCount(prev => Math.max(0, prev - 1));
+    } catch (err) {
+      console.error('알림 읽음 처리 실패:', err);
+    }
+  };
+
+  // 모든 알림 읽음 처리
+  const handleMarkAllAsRead = async () => {
+    const userId = user?.idx || user?.id;
+    if (!userId) return;
+    try {
+      await notificationApi.markAllAsRead(userId);
+      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+      setUnreadCount(0);
+    } catch (err) {
+      console.error('모든 알림 읽음 처리 실패:', err);
+    }
+  };
+
+  const menuItems = [
+    { id: 'home', label: '홈', icon: '🏠' },
+    { id: 'location-services', label: '주변 서비스', icon: '📍' },
+    { id: 'care-requests', label: '펫케어 요청', icon: '🐾' },
+    { id: 'missing-pets', label: '실종 제보', icon: '🚨' },
+    { id: 'meetup', label: '산책 모임', icon: '🐾' },
+    { id: 'community', label: '커뮤니티', icon: '💬' },
+    ...(user ? [
+      { id: 'activity', label: '내 활동', icon: '📋' },
+    ] : []),
+    ...(isAdmin ? [
+      { id: 'admin', label: '관리자', icon: '🔧' },
+    ] : []),
+  ];
+
+  return (
+    <>
+      <NavContainer>
+        <NavContent>
+          <Logo onClick={() => setActiveTab('home')}>
+            <span className="icon">🦴</span>
+            <span>Petory</span>
+          </Logo>
+
+          <NavMenu isOpen={isMobileMenuOpen}>
+            {menuItems.map(item => (
+              <NavItem
+                key={item.id}
+                className={activeTab === item.id ? 'active' : ''}
+                onClick={() => {
+                  setActiveTab(item.id);
+                  setIsMobileMenuOpen(false);
+                }}
+              >
+                <span style={{ marginRight: '8px' }}>{item.icon}</span>
+                {item.label}
+              </NavItem>
+            ))}
+          </NavMenu>
+
+          <RightSection>
+            {user && (
+              <>
+                <div style={{ position: 'relative' }}>
+                  <NotificationButton type="button" onClick={() => setIsNotificationOpen(!isNotificationOpen)}>
+                    🔔
+                    {unreadCount > 0 && <NotificationBadge>{unreadCount}</NotificationBadge>}
+                  </NotificationButton>
+                  {isNotificationOpen && (
+                    <NotificationDropdown>
+                      <NotificationHeader>
+                        <NotificationTitle>알림</NotificationTitle>
+                        {unreadCount > 0 && (
+                          <MarkAllReadButton onClick={handleMarkAllAsRead}>
+                            모두 읽음
+                          </MarkAllReadButton>
+                        )}
+                      </NotificationHeader>
+                      <NotificationList>
+                        {loadingNotifications ? (
+                          <NotificationEmpty>알림을 불러오는 중...</NotificationEmpty>
+                        ) : notifications.length === 0 ? (
+                          <NotificationEmpty>알림이 없습니다</NotificationEmpty>
+                        ) : (
+                          notifications.map((notification) => (
+                            <NotificationItem
+                              key={notification.idx}
+                              unread={!notification.isRead}
+                              onClick={() => {
+                                if (!notification.isRead) {
+                                  handleMarkAsRead(notification.idx);
+                                }
+                                setIsNotificationOpen(false);
+                                // 관련 게시글로 이동
+                                if (notification.relatedType === 'BOARD' && notification.relatedId) {
+                                  // 커뮤니티 탭으로 이동
+                                  setActiveTab('community');
+                                  // 게시글 상세 페이지 열기 (전역 이벤트 사용)
+                                  setTimeout(() => {
+                                    window.dispatchEvent(new CustomEvent('openBoardDetail', {
+                                      detail: { boardId: notification.relatedId }
+                                    }));
+                                  }, 100); // 탭 전환 후 실행
+                                } else if (notification.relatedType === 'MISSING_PET' && notification.relatedId) {
+                                  // 실종제보 탭으로 이동
+                                  setActiveTab('missing-pets');
+                                  // 실종제보 게시글 상세 페이지 열기 (전역 이벤트 사용)
+                                  setTimeout(() => {
+                                    window.dispatchEvent(new CustomEvent('openMissingPetDetail', {
+                                      detail: { boardId: notification.relatedId }
+                                    }));
+                                  }, 100); // 탭 전환 후 실행
+                                }
+                              }}
+                            >
+                              <NotificationContent>
+                                <NotificationTitleText>{notification.title || '알림'}</NotificationTitleText>
+                                <NotificationText>{notification.content || ''}</NotificationText>
+                                <NotificationTime>
+                                  {notification.createdAt
+                                    ? new Date(notification.createdAt).toLocaleString('ko-KR')
+                                    : '시간 정보 없음'}
+                                </NotificationTime>
+                              </NotificationContent>
+                              {!notification.isRead && <UnreadDot />}
+                            </NotificationItem>
+                          ))
+                        )}
+                      </NotificationList>
+                    </NotificationDropdown>
+                  )}
+                </div>
+                <UserInfo type="button" onClick={() => setIsProfileOpen(true)}>
+                  <span role="img" aria-label="user">
+                    👤
+                  </span>
+                  {user.username || '내 정보'}
+                </UserInfo>
+              </>
+            )}
+
+            <ThemeToggle onClick={toggleTheme}>
+              {isDarkMode ? '🌙' : '☀️'}
+            </ThemeToggle>
+
+            {user && (
+              <LogoutButton onClick={logout}>
+                로그아웃
+              </LogoutButton>
+            )}
+
+            <MobileMenuButton onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
+              ☰
+            </MobileMenuButton>
+          </RightSection>
+        </NavContent>
+      </NavContainer>
+      {user && (
+        <UserProfileModal
+          isOpen={isProfileOpen}
+          userId={user.idx}
+          onClose={() => setIsProfileOpen(false)}
+          onUpdated={(updated) => {
+            updateUserProfile?.(updated);
+          }}
+        />
+      )}
+    </>
+  );
+};
+
+export default Navigation;
+
+
 const NavContainer = styled.nav`
   background: ${props => props.theme.colors.background};
   border-bottom: 1px solid ${props => props.theme.colors.border};
@@ -304,271 +646,3 @@ const NotificationEmpty = styled.div`
   color: ${props => props.theme.colors.textSecondary};
   font-size: ${props => props.theme.typography.body2.fontSize};
 `;
-
-const Navigation = ({ activeTab, setActiveTab, user, onNavigateToBoard }) => {
-  const { isDarkMode, toggleTheme } = useTheme();
-  const { logout, updateUserProfile } = useAuth();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
-  const [notifications, setNotifications] = useState([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [loadingNotifications, setLoadingNotifications] = useState(false);
-
-  const isAdmin = user && (user.role === 'ADMIN' || user.role === 'MASTER');
-
-  // 알림 조회
-  const fetchNotifications = useCallback(async () => {
-    const userId = user?.idx || user?.id;
-    if (!userId) {
-      console.warn('알림 조회 실패: user 정보가 없습니다.', user);
-      return;
-    }
-    try {
-      setLoadingNotifications(true);
-      console.log('알림 조회 시작 - userId:', userId);
-      const [notificationsRes, countRes] = await Promise.all([
-        notificationApi.getUserNotifications(userId),
-        notificationApi.getUnreadCount(userId),
-      ]);
-      console.log('알림 조회 성공:', {
-        notifications: notificationsRes.data?.length || 0,
-        unreadCount: countRes.data || 0,
-        notificationsData: notificationsRes.data,
-        countData: countRes.data
-      });
-      setNotifications(notificationsRes.data || []);
-      setUnreadCount(countRes.data || 0);
-      console.log('알림 상태 업데이트:', {
-        notificationsCount: notificationsRes.data?.length || 0,
-        unreadCount: countRes.data || 0
-      });
-    } catch (err) {
-      console.error('알림 조회 실패:', {
-        error: err,
-        message: err.message,
-        response: err.response?.data,
-        status: err.response?.status,
-        url: err.config?.url
-      });
-    } finally {
-      setLoadingNotifications(false);
-    }
-  }, [user]);
-
-  // 알림 목록 열 때 조회
-  useEffect(() => {
-    const userId = user?.idx || user?.id;
-    if (isNotificationOpen && userId) {
-      console.log('알림 드롭다운 열림 - 알림 조회 시작');
-      fetchNotifications();
-    }
-  }, [isNotificationOpen, user, fetchNotifications]);
-
-  // 알림 상태 디버깅
-  useEffect(() => {
-    console.log('알림 상태 변경:', {
-      isNotificationOpen,
-      notificationsCount: notifications.length,
-      unreadCount,
-      notifications: notifications
-    });
-  }, [isNotificationOpen, notifications, unreadCount]);
-
-  // 주기적으로 알림 개수만 업데이트 (30초마다)
-  useEffect(() => {
-    const userId = user?.idx || user?.id;
-    if (!userId) return;
-    
-    const interval = setInterval(() => {
-      notificationApi.getUnreadCount(userId)
-        .then(res => setUnreadCount(res.data || 0))
-        .catch(err => console.error('알림 개수 조회 실패:', err));
-    }, 30000);
-
-    // 초기 로드
-    notificationApi.getUnreadCount(userId)
-      .then(res => setUnreadCount(res.data || 0))
-      .catch(err => {
-        console.error('알림 개수 조회 실패:', {
-          error: err,
-          message: err.message,
-          response: err.response?.data,
-          status: err.response?.status,
-          url: err.config?.url
-        });
-      });
-
-    return () => clearInterval(interval);
-  }, [user]);
-
-  // 알림 읽음 처리
-  const handleMarkAsRead = async (notificationId) => {
-    const userId = user?.idx || user?.id;
-    if (!userId) return;
-    try {
-      await notificationApi.markAsRead(notificationId, userId);
-      setNotifications(prev =>
-        prev.map(n => n.idx === notificationId ? { ...n, isRead: true } : n)
-      );
-      setUnreadCount(prev => Math.max(0, prev - 1));
-    } catch (err) {
-      console.error('알림 읽음 처리 실패:', err);
-    }
-  };
-
-  // 모든 알림 읽음 처리
-  const handleMarkAllAsRead = async () => {
-    const userId = user?.idx || user?.id;
-    if (!userId) return;
-    try {
-      await notificationApi.markAllAsRead(userId);
-      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
-      setUnreadCount(0);
-    } catch (err) {
-      console.error('모든 알림 읽음 처리 실패:', err);
-    }
-  };
-  
-  const menuItems = [
-    { id: 'home', label: '홈', icon: '🏠' },
-    { id: 'location-services', label: '주변 서비스', icon: '📍' },
-    { id: 'care-requests', label: '펫케어 요청', icon: '🐾' },
-    { id: 'missing-pets', label: '실종 제보', icon: '🚨' },
-    { id: 'community', label: '커뮤니티', icon: '💬' },
-    ...(user ? [
-      { id: 'activity', label: '내 활동', icon: '📋' },
-    ] : []),
-    ...(isAdmin ? [
-      { id: 'admin', label: '관리자', icon: '🔧' },
-    ] : []),
-  ];
-
-  return (
-    <>
-      <NavContainer>
-        <NavContent>
-          <Logo onClick={() => setActiveTab('home')}>
-            <span className="icon">🦴</span>
-            <span>Petory</span>
-          </Logo>
-          
-          <NavMenu isOpen={isMobileMenuOpen}>
-            {menuItems.map(item => (
-              <NavItem
-                key={item.id}
-                className={activeTab === item.id ? 'active' : ''}
-                onClick={() => {
-                  setActiveTab(item.id);
-                  setIsMobileMenuOpen(false);
-                }}
-              >
-                <span style={{ marginRight: '8px' }}>{item.icon}</span>
-                {item.label}
-              </NavItem>
-            ))}
-          </NavMenu>
-          
-          <RightSection>
-            {user && (
-              <>
-                <div style={{ position: 'relative' }}>
-                  <NotificationButton type="button" onClick={() => setIsNotificationOpen(!isNotificationOpen)}>
-                    🔔
-                    {unreadCount > 0 && <NotificationBadge>{unreadCount}</NotificationBadge>}
-                  </NotificationButton>
-                  {isNotificationOpen && (
-                    <NotificationDropdown>
-                      <NotificationHeader>
-                        <NotificationTitle>알림</NotificationTitle>
-                        {unreadCount > 0 && (
-                          <MarkAllReadButton onClick={handleMarkAllAsRead}>
-                            모두 읽음
-                          </MarkAllReadButton>
-                        )}
-                      </NotificationHeader>
-                      <NotificationList>
-                        {loadingNotifications ? (
-                          <NotificationEmpty>알림을 불러오는 중...</NotificationEmpty>
-                        ) : notifications.length === 0 ? (
-                          <NotificationEmpty>알림이 없습니다</NotificationEmpty>
-                        ) : (
-                          notifications.map((notification) => (
-                            <NotificationItem
-                              key={notification.idx}
-                              unread={!notification.isRead}
-                              onClick={() => {
-                                if (!notification.isRead) {
-                                  handleMarkAsRead(notification.idx);
-                                }
-                                setIsNotificationOpen(false);
-                                // 관련 게시글로 이동
-                                if (notification.relatedType === 'BOARD' && notification.relatedId) {
-                                  // 커뮤니티 탭으로 이동
-                                  setActiveTab('community');
-                                  // 게시글 상세 페이지 열기 (전역 이벤트 사용)
-                                  setTimeout(() => {
-                                    window.dispatchEvent(new CustomEvent('openBoardDetail', {
-                                      detail: { boardId: notification.relatedId }
-                                    }));
-                                  }, 100); // 탭 전환 후 실행
-                                }
-                              }}
-                            >
-                              <NotificationContent>
-                                <NotificationTitleText>{notification.title || '알림'}</NotificationTitleText>
-                                <NotificationText>{notification.content || ''}</NotificationText>
-                                <NotificationTime>
-                                  {notification.createdAt 
-                                    ? new Date(notification.createdAt).toLocaleString('ko-KR')
-                                    : '시간 정보 없음'}
-                                </NotificationTime>
-                              </NotificationContent>
-                              {!notification.isRead && <UnreadDot />}
-                            </NotificationItem>
-                          ))
-                        )}
-                      </NotificationList>
-                    </NotificationDropdown>
-                  )}
-                </div>
-                <UserInfo type="button" onClick={() => setIsProfileOpen(true)}>
-                  <span role="img" aria-label="user">
-                    👤
-                  </span>
-                  {user.username || '내 정보'}
-                </UserInfo>
-              </>
-            )}
-            
-            <ThemeToggle onClick={toggleTheme}>
-              {isDarkMode ? '🌙' : '☀️'}
-            </ThemeToggle>
-            
-            {user && (
-              <LogoutButton onClick={logout}>
-                로그아웃
-              </LogoutButton>
-            )}
-            
-            <MobileMenuButton onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
-              ☰
-            </MobileMenuButton>
-          </RightSection>
-        </NavContent>
-      </NavContainer>
-      {user && (
-        <UserProfileModal
-          isOpen={isProfileOpen}
-          userId={user.idx}
-          onClose={() => setIsProfileOpen(false)}
-          onUpdated={(updated) => {
-            updateUserProfile?.(updated);
-          }}
-        />
-      )}
-    </>
-  );
-};
-
-export default Navigation;

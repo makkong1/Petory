@@ -1,7 +1,9 @@
 package com.linkup.Petory.domain.location.converter;
 
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
+import com.linkup.Petory.domain.location.dto.KakaoPlaceDTO;
 import com.linkup.Petory.domain.location.dto.LocationServiceDTO;
 import com.linkup.Petory.domain.location.entity.LocationService;
 
@@ -49,5 +51,47 @@ public class LocationServiceConverter {
                 .petFriendly(dto.getPetFriendly())
                 .petPolicy(dto.getPetPolicy())
                 .build();
+    }
+
+    /**
+     * KakaoPlaceDTO.Document를 LocationServiceDTO로 변환
+     */
+    public LocationServiceDTO fromKakaoDocument(KakaoPlaceDTO.Document document) {
+        Double latitude = parseDoubleOrNull(document.getY());
+        Double longitude = parseDoubleOrNull(document.getX());
+
+        return LocationServiceDTO.builder()
+                .idx(null)
+                .externalId(document.getId())
+                .name(document.getPlaceName())
+                .category(document.getCategoryName())
+                .address(document.getAddressName())
+                .detailAddress(document.getRoadAddressName())
+                .latitude(latitude)
+                .longitude(longitude)
+                .rating(null)
+                .phone(document.getPhone())
+                .openingTime(null)
+                .closingTime(null)
+                .imageUrl(null)
+                .website(document.getPlace_url())
+                .placeUrl(document.getPlace_url())
+                .description(document.getCategoryName())
+                .petFriendly(true)
+                .petPolicy(null)
+                .reviewCount(null)
+                .reviews(null)
+                .build();
+    }
+
+    private Double parseDoubleOrNull(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        try {
+            return Double.parseDouble(value);
+        } catch (NumberFormatException ex) {
+            return null;
+        }
     }
 }

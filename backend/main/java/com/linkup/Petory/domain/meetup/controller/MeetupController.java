@@ -1,6 +1,7 @@
 package com.linkup.Petory.domain.meetup.controller;
 
 import com.linkup.Petory.domain.meetup.dto.MeetupDTO;
+import com.linkup.Petory.domain.meetup.dto.MeetupParticipantsDTO;
 import com.linkup.Petory.domain.meetup.service.MeetupService;
 
 import lombok.RequiredArgsConstructor;
@@ -190,6 +191,47 @@ public class MeetupController {
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             log.error("주최자별 모임 조회 실패: {}", e.getMessage());
+            Map<String, Object> response = new HashMap<>();
+            response.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    // 반경 기반 모임 조회 (마커 표시용)
+    @GetMapping("/nearby")
+    public ResponseEntity<Map<String, Object>> getNearbyMeetups(
+            @RequestParam Double lat,
+            @RequestParam Double lng,
+            @RequestParam(defaultValue = "5.0") Double radius) {
+        try {
+            List<MeetupDTO> meetups = meetupService.getNearbyMeetups(lat, lng, radius);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("meetups", meetups);
+            response.put("count", meetups.size());
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("반경 기반 모임 조회 실패: {}", e.getMessage());
+            Map<String, Object> response = new HashMap<>();
+            response.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    // 특정 모임의 참가자 목록 조회
+    @GetMapping("/{meetupIdx}/participants")
+    public ResponseEntity<Map<String, Object>> getMeetupParticipants(@PathVariable Long meetupIdx) {
+        try {
+            List<MeetupParticipantsDTO> participants = meetupService.getMeetupParticipants(meetupIdx);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("participants", participants);
+            response.put("count", participants.size());
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("참가자 목록 조회 실패: {}", e.getMessage());
             Map<String, Object> response = new HashMap<>();
             response.put("error", e.getMessage());
             return ResponseEntity.badRequest().body(response);

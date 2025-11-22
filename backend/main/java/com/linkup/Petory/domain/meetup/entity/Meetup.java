@@ -41,6 +41,14 @@ public class Meetup {
     @Builder.Default
     private Integer maxParticipants = 10; // 최대 참여 인원
 
+    @Builder.Default
+    private Integer currentParticipants = 0; // 현재 참여자 수
+
+    @Enumerated(EnumType.STRING)
+    @Builder.Default
+    @Column(length = 20)
+    private MeetupStatus status = MeetupStatus.RECRUITING; // 모임 상태
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 

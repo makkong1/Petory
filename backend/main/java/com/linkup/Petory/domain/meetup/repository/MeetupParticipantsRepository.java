@@ -15,7 +15,8 @@ import java.util.Optional;
 public interface MeetupParticipantsRepository extends JpaRepository<MeetupParticipants, MeetupParticipantsId> {
 
     // 특정 모임의 참여자 목록
-    List<MeetupParticipants> findByMeetupIdxOrderByJoinedAtAsc(Long meetupIdx);
+    @Query("SELECT mp FROM MeetupParticipants mp WHERE mp.meetup.idx = :meetupIdx ORDER BY mp.joinedAt ASC")
+    List<MeetupParticipants> findByMeetupIdxOrderByJoinedAtAsc(@Param("meetupIdx") Long meetupIdx);
 
     // 특정 사용자가 참여한 모임 목록
     List<MeetupParticipants> findByUserIdxOrderByJoinedAtDesc(Long userIdx);

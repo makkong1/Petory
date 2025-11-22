@@ -44,6 +44,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/users/register").permitAll() // 회원가입 허용
                         .requestMatchers(HttpMethod.GET, "/api/uploads/**").permitAll() // 업로드 파일 공개 조회
                         .requestMatchers("/error").permitAll() // 에러 페이지
+                        // MASTER 전용 API - 최상위 권한만 접근 가능
+                        .requestMatchers("/api/master/**").hasRole("MASTER")
                         // 관리자 전용 API - ADMIN 또는 MASTER 권한 필요
                         .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "MASTER")
                         // 나머지 API는 인증만 필요 (로그인한 사용자면 가능)

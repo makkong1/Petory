@@ -14,6 +14,7 @@ import AdminPanel from './components/Admin/AdminPanel';
 import PermissionDeniedModal from './components/Common/PermissionDeniedModal';
 import MissingPetBoardPage from './components/MissingPet/MissingPetBoardPage';
 import ActivityPage from './components/Activity/ActivityPage';
+import MeetupPage from './components/Meetup/MeetupPage';
 import { setupApiInterceptors } from './api/authApi';
 
 
@@ -102,6 +103,8 @@ function AppContent() {
         return <CommunityBoard />;
       case 'missing-pets':
         return <MissingPetBoardPage />;
+      case 'meetup':
+        return <MeetupPage />;
       case 'users':
         return <UserList />;
       case 'admin':

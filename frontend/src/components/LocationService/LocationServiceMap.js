@@ -80,6 +80,22 @@ const levelToRadius = (level) => {
   return mapping[level] || DEFAULT_RADIUS;
 };
 
+const levelToSize = (level) => {
+  // 지도 레벨에 따라 가져올 데이터 개수 결정
+  // 레벨이 낮을수록(축소, 넓은 화면) 더 많은 데이터
+  // 레벨이 높을수록(확대, 좁은 화면) 적은 데이터
+  const mapping = {
+    1: 30,   // 매우 확대: 30개
+    2: 40,   // 확대: 40개
+    3: 50,   // 기본 확대: 50개
+    4: 75,   // 기본: 75개
+    5: 100,  // 약간 축소: 100개
+    6: 125,  // 축소: 125개
+    7: 150,  // 많이 축소: 150개
+  };
+  return mapping[level] || 50; // 기본값 50개
+};
+
 const calculateDistance = (lat1, lng1, lat2, lng2) => {
   if (
     typeof lat1 !== 'number' ||
@@ -153,6 +169,7 @@ const LocationServiceMap = () => {
       keywordOverride,
       level,
       categoryOverride,
+      append = false, // 기존 서비스에 추가할지 여부
     }) => {
       const requestId = Date.now();
       latestRequestRef.current = requestId;
@@ -166,6 +183,7 @@ const LocationServiceMap = () => {
       const effectiveLongitude = typeof longitude === 'number' ? longitude : center.lng;
       const effectiveLevel = typeof level === 'number' ? level : currentLevel;
       const effectiveRadius = levelToRadius(effectiveLevel);
+      const effectiveSize = levelToSize(effectiveLevel); // 레벨에 따라 동적으로 크기 결정
       const effectiveCategoryType = categoryOverride ?? categoryType;
       const apiCategoryType =
         effectiveCategoryType &&
@@ -181,7 +199,7 @@ const LocationServiceMap = () => {
           latitude: effectiveLatitude,
           longitude: effectiveLongitude,
           radius: effectiveRadius,
-          size: 100,
+          size: effectiveSize, // 레벨에 따라 동적으로 설정
           categoryType: apiCategoryType,
         });
 
@@ -203,13 +221,35 @@ const LocationServiceMap = () => {
           };
         });
 
-        setServices(fetchedServices);
-        setSelectedService(null);
-        if (fetchedServices.length === 0) {
-          setStatusMessage('주변에 표시할 장소가 없습니다.');
+        if (append) {
+          // 기존 서비스에 추가 (중복 제거)
+          setServices((prevServices) => {
+            const existingIds = new Set(prevServices.map(s => s.externalId || `${s.latitude}-${s.longitude}`));
+            const newServices = fetchedServices.filter(
+              s => !existingIds.has(s.externalId || `${s.latitude}-${s.longitude}`)
+            );
+            const finalServices = [...prevServices, ...newServices];
+            
+            // 상태 메시지 업데이트
+            if (finalServices.length === 0) {
+              setStatusMessage('주변에 표시할 장소가 없습니다.');
+            } else {
+              setStatusMessage('');
+            }
+            
+            return finalServices;
+          });
         } else {
-          setStatusMessage('');
+          // 기존 서비스 교체
+          setServices(fetchedServices);
+          if (fetchedServices.length === 0) {
+            setStatusMessage('주변에 표시할 장소가 없습니다.');
+          } else {
+            setStatusMessage('');
+          }
         }
+        
+        setSelectedService(null);
       } catch (err) {
         if (latestRequestRef.current !== requestId) {
           return;
@@ -282,6 +322,9 @@ const LocationServiceMap = () => {
   const handleMapIdle = useCallback(
     ({ lat, lng, level }) => {
       const nextCenter = { lat, lng };
+      const prevLevel = mapLevel;
+      const levelChanged = prevLevel !== level;
+      const isZoomingOut = levelChanged && level > prevLevel; // 레벨이 높아지면 축소 (넓어짐)
 
       if (
         !mapCenter ||
@@ -291,7 +334,7 @@ const LocationServiceMap = () => {
         setMapCenter(nextCenter);
       }
 
-      if (mapLevel !== level) {
+      if (levelChanged) {
         setMapLevel(level);
       }
 
@@ -316,7 +359,8 @@ const LocationServiceMap = () => {
       const prevFetch = lastFetchedRef.current;
       if (prevFetch.lat != null && prevFetch.lng != null) {
         const movedDistance = calculateDistance(prevFetch.lat, prevFetch.lng, lat, lng);
-        if (movedDistance != null && movedDistance < 50 && prevFetch.level === level) {
+        // 레벨이 변경되지 않고 이동 거리가 작으면 스킵
+        if (movedDistance != null && movedDistance < 50 && !levelChanged) {
           programmaticCenterRef.current = null;
           return;
         }
@@ -324,10 +368,14 @@ const LocationServiceMap = () => {
 
       lastFetchedRef.current = { lat, lng, level };
       programmaticCenterRef.current = null;
+      
+      // 축소(레벨 증가) 시 기존 서비스 유지하고 추가로 가져오기
+      // 확대(레벨 감소) 또는 이동 시 기존 서비스 교체
       fetchServices({
         latitude: lat,
         longitude: lng,
         level,
+        append: isZoomingOut, // 축소 시에만 append 모드
       });
     },
     [fetchServices, mapCenter, mapLevel]

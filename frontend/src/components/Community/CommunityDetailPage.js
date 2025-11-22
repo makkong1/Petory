@@ -323,6 +323,8 @@ const CommunityDetailPage = ({
       if (onCommentAdded) {
         onCommentAdded(boardId);
       }
+      // 알림 개수 즉시 업데이트 (다른 사용자에게 알림이 갔을 수 있음)
+      window.dispatchEvent(new Event('notificationUpdate'));
     } catch (err) {
       const message = err.response?.data?.error || err.message || '댓글 등록에 실패했습니다.';
       setCommentError(message);

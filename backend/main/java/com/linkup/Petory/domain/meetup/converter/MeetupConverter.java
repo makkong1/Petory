@@ -4,6 +4,7 @@ import com.linkup.Petory.domain.meetup.dto.MeetupDTO;
 import com.linkup.Petory.domain.meetup.dto.MeetupParticipantsDTO;
 import com.linkup.Petory.domain.meetup.entity.Meetup;
 import com.linkup.Petory.domain.meetup.entity.MeetupParticipants;
+import com.linkup.Petory.domain.meetup.entity.MeetupStatus;
 import com.linkup.Petory.domain.user.entity.Users;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -43,7 +44,8 @@ public class MeetupConverter {
                 .organizerIdx(organizer != null ? organizer.getIdx() : null)
                 .organizerName(organizer != null ? organizer.getUsername() : null)
                 .maxParticipants(meetup.getMaxParticipants())
-                .currentParticipants(participants != null ? participants.size() : 0)
+                .currentParticipants(meetup.getCurrentParticipants() != null ? meetup.getCurrentParticipants() : 0)
+                .status(meetup.getStatus() != null ? meetup.getStatus().name() : MeetupStatus.RECRUITING.name())
                 .createdAt(meetup.getCreatedAt())
                 .updatedAt(meetup.getUpdatedAt())
                 .participants(participantsDTO)
@@ -55,6 +57,15 @@ public class MeetupConverter {
             return null;
         }
 
+        MeetupStatus status = MeetupStatus.RECRUITING;
+        if (dto.getStatus() != null) {
+            try {
+                status = MeetupStatus.valueOf(dto.getStatus());
+            } catch (IllegalArgumentException e) {
+                status = MeetupStatus.RECRUITING;
+            }
+        }
+
         return Meetup.builder()
                 .idx(dto.getIdx())
                 .title(dto.getTitle())
@@ -64,6 +75,8 @@ public class MeetupConverter {
                 .longitude(dto.getLongitude())
                 .date(dto.getDate())
                 .maxParticipants(dto.getMaxParticipants())
+                .currentParticipants(dto.getCurrentParticipants() != null ? dto.getCurrentParticipants() : 0)
+                .status(status)
                 .createdAt(dto.getCreatedAt())
                 .updatedAt(dto.getUpdatedAt())
                 .build();

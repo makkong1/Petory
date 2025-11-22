@@ -50,7 +50,7 @@ const CareRequestDetailPage = ({
   }, [careRequest]);
 
   const getStatusLabel = (status) => {
-    switch(status) {
+    switch (status) {
       case 'OPEN': return '모집중';
       case 'IN_PROGRESS': return '진행중';
       case 'COMPLETED': return '완료';
@@ -200,6 +200,8 @@ const CareRequestDetailPage = ({
       if (onCommentAdded) {
         onCommentAdded();
       }
+      // 알림 개수 즉시 업데이트 (다른 사용자에게 알림이 갔을 수 있음)
+      window.dispatchEvent(new Event('notificationUpdate'));
     } catch (err) {
       const message = err.response?.data?.error || err.message || '댓글 등록에 실패했습니다.';
       setCommentError(message);
@@ -572,7 +574,7 @@ const StatusBadge = styled.span`
   padding: ${(props) => props.theme.spacing.xs} ${(props) => props.theme.spacing.md};
   border-radius: ${(props) => props.theme.borderRadius.lg};
   background: ${(props) => {
-    switch(props.status) {
+    switch (props.status) {
       case 'OPEN': return props.theme.colors.success || '#22c55e';
       case 'IN_PROGRESS': return props.theme.colors.warning || '#f59e0b';
       case 'COMPLETED': return props.theme.colors.textLight || '#94a3b8';

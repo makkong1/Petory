@@ -59,6 +59,8 @@ const MissingPetBoardDetail = ({
       setCommentLng(null);
       setShowAddressMap(false);
       onRefresh();
+      // 알림 개수 즉시 업데이트 (다른 사용자에게 알림이 갔을 수 있음)
+      window.dispatchEvent(new Event('notificationUpdate'));
     } catch (err) {
       alert(err.response?.data?.error || err.message);
     } finally {
@@ -168,29 +170,36 @@ const MissingPetBoardDetail = ({
   };
 
   return (
-    <Drawer>
-      <DrawerHeader>
-        <HeaderLeft>
-          <StatusBadge status={board.status}>
-            {statusLabel[board.status] || board.status}
-          </StatusBadge>
-          <DrawerTitle>{board.title}</DrawerTitle>
-        </HeaderLeft>
-        <HeaderRight>
-          {canDeleteBoard && (
-            <DeleteBoardButton type="button" onClick={handleDeleteBoard}>
-              삭제
-            </DeleteBoardButton>
-          )}
-          {currentUser && currentUser.idx !== board.userId && (
-            <ReportBoardButton type="button" onClick={handleReportBoard}>
-              신고
-            </ReportBoardButton>
-          )}
-          <CloseButton onClick={onClose}>✕</CloseButton>
-        </HeaderRight>
-      </DrawerHeader>
-      <DrawerBody>
+    <>
+      <Backdrop onClick={onClose} />
+      <PageContainer onClick={onClose}>
+        <DetailCard onClick={(event) => event.stopPropagation()}>
+          <DetailHeader>
+            <HeaderTop>
+              <BackButton type="button" onClick={onClose}>
+                ← 목록으로
+              </BackButton>
+              <HeaderRight>
+                {canDeleteBoard && (
+                  <DeleteBoardButton type="button" onClick={handleDeleteBoard}>
+                    삭제
+                  </DeleteBoardButton>
+                )}
+                {currentUser && currentUser.idx !== board.userId && (
+                  <ReportBoardButton type="button" onClick={handleReportBoard}>
+                    신고
+                  </ReportBoardButton>
+                )}
+              </HeaderRight>
+            </HeaderTop>
+            <DetailTitleRow>
+              <StatusBadge status={board.status}>
+                {statusLabel[board.status] || board.status}
+              </StatusBadge>
+              <DetailTitle>{board.title}</DetailTitle>
+            </DetailTitleRow>
+          </DetailHeader>
+          <DetailBody>
         <InfoCard>
           <InfoContent>
             <InfoGrid>
@@ -388,40 +397,75 @@ const MissingPetBoardDetail = ({
             </CommentSubmit>
           </CommentForm>
         </Section>
-      </DrawerBody>
-    </Drawer>
+          </DetailBody>
+        </DetailCard>
+      </PageContainer>
+    </>
   );
 };
 
 export default MissingPetBoardDetail;
 
-const Drawer = styled.aside`
+const Backdrop = styled.div`
   position: fixed;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: min(580px, 100%);
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(4px);
+  z-index: 1090;
+`;
+
+const PageContainer = styled.div`
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  overflow-y: auto;
+  padding: ${(props) => props.theme.spacing.xxl} ${(props) => props.theme.spacing.lg};
+`;
+
+const DetailCard = styled.article`
+  width: min(960px, 100%);
   background: ${(props) => props.theme.colors.surface};
-  box-shadow: -10px 0 40px rgba(15, 23, 42, 0.2);
+  border-radius: ${(props) => props.theme.borderRadius.xl};
+  box-shadow: 0 22px 48px rgba(15, 23, 42, 0.25);
+  border: 1px solid ${(props) => props.theme.colors.border};
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  z-index: 1000;
 `;
 
-const DrawerHeader = styled.header`
+const DetailHeader = styled.header`
+  padding: ${(props) => props.theme.spacing.xl} ${(props) => props.theme.spacing.xl};
+  border-bottom: 1px solid ${(props) => props.theme.colors.borderLight};
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  gap: ${(props) => props.theme.spacing.md};
+`;
+
+const HeaderTop = styled.div`
+  display: flex;
   justify-content: space-between;
-  padding: ${(props) => props.theme.spacing.lg} ${(props) => props.theme.spacing.xl};
-  border-bottom: 1px solid ${(props) => props.theme.colors.border};
+  align-items: center;
+  gap: ${(props) => props.theme.spacing.md};
 `;
 
-const HeaderLeft = styled.div`
-  display: flex;
+const BackButton = styled.button`
+  display: inline-flex;
   align-items: center;
-  gap: ${(props) => props.theme.spacing.sm};
-  flex: 1;
-  min-width: 0;
+  gap: ${(props) => props.theme.spacing.xs};
+  background: none;
+  border: none;
+  color: ${(props) => props.theme.colors.textSecondary};
+  font-size: ${(props) => props.theme.typography.body1.fontSize};
+  cursor: pointer;
+  transition: color 0.2s ease;
+  padding: ${(props) => props.theme.spacing.xs};
+
+  &:hover {
+    color: ${(props) => props.theme.colors.text};
+  }
 `;
 
 const HeaderRight = styled.div`
@@ -430,12 +474,19 @@ const HeaderRight = styled.div`
   gap: ${(props) => props.theme.spacing.sm};
 `;
 
-const DrawerTitle = styled.h2`
+const DetailTitleRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${(props) => props.theme.spacing.md};
+  flex-wrap: wrap;
+`;
+
+const DetailTitle = styled.h2`
   margin: 0;
-  font-size: 1.3rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: ${(props) => props.theme.typography.h2.fontSize};
+  font-weight: ${(props) => props.theme.typography.h2.fontWeight};
+  color: ${(props) => props.theme.colors.text};
+  line-height: 1.4;
   flex: 1;
   min-width: 0;
 `;
@@ -484,7 +535,7 @@ const ReportBoardButton = styled.button`
   }
 `;
 
-const DrawerBody = styled.div`
+const DetailBody = styled.div`
   flex: 1;
   overflow-y: auto;
   padding: ${(props) => props.theme.spacing.xl};
