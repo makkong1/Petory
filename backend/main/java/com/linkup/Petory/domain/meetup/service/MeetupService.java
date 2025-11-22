@@ -5,6 +5,7 @@ import com.linkup.Petory.domain.meetup.converter.MeetupParticipantsConverter;
 import com.linkup.Petory.domain.meetup.dto.MeetupDTO;
 import com.linkup.Petory.domain.meetup.dto.MeetupParticipantsDTO;
 import com.linkup.Petory.domain.meetup.entity.Meetup;
+import com.linkup.Petory.domain.meetup.entity.MeetupParticipants;
 import com.linkup.Petory.domain.meetup.repository.MeetupRepository;
 import com.linkup.Petory.domain.meetup.repository.MeetupParticipantsRepository;
 import com.linkup.Petory.domain.user.entity.Users;
@@ -57,6 +58,19 @@ public class MeetupService {
                 .build();
 
         Meetup savedMeetup = meetupRepository.save(meetup);
+
+        // 주최자를 자동으로 참가자에 추가
+        MeetupParticipants organizerParticipant = MeetupParticipants.builder()
+                .meetup(savedMeetup)
+                .user(organizer)
+                .joinedAt(LocalDateTime.now())
+                .build();
+        meetupParticipantsRepository.save(organizerParticipant);
+
+        // currentParticipants를 1로 설정 (주최자 포함)
+        savedMeetup.setCurrentParticipants(1);
+        meetupRepository.save(savedMeetup);
+
         log.info("모임 생성 완료: meetupIdx={}, organizer={}", savedMeetup.getIdx(), userId);
         return converter.toDTO(savedMeetup);
     }
@@ -104,11 +118,11 @@ public class MeetupService {
     public List<MeetupDTO> getNearbyMeetups(Double lat, Double lng, Double radiusKm) {
         LocalDateTime now = LocalDateTime.now();
         log.info("반경 기반 모임 조회 요청: lat={}, lng={}, radius={}km, currentDate={}", lat, lng, radiusKm, now);
-        
+
         // 모든 모임을 가져와서 Java에서 필터링 (Native query 문제 회피)
         List<Meetup> allMeetups = meetupRepository.findAll();
         log.info("전체 모임 수: {}", allMeetups.size());
-        
+
         // 거리 계산 함수 (Haversine 공식)
         java.util.function.Function<Meetup, Double> calculateDistance = (meetup) -> {
             if (meetup.getLatitude() == null || meetup.getLongitude() == null) {
@@ -118,17 +132,17 @@ public class MeetupService {
             double lat2 = Math.toRadians(meetup.getLatitude());
             double lon1 = Math.toRadians(lng);
             double lon2 = Math.toRadians(meetup.getLongitude());
-            
+
             double dLat = lat2 - lat1;
             double dLon = lon2 - lon1;
-            
+
             double a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                       Math.cos(lat1) * Math.cos(lat2) *
-                       Math.sin(dLon / 2) * Math.sin(dLon / 2);
+                    Math.cos(lat1) * Math.cos(lat2) *
+                            Math.sin(dLon / 2) * Math.sin(dLon / 2);
             double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
             return 6371 * c; // 지구 반지름 6371km
         };
-        
+
         // 필터링 및 정렬 (거리 정보를 함께 저장)
         List<java.util.Map.Entry<Meetup, Double>> meetupsWithDistance = allMeetups.stream()
                 .filter(meetup -> {
@@ -137,21 +151,21 @@ public class MeetupService {
                         log.debug("좌표 없는 모임 제외: idx={}", meetup.getIdx());
                         return false;
                     }
-                    
+
                     // 미래 날짜만 포함
                     boolean isFuture = meetup.getDate() != null && meetup.getDate().isAfter(now);
-                    
+
                     // COMPLETED 상태 제외
-                    boolean isNotCompleted = meetup.getStatus() == null || 
-                                           !meetup.getStatus().equals(com.linkup.Petory.domain.meetup.entity.MeetupStatus.COMPLETED);
-                    
+                    boolean isNotCompleted = meetup.getStatus() == null ||
+                            !meetup.getStatus().equals(com.linkup.Petory.domain.meetup.entity.MeetupStatus.COMPLETED);
+
                     if (!isFuture) {
                         log.debug("과거 날짜 모임 제외: idx={}, date={}", meetup.getIdx(), meetup.getDate());
                     }
                     if (!isNotCompleted) {
                         log.debug("COMPLETED 상태 모임 제외: idx={}, status={}", meetup.getIdx(), meetup.getStatus());
                     }
-                    
+
                     return isFuture && isNotCompleted;
                 })
                 .map(meetup -> {
@@ -174,20 +188,20 @@ public class MeetupService {
                     return e1.getKey().getDate().compareTo(e2.getKey().getDate());
                 })
                 .collect(Collectors.toList());
-        
+
         List<MeetupDTO> filteredMeetups = meetupsWithDistance.stream()
                 .map(entry -> converter.toDTO(entry.getKey()))
                 .collect(Collectors.toList());
-        
+
         log.info("최종 필터링 후 모임 수: {}", filteredMeetups.size());
         for (java.util.Map.Entry<Meetup, Double> entry : meetupsWithDistance) {
             Meetup meetup = entry.getKey();
             double distance = entry.getValue();
-            log.info("모임: idx={}, title={}, date={}, lat={}, lng={}, status={}, distance={}km", 
-                    meetup.getIdx(), meetup.getTitle(), meetup.getDate(), 
+            log.info("모임: idx={}, title={}, date={}, lat={}, lng={}, status={}, distance={}km",
+                    meetup.getIdx(), meetup.getTitle(), meetup.getDate(),
                     meetup.getLatitude(), meetup.getLongitude(), meetup.getStatus(), distance);
         }
-        
+
         return filteredMeetups;
     }
 
@@ -197,6 +211,94 @@ public class MeetupService {
                 .stream()
                 .map(participantsConverter::toDTO)
                 .collect(Collectors.toList());
+    }
+
+    // 모임 참가
+    @Transactional
+    public MeetupParticipantsDTO joinMeetup(Long meetupIdx, String userId) {
+        // 모임 존재 확인
+        Meetup meetup = meetupRepository.findById(meetupIdx)
+                .orElseThrow(() -> new RuntimeException("모임을 찾을 수 없습니다."));
+
+        // 사용자 확인 (userId는 Users의 id 필드, 문자열)
+        Users user = usersRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
+
+        Long userIdx = user.getIdx(); // Users의 idx 필드 (Long)
+
+        // 이미 참가했는지 확인
+        if (meetupParticipantsRepository.existsByMeetupIdxAndUserIdx(meetupIdx, userIdx)) {
+            throw new RuntimeException("이미 참가한 모임입니다.");
+        }
+
+        // 주최자는 자동으로 참가자에 포함되므로, 주최자가 아닌 경우에만 인원 체크
+        if (!meetup.getOrganizer().getIdx().equals(userIdx)) {
+            // 최대 인원 체크
+            if (meetup.getCurrentParticipants() >= meetup.getMaxParticipants()) {
+                throw new RuntimeException("모임 인원이 가득 찼습니다.");
+            }
+        }
+
+        // 참가자 추가
+        MeetupParticipants participant = MeetupParticipants.builder()
+                .meetup(meetup)
+                .user(user)
+                .joinedAt(LocalDateTime.now())
+                .build();
+
+        MeetupParticipants savedParticipant = meetupParticipantsRepository.save(participant);
+
+        // 주최자가 아닌 경우에만 currentParticipants 증가
+        if (!meetup.getOrganizer().getIdx().equals(userIdx)) {
+            meetup.setCurrentParticipants(meetup.getCurrentParticipants() + 1);
+            meetupRepository.save(meetup);
+        }
+
+        log.info("모임 참가 완료: meetupIdx={}, userId={}, userIdx={}", meetupIdx, userId, userIdx);
+        return participantsConverter.toDTO(savedParticipant);
+    }
+
+    // 모임 참가 취소
+    @Transactional
+    public void cancelMeetupParticipation(Long meetupIdx, String userId) {
+        // 모임 존재 확인
+        Meetup meetup = meetupRepository.findById(meetupIdx)
+                .orElseThrow(() -> new RuntimeException("모임을 찾을 수 없습니다."));
+
+        // 사용자 확인 (userId는 Users의 id 필드, 문자열)
+        Users user = usersRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
+
+        Long userIdx = user.getIdx(); // Users의 idx 필드 (Long)
+
+        // 주최자는 참가 취소 불가
+        if (meetup.getOrganizer().getIdx().equals(userIdx)) {
+            throw new RuntimeException("주최자는 참가 취소할 수 없습니다.");
+        }
+
+        // 참가자 확인
+        MeetupParticipants participant = meetupParticipantsRepository
+                .findByMeetupIdxAndUserIdx(meetupIdx, userIdx)
+                .orElseThrow(() -> new RuntimeException("참가 정보를 찾을 수 없습니다."));
+
+        // 참가자 삭제
+        meetupParticipantsRepository.delete(participant);
+
+        // currentParticipants 감소
+        meetup.setCurrentParticipants(Math.max(0, meetup.getCurrentParticipants() - 1));
+        meetupRepository.save(meetup);
+
+        log.info("모임 참가 취소 완료: meetupIdx={}, userId={}, userIdx={}", meetupIdx, userId, userIdx);
+    }
+
+    // 사용자가 특정 모임에 참가했는지 확인
+    public boolean isUserParticipating(Long meetupIdx, String userId) {
+        // 사용자 확인 (userId는 Users의 id 필드, 문자열)
+        Users user = usersRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
+
+        Long userIdx = user.getIdx(); // Users의 idx 필드 (Long)
+        return meetupParticipantsRepository.existsByMeetupIdxAndUserIdx(meetupIdx, userIdx);
     }
 
     // 지역별 모임 조회
