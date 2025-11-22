@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import styled from 'styled-components';
 import { missingPetApi } from '../../api/missingPetApi';
 import { useAuth } from '../../contexts/AuthContext';
@@ -67,6 +67,25 @@ const MissingPetBoardPage = () => {
     },
     []
   );
+
+  // 전역 이벤트 리스너: 알림에서 실종제보 게시글로 이동할 때 사용
+  useEffect(() => {
+    const handleOpenMissingPetDetail = async (event) => {
+      const { boardId } = event.detail;
+      if (boardId) {
+        console.log('알림에서 실종제보 게시글 열기:', boardId);
+        setActiveBoardId(boardId);
+        setIsDrawerOpen(true);
+        setActiveBoard(null);
+        await loadBoardDetail(boardId);
+      }
+    };
+
+    window.addEventListener('openMissingPetDetail', handleOpenMissingPetDetail);
+    return () => {
+      window.removeEventListener('openMissingPetDetail', handleOpenMissingPetDetail);
+    };
+  }, [loadBoardDetail]);
 
   const refreshBoardDetail = useCallback(async () => {
     await fetchBoards();
@@ -221,7 +240,10 @@ const MissingPetBoardPage = () => {
                       {board.lostDate ? `실종일: ${board.lostDate}` : '실종일 정보 없음'}
                     </LostDate>
                   </CardHeader>
-                  <CardTitle>{board.title}</CardTitle>
+                  <CardTitleRow>
+                    <CardTitle>{board.title}</CardTitle>
+                    <CardNumber>#{board.idx}</CardNumber>
+                  </CardTitleRow>
                   <MetaRow>
                     {board.petName && <MetaItem>이름: {board.petName}</MetaItem>}
                     {board.species && <MetaItem>종: {board.species}</MetaItem>}
@@ -254,9 +276,11 @@ const MissingPetBoardPage = () => {
 
       {isDrawerOpen && (
         <>
-          <DrawerBackdrop onClick={closeDrawer} />
           {detailLoading && !activeBoard ? (
-            <DrawerLoader>상세 정보를 불러오는 중...</DrawerLoader>
+            <>
+              <DrawerBackdrop onClick={closeDrawer} />
+              <DrawerLoader>상세 정보를 불러오는 중...</DrawerLoader>
+            </>
           ) : (
             <MissingPetBoardDetail
               board={activeBoard}
@@ -339,7 +363,7 @@ const StatusButton = styled.button.withConfig({
   &:hover {
     transform: translateY(-1px);
     background: ${(props) =>
-      props.active ? props.theme.colors.primaryDark : 'rgba(255, 126, 54, 0.1)'};
+    props.active ? props.theme.colors.primaryDark : 'rgba(255, 126, 54, 0.1)'};
   }
 `;
 
@@ -489,10 +513,27 @@ const LostDate = styled.span`
   color: ${(props) => props.theme.colors.textSecondary};
 `;
 
+const CardTitleRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${props => props.theme.spacing.sm};
+  flex-wrap: wrap;
+  margin-bottom: ${props => props.theme.spacing.md};
+`;
+
 const CardTitle = styled.h2`
   margin: 0;
   font-size: 1.3rem;
   color: ${(props) => props.theme.colors.text};
+  flex: 1;
+  min-width: 0;
+`;
+
+const CardNumber = styled.span`
+  color: ${props => props.theme.colors.textLight};
+  font-size: ${props => props.theme.typography.body2.fontSize || '0.9rem'};
+  font-weight: 500;
+  white-space: nowrap;
 `;
 
 const MetaRow = styled.div`
@@ -566,8 +607,8 @@ const DrawerBackdrop = styled.div`
 const DrawerLoader = styled.div`
   position: fixed;
   top: 50%;
-  right: 50%;
-  transform: translate(50%, -50%);
+  left: 50%;
+  transform: translate(-50%, -50%);
   background: ${(props) => props.theme.colors.surface};
   border-radius: ${(props) => props.theme.borderRadius.lg};
   padding: ${(props) => props.theme.spacing.lg} ${(props) => props.theme.spacing.xl};

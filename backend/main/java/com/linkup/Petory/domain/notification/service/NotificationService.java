@@ -26,6 +26,7 @@ public class NotificationService {
     private final UsersRepository usersRepository;
     private final NotificationConverter notificationConverter;
     private final RedisTemplate<String, Object> notificationRedisTemplate;
+    private final NotificationSseService sseService;
 
     private static final String REDIS_KEY_PREFIX = "notification:";
     private static final int REDIS_TTL_HOURS = 24; // Redis에 24시간 저장
@@ -61,6 +62,9 @@ public class NotificationService {
 
         // Redis에 실시간 알림 저장 (최신 알림 목록 관리)
         saveToRedis(userId, dto);
+
+        // SSE를 통해 실시간 알림 전송 (연결된 경우)
+        sseService.sendNotification(userId, dto);
 
         return dto;
     }

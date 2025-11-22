@@ -32,28 +32,35 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             @NonNull FilterChain filterChain) throws ServletException, IOException {
 
         try {
+            String token = null;
+            
+            // 1. 헤더에서 토큰 추출 (일반 요청)
             String authorizationHeader = request.getHeader("Authorization");
-
             if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
-                String token = jwtUtil.extractTokenFromHeader(authorizationHeader);
+                token = jwtUtil.extractTokenFromHeader(authorizationHeader);
+            }
+            
+            // 2. 쿼리 파라미터에서 토큰 추출 (SSE 등 헤더를 사용할 수 없는 경우)
+            if (token == null) {
+                token = request.getParameter("token");
+            }
 
-                if (token != null && jwtUtil.validateToken(token)) {
-                    String id = jwtUtil.getIdFromToken(token);
+            if (token != null && jwtUtil.validateToken(token)) {
+                String id = jwtUtil.getIdFromToken(token);
 
-                    if (id != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                        UserDetails userDetails = userDetailsService.loadUserByUsername(id);
+                if (id != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                    UserDetails userDetails = userDetailsService.loadUserByUsername(id);
 
-                        if (jwtUtil.validateToken(token) && !jwtUtil.isTokenExpired(token)) {
-                            UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                                    userDetails,
-                                    null,
-                                    userDetails.getAuthorities());
+                    if (jwtUtil.validateToken(token) && !jwtUtil.isTokenExpired(token)) {
+                        UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                                userDetails,
+                                null,
+                                userDetails.getAuthorities());
 
-                            authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                            SecurityContextHolder.getContext().setAuthentication(authToken);
+                        authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                        SecurityContextHolder.getContext().setAuthentication(authToken);
 
-                            log.debug("JWT 인증 성공: {}", id);
-                        }
+                        log.debug("JWT 인증 성공: {}", id);
                     }
                 }
             }
