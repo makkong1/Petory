@@ -65,9 +65,6 @@ public class CommentService {
                 .build();
 
         Comment saved = commentRepository.save(comment);
-        if (board.getComments() != null) {
-            board.getComments().add(saved);
-        }
 
         // commentCount 실시간 업데이트
         incrementBoardCommentCount(board);

@@ -31,10 +31,12 @@ import com.linkup.Petory.domain.file.service.AttachmentFileService;
 import org.springframework.util.StringUtils;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
+@Slf4j
 public class BoardService {
 
     private final BoardRepository boardRepository;
@@ -47,7 +49,8 @@ public class BoardService {
 
     // 전체 게시글 조회 (카테고리 필터링 포함)
     // 캐시 임시 비활성화 - 개발 중 데이터 동기화 문제 해결
-    // @Cacheable(value = "boardList", key = "#category != null ? #category : 'ALL'")
+    // @Cacheable(value = "boardList", key = "#category != null ? #category :
+    // 'ALL'")
     public List<BoardDTO> getAllBoards(String category) {
         List<Board> boards;
 
