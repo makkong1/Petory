@@ -44,9 +44,16 @@ const CareRequestList = () => {
     { key: 'COMPLETED', label: '완료', count: careRequests.filter(c => c.status === 'COMPLETED').length }
   ];
 
+  // 작성일 기준 오래된 순으로 정렬
+  const sortedRequests = [...careRequests].sort((a, b) => {
+    const dateA = new Date(a.createdAt || a.date || 0);
+    const dateB = new Date(b.createdAt || b.date || 0);
+    return dateA - dateB; // 오래된 것부터
+  });
+
   const filteredRequests = activeFilter === 'ALL' 
-    ? careRequests 
-    : careRequests.filter(request => request.status === activeFilter);
+    ? sortedRequests 
+    : sortedRequests.filter(request => request.status === activeFilter);
 
   const handleAddButtonClick = () => {
     if (!user) {
@@ -143,7 +150,19 @@ const CareRequestList = () => {
   };
 
   const formatDate = (dateString) => {
+    if (!dateString) return '-';
     const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return '-';
+    const now = new Date();
+    const diff = now - date;
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 8640000);
+
+    if (minutes < 1) return '방금 전';
+    if (minutes < 60) return `${minutes}분 전`;
+    if (hours < 24) return `${hours}시간 전`;
+    if (days < 7) return `${days}일 전`;
     return date.toLocaleDateString('ko-KR', { 
       month: 'short', 
       day: 'numeric' 
@@ -246,42 +265,51 @@ const CareRequestList = () => {
               onClick={() => setSelectedCareRequestId(request.idx)}
             >
               <CardHeader>
-                <CardTitle>{request.title}</CardTitle>
-                <StatusBadge status={request.status}>
-                  {getStatusLabel(request.status)}
-                </StatusBadge>
-                {user && user.idx === request.userId && (
-                  <DeleteButton 
-                    type="button" 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteRequest(request.idx);
-                    }}
-                  >
-                    삭제
-                  </DeleteButton>
-                )}
+                <CardTitleSection>
+                  <CardTitleRow>
+                    <CardTitle>{request.title}</CardTitle>
+                    <CardNumber>#{request.idx}</CardNumber>
+                  </CardTitleRow>
+                </CardTitleSection>
+                <CardHeaderRight>
+                  <StatusBadge status={request.status}>
+                    {getStatusLabel(request.status)}
+                  </StatusBadge>
+                  {user && user.idx === request.userId && (
+                    <DeleteButton 
+                      type="button" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteRequest(request.idx);
+                      }}
+                    >
+                      삭제
+                    </DeleteButton>
+                  )}
+                </CardHeaderRight>
               </CardHeader>
               
               <CardDescription>{request.description}</CardDescription>
               
-              {/* <CardFooter>
-                <UserInfo>
-                  <UserAvatar>
-                    {request.user.username.charAt(0)}
-                  </UserAvatar>
-                  <div>
-                    <UserName>{request.user.username}</UserName>
-                    <div style={{ fontSize: '12px', color: 'var(--text-light)' }}>
-                      📍 {request.user.location}
-                    </div>
-                  </div>
-                </UserInfo>
+              <CardFooter>
+                <AuthorInfo>
+                  <AuthorAvatar>
+                    {request.username ? request.username.charAt(0).toUpperCase() : 'U'}
+                  </AuthorAvatar>
+                  <AuthorDetails>
+                    <AuthorName>{request.username || '알 수 없음'}</AuthorName>
+                    {request.userLocation && (
+                      <AuthorLocation>
+                        <LocationIcon>📍</LocationIcon>
+                        {request.userLocation}
+                      </AuthorLocation>
+                    )}
+                  </AuthorDetails>
+                </AuthorInfo>
                 <DateInfo>
-                  <div>{formatDate(request.date)}</div>
-                  <div>지원 {request.applications}명</div>
+                  <TimeAgo>{formatDate(request.createdAt || request.date)}</TimeAgo>
                 </DateInfo>
-              </CardFooter> */}
+              </CardFooter>
             </CareCard>
           ))
         )}
@@ -414,6 +442,19 @@ const CardHeader = styled.div`
   justify-content: space-between;
   align-items: flex-start;
   margin-bottom: ${props => props.theme.spacing.md};
+  gap: ${props => props.theme.spacing.sm};
+`;
+
+const CardTitleSection = styled.div`
+  flex: 1;
+  min-width: 0;
+`;
+
+const CardTitleRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${props => props.theme.spacing.sm};
+  flex-wrap: wrap;
 `;
 
 const CardTitle = styled.h3`
@@ -423,7 +464,21 @@ const CardTitle = styled.h3`
   margin: 0;
   line-height: 1.4;
   flex: 1;
-  margin-right: ${props => props.theme.spacing.sm};
+  min-width: 0;
+`;
+
+const CardNumber = styled.span`
+  color: ${props => props.theme.colors.textLight};
+  font-size: ${props => props.theme.typography.body2.fontSize};
+  font-weight: 500;
+  white-space: nowrap;
+`;
+
+const CardHeaderRight = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${props => props.theme.spacing.xs};
+  flex-shrink: 0;
 `;
 
 const StatusBadge = styled.span`
@@ -479,15 +534,17 @@ const CardFooter = styled.div`
   border-top: 1px solid ${props => props.theme.colors.borderLight};
 `;
 
-const UserInfo = styled.div`
+const AuthorInfo = styled.div`
   display: flex;
   align-items: center;
   gap: ${props => props.theme.spacing.sm};
+  flex: 1;
+  min-width: 0;
 `;
 
-const UserAvatar = styled.div`
-  width: 32px;
-  height: 32px;
+const AuthorAvatar = styled.div`
+  width: 36px;
+  height: 36px;
   border-radius: ${props => props.theme.borderRadius.full};
   background: ${props => props.theme.colors.primary};
   display: flex;
@@ -496,18 +553,52 @@ const UserAvatar = styled.div`
   color: white;
   font-weight: 600;
   font-size: 14px;
+  flex-shrink: 0;
 `;
 
-const UserName = styled.span`
+const AuthorDetails = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${props => props.theme.spacing.xs};
+  min-width: 0;
+`;
+
+const AuthorName = styled.span`
   color: ${props => props.theme.colors.text};
   font-size: ${props => props.theme.typography.body2.fontSize};
   font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`;
+
+const AuthorLocation = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${props => props.theme.spacing.xs};
+  color: ${props => props.theme.colors.textLight};
+  font-size: ${props => props.theme.typography.caption.fontSize};
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`;
+
+const LocationIcon = styled.span`
+  font-size: 12px;
 `;
 
 const DateInfo = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: ${props => props.theme.spacing.xs};
+  flex-shrink: 0;
+`;
+
+const TimeAgo = styled.div`
   color: ${props => props.theme.colors.textLight};
   font-size: ${props => props.theme.typography.caption.fontSize};
-  text-align: right;
+  white-space: nowrap;
 `;
 
 const LoadingMessage = styled.div`

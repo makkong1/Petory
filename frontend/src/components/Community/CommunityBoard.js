@@ -69,6 +69,23 @@ const CommunityBoard = () => {
     return date.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' });
   };
 
+  // 전역 이벤트 리스너: 알림에서 게시글로 이동할 때 사용
+  useEffect(() => {
+    const handleOpenBoardDetail = (event) => {
+      const { boardId } = event.detail;
+      if (boardId) {
+        console.log('알림에서 게시글 열기:', boardId);
+        setSelectedBoardId(boardId);
+        setIsDetailOpen(true);
+      }
+    };
+
+    window.addEventListener('openBoardDetail', handleOpenBoardDetail);
+    return () => {
+      window.removeEventListener('openBoardDetail', handleOpenBoardDetail);
+    };
+  }, []);
+
   // 전체 게시글을 한 번만 가져오기 (카테고리 변경 시 재호출하지 않음)
   const fetchBoards = useCallback(async () => {
     try {
