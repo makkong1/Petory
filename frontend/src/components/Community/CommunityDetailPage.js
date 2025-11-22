@@ -319,8 +319,9 @@ const CommunityDetailPage = ({
       setCommentContent('');
       setCommentFilePath('');
       setUploadError('');
+      // 댓글 카운트 업데이트를 위해 boardId 전달
       if (onCommentAdded) {
-        onCommentAdded();
+        onCommentAdded(boardId);
       }
     } catch (err) {
       const message = err.response?.data?.error || err.message || '댓글 등록에 실패했습니다.';
@@ -400,7 +401,8 @@ const CommunityDetailPage = ({
       try {
         await commentApi.delete(boardId, commentId);
         setComments((prev) => prev.filter((comment) => comment.idx !== commentId));
-        onCommentAdded?.();
+        // 댓글 삭제 시 카운트 감소를 위해 boardId와 isDelete=true 전달
+        onCommentAdded?.(boardId, true);
       } catch (err) {
         const message = err.response?.data?.error || err.message || '댓글 삭제에 실패했습니다.';
         setCommentError(message);

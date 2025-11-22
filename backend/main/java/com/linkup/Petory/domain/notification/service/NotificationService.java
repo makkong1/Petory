@@ -33,11 +33,11 @@ public class NotificationService {
     /**
      * 알림 생성 및 발송
      * 
-     * @param userId 알림을 받을 사용자 ID
-     * @param type 알림 타입
-     * @param title 알림 제목
-     * @param content 알림 내용
-     * @param relatedId 관련 게시글/댓글 ID
+     * @param userId      알림을 받을 사용자 ID
+     * @param type        알림 타입
+     * @param title       알림 제목
+     * @param content     알림 내용
+     * @param relatedId   관련 게시글/댓글 ID
      * @param relatedType 관련 타입
      */
     @Transactional
@@ -80,7 +80,7 @@ public class NotificationService {
                     .stream()
                     .map(notificationConverter::toDTO)
                     .collect(Collectors.toList());
-            
+
             // Redis와 DB 데이터 병합 (중복 제거)
             return mergeNotifications(redisNotifications, dbNotifications);
         }
@@ -159,18 +159,25 @@ public class NotificationService {
      */
     private void saveToRedis(Long userId, NotificationDTO notification) {
         String redisKey = REDIS_KEY_PREFIX + userId;
-        List<NotificationDTO> notifications = getFromRedis(userId);
-        
-        if (notifications == null) {
-            notifications = java.util.Collections.singletonList(notification);
+        List<NotificationDTO> existingNotifications = getFromRedis(userId);
+
+        // 수정 가능한 리스트 생성
+        List<NotificationDTO> notifications;
+        if (existingNotifications == null || existingNotifications.isEmpty()) {
+            notifications = new java.util.ArrayList<>();
         } else {
-            // 최신 알림을 맨 앞에 추가 (최대 50개만 유지)
-            notifications.add(0, notification);
-            if (notifications.size() > 50) {
-                notifications = notifications.subList(0, 50);
-            }
+            // 기존 리스트를 수정 가능한 새 리스트로 복사 (불변 리스트일 수 있으므로)
+            notifications = new java.util.ArrayList<>(existingNotifications);
         }
-        
+
+        // 최신 알림을 맨 앞에 추가 (최대 50개만 유지)
+        notifications.add(0, notification);
+        if (notifications.size() > 50) {
+            notifications = notifications.subList(0, 50);
+            // subList는 원본 리스트의 뷰이므로 새 리스트로 복사 필요
+            notifications = new java.util.ArrayList<>(notifications);
+        }
+
         notificationRedisTemplate.opsForValue().set(redisKey, notifications,
                 java.time.Duration.ofHours(REDIS_TTL_HOURS));
     }
@@ -182,7 +189,7 @@ public class NotificationService {
     private List<NotificationDTO> getFromRedis(Long userId) {
         String redisKey = REDIS_KEY_PREFIX + userId;
         Object value = notificationRedisTemplate.opsForValue().get(redisKey);
-        
+
         if (value instanceof List) {
             return (List<NotificationDTO>) value;
         }
@@ -194,9 +201,11 @@ public class NotificationService {
      */
     private void removeFromRedis(Long userId, Long notificationId) {
         String redisKey = REDIS_KEY_PREFIX + userId;
-        List<NotificationDTO> notifications = getFromRedis(userId);
-        
-        if (notifications != null) {
+        List<NotificationDTO> existingNotifications = getFromRedis(userId);
+
+        if (existingNotifications != null && !existingNotifications.isEmpty()) {
+            // 수정 가능한 새 리스트로 복사
+            List<NotificationDTO> notifications = new java.util.ArrayList<>(existingNotifications);
             notifications.removeIf(n -> n.getIdx().equals(notificationId));
             notificationRedisTemplate.opsForValue().set(redisKey, notifications,
                     java.time.Duration.ofHours(REDIS_TTL_HOURS));
@@ -232,4 +241,3 @@ public class NotificationService {
         return merged;
     }
 }
-

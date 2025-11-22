@@ -5,7 +5,6 @@ import { reportApi } from '../../api/reportApi';
 import { usePermission } from '../../hooks/usePermission';
 import { useAuth } from '../../contexts/AuthContext';
 import CommunityPostModal from './CommunityPostModal';
-import CommunityCommentDrawer from './CommunityCommentDrawer';
 import CommunityDetailPage from './CommunityDetailPage';
 
 const CommunityBoard = () => {
@@ -196,6 +195,8 @@ const CommunityBoard = () => {
   const handleDetailClose = () => {
     setIsDetailOpen(false);
     setSelectedBoardId(null);
+    setIsCommentDrawerOpen(false);
+    setSelectedBoard(null);
   };
 
   const handlePopularCardClick = (snapshot) => {
@@ -206,7 +207,9 @@ const CommunityBoard = () => {
 
   const handleCommentClick = (post, e) => {
     e.stopPropagation();
-    handlePostSelect(post);
+    if (!post?.idx) return;
+    setSelectedBoardId(post.idx);
+    setIsDetailOpen(true);
   };
 
   const handlePostSelect = (post, event) => {
@@ -214,13 +217,6 @@ const CommunityBoard = () => {
     event?.stopPropagation?.();
     setSelectedBoardId(post.idx);
     setIsDetailOpen(true);
-    const { requiresRedirect } = requireLogin();
-    if (requiresRedirect) {
-      redirectToLogin();
-      return;
-    }
-    setSelectedBoard(post);
-    setIsCommentDrawerOpen(true);
   };
 
   const handlePostReport = async (postIdx) => {
@@ -263,9 +259,21 @@ const CommunityBoard = () => {
     setSelectedBoard(null);
   };
 
-  const handleCommentAdded = () => {
-    fetchBoards();
-  };
+  const handleCommentAdded = useCallback((boardId, isDelete = false) => {
+    // 댓글 추가/삭제 시 해당 게시글의 댓글 카운트만 업데이트 (게시글 목록 전체 재조회 방지)
+    if (boardId) {
+      setPosts((prev) =>
+        prev.map((post) =>
+          post.idx === boardId
+            ? {
+              ...post,
+              commentCount: Math.max(0, (post.commentCount ?? 0) + (isDelete ? -1 : 1)),
+            }
+            : post
+        )
+      );
+    }
+  }, []);
 
   const handleDeletePost = async (postIdx, event) => {
     event?.stopPropagation?.();
@@ -467,7 +475,7 @@ const CommunityBoard = () => {
               <LoadingMessage>{popularPeriod === 'WEEKLY' ? '주간' : '월간'} 인기 게시글을 불러오는 중...</LoadingMessage>
             </LoadingContainer>
           ) : (
-            <PopularGrid>
+            <PopularScrollContainer>
               {popularPosts.length === 0 ? (
                 <EmptyPopularMessage>
                   {popularPeriod === 'WEEKLY'
@@ -475,26 +483,28 @@ const CommunityBoard = () => {
                     : '아직 월간 인기 자랑글이 없어요.'}
                 </EmptyPopularMessage>
               ) : (
-                popularPosts.slice(0, 6).map((snapshot) => (
-                  <PopularCard type="button" key={`${snapshot.periodType}-${snapshot.boardId}-${snapshot.ranking}`} onClick={() => handlePopularCardClick(snapshot)}>
-                    <PopularRank>{snapshot.ranking}</PopularRank>
-                    <PopularContent>
-                      <PopularTitleText>{snapshot.boardTitle || '제목 없음'}</PopularTitleText>
-                      <PopularStats>
-                        <PopularStat>❤️ {snapshot.likeCount ?? 0}</PopularStat>
-                        <PopularStat>💬 {snapshot.commentCount ?? 0}</PopularStat>
-                        <PopularStat>👁️ {snapshot.viewCount ?? 0}</PopularStat>
-                      </PopularStats>
-                    </PopularContent>
-                    {snapshot.boardFilePath && (
-                      <PopularThumb>
-                        <img src={snapshot.boardFilePath} alt={snapshot.boardTitle} />
-                      </PopularThumb>
-                    )}
-                  </PopularCard>
-                ))
+                <PopularScrollContent>
+                  {popularPosts.map((snapshot) => (
+                    <PopularCard type="button" key={`${snapshot.periodType}-${snapshot.boardId}-${snapshot.ranking}`} onClick={() => handlePopularCardClick(snapshot)}>
+                      <PopularRank>{snapshot.ranking}</PopularRank>
+                      <PopularContent>
+                        <PopularTitleText>{snapshot.boardTitle || '제목 없음'}</PopularTitleText>
+                        <PopularStats>
+                          <PopularStat>❤️ {snapshot.likeCount ?? 0}</PopularStat>
+                          <PopularStat>💬 {snapshot.commentCount ?? 0}</PopularStat>
+                          <PopularStat>👁️ {snapshot.viewCount ?? 0}</PopularStat>
+                        </PopularStats>
+                      </PopularContent>
+                      {snapshot.boardFilePath && (
+                        <PopularThumb>
+                          <img src={snapshot.boardFilePath} alt={snapshot.boardTitle} />
+                        </PopularThumb>
+                      )}
+                    </PopularCard>
+                  ))}
+                </PopularScrollContent>
               )}
-            </PopularGrid>
+            </PopularScrollContainer>
           )}
         </PopularSection>
       )}
@@ -515,7 +525,10 @@ const CommunityBoard = () => {
               <PostCard key={post.idx} onClick={() => handlePostSelect(post)}>
                 <PostHeader>
                   <PostTitleSection>
-                    <PostTitle>{post.title}</PostTitle>
+                    <PostTitleRow>
+                      <PostTitle>{post.title}</PostTitle>
+                      <PostNumber>#{post.idx}</PostNumber>
+                    </PostTitleRow>
                     <CategoryBadge categoryColor={categoryInfo.color}>
                       <CategoryBadgeIcon>{categoryInfo.icon}</CategoryBadgeIcon>
                       {categoryInfo.label}
@@ -592,14 +605,6 @@ const CommunityBoard = () => {
         onSubmit={handlePostSubmit}
         loading={isSubmittingPost}
         currentUser={user}
-      />
-
-      <CommunityCommentDrawer
-        isOpen={isCommentDrawerOpen}
-        board={selectedBoard}
-        onClose={handleCommentDrawerClose}
-        currentUser={user}
-        onCommentAdded={handleCommentAdded}
       />
 
       <CommunityDetailPage
@@ -809,12 +814,28 @@ const PostImage = styled.div`
   }
 `;
 
+const PostTitleRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${props => props.theme.spacing.sm};
+  flex-wrap: wrap;
+`;
+
 const PostTitle = styled.h3`
   color: ${props => props.theme.colors.text};
   font-size: ${props => props.theme.typography.h3.fontSize};
   font-weight: ${props => props.theme.typography.h3.fontWeight};
   margin: 0;
   line-height: 1.4;
+  flex: 1;
+`;
+
+const PostNumber = styled.span`
+  color: ${props => props.theme.colors.textSecondary};
+  font-size: ${props => props.theme.typography.caption.fontSize};
+  font-weight: 500;
+  opacity: 0.7;
+  white-space: nowrap;
 `;
 
 const CategoryBadge = styled.span`
@@ -1071,10 +1092,37 @@ const PopularTab = styled.button`
   }
 `;
 
-const PopularGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+const PopularScrollContainer = styled.div`
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: ${(props) => props.theme.spacing.sm};
+  
+  /* 스크롤바 스타일링 */
+  &::-webkit-scrollbar {
+    height: 8px;
+  }
+  
+  &::-webkit-scrollbar-track {
+    background: ${(props) => props.theme.colors.surface};
+    border-radius: ${(props) => props.theme.borderRadius.md};
+  }
+  
+  &::-webkit-scrollbar-thumb {
+    background: ${(props) => props.theme.colors.border};
+    border-radius: ${(props) => props.theme.borderRadius.md};
+    
+    &:hover {
+      background: ${(props) => props.theme.colors.textSecondary};
+    }
+  }
+`;
+
+const PopularScrollContent = styled.div`
+  display: flex;
   gap: ${(props) => props.theme.spacing.md};
+  min-width: fit-content;
+  padding: ${(props) => props.theme.spacing.xs} 0;
 `;
 
 const PopularCard = styled.button`
@@ -1088,6 +1136,9 @@ const PopularCard = styled.button`
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
   text-align: left;
+  flex-shrink: 0;
+  width: 220px;
+  min-width: 220px;
 
   &:hover {
     transform: translateY(-4px);
