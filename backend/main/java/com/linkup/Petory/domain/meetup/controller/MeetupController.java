@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -25,9 +26,16 @@ public class MeetupController {
 
     // 모임 생성
     @PostMapping
-    public ResponseEntity<Map<String, Object>> createMeetup(@RequestBody MeetupDTO meetupDTO) {
+    public ResponseEntity<Map<String, Object>> createMeetup(
+            @RequestBody MeetupDTO meetupDTO,
+            Authentication authentication) {
         try {
-            MeetupDTO createdMeetup = meetupService.createMeetup(meetupDTO);
+            String userId = authentication != null ? authentication.getName() : null;
+            if (userId == null) {
+                throw new RuntimeException("인증된 사용자 정보를 찾을 수 없습니다.");
+            }
+
+            MeetupDTO createdMeetup = meetupService.createMeetup(meetupDTO, userId);
 
             Map<String, Object> response = new HashMap<>();
             response.put("meetup", createdMeetup);

@@ -1,4 +1,4 @@
-package com.linkup.Petory.domain.meetup.controller;
+package com.linkup.Petory.domain.board.controller;
 
 import java.util.HashMap;
 import java.util.List;

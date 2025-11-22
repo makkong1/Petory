@@ -6,7 +6,6 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.linkup.Petory.domain.meetup.entity.Meetup;
-import com.linkup.Petory.domain.meetup.entity.MeetupStatus;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -44,18 +43,16 @@ public interface MeetupRepository extends JpaRepository<Meetup, Long> {
         List<Meetup> findAvailableMeetups(@Param("currentDate") LocalDateTime currentDate);
 
         // 반경 기반 모임 조회 (Haversine 공식 사용)
-        // 시간 지난 모임 제외, COMPLETED 상태 제외
-        @Query(value = "SELECT m.*, " +
-                        "(6371 * acos(cos(radians(:lat)) * cos(radians(m.latitude)) * " +
+        // 거리만 계산하고, 날짜/상태 필터는 Java에서 처리
+        @Query(value = "SELECT m.* FROM meetup m " +
+                        "WHERE m.latitude IS NOT NULL AND m.longitude IS NOT NULL " +
+                        "AND (6371 * acos(cos(radians(:lat)) * cos(radians(m.latitude)) * " +
                         "cos(radians(m.longitude) - radians(:lng)) + " +
-                        "sin(radians(:lat)) * sin(radians(m.latitude)))) AS distance " +
-                        "FROM meetup m " +
-                        "WHERE m.date > :currentDate " +
-                        "AND m.status != 'COMPLETED' " +
-                        "HAVING distance <= :radius " +
-                        "ORDER BY distance ASC, m.date ASC", nativeQuery = true)
+                        "sin(radians(:lat)) * sin(radians(m.latitude)))) <= :radius " +
+                        "ORDER BY (6371 * acos(cos(radians(:lat)) * cos(radians(m.latitude)) * " +
+                        "cos(radians(m.longitude) - radians(:lng)) + " +
+                        "sin(radians(:lat)) * sin(radians(m.latitude)))) ASC, m.date ASC", nativeQuery = true)
         List<Meetup> findNearbyMeetups(@Param("lat") Double lat, 
                                        @Param("lng") Double lng, 
-                                       @Param("radius") Double radius,
-                                       @Param("currentDate") LocalDateTime currentDate);
+                                       @Param("radius") Double radius);
 }

@@ -35,7 +35,7 @@ export const geocodingApi = {
   // 주소를 위도/경도로 변환
   addressToCoordinates: async (address) => {
     const response = await api.get('/geocoding/address', { params: { address } });
-    return response.data;
+    return response; // axios response 객체 반환 (response.data에 실제 데이터)
   },
 };
 
