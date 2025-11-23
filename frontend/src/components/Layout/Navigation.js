@@ -285,6 +285,15 @@ const Navigation = ({ activeTab, setActiveTab, user, onNavigateToBoard }) => {
                                       detail: { boardId: notification.relatedId }
                                     }));
                                   }, 100); // 탭 전환 후 실행
+                                } else if (notification.relatedType === 'CARE_REQUEST' && notification.relatedId) {
+                                  // 펫케어 요청 탭으로 이동
+                                  setActiveTab('care-requests');
+                                  // 펫케어 요청 상세 페이지 열기 (전역 이벤트 사용)
+                                  setTimeout(() => {
+                                    window.dispatchEvent(new CustomEvent('openCareRequestDetail', {
+                                      detail: { careRequestId: notification.relatedId }
+                                    }));
+                                  }, 100); // 탭 전환 후 실행
                                 }
                               }}
                             >
@@ -359,7 +368,7 @@ const NavContainer = styled.nav`
 `;
 
 const NavContent = styled.div`
-  max-width: 1600px;
+  max-width: 1700px;
   margin: 0 auto;
   padding: 0 ${props => props.theme.spacing.lg};
   display: flex;

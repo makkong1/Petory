@@ -37,6 +37,22 @@ const CareRequestList = () => {
     fetchCareRequests();
   }, []);
 
+  // 전역 이벤트 리스너: 알림에서 펫케어 요청글로 이동할 때 사용
+  useEffect(() => {
+    const handleOpenCareRequestDetail = (event) => {
+      const { careRequestId } = event.detail;
+      if (careRequestId) {
+        console.log('알림에서 펫케어 요청글 열기:', careRequestId);
+        setSelectedCareRequestId(careRequestId);
+      }
+    };
+
+    window.addEventListener('openCareRequestDetail', handleOpenCareRequestDetail);
+    return () => {
+      window.removeEventListener('openCareRequestDetail', handleOpenCareRequestDetail);
+    };
+  }, []);
+
   const filters = [
     { key: 'ALL', label: '전체', count: careRequests.length },
     { key: 'OPEN', label: '모집중', count: careRequests.filter(c => c.status === 'OPEN').length },
@@ -51,8 +67,8 @@ const CareRequestList = () => {
     return dateA - dateB; // 오래된 것부터
   });
 
-  const filteredRequests = activeFilter === 'ALL' 
-    ? sortedRequests 
+  const filteredRequests = activeFilter === 'ALL'
+    ? sortedRequests
     : sortedRequests.filter(request => request.status === activeFilter);
 
   const handleAddButtonClick = () => {
@@ -140,7 +156,7 @@ const CareRequestList = () => {
   };
 
   const getStatusLabel = (status) => {
-    switch(status) {
+    switch (status) {
       case 'OPEN': return '모집중';
       case 'IN_PROGRESS': return '진행중';
       case 'COMPLETED': return '완료';
@@ -163,9 +179,9 @@ const CareRequestList = () => {
     if (minutes < 60) return `${minutes}분 전`;
     if (hours < 24) return `${hours}시간 전`;
     if (days < 7) return `${days}일 전`;
-    return date.toLocaleDateString('ko-KR', { 
-      month: 'short', 
-      day: 'numeric' 
+    return date.toLocaleDateString('ko-KR', {
+      month: 'short',
+      day: 'numeric'
     });
   };
 
@@ -260,7 +276,7 @@ const CareRequestList = () => {
           </EmptyMessage>
         ) : (
           filteredRequests.map(request => (
-            <CareCard 
+            <CareCard
               key={request.idx}
               onClick={() => setSelectedCareRequestId(request.idx)}
             >
@@ -276,8 +292,8 @@ const CareRequestList = () => {
                     {getStatusLabel(request.status)}
                   </StatusBadge>
                   {user && user.idx === request.userId && (
-                    <DeleteButton 
-                      type="button" 
+                    <DeleteButton
+                      type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleDeleteRequest(request.idx);
@@ -288,9 +304,9 @@ const CareRequestList = () => {
                   )}
                 </CardHeaderRight>
               </CardHeader>
-              
+
               <CardDescription>{request.description}</CardDescription>
-              
+
               <CardFooter>
                 <AuthorInfo>
                   <AuthorAvatar>
@@ -336,7 +352,7 @@ export default CareRequestList;
 
 
 const Container = styled.div`
-  max-width: 1400px;
+  max-width: 1500px;
   margin: 0 auto;
   padding: ${props => props.theme.spacing.xl} ${props => props.theme.spacing.lg};
 `;
@@ -418,8 +434,12 @@ const FilterButton = styled.button`
 
 const CareGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: ${props => props.theme.spacing.lg};
+
+  @media (max-width: 1024px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
 
   @media (max-width: 768px) {
     grid-template-columns: 1fr;
@@ -488,7 +508,7 @@ const CardHeaderRight = styled.div`
 
 const StatusBadge = styled.span`
   background: ${props => {
-    switch(props.status) {
+    switch (props.status) {
       case 'OPEN': return props.theme.colors.success;
       case 'IN_PROGRESS': return props.theme.colors.warning;
       case 'COMPLETED': return props.theme.colors.textLight;

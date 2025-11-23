@@ -299,7 +299,7 @@ const MissingPetBoardPage = () => {
 export default MissingPetBoardPage;
 
 const Wrapper = styled.div`
-  max-width: 1400px;
+  max-width: 1500px;
   margin: 0 auto;
   padding: ${(props) => props.theme.spacing.xl} ${(props) => props.theme.spacing.lg};
 `;
@@ -441,7 +441,11 @@ const EmptyState = styled.div`
 const BoardGrid = styled.div`
   display: grid;
   gap: ${(props) => props.theme.spacing.lg};
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
+
+  @media (max-width: 1024px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
 
   @media (max-width: 768px) {
     grid-template-columns: 1fr;

@@ -31,7 +31,7 @@ const CommunityBoard = () => {
     { key: '일상', label: '일상', icon: '📖', color: '#EC4899' },
     { key: '자랑', label: '자랑', icon: '🐾', color: '#F472B6' },
     { key: '질문', label: '질문', icon: '❓', color: '#3B82F6' },
-    { key: '정보', label: '정보', icon: '📢', color: '#10B981' },
+    { key: '정보공유', label: '정보공유', icon: '📢', color: '#10B981' },
     { key: '후기', label: '후기', icon: '📝', color: '#8B5CF6' },
     { key: '모임', label: '모임', icon: '🤝', color: '#F59E0B' },
     { key: '공지', label: '공지', icon: '📢', color: '#EF4444' },
@@ -43,7 +43,7 @@ const CommunityBoard = () => {
       일상: { label: '일상', icon: '📖', color: '#EC4899' },
       자랑: { label: '자랑', icon: '🐾', color: '#F472B6' },
       질문: { label: '질문', icon: '❓', color: '#3B82F6' },
-      정보: { label: '정보', icon: '📢', color: '#10B981' },
+      정보: { label: '정보공유', icon: '📢', color: '#10B981' },
       후기: { label: '후기', icon: '📝', color: '#8B5CF6' },
       모임: { label: '모임', icon: '🤝', color: '#F59E0B' },
       공지: { label: '공지', icon: '📢', color: '#EF4444' },
@@ -110,11 +110,8 @@ const CommunityBoard = () => {
     try {
       setPopularLoading(true);
       setPopularError('');
-      console.log('🔥 인기 게시글 조회 시작:', popularPeriod);
       const response = await boardApi.getPopularBoards(popularPeriod);
       const popularData = response.data || [];
-      console.log(`🔥 ${popularPeriod} 인기 게시글 수:`, popularData.length);
-      console.log(`🔥 ${popularPeriod} 인기 게시글 목록:`, popularData.map(p => ({ ranking: p.ranking, title: p.boardTitle, periodType: p.periodType })));
       setPopularPosts(popularData);
     } catch (err) {
       console.error(`❌ ${popularPeriod} 인기 게시글 조회 실패:`, err);
@@ -167,6 +164,39 @@ const CommunityBoard = () => {
     });
     return categoryFiltered;
   }, [posts, activeCategory]);
+
+  // Magazine 스타일을 위한 게시글 분류
+  const categorizedPosts = useMemo(() => {
+    if (filteredPosts.length === 0) return { large: [], medium: [], small: [] };
+
+    const large = [];
+    const medium = [];
+    const small = [];
+
+    // 첫 번째 게시글 중 공지사항이 있으면 대형 카드로, 없으면 첫 번째 썸네일 게시글을 대형으로
+    const noticePost = filteredPosts.find(post => post.category === '공지');
+    const firstWithImage = filteredPosts.find(post => post.boardFilePath);
+
+    if (noticePost) {
+      large.push(noticePost);
+    } else if (firstWithImage) {
+      large.push(firstWithImage);
+    }
+
+    // 나머지 게시글 분류
+    filteredPosts.forEach((post) => {
+      // 이미 대형 카드로 선택된 게시글은 제외
+      if (large.includes(post)) return;
+
+      if (post.boardFilePath) {
+        medium.push(post);
+      } else {
+        small.push(post);
+      }
+    });
+
+    return { large, medium, small };
+  }, [filteredPosts]);
 
   const handleWriteClick = () => {
     const { requiresRedirect } = requireLogin();
@@ -536,83 +566,238 @@ const CommunityBoard = () => {
             <EmptySubtext>첫 번째 게시글을 작성해보세요!</EmptySubtext>
           </EmptyState>
         ) : (
-          filteredPosts.map((post) => {
-            const categoryInfo = getCategoryInfo(post.category);
-            return (
-              <PostCard key={post.idx} onClick={() => handlePostSelect(post)}>
-                <PostHeader>
-                  <PostTitleSection>
-                    <PostTitleRow>
-                      <PostTitle>{post.title}</PostTitle>
-                      <PostNumber>#{post.idx}</PostNumber>
-                    </PostTitleRow>
-                    <CategoryBadge categoryColor={categoryInfo.color}>
-                      <CategoryBadgeIcon>{categoryInfo.icon}</CategoryBadgeIcon>
-                      {categoryInfo.label}
-                    </CategoryBadge>
-                  </PostTitleSection>
-                </PostHeader>
+          <>
+            {/* 대형 카드 (전체 너비) */}
+            {categorizedPosts.large.map((post) => {
+              const categoryInfo = getCategoryInfo(post.category);
+              return (
+                <PostCard key={post.idx} size="large" onClick={() => handlePostSelect(post)}>
+                  <PostHeader>
+                    <PostTitleSection>
+                      <PostTitleRow>
+                        <PostTitle>{post.title}</PostTitle>
+                        <PostNumber>#{post.idx}</PostNumber>
+                      </PostTitleRow>
+                      <CategoryBadge categoryColor={categoryInfo.color}>
+                        <CategoryBadgeIcon>{categoryInfo.icon}</CategoryBadgeIcon>
+                        {categoryInfo.label}
+                      </CategoryBadge>
+                    </PostTitleSection>
+                  </PostHeader>
 
-                {post.boardFilePath && (
-                  <PostImage>
-                    <img src={post.boardFilePath} alt={post.title} />
-                  </PostImage>
-                )}
+                  {post.boardFilePath && (
+                    <PostImage size="large">
+                      <img src={post.boardFilePath} alt={post.title} />
+                    </PostImage>
+                  )}
 
-                <PostContent>{post.content}</PostContent>
+                  <PostContent size="large">{post.content}</PostContent>
 
-                <PostFooter>
-                  <AuthorInfo>
-                    <AuthorAvatar>
-                      {post.username ? post.username.charAt(0).toUpperCase() : 'U'}
-                    </AuthorAvatar>
-                    <AuthorDetails>
-                      <AuthorName>{post.username || '알 수 없음'}</AuthorName>
-                      <AuthorLocation>
-                        <LocationIcon>📍</LocationIcon>
-                        {post.userLocation || '위치 정보 없음'}
-                      </AuthorLocation>
-                    </AuthorDetails>
-                  </AuthorInfo>
-                  <PostActions>
-                    <PostStats>
-                      <StatItem onClick={(e) => handleCommentClick(post, e)}>
-                        <StatIcon>💬</StatIcon>
-                        <StatValue>{post.commentCount ?? 0}</StatValue>
-                      </StatItem>
-                      <StatItem onClick={(e) => handleLikeClick(post.idx, e)}>
-                        <StatIcon>❤️</StatIcon>
-                        <StatValue>{post.likes ?? 0}</StatValue>
-                      </StatItem>
-                      <StatInfo>
-                        <StatIcon>👁️</StatIcon>
-                        <StatValue>{post.views ?? 0}</StatValue>
-                      </StatInfo>
-                      <TimeAgo>{formatDate(post.createdAt)}</TimeAgo>
-                    </PostStats>
-                    <PostActionsRight>
-                      {user && user.idx === post.userId && (
-                        <DeleteButton
-                          type="button"
-                          onClick={(event) => handleDeletePost(post.idx, event)}
+                  <PostFooter>
+                    <AuthorInfo>
+                      <AuthorAvatar>
+                        {post.username ? post.username.charAt(0).toUpperCase() : 'U'}
+                      </AuthorAvatar>
+                      <AuthorDetails>
+                        <AuthorName>{post.username || '알 수 없음'}</AuthorName>
+                        <AuthorLocation>
+                          <LocationIcon>📍</LocationIcon>
+                          {post.userLocation || '위치 정보 없음'}
+                        </AuthorLocation>
+                      </AuthorDetails>
+                    </AuthorInfo>
+                    <PostActions>
+                      <PostStats>
+                        <StatItem onClick={(e) => handleCommentClick(post, e)}>
+                          <StatIcon>💬</StatIcon>
+                          <StatValue>{post.commentCount ?? 0}</StatValue>
+                        </StatItem>
+                        <StatItem onClick={(e) => handleLikeClick(post.idx, e)}>
+                          <StatIcon>❤️</StatIcon>
+                          <StatValue>{post.likes ?? 0}</StatValue>
+                        </StatItem>
+                        <StatInfo>
+                          <StatIcon>👁️</StatIcon>
+                          <StatValue>{post.views ?? 0}</StatValue>
+                        </StatInfo>
+                        <TimeAgo>{formatDate(post.createdAt)}</TimeAgo>
+                      </PostStats>
+                      <PostActionsRight>
+                        {user && user.idx === post.userId && (
+                          <DeleteButton
+                            type="button"
+                            onClick={(event) => handleDeletePost(post.idx, event)}
+                          >
+                            삭제
+                          </DeleteButton>
+                        )}
+                        <ReportButton
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handlePostReport(post.idx);
+                          }}
                         >
-                          삭제
-                        </DeleteButton>
-                      )}
-                      <ReportButton
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handlePostReport(post.idx);
-                        }}
-                      >
-                        <ReportIcon>🚨</ReportIcon>
-                      </ReportButton>
-                    </PostActionsRight>
-                  </PostActions>
-                </PostFooter>
-              </PostCard>
-            );
-          })
+                          <ReportIcon>🚨</ReportIcon>
+                        </ReportButton>
+                      </PostActionsRight>
+                    </PostActions>
+                  </PostFooter>
+                </PostCard>
+              );
+            })}
+
+            {/* 중간 카드 (썸네일 있는 글) */}
+            {categorizedPosts.medium.map((post) => {
+              const categoryInfo = getCategoryInfo(post.category);
+              return (
+                <PostCard key={post.idx} size="medium" onClick={() => handlePostSelect(post)}>
+                  <PostHeader>
+                    <PostTitleSection>
+                      <PostTitleRow>
+                        <PostTitle>{post.title}</PostTitle>
+                        <PostNumber>#{post.idx}</PostNumber>
+                      </PostTitleRow>
+                      <CategoryBadge categoryColor={categoryInfo.color}>
+                        <CategoryBadgeIcon>{categoryInfo.icon}</CategoryBadgeIcon>
+                        {categoryInfo.label}
+                      </CategoryBadge>
+                    </PostTitleSection>
+                  </PostHeader>
+
+                  {post.boardFilePath && (
+                    <PostImage size="medium">
+                      <img src={post.boardFilePath} alt={post.title} />
+                    </PostImage>
+                  )}
+
+                  <PostContent size="medium">{post.content}</PostContent>
+
+                  <PostFooter>
+                    <AuthorInfo>
+                      <AuthorAvatar>
+                        {post.username ? post.username.charAt(0).toUpperCase() : 'U'}
+                      </AuthorAvatar>
+                      <AuthorDetails>
+                        <AuthorName>{post.username || '알 수 없음'}</AuthorName>
+                        <AuthorLocation>
+                          <LocationIcon>📍</LocationIcon>
+                          {post.userLocation || '위치 정보 없음'}
+                        </AuthorLocation>
+                      </AuthorDetails>
+                    </AuthorInfo>
+                    <PostActions>
+                      <PostStats>
+                        <StatItem onClick={(e) => handleCommentClick(post, e)}>
+                          <StatIcon>💬</StatIcon>
+                          <StatValue>{post.commentCount ?? 0}</StatValue>
+                        </StatItem>
+                        <StatItem onClick={(e) => handleLikeClick(post.idx, e)}>
+                          <StatIcon>❤️</StatIcon>
+                          <StatValue>{post.likes ?? 0}</StatValue>
+                        </StatItem>
+                        <StatInfo>
+                          <StatIcon>👁️</StatIcon>
+                          <StatValue>{post.views ?? 0}</StatValue>
+                        </StatInfo>
+                        <TimeAgo>{formatDate(post.createdAt)}</TimeAgo>
+                      </PostStats>
+                      <PostActionsRight>
+                        {user && user.idx === post.userId && (
+                          <DeleteButton
+                            type="button"
+                            onClick={(event) => handleDeletePost(post.idx, event)}
+                          >
+                            삭제
+                          </DeleteButton>
+                        )}
+                        <ReportButton
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handlePostReport(post.idx);
+                          }}
+                        >
+                          <ReportIcon>🚨</ReportIcon>
+                        </ReportButton>
+                      </PostActionsRight>
+                    </PostActions>
+                  </PostFooter>
+                </PostCard>
+              );
+            })}
+
+            {/* 작은 카드 (텍스트만 있는 글) */}
+            {categorizedPosts.small.map((post) => {
+              const categoryInfo = getCategoryInfo(post.category);
+              return (
+                <PostCard key={post.idx} size="small" onClick={() => handlePostSelect(post)}>
+                  <PostHeader>
+                    <PostTitleSection>
+                      <PostTitleRow>
+                        <PostTitle>{post.title}</PostTitle>
+                        <PostNumber>#{post.idx}</PostNumber>
+                      </PostTitleRow>
+                      <CategoryBadge categoryColor={categoryInfo.color}>
+                        <CategoryBadgeIcon>{categoryInfo.icon}</CategoryBadgeIcon>
+                        {categoryInfo.label}
+                      </CategoryBadge>
+                    </PostTitleSection>
+                  </PostHeader>
+
+                  <PostContent size="small">{post.content}</PostContent>
+
+                  <PostFooter>
+                    <AuthorInfo>
+                      <AuthorAvatar>
+                        {post.username ? post.username.charAt(0).toUpperCase() : 'U'}
+                      </AuthorAvatar>
+                      <AuthorDetails>
+                        <AuthorName>{post.username || '알 수 없음'}</AuthorName>
+                        <AuthorLocation>
+                          <LocationIcon>📍</LocationIcon>
+                          {post.userLocation || '위치 정보 없음'}
+                        </AuthorLocation>
+                      </AuthorDetails>
+                    </AuthorInfo>
+                    <PostActions>
+                      <PostStats>
+                        <StatItem onClick={(e) => handleCommentClick(post, e)}>
+                          <StatIcon>💬</StatIcon>
+                          <StatValue>{post.commentCount ?? 0}</StatValue>
+                        </StatItem>
+                        <StatItem onClick={(e) => handleLikeClick(post.idx, e)}>
+                          <StatIcon>❤️</StatIcon>
+                          <StatValue>{post.likes ?? 0}</StatValue>
+                        </StatItem>
+                        <StatInfo>
+                          <StatIcon>👁️</StatIcon>
+                          <StatValue>{post.views ?? 0}</StatValue>
+                        </StatInfo>
+                        <TimeAgo>{formatDate(post.createdAt)}</TimeAgo>
+                      </PostStats>
+                      <PostActionsRight>
+                        {user && user.idx === post.userId && (
+                          <DeleteButton
+                            type="button"
+                            onClick={(event) => handleDeletePost(post.idx, event)}
+                          >
+                            삭제
+                          </DeleteButton>
+                        )}
+                        <ReportButton
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handlePostReport(post.idx);
+                          }}
+                        >
+                          <ReportIcon>🚨</ReportIcon>
+                        </ReportButton>
+                      </PostActionsRight>
+                    </PostActions>
+                  </PostFooter>
+                </PostCard>
+              );
+            })}
+          </>
         )}
       </PostGrid>
 
@@ -641,7 +826,7 @@ const CommunityBoard = () => {
 export default CommunityBoard;
 
 const Container = styled.div`
-  max-width: 1400px;
+  max-width: 1500px;
   margin: 0 auto;
   padding: ${props => props.theme.spacing.xl} ${props => props.theme.spacing.lg};
   min-height: 100vh;
@@ -768,12 +953,18 @@ const CategoryIcon = styled.span`
 
 const PostGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(12, 1fr);
   gap: ${(props) => props.theme.spacing.lg};
+  grid-auto-flow: row dense;
+
+  @media (max-width: 1024px) {
+    grid-template-columns: repeat(4, 1fr);
+  }
 
   @media (max-width: 768px) {
     grid-template-columns: 1fr;
     gap: ${(props) => props.theme.spacing.md};
+    grid-auto-flow: row;
   }
 `;
 
@@ -787,7 +978,9 @@ const ErrorBanner = styled.div`
   font-size: 0.95rem;
 `;
 
-const PostCard = styled.div`
+const PostCard = styled.div.withConfig({
+  shouldForwardProp: (prop) => prop !== 'size',
+})`
   background: ${(props) => props.theme.colors.surface};
   border: 1px solid ${(props) => props.theme.colors.borderLight};
   border-radius: ${(props) => props.theme.borderRadius.xl};
@@ -797,9 +990,42 @@ const PostCard = styled.div`
   display: flex;
   flex-direction: column;
   gap: ${(props) => props.theme.spacing.md};
-  min-height: 320px;
   background-image: linear-gradient(135deg, ${(props) =>
     props.theme.colors.surface} 0%, ${(props) => props.theme.colors.surfaceElevated} 100%);
+
+  /* 대형 카드: 전체 너비 (12칸) */
+  ${(props) => props.size === 'large' && `
+    grid-column: span 12;
+    min-height: 400px;
+  `}
+
+  /* 중간 카드: PC에서 6칸 (2개씩), Tablet에서 2칸 (2개씩) */
+  ${(props) => props.size === 'medium' && `
+    grid-column: span 6;
+    min-height: 350px;
+
+    @media (max-width: 1024px) {
+      grid-column: span 2;
+      min-height: 320px;
+    }
+  `}
+
+  /* 작은 카드: PC에서 3칸 (4개씩), Tablet에서 2칸 (2개씩) */
+  ${(props) => props.size === 'small' && `
+    grid-column: span 3;
+    min-height: 280px;
+
+    @media (max-width: 1024px) {
+      grid-column: span 2;
+      min-height: 260px;
+    }
+  `}
+
+  /* Mobile: 모든 카드 1열 */
+  @media (max-width: 768px) {
+    grid-column: span 1 !important;
+    min-height: auto;
+  }
 
   &:hover {
     transform: translateY(-8px);
@@ -822,7 +1048,9 @@ const PostTitleSection = styled.div`
   flex: 1;
 `;
 
-const PostImage = styled.div`
+const PostImage = styled.div.withConfig({
+  shouldForwardProp: (prop) => prop !== 'size',
+})`
   margin: ${props => props.theme.spacing.md} 0;
   border-radius: ${props => props.theme.borderRadius.lg};
   overflow: hidden;
@@ -833,6 +1061,11 @@ const PostImage = styled.div`
     height: auto;
     display: block;
     object-fit: cover;
+    max-height: ${props => {
+    if (props.size === 'large') return '500px';
+    if (props.size === 'medium') return '300px';
+    return '200px';
+  }};
   }
 `;
 
@@ -878,17 +1111,30 @@ const CategoryBadgeIcon = styled.span`
   font-size: 12px;
 `;
 
-const PostContent = styled.p`
+const PostContent = styled.p.withConfig({
+  shouldForwardProp: (prop) => prop !== 'size',
+})`
   color: ${props => props.theme.colors.textSecondary};
   font-size: ${props => props.theme.typography.body1.fontSize};
   line-height: 1.7;
   margin: ${props => props.theme.spacing.md} 0;
   overflow: hidden;
   display: -webkit-box;
-  -webkit-line-clamp: 4;
   -webkit-box-orient: vertical;
   flex: 1;
-  min-height: 3.6em;
+  
+  /* 크기에 따라 다른 줄 수 제한 */
+  -webkit-line-clamp: ${props => {
+    if (props.size === 'large') return 6;
+    if (props.size === 'medium') return 4;
+    return 3;
+  }};
+  
+  min-height: ${props => {
+    if (props.size === 'large') return '4.8em';
+    if (props.size === 'medium') return '3.6em';
+    return '2.7em';
+  }};
 `;
 
 const PostFooter = styled.div`
