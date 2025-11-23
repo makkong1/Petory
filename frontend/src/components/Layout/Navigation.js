@@ -368,7 +368,7 @@ const NavContainer = styled.nav`
 `;
 
 const NavContent = styled.div`
-  max-width: 1700px;
+  max-width: 1350px;
   margin: 0 auto;
   padding: 0 ${props => props.theme.spacing.lg};
   display: flex;
@@ -386,7 +386,7 @@ const Logo = styled.div`
   cursor: pointer;
   
   .icon {
-    font-size: 28px;
+    font-size: 24px;
   }
 `;
 
@@ -414,7 +414,7 @@ const NavMenu = styled.div.withConfig({
 const NavItem = styled.a`
   color: ${props => props.theme.colors.text};
   text-decoration: none;
-  font-weight: 500;
+  font-weight: 400;
   padding: ${props => props.theme.spacing.sm} ${props => props.theme.spacing.md};
   border-radius: ${props => props.theme.borderRadius.md};
   transition: all 0.2s ease;
@@ -435,15 +435,15 @@ const ThemeToggle = styled.button`
   background: ${props => props.theme.colors.surface};
   border: 1px solid ${props => props.theme.colors.border};
   color: ${props => props.theme.colors.text};
-  width: 44px;
-  height: 44px;
+  width: 36px;
+  height: 36px;
   border-radius: ${props => props.theme.borderRadius.full};
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: all 0.2s ease;
-  font-size: 20px;
+  font-size: 16px;
   
   &:hover {
     background: ${props => props.theme.colors.surfaceHover};
@@ -456,7 +456,7 @@ const MobileMenuButton = styled.button`
   background: none;
   border: none;
   color: ${props => props.theme.colors.text};
-  font-size: 24px;
+  font-size: 16px;
   cursor: pointer;
   padding: ${props => props.theme.spacing.sm};
   
@@ -477,7 +477,7 @@ const UserInfo = styled.button`
   align-items: center;
   gap: ${props => props.theme.spacing.xs};
   color: ${props => props.theme.colors.text};
-  font-size: 14px;
+  font-size: 12px;
   background: ${props => props.theme.colors.surface};
   border: 1px solid ${props => props.theme.colors.border};
   padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.sm};
@@ -499,7 +499,7 @@ const LogoutButton = styled.button`
   border-radius: ${props => props.theme.borderRadius.md};
   cursor: pointer;
   transition: all 0.2s ease;
-  font-size: 14px;
+  font-size: 12px;
   
   &:hover {
     background: ${props => props.theme.colors.surfaceHover};
@@ -512,15 +512,15 @@ const NotificationButton = styled.button`
   background: ${props => props.theme.colors.surface};
   border: 1px solid ${props => props.theme.colors.border};
   color: ${props => props.theme.colors.text};
-  width: 44px;
-  height: 44px;
+  width: 36px;
+  height: 36px;
   border-radius: ${props => props.theme.borderRadius.full};
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: all 0.2s ease;
-  font-size: 20px;
+  font-size: 16px;
   
   &:hover {
     background: ${props => props.theme.colors.surfaceHover};

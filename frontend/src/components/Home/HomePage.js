@@ -123,7 +123,7 @@ const HomePage = ({ setActiveTab }) => {
 export default HomePage;
 
 const Container = styled.div`
-  max-width: 1400px;
+  max-width: 1200px;
   margin: 0 auto;
   padding: ${props => props.theme.spacing.xxl} ${props => props.theme.spacing.lg};
 `;
@@ -189,7 +189,7 @@ const FeatureIcon = styled.div`
 const FeatureTitle = styled.h3`
   color: ${props => props.theme.colors.text};
   margin-bottom: ${props => props.theme.spacing.md};
-  font-size: ${props => props.theme.typography.h4.fontSize};
+  font-size: ${props => props.theme.typography.h3.fontSize};
   font-weight: ${props => props.theme.typography.h4.fontWeight};
 `;
 

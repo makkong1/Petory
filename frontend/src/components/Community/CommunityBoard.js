@@ -826,7 +826,7 @@ const CommunityBoard = () => {
 export default CommunityBoard;
 
 const Container = styled.div`
-  max-width: 1500px;
+  max-width: 1200px;
   margin: 0 auto;
   padding: ${props => props.theme.spacing.xl} ${props => props.theme.spacing.lg};
   min-height: 100vh;
@@ -906,7 +906,7 @@ const WriteButton = styled.button`
 `;
 
 const WriteIcon = styled.span`
-  font-size: 18px;
+  font-size: 15px;
 `;
 
 const CategoryTabs = styled.div`
@@ -948,7 +948,7 @@ const CategoryTab = styled.button`
 `;
 
 const CategoryIcon = styled.span`
-  font-size: 16px;
+  font-size: 14px;
 `;
 
 const PostGrid = styled.div`
@@ -1165,7 +1165,7 @@ const AuthorAvatar = styled.div`
   justify-content: center;
   color: white;
   font-weight: 700;
-  font-size: 18px;
+  font-size: 15px;
   box-shadow: 0 4px 12px rgba(255, 126, 54, 0.25);
 `;
 
@@ -1251,7 +1251,7 @@ const StatInfo = styled.div`
 `;
 
 const StatIcon = styled.span`
-  font-size: 16px;
+  font-size: 14px;
 `;
 
 const StatValue = styled.span`
@@ -1308,7 +1308,7 @@ const PostActionsRight = styled.div`
 `;
 
 const ReportIcon = styled.span`
-  font-size: 18px;
+  font-size: 15px;
 `;
 
 const PopularSection = styled.section`

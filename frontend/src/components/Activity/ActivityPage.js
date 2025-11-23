@@ -223,7 +223,7 @@ const ActivityPage = () => {
 export default ActivityPage;
 
 const Container = styled.div`
-  max-width: 1400px;
+  max-width: 1200px;
   margin: 0 auto;
   padding: ${props => props.theme.spacing.xl} ${props => props.theme.spacing.lg};
 

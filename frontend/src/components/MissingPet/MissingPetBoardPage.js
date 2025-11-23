@@ -299,7 +299,7 @@ const MissingPetBoardPage = () => {
 export default MissingPetBoardPage;
 
 const Wrapper = styled.div`
-  max-width: 1500px;
+  max-width: 1200px;
   margin: 0 auto;
   padding: ${(props) => props.theme.spacing.xl} ${(props) => props.theme.spacing.lg};
 `;
@@ -319,7 +319,7 @@ const Header = styled.div`
 
 const Title = styled.h1`
   margin: 0;
-  font-size: 2.4rem;
+  font-size: 2rem;
   color: ${(props) => props.theme.colors.text};
 `;
 
@@ -532,7 +532,7 @@ const CardTitleRow = styled.div`
 
 const CardTitle = styled.h2`
   margin: 0;
-  font-size: 1.3rem;
+  font-size: 1.1rem;
   color: ${(props) => props.theme.colors.text};
   flex: 1;
   min-width: 0;

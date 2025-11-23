@@ -431,7 +431,7 @@ const PageContainer = styled.div`
 `;
 
 const DetailCard = styled.article`
-  width: min(1200px, 100%);
+  width: min(1000px, 100%);
   background: ${(props) => props.theme.colors.surface};
   border-radius: ${(props) => props.theme.borderRadius.xl};
   box-shadow: 0 22px 48px rgba(15, 23, 42, 0.25);
@@ -525,7 +525,7 @@ const DetailTitle = styled.h2`
 const CloseButton = styled.button`
   border: none;
   background: transparent;
-  font-size: 1.4rem;
+  font-size: 1.2rem;
   color: ${(props) => props.theme.colors.textSecondary};
   cursor: pointer;
 
@@ -661,7 +661,7 @@ const Section = styled.section`
 
 const SectionTitle = styled.h3`
   margin: 0;
-  font-size: 1.1rem;
+  font-size: 0.95rem;
 `;
 
 const ContentBox = styled.div`
