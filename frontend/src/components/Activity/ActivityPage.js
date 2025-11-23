@@ -223,9 +223,13 @@ const ActivityPage = () => {
 export default ActivityPage;
 
 const Container = styled.div`
-  max-width: 1000px;
+  max-width: 1400px;
   margin: 0 auto;
   padding: ${props => props.theme.spacing.xl} ${props => props.theme.spacing.lg};
+
+  @media (max-width: 768px) {
+    padding: ${props => props.theme.spacing.md};
+  }
 `;
 
 const Header = styled.div`
@@ -237,6 +241,10 @@ const Title = styled.h1`
   font-size: ${props => props.theme.typography.h2.fontSize};
   font-weight: ${props => props.theme.typography.h2.fontWeight};
   margin: 0 0 ${props => props.theme.spacing.sm} 0;
+
+  @media (max-width: 768px) {
+    font-size: ${props => props.theme.typography.h3.fontSize};
+  }
 `;
 
 const Subtitle = styled.p`
@@ -286,6 +294,10 @@ const ActivityCard = styled.div`
     box-shadow: 0 4px 12px ${props => props.theme.colors.shadow};
     border-color: ${props => props.theme.colors.primary};
   }
+
+  @media (max-width: 768px) {
+    padding: ${props => props.theme.spacing.md};
+  }
 `;
 
 const ActivityHeader = styled.div`
@@ -293,6 +305,12 @@ const ActivityHeader = styled.div`
   justify-content: space-between;
   align-items: center;
   margin-bottom: ${props => props.theme.spacing.md};
+
+  @media (max-width: 768px) {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: ${props => props.theme.spacing.sm};
+  }
 `;
 
 const TypeBadge = styled.div`

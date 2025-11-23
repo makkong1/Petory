@@ -359,7 +359,7 @@ const NavContainer = styled.nav`
 `;
 
 const NavContent = styled.div`
-  max-width: 1400px;
+  max-width: 1600px;
   margin: 0 auto;
   padding: 0 ${props => props.theme.spacing.lg};
   display: flex;

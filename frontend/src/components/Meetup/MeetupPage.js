@@ -1048,6 +1048,11 @@ const Container = styled.div`
   display: flex;
   flex-direction: column;
   background: ${props => props.theme.colors.background};
+
+  @media (max-width: 768px) {
+    height: auto;
+    min-height: calc(100vh - 80px);
+  }
 `;
 
 const Header = styled.div`
@@ -1057,6 +1062,13 @@ const Header = styled.div`
   padding: 1rem 2rem;
   background: ${props => props.theme.colors.surface};
   border-bottom: 1px solid ${props => props.theme.colors.border};
+
+  @media (max-width: 768px) {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: stretch;
+    padding: 1rem;
+  }
 `;
 
 const Title = styled.h1`
@@ -1064,12 +1076,23 @@ const Title = styled.h1`
   font-weight: 700;
   color: ${props => props.theme.colors.text};
   margin: 0;
+
+  @media (max-width: 768px) {
+    font-size: 1.25rem;
+  }
 `;
 
 const Controls = styled.div`
   display: flex;
   gap: 1rem;
   align-items: center;
+  flex-wrap: wrap;
+
+  @media (max-width: 768px) {
+    width: 100%;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
 `;
 
 const RadiusSelect = styled.select`
@@ -1136,6 +1159,10 @@ const ContentWrapper = styled.div`
   flex: 1;
   display: flex;
   overflow: hidden;
+
+  @media (max-width: 1024px) {
+    flex-direction: column;
+  }
 `;
 
 const MapSection = styled.div`
@@ -1150,6 +1177,13 @@ const ListSection = styled.div`
   display: flex;
   flex-direction: column;
   overflow: hidden;
+
+  @media (max-width: 1024px) {
+    width: 100%;
+    border-left: none;
+    border-top: 1px solid ${props => props.theme.colors.border};
+    max-height: 400px;
+  }
 `;
 
 const ListHeader = styled.div`
@@ -1235,6 +1269,13 @@ const ModalContent = styled.div`
   overflow-y: auto;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
   position: relative;
+
+  @media (max-width: 768px) {
+    width: 95%;
+    max-width: 100%;
+    max-height: 90vh;
+    border-radius: 8px;
+  }
 `;
 
 const ModalHeader = styled.div`
@@ -1557,6 +1598,12 @@ const DatePickerDropdown = styled.div`
       opacity: 1;
       transform: translateY(0);
     }
+  }
+
+  @media (max-width: 768px) {
+    min-width: 280px;
+    max-width: 90vw;
+    padding: 0.75rem;
   }
 `;
 

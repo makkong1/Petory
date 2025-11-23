@@ -498,10 +498,15 @@ const PageContainer = styled.div`
   align-items: flex-start;
   overflow-y: auto;
   padding: ${(props) => props.theme.spacing.xxl} ${(props) => props.theme.spacing.lg};
+
+  @media (max-width: 768px) {
+    padding: ${(props) => props.theme.spacing.md};
+    align-items: stretch;
+  }
 `;
 
 const DetailCard = styled.article`
-  width: min(960px, 100%);
+  width: min(1200px, 100%);
   background: ${(props) => props.theme.colors.surface};
   border-radius: ${(props) => props.theme.borderRadius.xl};
   box-shadow: 0 22px 48px rgba(15, 23, 42, 0.25);
@@ -509,6 +514,12 @@ const DetailCard = styled.article`
   overflow: hidden;
   display: flex;
   flex-direction: column;
+
+  @media (max-width: 768px) {
+    width: 100%;
+    border-radius: ${(props) => props.theme.borderRadius.lg};
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.2);
+  }
 `;
 
 const DetailHeader = styled.header`
@@ -517,6 +528,10 @@ const DetailHeader = styled.header`
   display: flex;
   flex-direction: column;
   gap: ${(props) => props.theme.spacing.md};
+
+  @media (max-width: 768px) {
+    padding: ${(props) => props.theme.spacing.md};
+  }
 `;
 
 const HeaderTop = styled.div`
@@ -524,6 +539,12 @@ const HeaderTop = styled.div`
   justify-content: space-between;
   align-items: center;
   gap: ${(props) => props.theme.spacing.md};
+
+  @media (max-width: 768px) {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: ${(props) => props.theme.spacing.sm};
+  }
 `;
 
 const BackButton = styled.button`
@@ -547,6 +568,12 @@ const HeaderActions = styled.div`
   display: flex;
   align-items: center;
   gap: ${(props) => props.theme.spacing.sm};
+  flex-wrap: wrap;
+
+  @media (max-width: 768px) {
+    width: 100%;
+    justify-content: flex-start;
+  }
 `;
 
 const HeaderActionButton = styled.button`
@@ -591,6 +618,10 @@ const Title = styled.h1`
   color: ${(props) => props.theme.colors.text};
   font-size: ${(props) => props.theme.typography.h2.fontSize};
   line-height: 1.4;
+
+  @media (max-width: 768px) {
+    font-size: ${(props) => props.theme.typography.h3.fontSize};
+  }
 `;
 
 const MetaInfo = styled.div`
@@ -622,6 +653,10 @@ const ContentSection = styled.section`
   padding: ${(props) => props.theme.spacing.xl} ${(props) => props.theme.spacing.xl};
   border-bottom: 1px solid ${(props) => props.theme.colors.borderLight};
   background: ${(props) => props.theme.colors.surface};
+
+  @media (max-width: 768px) {
+    padding: ${(props) => props.theme.spacing.md};
+  }
 `;
 
 const ContentText = styled.p`
@@ -655,6 +690,11 @@ const CommentSection = styled.section`
   display: flex;
   flex-direction: column;
   gap: ${(props) => props.theme.spacing.xl};
+
+  @media (max-width: 768px) {
+    padding: ${(props) => props.theme.spacing.md};
+    gap: ${(props) => props.theme.spacing.md};
+  }
 `;
 
 const CommentHeader = styled.div`

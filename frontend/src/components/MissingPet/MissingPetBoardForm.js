@@ -292,6 +292,10 @@ const Overlay = styled.div`
   overflow-y: auto;
   z-index: 1000;
   padding: 3rem 1rem;
+
+  @media (max-width: 768px) {
+    padding: 1rem;
+  }
 `;
 
 const Modal = styled.div`
@@ -300,6 +304,11 @@ const Modal = styled.div`
   max-width: 880px;
   width: 100%;
   box-shadow: 0 25px 80px rgba(15, 23, 42, 0.25);
+
+  @media (max-width: 768px) {
+    max-width: 100%;
+    border-radius: ${(props) => props.theme.borderRadius.lg};
+  }
 `;
 
 const ModalHeader = styled.div`
@@ -308,6 +317,10 @@ const ModalHeader = styled.div`
   justify-content: space-between;
   padding: ${(props) => props.theme.spacing.lg} ${(props) => props.theme.spacing.xl};
   border-bottom: 1px solid ${(props) => props.theme.colors.border};
+
+  @media (max-width: 768px) {
+    padding: ${(props) => props.theme.spacing.md};
+  }
 `;
 
 const ModalTitle = styled.h2`

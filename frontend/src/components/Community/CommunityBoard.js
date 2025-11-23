@@ -641,7 +641,7 @@ const CommunityBoard = () => {
 export default CommunityBoard;
 
 const Container = styled.div`
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
   padding: ${props => props.theme.spacing.xl} ${props => props.theme.spacing.lg};
   min-height: 100vh;
@@ -770,6 +770,11 @@ const PostGrid = styled.div`
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: ${(props) => props.theme.spacing.lg};
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+    gap: ${(props) => props.theme.spacing.md};
+  }
 `;
 
 const ErrorBanner = styled.div`

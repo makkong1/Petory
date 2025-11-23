@@ -299,7 +299,7 @@ const MissingPetBoardPage = () => {
 export default MissingPetBoardPage;
 
 const Wrapper = styled.div`
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
   padding: ${(props) => props.theme.spacing.xl} ${(props) => props.theme.spacing.lg};
 `;
@@ -442,6 +442,11 @@ const BoardGrid = styled.div`
   display: grid;
   gap: ${(props) => props.theme.spacing.lg};
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+    gap: ${(props) => props.theme.spacing.md};
+  }
 `;
 
 const BoardCard = styled.div`

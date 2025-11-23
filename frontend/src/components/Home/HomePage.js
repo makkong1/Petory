@@ -123,7 +123,7 @@ const HomePage = ({ setActiveTab }) => {
 export default HomePage;
 
 const Container = styled.div`
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
   padding: ${props => props.theme.spacing.xxl} ${props => props.theme.spacing.lg};
 `;
