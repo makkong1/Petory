@@ -168,7 +168,11 @@ const ReportDetailModal = ({ reportId, onClose, onHandled }) => {
               <SectionTitle>대상 미리보기</SectionTitle>
               <PreviewCard>
                 <PreviewTitle>
-                  제목 : {detail?.target?.title || '(제목 없음)'} <small>({detail?.target?.type} #{detail?.target?.id})</small>
+                  {detail?.report?.targetType === 'PET_CARE_PROVIDER' ? (
+                    <>유저: {detail?.target?.authorName || '(이름 없음)'} <small>({detail?.target?.type} #{detail?.target?.id})</small></>
+                  ) : (
+                    <>제목 : {detail?.target?.title || '(제목 없음)'} <small>({detail?.target?.type} #{detail?.target?.id})</small></>
+                  )}
                 </PreviewTitle>
                 {detail?.target?.summary && (
                   <PreviewSummary>내용 : {detail?.target?.summary}</PreviewSummary>

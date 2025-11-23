@@ -15,7 +15,7 @@ const ReportManagementSection = () => {
     { key: 'BOARD', label: '게시글 신고' },
     { key: 'COMMENT', label: '댓글 신고' },
     { key: 'MISSING_PET', label: '실종 제보 신고' },
-    { key: 'PET_CARE_PROVIDER', label: '펫케어 제공자 신고' },
+    { key: 'PET_CARE_PROVIDER', label: '유저 신고' },
   ];
 
   const statusOptions = [
@@ -216,7 +216,7 @@ const StatusTab = styled.button`
   border-radius: 999px;
   border: 1px solid
     ${props =>
-      props.$active ? props.theme.colors.primary : props.theme.colors.border};
+    props.$active ? props.theme.colors.primary : props.theme.colors.border};
   padding: 6px 14px;
   background: ${props =>
     props.$active ? props.theme.colors.primarySoft : props.theme.colors.surface};
@@ -228,9 +228,9 @@ const StatusTab = styled.button`
 
   &:hover {
     background: ${props =>
-      props.$active
-        ? props.theme.colors.primarySoft
-        : props.theme.colors.surfaceHover};
+    props.$active
+      ? props.theme.colors.primarySoft
+      : props.theme.colors.surfaceHover};
   }
 `;
 
@@ -307,6 +307,7 @@ const ViewButton = styled.button`
   background: ${props => props.theme.colors.surface};
   cursor: pointer;
   font-size: ${props => props.theme.typography.caption.fontSize};
+  color: ${props => props.theme.colors.text};
 
   &:hover {
     background: ${props => props.theme.colors.surfaceHover};

@@ -41,6 +41,7 @@ public class AuthController {
                             loginRequest.getPassword()));
 
             // AuthService를 통해 로그인 처리 (Access Token + Refresh Token 발급)
+            // 내부에서 제재 체크도 수행
             TokenResponse tokenResponse = authService.login(loginRequest.getId(), loginRequest.getPassword());
 
             Map<String, Object> response = new HashMap<>();

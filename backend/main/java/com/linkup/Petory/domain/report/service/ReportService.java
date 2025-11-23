@@ -24,6 +24,7 @@ import com.linkup.Petory.domain.report.repository.ReportRepository;
 import com.linkup.Petory.domain.user.entity.Role;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
+import com.linkup.Petory.domain.user.service.UserSanctionService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -39,6 +40,7 @@ public class ReportService {
     private final MissingPetBoardRepository missingPetBoardRepository;
     private final MissingPetCommentRepository missingPetCommentRepository;
     private final ReportConverter reportConverter;
+    private final UserSanctionService userSanctionService;
 
     @Transactional
     public ReportDTO createReport(ReportRequestDTO request) {
@@ -123,6 +125,20 @@ public class ReportService {
         report.setHandledAt(LocalDateTime.now());
         report.setAdminNote(req.getAdminNote());
         report.setActionTaken(req.getActionTaken() != null ? req.getActionTaken() : ReportActionType.NONE);
+
+        // 제재 조치가 있으면 자동 적용
+        if (req.getActionTaken() != null &&
+                (req.getActionTaken() == ReportActionType.WARN_USER ||
+                        req.getActionTaken() == ReportActionType.SUSPEND_USER)) {
+            String sanctionReason = String.format("신고 #%d 처리: %s", reportId,
+                    req.getAdminNote() != null ? req.getAdminNote() : report.getReason());
+            userSanctionService.applySanctionFromReport(
+                    report.getTargetIdx(),
+                    req.getActionTaken(),
+                    sanctionReason,
+                    admin.getIdx(),
+                    reportId);
+        }
 
         return reportConverter.toDTO(report);
     }

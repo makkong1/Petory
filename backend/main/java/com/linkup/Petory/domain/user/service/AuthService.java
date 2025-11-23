@@ -29,6 +29,24 @@ public class AuthService {
         Users user = usersRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("유저 없음"));
 
+        // 제재 상태 확인
+        if (user.getStatus() == Users.UserStatus.BANNED) {
+            throw new RuntimeException("영구 차단된 계정입니다. 웹사이트 이용이 불가능합니다.");
+        }
+        
+        if (user.getStatus() == Users.UserStatus.SUSPENDED) {
+            if (user.getSuspendedUntil() != null && user.getSuspendedUntil().isAfter(LocalDateTime.now())) {
+                throw new RuntimeException(String.format("이용제한 중인 계정입니다. 해제일: %s", 
+                    user.getSuspendedUntil().toString()));
+            } else {
+                // 만료된 이용제한 자동 해제
+                user.setStatus(Users.UserStatus.ACTIVE);
+                user.setSuspendedUntil(null);
+                usersRepository.save(user);
+                log.info("만료된 이용제한 자동 해제: {}", id);
+            }
+        }
+
         // Access Token 생성 (15분)
         String accessToken = jwtUtil.createAccessToken(user.getId());
 
