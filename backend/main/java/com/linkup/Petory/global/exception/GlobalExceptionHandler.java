@@ -5,6 +5,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestTimeoutException;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -18,10 +19,12 @@ public class GlobalExceptionHandler {
     /**
      * 권한 거부 예외 처리
      * SSE 연결 등에서 발생하는 AuthorizationDeniedException 처리
+     * 응답이 이미 커밋된 경우는 로그만 남기고 조용히 처리
      */
     @ExceptionHandler(AuthorizationDeniedException.class)
     public ResponseEntity<Map<String, Object>> handleAuthorizationDeniedException(AuthorizationDeniedException e) {
-        log.warn("권한 거부: {}", e.getMessage());
+        // 응답이 이미 커밋된 경우는 로그만 남기고 조용히 처리
+        log.debug("권한 거부 (응답 커밋 후): {}", e.getMessage());
         
         Map<String, Object> response = new HashMap<>();
         response.put("error", "권한이 없습니다.");
@@ -29,6 +32,17 @@ public class GlobalExceptionHandler {
         response.put("status", HttpStatus.FORBIDDEN.value());
         
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+    }
+
+    /**
+     * 비동기 요청 타임아웃 예외 처리
+     * SSE 연결 타임아웃은 정상적인 동작이므로 로그 레벨을 낮춤
+     */
+    @ExceptionHandler(AsyncRequestTimeoutException.class)
+    public void handleAsyncRequestTimeoutException(AsyncRequestTimeoutException e) {
+        // SSE 타임아웃은 정상적인 동작이므로 DEBUG 레벨로만 로깅
+        log.debug("비동기 요청 타임아웃 (SSE 연결 종료): {}", e.getMessage());
+        // 응답이 이미 커밋되었을 수 있으므로 void 반환
     }
 
     /**
@@ -63,9 +77,15 @@ public class GlobalExceptionHandler {
 
     /**
      * 기타 예외 처리
+     * AsyncRequestTimeoutException은 위에서 처리하므로 제외
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleException(Exception e) {
+        // AsyncRequestTimeoutException은 이미 처리했으므로 제외
+        if (e instanceof AsyncRequestTimeoutException) {
+            return null;
+        }
+        
         log.error("예상치 못한 오류 발생", e);
         
         Map<String, Object> response = new HashMap<>();
