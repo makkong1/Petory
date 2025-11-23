@@ -148,7 +148,7 @@ public class ReportService {
         Long id = report.getTargetIdx();
 
         switch (report.getTargetType()) {
-            case BOARD -> {
+            case BOARD: {
                 return boardRepository.findById(id)
                         .map(b -> ReportDetailDTO.TargetPreview.builder()
                                 .type(type)
@@ -159,7 +159,7 @@ public class ReportService {
                                 .build())
                         .orElse(ReportDetailDTO.TargetPreview.builder().type(type).id(id).title("(삭제됨)").build());
             }
-            case COMMENT -> {
+            case COMMENT: {
                 return commentRepository.findById(id)
                         .map(c -> ReportDetailDTO.TargetPreview.builder()
                                 .type(type)
@@ -170,7 +170,7 @@ public class ReportService {
                                 .build())
                         .orElse(ReportDetailDTO.TargetPreview.builder().type(type).id(id).summary("(삭제됨)").build());
             }
-            case MISSING_PET -> {
+            case MISSING_PET: {
                 return missingPetBoardRepository.findById(id)
                         .map(m -> ReportDetailDTO.TargetPreview.builder()
                                 .type(type)
@@ -181,7 +181,7 @@ public class ReportService {
                                 .build())
                         .orElse(ReportDetailDTO.TargetPreview.builder().type(type).id(id).title("(삭제됨)").build());
             }
-            case PET_CARE_PROVIDER -> {
+            case PET_CARE_PROVIDER: {
                 return usersRepository.findById(id)
                         .map(u -> ReportDetailDTO.TargetPreview.builder()
                                 .type(type)
@@ -192,7 +192,7 @@ public class ReportService {
                                 .build())
                         .orElse(ReportDetailDTO.TargetPreview.builder().type(type).id(id).title("(탈퇴/없음)").build());
             }
-            default -> {
+            default: {
                 return ReportDetailDTO.TargetPreview.builder().type(type).id(id).build();
             }
         }
@@ -210,13 +210,14 @@ public class ReportService {
     private void validateTarget(ReportTargetType targetType, Long targetIdx) {
         boolean exists;
         switch (targetType) {
-            case BOARD -> {
+            case BOARD: {
                 exists = boardRepository.existsById(targetIdx);
                 if (!exists) {
                     throw new IllegalArgumentException("신고 대상 게시글을 찾을 수 없습니다.");
                 }
+                break;
             }
-            case COMMENT -> {
+            case COMMENT: {
                 exists = commentRepository.existsById(targetIdx);
                 if (!exists) {
                     exists = missingPetCommentRepository.existsById(targetIdx);
@@ -224,21 +225,25 @@ public class ReportService {
                 if (!exists) {
                     throw new IllegalArgumentException("신고 대상 댓글을 찾을 수 없습니다.");
                 }
+                break;
             }
-            case MISSING_PET -> {
+            case MISSING_PET: {
                 exists = missingPetBoardRepository.existsById(targetIdx);
                 if (!exists) {
                     throw new IllegalArgumentException("신고 대상 실종 제보를 찾을 수 없습니다.");
                 }
+                break;
             }
-            case PET_CARE_PROVIDER -> {
+            case PET_CARE_PROVIDER: {
                 Users provider = usersRepository.findById(targetIdx)
                         .orElseThrow(() -> new IllegalArgumentException("해당 서비스 제공자를 찾을 수 없습니다."));
                 if (provider.getRole() != Role.SERVICE_PROVIDER) {
                     throw new IllegalArgumentException("서비스 제공자만 신고할 수 있습니다.");
                 }
+                break;
             }
-            default -> throw new IllegalArgumentException("지원하지 않는 신고 대상입니다.");
+            default:
+                throw new IllegalArgumentException("지원하지 않는 신고 대상입니다.");
         }
     }
 }
