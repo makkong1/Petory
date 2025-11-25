@@ -29,11 +29,14 @@ api.interceptors.request.use(
 
 export const boardApi = {
   // 전체 게시글 조회 (캐시 무시)
-  getAllBoards: (params = {}) => api.get('', { 
-    params: { ...params, _t: Date.now() }, // 캐시 무시를 위한 타임스탬프 추가
-    headers: { 'Cache-Control': 'no-cache' }
-  }),
-  
+  getAllBoards: (params = {}) => {
+    const requestParams = { ...params, _t: Date.now() }; // 캐시 무시를 위한 타임스탬프 추가
+    return api.get('', {
+      params: requestParams,
+      headers: { 'Cache-Control': 'no-cache' }
+    });
+  },
+
   // 단일 게시글 조회 (옵션 viewerId)
   getBoard: (id, viewerId) => {
     const params = {};
@@ -48,19 +51,19 @@ export const boardApi = {
     const normalized = (period || 'WEEKLY').toUpperCase();
     return api.get('/popular', { params: { period: normalized } });
   },
-  
+
   // 게시글 생성
   createBoard: (data) => api.post('', data),
-  
+
   // 게시글 수정
   updateBoard: (id, data) => api.put(`/${id}`, data),
-  
+
   // 게시글 삭제
   deleteBoard: (id) => api.delete(`/${id}`),
-  
+
   // 내 게시글 조회
   getMyBoards: (userId) => api.get('/my-posts', { params: { userId } }),
-  
+
   // 게시글 검색
   searchBoards: (keyword) => api.get('/search', { params: { keyword } }),
 

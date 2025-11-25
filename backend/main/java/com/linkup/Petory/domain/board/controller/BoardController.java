@@ -66,7 +66,6 @@ public class BoardController {
     @PostMapping
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<BoardDTO> createBoard(@RequestBody BoardDTO dto) {
-        System.out.println("=== 게시글 생성: " + dto.getTitle() + " ===");
         return ResponseEntity.ok(boardService.createBoard(dto));
     }
 

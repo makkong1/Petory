@@ -15,28 +15,34 @@ public class BoardPopularityScheduler {
     private final BoardPopularityService boardPopularityService;
 
     /**
-     * 매일 오후 6시(18:00:00)에 실행되어 주간/월간 인기 게시글 스냅샷 생성
+     * 매일 오후 6시 30분(18:30:00)에 실행되어 주간 인기 게시글 스냅샷 생성
      */
-    @Scheduled(cron = "0 0 18 * * ?")
+    @Scheduled(cron = "0 30 18 * * ?")
     @Transactional
-    public void generateDailyPopularitySnapshots() {
-        log.info("인기 게시글 스냅샷 생성 시작 - {}", java.time.LocalDateTime.now());
-        
+    public void generateWeeklyPopularitySnapshots() {
+        log.info("주간 인기 게시글 스냅샷 생성 시작 - {}", java.time.LocalDateTime.now());
+
         try {
-            // 주간 스냅샷 생성
-            log.info("주간 인기 게시글 스냅샷 생성 중...");
             boardPopularityService.generateSnapshots(PopularityPeriodType.WEEKLY);
-            log.info("주간 인기 게시글 스냅샷 생성 완료");
-            
-            // 월간 스냅샷 생성
-            log.info("월간 인기 게시글 스냅샷 생성 중...");
-            boardPopularityService.generateSnapshots(PopularityPeriodType.MONTHLY);
-            log.info("월간 인기 게시글 스냅샷 생성 완료");
-            
-            log.info("인기 게시글 스냅샷 생성 완료 - {}", java.time.LocalDateTime.now());
+            log.info("주간 인기 게시글 스냅샷 생성 완료 - {}", java.time.LocalDateTime.now());
         } catch (Exception e) {
-            log.error("인기 게시글 스냅샷 생성 중 오류 발생", e);
+            log.error("주간 인기 게시글 스냅샷 생성 중 오류 발생", e);
+        }
+    }
+
+    /**
+     * 매주 월요일 오후 6시 30분(18:30:00)에 실행되어 월간 인기 게시글 스냅샷 생성
+     */
+    @Scheduled(cron = "0 30 18 ? * MON")
+    @Transactional
+    public void generateMonthlyPopularitySnapshots() {
+        log.info("월간 인기 게시글 스냅샷 생성 시작 - {}", java.time.LocalDateTime.now());
+
+        try {
+            boardPopularityService.generateSnapshots(PopularityPeriodType.MONTHLY);
+            log.info("월간 인기 게시글 스냅샷 생성 완료 - {}", java.time.LocalDateTime.now());
+        } catch (Exception e) {
+            log.error("월간 인기 게시글 스냅샷 생성 중 오류 발생", e);
         }
     }
 }
-

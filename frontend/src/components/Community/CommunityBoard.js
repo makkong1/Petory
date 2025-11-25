@@ -92,11 +92,15 @@ const CommunityBoard = () => {
       setLoading(true);
       setError('');
       // 항상 전체 게시글을 가져옴 (카테고리는 프론트엔드에서 필터링)
-      const response = await boardApi.getAllBoards({});
+      const requestParams = {};
+      const response = await boardApi.getAllBoards(requestParams);
+
       const boards = response.data || [];
       setPosts(boards);
     } catch (err) {
-      console.error('게시글 조회 실패:', err);
+      console.error('❌ [CommunityBoard] 게시글 조회 실패:', err);
+      console.error('❌ [CommunityBoard] 에러 상세:', err.response?.data);
+      alert(`[CommunityBoard] 게시글 조회 실패:\n${JSON.stringify(err.response?.data || err.message, null, 2)}`);
       const message = err.response?.data?.error || err.message || '게시글을 불러오지 못했습니다.';
       setError(message);
     } finally {

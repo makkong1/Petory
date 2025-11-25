@@ -21,7 +21,6 @@ import com.linkup.Petory.domain.board.dto.BoardDTO;
 import com.linkup.Petory.domain.board.entity.Board;
 import com.linkup.Petory.domain.board.repository.BoardRepository;
 import com.linkup.Petory.domain.board.repository.BoardReactionRepository;
-// import com.linkup.Petory.domain.board.repository.CommentReactionRepository;
 import com.linkup.Petory.domain.board.repository.BoardViewLogRepository;
 import com.linkup.Petory.domain.board.entity.ReactionType;
 import com.linkup.Petory.domain.board.entity.BoardViewLog;
@@ -42,7 +41,6 @@ public class BoardService {
     private final BoardRepository boardRepository;
     private final UsersRepository usersRepository;
     private final BoardReactionRepository boardReactionRepository;
-    // private final CommentReactionRepository commentReactionRepository;
     private final BoardViewLogRepository boardViewLogRepository;
     private final AttachmentFileService attachmentFileService;
     private final BoardConverter boardConverter;
@@ -87,7 +85,10 @@ public class BoardService {
     @Transactional
     public BoardDTO createBoard(BoardDTO dto) {
         Users user = usersRepository.findById(dto.getUserId())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> {
+                    log.error("❌ [BoardService.createBoard] User not found with userId: {}", dto.getUserId());
+                    return new RuntimeException("User not found with userId: " + dto.getUserId());
+                });
 
         Board board = Board.builder()
                 .title(dto.getTitle())
@@ -156,8 +157,12 @@ public class BoardService {
 
     // 내 게시글 조회
     public List<BoardDTO> getMyBoards(long userId) {
+        log.info("🔍 [BoardService.getMyBoards] userId: {}", userId);
         Users user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> {
+                    log.error("❌ [BoardService.getMyBoards] User not found with userId: {}", userId);
+                    return new RuntimeException("User not found with userId: " + userId);
+                });
 
         List<Board> boards = boardRepository.findByUserAndIsDeletedFalseOrderByCreatedAtDesc(user);
 
@@ -276,6 +281,9 @@ public class BoardService {
         }
 
         Users viewer = usersRepository.findById(viewerId).orElse(null);
+        if (viewer == null) {
+            log.error("❌ [BoardService.shouldIncrementView] User not found with viewerId: {}", viewerId);
+        }
         if (viewer == null) {
             return true;
         }

@@ -4,6 +4,8 @@ import java.util.Optional;
 import java.time.LocalDateTime;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.linkup.Petory.domain.user.entity.Users;
@@ -14,7 +16,8 @@ public interface UsersRepository extends JpaRepository<Users, Long> {
     Optional<Users> findByUsername(String username);
 
     // 로그인용 아이디(String 타입 id 필드)로 조회
-    Optional<Users> findById(String id);
+    @Query("SELECT u FROM Users u WHERE u.id = :id")
+    Optional<Users> findById(@Param("id") String id);
 
     // Refresh Token으로 사용자 조회
     Optional<Users> findByRefreshToken(String refreshToken);

@@ -172,3 +172,33 @@ CREATE INDEX idx_carerequest_status ON carerequest(status);
 -- 제목이나 설명에 키워드 포함된 케어 요청 검색 (findByTitleContainingOrDescriptionContaining)
 CREATE FULLTEXT INDEX idx_carerequest_title_description ON carerequest(title, description);
 
+
+-- ============================================
+-- BOARDPOPULARITYSNAPSHOT TABLE INDEXES
+-- ============================================
+-- 기본 조회 쿼리 최적화 (정확한 날짜 매칭)
+-- 쿼리: findByPeriodTypeAndPeriodStartDateAndPeriodEndDateOrderByRankingAsc
+-- WHERE: period_type = ? AND period_start_date = ? AND period_end_date = ?
+-- ORDER BY: ranking ASC
+CREATE INDEX idx_snapshot_period_ranking 
+ON board_popularity_snapshot(period_type, period_start_date, period_end_date, ranking);
+
+-- 범위 조회 쿼리 최적화 (기간 겹치는 경우)
+-- 쿼리: findByPeriodTypeAndPeriodStartDateLessThanEqualAndPeriodEndDateGreaterThanEqualOrderByRankingAsc
+-- WHERE: period_type = ? AND period_start_date <= ? AND period_end_date >= ?
+-- ORDER BY: ranking ASC
+CREATE INDEX idx_snapshot_period_range_ranking 
+ON board_popularity_snapshot(period_type, period_start_date, period_end_date, ranking);
+
+-- 최근 스냅샷 조회 최적화
+-- 쿼리: findTop30ByPeriodTypeOrderByPeriodEndDateDescRankingAsc
+-- WHERE: period_type = ?
+-- ORDER BY: period_end_date DESC, ranking ASC
+-- LIMIT: 30
+CREATE INDEX idx_snapshot_recent 
+ON board_popularity_snapshot(period_type, period_end_date DESC, ranking ASC);
+
+-- board_id 조회 최적화 (FK이지만 명시적 인덱스 생성)
+-- 특정 게시글의 스냅샷 이력 조회 시 사용
+CREATE INDEX idx_snapshot_board_id 
+ON board_popularity_snapshot(board_id);

@@ -32,8 +32,11 @@ public interface BoardRepository extends JpaRepository<Board, Long> {
         // 사용자별 삭제되지 않은 게시글 조회 (최신순)
         List<Board> findByUserAndIsDeletedFalseOrderByCreatedAtDesc(Users user);
 
-        // 제목/내용 키워드 + 삭제되지 않은 게시글 검색
-        @Query("select b from Board b where b.isDeleted = false and (lower(b.title) like lower(concat('%', :kw, '%')) or b.content like concat('%', :kw, '%')) order by b.createdAt desc")
+        // FULLTEXT 인덱스 사용 쿼리
+        @Query(value = "SELECT b.*, " + "MATCH(b.title, b.content) AGAINST(:kw IN BOOLEAN MODE) as relevance "
+                        + "FROM board b " + "WHERE b.is_deleted = false "
+                        + "AND MATCH(b.title, b.content) AGAINST(:kw IN BOOLEAN MODE) "
+                        + "ORDER BY relevance DESC, b.created_at DESC", nativeQuery = true)
         List<Board> searchByKeyword(@Param("kw") String keyword);
 
         // 카테고리 + 기간별 조회
