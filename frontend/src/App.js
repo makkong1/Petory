@@ -12,6 +12,7 @@ import LoginForm from './components/Auth/LoginForm';
 import RegisterForm from './components/Auth/RegisterForm';
 import AdminPanel from './components/Admin/AdminPanel';
 import PermissionDeniedModal from './components/Common/PermissionDeniedModal';
+import ScrollToTopBottom from './components/Common/ScrollToTopBottom';
 import MissingPetBoardPage from './components/MissingPet/MissingPetBoardPage';
 import ActivityPage from './components/Activity/ActivityPage';
 import MeetupPage from './components/Meetup/MeetupPage';
@@ -131,6 +132,7 @@ function AppContent() {
       <MainContent>
         {renderContent()}
       </MainContent>
+      <ScrollToTopBottom />
     </>
   );
 }

@@ -216,8 +216,42 @@ public class BoardService {
     }
 
     // 게시글 검색
-    public List<BoardDTO> searchBoards(String keyword) {
-        List<Board> boards = boardRepository.searchByKeyword(keyword);
+    public List<BoardDTO> searchBoards(String keyword, String searchType) {
+        List<Board> boards;
+
+        if (keyword == null || keyword.trim().isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        String trimmedKeyword = keyword.trim();
+
+        // 검색 타입에 따라 다른 쿼리 실행
+        switch (searchType != null ? searchType.toUpperCase() : "TITLE_CONTENT") {
+            case "ID":
+                try {
+                    Long boardId = Long.parseLong(trimmedKeyword);
+                    Board board = boardRepository.findById(boardId)
+                            .orElse(null);
+                    if (board != null && !board.getIsDeleted()) {
+                        boards = List.of(board);
+                    } else {
+                        boards = new ArrayList<>();
+                    }
+                } catch (NumberFormatException e) {
+                    boards = new ArrayList<>();
+                }
+                break;
+            case "TITLE":
+                boards = boardRepository.findByTitleContainingAndIsDeletedFalseOrderByCreatedAtDesc(trimmedKeyword);
+                break;
+            case "CONTENT":
+                boards = boardRepository.findByContentContainingAndIsDeletedFalseOrderByCreatedAtDesc(trimmedKeyword);
+                break;
+            case "TITLE_CONTENT":
+            default:
+                boards = boardRepository.searchByKeyword(trimmedKeyword);
+                break;
+        }
 
         if (boards.isEmpty()) {
             return new ArrayList<>();

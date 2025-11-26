@@ -33,13 +33,14 @@ const CommunityBoard = () => {
   const [hasNext, setHasNext] = useState(false);
   const [allLoadedPosts, setAllLoadedPosts] = useState([]); // 누적된 게시글 목록
 
-  // 카테고리 변경 시 페이징 리셋
-  useEffect(() => {
-    setPage(0);
-    setAllLoadedPosts([]);
-    setTotalCount(0);
-    setHasNext(false);
-  }, [activeCategory, pageSize]);
+  // 검색 상태
+  const [searchKeyword, setSearchKeyword] = useState('');
+  const [searchType, setSearchType] = useState('TITLE_CONTENT'); // ID, TITLE, CONTENT, TITLE_CONTENT
+  const [isSearchMode, setIsSearchMode] = useState(false);
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+
+  // 카테고리 변경 시 페이징 리셋은 fetchBoards에서 처리됨
 
   const categories = [
     { key: 'ALL', label: '전체', icon: '📋', color: '#6366F1' },
@@ -160,7 +161,8 @@ const CommunityBoard = () => {
   // 카테고리나 페이지 크기 변경 시 게시글 다시 로드
   useEffect(() => {
     fetchBoards(0, true);
-  }, [activeCategory, pageSize]); // fetchBoards는 의존성에 포함하지 않음 (useCallback으로 메모이제이션됨)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeCategory, pageSize]);
 
   useEffect(() => {
     fetchPopularBoards();
@@ -168,6 +170,16 @@ const CommunityBoard = () => {
 
   // 서버에서 이미 필터링되어 오므로 최소한만 필터링
   const filteredPosts = useMemo(() => {
+    // 검색 모드일 때는 검색 결과 사용
+    if (isSearchMode) {
+      return searchResults.filter((post) => {
+        if (post.deleted === true || post.status === 'DELETED' || post.status === 'BLINDED') {
+          return false;
+        }
+        return true;
+      });
+    }
+
     // 백엔드에서 이미 삭제된 게시글은 필터링되어 오므로, 프론트엔드에서는 최소한만 필터링
     // deleted가 명시적으로 true인 경우만 제외 (null이나 undefined는 통과)
     let result = allLoadedPosts.filter((post) => {
@@ -188,7 +200,7 @@ const CommunityBoard = () => {
 
     // 카테고리는 서버에서 이미 필터링되어 옴
     return result;
-  }, [allLoadedPosts]);
+  }, [allLoadedPosts, isSearchMode, searchResults]);
 
   // Magazine 스타일을 위한 게시글 분류
   const categorizedPosts = useMemo(() => {
@@ -239,6 +251,43 @@ const CommunityBoard = () => {
     setPage(0);
     setAllLoadedPosts([]);
   }, []);
+
+  // 검색 핸들러
+  const handleSearch = useCallback(async () => {
+    if (!searchKeyword.trim()) {
+      alert('검색어를 입력하세요');
+      return;
+    }
+
+    try {
+      setSearchLoading(true);
+      setIsSearchMode(true);
+      const response = await boardApi.searchBoards(searchKeyword.trim(), searchType);
+      const results = response.data || [];
+      setSearchResults(results);
+    } catch (err) {
+      console.error('❌ 검색 실패:', err);
+      alert(`검색 실패: ${err.response?.data?.error || err.message}`);
+      setSearchResults([]);
+    } finally {
+      setSearchLoading(false);
+    }
+  }, [searchKeyword, searchType]);
+
+  // 검색 취소 핸들러
+  const handleCancelSearch = useCallback(() => {
+    setIsSearchMode(false);
+    setSearchKeyword('');
+    setSearchResults([]);
+    setSearchType('TITLE_CONTENT');
+  }, []);
+
+  // Enter 키로 검색
+  const handleSearchKeyPress = useCallback((e) => {
+    if (e.key === 'Enter') {
+      handleSearch();
+    }
+  }, [handleSearch]);
 
 
   const handleWriteClick = () => {
@@ -535,6 +584,41 @@ const CommunityBoard = () => {
           </CategoryTab>
         ))}
       </CategoryTabs>
+
+      <SearchContainer>
+        <SearchBox>
+          <SearchInput
+            type="text"
+            placeholder="게시글 검색..."
+            value={searchKeyword}
+            onChange={(e) => setSearchKeyword(e.target.value)}
+            onKeyPress={handleSearchKeyPress}
+          />
+          <SearchTypeSelect
+            value={searchType}
+            onChange={(e) => setSearchType(e.target.value)}
+          >
+            <option value="ID">ID</option>
+            <option value="TITLE">제목</option>
+            <option value="CONTENT">내용</option>
+            <option value="TITLE_CONTENT">제목+내용</option>
+          </SearchTypeSelect>
+          <SearchButton onClick={handleSearch} disabled={searchLoading}>
+            {searchLoading ? '검색 중...' : '🔍 검색'}
+          </SearchButton>
+          {isSearchMode && (
+            <CancelSearchButton onClick={handleCancelSearch}>
+              ✕ 취소
+            </CancelSearchButton>
+          )}
+        </SearchBox>
+        {isSearchMode && (
+          <SearchInfo>
+            검색 결과: {searchResults.length}개
+            {searchKeyword && ` (검색어: "${searchKeyword}")`}
+          </SearchInfo>
+        )}
+      </SearchContainer>
 
       <PageSizeSelector>
         <PageSizeLabel>페이지당 게시글 수:</PageSizeLabel>
@@ -921,7 +1005,7 @@ const TitleSection = styled.div`
 `;
 
 const TitleIcon = styled.span`
-  font-size: 32px;
+  font-size: 28px;
   margin-bottom: ${props => props.theme.spacing.xs};
 `;
 
@@ -1064,28 +1148,28 @@ const PostCard = styled.div.withConfig({
   /* 대형 카드: 전체 너비 (12칸) */
   ${(props) => props.size === 'large' && `
     grid-column: span 12;
-    min-height: 400px;
+    min-height: 350px;
   `}
 
   /* 중간 카드: PC에서 6칸 (2개씩), Tablet에서 2칸 (2개씩) */
   ${(props) => props.size === 'medium' && `
     grid-column: span 6;
-    min-height: 350px;
+    min-height: 300px;
 
     @media (max-width: 1024px) {
       grid-column: span 2;
-      min-height: 320px;
+      min-height: 280px;
     }
   `}
 
   /* 작은 카드: PC에서 3칸 (4개씩), Tablet에서 2칸 (2개씩) */
   ${(props) => props.size === 'small' && `
     grid-column: span 3;
-    min-height: 280px;
+    min-height: 250px;
 
     @media (max-width: 1024px) {
       grid-column: span 2;
-      min-height: 260px;
+      min-height: 230px;
     }
   `}
 
@@ -1130,9 +1214,9 @@ const PostImage = styled.div.withConfig({
     display: block;
     object-fit: cover;
     max-height: ${props => {
-    if (props.size === 'large') return '500px';
-    if (props.size === 'medium') return '300px';
-    return '200px';
+    if (props.size === 'large') return '420px';
+    if (props.size === 'medium') return '260px';
+    return '180px';
   }};
   }
 `;
@@ -1224,8 +1308,8 @@ const AuthorInfo = styled.div`
 `;
 
 const AuthorAvatar = styled.div`
-  width: 46px;
-  height: 46px;
+  width: 40px;
+  height: 40px;
   border-radius: ${(props) => props.theme.borderRadius.full};
   background: ${(props) => props.theme.colors.gradient};
   display: flex;
@@ -1233,8 +1317,8 @@ const AuthorAvatar = styled.div`
   justify-content: center;
   color: white;
   font-weight: 700;
-  font-size: 15px;
-  box-shadow: 0 4px 12px rgba(255, 126, 54, 0.25);
+  font-size: 14px;
+  box-shadow: 0 3px 10px rgba(255, 126, 54, 0.25);
 `;
 
 const AuthorDetails = styled.div`
@@ -1291,11 +1375,11 @@ const StatItem = styled.button`
   align-items: center;
   gap: ${props => props.theme.spacing.xs};
   background: none;
-  border: 2px solid ${props => props.theme.colors.border};
+  border: 1px solid ${props => props.theme.colors.border};
   color: ${(props) => props.theme.colors.textSecondary};
   cursor: pointer;
   padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.sm};
-  border-radius: ${props => props.theme.borderRadius.md};
+  border-radius: ${props => props.theme.borderRadius.sm};
   transition: all 0.2s ease;
   min-width: fit-content;
 
@@ -1311,10 +1395,10 @@ const StatInfo = styled.div`
   align-items: center;
   gap: ${props => props.theme.spacing.xs};
   background: ${props => props.theme.colors.surfaceElevated};
-  border: 2px solid ${props => props.theme.colors.border};
+  border: 1px solid ${props => props.theme.colors.border};
   color: ${(props) => props.theme.colors.textSecondary};
   padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.sm};
-  border-radius: ${props => props.theme.borderRadius.md};
+  border-radius: ${props => props.theme.borderRadius.sm};
   min-width: fit-content;
 `;
 
@@ -1380,10 +1464,10 @@ const ReportIcon = styled.span`
 `;
 
 const PopularSection = styled.section`
-  margin-bottom: ${(props) => props.theme.spacing.xxl};
-  padding: ${(props) => props.theme.spacing.xl};
+  margin-bottom: ${(props) => props.theme.spacing.xl};
+  padding: ${(props) => props.theme.spacing.lg};
   border: 1px solid ${(props) => props.theme.colors.borderLight};
-  border-radius: ${(props) => props.theme.borderRadius.xl};
+  border-radius: ${(props) => props.theme.borderRadius.lg};
   background: ${(props) => props.theme.colors.surfaceElevated};
 `;
 
@@ -1402,7 +1486,7 @@ const PopularHeader = styled.div`
 
 const PopularTitle = styled.h2`
   margin: 0;
-  font-size: 1.4rem;
+  font-size: ${props => props.theme.typography.h2.fontSize};
   color: ${(props) => props.theme.colors.text};
 `;
 
@@ -1415,12 +1499,13 @@ const PopularTabs = styled.div`
 `;
 
 const PopularTab = styled.button`
-  padding: ${(props) => props.theme.spacing.sm} ${(props) => props.theme.spacing.lg};
+  padding: ${(props) => props.theme.spacing.xs} ${(props) => props.theme.spacing.md};
   border: none;
   background: ${(props) => (props.active ? props.theme.colors.primary : 'transparent')};
   color: ${(props) => (props.active ? '#fff' : props.theme.colors.textSecondary)};
   cursor: pointer;
   font-weight: 600;
+  font-size: ${props => props.theme.typography.body2.fontSize};
   transition: background 0.2s ease;
 
   &:hover {
@@ -1464,17 +1549,17 @@ const PopularScrollContent = styled.div`
 const PopularCard = styled.button`
   display: flex;
   align-items: center;
-  gap: ${(props) => props.theme.spacing.md};
-  padding: ${(props) => props.theme.spacing.md};
+  gap: ${(props) => props.theme.spacing.sm};
+  padding: ${(props) => props.theme.spacing.sm};
   border: 1px solid ${(props) => props.theme.colors.borderLight};
-  border-radius: ${(props) => props.theme.borderRadius.lg};
+  border-radius: ${(props) => props.theme.borderRadius.md};
   background: ${(props) => props.theme.colors.surface};
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
   text-align: left;
   flex-shrink: 0;
-  width: 220px;
-  min-width: 220px;
+  width: 180px;
+  min-width: 180px;
 
   &:hover {
     transform: translateY(-4px);
@@ -1483,10 +1568,10 @@ const PopularCard = styled.button`
 `;
 
 const PopularRank = styled.span`
-  font-size: 1.4rem;
+  font-size: ${props => props.theme.typography.h2.fontSize};
   font-weight: 700;
   color: ${(props) => props.theme.colors.primary};
-  min-width: 24px;
+  min-width: 20px;
 `;
 
 const PopularContent = styled.div`
@@ -1517,9 +1602,9 @@ const PopularStat = styled.span`
 `;
 
 const PopularThumb = styled.div`
-  width: 64px;
-  height: 64px;
-  border-radius: ${(props) => props.theme.borderRadius.md};
+  width: 48px;
+  height: 48px;
+  border-radius: ${(props) => props.theme.borderRadius.sm};
   overflow: hidden;
   border: 1px solid ${(props) => props.theme.colors.border};
   flex-shrink: 0;
@@ -1578,7 +1663,7 @@ const EmptyState = styled.div`
 `;
 
 const EmptyIcon = styled.div`
-  font-size: 64px;
+  font-size: 56px;
   margin-bottom: ${props => props.theme.spacing.md};
 `;
 
@@ -1591,6 +1676,109 @@ const EmptyText = styled.div`
 const EmptySubtext = styled.div`
   color: ${props => props.theme.colors.textSecondary};
   font-size: ${props => props.theme.typography.body1.fontSize};
+`;
+
+const SearchContainer = styled.div`
+  margin-bottom: ${props => props.theme.spacing.lg};
+`;
+
+const SearchBox = styled.div`
+  display: flex;
+  gap: ${props => props.theme.spacing.sm};
+  align-items: center;
+  margin-bottom: ${props => props.theme.spacing.sm};
+  
+  @media (max-width: 768px) {
+    flex-wrap: wrap;
+  }
+`;
+
+const SearchInput = styled.input`
+  flex: 1;
+  padding: ${props => props.theme.spacing.sm} ${props => props.theme.spacing.md};
+  border: 1px solid ${props => props.theme.colors.border};
+  border-radius: ${props => props.theme.borderRadius.md};
+  font-size: ${props => props.theme.typography.body1.fontSize};
+  background: ${props => props.theme.colors.background};
+  color: ${props => props.theme.colors.text};
+  
+  &:focus {
+    outline: none;
+    border-color: ${props => props.theme.colors.primary};
+    box-shadow: 0 0 0 2px ${props => props.theme.colors.primary}20;
+  }
+  
+  &::placeholder {
+    color: ${props => props.theme.colors.textLight};
+  }
+`;
+
+const SearchTypeSelect = styled.select`
+  padding: ${props => props.theme.spacing.sm} ${props => props.theme.spacing.md};
+  border: 1px solid ${props => props.theme.colors.border};
+  border-radius: ${props => props.theme.borderRadius.md};
+  font-size: ${props => props.theme.typography.body2.fontSize};
+  background: ${props => props.theme.colors.background};
+  color: ${props => props.theme.colors.text};
+  cursor: pointer;
+  
+  &:focus {
+    outline: none;
+    border-color: ${props => props.theme.colors.primary};
+  }
+  
+  @media (max-width: 768px) {
+    flex: 1;
+    min-width: 120px;
+  }
+`;
+
+const SearchButton = styled.button`
+  padding: ${props => props.theme.spacing.sm} ${props => props.theme.spacing.lg};
+  background: ${props => props.theme.colors.gradient};
+  color: white;
+  border: none;
+  border-radius: ${props => props.theme.borderRadius.md};
+  font-size: ${props => props.theme.typography.body2.fontSize};
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  
+  &:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  }
+  
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+`;
+
+const CancelSearchButton = styled.button`
+  padding: ${props => props.theme.spacing.sm} ${props => props.theme.spacing.md};
+  background: ${props => props.theme.colors.surface};
+  color: ${props => props.theme.colors.text};
+  border: 1px solid ${props => props.theme.colors.border};
+  border-radius: ${props => props.theme.borderRadius.md};
+  font-size: ${props => props.theme.typography.body2.fontSize};
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  
+  &:hover {
+    background: ${props => props.theme.colors.surfaceHover};
+    color: ${props => props.theme.colors.error};
+  }
+`;
+
+const SearchInfo = styled.div`
+  padding: ${props => props.theme.spacing.sm} ${props => props.theme.spacing.md};
+  background: ${props => props.theme.colors.surface};
+  border-radius: ${props => props.theme.borderRadius.md};
+  font-size: ${props => props.theme.typography.body2.fontSize};
+  color: ${props => props.theme.colors.textSecondary};
 `;
 
 const PageSizeSelector = styled.div`

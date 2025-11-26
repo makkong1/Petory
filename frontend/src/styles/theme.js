@@ -21,12 +21,12 @@ export const lightTheme = {
     gradient: 'linear-gradient(135deg, #FF7E36 0%, #FF9558 100%)',
   },
   spacing: {
-    xs: '3px',
-    sm: '6px',
+    xs: '4px',
+    sm: '8px',
     md: '12px',
-    lg: '18px',
-    xl: '24px',
-    xxl: '36px',
+    lg: '16px',
+    xl: '20px',
+    xxl: '30px',
   },
   borderRadius: {
     sm: '4px',

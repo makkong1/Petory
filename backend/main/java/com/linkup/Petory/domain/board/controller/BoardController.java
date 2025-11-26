@@ -97,8 +97,10 @@ public class BoardController {
     // 게시글 검색
     @GetMapping("/search")
     @PreAuthorize("permitAll()")
-    public ResponseEntity<List<BoardDTO>> searchBoards(@RequestParam String keyword) {
-        return ResponseEntity.ok(boardService.searchBoards(keyword));
+    public ResponseEntity<List<BoardDTO>> searchBoards(
+            @RequestParam String keyword,
+            @RequestParam(required = false, defaultValue = "TITLE_CONTENT") String searchType) {
+        return ResponseEntity.ok(boardService.searchBoards(keyword, searchType));
     }
 
     @PreAuthorize("permitAll()")

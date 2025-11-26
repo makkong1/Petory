@@ -386,7 +386,7 @@ const Logo = styled.div`
   cursor: pointer;
   
   .icon {
-    font-size: 24px;
+    font-size: 22px;
   }
 `;
 
@@ -395,7 +395,7 @@ const NavMenu = styled.div.withConfig({
 })`
   display: flex;
   align-items: center;
-  gap: ${props => props.theme.spacing.xl};
+  gap: ${props => props.theme.spacing.lg};
   
   @media (max-width: 768px) {
     display: ${props => props.isOpen ? 'flex' : 'none'};
@@ -415,6 +415,7 @@ const NavItem = styled.a`
   color: ${props => props.theme.colors.text};
   text-decoration: none;
   font-weight: 400;
+  font-size: ${props => props.theme.typography.body1.fontSize};
   padding: ${props => props.theme.spacing.sm} ${props => props.theme.spacing.md};
   border-radius: ${props => props.theme.borderRadius.md};
   transition: all 0.2s ease;
@@ -435,15 +436,15 @@ const ThemeToggle = styled.button`
   background: ${props => props.theme.colors.surface};
   border: 1px solid ${props => props.theme.colors.border};
   color: ${props => props.theme.colors.text};
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   border-radius: ${props => props.theme.borderRadius.full};
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: all 0.2s ease;
-  font-size: 16px;
+  font-size: 15px;
   
   &:hover {
     background: ${props => props.theme.colors.surfaceHover};
@@ -477,11 +478,11 @@ const UserInfo = styled.button`
   align-items: center;
   gap: ${props => props.theme.spacing.xs};
   color: ${props => props.theme.colors.text};
-  font-size: 12px;
+  font-size: ${props => props.theme.typography.body2.fontSize};
   background: ${props => props.theme.colors.surface};
   border: 1px solid ${props => props.theme.colors.border};
   padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.sm};
-  border-radius: ${props => props.theme.borderRadius.md};
+  border-radius: ${props => props.theme.borderRadius.sm};
   cursor: pointer;
   transition: all 0.2s ease;
 
@@ -495,11 +496,11 @@ const LogoutButton = styled.button`
   background: ${props => props.theme.colors.surface};
   border: 1px solid ${props => props.theme.colors.border};
   color: ${props => props.theme.colors.text};
-  padding: ${props => props.theme.spacing.sm} ${props => props.theme.spacing.md};
-  border-radius: ${props => props.theme.borderRadius.md};
+  padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.sm};
+  border-radius: ${props => props.theme.borderRadius.sm};
   cursor: pointer;
   transition: all 0.2s ease;
-  font-size: 12px;
+  font-size: ${props => props.theme.typography.body2.fontSize};
   
   &:hover {
     background: ${props => props.theme.colors.surfaceHover};
@@ -512,15 +513,15 @@ const NotificationButton = styled.button`
   background: ${props => props.theme.colors.surface};
   border: 1px solid ${props => props.theme.colors.border};
   color: ${props => props.theme.colors.text};
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   border-radius: ${props => props.theme.borderRadius.full};
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: all 0.2s ease;
-  font-size: 16px;
+  font-size: 15px;
   
   &:hover {
     background: ${props => props.theme.colors.surfaceHover};
@@ -535,23 +536,23 @@ const NotificationBadge = styled.span`
   background: ${props => props.theme.colors.error || '#ef4444'};
   color: white;
   border-radius: ${props => props.theme.borderRadius.full};
-  min-width: 20px;
-  height: 20px;
+  min-width: 18px;
+  height: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
-  padding: 0 6px;
+  padding: 0 5px;
 `;
 
 const NotificationDropdown = styled.div`
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
-  width: 400px;
+  width: 360px;
   max-width: 90vw;
-  max-height: 500px;
+  max-height: 450px;
   background: ${props => props.theme.colors.surface || '#ffffff'};
   border: 1px solid ${props => props.theme.colors.border || '#e0e0e0'};
   border-radius: ${props => props.theme.borderRadius?.lg || '8px'};
@@ -593,7 +594,7 @@ const MarkAllReadButton = styled.button`
 
 const NotificationList = styled.div`
   overflow-y: auto;
-  max-height: 400px;
+  max-height: 360px;
 `;
 
 const NotificationItem = styled.div`
