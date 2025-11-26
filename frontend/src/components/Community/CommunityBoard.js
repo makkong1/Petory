@@ -25,6 +25,12 @@ const CommunityBoard = () => {
   const [popularLoading, setPopularLoading] = useState(false);
   const [popularError, setPopularError] = useState('');
   const [popularPeriod, setPopularPeriod] = useState('WEEKLY');
+  const [displayCount, setDisplayCount] = useState(20); // 페이징: 초기 20개만 표시
+
+  // 카테고리 변경 시 displayCount 리셋
+  useEffect(() => {
+    setDisplayCount(20);
+  }, [activeCategory]);
 
   const categories = [
     { key: 'ALL', label: '전체', icon: '📋', color: '#6366F1' },
@@ -37,7 +43,7 @@ const CommunityBoard = () => {
     { key: '공지', label: '공지', icon: '📢', color: '#EF4444' },
   ];
 
-  const getCategoryInfo = (category) => {
+  const getCategoryInfo = useCallback((category) => {
     const mapping = {
       ALL: { label: '전체', icon: '📋', color: '#6366F1' },
       일상: { label: '일상', icon: '📖', color: '#EC4899' },
@@ -50,7 +56,7 @@ const CommunityBoard = () => {
       PRIDE: { label: '자랑', icon: '🐾', color: '#F472B6' }, // 레거시 호환
     };
     return mapping[category] || { label: category || '전체', icon: '📋', color: '#6366F1' };
-  };
+  }, []);
 
   const formatDate = (dateString) => {
     if (!dateString) return '-';
@@ -201,6 +207,44 @@ const CommunityBoard = () => {
 
     return { large, medium, small };
   }, [filteredPosts]);
+
+  // 페이징을 위한 게시글 제한
+  const displayedPosts = useMemo(() => {
+    const allPosts = [
+      ...categorizedPosts.large,
+      ...categorizedPosts.medium,
+      ...categorizedPosts.small
+    ];
+
+    // 처음 displayCount개만 반환
+    const limited = allPosts.slice(0, displayCount);
+
+    // 다시 large, medium, small로 분류
+    const result = { large: [], medium: [], small: [] };
+
+    limited.forEach((post) => {
+      if (categorizedPosts.large.includes(post)) {
+        result.large.push(post);
+      } else if (categorizedPosts.medium.includes(post)) {
+        result.medium.push(post);
+      } else if (categorizedPosts.small.includes(post)) {
+        result.small.push(post);
+      }
+    });
+
+    return result;
+  }, [categorizedPosts, displayCount]);
+
+  // 더 보기 버튼 표시 여부
+  const hasMore = useMemo(() => {
+    const totalCount = categorizedPosts.large.length + categorizedPosts.medium.length + categorizedPosts.small.length;
+    return displayCount < totalCount;
+  }, [categorizedPosts, displayCount]);
+
+  const handleLoadMore = useCallback(() => {
+    setDisplayCount(prev => prev + 20); // 20개씩 추가
+  }, []);
+
 
   const handleWriteClick = () => {
     const { requiresRedirect } = requireLogin();
@@ -459,6 +503,7 @@ const CommunityBoard = () => {
     );
   }, []);
 
+
   if (loading && posts.length === 0) {
     return (
       <LoadingContainer>
@@ -562,17 +607,17 @@ const CommunityBoard = () => {
 
       {error && <ErrorBanner>{error}</ErrorBanner>}
 
-      <PostGrid>
-        {filteredPosts.length === 0 ? (
-          <EmptyState>
-            <EmptyIcon>📭</EmptyIcon>
-            <EmptyText>아직 게시글이 없어요</EmptyText>
-            <EmptySubtext>첫 번째 게시글을 작성해보세요!</EmptySubtext>
-          </EmptyState>
-        ) : (
-          <>
+      {filteredPosts.length === 0 ? (
+        <EmptyState>
+          <EmptyIcon>📭</EmptyIcon>
+          <EmptyText>아직 게시글이 없어요</EmptyText>
+          <EmptySubtext>첫 번째 게시글을 작성해보세요!</EmptySubtext>
+        </EmptyState>
+      ) : (
+        <>
+          <PostGrid>
             {/* 대형 카드 (전체 너비) */}
-            {categorizedPosts.large.map((post) => {
+            {displayedPosts.large.map((post) => {
               const categoryInfo = getCategoryInfo(post.category);
               return (
                 <PostCard key={post.idx} size="large" onClick={() => handlePostSelect(post)}>
@@ -591,7 +636,7 @@ const CommunityBoard = () => {
 
                   {post.boardFilePath && (
                     <PostImage size="large">
-                      <img src={post.boardFilePath} alt={post.title} />
+                      <img src={post.boardFilePath} alt={post.title} loading="lazy" />
                     </PostImage>
                   )}
 
@@ -651,7 +696,7 @@ const CommunityBoard = () => {
             })}
 
             {/* 중간 카드 (썸네일 있는 글) */}
-            {categorizedPosts.medium.map((post) => {
+            {displayedPosts.medium.map((post) => {
               const categoryInfo = getCategoryInfo(post.category);
               return (
                 <PostCard key={post.idx} size="medium" onClick={() => handlePostSelect(post)}>
@@ -670,7 +715,7 @@ const CommunityBoard = () => {
 
                   {post.boardFilePath && (
                     <PostImage size="medium">
-                      <img src={post.boardFilePath} alt={post.title} />
+                      <img src={post.boardFilePath} alt={post.title} loading="lazy" />
                     </PostImage>
                   )}
 
@@ -730,7 +775,7 @@ const CommunityBoard = () => {
             })}
 
             {/* 작은 카드 (텍스트만 있는 글) */}
-            {categorizedPosts.small.map((post) => {
+            {displayedPosts.small.map((post) => {
               const categoryInfo = getCategoryInfo(post.category);
               return (
                 <PostCard key={post.idx} size="small" onClick={() => handlePostSelect(post)}>
@@ -801,9 +846,17 @@ const CommunityBoard = () => {
                 </PostCard>
               );
             })}
-          </>
-        )}
-      </PostGrid>
+          </PostGrid>
+
+          {hasMore && (
+            <LoadMoreContainer>
+              <LoadMoreButton onClick={handleLoadMore}>
+                더 보기 ({displayedPosts.large.length + displayedPosts.medium.length + displayedPosts.small.length} / {categorizedPosts.large.length + categorizedPosts.medium.length + categorizedPosts.small.length})
+              </LoadMoreButton>
+            </LoadMoreContainer>
+          )}
+        </>
+      )}
 
       <CommunityPostModal
         isOpen={isPostModalOpen}
@@ -971,6 +1024,7 @@ const PostGrid = styled.div`
     grid-auto-flow: row;
   }
 `;
+
 
 const ErrorBanner = styled.div`
   background: rgba(220, 38, 38, 0.1);
@@ -1527,4 +1581,34 @@ const EmptyText = styled.div`
 const EmptySubtext = styled.div`
   color: ${props => props.theme.colors.textSecondary};
   font-size: ${props => props.theme.typography.body1.fontSize};
+`;
+
+const LoadMoreContainer = styled.div`
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: ${props => props.theme.spacing.xl} 0;
+  margin-top: ${props => props.theme.spacing.lg};
+`;
+
+const LoadMoreButton = styled.button`
+  background: ${props => props.theme.colors.gradient};
+  color: white;
+  border: none;
+  padding: ${props => props.theme.spacing.md} ${props => props.theme.spacing.xl};
+  border-radius: ${props => props.theme.borderRadius.xl};
+  font-size: ${props => props.theme.typography.body1.fontSize};
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(255, 126, 54, 0.25);
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(255, 126, 54, 0.35);
+  }
+  
+  &:active {
+    transform: translateY(0);
+  }
 `;

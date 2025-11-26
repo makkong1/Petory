@@ -52,10 +52,10 @@ public class BoardService {
     public List<BoardDTO> getAllBoards(String category) {
         List<Board> boards;
 
-        if (category != null && !category.equals("ALL")) {
+        if (category != null && !category.equals("ALL")) { // 카테고리 필터링
             boards = boardRepository.findByCategoryAndIsDeletedFalseOrderByCreatedAtDesc(category);
         } else {
-            boards = boardRepository.findAllByIsDeletedFalseOrderByCreatedAtDesc();
+            boards = boardRepository.findAllByIsDeletedFalseOrderByCreatedAtDesc(); // 전체
         }
 
         if (boards.isEmpty()) {
@@ -246,24 +246,33 @@ public class BoardService {
     /**
      * 여러 게시글의 좋아요/싫어요 카운트를 배치로 조회
      * 반환값: Map<BoardId, Map<ReactionType, Count>>
+     * IN 절 크기 제한을 위해 배치 단위로 나누어 조회
      */
     private Map<Long, Map<ReactionType, Long>> getReactionCountsBatch(List<Long> boardIds) {
         if (boardIds.isEmpty()) {
             return new HashMap<>();
         }
 
-        List<Object[]> results = boardReactionRepository.countByBoardsGroupByReactionType(boardIds);
-
-        // 결과를 Map으로 변환: Map<BoardId, Map<ReactionType, Count>>
+        // IN 절 크기 제한 (일반적으로 1000개 이하 권장)
+        final int BATCH_SIZE = 500;
         Map<Long, Map<ReactionType, Long>> countsMap = new HashMap<>();
 
-        for (Object[] result : results) {
-            Long boardId = ((Number) result[0]).longValue();
-            ReactionType reactionType = (ReactionType) result[1];
-            Long count = ((Number) result[2]).longValue();
+        // boardIds를 배치 단위로 나누어 처리
+        for (int i = 0; i < boardIds.size(); i += BATCH_SIZE) {
+            int end = Math.min(i + BATCH_SIZE, boardIds.size());
+            List<Long> batch = boardIds.subList(i, end);
 
-            countsMap.computeIfAbsent(boardId, k -> new HashMap<>())
-                    .put(reactionType, count);
+            List<Object[]> results = boardReactionRepository.countByBoardsGroupByReactionType(batch);
+
+            // 결과를 Map으로 변환: Map<BoardId, Map<ReactionType, Count>>
+            for (Object[] result : results) {
+                Long boardId = ((Number) result[0]).longValue();
+                ReactionType reactionType = (ReactionType) result[1];
+                Long count = ((Number) result[2]).longValue();
+
+                countsMap.computeIfAbsent(boardId, k -> new HashMap<>())
+                        .put(reactionType, count);
+            }
         }
 
         return countsMap;

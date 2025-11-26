@@ -180,22 +180,32 @@ public class BoardPopularityService {
 
     /**
      * 여러 게시글의 좋아요 카운트를 배치로 조회 (실시간 집계)
+     * IN 절 크기 제한을 위해 배치 단위로 나누어 조회
      */
     private Map<Long, Integer> getLikeCountsBatch(List<Long> boardIds) {
         if (boardIds.isEmpty()) {
             return new HashMap<>();
         }
 
-        List<Object[]> results = boardReactionRepository.countByBoardsGroupByReactionType(boardIds);
+        // IN 절 크기 제한 (일반적으로 1000개 이하 권장)
+        final int BATCH_SIZE = 1000;
         Map<Long, Integer> countsMap = new HashMap<>();
 
-        for (Object[] result : results) {
-            Long boardId = ((Number) result[0]).longValue();
-            ReactionType reactionType = (ReactionType) result[1];
-            Long count = ((Number) result[2]).longValue();
+        // boardIds를 배치 단위로 나누어 처리
+        for (int i = 0; i < boardIds.size(); i += BATCH_SIZE) {
+            int end = Math.min(i + BATCH_SIZE, boardIds.size());
+            List<Long> batch = boardIds.subList(i, end);
+            
+            List<Object[]> results = boardReactionRepository.countByBoardsGroupByReactionType(batch);
 
-            if (reactionType == ReactionType.LIKE) {
-                countsMap.put(boardId, count.intValue());
+            for (Object[] result : results) {
+                Long boardId = ((Number) result[0]).longValue();
+                ReactionType reactionType = (ReactionType) result[1];
+                Long count = ((Number) result[2]).longValue();
+
+                if (reactionType == ReactionType.LIKE) {
+                    countsMap.put(boardId, count.intValue());
+                }
             }
         }
 
@@ -207,19 +217,29 @@ public class BoardPopularityService {
 
     /**
      * 여러 게시글의 댓글 카운트를 배치로 조회 (실시간 집계)
+     * IN 절 크기 제한을 위해 배치 단위로 나누어 조회
      */
     private Map<Long, Integer> getCommentCountsBatch(List<Long> boardIds) {
         if (boardIds.isEmpty()) {
             return new HashMap<>();
         }
 
-        List<Object[]> results = commentRepository.countByBoardsAndIsDeletedFalse(boardIds);
+        // IN 절 크기 제한 (일반적으로 1000개 이하 권장)
+        final int BATCH_SIZE = 1000;
         Map<Long, Integer> countsMap = new HashMap<>();
 
-        for (Object[] result : results) {
-            Long boardId = ((Number) result[0]).longValue();
-            Long count = ((Number) result[1]).longValue();
-            countsMap.put(boardId, count.intValue());
+        // boardIds를 배치 단위로 나누어 처리
+        for (int i = 0; i < boardIds.size(); i += BATCH_SIZE) {
+            int end = Math.min(i + BATCH_SIZE, boardIds.size());
+            List<Long> batch = boardIds.subList(i, end);
+            
+            List<Object[]> results = commentRepository.countByBoardsAndIsDeletedFalse(batch);
+
+            for (Object[] result : results) {
+                Long boardId = ((Number) result[0]).longValue();
+                Long count = ((Number) result[1]).longValue();
+                countsMap.put(boardId, count.intValue());
+            }
         }
 
         // 댓글이 없는 게시글은 0으로 초기화
@@ -230,19 +250,29 @@ public class BoardPopularityService {
 
     /**
      * 여러 게시글의 조회수 카운트를 배치로 조회 (실시간 집계)
+     * IN 절 크기 제한을 위해 배치 단위로 나누어 조회
      */
     private Map<Long, Integer> getViewCountsBatch(List<Long> boardIds) {
         if (boardIds.isEmpty()) {
             return new HashMap<>();
         }
 
-        List<Object[]> results = boardViewLogRepository.countByBoards(boardIds);
+        // IN 절 크기 제한 (일반적으로 1000개 이하 권장)
+        final int BATCH_SIZE = 1000;
         Map<Long, Integer> countsMap = new HashMap<>();
 
-        for (Object[] result : results) {
-            Long boardId = ((Number) result[0]).longValue();
-            Long count = ((Number) result[1]).longValue();
-            countsMap.put(boardId, count.intValue());
+        // boardIds를 배치 단위로 나누어 처리
+        for (int i = 0; i < boardIds.size(); i += BATCH_SIZE) {
+            int end = Math.min(i + BATCH_SIZE, boardIds.size());
+            List<Long> batch = boardIds.subList(i, end);
+            
+            List<Object[]> results = boardViewLogRepository.countByBoards(batch);
+
+            for (Object[] result : results) {
+                Long boardId = ((Number) result[0]).longValue();
+                Long count = ((Number) result[1]).longValue();
+                countsMap.put(boardId, count.intValue());
+            }
         }
 
         // 조회수가 없는 게시글은 0으로 초기화
