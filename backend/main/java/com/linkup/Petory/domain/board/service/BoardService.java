@@ -10,6 +10,9 @@ import java.util.stream.Collectors;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,6 +21,7 @@ import com.linkup.Petory.domain.common.ContentStatus;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 import com.linkup.Petory.domain.board.dto.BoardDTO;
+import com.linkup.Petory.domain.board.dto.BoardPageResponseDTO;
 import com.linkup.Petory.domain.board.entity.Board;
 import com.linkup.Petory.domain.board.repository.BoardRepository;
 import com.linkup.Petory.domain.board.repository.BoardReactionRepository;
@@ -64,6 +68,43 @@ public class BoardService {
 
         // 배치 조회로 N+1 문제 해결
         return mapBoardsWithReactionsBatch(boards);
+    }
+
+    // 전체 게시글 조회 (페이징 지원)
+    public BoardPageResponseDTO getAllBoardsWithPaging(String category, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        Page<Board> boardPage;
+
+        if (category != null && !category.equals("ALL")) { // 카테고리 필터링
+            boardPage = boardRepository.findByCategoryAndIsDeletedFalseOrderByCreatedAtDesc(category, pageable);
+        } else {
+            boardPage = boardRepository.findAllByIsDeletedFalseOrderByCreatedAtDesc(pageable); // 전체
+        }
+
+        if (boardPage.isEmpty()) {
+            return BoardPageResponseDTO.builder()
+                    .boards(new ArrayList<>())
+                    .totalCount(0)
+                    .totalPages(0)
+                    .currentPage(page)
+                    .pageSize(size)
+                    .hasNext(false)
+                    .hasPrevious(false)
+                    .build();
+        }
+
+        // 배치 조회로 N+1 문제 해결
+        List<BoardDTO> boardDTOs = mapBoardsWithReactionsBatch(boardPage.getContent());
+
+        return BoardPageResponseDTO.builder()
+                .boards(boardDTOs)
+                .totalCount(boardPage.getTotalElements())
+                .totalPages(boardPage.getTotalPages())
+                .currentPage(page)
+                .pageSize(size)
+                .hasNext(boardPage.hasNext())
+                .hasPrevious(boardPage.hasPrevious())
+                .build();
     }
 
     // 단일 게시글 조회 + 조회수 증가

@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.linkup.Petory.domain.board.dto.BoardDTO;
+import com.linkup.Petory.domain.board.dto.BoardPageResponseDTO;
 import com.linkup.Petory.domain.board.dto.CommentDTO;
 import com.linkup.Petory.domain.board.dto.ReactionRequest;
 import com.linkup.Petory.domain.board.dto.ReactionSummaryDTO;
@@ -37,13 +38,15 @@ public class BoardController {
     private final ReactionService reactionService;
     private final BoardPopularityService boardPopularityService;
 
-    // 전체 게시글 조회
+    // 전체 게시글 조회 (페이징 지원)
     @PreAuthorize("permitAll()")
     @GetMapping
-    public ResponseEntity<List<BoardDTO>> getAllBoards(
-            @RequestParam(required = false) String category) {
+    public ResponseEntity<BoardPageResponseDTO> getAllBoards(
+            @RequestParam(required = false) String category,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
         System.out.println("=== API 호출됨: GET /api/boards ===");
-        return ResponseEntity.ok(boardService.getAllBoards(category));
+        return ResponseEntity.ok(boardService.getAllBoardsWithPaging(category, page, size));
     }
 
     // 단일 게시글 조회

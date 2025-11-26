@@ -11,7 +11,7 @@ const CommunityBoard = () => {
   const { requireLogin } = usePermission();
   const { user, redirectToLogin } = useAuth();
 
-  const [posts, setPosts] = useState([]);
+  const [posts, setPosts] = useState([]); // 레거시 호환 (점진적 제거 예정)
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [activeCategory, setActiveCategory] = useState('ALL');
@@ -25,12 +25,21 @@ const CommunityBoard = () => {
   const [popularLoading, setPopularLoading] = useState(false);
   const [popularError, setPopularError] = useState('');
   const [popularPeriod, setPopularPeriod] = useState('WEEKLY');
-  const [displayCount, setDisplayCount] = useState(20); // 페이징: 초기 20개만 표시
 
-  // 카테고리 변경 시 displayCount 리셋
+  // 서버 사이드 페이징 상태
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(20);
+  const [totalCount, setTotalCount] = useState(0);
+  const [hasNext, setHasNext] = useState(false);
+  const [allLoadedPosts, setAllLoadedPosts] = useState([]); // 누적된 게시글 목록
+
+  // 카테고리 변경 시 페이징 리셋
   useEffect(() => {
-    setDisplayCount(20);
-  }, [activeCategory]);
+    setPage(0);
+    setAllLoadedPosts([]);
+    setTotalCount(0);
+    setHasNext(false);
+  }, [activeCategory, pageSize]);
 
   const categories = [
     { key: 'ALL', label: '전체', icon: '📋', color: '#6366F1' },
@@ -92,17 +101,32 @@ const CommunityBoard = () => {
     };
   }, []);
 
-  // 전체 게시글을 한 번만 가져오기 (카테고리 변경 시 재호출하지 않음)
-  const fetchBoards = useCallback(async () => {
+  // 서버 사이드 페이징으로 게시글 가져오기
+  const fetchBoards = useCallback(async (pageNum = 0, reset = false) => {
     try {
       setLoading(true);
       setError('');
-      // 항상 전체 게시글을 가져옴 (카테고리는 프론트엔드에서 필터링)
-      const requestParams = {};
-      const response = await boardApi.getAllBoards(requestParams);
 
-      const boards = response.data || [];
-      setPosts(boards);
+      const requestParams = {
+        category: activeCategory === 'ALL' ? null : activeCategory,
+        page: pageNum,
+        size: pageSize
+      };
+
+      const response = await boardApi.getAllBoards(requestParams);
+      const pageData = response.data || {};
+
+      const boards = pageData.boards || [];
+
+      if (reset) {
+        setAllLoadedPosts(boards);
+      } else {
+        setAllLoadedPosts(prev => [...prev, ...boards]);
+      }
+
+      setTotalCount(pageData.totalCount || 0);
+      setHasNext(pageData.hasNext || false);
+      setPage(pageNum);
     } catch (err) {
       console.error('❌ [CommunityBoard] 게시글 조회 실패:', err);
       console.error('❌ [CommunityBoard] 에러 상세:', err.response?.data);
@@ -112,7 +136,7 @@ const CommunityBoard = () => {
     } finally {
       setLoading(false);
     }
-  }, []); // activeCategory 의존성 제거
+  }, [activeCategory, pageSize]);
 
   const fetchPopularBoards = useCallback(async () => {
     // 자랑 카테고리일 때만 인기 게시글 조회
@@ -133,20 +157,20 @@ const CommunityBoard = () => {
     }
   }, [activeCategory, popularPeriod]);
 
-  // 컴포넌트 마운트 시 한 번만 전체 게시글 로드
+  // 카테고리나 페이지 크기 변경 시 게시글 다시 로드
   useEffect(() => {
-    fetchBoards();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // 빈 배열로 마운트 시 한 번만 실행
+    fetchBoards(0, true);
+  }, [activeCategory, pageSize]); // fetchBoards는 의존성에 포함하지 않음 (useCallback으로 메모이제이션됨)
 
   useEffect(() => {
     fetchPopularBoards();
   }, [fetchPopularBoards]);
 
+  // 서버에서 이미 필터링되어 오므로 최소한만 필터링
   const filteredPosts = useMemo(() => {
     // 백엔드에서 이미 삭제된 게시글은 필터링되어 오므로, 프론트엔드에서는 최소한만 필터링
     // deleted가 명시적으로 true인 경우만 제외 (null이나 undefined는 통과)
-    let result = posts.filter((post) => {
+    let result = allLoadedPosts.filter((post) => {
       // 명시적으로 삭제된 게시글만 제외
       if (post.deleted === true) {
         return false;
@@ -162,18 +186,9 @@ const CommunityBoard = () => {
       return true;
     });
 
-
-    // 카테고리 필터링
-    if (activeCategory === 'ALL') {
-      return result;
-    }
-    // 자랑 카테고리는 일반 게시글과 인기 게시글 모두 표시
-    const categoryFiltered = result.filter((post) => {
-      const matches = post.category === activeCategory || (activeCategory === '자랑' && (post.category === '자랑' || post.category === 'PRIDE'));
-      return matches;
-    });
-    return categoryFiltered;
-  }, [posts, activeCategory]);
+    // 카테고리는 서버에서 이미 필터링되어 옴
+    return result;
+  }, [allLoadedPosts]);
 
   // Magazine 스타일을 위한 게시글 분류
   const categorizedPosts = useMemo(() => {
@@ -208,41 +223,21 @@ const CommunityBoard = () => {
     return { large, medium, small };
   }, [filteredPosts]);
 
-  // 페이징을 위한 게시글 제한
-  const displayedPosts = useMemo(() => {
-    const allPosts = [
-      ...categorizedPosts.large,
-      ...categorizedPosts.medium,
-      ...categorizedPosts.small
-    ];
+  // 표시할 게시글 (이미 categorizedPosts에 있음)
+  const displayedPosts = categorizedPosts;
 
-    // 처음 displayCount개만 반환
-    const limited = allPosts.slice(0, displayCount);
-
-    // 다시 large, medium, small로 분류
-    const result = { large: [], medium: [], small: [] };
-
-    limited.forEach((post) => {
-      if (categorizedPosts.large.includes(post)) {
-        result.large.push(post);
-      } else if (categorizedPosts.medium.includes(post)) {
-        result.medium.push(post);
-      } else if (categorizedPosts.small.includes(post)) {
-        result.small.push(post);
-      }
-    });
-
-    return result;
-  }, [categorizedPosts, displayCount]);
-
-  // 더 보기 버튼 표시 여부
-  const hasMore = useMemo(() => {
-    const totalCount = categorizedPosts.large.length + categorizedPosts.medium.length + categorizedPosts.small.length;
-    return displayCount < totalCount;
-  }, [categorizedPosts, displayCount]);
-
+  // 더 보기 버튼 클릭 핸들러
   const handleLoadMore = useCallback(() => {
-    setDisplayCount(prev => prev + 20); // 20개씩 추가
+    if (!loading && hasNext) {
+      fetchBoards(page + 1, false);
+    }
+  }, [loading, hasNext, page, fetchBoards]);
+
+  // 페이지 크기 변경 핸들러
+  const handlePageSizeChange = useCallback((newSize) => {
+    setPageSize(newSize);
+    setPage(0);
+    setAllLoadedPosts([]);
   }, []);
 
 
@@ -276,8 +271,8 @@ const CommunityBoard = () => {
       };
       const response = await boardApi.createBoard(payload);
       setIsPostModalOpen(false);
-      // 게시글 작성 후 강제로 새로고침 (캐시 무시)
-      await fetchBoards();
+      // 게시글 작성 후 첫 페이지부터 다시 로드
+      await fetchBoards(0, true);
     } catch (err) {
       console.error('❌ 게시글 생성 실패:', err);
       const message = err.response?.data?.error || err.message;
@@ -357,7 +352,7 @@ const CommunityBoard = () => {
   const handleCommentAdded = useCallback((boardId, isDelete = false) => {
     // 댓글 추가/삭제 시 해당 게시글의 댓글 카운트만 업데이트 (게시글 목록 전체 재조회 방지)
     if (boardId) {
-      setPosts((prev) =>
+      setAllLoadedPosts((prev) =>
         prev.map((post) =>
           post.idx === boardId
             ? {
@@ -381,14 +376,14 @@ const CommunityBoard = () => {
     }
     try {
       await boardApi.deleteBoard(postIdx);
-      setPosts((prev) => prev.filter((post) => post.idx !== postIdx));
+      setAllLoadedPosts((prev) => prev.filter((post) => post.idx !== postIdx));
       if (selectedBoard?.idx === postIdx) {
         handleCommentDrawerClose();
       }
       if (selectedBoardId === postIdx) {
         handleDetailClose();
       }
-      fetchBoards();
+      fetchBoards(0, true);
     } catch (err) {
       const message = err.response?.data?.error || err.message;
       alert(`게시글을 삭제하지 못했습니다: ${message}`);
@@ -397,14 +392,14 @@ const CommunityBoard = () => {
 
   const handleBoardDeleted = useCallback(
     (boardId) => {
-      setPosts((prev) => prev.filter((post) => post.idx !== boardId));
+      setAllLoadedPosts((prev) => prev.filter((post) => post.idx !== boardId));
       if (selectedBoard?.idx === boardId) {
         handleCommentDrawerClose();
       }
       if (selectedBoardId === boardId) {
         handleDetailClose();
       }
-      fetchBoards();
+      fetchBoards(0, true);
     },
     [fetchBoards, selectedBoard, selectedBoardId]
   );
@@ -426,7 +421,7 @@ const CommunityBoard = () => {
         reactionType,
       });
       const summary = response.data;
-      setPosts((prev) =>
+      setAllLoadedPosts((prev) =>
         prev.map((post) =>
           post.idx === boardId
             ? {
@@ -457,7 +452,7 @@ const CommunityBoard = () => {
   };
 
   const handleBoardReactionUpdate = useCallback((boardId, summary) => {
-    setPosts((prev) =>
+    setAllLoadedPosts((prev) =>
       prev.map((post) =>
         post.idx === boardId
           ? {
@@ -482,7 +477,7 @@ const CommunityBoard = () => {
   }, []);
 
   const handleBoardViewUpdate = useCallback((boardId, views) => {
-    setPosts((prev) =>
+    setAllLoadedPosts((prev) =>
       prev.map((post) =>
         post.idx === boardId
           ? {
@@ -504,7 +499,7 @@ const CommunityBoard = () => {
   }, []);
 
 
-  if (loading && posts.length === 0) {
+  if (loading && allLoadedPosts.length === 0) {
     return (
       <LoadingContainer>
         <LoadingSpinner />
@@ -540,6 +535,21 @@ const CommunityBoard = () => {
           </CategoryTab>
         ))}
       </CategoryTabs>
+
+      <PageSizeSelector>
+        <PageSizeLabel>페이지당 게시글 수:</PageSizeLabel>
+        <PageSizeButtons>
+          <PageSizeButton active={pageSize === 20} onClick={() => handlePageSizeChange(20)}>
+            20
+          </PageSizeButton>
+          <PageSizeButton active={pageSize === 50} onClick={() => handlePageSizeChange(50)}>
+            50
+          </PageSizeButton>
+          <PageSizeButton active={pageSize === 100} onClick={() => handlePageSizeChange(100)}>
+            100
+          </PageSizeButton>
+        </PageSizeButtons>
+      </PageSizeSelector>
 
       {activeCategory === '자랑' && (
         <PopularSection>
@@ -848,10 +858,10 @@ const CommunityBoard = () => {
             })}
           </PostGrid>
 
-          {hasMore && (
+          {hasNext && (
             <LoadMoreContainer>
-              <LoadMoreButton onClick={handleLoadMore}>
-                더 보기 ({displayedPosts.large.length + displayedPosts.medium.length + displayedPosts.small.length} / {categorizedPosts.large.length + categorizedPosts.medium.length + categorizedPosts.small.length})
+              <LoadMoreButton onClick={handleLoadMore} disabled={loading}>
+                {loading ? '로딩 중...' : `더 보기 (${filteredPosts.length} / ${totalCount})`}
               </LoadMoreButton>
             </LoadMoreContainer>
           )}
@@ -1581,6 +1591,49 @@ const EmptyText = styled.div`
 const EmptySubtext = styled.div`
   color: ${props => props.theme.colors.textSecondary};
   font-size: ${props => props.theme.typography.body1.fontSize};
+`;
+
+const PageSizeSelector = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${props => props.theme.spacing.md};
+  padding: ${props => props.theme.spacing.md} ${props => props.theme.spacing.lg};
+  margin-bottom: ${props => props.theme.spacing.md};
+  background: ${props => props.theme.colors.surface};
+  border-radius: ${props => props.theme.borderRadius.md};
+`;
+
+const PageSizeLabel = styled.span`
+  font-size: ${props => props.theme.typography.body2.fontSize};
+  color: ${props => props.theme.colors.textSecondary};
+  font-weight: 500;
+`;
+
+const PageSizeButtons = styled.div`
+  display: flex;
+  gap: ${props => props.theme.spacing.xs};
+`;
+
+const PageSizeButton = styled.button`
+  padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.md};
+  border: 1px solid ${props => props.theme.colors.border};
+  border-radius: ${props => props.theme.borderRadius.md};
+  background: ${props => props.active ? props.theme.colors.primary : 'transparent'};
+  color: ${props => props.active ? 'white' : props.theme.colors.text};
+  font-size: ${props => props.theme.typography.body2.fontSize};
+  font-weight: ${props => props.active ? 600 : 400};
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: ${props => props.active ? props.theme.colors.primary : props.theme.colors.background};
+    border-color: ${props => props.theme.colors.primary};
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 `;
 
 const LoadMoreContainer = styled.div`

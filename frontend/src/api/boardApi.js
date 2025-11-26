@@ -28,9 +28,15 @@ api.interceptors.request.use(
 );
 
 export const boardApi = {
-  // 전체 게시글 조회 (캐시 무시)
+  // 전체 게시글 조회 (페이징 지원)
   getAllBoards: (params = {}) => {
-    const requestParams = { ...params, _t: Date.now() }; // 캐시 무시를 위한 타임스탬프 추가
+    const { page = 0, size = 20, ...otherParams } = params;
+    const requestParams = { 
+      page, 
+      size, 
+      ...otherParams, 
+      _t: Date.now() 
+    }; // 캐시 무시를 위한 타임스탬프 추가
     return api.get('', {
       params: requestParams,
       headers: { 'Cache-Control': 'no-cache' }
