@@ -29,7 +29,24 @@ api.interceptors.request.use(
 );
 
 export const activityApi = {
-  // 내 활동 조회
+  // 내 활동 조회 (기존 API - 하위 호환성 유지)
   getMyActivities: (userId) => api.get('/my', { params: { userId } }),
+  
+  // 내 활동 조회 (페이징 지원)
+  getMyActivitiesWithPaging: (params = {}) => {
+    const { userId, filter = 'ALL', page = 0, size = 20, ...otherParams } = params;
+    const requestParams = {
+      userId,
+      filter,
+      page,
+      size,
+      ...otherParams,
+      _t: Date.now()
+    };
+    return api.get('/my/paging', {
+      params: requestParams,
+      headers: { 'Cache-Control': 'no-cache' }
+    });
+  },
 };
 

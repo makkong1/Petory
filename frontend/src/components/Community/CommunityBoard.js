@@ -31,16 +31,58 @@ const CommunityBoard = () => {
   const [pageSize, setPageSize] = useState(20);
   const [totalCount, setTotalCount] = useState(0);
   const [hasNext, setHasNext] = useState(false);
-  const [allLoadedPosts, setAllLoadedPosts] = useState([]); // 누적된 게시글 목록
+  // Map + Array 조합: Map으로 빠른 조회/업데이트, Array로 순서 유지
+  // React 상태에서 Map을 직접 사용하기 어려우므로 객체로 관리
+  const [postsData, setPostsData] = useState({ map: {}, order: [] }); // { map: {[id]: BoardDTO}, order: [id, ...] }
 
   // 검색 상태
   const [searchKeyword, setSearchKeyword] = useState('');
   const [searchType, setSearchType] = useState('TITLE_CONTENT'); // ID, TITLE, CONTENT, TITLE_CONTENT
   const [isSearchMode, setIsSearchMode] = useState(false);
-  const [searchResults, setSearchResults] = useState([]);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [searchPage, setSearchPage] = useState(0);
+  const [searchTotalCount, setSearchTotalCount] = useState(0);
+  const [searchHasNext, setSearchHasNext] = useState(false);
+  // 검색 결과도 동일한 구조 사용
+  const [searchPostsData, setSearchPostsData] = useState({ map: {}, order: [] });
 
   // 카테고리 변경 시 페이징 리셋은 fetchBoards에서 처리됨
+
+  // Map + Array를 배열로 변환하는 헬퍼 함수
+  const getPostsArray = useCallback((postsData) => {
+    return postsData.order.map(id => postsData.map[id]).filter(Boolean);
+  }, []);
+
+  // 게시글 배열을 Map + Array 구조로 변환하는 헬퍼 함수
+  const convertToMapAndOrder = useCallback((boards) => {
+    const map = {};
+    const order = [];
+    boards.forEach(board => {
+      if (board?.idx && !map[board.idx]) {
+        map[board.idx] = board;
+        order.push(board.idx);
+      }
+    });
+    return { map, order };
+  }, []);
+
+  // 게시글 추가 (중복 체크 포함)
+  const addPostsToMap = useCallback((existingData, newBoards) => {
+    const map = { ...existingData.map };
+    const order = [...existingData.order];
+    newBoards.forEach(board => {
+      if (board?.idx) {
+        if (!map[board.idx]) {
+          map[board.idx] = board;
+          order.push(board.idx);
+        } else {
+          // 이미 있으면 업데이트
+          map[board.idx] = board;
+        }
+      }
+    });
+    return { map, order };
+  }, []);
 
   const categories = [
     { key: 'ALL', label: '전체', icon: '📋', color: '#6366F1' },
@@ -120,9 +162,10 @@ const CommunityBoard = () => {
       const boards = pageData.boards || [];
 
       if (reset) {
-        setAllLoadedPosts(boards);
+        const newData = convertToMapAndOrder(boards);
+        setPostsData(newData);
       } else {
-        setAllLoadedPosts(prev => [...prev, ...boards]);
+        setPostsData(prevData => addPostsToMap(prevData, boards));
       }
 
       setTotalCount(pageData.totalCount || 0);
@@ -137,7 +180,7 @@ const CommunityBoard = () => {
     } finally {
       setLoading(false);
     }
-  }, [activeCategory, pageSize]);
+  }, [activeCategory, pageSize, convertToMapAndOrder, addPostsToMap]);
 
   const fetchPopularBoards = useCallback(async () => {
     // 자랑 카테고리일 때만 인기 게시글 조회
@@ -169,10 +212,12 @@ const CommunityBoard = () => {
   }, [fetchPopularBoards]);
 
   // 서버에서 이미 필터링되어 오므로 최소한만 필터링
+  // 검색어 변경 시에는 재계산하지 않도록 최적화
   const filteredPosts = useMemo(() => {
     // 검색 모드일 때는 검색 결과 사용
     if (isSearchMode) {
-      return searchResults.filter((post) => {
+      const searchArray = getPostsArray(searchPostsData);
+      return searchArray.filter((post) => {
         if (post.deleted === true || post.status === 'DELETED' || post.status === 'BLINDED') {
           return false;
         }
@@ -182,7 +227,8 @@ const CommunityBoard = () => {
 
     // 백엔드에서 이미 삭제된 게시글은 필터링되어 오므로, 프론트엔드에서는 최소한만 필터링
     // deleted가 명시적으로 true인 경우만 제외 (null이나 undefined는 통과)
-    let result = allLoadedPosts.filter((post) => {
+    const postsArray = getPostsArray(postsData);
+    let result = postsArray.filter((post) => {
       // 명시적으로 삭제된 게시글만 제외
       if (post.deleted === true) {
         return false;
@@ -200,7 +246,8 @@ const CommunityBoard = () => {
 
     // 카테고리는 서버에서 이미 필터링되어 옴
     return result;
-  }, [allLoadedPosts, isSearchMode, searchResults]);
+  }, [postsData, isSearchMode, searchPostsData, getPostsArray]);
+  // searchKeyword는 의존성에 포함하지 않음 (검색어 변경 시 재계산 불필요)
 
   // Magazine 스타일을 위한 게시글 분류
   const categorizedPosts = useMemo(() => {
@@ -249,11 +296,21 @@ const CommunityBoard = () => {
   const handlePageSizeChange = useCallback((newSize) => {
     setPageSize(newSize);
     setPage(0);
-    setAllLoadedPosts([]);
+    setPostsData({ map: {}, order: [] });
   }, []);
 
-  // 검색 핸들러
-  const handleSearch = useCallback(async () => {
+  // 검색어 변경 핸들러 (최적화)
+  const handleSearchKeywordChange = useCallback((e) => {
+    setSearchKeyword(e.target.value);
+  }, []);
+
+  // 검색 타입 변경 핸들러 (최적화)
+  const handleSearchTypeChange = useCallback((e) => {
+    setSearchType(e.target.value);
+  }, []);
+
+  // 검색 핸들러 (페이징 지원)
+  const handleSearch = useCallback(async (pageNum = 0, reset = false) => {
     if (!searchKeyword.trim()) {
       alert('검색어를 입력하세요');
       return;
@@ -262,30 +319,52 @@ const CommunityBoard = () => {
     try {
       setSearchLoading(true);
       setIsSearchMode(true);
-      const response = await boardApi.searchBoards(searchKeyword.trim(), searchType);
-      const results = response.data || [];
-      setSearchResults(results);
+
+      const response = await boardApi.searchBoards(searchKeyword.trim(), searchType, pageNum, pageSize);
+      const pageData = response.data || {};
+      const results = pageData.boards || [];
+
+      if (reset) {
+        const newData = convertToMapAndOrder(results);
+        setSearchPostsData(newData);
+      } else {
+        setSearchPostsData(prevData => addPostsToMap(prevData, results));
+      }
+
+      setSearchTotalCount(pageData.totalCount || 0);
+      setSearchHasNext(pageData.hasNext || false);
+      setSearchPage(pageNum);
     } catch (err) {
       console.error('❌ 검색 실패:', err);
       alert(`검색 실패: ${err.response?.data?.error || err.message}`);
-      setSearchResults([]);
+      setSearchPostsData({ map: {}, order: [] });
     } finally {
       setSearchLoading(false);
     }
-  }, [searchKeyword, searchType]);
+  }, [searchKeyword, searchType, pageSize, convertToMapAndOrder, addPostsToMap]);
 
   // 검색 취소 핸들러
   const handleCancelSearch = useCallback(() => {
     setIsSearchMode(false);
     setSearchKeyword('');
-    setSearchResults([]);
+    setSearchPostsData({ map: {}, order: [] });
     setSearchType('TITLE_CONTENT');
+    setSearchPage(0);
+    setSearchTotalCount(0);
+    setSearchHasNext(false);
   }, []);
+
+  // 검색 결과 더 보기
+  const handleSearchLoadMore = useCallback(() => {
+    if (!searchLoading && searchHasNext) {
+      handleSearch(searchPage + 1, false);
+    }
+  }, [searchLoading, searchHasNext, searchPage, handleSearch]);
 
   // Enter 키로 검색
   const handleSearchKeyPress = useCallback((e) => {
     if (e.key === 'Enter') {
-      handleSearch();
+      handleSearch(0, true);
     }
   }, [handleSearch]);
 
@@ -401,16 +480,22 @@ const CommunityBoard = () => {
   const handleCommentAdded = useCallback((boardId, isDelete = false) => {
     // 댓글 추가/삭제 시 해당 게시글의 댓글 카운트만 업데이트 (게시글 목록 전체 재조회 방지)
     if (boardId) {
-      setAllLoadedPosts((prev) =>
-        prev.map((post) =>
-          post.idx === boardId
-            ? {
-              ...post,
-              commentCount: Math.max(0, (post.commentCount ?? 0) + (isDelete ? -1 : 1)),
-            }
-            : post
-        )
-      );
+      setPostsData((prev) => {
+        const post = prev.map[boardId];
+        if (post) {
+          return {
+            ...prev,
+            map: {
+              ...prev.map,
+              [boardId]: {
+                ...post,
+                commentCount: Math.max(0, (post.commentCount ?? 0) + (isDelete ? -1 : 1)),
+              },
+            },
+          };
+        }
+        return prev;
+      });
     }
   }, []);
 
@@ -425,7 +510,13 @@ const CommunityBoard = () => {
     }
     try {
       await boardApi.deleteBoard(postIdx);
-      setAllLoadedPosts((prev) => prev.filter((post) => post.idx !== postIdx));
+      setPostsData((prev) => {
+        const { [postIdx]: removed, ...restMap } = prev.map;
+        return {
+          map: restMap,
+          order: prev.order.filter(id => id !== postIdx),
+        };
+      });
       if (selectedBoard?.idx === postIdx) {
         handleCommentDrawerClose();
       }
@@ -441,7 +532,13 @@ const CommunityBoard = () => {
 
   const handleBoardDeleted = useCallback(
     (boardId) => {
-      setAllLoadedPosts((prev) => prev.filter((post) => post.idx !== boardId));
+      setPostsData((prev) => {
+        const { [boardId]: removed, ...restMap } = prev.map;
+        return {
+          map: restMap,
+          order: prev.order.filter(id => id !== boardId),
+        };
+      });
       if (selectedBoard?.idx === boardId) {
         handleCommentDrawerClose();
       }
@@ -470,18 +567,24 @@ const CommunityBoard = () => {
         reactionType,
       });
       const summary = response.data;
-      setAllLoadedPosts((prev) =>
-        prev.map((post) =>
-          post.idx === boardId
-            ? {
-              ...post,
-              likes: summary.likeCount,
-              dislikes: summary.dislikeCount,
-              userReaction: summary.userReaction,
-            }
-            : post
-        )
-      );
+      setPostsData((prev) => {
+        const post = prev.map[boardId];
+        if (post) {
+          return {
+            ...prev,
+            map: {
+              ...prev.map,
+              [boardId]: {
+                ...post,
+                likes: summary.likeCount,
+                dislikes: summary.dislikeCount,
+                userReaction: summary.userReaction,
+              },
+            },
+          };
+        }
+        return prev;
+      });
       if (selectedBoard?.idx === boardId) {
         setSelectedBoard((prev) =>
           prev
@@ -501,18 +604,24 @@ const CommunityBoard = () => {
   };
 
   const handleBoardReactionUpdate = useCallback((boardId, summary) => {
-    setAllLoadedPosts((prev) =>
-      prev.map((post) =>
-        post.idx === boardId
-          ? {
-            ...post,
-            likes: summary.likeCount,
-            dislikes: summary.dislikeCount,
-            userReaction: summary.userReaction,
-          }
-          : post
-      )
-    );
+    setPostsData((prev) => {
+      const post = prev.map[boardId];
+      if (post) {
+        return {
+          ...prev,
+          map: {
+            ...prev.map,
+            [boardId]: {
+              ...post,
+              likes: summary.likeCount,
+              dislikes: summary.dislikeCount,
+              userReaction: summary.userReaction,
+            },
+          },
+        };
+      }
+      return prev;
+    });
     setSelectedBoard((prev) =>
       prev && prev.idx === boardId
         ? {
@@ -526,16 +635,22 @@ const CommunityBoard = () => {
   }, []);
 
   const handleBoardViewUpdate = useCallback((boardId, views) => {
-    setAllLoadedPosts((prev) =>
-      prev.map((post) =>
-        post.idx === boardId
-          ? {
-            ...post,
-            views,
-          }
-          : post
-      )
-    );
+    setPostsData((prev) => {
+      const post = prev.map[boardId];
+      if (post) {
+        return {
+          ...prev,
+          map: {
+            ...prev.map,
+            [boardId]: {
+              ...post,
+              views,
+            },
+          },
+        };
+      }
+      return prev;
+    });
 
     setSelectedBoard((prev) =>
       prev && prev.idx === boardId
@@ -548,7 +663,7 @@ const CommunityBoard = () => {
   }, []);
 
 
-  if (loading && allLoadedPosts.length === 0) {
+  if (loading && postsData.order.length === 0) {
     return (
       <LoadingContainer>
         <LoadingSpinner />
@@ -591,19 +706,19 @@ const CommunityBoard = () => {
             type="text"
             placeholder="게시글 검색..."
             value={searchKeyword}
-            onChange={(e) => setSearchKeyword(e.target.value)}
+            onChange={handleSearchKeywordChange}
             onKeyPress={handleSearchKeyPress}
           />
           <SearchTypeSelect
             value={searchType}
-            onChange={(e) => setSearchType(e.target.value)}
+            onChange={handleSearchTypeChange}
           >
             <option value="ID">ID</option>
             <option value="TITLE">제목</option>
             <option value="CONTENT">내용</option>
             <option value="TITLE_CONTENT">제목+내용</option>
           </SearchTypeSelect>
-          <SearchButton onClick={handleSearch} disabled={searchLoading}>
+          <SearchButton onClick={() => handleSearch(0, true)} disabled={searchLoading}>
             {searchLoading ? '검색 중...' : '🔍 검색'}
           </SearchButton>
           {isSearchMode && (
@@ -614,7 +729,7 @@ const CommunityBoard = () => {
         </SearchBox>
         {isSearchMode && (
           <SearchInfo>
-            검색 결과: {searchResults.length}개
+            검색 결과: {searchPostsData.order.length} / {searchTotalCount}개
             {searchKeyword && ` (검색어: "${searchKeyword}")`}
           </SearchInfo>
         )}
@@ -942,10 +1057,14 @@ const CommunityBoard = () => {
             })}
           </PostGrid>
 
-          {hasNext && (
+          {(isSearchMode ? searchHasNext : hasNext) && (
             <LoadMoreContainer>
-              <LoadMoreButton onClick={handleLoadMore} disabled={loading}>
-                {loading ? '로딩 중...' : `더 보기 (${filteredPosts.length} / ${totalCount})`}
+              <LoadMoreButton
+                onClick={isSearchMode ? handleSearchLoadMore : handleLoadMore}
+                disabled={isSearchMode ? searchLoading : loading}
+              >
+                {(isSearchMode ? searchLoading : loading) ? '로딩 중...' :
+                  `더 보기 (${filteredPosts.length} / ${isSearchMode ? searchTotalCount : totalCount})`}
               </LoadMoreButton>
             </LoadMoreContainer>
           )}

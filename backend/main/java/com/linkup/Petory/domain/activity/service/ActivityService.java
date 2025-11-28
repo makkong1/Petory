@@ -4,10 +4,15 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.linkup.Petory.domain.activity.dto.ActivityDTO;
+import com.linkup.Petory.domain.activity.dto.ActivityPageResponseDTO;
 import com.linkup.Petory.domain.board.entity.Board;
 import com.linkup.Petory.domain.board.entity.Comment;
 import com.linkup.Petory.domain.board.entity.MissingPetBoard;
@@ -243,5 +248,86 @@ public class ActivityService {
 
                 System.out.println("=== [ActivityService] 전체 활동 조회 완료: 총 " + activities.size() + "개 ===");
                 return activities;
+        }
+
+        // 페이징 지원 메서드
+        public ActivityPageResponseDTO getUserActivitiesWithPaging(long userId, String filter, int page, int size) {
+                System.out.println("=== [ActivityService] getUserActivitiesWithPaging 호출됨 - userId: " + userId 
+                                + ", filter: " + filter + ", page: " + page + ", size: " + size + " ===");
+                
+                // 전체 활동 가져오기
+                List<ActivityDTO> allActivities = getUserActivities(userId);
+                
+                // 필터링 적용
+                List<ActivityDTO> filteredActivities = filterActivities(allActivities, filter);
+                
+                // 필터별 개수 계산
+                long allCount = allActivities.size();
+                long postsCount = allActivities.stream()
+                                .filter(a -> isPostType(a.getType()))
+                                .count();
+                long commentsCount = allActivities.stream()
+                                .filter(a -> isCommentType(a.getType()))
+                                .count();
+                long reviewsCount = allActivities.stream()
+                                .filter(a -> "LOCATION_REVIEW".equals(a.getType()))
+                                .count();
+                
+                // 페이징 적용
+                Pageable pageable = PageRequest.of(page, size);
+                int start = (int) pageable.getOffset();
+                int end = Math.min((start + pageable.getPageSize()), filteredActivities.size());
+                
+                List<ActivityDTO> pageContent = filteredActivities.subList(start, end);
+                Page<ActivityDTO> activityPage = new PageImpl<>(pageContent, pageable, filteredActivities.size());
+                
+                return ActivityPageResponseDTO.builder()
+                                .activities(activityPage.getContent())
+                                .totalCount(activityPage.getTotalElements())
+                                .totalPages(activityPage.getTotalPages())
+                                .currentPage(page)
+                                .pageSize(size)
+                                .hasNext(activityPage.hasNext())
+                                .hasPrevious(activityPage.hasPrevious())
+                                .allCount(allCount)
+                                .postsCount(postsCount)
+                                .commentsCount(commentsCount)
+                                .reviewsCount(reviewsCount)
+                                .build();
+        }
+        
+        private List<ActivityDTO> filterActivities(List<ActivityDTO> activities, String filter) {
+                if (filter == null || "ALL".equals(filter)) {
+                        return activities;
+                }
+                
+                switch (filter) {
+                        case "POSTS":
+                                return activities.stream()
+                                                .filter(a -> isPostType(a.getType()))
+                                                .collect(Collectors.toList());
+                        case "COMMENTS":
+                                return activities.stream()
+                                                .filter(a -> isCommentType(a.getType()))
+                                                .collect(Collectors.toList());
+                        case "REVIEWS":
+                                return activities.stream()
+                                                .filter(a -> "LOCATION_REVIEW".equals(a.getType()))
+                                                .collect(Collectors.toList());
+                        default:
+                                return activities;
+                }
+        }
+        
+        private boolean isPostType(String type) {
+                return "CARE_REQUEST".equals(type) 
+                                || "BOARD".equals(type) 
+                                || "MISSING_PET".equals(type);
+        }
+        
+        private boolean isCommentType(String type) {
+                return "CARE_COMMENT".equals(type) 
+                                || "COMMENT".equals(type) 
+                                || "MISSING_COMMENT".equals(type);
         }
 }

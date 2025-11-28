@@ -31,11 +31,11 @@ export const boardApi = {
   // 전체 게시글 조회 (페이징 지원)
   getAllBoards: (params = {}) => {
     const { page = 0, size = 20, ...otherParams } = params;
-    const requestParams = { 
-      page, 
-      size, 
-      ...otherParams, 
-      _t: Date.now() 
+    const requestParams = {
+      page,
+      size,
+      ...otherParams,
+      _t: Date.now()
     }; // 캐시 무시를 위한 타임스탬프 추가
     return api.get('', {
       params: requestParams,
@@ -70,9 +70,9 @@ export const boardApi = {
   // 내 게시글 조회
   getMyBoards: (userId) => api.get('/my-posts', { params: { userId } }),
 
-  // 게시글 검색
-  searchBoards: (keyword, searchType = 'TITLE_CONTENT') => api.get('/search', { 
-    params: { keyword, searchType } 
+  // 게시글 검색 (페이징 지원)
+  searchBoards: (keyword, searchType = 'TITLE_CONTENT', page = 0, size = 20) => api.get('/search', {
+    params: { keyword, searchType, page, size }
   }),
 
   // 게시글 좋아요/싫어요 반응

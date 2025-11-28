@@ -11,6 +11,7 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -215,15 +216,23 @@ public class BoardService {
         return mapBoardsWithReactionsBatch(boards);
     }
 
-    // 게시글 검색
-    public List<BoardDTO> searchBoards(String keyword, String searchType) {
-        List<Board> boards;
-
+    // 게시글 검색 (페이징 지원)
+    public BoardPageResponseDTO searchBoardsWithPaging(String keyword, String searchType, int page, int size) {
         if (keyword == null || keyword.trim().isEmpty()) {
-            return new ArrayList<>();
+            return BoardPageResponseDTO.builder()
+                    .boards(new ArrayList<>())
+                    .totalCount(0)
+                    .totalPages(0)
+                    .currentPage(page)
+                    .pageSize(size)
+                    .hasNext(false)
+                    .hasPrevious(false)
+                    .build();
         }
 
         String trimmedKeyword = keyword.trim();
+        Pageable pageable = PageRequest.of(page, size);
+        Page<Board> boardPage;
 
         // 검색 타입에 따라 다른 쿼리 실행
         switch (searchType != null ? searchType.toUpperCase() : "TITLE_CONTENT") {
@@ -233,32 +242,52 @@ public class BoardService {
                     Board board = boardRepository.findById(boardId)
                             .orElse(null);
                     if (board != null && !board.getIsDeleted()) {
-                        boards = List.of(board);
+                        boardPage = new PageImpl<>(List.of(board), pageable, 1);
                     } else {
-                        boards = new ArrayList<>();
+                        boardPage = Page.empty(pageable);
                     }
                 } catch (NumberFormatException e) {
-                    boards = new ArrayList<>();
+                    boardPage = Page.empty(pageable);
                 }
                 break;
             case "TITLE":
-                boards = boardRepository.findByTitleContainingAndIsDeletedFalseOrderByCreatedAtDesc(trimmedKeyword);
+                boardPage = boardRepository.findByTitleContainingAndIsDeletedFalseOrderByCreatedAtDesc(trimmedKeyword,
+                        pageable);
                 break;
             case "CONTENT":
-                boards = boardRepository.findByContentContainingAndIsDeletedFalseOrderByCreatedAtDesc(trimmedKeyword);
+                boardPage = boardRepository.findByContentContainingAndIsDeletedFalseOrderByCreatedAtDesc(trimmedKeyword,
+                        pageable);
                 break;
             case "TITLE_CONTENT":
             default:
-                boards = boardRepository.searchByKeyword(trimmedKeyword);
+                boardPage = boardRepository.searchByKeywordWithPaging(trimmedKeyword, pageable);
                 break;
         }
 
-        if (boards.isEmpty()) {
-            return new ArrayList<>();
+        if (boardPage.isEmpty()) {
+            return BoardPageResponseDTO.builder()
+                    .boards(new ArrayList<>())
+                    .totalCount(0)
+                    .totalPages(0)
+                    .currentPage(page)
+                    .pageSize(size)
+                    .hasNext(false)
+                    .hasPrevious(false)
+                    .build();
         }
 
         // 배치 조회로 N+1 문제 해결
-        return mapBoardsWithReactionsBatch(boards);
+        List<BoardDTO> boardDTOs = mapBoardsWithReactionsBatch(boardPage.getContent());
+
+        return BoardPageResponseDTO.builder()
+                .boards(boardDTOs)
+                .totalCount(boardPage.getTotalElements())
+                .totalPages(boardPage.getTotalPages())
+                .currentPage(page)
+                .pageSize(size)
+                .hasNext(boardPage.hasNext())
+                .hasPrevious(boardPage.hasPrevious())
+                .build();
     }
 
     /**

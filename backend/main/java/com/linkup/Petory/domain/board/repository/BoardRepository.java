@@ -43,15 +43,22 @@ public interface BoardRepository extends JpaRepository<Board, Long> {
         // 제목으로 검색
         List<Board> findByTitleContainingAndIsDeletedFalseOrderByCreatedAtDesc(String title);
 
+        // 제목으로 검색 (페이징)
+        Page<Board> findByTitleContainingAndIsDeletedFalseOrderByCreatedAtDesc(String title, Pageable pageable);
+
         // 내용으로 검색
         List<Board> findByContentContainingAndIsDeletedFalseOrderByCreatedAtDesc(String content);
 
-        // FULLTEXT 인덱스 사용 쿼리 (제목+내용)
+        // 내용으로 검색 (페이징)
+        Page<Board> findByContentContainingAndIsDeletedFalseOrderByCreatedAtDesc(String content, Pageable pageable);
+
+        // FULLTEXT 인덱스 사용 쿼리 (제목+내용) - 페이징
         @Query(value = "SELECT b.*, " + "MATCH(b.title, b.content) AGAINST(:kw IN BOOLEAN MODE) as relevance "
                         + "FROM board b " + "WHERE b.is_deleted = false "
                         + "AND MATCH(b.title, b.content) AGAINST(:kw IN BOOLEAN MODE) "
-                        + "ORDER BY relevance DESC, b.created_at DESC", nativeQuery = true)
-        List<Board> searchByKeyword(@Param("kw") String keyword);
+                        + "ORDER BY relevance DESC, b.created_at DESC", countQuery = "SELECT COUNT(*) FROM board b WHERE b.is_deleted = false "
+                                        + "AND MATCH(b.title, b.content) AGAINST(:kw IN BOOLEAN MODE)", nativeQuery = true)
+        Page<Board> searchByKeywordWithPaging(@Param("kw") String keyword, Pageable pageable);
 
         // 카테고리 + 기간별 조회
         List<Board> findByCategoryAndCreatedAtBetween(String category, LocalDateTime start, LocalDateTime end);

@@ -1,22 +1,78 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import styled from 'styled-components';
 import { activityApi } from '../../api/activityApi';
 import { useAuth } from '../../contexts/AuthContext';
 
 const ActivityPage = () => {
   const { user } = useAuth();
-  const [activities, setActivities] = useState([]);
+  
+  // 서버 사이드 페이징 상태
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(20);
+  const [totalCount, setTotalCount] = useState(0);
+  const [hasNext, setHasNext] = useState(false);
+  
+  // Map + Array 조합: Map으로 빠른 조회/업데이트, Array로 순서 유지
+  const [activitiesData, setActivitiesData] = useState({ map: {}, order: [] });
+  
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeFilter, setActiveFilter] = useState('ALL');
+  
+  // 필터별 개수 (서버에서 받아온 값)
+  const [filterCounts, setFilterCounts] = useState({
+    allCount: 0,
+    postsCount: 0,
+    commentsCount: 0,
+    reviewsCount: 0,
+  });
 
+  // Map + Array를 배열로 변환하는 헬퍼 함수
+  const getActivitiesArray = useCallback((activitiesData) => {
+    return activitiesData.order.map(id => activitiesData.map[id]).filter(Boolean);
+  }, []);
+
+  // 게시글 배열을 Map + Array 구조로 변환하는 헬퍼 함수
+  const convertToMapAndOrder = useCallback((activities) => {
+    const map = {};
+    const order = [];
+    activities.forEach(activity => {
+      if (activity?.idx && !map[activity.idx]) {
+        const key = `${activity.type}-${activity.idx}`;
+        map[key] = activity;
+        order.push(key);
+      }
+    });
+    return { map, order };
+  }, []);
+
+  // 게시글 추가 (중복 체크 포함)
+  const addActivitiesToMap = useCallback((existingData, newActivities) => {
+    const map = { ...existingData.map };
+    const order = [...existingData.order];
+    newActivities.forEach(activity => {
+      if (activity?.idx) {
+        const key = `${activity.type}-${activity.idx}`;
+        if (!map[key]) {
+          map[key] = activity;
+          order.push(key);
+        } else {
+          // 이미 있으면 업데이트
+          map[key] = activity;
+        }
+      }
+    });
+    return { map, order };
+  }, []);
+
+  // 필터 변경 시 첫 페이지부터 다시 로드
   useEffect(() => {
     if (user && user.idx) {
-      fetchActivities();
+      fetchActivities(0, true);
     }
-  }, [user]);
+  }, [user, activeFilter]);
 
-  const fetchActivities = async () => {
+  const fetchActivities = useCallback(async (pageNum = 0, reset = false) => {
     if (!user || !user.idx) {
       setError('로그인이 필요합니다.');
       setLoading(false);
@@ -26,15 +82,42 @@ const ActivityPage = () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await activityApi.getMyActivities(user.idx);
-      setActivities(response.data || []);
+      
+      const response = await activityApi.getMyActivitiesWithPaging({
+        userId: user.idx,
+        filter: activeFilter,
+        page: pageNum,
+        size: pageSize
+      });
+      
+      const pageData = response.data || {};
+      const activities = pageData.activities || [];
+
+      if (reset) {
+        const newData = convertToMapAndOrder(activities);
+        setActivitiesData(newData);
+      } else {
+        setActivitiesData(prevData => addActivitiesToMap(prevData, activities));
+      }
+
+      setTotalCount(pageData.totalCount || 0);
+      setHasNext(pageData.hasNext || false);
+      setPage(pageNum);
+      
+      // 필터별 개수 업데이트
+      setFilterCounts({
+        allCount: pageData.allCount || 0,
+        postsCount: pageData.postsCount || 0,
+        commentsCount: pageData.commentsCount || 0,
+        reviewsCount: pageData.reviewsCount || 0,
+      });
     } catch (error) {
       console.error('활동 내역 로딩 실패:', error);
       setError('활동 내역을 불러오는데 실패했습니다.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, activeFilter, pageSize, convertToMapAndOrder, addActivitiesToMap]);
 
   const getTypeLabel = (type) => {
     switch (type) {
@@ -94,27 +177,24 @@ const ActivityPage = () => {
     });
   };
 
-  const filteredActivities = activeFilter === 'ALL' 
-    ? activities 
-    : activities.filter(activity => {
-        switch (activeFilter) {
-          case 'POSTS':
-            return ['CARE_REQUEST', 'BOARD', 'MISSING_PET'].includes(activity.type);
-          case 'COMMENTS':
-            return ['CARE_COMMENT', 'COMMENT', 'MISSING_COMMENT'].includes(activity.type);
-          case 'REVIEWS':
-            return activity.type === 'LOCATION_REVIEW';
-          default:
-            return true;
-        }
-      });
+  // 서버에서 이미 필터링되어 오므로 그대로 사용
+  const filteredActivities = useMemo(() => {
+    return getActivitiesArray(activitiesData);
+  }, [activitiesData, getActivitiesArray]);
 
   const filters = [
-    { key: 'ALL', label: '전체', count: activities.length },
-    { key: 'POSTS', label: '게시글', count: activities.filter(a => ['CARE_REQUEST', 'BOARD', 'MISSING_PET'].includes(a.type)).length },
-    { key: 'COMMENTS', label: '댓글', count: activities.filter(a => ['CARE_COMMENT', 'COMMENT', 'MISSING_COMMENT'].includes(a.type)).length },
-    { key: 'REVIEWS', label: '리뷰', count: activities.filter(a => a.type === 'LOCATION_REVIEW').length },
+    { key: 'ALL', label: '전체', count: filterCounts.allCount },
+    { key: 'POSTS', label: '게시글', count: filterCounts.postsCount },
+    { key: 'COMMENTS', label: '댓글', count: filterCounts.commentsCount },
+    { key: 'REVIEWS', label: '리뷰', count: filterCounts.reviewsCount },
   ];
+
+  // 더 보기 버튼 클릭 핸들러
+  const handleLoadMore = useCallback(() => {
+    if (!loading && hasNext) {
+      fetchActivities(page + 1, false);
+    }
+  }, [loading, hasNext, page, fetchActivities]);
 
   if (!user) {
     return (
@@ -128,7 +208,7 @@ const ActivityPage = () => {
     );
   }
 
-  if (loading) {
+  if (loading && activitiesData.order.length === 0) {
     return (
       <Container>
         <LoadingMessage>
@@ -145,7 +225,7 @@ const ActivityPage = () => {
         <ErrorMessage>
           <div className="icon">❌</div>
           <h3>{error}</h3>
-          <button onClick={fetchActivities}>다시 시도</button>
+          <button onClick={() => fetchActivities(0, true)}>다시 시도</button>
         </ErrorMessage>
       </Container>
     );
@@ -178,42 +258,55 @@ const ActivityPage = () => {
             <p>게시글을 작성하거나 댓글을 남겨보세요!</p>
           </EmptyMessage>
         ) : (
-          filteredActivities.map(activity => (
-            <ActivityCard key={`${activity.type}-${activity.idx}`}>
-              <ActivityHeader>
-                <TypeBadge color={getTypeColor(activity.type)}>
-                  <span className="icon">{getTypeIcon(activity.type)}</span>
-                  <span className="label">{getTypeLabel(activity.type)}</span>
-                </TypeBadge>
-                <DateInfo>{formatDate(activity.createdAt)}</DateInfo>
-              </ActivityHeader>
-              
-              {activity.title && (
-                <ActivityTitle>{activity.title}</ActivityTitle>
-              )}
-              
-              {activity.content && (
-                <ActivityContent>
-                  {activity.content.length > 150 
-                    ? `${activity.content.substring(0, 150)}...` 
-                    : activity.content}
-                </ActivityContent>
-              )}
+          <>
+            {filteredActivities.map(activity => {
+              const key = `${activity.type}-${activity.idx}`;
+              return (
+                <ActivityCard key={key}>
+                  <ActivityHeader>
+                    <TypeBadge color={getTypeColor(activity.type)}>
+                      <span className="icon">{getTypeIcon(activity.type)}</span>
+                      <span className="label">{getTypeLabel(activity.type)}</span>
+                    </TypeBadge>
+                    <DateInfo>{formatDate(activity.createdAt)}</DateInfo>
+                  </ActivityHeader>
+                  
+                  {activity.title && (
+                    <ActivityTitle>{activity.title}</ActivityTitle>
+                  )}
+                  
+                  {activity.content && (
+                    <ActivityContent>
+                      {activity.content.length > 150 
+                        ? `${activity.content.substring(0, 150)}...` 
+                        : activity.content}
+                    </ActivityContent>
+                  )}
 
-              {activity.relatedTitle && (
-                <RelatedInfo>
-                  <span className="label">관련:</span>
-                  <span className="title">{activity.relatedTitle}</span>
-                </RelatedInfo>
-              )}
+                  {activity.relatedTitle && (
+                    <RelatedInfo>
+                      <span className="label">관련:</span>
+                      <span className="title">{activity.relatedTitle}</span>
+                    </RelatedInfo>
+                  )}
 
-              {activity.status && (
-                <StatusBadge status={activity.status}>
-                  {activity.status}
-                </StatusBadge>
-              )}
-            </ActivityCard>
-          ))
+                  {activity.status && (
+                    <StatusBadge status={activity.status}>
+                      {activity.status}
+                    </StatusBadge>
+                  )}
+                </ActivityCard>
+              );
+            })}
+            
+            {hasNext && (
+              <LoadMoreContainer>
+                <LoadMoreButton onClick={handleLoadMore} disabled={loading}>
+                  {loading ? '로딩 중...' : `더 보기 (${filteredActivities.length} / ${totalCount})`}
+                </LoadMoreButton>
+              </LoadMoreContainer>
+            )}
+          </>
         )}
       </ActivityList>
     </Container>
@@ -443,6 +536,41 @@ const EmptyMessage = styled.div`
   h3 {
     color: ${props => props.theme.colors.text};
     margin-bottom: ${props => props.theme.spacing.sm};
+  }
+`;
+
+const LoadMoreContainer = styled.div`
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: ${props => props.theme.spacing.xl} 0;
+  margin-top: ${props => props.theme.spacing.lg};
+`;
+
+const LoadMoreButton = styled.button`
+  background: ${props => props.theme.colors.gradient || props.theme.colors.primary};
+  color: white;
+  border: none;
+  padding: ${props => props.theme.spacing.md} ${props => props.theme.spacing.xl};
+  border-radius: ${props => props.theme.borderRadius.xl};
+  font-size: ${props => props.theme.typography.body1.fontSize};
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(255, 126, 54, 0.25);
+  
+  &:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(255, 126, 54, 0.35);
+  }
+  
+  &:active:not(:disabled) {
+    transform: translateY(0);
+  }
+  
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
   }
 `;
 
