@@ -127,8 +127,12 @@ public class UsersService {
         return usersConverter.toDTO(updated);
     }
 
-    // 탈퇴
+    // 탈퇴 (소프트 삭제)
     public void deleteUser(long idx) {
-        usersRepository.deleteById(idx);
+        Users user = usersRepository.findById(idx)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        user.setIsDeleted(true);
+        user.setDeletedAt(java.time.LocalDateTime.now());
+        usersRepository.save(user);
     }
 }

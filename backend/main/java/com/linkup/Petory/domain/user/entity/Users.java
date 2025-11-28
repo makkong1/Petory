@@ -69,6 +69,14 @@ public class Users {
     @Column(name = "suspended_until")
     private LocalDateTime suspendedUntil; // 이용제한 종료일 (null이면 영구 차단)
 
+    // 소프트 삭제 관련 필드
+    @Column(name = "is_deleted")
+    @Builder.Default
+    private Boolean isDeleted = false;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<UserSanction> sanctions;
 
@@ -81,6 +89,9 @@ public class Users {
         }
         if (this.warningCount == null) {
             this.warningCount = 0;
+        }
+        if (this.isDeleted == null) {
+            this.isDeleted = false;
         }
     }
 

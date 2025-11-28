@@ -1,5 +1,6 @@
 package com.linkup.Petory.domain.user.dto;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import lombok.Data;
@@ -22,4 +23,13 @@ public class UsersDTO {
     private String location;
     private String petInfo;
     private List<SocialUserDTO> socialUsers;
+    
+    // 제재 관련 필드
+    private String status; // ACTIVE, SUSPENDED, BANNED
+    private Integer warningCount;
+    private LocalDateTime suspendedUntil;
+    
+    // 소프트 삭제 관련 필드
+    private Boolean isDeleted;
+    private LocalDateTime deletedAt;
 }

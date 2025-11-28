@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 import com.linkup.Petory.domain.user.dto.UsersDTO;
 import com.linkup.Petory.domain.user.entity.Role;
 import com.linkup.Petory.domain.user.entity.Users;
+import com.linkup.Petory.domain.user.entity.Users.UserStatus;
 
 import lombok.RequiredArgsConstructor;
 
@@ -33,6 +34,11 @@ public class UsersConverter {
                         .map(socialUserConverter::toDTO)
                         .collect(Collectors.toList())
                         : null)
+                .status(user.getStatus() != null ? user.getStatus().name() : null)
+                .warningCount(user.getWarningCount())
+                .suspendedUntil(user.getSuspendedUntil())
+                .isDeleted(user.getIsDeleted())
+                .deletedAt(user.getDeletedAt())
                 .build();
     }
 
