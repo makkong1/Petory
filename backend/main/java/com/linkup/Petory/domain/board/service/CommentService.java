@@ -44,7 +44,18 @@ public class CommentService {
     public List<CommentDTO> getComments(Long boardId) {
         Board board = boardRepository.findById(boardId)
                 .orElseThrow(() -> new IllegalArgumentException("Board not found"));
+        // 일반 사용자용: 작성자도 활성 상태여야 함
         List<Comment> comments = commentRepository.findByBoardAndIsDeletedFalseOrderByCreatedAtAsc(board);
+        return comments.stream()
+                .map(this::mapWithReactionCounts)
+                .collect(Collectors.toList());
+    }
+
+    // 관리자용: 작성자 상태 체크 없이 조회 (삭제된 사용자 댓글도 포함)
+    public List<CommentDTO> getCommentsForAdmin(Long boardId) {
+        Board board = boardRepository.findById(boardId)
+                .orElseThrow(() -> new IllegalArgumentException("Board not found"));
+        List<Comment> comments = commentRepository.findByBoardAndIsDeletedFalseForAdmin(board);
         return comments.stream()
                 .map(this::mapWithReactionCounts)
                 .collect(Collectors.toList());

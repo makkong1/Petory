@@ -82,11 +82,11 @@ public class BoardService {
         Page<Board> boardPage;
 
         if (Boolean.TRUE.equals(deleted)) {
-            // 삭제된 게시글 포함
+            // 삭제된 게시글 포함 (관리자용 - 작성자 상태 체크 없음)
             boardPage = boardRepository.findAll(largePageable);
         } else {
-            // 삭제되지 않은 게시글만
-            boardPage = boardRepository.findAllByIsDeletedFalseOrderByCreatedAtDesc(largePageable);
+            // 삭제되지 않은 게시글만 (관리자용 - 작성자 상태 체크 없음)
+            boardPage = boardRepository.findAllByIsDeletedFalseForAdmin(largePageable);
         }
 
         // 메모리에서 필터링

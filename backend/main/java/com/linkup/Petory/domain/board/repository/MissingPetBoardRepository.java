@@ -13,15 +13,16 @@ import com.linkup.Petory.domain.user.entity.Users;
 
 public interface MissingPetBoardRepository extends JpaRepository<MissingPetBoard, Long> {
 
-    @Query("SELECT b FROM MissingPetBoard b JOIN FETCH b.user WHERE b.isDeleted = false ORDER BY b.createdAt DESC")
+    @Query("SELECT b FROM MissingPetBoard b JOIN FETCH b.user u WHERE b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY b.createdAt DESC")
     List<MissingPetBoard> findAllByOrderByCreatedAtDesc();
 
-    @Query("SELECT b FROM MissingPetBoard b JOIN FETCH b.user WHERE b.status = :status AND b.isDeleted = false ORDER BY b.createdAt DESC")
+    @Query("SELECT b FROM MissingPetBoard b JOIN FETCH b.user u WHERE b.status = :status AND b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY b.createdAt DESC")
     List<MissingPetBoard> findByStatusOrderByCreatedAtDesc(@Param("status") MissingPetStatus status);
 
-    @Query("SELECT b FROM MissingPetBoard b JOIN FETCH b.user WHERE b.idx = :id AND b.isDeleted = false")
+    @Query("SELECT b FROM MissingPetBoard b JOIN FETCH b.user u WHERE b.idx = :id AND b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE'")
     Optional<MissingPetBoard> findByIdWithUser(@Param("id") Long id);
 
-    // 사용자별 게시글 조회 (삭제되지 않은 것만, 최신순)
-    List<MissingPetBoard> findByUserAndIsDeletedFalseOrderByCreatedAtDesc(Users user);
+    // 사용자별 게시글 조회 (삭제되지 않은 것만, 최신순) - 작성자도 활성 상태여야 함
+    @Query("SELECT b FROM MissingPetBoard b JOIN FETCH b.user u WHERE b.user = :user AND b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY b.createdAt DESC")
+    List<MissingPetBoard> findByUserAndIsDeletedFalseOrderByCreatedAtDesc(@Param("user") Users user);
 }

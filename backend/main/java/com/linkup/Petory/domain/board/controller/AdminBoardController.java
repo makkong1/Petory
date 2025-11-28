@@ -114,7 +114,8 @@ public class AdminBoardController {
             @PathVariable("boardId") Long boardId,
             @RequestParam(value = "status", required = false, defaultValue = "ALL") String status,
             @RequestParam(value = "deleted", required = false) Boolean deleted) {
-        List<CommentDTO> list = commentService.getComments(boardId);
+        // 관리자용: 작성자 상태 체크 없이 조회
+        List<CommentDTO> list = commentService.getCommentsForAdmin(boardId);
         if (deleted != null) {
             final boolean wantDeleted = deleted.booleanValue();
             list = list.stream().filter(c -> Boolean.TRUE.equals(c.getDeleted()) == wantDeleted)
