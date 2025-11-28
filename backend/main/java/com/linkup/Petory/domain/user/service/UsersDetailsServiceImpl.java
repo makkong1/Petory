@@ -23,7 +23,7 @@ public class UsersDetailsServiceImpl implements UserDetailsService {
     @Override
     public UserDetails loadUserByUsername(String id) throws UsernameNotFoundException {
         // username 파라미터는 실제로는 id (로그인용 아이디)를 의미함
-        Users user = usersRepository.findById(id)
+        Users user = usersRepository.findByIdString(id)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with id: " + id));
 
         return new org.springframework.security.core.userdetails.User(

@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.springframework.cache.annotation.CacheEvict;
@@ -330,16 +331,33 @@ public class BoardService {
         // 검색 타입에 따라 다른 쿼리 실행
         switch (searchType != null ? searchType.toUpperCase() : "TITLE_CONTENT") {
             case "ID":
-                try {
-                    Long boardId = Long.parseLong(trimmedKeyword);
-                    Board board = boardRepository.findById(boardId)
-                            .orElse(null);
-                    if (board != null && !board.getIsDeleted()) {
-                        boardPage = new PageImpl<>(List.of(board), pageable, 1);
+                // 작성자 ID로 검색 (Users 엔티티의 id 필드)
+                log.info("🔍 [BoardService.searchBoardsWithPaging] ID 검색: keyword = {}", trimmedKeyword);
+                Optional<Users> userOpt = usersRepository.findByIdString(trimmedKeyword);
+                log.info("🔍 [BoardService.searchBoardsWithPaging] 사용자 조회 결과: {}", userOpt.isPresent() ? "존재함" : "없음");
+                if (userOpt.isPresent()) {
+                    Users user = userOpt.get();
+                    log.info("🔍 [BoardService.searchBoardsWithPaging] 사용자 정보: idx={}, id={}, isDeleted={}, status={}",
+                            user.getIdx(), user.getId(), user.getIsDeleted(), user.getStatus());
+                    // 작성자가 활성 상태인 경우에만 검색
+                    if (!Boolean.TRUE.equals(user.getIsDeleted())
+                            && user.getStatus() == com.linkup.Petory.domain.user.entity.Users.UserStatus.ACTIVE) {
+                        List<Board> userBoards = boardRepository.findByUserAndIsDeletedFalseOrderByCreatedAtDesc(user);
+                        log.info("🔍 [BoardService.searchBoardsWithPaging] 작성한 게시글 수: {}", userBoards.size());
+                        // 페이징 처리
+                        int start = (int) pageable.getOffset();
+                        int end = Math.min(start + pageable.getPageSize(), userBoards.size());
+                        List<Board> pagedBoards = start < userBoards.size()
+                                ? userBoards.subList(start, end)
+                                : new ArrayList<>();
+                        boardPage = new PageImpl<>(pagedBoards, pageable, userBoards.size());
                     } else {
+                        log.warn("⚠️ [BoardService.searchBoardsWithPaging] 사용자가 비활성 상태: isDeleted={}, status={}",
+                                user.getIsDeleted(), user.getStatus());
                         boardPage = Page.empty(pageable);
                     }
-                } catch (NumberFormatException e) {
+                } else {
+                    log.warn("⚠️ [BoardService.searchBoardsWithPaging] 사용자를 찾을 수 없음: id={}", trimmedKeyword);
                     boardPage = Page.empty(pageable);
                 }
                 break;

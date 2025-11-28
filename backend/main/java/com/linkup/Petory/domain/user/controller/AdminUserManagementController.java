@@ -60,7 +60,7 @@ public class AdminUserManagementController {
         if (usersRepository.findByUsername(dto.getUsername()).isPresent()) {
             throw new IllegalArgumentException("이미 존재하는 사용자명입니다.");
         }
-        if (usersRepository.findById(dto.getId()).isPresent()) {
+        if (usersRepository.findByIdString(dto.getId()).isPresent()) {
             throw new IllegalArgumentException("이미 존재하는 아이디입니다.");
         }
         if (dto.getEmail() != null && usersRepository.findAll().stream()
@@ -121,7 +121,7 @@ public class AdminUserManagementController {
     public ResponseEntity<UsersDTO> changeAdminRole(
             @PathVariable Long id,
             @RequestBody RoleChangeRequest request) {
-        
+
         Users user = usersRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
 
@@ -170,7 +170,7 @@ public class AdminUserManagementController {
     public ResponseEntity<Void> changeAdminPassword(
             @PathVariable Long id,
             @RequestBody PasswordChangeRequest request) {
-        
+
         Users user = usersRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
 
@@ -214,4 +214,3 @@ public class AdminUserManagementController {
         }
     }
 }
-

@@ -36,7 +36,7 @@ public class MeetupService {
     @Transactional
     public MeetupDTO createMeetup(MeetupDTO meetupDTO, String userId) {
         // userId로 사용자 찾기 (id 필드 사용)
-        Users organizer = usersRepository.findById(userId)
+        Users organizer = usersRepository.findByIdString(userId)
                 .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
 
         // 날짜 검증
@@ -221,7 +221,7 @@ public class MeetupService {
                 .orElseThrow(() -> new RuntimeException("모임을 찾을 수 없습니다."));
 
         // 사용자 확인 (userId는 Users의 id 필드, 문자열)
-        Users user = usersRepository.findById(userId)
+        Users user = usersRepository.findByIdString(userId)
                 .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
 
         Long userIdx = user.getIdx(); // Users의 idx 필드 (Long)
@@ -266,7 +266,7 @@ public class MeetupService {
                 .orElseThrow(() -> new RuntimeException("모임을 찾을 수 없습니다."));
 
         // 사용자 확인 (userId는 Users의 id 필드, 문자열)
-        Users user = usersRepository.findById(userId)
+        Users user = usersRepository.findByIdString(userId)
                 .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
 
         Long userIdx = user.getIdx(); // Users의 idx 필드 (Long)
@@ -294,7 +294,7 @@ public class MeetupService {
     // 사용자가 특정 모임에 참가했는지 확인
     public boolean isUserParticipating(Long meetupIdx, String userId) {
         // 사용자 확인 (userId는 Users의 id 필드, 문자열)
-        Users user = usersRepository.findById(userId)
+        Users user = usersRepository.findByIdString(userId)
                 .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
 
         Long userIdx = user.getIdx(); // Users의 idx 필드 (Long)

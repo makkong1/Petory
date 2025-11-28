@@ -80,7 +80,7 @@ public class UsersService {
 
     // id로 조회 (로그인용)
     public UsersDTO getUserById(String id) {
-        Users user = usersRepository.findById(id)
+        Users user = usersRepository.findByIdString(id)
                 .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
         return usersConverter.toDTO(user);
     }
