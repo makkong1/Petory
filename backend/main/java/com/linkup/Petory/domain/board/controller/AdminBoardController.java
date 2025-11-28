@@ -9,6 +9,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import com.linkup.Petory.domain.board.dto.BoardDTO;
+import com.linkup.Petory.domain.board.dto.BoardPageResponseDTO;
 import com.linkup.Petory.domain.board.dto.CommentDTO;
 import com.linkup.Petory.domain.board.service.BoardService;
 import com.linkup.Petory.domain.board.service.CommentService;
@@ -26,7 +27,7 @@ public class AdminBoardController {
     private final CommentService commentService;
 
     // Boards moderation list with filters (status: ALL/ACTIVE/BLINDED/DELETED;
-    // deleted: true/false; category; q)
+    // deleted: true/false; category; q) - 기존 API (하위 호환성 유지)
     @GetMapping("/boards")
     public ResponseEntity<List<BoardDTO>> listBoards(
             @RequestParam(value = "status", required = false, defaultValue = "ALL") String status,
@@ -67,6 +68,18 @@ public class AdminBoardController {
                     .collect(Collectors.toList());
         }
         return ResponseEntity.ok(all);
+    }
+
+    // Boards moderation list with pagination (페이징 지원)
+    @GetMapping("/boards/paging")
+    public ResponseEntity<BoardPageResponseDTO> listBoardsWithPaging(
+            @RequestParam(value = "status", required = false, defaultValue = "ALL") String status,
+            @RequestParam(value = "deleted", required = false) Boolean deleted,
+            @RequestParam(value = "category", required = false) String category,
+            @RequestParam(value = "q", required = false) String q,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "20") int size) {
+        return ResponseEntity.ok(boardService.getAdminBoardsWithPaging(status, deleted, category, q, page, size));
     }
 
     @PatchMapping("/boards/{id}/blind")

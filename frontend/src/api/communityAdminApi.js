@@ -18,8 +18,24 @@ api.interceptors.request.use((config) => {
 });
 
 export const communityAdminApi = {
-    // Boards
+    // Boards (기존 API - 하위 호환성 유지)
     listBoards: (params) => api.get('/boards', { params }),
+    
+    // Boards (페이징 지원)
+    listBoardsWithPaging: (params = {}) => {
+        const { page = 0, size = 20, ...otherParams } = params;
+        const requestParams = {
+            page,
+            size,
+            ...otherParams,
+            _t: Date.now()
+        };
+        return api.get('/boards/paging', {
+            params: requestParams,
+            headers: { 'Cache-Control': 'no-cache' }
+        });
+    },
+    
     blindBoard: (id, body) => api.patch(`/boards/${id}/blind`, body || {}),
     unblindBoard: (id, body) => api.patch(`/boards/${id}/unblind`, body || {}),
     deleteBoard: (id, body) => api.post(`/boards/${id}/delete`, body || {}),

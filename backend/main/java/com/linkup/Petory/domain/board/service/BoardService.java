@@ -71,6 +71,99 @@ public class BoardService {
         return mapBoardsWithReactionsBatch(boards);
     }
 
+    // 관리자용 게시글 조회 (페이징 + 필터링 지원)
+    public BoardPageResponseDTO getAdminBoardsWithPaging(
+            String status, Boolean deleted, String category, String q, int page, int size) {
+        // 필터링을 위해 더 많은 데이터를 가져옴 (최대 1000개 또는 필요한 만큼)
+        // 실제로는 DB 쿼리 레벨에서 필터링하는 것이 더 효율적이지만, 복잡한 필터링이므로 일단 이 방식 사용
+        Pageable largePageable = PageRequest.of(0, 1000); // 충분히 큰 페이지 크기
+
+        // 기본 쿼리: 전체 게시글 (삭제 포함 여부에 따라)
+        Page<Board> boardPage;
+
+        if (Boolean.TRUE.equals(deleted)) {
+            // 삭제된 게시글 포함
+            boardPage = boardRepository.findAll(largePageable);
+        } else {
+            // 삭제되지 않은 게시글만
+            boardPage = boardRepository.findAllByIsDeletedFalseOrderByCreatedAtDesc(largePageable);
+        }
+
+        // 메모리에서 필터링
+        List<Board> filteredBoards = boardPage.getContent().stream()
+                .filter(board -> {
+                    // 카테고리 필터
+                    if (category != null && !category.equals("ALL")
+                            && !category.equalsIgnoreCase(board.getCategory())) {
+                        return false;
+                    }
+                    // 상태 필터
+                    if (status != null && !status.equals("ALL")) {
+                        if (!status.equalsIgnoreCase(board.getStatus().name())) {
+                            return false;
+                        }
+                    }
+                    // 삭제 여부 필터
+                    if (deleted != null) {
+                        if (Boolean.TRUE.equals(deleted) != board.getIsDeleted()) {
+                            return false;
+                        }
+                    }
+                    // 검색어 필터
+                    if (q != null && !q.isBlank()) {
+                        String keyword = q.toLowerCase();
+                        boolean matches = (board.getTitle() != null && board.getTitle().toLowerCase().contains(keyword))
+                                || (board.getContent() != null && board.getContent().toLowerCase().contains(keyword))
+                                || (board.getUser() != null && board.getUser().getUsername() != null
+                                        && board.getUser().getUsername().toLowerCase().contains(keyword));
+                        if (!matches) {
+                            return false;
+                        }
+                    }
+                    return true;
+                })
+                .collect(Collectors.toList());
+
+        // 필터링된 결과로 페이징 재구성
+        int start = page * size;
+        int end = Math.min(start + size, filteredBoards.size());
+        List<Board> pagedBoards = start < filteredBoards.size()
+                ? filteredBoards.subList(start, end)
+                : new ArrayList<>();
+
+        // 전체 개수 계산 (필터링된 전체)
+        long totalCount = filteredBoards.size();
+        int totalPages = (int) Math.ceil((double) totalCount / size);
+
+        // hasNext 계산: 현재 페이지가 마지막 페이지보다 작으면 true
+        boolean hasNextPage = page < totalPages - 1;
+
+        if (pagedBoards.isEmpty()) {
+            return BoardPageResponseDTO.builder()
+                    .boards(new ArrayList<>())
+                    .totalCount(totalCount)
+                    .totalPages(totalPages)
+                    .currentPage(page)
+                    .pageSize(size)
+                    .hasNext(hasNextPage)
+                    .hasPrevious(page > 0)
+                    .build();
+        }
+
+        // 배치 조회로 N+1 문제 해결
+        List<BoardDTO> boardDTOs = mapBoardsWithReactionsBatch(pagedBoards);
+
+        return BoardPageResponseDTO.builder()
+                .boards(boardDTOs)
+                .totalCount(totalCount)
+                .totalPages(totalPages)
+                .currentPage(page)
+                .pageSize(size)
+                .hasNext(hasNextPage)
+                .hasPrevious(page > 0)
+                .build();
+    }
+
     // 전체 게시글 조회 (페이징 지원)
     public BoardPageResponseDTO getAllBoardsWithPaging(String category, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);

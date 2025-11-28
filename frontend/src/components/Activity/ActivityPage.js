@@ -196,6 +196,74 @@ const ActivityPage = () => {
     }
   }, [loading, hasNext, page, fetchActivities]);
 
+  // 활동 카드 클릭 핸들러 - 해당 게시글로 이동
+  const handleActivityClick = useCallback((activity) => {
+    if (!activity) return;
+
+    const { type, idx, relatedId } = activity;
+    const targetId = relatedId || idx; // 댓글은 relatedId, 게시글은 idx 사용
+
+    switch (type) {
+      case 'BOARD':
+      case 'COMMENT':
+        // 커뮤니티 게시글로 이동
+        if (window.setActiveTab) {
+          window.setActiveTab('community');
+        }
+        // 게시글 상세 모달 열기
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('openBoardDetail', {
+            detail: { boardId: targetId }
+          }));
+        }, 100);
+        break;
+
+      case 'CARE_REQUEST':
+      case 'CARE_COMMENT':
+        // 펫케어 요청으로 이동
+        if (window.setActiveTab) {
+          window.setActiveTab('care-requests');
+        }
+        // 펫케어 요청 상세 열기
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('openCareRequestDetail', {
+            detail: { requestId: targetId }
+          }));
+        }, 100);
+        break;
+
+      case 'MISSING_PET':
+      case 'MISSING_COMMENT':
+        // 실종 제보로 이동
+        if (window.setActiveTab) {
+          window.setActiveTab('missing-pets');
+        }
+        // 실종 제보 상세 열기
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('openMissingPetDetail', {
+            detail: { boardId: targetId }
+          }));
+        }, 100);
+        break;
+
+      case 'LOCATION_REVIEW':
+        // 주변서비스로 이동
+        if (window.setActiveTab) {
+          window.setActiveTab('location-services');
+        }
+        // 리뷰 상세 열기
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('openLocationReviewDetail', {
+            detail: { reviewId: idx, locationId: relatedId }
+          }));
+        }, 100);
+        break;
+
+      default:
+        console.warn('알 수 없는 활동 타입:', type);
+    }
+  }, []);
+
   if (!user) {
     return (
       <Container>
@@ -262,7 +330,11 @@ const ActivityPage = () => {
             {filteredActivities.map(activity => {
               const key = `${activity.type}-${activity.idx}`;
               return (
-                <ActivityCard key={key}>
+                <ActivityCard 
+                  key={key}
+                  onClick={() => handleActivityClick(activity)}
+                  clickable
+                >
                   <ActivityHeader>
                     <TypeBadge color={getTypeColor(activity.type)}>
                       <span className="icon">{getTypeIcon(activity.type)}</span>
@@ -381,11 +453,17 @@ const ActivityCard = styled.div`
   border-radius: ${props => props.theme.borderRadius.lg};
   padding: ${props => props.theme.spacing.lg};
   transition: all 0.3s ease;
+  ${props => props.clickable && `
+    cursor: pointer;
+  `}
   
   &:hover {
     transform: translateY(-2px);
     box-shadow: 0 4px 12px ${props => props.theme.colors.shadow};
     border-color: ${props => props.theme.colors.primary};
+    ${props => props.clickable && `
+      background: ${props.theme.colors.surfaceHover || props.theme.colors.surface};
+    `}
   }
 
   @media (max-width: 768px) {

@@ -1,26 +1,88 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import styled from 'styled-components';
 import { userApi } from '../../api/userApi';
 import UserModal from './UserModal';
 
 const UserList = () => {
-  const [users, setUsers] = useState([]);
+  // 서버 사이드 페이징 상태
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(20);
+  const [totalCount, setTotalCount] = useState(0);
+  const [hasNext, setHasNext] = useState(false);
+  
+  // Map + Array 조합: Map으로 빠른 조회/업데이트, Array로 순서 유지
+  const [usersData, setUsersData] = useState({ map: {}, order: [] });
+  
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
 
-  useEffect(() => {
-    fetchUsers();
+  // Map + Array를 배열로 변환하는 헬퍼 함수
+  const getUsersArray = useCallback((usersData) => {
+    return usersData.order.map(id => usersData.map[id]).filter(Boolean);
   }, []);
 
-  const fetchUsers = async () => {
+  // 게시글 배열을 Map + Array 구조로 변환하는 헬퍼 함수
+  const convertToMapAndOrder = useCallback((users) => {
+    const map = {};
+    const order = [];
+    users.forEach(user => {
+      if (user?.idx && !map[user.idx]) {
+        map[user.idx] = user;
+        order.push(user.idx);
+      }
+    });
+    return { map, order };
+  }, []);
+
+  // 게시글 추가 (중복 체크 포함)
+  const addUsersToMap = useCallback((existingData, newUsers) => {
+    const map = { ...existingData.map };
+    const order = [...existingData.order];
+    newUsers.forEach(user => {
+      if (user?.idx) {
+        if (!map[user.idx]) {
+          map[user.idx] = user;
+          order.push(user.idx);
+        } else {
+          // 이미 있으면 업데이트
+          map[user.idx] = user;
+        }
+      }
+    });
+    return { map, order };
+  }, []);
+
+  useEffect(() => {
+    fetchUsers(0, true);
+  }, []);
+
+  const fetchUsers = useCallback(async (pageNum = 0, reset = false, size = pageSize) => {
     try {
       setLoading(true);
-      console.log('API 호출 시작: GET /api/users');
-      const response = await userApi.getAllUsers();
+      setError(null);
+      console.log('API 호출 시작: GET /api/admin/users/paging');
+      
+      const response = await userApi.getAllUsersWithPaging({
+        page: pageNum,
+        size: size
+      });
+      
       console.log('API 응답:', response);
-      setUsers(response.data);
+      const pageData = response.data || {};
+      const users = pageData.users || [];
+
+      if (reset) {
+        const newData = convertToMapAndOrder(users);
+        setUsersData(newData);
+      } else {
+        setUsersData(prevData => addUsersToMap(prevData, users));
+      }
+
+      setTotalCount(pageData.totalCount || 0);
+      setHasNext(pageData.hasNext || false);
+      setPage(pageNum);
     } catch (err) {
       console.error('API 에러 상세 정보:', {
         message: err.message,
@@ -33,7 +95,7 @@ const UserList = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [pageSize, convertToMapAndOrder, addUsersToMap]);
 
   const handleAddUser = () => {
     setSelectedUser(null);
@@ -49,7 +111,16 @@ const UserList = () => {
     if (window.confirm('정말로 이 유저를 삭제하시겠습니까?')) {
       try {
         await userApi.deleteUser(id);
-        fetchUsers(); // 목록 새로고침
+        // Map에서 해당 사용자 제거
+        setUsersData((prev) => {
+          const { [id]: removed, ...restMap } = prev.map;
+          return {
+            map: restMap,
+            order: prev.order.filter(userId => userId !== id),
+          };
+        });
+        // 첫 페이지부터 다시 로드
+        fetchUsers(0, true);
       } catch (err) {
         alert('유저 삭제에 실패했습니다.');
         console.error('Error deleting user:', err);
@@ -60,27 +131,54 @@ const UserList = () => {
   const handleModalClose = () => {
     setModalOpen(false);
     setSelectedUser(null);
-    fetchUsers(); // 목록 새로고침
+    // 첫 페이지부터 다시 로드
+    fetchUsers(0, true);
+  };
+
+  // 더 보기 버튼 클릭 핸들러
+  const handleLoadMore = useCallback(() => {
+    if (!loading && hasNext) {
+      fetchUsers(page + 1, false);
+    }
+  }, [loading, hasNext, page, fetchUsers]);
+
+  // 서버에서 이미 필터링되어 오므로 그대로 사용
+  const users = useMemo(() => {
+    return getUsersArray(usersData);
+  }, [usersData, getUsersArray]);
+
+  // 페이지 크기 변경 핸들러
+  const handlePageSizeChange = (e) => {
+    const newSize = parseInt(e.target.value);
+    setPageSize(newSize);
+    fetchUsers(0, true, newSize);
   };
 
   return (
     <Container>
       <Header>
         <Title>👥 사용자 관리</Title>
-        <AddButton onClick={handleAddUser}>
-          <span>+</span>
-          새 유저 추가
-        </AddButton>
+        <HeaderRight>
+          <PageSizeSelect value={pageSize} onChange={handlePageSizeChange}>
+            <option value={20}>20개씩</option>
+            <option value={50}>50개씩</option>
+            <option value={100}>100개씩</option>
+          </PageSizeSelect>
+          <AddButton onClick={handleAddUser}>
+            <span>+</span>
+            새 유저 추가
+          </AddButton>
+        </HeaderRight>
       </Header>
 
-      {loading ? (
+      {loading && usersData.order.length === 0 ? (
         <LoadingMessage>로딩 중...</LoadingMessage>
       ) : error ? (
         <div>
           <ErrorMessage>{error}</ErrorMessage>
           <div style={{ textAlign: 'center', marginTop: '20px' }}>
             <button
-              onClick={fetchUsers}
+              onClick={() => fetchUsers(0, true)}
               style={{
                 padding: '10px 20px',
                 backgroundColor: '#4a90e2',
@@ -95,47 +193,57 @@ const UserList = () => {
           </div>
         </div>
       ) : (
-        <UserGrid>
-          {users.length === 0 ? (
-            <div style={{
-              gridColumn: '1 / -1',
-              textAlign: 'center',
-              padding: '40px',
-              color: '#666',
-              fontSize: '18px'
-            }}>
-              등록된 유저가 없습니다. 새 유저를 추가해보세요!
-            </div>
-          ) : (
-            users.map((user) => (
-              <UserCard key={user.idx}>
-                <UserInfo>
-                  <UserName>{user.username}</UserName>
-                  <UserDetail><strong>ID:</strong> {user.id}</UserDetail>
-                  <UserDetail><strong>이메일:</strong> {user.email}</UserDetail>
-                  <UserDetail><strong>역할:</strong> <RoleBadge role={user.role}>{user.role}</RoleBadge></UserDetail>
-                  {user.location && <UserDetail><strong>위치:</strong> {user.location}</UserDetail>}
-                  {user.petInfo && <UserDetail><strong>펫 정보:</strong> {user.petInfo}</UserDetail>}
-                </UserInfo>
+        <>
+          <UserGrid>
+            {users.length === 0 ? (
+              <div style={{
+                gridColumn: '1 / -1',
+                textAlign: 'center',
+                padding: '40px',
+                color: '#666',
+                fontSize: '18px'
+              }}>
+                등록된 유저가 없습니다. 새 유저를 추가해보세요!
+              </div>
+            ) : (
+              users.map((user) => (
+                <UserCard key={user.idx}>
+                  <UserInfo>
+                    <UserName>{user.username}</UserName>
+                    <UserDetail><strong>ID:</strong> {user.id}</UserDetail>
+                    <UserDetail><strong>이메일:</strong> {user.email}</UserDetail>
+                    <UserDetail><strong>역할:</strong> <RoleBadge role={user.role}>{user.role}</RoleBadge></UserDetail>
+                    {user.location && <UserDetail><strong>위치:</strong> {user.location}</UserDetail>}
+                    {user.petInfo && <UserDetail><strong>펫 정보:</strong> {user.petInfo}</UserDetail>}
+                  </UserInfo>
 
-                <ButtonGroup>
-                  <ActionButton
-                    variant="edit"
-                    onClick={() => handleEditUser(user)}
-                  >
-                    수정
-                  </ActionButton>
-                  <ActionButton
-                    variant="delete"
-                    onClick={() => handleDeleteUser(user.idx)}
-                  >
-                    삭제
-                  </ActionButton>
-                </ButtonGroup>
-              </UserCard>
-            ))
+                  <ButtonGroup>
+                    <ActionButton
+                      variant="edit"
+                      onClick={() => handleEditUser(user)}
+                    >
+                      수정
+                    </ActionButton>
+                    <ActionButton
+                      variant="delete"
+                      onClick={() => handleDeleteUser(user.idx)}
+                    >
+                      삭제
+                    </ActionButton>
+                  </ButtonGroup>
+                </UserCard>
+              ))
+            )}
+          </UserGrid>
+          
+          {hasNext && (
+            <LoadMoreContainer>
+              <LoadMoreButton onClick={handleLoadMore} disabled={loading}>
+                {loading ? '로딩 중...' : `더 보기 (${users.length} / ${totalCount})`}
+              </LoadMoreButton>
+            </LoadMoreContainer>
           )}
-        </UserGrid>
+        </>
       )}
 
       {modalOpen && (
@@ -164,11 +272,38 @@ const Header = styled.div`
   margin-bottom: 30px;
 `;
 
+const HeaderRight = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${props => props.theme.spacing.md};
+`;
+
 const Title = styled.h1`
   color: ${props => props.theme.colors.text};
   font-size: ${props => props.theme.typography.h2.fontSize};
   font-weight: ${props => props.theme.typography.h2.fontWeight};
   margin: 0;
+`;
+
+const PageSizeSelect = styled.select`
+  padding: ${props => props.theme.spacing.sm} ${props => props.theme.spacing.md};
+  border: 1px solid ${props => props.theme.colors.border};
+  border-radius: ${props => props.theme.borderRadius.md};
+  background: ${props => props.theme.colors.surface};
+  color: ${props => props.theme.colors.text};
+  font-size: ${props => props.theme.typography.body2.fontSize};
+  cursor: pointer;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    border-color: ${props => props.theme.colors.primary};
+  }
+  
+  &:focus {
+    outline: none;
+    border-color: ${props => props.theme.colors.primary};
+    box-shadow: 0 0 0 2px rgba(255, 126, 54, 0.1);
+  }
 `;
 
 const AddButton = styled.button`
@@ -298,4 +433,39 @@ const ErrorMessage = styled.div`
   background: #fdf2f2;
   border-radius: 8px;
   border: 1px solid #fad5d5;
+`;
+
+const LoadMoreContainer = styled.div`
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: ${props => props.theme.spacing.xl} 0;
+  margin-top: ${props => props.theme.spacing.lg};
+`;
+
+const LoadMoreButton = styled.button`
+  background: ${props => props.theme.colors.gradient || props.theme.colors.primary};
+  color: white;
+  border: none;
+  padding: ${props => props.theme.spacing.md} ${props => props.theme.spacing.xl};
+  border-radius: ${props => props.theme.borderRadius.xl};
+  font-size: ${props => props.theme.typography.body1.fontSize};
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(255, 126, 54, 0.25);
+  
+  &:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(255, 126, 54, 0.35);
+  }
+  
+  &:active:not(:disabled) {
+    transform: translateY(0);
+  }
+  
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
 `;

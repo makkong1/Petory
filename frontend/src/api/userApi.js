@@ -32,8 +32,23 @@ api.interceptors.request.use(
 // 401 에러는 전역 인터셉터에서 refresh token으로 자동 처리됨
 
 export const userApi = {
-  // 전체 유저 조회
+  // 전체 유저 조회 (기존 API - 하위 호환성 유지)
   getAllUsers: () => api.get(''),
+  
+  // 전체 유저 조회 (페이징 지원)
+  getAllUsersWithPaging: (params = {}) => {
+    const { page = 0, size = 20, ...otherParams } = params;
+    const requestParams = {
+      page,
+      size,
+      ...otherParams,
+      _t: Date.now()
+    };
+    return api.get('/paging', {
+      params: requestParams,
+      headers: { 'Cache-Control': 'no-cache' }
+    });
+  },
   
   // 단일 유저 조회
   getUser: (id) => api.get(`/${id}`),

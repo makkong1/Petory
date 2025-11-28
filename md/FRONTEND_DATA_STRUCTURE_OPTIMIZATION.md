@@ -465,6 +465,31 @@ const handleCommentAdded = (boardId, isDelete = false) => {
 ### 최종 평가
 **게시글 목록 관리에 최적화된 자료구조**로, 서버 사이드 페이징과 함께 사용하면 대규모 데이터도 효율적으로 처리할 수 있습니다.
 
+## 실제 적용 사례
+
+### 1. 커뮤니티 게시판 (CommunityBoard)
+- 게시글 목록 관리
+- 좋아요/싫어요 업데이트: O(1)
+- 댓글 수 업데이트: O(1)
+- 게시글 삭제: O(1)
+
+### 2. 내 활동 페이지 (ActivityPage)
+- 활동 내역 관리
+- 필터링과 함께 사용
+- 활동 카드 클릭 시 해당 게시글로 이동
+
+### 3. 관리자 사용자 관리 (UserList)
+- 사용자 목록 관리
+- 사용자 수정: O(1)
+- 사용자 삭제: O(1)
+- **성능 개선: 1.23초 → 56ms (약 22배 개선)**
+
+### 4. 관리자 커뮤니티 관리 (CommunityManagementSection)
+- 게시글 목록 관리
+- 게시글 블라인드/해제: O(1)
+- 게시글 삭제/복구: O(1)
+- **성능 개선: 1.91초 (4800KB) → 예상 50-100ms (약 20-40배 개선)**
+
 ## 참고 자료
 
 - [JavaScript Map vs Object Performance](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Map)
