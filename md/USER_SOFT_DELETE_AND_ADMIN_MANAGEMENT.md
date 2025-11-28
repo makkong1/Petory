@@ -264,3 +264,9 @@ await userApi.updateUserStatus(userId, {
 - 삭제된 계정 자동 정리 스케줄러 (선택사항)
 - 상태 변경 이력 기록 (UserSanction 활용)
 
+## 6. 삭제/밴된 사용자 콘텐츠 필터링
+
+사용자가 삭제되거나 밴되면 작성한 콘텐츠도 자동으로 필터링됩니다.
+
+**자세한 내용은 `DELETED_USER_CONTENT_FILTERING.md` 참고**
+
