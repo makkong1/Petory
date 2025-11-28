@@ -24,19 +24,16 @@ public class CareRequestService {
     private final UsersRepository usersRepository;
     private final CareRequestConverter careRequestConverter;
 
-    // 전체 케어 요청 조회 (필터링 포함)
+    // 전체 케어 요청 조회 (필터링 포함) - 작성자도 활성 상태여야 함
     @Transactional(readOnly = true)
     public List<CareRequestDTO> getAllCareRequests(String status, String location) {
-        List<CareRequest> requests = careRequestRepository.findAll().stream()
-                .filter(r -> !Boolean.TRUE.equals(r.getIsDeleted()))
-                .collect(Collectors.toList());
-
-        // 상태 필터링
+        // 작성자 상태 체크가 포함된 쿼리 사용
+        List<CareRequest> requests;
         if (status != null && !status.equals("ALL")) {
             CareRequestStatus statusEnum = CareRequestStatus.valueOf(status);
-            requests = requests.stream()
-                    .filter(r -> r.getStatus() == statusEnum)
-                    .collect(Collectors.toList());
+            requests = careRequestRepository.findByStatusAndIsDeletedFalse(statusEnum);
+        } else {
+            requests = careRequestRepository.findAllActiveRequests();
         }
 
         // 위치 필터링 (추후 구현)

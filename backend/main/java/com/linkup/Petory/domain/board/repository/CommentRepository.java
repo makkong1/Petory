@@ -14,20 +14,25 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
 
     List<Comment> findByBoardOrderByCreatedAtAsc(Board board);
 
-    // 삭제되지 않은 댓글만 조회
-    List<Comment> findByBoardAndIsDeletedFalseOrderByCreatedAtAsc(Board board);
+    // 삭제되지 않은 댓글만 조회 - 작성자도 활성 상태여야 함
+    @Query("SELECT c FROM Comment c JOIN FETCH c.user u WHERE c.board = :board AND c.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY c.createdAt ASC")
+    List<Comment> findByBoardAndIsDeletedFalseOrderByCreatedAtAsc(@Param("board") Board board);
 
-    // 사용자별 댓글 조회 (삭제되지 않은 것만, 최신순) - JOIN FETCH로 N+1 문제 해결
-    @Query("SELECT c FROM Comment c JOIN FETCH c.board b JOIN FETCH b.user WHERE c.user = :user AND c.isDeleted = false ORDER BY c.createdAt DESC")
+    // 사용자별 댓글 조회 (삭제되지 않은 것만, 최신순) - JOIN FETCH로 N+1 문제 해결 - 작성자도 활성 상태여야 함
+    @Query("SELECT c FROM Comment c JOIN FETCH c.board b JOIN FETCH b.user bu JOIN FETCH c.user u WHERE c.user = :user AND c.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY c.createdAt DESC")
     List<Comment> findByUserAndIsDeletedFalseOrderByCreatedAtDesc(@Param("user") Users user);
 
     /**
-     * 여러 게시글의 댓글 카운트를 한 번에 조회 (배치 조회)
+     * 여러 게시글의 댓글 카운트를 한 번에 조회 (배치 조회) - 작성자도 활성 상태여야 함
      * 반환값: List<Object[]> [boardId, count]
      */
     @Query("SELECT c.board.idx as boardId, COUNT(c) as count " +
-           "FROM Comment c " +
-           "WHERE c.board.idx IN :boardIds AND c.isDeleted = false " +
+           "FROM Comment c JOIN c.user u " +
+           "WHERE c.board.idx IN :boardIds AND c.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' " +
            "GROUP BY c.board.idx")
     List<Object[]> countByBoardsAndIsDeletedFalse(@Param("boardIds") List<Long> boardIds);
+
+    // 관리자용: 작성자 상태 체크 없이 조회 (삭제된 사용자 댓글도 포함)
+    @Query("SELECT c FROM Comment c JOIN FETCH c.user u WHERE c.board = :board AND c.isDeleted = false ORDER BY c.createdAt ASC")
+    List<Comment> findByBoardAndIsDeletedFalseForAdmin(@Param("board") Board board);
 }

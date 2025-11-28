@@ -7,6 +7,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import com.linkup.Petory.domain.user.dto.UsersDTO;
+import com.linkup.Petory.domain.user.dto.UserPageResponseDTO;
 import com.linkup.Petory.domain.user.service.UsersService;
 
 import lombok.RequiredArgsConstructor;
@@ -26,13 +27,23 @@ public class UsersController {
     private final UsersService usersService;
 
     /**
-     * 일반 사용자 목록 조회 (USER, SERVICE_PROVIDER만)
+     * 일반 사용자 목록 조회 (USER, SERVICE_PROVIDER만) - 기존 API (하위 호환성 유지)
      */
     @GetMapping
     public ResponseEntity<List<UsersDTO>> getAllUsers() {
         List<UsersDTO> users = usersService.getAllUsers();
         // ADMIN과 MASTER는 필터링하지 않고 전체 조회 가능
         return ResponseEntity.ok(users);
+    }
+
+    /**
+     * 일반 사용자 목록 조회 (페이징 지원)
+     */
+    @GetMapping("/paging")
+    public ResponseEntity<UserPageResponseDTO> getAllUsersWithPaging(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(usersService.getAllUsersWithPaging(page, size));
     }
 
     /**
@@ -72,7 +83,7 @@ public class UsersController {
     }
 
     /**
-     * 사용자 삭제 (일반 사용자만)
+     * 사용자 삭제 (소프트 삭제)
      */
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
@@ -84,5 +95,21 @@ public class UsersController {
         }
         usersService.deleteUser(id);
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * 계정 복구
+     */
+    @PostMapping("/{id}/restore")
+    public ResponseEntity<UsersDTO> restoreUser(@PathVariable Long id) {
+        return ResponseEntity.ok(usersService.restoreUser(id));
+    }
+
+    /**
+     * 상태 관리 (상태, 경고 횟수, 정지 기간만 업데이트)
+     */
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<UsersDTO> updateUserStatus(@PathVariable Long id, @RequestBody UsersDTO dto) {
+        return ResponseEntity.ok(usersService.updateUserStatus(id, dto));
     }
 }

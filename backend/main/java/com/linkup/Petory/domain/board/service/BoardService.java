@@ -11,6 +11,7 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -68,6 +69,99 @@ public class BoardService {
 
         // 배치 조회로 N+1 문제 해결
         return mapBoardsWithReactionsBatch(boards);
+    }
+
+    // 관리자용 게시글 조회 (페이징 + 필터링 지원)
+    public BoardPageResponseDTO getAdminBoardsWithPaging(
+            String status, Boolean deleted, String category, String q, int page, int size) {
+        // 필터링을 위해 더 많은 데이터를 가져옴 (최대 1000개 또는 필요한 만큼)
+        // 실제로는 DB 쿼리 레벨에서 필터링하는 것이 더 효율적이지만, 복잡한 필터링이므로 일단 이 방식 사용
+        Pageable largePageable = PageRequest.of(0, 1000); // 충분히 큰 페이지 크기
+
+        // 기본 쿼리: 전체 게시글 (삭제 포함 여부에 따라)
+        Page<Board> boardPage;
+
+        if (Boolean.TRUE.equals(deleted)) {
+            // 삭제된 게시글 포함 (관리자용 - 작성자 상태 체크 없음)
+            boardPage = boardRepository.findAll(largePageable);
+        } else {
+            // 삭제되지 않은 게시글만 (관리자용 - 작성자 상태 체크 없음)
+            boardPage = boardRepository.findAllByIsDeletedFalseForAdmin(largePageable);
+        }
+
+        // 메모리에서 필터링
+        List<Board> filteredBoards = boardPage.getContent().stream()
+                .filter(board -> {
+                    // 카테고리 필터
+                    if (category != null && !category.equals("ALL")
+                            && !category.equalsIgnoreCase(board.getCategory())) {
+                        return false;
+                    }
+                    // 상태 필터
+                    if (status != null && !status.equals("ALL")) {
+                        if (!status.equalsIgnoreCase(board.getStatus().name())) {
+                            return false;
+                        }
+                    }
+                    // 삭제 여부 필터
+                    if (deleted != null) {
+                        if (Boolean.TRUE.equals(deleted) != board.getIsDeleted()) {
+                            return false;
+                        }
+                    }
+                    // 검색어 필터
+                    if (q != null && !q.isBlank()) {
+                        String keyword = q.toLowerCase();
+                        boolean matches = (board.getTitle() != null && board.getTitle().toLowerCase().contains(keyword))
+                                || (board.getContent() != null && board.getContent().toLowerCase().contains(keyword))
+                                || (board.getUser() != null && board.getUser().getUsername() != null
+                                        && board.getUser().getUsername().toLowerCase().contains(keyword));
+                        if (!matches) {
+                            return false;
+                        }
+                    }
+                    return true;
+                })
+                .collect(Collectors.toList());
+
+        // 필터링된 결과로 페이징 재구성
+        int start = page * size;
+        int end = Math.min(start + size, filteredBoards.size());
+        List<Board> pagedBoards = start < filteredBoards.size()
+                ? filteredBoards.subList(start, end)
+                : new ArrayList<>();
+
+        // 전체 개수 계산 (필터링된 전체)
+        long totalCount = filteredBoards.size();
+        int totalPages = (int) Math.ceil((double) totalCount / size);
+
+        // hasNext 계산: 현재 페이지가 마지막 페이지보다 작으면 true
+        boolean hasNextPage = page < totalPages - 1;
+
+        if (pagedBoards.isEmpty()) {
+            return BoardPageResponseDTO.builder()
+                    .boards(new ArrayList<>())
+                    .totalCount(totalCount)
+                    .totalPages(totalPages)
+                    .currentPage(page)
+                    .pageSize(size)
+                    .hasNext(hasNextPage)
+                    .hasPrevious(page > 0)
+                    .build();
+        }
+
+        // 배치 조회로 N+1 문제 해결
+        List<BoardDTO> boardDTOs = mapBoardsWithReactionsBatch(pagedBoards);
+
+        return BoardPageResponseDTO.builder()
+                .boards(boardDTOs)
+                .totalCount(totalCount)
+                .totalPages(totalPages)
+                .currentPage(page)
+                .pageSize(size)
+                .hasNext(hasNextPage)
+                .hasPrevious(page > 0)
+                .build();
     }
 
     // 전체 게시글 조회 (페이징 지원)
@@ -215,15 +309,23 @@ public class BoardService {
         return mapBoardsWithReactionsBatch(boards);
     }
 
-    // 게시글 검색
-    public List<BoardDTO> searchBoards(String keyword, String searchType) {
-        List<Board> boards;
-
+    // 게시글 검색 (페이징 지원)
+    public BoardPageResponseDTO searchBoardsWithPaging(String keyword, String searchType, int page, int size) {
         if (keyword == null || keyword.trim().isEmpty()) {
-            return new ArrayList<>();
+            return BoardPageResponseDTO.builder()
+                    .boards(new ArrayList<>())
+                    .totalCount(0)
+                    .totalPages(0)
+                    .currentPage(page)
+                    .pageSize(size)
+                    .hasNext(false)
+                    .hasPrevious(false)
+                    .build();
         }
 
         String trimmedKeyword = keyword.trim();
+        Pageable pageable = PageRequest.of(page, size);
+        Page<Board> boardPage;
 
         // 검색 타입에 따라 다른 쿼리 실행
         switch (searchType != null ? searchType.toUpperCase() : "TITLE_CONTENT") {
@@ -233,32 +335,52 @@ public class BoardService {
                     Board board = boardRepository.findById(boardId)
                             .orElse(null);
                     if (board != null && !board.getIsDeleted()) {
-                        boards = List.of(board);
+                        boardPage = new PageImpl<>(List.of(board), pageable, 1);
                     } else {
-                        boards = new ArrayList<>();
+                        boardPage = Page.empty(pageable);
                     }
                 } catch (NumberFormatException e) {
-                    boards = new ArrayList<>();
+                    boardPage = Page.empty(pageable);
                 }
                 break;
             case "TITLE":
-                boards = boardRepository.findByTitleContainingAndIsDeletedFalseOrderByCreatedAtDesc(trimmedKeyword);
+                boardPage = boardRepository.findByTitleContainingAndIsDeletedFalseOrderByCreatedAtDesc(trimmedKeyword,
+                        pageable);
                 break;
             case "CONTENT":
-                boards = boardRepository.findByContentContainingAndIsDeletedFalseOrderByCreatedAtDesc(trimmedKeyword);
+                boardPage = boardRepository.findByContentContainingAndIsDeletedFalseOrderByCreatedAtDesc(trimmedKeyword,
+                        pageable);
                 break;
             case "TITLE_CONTENT":
             default:
-                boards = boardRepository.searchByKeyword(trimmedKeyword);
+                boardPage = boardRepository.searchByKeywordWithPaging(trimmedKeyword, pageable);
                 break;
         }
 
-        if (boards.isEmpty()) {
-            return new ArrayList<>();
+        if (boardPage.isEmpty()) {
+            return BoardPageResponseDTO.builder()
+                    .boards(new ArrayList<>())
+                    .totalCount(0)
+                    .totalPages(0)
+                    .currentPage(page)
+                    .pageSize(size)
+                    .hasNext(false)
+                    .hasPrevious(false)
+                    .build();
         }
 
         // 배치 조회로 N+1 문제 해결
-        return mapBoardsWithReactionsBatch(boards);
+        List<BoardDTO> boardDTOs = mapBoardsWithReactionsBatch(boardPage.getContent());
+
+        return BoardPageResponseDTO.builder()
+                .boards(boardDTOs)
+                .totalCount(boardPage.getTotalElements())
+                .totalPages(boardPage.getTotalPages())
+                .currentPage(page)
+                .pageSize(size)
+                .hasNext(boardPage.hasNext())
+                .hasPrevious(boardPage.hasPrevious())
+                .build();
     }
 
     /**

@@ -57,6 +57,16 @@ function AppContent() {
     };
   }, []);
 
+  // 전역 탭 전환 함수 등록
+  useEffect(() => {
+    window.setActiveTab = (tab) => {
+      setActiveTab(tab);
+    };
+    return () => {
+      delete window.setActiveTab;
+    };
+  }, []);
+
   // API 인터셉터 설정 (앱 시작 시 한 번만)
   useEffect(() => {
     if (typeof window !== 'undefined') {

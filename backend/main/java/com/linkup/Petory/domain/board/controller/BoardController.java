@@ -94,13 +94,15 @@ public class BoardController {
         return ResponseEntity.ok(boardService.getMyBoards(userId));
     }
 
-    // 게시글 검색
+    // 게시글 검색 (페이징 지원)
     @GetMapping("/search")
     @PreAuthorize("permitAll()")
-    public ResponseEntity<List<BoardDTO>> searchBoards(
+    public ResponseEntity<BoardPageResponseDTO> searchBoards(
             @RequestParam String keyword,
-            @RequestParam(required = false, defaultValue = "TITLE_CONTENT") String searchType) {
-        return ResponseEntity.ok(boardService.searchBoards(keyword, searchType));
+            @RequestParam(required = false, defaultValue = "TITLE_CONTENT") String searchType,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(boardService.searchBoardsWithPaging(keyword, searchType, page, size));
     }
 
     @PreAuthorize("permitAll()")

@@ -15,17 +15,23 @@ import com.linkup.Petory.domain.user.entity.Users;
 @Repository
 public interface CareRequestRepository extends JpaRepository<CareRequest, Long> {
 
-        // 사용자별 케어 요청 조회 (최신순)
-        List<CareRequest> findByUserAndIsDeletedFalseOrderByCreatedAtDesc(Users user);
+        // 사용자별 케어 요청 조회 (최신순) - 작성자도 활성 상태여야 함
+        @Query("SELECT cr FROM CareRequest cr JOIN FETCH cr.user u WHERE cr.user = :user AND cr.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY cr.createdAt DESC")
+        List<CareRequest> findByUserAndIsDeletedFalseOrderByCreatedAtDesc(@Param("user") Users user);
 
-        // 상태별 케어 요청 조회
-        List<CareRequest> findByStatusAndIsDeletedFalse(CareRequestStatus status);
+        // 전체 케어 요청 조회 - 작성자도 활성 상태여야 함
+        @Query("SELECT cr FROM CareRequest cr JOIN FETCH cr.user u WHERE cr.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY cr.createdAt DESC")
+        List<CareRequest> findAllActiveRequests();
+
+        // 상태별 케어 요청 조회 - 작성자도 활성 상태여야 함
+        @Query("SELECT cr FROM CareRequest cr JOIN FETCH cr.user u WHERE cr.status = :status AND cr.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY cr.createdAt DESC")
+        List<CareRequest> findByStatusAndIsDeletedFalse(@Param("status") CareRequestStatus status);
 
         // 위치별 케어 요청 조회 (사용자 위치 기반)
         List<CareRequest> findByUser_LocationContaining(String location);
 
-        // 제목이나 설명에 키워드 포함된 케어 요청 검색
-        @Query("SELECT cr FROM CareRequest cr WHERE cr.isDeleted = false AND " +
+        // 제목이나 설명에 키워드 포함된 케어 요청 검색 - 작성자도 활성 상태여야 함
+        @Query("SELECT cr FROM CareRequest cr JOIN cr.user u WHERE cr.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' AND " +
                         "(LOWER(cr.title) LIKE LOWER(CONCAT('%', :titleKeyword, '%')) OR " +
                         "LOWER(CAST(cr.description AS string)) LIKE LOWER(CONCAT('%', :descKeyword, '%')))")
         List<CareRequest> findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCaseAndIsDeletedFalse(

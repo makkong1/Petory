@@ -2,12 +2,16 @@ package com.linkup.Petory.domain.user.service;
 
 import java.util.List;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.linkup.Petory.domain.user.converter.UsersConverter;
 import com.linkup.Petory.domain.user.dto.UsersDTO;
+import com.linkup.Petory.domain.user.dto.UserPageResponseDTO;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 
@@ -27,6 +31,37 @@ public class UsersService {
     // 전체 조회
     public List<UsersDTO> getAllUsers() {
         return usersConverter.toDTOList(usersRepository.findAll());
+    }
+
+    // 전체 조회 (페이징 지원)
+    @Transactional(readOnly = true)
+    public UserPageResponseDTO getAllUsersWithPaging(int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        Page<Users> userPage = usersRepository.findAll(pageable);
+
+        if (userPage.isEmpty()) {
+            return UserPageResponseDTO.builder()
+                    .users(List.of())
+                    .totalCount(0)
+                    .totalPages(0)
+                    .currentPage(page)
+                    .pageSize(size)
+                    .hasNext(false)
+                    .hasPrevious(false)
+                    .build();
+        }
+
+        List<UsersDTO> userDTOs = usersConverter.toDTOList(userPage.getContent());
+
+        return UserPageResponseDTO.builder()
+                .users(userDTOs)
+                .totalCount(userPage.getTotalElements())
+                .totalPages(userPage.getTotalPages())
+                .currentPage(page)
+                .pageSize(size)
+                .hasNext(userPage.hasNext())
+                .hasPrevious(userPage.hasPrevious())
+                .build();
     }
 
     // 단일 조회
@@ -92,8 +127,54 @@ public class UsersService {
         return usersConverter.toDTO(updated);
     }
 
-    // 탈퇴
+    // 탈퇴 (소프트 삭제)
     public void deleteUser(long idx) {
-        usersRepository.deleteById(idx);
+        Users user = usersRepository.findById(idx)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        user.setIsDeleted(true);
+        user.setDeletedAt(java.time.LocalDateTime.now());
+        usersRepository.save(user);
+    }
+
+    // 계정 복구
+    public UsersDTO restoreUser(long idx) {
+        Users user = usersRepository.findById(idx)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        user.setIsDeleted(false);
+        user.setDeletedAt(null);
+        Users restored = usersRepository.save(user);
+        return usersConverter.toDTO(restored);
+    }
+
+    // 상태 관리 (상태, 경고 횟수, 정지 기간만 업데이트)
+    public UsersDTO updateUserStatus(long idx, UsersDTO dto) {
+        Users user = usersRepository.findById(idx)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // 상태 업데이트
+        if (dto.getStatus() != null) {
+            user.setStatus(Enum.valueOf(Users.UserStatus.class, dto.getStatus()));
+        }
+
+        // 경고 횟수 업데이트
+        if (dto.getWarningCount() != null) {
+            user.setWarningCount(dto.getWarningCount());
+        }
+
+        // 정지 기간 업데이트
+        if (dto.getSuspendedUntil() != null) {
+            user.setSuspendedUntil(dto.getSuspendedUntil());
+        }
+
+        // 역할 업데이트 (일반 사용자 → ADMIN 승격만)
+        if (dto.getRole() != null) {
+            // ADMIN/MASTER 역할 변경은 AdminUserManagementController에서만 가능
+            if (!dto.getRole().equals("ADMIN") && !dto.getRole().equals("MASTER")) {
+                user.setRole(Enum.valueOf(com.linkup.Petory.domain.user.entity.Role.class, dto.getRole()));
+            }
+        }
+
+        Users updated = usersRepository.save(user);
+        return usersConverter.toDTO(updated);
     }
 }
