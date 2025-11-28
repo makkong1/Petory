@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import styled from 'styled-components';
 import { userApi } from '../../api/userApi';
-import UserModal from './UserModal';
+import UserStatusModal from './UserStatusModal';
 
 const UserList = () => {
   // 서버 사이드 페이징 상태
@@ -108,22 +108,55 @@ const UserList = () => {
   };
 
   const handleDeleteUser = async (id) => {
-    if (window.confirm('정말로 이 유저를 삭제하시겠습니까?')) {
+    if (window.confirm('정말로 이 계정을 삭제(소프트 삭제)하시겠습니까?\n삭제된 계정은 복구할 수 있습니다.')) {
       try {
         await userApi.deleteUser(id);
-        // Map에서 해당 사용자 제거
+        // Map에서 해당 사용자 업데이트 (isDeleted 표시)
         setUsersData((prev) => {
-          const { [id]: removed, ...restMap } = prev.map;
-          return {
-            map: restMap,
-            order: prev.order.filter(userId => userId !== id),
-          };
+          if (prev.map[id]) {
+            return {
+              ...prev,
+              map: {
+                ...prev.map,
+                [id]: { ...prev.map[id], isDeleted: true, deletedAt: new Date().toISOString() }
+              }
+            };
+          }
+          return prev;
         });
         // 첫 페이지부터 다시 로드
         fetchUsers(0, true);
+        alert('계정이 삭제되었습니다.');
       } catch (err) {
-        alert('유저 삭제에 실패했습니다.');
+        alert('계정 삭제에 실패했습니다.');
         console.error('Error deleting user:', err);
+      }
+    }
+  };
+
+  const handleRestoreUser = async (id) => {
+    if (window.confirm('이 계정을 복구하시겠습니까?')) {
+      try {
+        await userApi.restoreUser(id);
+        // Map에서 해당 사용자 업데이트 (isDeleted 해제)
+        setUsersData((prev) => {
+          if (prev.map[id]) {
+            return {
+              ...prev,
+              map: {
+                ...prev.map,
+                [id]: { ...prev.map[id], isDeleted: false, deletedAt: null }
+              }
+            };
+          }
+          return prev;
+        });
+        // 첫 페이지부터 다시 로드
+        fetchUsers(0, true);
+        alert('계정이 복구되었습니다.');
+      } catch (err) {
+        alert('계정 복구에 실패했습니다.');
+        console.error('Error restoring user:', err);
       }
     }
   };
@@ -222,14 +255,23 @@ const UserList = () => {
                       variant="edit"
                       onClick={() => handleEditUser(user)}
                     >
-                      수정
+                      상태 관리
                     </ActionButton>
-                    <ActionButton
-                      variant="delete"
-                      onClick={() => handleDeleteUser(user.idx)}
-                    >
-                      삭제
-                    </ActionButton>
+                    {!user.isDeleted ? (
+                      <ActionButton
+                        variant="delete"
+                        onClick={() => handleDeleteUser(user.idx)}
+                      >
+                        계정 삭제
+                      </ActionButton>
+                    ) : (
+                      <ActionButton
+                        variant="restore"
+                        onClick={() => handleRestoreUser(user.idx)}
+                      >
+                        복구
+                      </ActionButton>
+                    )}
                   </ButtonGroup>
                 </UserCard>
               ))
@@ -247,7 +289,7 @@ const UserList = () => {
       )}
 
       {modalOpen && (
-        <UserModal
+        <UserStatusModal
           user={selectedUser}
           onClose={handleModalClose}
         />

@@ -59,8 +59,14 @@ export const userApi = {
   // 유저 수정
   updateUser: (id, userData) => api.put(`/${id}`, userData),
   
-  // 유저 삭제
+  // 유저 삭제 (소프트 삭제)
   deleteUser: (id) => api.delete(`/${id}`),
+  
+  // 계정 복구
+  restoreUser: (id) => api.post(`/${id}/restore`),
+  
+  // 상태 관리 (상태, 경고 횟수, 정지 기간만 업데이트)
+  updateUserStatus: (id, userData) => api.patch(`/${id}/status`, userData),
 };
 
 // MASTER 전용: ADMIN 계정 관리 API

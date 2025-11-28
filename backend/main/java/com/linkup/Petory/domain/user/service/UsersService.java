@@ -135,4 +135,46 @@ public class UsersService {
         user.setDeletedAt(java.time.LocalDateTime.now());
         usersRepository.save(user);
     }
+
+    // 계정 복구
+    public UsersDTO restoreUser(long idx) {
+        Users user = usersRepository.findById(idx)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        user.setIsDeleted(false);
+        user.setDeletedAt(null);
+        Users restored = usersRepository.save(user);
+        return usersConverter.toDTO(restored);
+    }
+
+    // 상태 관리 (상태, 경고 횟수, 정지 기간만 업데이트)
+    public UsersDTO updateUserStatus(long idx, UsersDTO dto) {
+        Users user = usersRepository.findById(idx)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // 상태 업데이트
+        if (dto.getStatus() != null) {
+            user.setStatus(Enum.valueOf(Users.UserStatus.class, dto.getStatus()));
+        }
+
+        // 경고 횟수 업데이트
+        if (dto.getWarningCount() != null) {
+            user.setWarningCount(dto.getWarningCount());
+        }
+
+        // 정지 기간 업데이트
+        if (dto.getSuspendedUntil() != null) {
+            user.setSuspendedUntil(dto.getSuspendedUntil());
+        }
+
+        // 역할 업데이트 (일반 사용자 → ADMIN 승격만)
+        if (dto.getRole() != null) {
+            // ADMIN/MASTER 역할 변경은 AdminUserManagementController에서만 가능
+            if (!dto.getRole().equals("ADMIN") && !dto.getRole().equals("MASTER")) {
+                user.setRole(Enum.valueOf(com.linkup.Petory.domain.user.entity.Role.class, dto.getRole()));
+            }
+        }
+
+        Users updated = usersRepository.save(user);
+        return usersConverter.toDTO(updated);
+    }
 }

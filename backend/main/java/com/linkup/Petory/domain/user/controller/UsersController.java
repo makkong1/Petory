@@ -83,7 +83,7 @@ public class UsersController {
     }
 
     /**
-     * 사용자 삭제 (일반 사용자만)
+     * 사용자 삭제 (소프트 삭제)
      */
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
@@ -95,5 +95,21 @@ public class UsersController {
         }
         usersService.deleteUser(id);
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * 계정 복구
+     */
+    @PostMapping("/{id}/restore")
+    public ResponseEntity<UsersDTO> restoreUser(@PathVariable Long id) {
+        return ResponseEntity.ok(usersService.restoreUser(id));
+    }
+
+    /**
+     * 상태 관리 (상태, 경고 횟수, 정지 기간만 업데이트)
+     */
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<UsersDTO> updateUserStatus(@PathVariable Long id, @RequestBody UsersDTO dto) {
+        return ResponseEntity.ok(usersService.updateUserStatus(id, dto));
     }
 }
