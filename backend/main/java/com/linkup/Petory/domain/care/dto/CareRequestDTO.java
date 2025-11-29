@@ -3,6 +3,8 @@ package com.linkup.Petory.domain.care.dto;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import com.linkup.Petory.domain.user.dto.PetDTO;
+
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
@@ -26,6 +28,10 @@ public class CareRequestDTO {
     private Long userId;
     private String username;
     private String userLocation;
+
+    // 관련 펫 정보 (선택사항)
+    private Long petIdx;
+    private PetDTO pet;
 
     // 지원자 정보
     private List<CareApplicationDTO> applications;

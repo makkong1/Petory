@@ -24,6 +24,10 @@ public class CareRequest {
     @JoinColumn(name = "user_idx", nullable = false)
     private Users user; // 요청자
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "pet_idx")
+    private com.linkup.Petory.domain.user.entity.Pet pet; // 관련 펫 (선택사항)
+
     private String title;
 
     @Lob

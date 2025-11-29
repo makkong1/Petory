@@ -16,15 +16,15 @@ import com.linkup.Petory.domain.user.entity.Users;
 public interface CareRequestRepository extends JpaRepository<CareRequest, Long> {
 
         // 사용자별 케어 요청 조회 (최신순) - 작성자도 활성 상태여야 함
-        @Query("SELECT cr FROM CareRequest cr JOIN FETCH cr.user u WHERE cr.user = :user AND cr.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY cr.createdAt DESC")
+        @Query("SELECT cr FROM CareRequest cr JOIN FETCH cr.user u LEFT JOIN FETCH cr.pet WHERE cr.user = :user AND cr.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY cr.createdAt DESC")
         List<CareRequest> findByUserAndIsDeletedFalseOrderByCreatedAtDesc(@Param("user") Users user);
 
         // 전체 케어 요청 조회 - 작성자도 활성 상태여야 함
-        @Query("SELECT cr FROM CareRequest cr JOIN FETCH cr.user u WHERE cr.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY cr.createdAt DESC")
+        @Query("SELECT cr FROM CareRequest cr JOIN FETCH cr.user u LEFT JOIN FETCH cr.pet WHERE cr.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY cr.createdAt DESC")
         List<CareRequest> findAllActiveRequests();
 
         // 상태별 케어 요청 조회 - 작성자도 활성 상태여야 함
-        @Query("SELECT cr FROM CareRequest cr JOIN FETCH cr.user u WHERE cr.status = :status AND cr.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY cr.createdAt DESC")
+        @Query("SELECT cr FROM CareRequest cr JOIN FETCH cr.user u LEFT JOIN FETCH cr.pet WHERE cr.status = :status AND cr.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY cr.createdAt DESC")
         List<CareRequest> findByStatusAndIsDeletedFalse(@Param("status") CareRequestStatus status);
 
         // 위치별 케어 요청 조회 (사용자 위치 기반)
@@ -43,6 +43,10 @@ public interface CareRequestRepository extends JpaRepository<CareRequest, Long> 
         List<CareRequest> findByDateBeforeAndStatusIn(
                         @Param("now") LocalDateTime now,
                         @Param("statuses") List<CareRequestStatus> statuses);
+
+        // 단일 케어 요청 조회 (펫 정보 포함)
+        @Query("SELECT cr FROM CareRequest cr LEFT JOIN FETCH cr.pet LEFT JOIN FETCH cr.user WHERE cr.idx = :idx")
+        java.util.Optional<CareRequest> findByIdWithPet(@Param("idx") Long idx);
 
         // 통계용
         long countByCreatedAtBetween(LocalDateTime start, LocalDateTime end);

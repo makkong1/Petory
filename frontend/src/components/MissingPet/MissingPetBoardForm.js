@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import styled from 'styled-components';
 import { uploadApi } from '../../api/uploadApi';
+import { petApiClient } from '../../api/userApi';
 import AddressMapSelector from './AddressMapSelector';
 
 const defaultForm = {
@@ -23,6 +24,27 @@ const MissingPetBoardForm = ({ isOpen, onClose, onSubmit, initialData, loading, 
   const [form, setForm] = useState(defaultForm);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
+  const [pets, setPets] = useState([]);
+  const [selectedPetIdx, setSelectedPetIdx] = useState(null);
+  const [loadingPets, setLoadingPets] = useState(false);
+
+  // 펫 목록 불러오기
+  useEffect(() => {
+    if (currentUser && isOpen) {
+      const fetchPets = async () => {
+        try {
+          setLoadingPets(true);
+          const response = await petApiClient.getMyPets();
+          setPets(response.data || []);
+        } catch (err) {
+          console.error('펫 목록 조회 실패:', err);
+        } finally {
+          setLoadingPets(false);
+        }
+      };
+      fetchPets();
+    }
+  }, [currentUser, isOpen]);
 
   useEffect(() => {
     if (initialData) {
@@ -33,10 +55,34 @@ const MissingPetBoardForm = ({ isOpen, onClose, onSubmit, initialData, loading, 
       });
     } else {
       setForm(defaultForm);
+      setSelectedPetIdx(null);
     }
     setUploadError('');
     setIsUploading(false);
   }, [initialData, isOpen]);
+
+  // 펫 선택 시 폼에 정보 자동 입력
+  useEffect(() => {
+    if (selectedPetIdx && pets.length > 0) {
+      const selectedPet = pets.find(p => p.idx === selectedPetIdx);
+      if (selectedPet) {
+        setForm(prev => ({
+          ...prev,
+          petName: selectedPet.petName || prev.petName,
+          species: selectedPet.petType === 'DOG' ? '개' : 
+                   selectedPet.petType === 'CAT' ? '고양이' : 
+                   selectedPet.petType === 'BIRD' ? '새' :
+                   selectedPet.petType === 'RABBIT' ? '토끼' :
+                   selectedPet.petType === 'HAMSTER' ? '햄스터' : selectedPet.petType || prev.species,
+          breed: selectedPet.breed || prev.breed,
+          gender: selectedPet.gender || prev.gender,
+          age: selectedPet.age || prev.age,
+          color: selectedPet.color || prev.color,
+          imageUrl: selectedPet.profileImageUrl || prev.imageUrl,
+        }));
+      }
+    }
+  }, [selectedPetIdx, pets]);
 
   if (!isOpen) {
     return null;
@@ -120,10 +166,12 @@ const MissingPetBoardForm = ({ isOpen, onClose, onSubmit, initialData, loading, 
           </CloseButton>
         </ModalHeader>
         <ModalBody>
-          <Form onSubmit={handleSubmit}>
-            <Section>
-              <SectionTitle>기본 정보</SectionTitle>
-              <FieldGrid columns={2}>
+          <FormWrapper>
+            <LeftSection>
+              <Form onSubmit={handleSubmit}>
+                <Section>
+                  <SectionTitle>기본 정보</SectionTitle>
+                  <FieldGrid columns={2}>
                 <Field>
                   <Label>제목 *</Label>
                   <Input
@@ -265,15 +313,87 @@ const MissingPetBoardForm = ({ isOpen, onClose, onSubmit, initialData, loading, 
               />
             </Section>
 
-            <ButtonRow>
-              <SecondaryButton type="button" onClick={onClose}>
-                취소
-              </SecondaryButton>
-              <PrimaryButton type="submit" disabled={loading}>
-                {loading ? '등록 중...' : '등록'}
-              </PrimaryButton>
-            </ButtonRow>
-          </Form>
+                <ButtonRow>
+                  <SecondaryButton type="button" onClick={onClose}>
+                    취소
+                  </SecondaryButton>
+                  <PrimaryButton type="submit" disabled={loading}>
+                    {loading ? '등록 중...' : '등록'}
+                  </PrimaryButton>
+                </ButtonRow>
+              </Form>
+            </LeftSection>
+
+            <RightCard>
+              <CardTitle>반려동물 정보</CardTitle>
+              {loadingPets ? (
+                <LoadingMessage>펫 정보를 불러오는 중...</LoadingMessage>
+              ) : pets.length === 0 ? (
+                <EmptyMessage>등록된 반려동물이 없습니다.</EmptyMessage>
+              ) : (
+                <>
+                  <PetSelect
+                    value={selectedPetIdx || ''}
+                    onChange={(e) => setSelectedPetIdx(e.target.value ? Number(e.target.value) : null)}
+                  >
+                    <option value="">펫 선택 (선택사항)</option>
+                    {pets.map(pet => (
+                      <option key={pet.idx} value={pet.idx}>
+                        {pet.petName} ({pet.petType === 'DOG' ? '강아지' : pet.petType === 'CAT' ? '고양이' : pet.petType})
+                      </option>
+                    ))}
+                  </PetSelect>
+
+                  {selectedPetIdx && pets.find(p => p.idx === selectedPetIdx) && (
+                    <PetInfoCard>
+                      {(() => {
+                        const selectedPet = pets.find(p => p.idx === selectedPetIdx);
+                        return (
+                          <>
+                            <PetImageWrapper>
+                              {selectedPet.profileImageUrl ? (
+                                <PetImage 
+                                  src={selectedPet.profileImageUrl} 
+                                  alt={selectedPet.petName}
+                                  onError={(e) => {
+                                    e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect width="200" height="200" fill="%23e2e8f0"/%3E%3Ctext x="100" y="100" font-family="Arial" font-size="16" fill="%2394a3b8" text-anchor="middle" dominant-baseline="middle"%3E사진 없음%3C/text%3E%3C/svg%3E';
+                                  }}
+                                />
+                              ) : (
+                                <NoImagePlaceholder>
+                                  <NoImageText>사진 없음</NoImageText>
+                                </NoImagePlaceholder>
+                              )}
+                            </PetImageWrapper>
+                            <PetDetails>
+                              <PetName>{selectedPet.petName}</PetName>
+                              <PetDetail>
+                                {selectedPet.petType === 'DOG' ? '강아지' : 
+                                 selectedPet.petType === 'CAT' ? '고양이' : 
+                                 selectedPet.petType === 'BIRD' ? '새' :
+                                 selectedPet.petType === 'RABBIT' ? '토끼' :
+                                 selectedPet.petType === 'HAMSTER' ? '햄스터' : '기타'}
+                                {' · '}
+                                {selectedPet.breed || '품종 미상'}
+                              </PetDetail>
+                              {selectedPet.age && <PetDetail>나이: {selectedPet.age}</PetDetail>}
+                              {selectedPet.gender && (
+                                <PetDetail>
+                                  성별: {selectedPet.gender === 'M' ? '수컷' : selectedPet.gender === 'F' ? '암컷' : '미확인'}
+                                </PetDetail>
+                              )}
+                              {selectedPet.color && <PetDetail>색상: {selectedPet.color}</PetDetail>}
+                              {selectedPet.weight && <PetDetail>몸무게: {selectedPet.weight}kg</PetDetail>}
+                            </PetDetails>
+                          </>
+                        );
+                      })()}
+                    </PetInfoCard>
+                  )}
+                </>
+              )}
+            </RightCard>
+          </FormWrapper>
         </ModalBody>
       </Modal>
     </Overlay>
@@ -342,6 +462,128 @@ const CloseButton = styled.button`
 
 const ModalBody = styled.div`
   padding: ${(props) => props.theme.spacing.xl};
+
+  @media (max-width: 768px) {
+    padding: ${(props) => props.theme.spacing.md};
+  }
+`;
+
+const FormWrapper = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 400px;
+  gap: ${(props) => props.theme.spacing.xl};
+
+  @media (max-width: 1024px) {
+    grid-template-columns: 1fr;
+  }
+`;
+
+const LeftSection = styled.div`
+  display: flex;
+  flex-direction: column;
+`;
+
+const RightCard = styled.div`
+  background: ${(props) => props.theme.colors.surfaceElevated};
+  border: 1px solid ${(props) => props.theme.colors.border};
+  border-radius: ${(props) => props.theme.borderRadius.lg};
+  padding: ${(props) => props.theme.spacing.lg};
+  height: fit-content;
+  position: sticky;
+  top: ${(props) => props.theme.spacing.xl};
+
+  @media (max-width: 1024px) {
+    position: static;
+  }
+`;
+
+const CardTitle = styled.h3`
+  margin: 0 0 ${(props) => props.theme.spacing.md} 0;
+  font-size: 1.1rem;
+  color: ${(props) => props.theme.colors.text};
+`;
+
+const PetSelect = styled.select`
+  width: 100%;
+  padding: ${(props) => props.theme.spacing.sm} ${(props) => props.theme.spacing.md};
+  border-radius: ${(props) => props.theme.borderRadius.md};
+  border: 1px solid ${(props) => props.theme.colors.border};
+  background: ${(props) => props.theme.colors.surface};
+  font-size: 0.95rem;
+  margin-bottom: ${(props) => props.theme.spacing.md};
+
+  &:focus {
+    outline: none;
+    border-color: ${(props) => props.theme.colors.primary};
+    box-shadow: 0 0 0 3px rgba(255, 126, 54, 0.2);
+  }
+`;
+
+const PetInfoCard = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${(props) => props.theme.spacing.md};
+`;
+
+const PetImageWrapper = styled.div`
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: ${(props) => props.theme.borderRadius.md};
+  overflow: hidden;
+  background: ${(props) => props.theme.colors.borderLight};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+`;
+
+const PetImage = styled.img`
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+`;
+
+const NoImagePlaceholder = styled.div`
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: ${(props) => props.theme.colors.borderLight};
+`;
+
+const NoImageText = styled.div`
+  color: ${(props) => props.theme.colors.textSecondary};
+  font-size: 0.9rem;
+`;
+
+const PetDetails = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${(props) => props.theme.spacing.xs};
+`;
+
+const PetName = styled.div`
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: ${(props) => props.theme.colors.text};
+`;
+
+const PetDetail = styled.div`
+  font-size: 0.9rem;
+  color: ${(props) => props.theme.colors.textSecondary};
+`;
+
+const LoadingMessage = styled.div`
+  padding: ${(props) => props.theme.spacing.lg};
+  text-align: center;
+  color: ${(props) => props.theme.colors.textSecondary};
+`;
+
+const EmptyMessage = styled.div`
+  padding: ${(props) => props.theme.spacing.lg};
+  text-align: center;
+  color: ${(props) => props.theme.colors.textSecondary};
+  font-style: italic;
 `;
 
 const Form = styled.form`
