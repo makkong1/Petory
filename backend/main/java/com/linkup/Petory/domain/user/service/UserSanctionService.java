@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.linkup.Petory.domain.report.entity.ReportActionType;
 import com.linkup.Petory.domain.user.entity.UserSanction;
+import com.linkup.Petory.domain.user.entity.UserStatus;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.repository.UserSanctionRepository;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
@@ -96,7 +97,7 @@ public class UserSanctionService {
         sanctionRepository.save(suspension);
 
         // 유저 상태 업데이트
-        user.setStatus(Users.UserStatus.SUSPENDED);
+        user.setStatus(UserStatus.SUSPENDED);
         user.setSuspendedUntil(endsAt);
         usersRepository.save(user);
 
@@ -127,7 +128,7 @@ public class UserSanctionService {
         sanctionRepository.save(ban);
 
         // 유저 상태 업데이트
-        user.setStatus(Users.UserStatus.BANNED);
+        user.setStatus(UserStatus.BANNED);
         user.setSuspendedUntil(null);
         usersRepository.save(user);
 
@@ -142,7 +143,7 @@ public class UserSanctionService {
         Users user = usersRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("유저를 찾을 수 없습니다."));
 
-        user.setStatus(Users.UserStatus.ACTIVE);
+        user.setStatus(UserStatus.ACTIVE);
         user.setSuspendedUntil(null);
         usersRepository.save(user);
     }

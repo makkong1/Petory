@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.linkup.Petory.domain.user.converter.UsersConverter;
 import com.linkup.Petory.domain.user.dto.UsersDTO;
 import com.linkup.Petory.domain.user.dto.UserPageResponseDTO;
+import com.linkup.Petory.domain.user.entity.UserStatus;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 
@@ -153,7 +154,7 @@ public class UsersService {
 
         // 상태 업데이트
         if (dto.getStatus() != null) {
-            user.setStatus(Enum.valueOf(Users.UserStatus.class, dto.getStatus()));
+            user.setStatus(Enum.valueOf(UserStatus.class, dto.getStatus()));
         }
 
         // 경고 횟수 업데이트

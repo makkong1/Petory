@@ -341,7 +341,7 @@ public class BoardService {
                             user.getIdx(), user.getId(), user.getIsDeleted(), user.getStatus());
                     // 작성자가 활성 상태인 경우에만 검색
                     if (!Boolean.TRUE.equals(user.getIsDeleted())
-                            && user.getStatus() == com.linkup.Petory.domain.user.entity.Users.UserStatus.ACTIVE) {
+                            && user.getStatus() == com.linkup.Petory.domain.user.entity.UserStatus.ACTIVE) {
                         List<Board> userBoards = boardRepository.findByUserAndIsDeletedFalseOrderByCreatedAtDesc(user);
                         log.info("🔍 [BoardService.searchBoardsWithPaging] 작성한 게시글 수: {}", userBoards.size());
                         // 페이징 처리

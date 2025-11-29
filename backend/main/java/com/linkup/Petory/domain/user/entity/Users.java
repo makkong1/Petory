@@ -103,12 +103,6 @@ public class Users {
         this.updatedAt = LocalDateTime.now();
     }
 
-    public enum UserStatus {
-        ACTIVE, // 정상
-        SUSPENDED, // 이용제한 중
-        BANNED // 영구 차단
-    }
-
     /**
      * 현재 제재 상태인지 확인
      */
