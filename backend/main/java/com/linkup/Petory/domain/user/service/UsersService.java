@@ -177,4 +177,96 @@ public class UsersService {
         Users updated = usersRepository.save(user);
         return usersConverter.toDTO(updated);
     }
+
+    // ========== 일반 사용자용 프로필 관리 메서드 ==========
+
+    /**
+     * 자신의 프로필 조회
+     */
+    @Transactional(readOnly = true)
+    public UsersDTO getMyProfile(String userId) {
+        Users user = usersRepository.findByIdString(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        return usersConverter.toDTO(user);
+    }
+
+    /**
+     * 자신의 프로필 수정 (닉네임, 이메일, 전화번호, 위치, 펫 정보 등)
+     * 역할, 상태 등은 수정 불가
+     */
+    public UsersDTO updateMyProfile(String userId, UsersDTO dto) {
+        Users user = usersRepository.findByIdString(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // 일반 사용자가 수정 가능한 필드만 업데이트
+        if (dto.getUsername() != null && !dto.getUsername().isEmpty()) {
+            // 닉네임 중복 확인
+            usersRepository.findByUsername(dto.getUsername())
+                    .ifPresent(existingUser -> {
+                        if (!existingUser.getId().equals(userId)) {
+                            throw new RuntimeException("이미 사용 중인 닉네임입니다.");
+                        }
+                    });
+            user.setUsername(dto.getUsername());
+        }
+        if (dto.getEmail() != null && !dto.getEmail().isEmpty()) {
+            // 이메일 중복 확인
+            usersRepository.findByEmail(dto.getEmail())
+                    .ifPresent(existingUser -> {
+                        if (!existingUser.getId().equals(userId)) {
+                            throw new RuntimeException("이미 사용 중인 이메일입니다.");
+                        }
+                    });
+            user.setEmail(dto.getEmail());
+        }
+        if (dto.getPhone() != null) {
+            user.setPhone(dto.getPhone());
+        }
+        if (dto.getLocation() != null) {
+            user.setLocation(dto.getLocation());
+        }
+        if (dto.getPetInfo() != null) {
+            user.setPetInfo(dto.getPetInfo());
+        }
+
+        Users updated = usersRepository.save(user);
+        return usersConverter.toDTO(updated);
+    }
+
+    /**
+     * 비밀번호 변경
+     */
+    public void changePassword(String userId, String currentPassword, String newPassword) {
+        Users user = usersRepository.findByIdString(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // 현재 비밀번호 확인
+        if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
+            throw new RuntimeException("현재 비밀번호가 일치하지 않습니다.");
+        }
+
+        // 새 비밀번호 설정
+        user.setPassword(passwordEncoder.encode(newPassword));
+        usersRepository.save(user);
+    }
+
+    /**
+     * 닉네임 변경
+     */
+    public UsersDTO updateMyUsername(String userId, String newUsername) {
+        Users user = usersRepository.findByIdString(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // 닉네임 중복 확인
+        usersRepository.findByUsername(newUsername)
+                .ifPresent(existingUser -> {
+                    if (!existingUser.getId().equals(userId)) {
+                        throw new RuntimeException("이미 사용 중인 닉네임입니다.");
+                    }
+                });
+
+        user.setUsername(newUsername);
+        Users updated = usersRepository.save(user);
+        return usersConverter.toDTO(updated);
+    }
 }
