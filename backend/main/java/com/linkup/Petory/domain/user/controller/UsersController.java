@@ -21,7 +21,7 @@ import lombok.RequiredArgsConstructor;
 @RestController
 @RequestMapping("/api/admin/users")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('ADMIN','MASTER')")
+@PreAuthorize("hasAnyRole('ADMIN', 'MASTER')")
 public class UsersController {
 
     private final UsersService usersService;
@@ -47,7 +47,9 @@ public class UsersController {
     }
 
     /**
-     * 사용자 상세 조회
+     * 사용자 상세 조회 (관리자용)
+     * - 관리자가 다른 사용자의 정보를 조회할 때 사용
+     * - 일반 사용자는 /api/users/me 엔드포인트를 사용하여 자신의 정보만 조회 가능
      */
     @GetMapping("/{id}")
     public ResponseEntity<UsersDTO> getUser(@PathVariable Long id) {
@@ -60,8 +62,8 @@ public class UsersController {
     @PostMapping
     public ResponseEntity<UsersDTO> createUser(@RequestBody UsersDTO dto) {
         // ADMIN/MASTER 역할은 AdminUserManagementController에서만 생성 가능
-        if (dto.getRole() != null && 
-            (dto.getRole().equals("ADMIN") || dto.getRole().equals("MASTER"))) {
+        if (dto.getRole() != null &&
+                (dto.getRole().equals("ADMIN") || dto.getRole().equals("MASTER"))) {
             throw new IllegalArgumentException("관리자 계정은 별도 엔드포인트를 사용해주세요.");
         }
         return ResponseEntity.ok(usersService.createUser(dto));
@@ -70,13 +72,14 @@ public class UsersController {
     /**
      * 사용자 정보 수정
      * - ADMIN은 일반 사용자만 수정 가능
-     * - MASTER는 모든 사용자 수정 가능 (단, ADMIN/MASTER 역할 변경은 AdminUserManagementController에서)
+     * - MASTER는 모든 사용자 수정 가능 (단, ADMIN/MASTER 역할 변경은
+     * AdminUserManagementController에서)
      */
     @PutMapping("/{id}")
     public ResponseEntity<UsersDTO> updateUser(@PathVariable Long id, @RequestBody UsersDTO dto) {
         // 역할 변경 시도 시 검증
-        if (dto.getRole() != null && 
-            (dto.getRole().equals("ADMIN") || dto.getRole().equals("MASTER"))) {
+        if (dto.getRole() != null &&
+                (dto.getRole().equals("ADMIN") || dto.getRole().equals("MASTER"))) {
             throw new IllegalArgumentException("관리자 역할 변경은 별도 엔드포인트를 사용해주세요.");
         }
         return ResponseEntity.ok(usersService.updateUser(id, dto));
@@ -89,8 +92,8 @@ public class UsersController {
     public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
         // ADMIN 계정 삭제는 AdminUserManagementController에서만 가능
         UsersDTO user = usersService.getUser(id);
-        if (user.getRole() != null && 
-            (user.getRole().equals("ADMIN") || user.getRole().equals("MASTER"))) {
+        if (user.getRole() != null &&
+                (user.getRole().equals("ADMIN") || user.getRole().equals("MASTER"))) {
             throw new IllegalArgumentException("관리자 계정 삭제는 별도 엔드포인트를 사용해주세요.");
         }
         usersService.deleteUser(id);

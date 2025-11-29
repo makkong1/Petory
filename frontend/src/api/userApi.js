@@ -34,7 +34,7 @@ api.interceptors.request.use(
 export const userApi = {
   // 전체 유저 조회 (기존 API - 하위 호환성 유지)
   getAllUsers: () => api.get(''),
-  
+
   // 전체 유저 조회 (페이징 지원)
   getAllUsersWithPaging: (params = {}) => {
     const { page = 0, size = 20, ...otherParams } = params;
@@ -49,22 +49,22 @@ export const userApi = {
       headers: { 'Cache-Control': 'no-cache' }
     });
   },
-  
+
   // 단일 유저 조회
   getUser: (id) => api.get(`/${id}`),
-  
+
   // 유저 생성
   createUser: (userData) => api.post('', userData),
-  
+
   // 유저 수정
   updateUser: (id, userData) => api.put(`/${id}`, userData),
-  
+
   // 유저 삭제 (소프트 삭제)
   deleteUser: (id) => api.delete(`/${id}`),
-  
+
   // 계정 복구
   restoreUser: (id) => api.post(`/${id}/restore`),
-  
+
   // 상태 관리 (상태, 경고 횟수, 정지 기간만 업데이트)
   updateUserStatus: (id, userData) => api.patch(`/${id}/status`, userData),
 };
@@ -94,4 +94,42 @@ masterApi.interceptors.request.use(
 export const adminUserApi = {
   // 일반 사용자를 ADMIN으로 승격
   promoteToAdmin: (id) => masterApi.patch(`/${id}/promote-to-admin`),
+};
+
+// 일반 사용자용 프로필 API
+const profileApi = axios.create({
+  baseURL: 'http://localhost:8080/api/users',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// 요청 인터셉터 - 모든 요청에 토큰 자동 추가
+profileApi.interceptors.request.use(
+  (config) => {
+    const token = getToken();
+    if (token && !config.headers.Authorization) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+export const userProfileApi = {
+  // 자신의 프로필 조회
+  getMyProfile: () => profileApi.get('/me'),
+
+  // 자신의 프로필 수정 (닉네임, 이메일, 전화번호, 위치, 펫 정보 등)
+  updateMyProfile: (userData) => profileApi.put('/me', userData),
+
+  // 비밀번호 변경
+  changePassword: (currentPassword, newPassword) =>
+    profileApi.patch('/me/password', { currentPassword, newPassword }),
+
+  // 닉네임 변경
+  updateMyUsername: (username) =>
+    profileApi.patch('/me/username', { username }),
 };

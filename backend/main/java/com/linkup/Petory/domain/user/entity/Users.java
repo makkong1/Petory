@@ -80,6 +80,9 @@ public class Users {
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<UserSanction> sanctions;
 
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<Pet> pets; // 등록한 애완동물 목록
+
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
@@ -101,9 +104,9 @@ public class Users {
     }
 
     public enum UserStatus {
-        ACTIVE,      // 정상
-        SUSPENDED,   // 이용제한 중
-        BANNED       // 영구 차단
+        ACTIVE, // 정상
+        SUSPENDED, // 이용제한 중
+        BANNED // 영구 차단
     }
 
     /**
