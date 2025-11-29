@@ -86,19 +86,25 @@ const MissingPetBoardForm = ({ isOpen, onClose, onSubmit, initialData, loading, 
     }
   }, [form.lostDate]);
 
-  // 달력 버튼 위치 계산
-  const handleDatePickerToggle = () => {
+  // 달력 버튼 위치 계산 (중앙 정렬)
+  const handleDatePickerToggle = (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     if (!showDatePicker) {
-      if (datePickerButtonRef.current) {
-        const rect = datePickerButtonRef.current.getBoundingClientRect();
-        const calendarWidth = 320;
-        const rightPosition = rect.right + window.scrollX - calendarWidth;
+      const calendarWidth = 320;
+      const calendarHeight = 400; // Approximate height of the calendar dropdown
+      const gap = 8;
 
-        setDatePickerPosition({
-          top: rect.bottom + window.scrollY + 8,
-          left: Math.max(10, rightPosition),
-        });
-      }
+      // Center the calendar on the screen
+      const left = (window.innerWidth - calendarWidth) / 2 + window.scrollX;
+      const top = (window.innerHeight - calendarHeight) / 2 + window.scrollY - 50; // Adjusted slightly up
+
+      setDatePickerPosition({
+        top: Math.max(gap, top),
+        left: Math.max(gap, left),
+      });
     }
     setShowDatePicker(!showDatePicker);
   };
@@ -921,45 +927,49 @@ const Label = styled.label`
 `;
 
 const Input = styled.input`
-  padding: ${(props) => props.theme.spacing.sm} ${(props) => props.theme.spacing.md};
-  border-radius: ${(props) => props.theme.borderRadius.md};
+  width: 100%;
+  padding: 0.75rem;
   border: 1px solid ${(props) => props.theme.colors.border};
-  background: ${(props) => props.theme.colors.surfaceElevated};
-  font-size: 0.95rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  background: ${(props) => props.theme.colors.background};
+  color: ${(props) => props.theme.colors.text};
 
   &:focus {
     outline: none;
     border-color: ${(props) => props.theme.colors.primary};
-    box-shadow: 0 0 0 3px rgba(255, 126, 54, 0.2);
   }
 `;
 
 const Select = styled.select`
-  padding: ${(props) => props.theme.spacing.sm} ${(props) => props.theme.spacing.md};
-  border-radius: ${(props) => props.theme.borderRadius.md};
+  width: 100%;
+  padding: 0.75rem;
   border: 1px solid ${(props) => props.theme.colors.border};
-  background: ${(props) => props.theme.colors.surfaceElevated};
-  font-size: 0.95rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  background: ${(props) => props.theme.colors.background};
+  color: ${(props) => props.theme.colors.text};
 
   &:focus {
     outline: none;
     border-color: ${(props) => props.theme.colors.primary};
-    box-shadow: 0 0 0 3px rgba(255, 126, 54, 0.2);
   }
 `;
 
 const Textarea = styled.textarea`
-  padding: ${(props) => props.theme.spacing.md};
-  border-radius: ${(props) => props.theme.borderRadius.lg};
+  width: 100%;
+  padding: 0.75rem;
   border: 1px solid ${(props) => props.theme.colors.border};
-  background: ${(props) => props.theme.colors.surfaceElevated};
-  font-size: 0.95rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  background: ${(props) => props.theme.colors.background};
+  color: ${(props) => props.theme.colors.text};
+  font-family: inherit;
   resize: vertical;
 
   &:focus {
     outline: none;
     border-color: ${(props) => props.theme.colors.primary};
-    box-shadow: 0 0 0 3px rgba(255, 126, 54, 0.2);
   }
 `;
 
@@ -1098,12 +1108,12 @@ const DatePickerWrapper = styled.div`
 
 const DateInputButton = styled.button`
   width: 100%;
-  padding: ${(props) => props.theme.spacing.sm} ${(props) => props.theme.spacing.md};
+  padding: 0.75rem;
   border: 1px solid ${(props) => props.theme.colors.border};
-  border-radius: ${(props) => props.theme.borderRadius.md};
-  background: ${(props) => props.theme.colors.surfaceElevated};
+  border-radius: 8px;
+  background: ${(props) => props.theme.colors.background};
   color: ${(props) => props.hasValue ? props.theme.colors.text : props.theme.colors.textSecondary};
-  font-size: 0.95rem;
+  font-size: 1rem;
   text-align: left;
   cursor: pointer;
   display: flex;
@@ -1118,7 +1128,7 @@ const DateInputButton = styled.button`
   &:focus {
     outline: none;
     border-color: ${(props) => props.theme.colors.primary};
-    box-shadow: 0 0 0 3px rgba(255, 126, 54, 0.2);
+    box-shadow: 0 0 0 2px ${(props) => props.theme.colors.primary}33;
   }
 `;
 
@@ -1132,9 +1142,10 @@ const DatePickerDropdown = styled.div`
   background: ${(props) => props.theme.colors.surface};
   border: 1px solid ${(props) => props.theme.colors.border};
   border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
   padding: 1rem;
   min-width: 320px;
+  max-width: 90vw;
   animation: slideDown 0.2s ease-out;
   
   @keyframes slideDown {
@@ -1150,6 +1161,12 @@ const DatePickerDropdown = styled.div`
 
   @media (max-width: 768px) {
     min-width: 280px;
+    max-width: 95vw;
+    padding: 0.75rem;
+    left: 50% !important; /* Centered for mobile */
+    transform: translateX(-50%);
+    top: 50% !important; /* Centered for mobile */
+    margin-top: -200px; /* Adjusted for vertical centering */
     max-width: 90vw;
     padding: 0.75rem;
   }

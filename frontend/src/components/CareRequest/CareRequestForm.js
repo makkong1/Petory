@@ -62,17 +62,20 @@ const CareRequestForm = ({ onCancel, onCreated }) => {
     }
   }, []);
 
-  // 달력 버튼 위치 계산
+  // 달력 버튼 위치 계산 (화면 중앙에 배치)
   const handleDatePickerToggle = () => {
     if (!showDatePicker) {
       if (datePickerButtonRef.current) {
         const rect = datePickerButtonRef.current.getBoundingClientRect();
         const calendarWidth = 320;
-        const rightPosition = rect.right + window.scrollX - calendarWidth;
+
+        // 화면 중앙에 배치
+        const centerX = window.innerWidth / 2;
+        const centerY = window.innerHeight / 2;
 
         setDatePickerPosition({
-          top: rect.bottom + window.scrollY + 8,
-          left: Math.max(10, rightPosition),
+          top: centerY - 200 + window.scrollY, // 달력 높이의 약 절반만큼 위로
+          left: centerX - calendarWidth / 2 + window.scrollX,
         });
       }
     }
@@ -317,177 +320,177 @@ const CareRequestForm = ({ onCancel, onCreated }) => {
   const selectedPet = pets.find(p => p.idx === selectedPetIdx);
 
   return (
-    <FormContainer>
+    <FormContainer ref={formContainerRef}>
       <FormWrapper>
         <LeftCard>
           <Form onSubmit={handleSubmit}>
-        <Field>
-          <Label htmlFor="care-request-title">제목</Label>
-          <TextInput
-            id="care-request-title"
-            name="title"
-            value={form.title}
-            onChange={handleChange}
-            placeholder="예: 주말 여행 동안 강아지 산책 도와주세요"
-            disabled={submitting}
-            required
-          />
-        </Field>
+            <Field>
+              <Label htmlFor="care-request-title">제목</Label>
+              <TextInput
+                id="care-request-title"
+                name="title"
+                value={form.title}
+                onChange={handleChange}
+                placeholder="예: 주말 여행 동안 강아지 산책 도와주세요"
+                disabled={submitting}
+                required
+              />
+            </Field>
 
-        <Field>
-          <Label htmlFor="care-request-date">요청 일시</Label>
-          <DatePickerWrapper className="date-picker-wrapper">
-            <DateInputButton
-              ref={datePickerButtonRef}
-              type="button"
-              onClick={handleDatePickerToggle}
-              hasValue={!!form.date}
-              disabled={submitting}
-            >
-              {form.date
-                ? formatDate(form.date)
-                : '날짜와 시간을 선택해주세요'}
-              <CalendarIcon>📅</CalendarIcon>
-            </DateInputButton>
-          </DatePickerWrapper>
-          {showDatePicker && (
-            <DatePickerDropdown
-              className="date-picker-dropdown"
-              style={{
-                top: `${datePickerPosition.top}px`,
-                left: `${datePickerPosition.left}px`,
-              }}
-            >
-              <CalendarContainer>
-                <CalendarHeader>
-                  <NavButton
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      const current = selectedDate || new Date();
-                      const newDate = new Date(current.getFullYear(), current.getMonth() - 1, 1);
-                      setSelectedDate(newDate);
-                    }}
-                  >
-                    ‹
-                  </NavButton>
-                  <MonthYear>
-                    {selectedDate
-                      ? `${selectedDate.getFullYear()}년 ${selectedDate.getMonth() + 1}월`
-                      : `${new Date().getFullYear()}년 ${new Date().getMonth() + 1}월`}
-                  </MonthYear>
-                  <NavButton
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      const current = selectedDate || new Date();
-                      const newDate = new Date(current.getFullYear(), current.getMonth() + 1, 1);
-                      setSelectedDate(newDate);
-                    }}
-                  >
-                    ›
-                  </NavButton>
-                </CalendarHeader>
-                <CalendarGrid>
-                  {['일', '월', '화', '수', '목', '금', '토'].map((day) => (
-                    <CalendarDayHeader key={day}>{day}</CalendarDayHeader>
-                  ))}
-                  {getCalendarDays(selectedDate || new Date()).map((day, index) => {
-                    const now = new Date();
-                    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-                    const dayDate = new Date(day.getFullYear(), day.getMonth(), day.getDate());
-
-                    const isToday = dayDate.getTime() === today.getTime();
-                    const isSelected = selectedDate &&
-                      dayDate.getTime() === new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate()).getTime();
-                    const isPast = dayDate < today;
-                    const isCurrentMonth = day.getMonth() === (selectedDate || new Date()).getMonth();
-
-                    return (
-                      <CalendarDay
-                        key={index}
+            <Field>
+              <Label htmlFor="care-request-date">요청 일시</Label>
+              <DatePickerWrapper className="date-picker-wrapper">
+                <DateInputButton
+                  ref={datePickerButtonRef}
+                  type="button"
+                  onClick={handleDatePickerToggle}
+                  hasValue={!!form.date}
+                  disabled={submitting}
+                >
+                  {form.date
+                    ? formatDate(form.date)
+                    : '날짜와 시간을 선택해주세요'}
+                  <CalendarIcon>📅</CalendarIcon>
+                </DateInputButton>
+              </DatePickerWrapper>
+              {showDatePicker && (
+                <DatePickerDropdown
+                  className="date-picker-dropdown"
+                  style={{
+                    top: `${datePickerPosition.top}px`,
+                    left: `${datePickerPosition.left}px`,
+                  }}
+                >
+                  <CalendarContainer>
+                    <CalendarHeader>
+                      <NavButton
                         type="button"
-                        isToday={isToday}
-                        isSelected={isSelected}
-                        isPast={isPast}
-                        isCurrentMonth={isCurrentMonth}
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          if (!isPast && isCurrentMonth) {
-                            handleDateSelect(day);
-                          }
+                          const current = selectedDate || new Date();
+                          const newDate = new Date(current.getFullYear(), current.getMonth() - 1, 1);
+                          setSelectedDate(newDate);
                         }}
                       >
-                        {day.getDate()}
-                      </CalendarDay>
-                    );
-                  })}
-                </CalendarGrid>
-                <TimeSelector>
-                  <TimeLabel>시간 선택:</TimeLabel>
-                  <TimeInputs>
-                    <TimeInput
-                      type="number"
-                      min="0"
-                      max="23"
-                      value={selectedTime.hour}
-                      onChange={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        handleTimeChange('hour', e.target.value);
-                      }}
-                      onBlur={(e) => {
-                        if (e.target.value === '' || parseInt(e.target.value) < 0) {
-                          handleTimeChange('hour', '0');
-                        }
-                      }}
-                    />
-                    <TimeSeparator>:</TimeSeparator>
-                    <TimeInput
-                      type="number"
-                      min="0"
-                      max="59"
-                      value={selectedTime.minute}
-                      onChange={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        handleTimeChange('minute', e.target.value);
-                      }}
-                      onBlur={(e) => {
-                        if (e.target.value === '' || parseInt(e.target.value) < 0) {
-                          handleTimeChange('minute', '0');
-                        }
-                      }}
-                    />
-                  </TimeInputs>
-                </TimeSelector>
-                <DatePickerActions>
-                  <DatePickerButton onClick={() => setShowDatePicker(false)}>
-                    확인
-                  </DatePickerButton>
-                </DatePickerActions>
-              </CalendarContainer>
-            </DatePickerDropdown>
-          )}
-          <HelperText>선택 사항입니다. 필요한 경우 정확한 일시를 입력하세요.</HelperText>
-        </Field>
+                        ‹
+                      </NavButton>
+                      <MonthYear>
+                        {selectedDate
+                          ? `${selectedDate.getFullYear()}년 ${selectedDate.getMonth() + 1}월`
+                          : `${new Date().getFullYear()}년 ${new Date().getMonth() + 1}월`}
+                      </MonthYear>
+                      <NavButton
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          const current = selectedDate || new Date();
+                          const newDate = new Date(current.getFullYear(), current.getMonth() + 1, 1);
+                          setSelectedDate(newDate);
+                        }}
+                      >
+                        ›
+                      </NavButton>
+                    </CalendarHeader>
+                    <CalendarGrid>
+                      {['일', '월', '화', '수', '목', '금', '토'].map((day) => (
+                        <CalendarDayHeader key={day}>{day}</CalendarDayHeader>
+                      ))}
+                      {getCalendarDays(selectedDate || new Date()).map((day, index) => {
+                        const now = new Date();
+                        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                        const dayDate = new Date(day.getFullYear(), day.getMonth(), day.getDate());
 
-        <Field>
-          <Label htmlFor="care-request-description">요청 내용</Label>
-          <TextArea
-            id="care-request-description"
-            name="description"
-            value={form.description}
-            onChange={handleChange}
-            placeholder="돌봄이 필요한 반려동물 정보, 원하는 도움 내용을 자세히 적어주세요."
-            rows={6}
-            disabled={submitting}
-            required
-          />
-        </Field>
+                        const isToday = dayDate.getTime() === today.getTime();
+                        const isSelected = selectedDate &&
+                          dayDate.getTime() === new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate()).getTime();
+                        const isPast = dayDate < today;
+                        const isCurrentMonth = day.getMonth() === (selectedDate || new Date()).getMonth();
+
+                        return (
+                          <CalendarDay
+                            key={index}
+                            type="button"
+                            isToday={isToday}
+                            isSelected={isSelected}
+                            isPast={isPast}
+                            isCurrentMonth={isCurrentMonth}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              if (!isPast && isCurrentMonth) {
+                                handleDateSelect(day);
+                              }
+                            }}
+                          >
+                            {day.getDate()}
+                          </CalendarDay>
+                        );
+                      })}
+                    </CalendarGrid>
+                    <TimeSelector>
+                      <TimeLabel>시간 선택:</TimeLabel>
+                      <TimeInputs>
+                        <TimeInput
+                          type="number"
+                          min="0"
+                          max="23"
+                          value={selectedTime.hour}
+                          onChange={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleTimeChange('hour', e.target.value);
+                          }}
+                          onBlur={(e) => {
+                            if (e.target.value === '' || parseInt(e.target.value) < 0) {
+                              handleTimeChange('hour', '0');
+                            }
+                          }}
+                        />
+                        <TimeSeparator>:</TimeSeparator>
+                        <TimeInput
+                          type="number"
+                          min="0"
+                          max="59"
+                          value={selectedTime.minute}
+                          onChange={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleTimeChange('minute', e.target.value);
+                          }}
+                          onBlur={(e) => {
+                            if (e.target.value === '' || parseInt(e.target.value) < 0) {
+                              handleTimeChange('minute', '0');
+                            }
+                          }}
+                        />
+                      </TimeInputs>
+                    </TimeSelector>
+                    <DatePickerActions>
+                      <DatePickerButton onClick={() => setShowDatePicker(false)}>
+                        확인
+                      </DatePickerButton>
+                    </DatePickerActions>
+                  </CalendarContainer>
+                </DatePickerDropdown>
+              )}
+              <HelperText>선택 사항입니다. 필요한 경우 정확한 일시를 입력하세요.</HelperText>
+            </Field>
+
+            <Field>
+              <Label htmlFor="care-request-description">요청 내용</Label>
+              <TextArea
+                id="care-request-description"
+                name="description"
+                value={form.description}
+                onChange={handleChange}
+                placeholder="돌봄이 필요한 반려동물 정보, 원하는 도움 내용을 자세히 적어주세요."
+                rows={6}
+                disabled={submitting}
+                required
+              />
+            </Field>
 
             {error && <ErrorBanner>{error}</ErrorBanner>}
 
@@ -526,8 +529,8 @@ const CareRequestForm = ({ onCancel, onCreated }) => {
                 <PetInfoCard>
                   <PetImageWrapper>
                     {selectedPet.profileImageUrl ? (
-                      <PetImage 
-                        src={selectedPet.profileImageUrl} 
+                      <PetImage
+                        src={selectedPet.profileImageUrl}
                         alt={selectedPet.petName}
                         onError={(e) => {
                           e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect width="200" height="200" fill="%23e2e8f0"/%3E%3Ctext x="100" y="100" font-family="Arial" font-size="16" fill="%2394a3b8" text-anchor="middle" dominant-baseline="middle"%3E사진 없음%3C/text%3E%3C/svg%3E';
@@ -542,11 +545,11 @@ const CareRequestForm = ({ onCancel, onCreated }) => {
                   <PetDetails>
                     <PetName>{selectedPet.petName}</PetName>
                     <PetDetail>
-                      {selectedPet.petType === 'DOG' ? '강아지' : 
-                       selectedPet.petType === 'CAT' ? '고양이' : 
-                       selectedPet.petType === 'BIRD' ? '새' :
-                       selectedPet.petType === 'RABBIT' ? '토끼' :
-                       selectedPet.petType === 'HAMSTER' ? '햄스터' : '기타'}
+                      {selectedPet.petType === 'DOG' ? '강아지' :
+                        selectedPet.petType === 'CAT' ? '고양이' :
+                          selectedPet.petType === 'BIRD' ? '새' :
+                            selectedPet.petType === 'RABBIT' ? '토끼' :
+                              selectedPet.petType === 'HAMSTER' ? '햄스터' : '기타'}
                       {' · '}
                       {selectedPet.breed || '품종 미상'}
                     </PetDetail>
@@ -726,17 +729,17 @@ const Label = styled.label`
 `;
 
 const TextInput = styled.input`
-  padding: ${(props) => props.theme.spacing.md};
-  border-radius: ${(props) => props.theme.borderRadius.lg};
+  width: 100%;
+  padding: 0.75rem;
   border: 1px solid ${(props) => props.theme.colors.border};
-  background: ${(props) => props.theme.colors.surfaceElevated};
+  border-radius: 8px;
   font-size: 1rem;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  background: ${(props) => props.theme.colors.background};
+  color: ${(props) => props.theme.colors.text};
 
   &:focus {
     outline: none;
     border-color: ${(props) => props.theme.colors.primary};
-    box-shadow: 0 0 0 3px rgba(255, 126, 54, 0.2);
   }
 
   &:disabled {
@@ -746,20 +749,19 @@ const TextInput = styled.input`
 `;
 
 const TextArea = styled.textarea`
-  padding: ${(props) => props.theme.spacing.md};
-  border-radius: ${(props) => props.theme.borderRadius.lg};
+  width: 100%;
+  padding: 0.75rem;
   border: 1px solid ${(props) => props.theme.colors.border};
-  background: ${(props) => props.theme.colors.surfaceElevated};
+  border-radius: 8px;
   font-size: 1rem;
-  line-height: 1.6;
+  background: ${(props) => props.theme.colors.background};
+  color: ${(props) => props.theme.colors.text};
+  font-family: inherit;
   resize: vertical;
-  min-height: 160px;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 
   &:focus {
     outline: none;
     border-color: ${(props) => props.theme.colors.primary};
-    box-shadow: 0 0 0 3px rgba(255, 126, 54, 0.2);
   }
 
   &:disabled {
@@ -840,10 +842,10 @@ const DatePickerWrapper = styled.div`
 
 const DateInputButton = styled.button`
   width: 100%;
-  padding: ${(props) => props.theme.spacing.md};
+  padding: 0.75rem;
   border: 1px solid ${(props) => props.theme.colors.border};
-  border-radius: ${(props) => props.theme.borderRadius.lg};
-  background: ${(props) => props.theme.colors.surfaceElevated};
+  border-radius: 8px;
+  background: ${(props) => props.theme.colors.background};
   color: ${(props) => props.hasValue ? props.theme.colors.text : props.theme.colors.textSecondary};
   font-size: 1rem;
   text-align: left;
@@ -853,14 +855,14 @@ const DateInputButton = styled.button`
   align-items: center;
   transition: all 0.2s;
 
-  &:hover:not(:disabled) {
+  &:hover {
     border-color: ${(props) => props.theme.colors.primary};
   }
 
-  &:focus:not(:disabled) {
+  &:focus {
     outline: none;
     border-color: ${(props) => props.theme.colors.primary};
-    box-shadow: 0 0 0 3px rgba(255, 126, 54, 0.2);
+    box-shadow: 0 0 0 2px ${(props) => props.theme.colors.primary}33;
   }
 
   &:disabled {

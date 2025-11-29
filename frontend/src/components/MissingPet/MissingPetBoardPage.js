@@ -376,6 +376,7 @@ const RefreshButton = styled.button`
   cursor: pointer;
   font-weight: 600;
   transition: all 0.2s ease;
+  color: ${(props) => props.theme.colors.text};
 
   &:hover:not(:disabled) {
     background: ${(props) => props.theme.colors.surfaceHover};
