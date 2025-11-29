@@ -5,9 +5,10 @@ import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Component;
 
+import com.linkup.Petory.domain.file.dto.FileDTO;
+import com.linkup.Petory.domain.file.entity.FileTargetType;
+import com.linkup.Petory.domain.file.service.AttachmentFileService;
 import com.linkup.Petory.domain.user.dto.PetDTO;
-import com.linkup.Petory.domain.user.dto.PetImageDTO;
-import com.linkup.Petory.domain.user.dto.PetVaccinationDTO;
 import com.linkup.Petory.domain.user.entity.Pet;
 import com.linkup.Petory.domain.user.entity.PetType;
 import com.linkup.Petory.domain.user.entity.PetGender;
@@ -18,13 +19,25 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class PetConverter {
 
-    private final PetImageConverter petImageConverter;
     private final PetVaccinationConverter petVaccinationConverter;
+    private final AttachmentFileService attachmentFileService;
 
     /**
      * Entity → DTO 변환
      */
     public PetDTO toDTO(Pet pet) {
+        // File 테이블에서 펫 이미지 가져오기
+        String profileImageUrl = pet.getProfileImageUrl(); // 기존 값 유지 (하위 호환성)
+        try {
+            List<FileDTO> files = attachmentFileService.getAttachments(FileTargetType.PET, pet.getIdx());
+            if (!files.isEmpty()) {
+                // File 테이블에 이미지가 있으면 우선 사용
+                profileImageUrl = files.get(0).getDownloadUrl();
+            }
+        } catch (Exception e) {
+            // File 테이블 조회 실패 시 기존 profileImageUrl 사용
+        }
+
         PetDTO.PetDTOBuilder builder = PetDTO.builder()
                 .idx(pet.getIdx())
                 .userIdx(pet.getUser() != null ? pet.getUser().getIdx() : null)
@@ -39,19 +52,13 @@ public class PetConverter {
                 .isNeutered(pet.getIsNeutered())
                 .healthInfo(pet.getHealthInfo())
                 .specialNotes(pet.getSpecialNotes())
-                .profileImageUrl(pet.getProfileImageUrl())
+                .profileImageUrl(profileImageUrl)
                 .isDeleted(pet.getIsDeleted())
                 .createdAt(pet.getCreatedAt())
                 .updatedAt(pet.getUpdatedAt())
                 .deletedAt(pet.getDeletedAt());
 
         // 연관 데이터 변환 (있는 경우만)
-        if (pet.getImages() != null && !pet.getImages().isEmpty()) {
-            builder.images(pet.getImages().stream()
-                    .map(petImageConverter::toDTO)
-                    .collect(Collectors.toList()));
-        }
-
         if (pet.getVaccinations() != null && !pet.getVaccinations().isEmpty()) {
             builder.vaccinations(pet.getVaccinations().stream()
                     .map(petVaccinationConverter::toDTO)
@@ -83,14 +90,6 @@ public class PetConverter {
                 .deletedAt(dto.getDeletedAt());
 
         // 연관 데이터 변환 (있는 경우만)
-        if (dto.getImages() != null && !dto.getImages().isEmpty()) {
-            Pet pet = builder.build();
-            pet.setImages(dto.getImages().stream()
-                    .map(imgDto -> petImageConverter.toEntity(imgDto, pet))
-                    .collect(Collectors.toList()));
-            return pet;
-        }
-
         if (dto.getVaccinations() != null && !dto.getVaccinations().isEmpty()) {
             Pet pet = builder.build();
             pet.setVaccinations(dto.getVaccinations().stream()
@@ -117,4 +116,3 @@ public class PetConverter {
                 .collect(Collectors.toList());
     }
 }
-

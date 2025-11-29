@@ -23,6 +23,7 @@ public class UsersDTO {
     private String location;
     private String petInfo;
     private List<SocialUserDTO> socialUsers;
+    private List<PetDTO> pets; // 등록한 애완동물 목록
     
     // 제재 관련 필드
     private String status; // ACTIVE, SUSPENDED, BANNED

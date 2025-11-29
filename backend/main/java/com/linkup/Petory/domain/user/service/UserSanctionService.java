@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.linkup.Petory.domain.report.entity.ReportActionType;
 import com.linkup.Petory.domain.user.entity.UserSanction;
+import com.linkup.Petory.domain.user.entity.UserStatus;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.repository.UserSanctionRepository;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
@@ -59,11 +60,11 @@ public class UserSanctionService {
         // 경고 3회 이상이면 자동 이용제한
         if (user.getWarningCount() >= WARNING_THRESHOLD) {
             log.info("유저 {} 경고 {}회 도달, 자동 이용제한 {}일 적용", userId, user.getWarningCount(), AUTO_SUSPENSION_DAYS);
-            addSuspension(userId, 
-                String.format("경고 %d회 누적으로 인한 자동 이용제한", user.getWarningCount()),
-                adminId, 
-                reportId, 
-                AUTO_SUSPENSION_DAYS);
+            addSuspension(userId,
+                    String.format("경고 %d회 누적으로 인한 자동 이용제한", user.getWarningCount()),
+                    adminId,
+                    reportId,
+                    AUTO_SUSPENSION_DAYS);
         }
 
         return warning;
@@ -96,7 +97,7 @@ public class UserSanctionService {
         sanctionRepository.save(suspension);
 
         // 유저 상태 업데이트
-        user.setStatus(Users.UserStatus.SUSPENDED);
+        user.setStatus(UserStatus.SUSPENDED);
         user.setSuspendedUntil(endsAt);
         usersRepository.save(user);
 
@@ -127,7 +128,7 @@ public class UserSanctionService {
         sanctionRepository.save(ban);
 
         // 유저 상태 업데이트
-        user.setStatus(Users.UserStatus.BANNED);
+        user.setStatus(UserStatus.BANNED);
         user.setSuspendedUntil(null);
         usersRepository.save(user);
 
@@ -142,7 +143,7 @@ public class UserSanctionService {
         Users user = usersRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("유저를 찾을 수 없습니다."));
 
-        user.setStatus(Users.UserStatus.ACTIVE);
+        user.setStatus(UserStatus.ACTIVE);
         user.setSuspendedUntil(null);
         usersRepository.save(user);
     }
@@ -153,28 +154,28 @@ public class UserSanctionService {
     @Transactional
     public void releaseExpiredSuspensions() {
         List<UserSanction> expired = sanctionRepository.findExpiredSuspensions(LocalDateTime.now());
-        
+
         for (UserSanction sanction : expired) {
             Users user = sanction.getUser();
             // 다른 활성 제재가 있는지 확인
             List<UserSanction> activeSanctions = sanctionRepository.findActiveSanctionsByUserId(
-                user.getIdx(), LocalDateTime.now());
-            
+                    user.getIdx(), LocalDateTime.now());
+
             boolean hasActiveBan = activeSanctions.stream()
-                .anyMatch(s -> s.getSanctionType() == UserSanction.SanctionType.BAN);
-            
+                    .anyMatch(s -> s.getSanctionType() == UserSanction.SanctionType.BAN);
+
             if (hasActiveBan) {
                 // 영구 차단이 있으면 그대로 유지
                 continue;
             }
-            
+
             boolean hasActiveSuspension = activeSanctions.stream()
-                .anyMatch(s -> s.getSanctionType() == UserSanction.SanctionType.SUSPENSION
-                    && s.getEndsAt() != null && s.getEndsAt().isAfter(LocalDateTime.now()));
-            
+                    .anyMatch(s -> s.getSanctionType() == UserSanction.SanctionType.SUSPENSION
+                            && s.getEndsAt() != null && s.getEndsAt().isAfter(LocalDateTime.now()));
+
             if (!hasActiveSuspension) {
                 // 활성 이용제한이 없으면 해제
-                user.setStatus(Users.UserStatus.ACTIVE);
+                user.setStatus(UserStatus.ACTIVE);
                 user.setSuspendedUntil(null);
                 usersRepository.save(user);
                 log.info("유저 {} 이용제한 자동 해제", user.getIdx());
@@ -195,7 +196,8 @@ public class UserSanctionService {
      * 신고 처리 시 자동 제재 적용
      */
     @Transactional
-    public void applySanctionFromReport(Long userId, ReportActionType actionType, String reason, Long adminId, Long reportId) {
+    public void applySanctionFromReport(Long userId, ReportActionType actionType, String reason, Long adminId,
+            Long reportId) {
         switch (actionType) {
             case WARN_USER -> addWarning(userId, reason, adminId, reportId);
             case SUSPEND_USER -> addBan(userId, reason, adminId, reportId); // 정지는 영구 차단으로 처리
@@ -205,4 +207,3 @@ public class UserSanctionService {
         }
     }
 }
-

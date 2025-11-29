@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 
 import com.linkup.Petory.domain.care.dto.CareRequestDTO;
 import com.linkup.Petory.domain.care.entity.CareRequest;
+import com.linkup.Petory.domain.user.converter.PetConverter;
 
 import lombok.RequiredArgsConstructor;
 
@@ -14,9 +15,11 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class CareRequestConverter {
 
+    private final PetConverter petConverter;
+
     // Entity → DTO
     public CareRequestDTO toDTO(CareRequest request) {
-        return CareRequestDTO.builder()
+        CareRequestDTO.CareRequestDTOBuilder builder = CareRequestDTO.builder()
                 .idx(request.getIdx())
                 .title(request.getTitle())
                 .description(request.getDescription())
@@ -28,8 +31,15 @@ public class CareRequestConverter {
                 .userId(request.getUser().getIdx())
                 .username(request.getUser().getUsername())
                 .userLocation(request.getUser().getLocation())
-                .applicationCount(request.getApplications() != null ? request.getApplications().size() : 0)
-                .build();
+                .applicationCount(request.getApplications() != null ? request.getApplications().size() : 0);
+
+        // 펫 정보 추가
+        if (request.getPet() != null) {
+            builder.petIdx(request.getPet().getIdx())
+                   .pet(petConverter.toDTO(request.getPet()));
+        }
+
+        return builder.build();
     }
 
     // DTO 리스트 변환

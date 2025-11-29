@@ -133,3 +133,45 @@ export const userProfileApi = {
   updateMyUsername: (username) =>
     profileApi.patch('/me/username', { username }),
 };
+
+// 펫 관리 API
+const petApi = axios.create({
+  baseURL: 'http://localhost:8080/api/pets',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// 요청 인터셉터 - 모든 요청에 토큰 자동 추가
+petApi.interceptors.request.use(
+  (config) => {
+    const token = getToken();
+    if (token && !config.headers.Authorization) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+export const petApiClient = {
+  // 자신의 펫 목록 조회
+  getMyPets: () => petApi.get(''),
+
+  // 펫 상세 조회
+  getPet: (petIdx) => petApi.get(`/${petIdx}`),
+
+  // 펫 생성
+  createPet: (petData) => petApi.post('', petData),
+
+  // 펫 수정
+  updatePet: (petIdx, petData) => petApi.put(`/${petIdx}`, petData),
+
+  // 펫 삭제
+  deletePet: (petIdx) => petApi.delete(`/${petIdx}`),
+
+  // 펫 복구
+  restorePet: (petIdx) => petApi.post(`/${petIdx}/restore`),
+};

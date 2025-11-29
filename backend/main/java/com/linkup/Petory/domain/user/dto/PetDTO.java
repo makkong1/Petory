@@ -38,7 +38,6 @@ public class PetDTO {
     private LocalDateTime deletedAt;
     
     // 연관 데이터 (선택적)
-    private List<PetImageDTO> images;
     private List<PetVaccinationDTO> vaccinations;
 }
 

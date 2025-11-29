@@ -7,8 +7,8 @@ import org.springframework.stereotype.Component;
 
 import com.linkup.Petory.domain.user.dto.UsersDTO;
 import com.linkup.Petory.domain.user.entity.Role;
+import com.linkup.Petory.domain.user.entity.UserStatus;
 import com.linkup.Petory.domain.user.entity.Users;
-import com.linkup.Petory.domain.user.entity.Users.UserStatus;
 
 import lombok.RequiredArgsConstructor;
 

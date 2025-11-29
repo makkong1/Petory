@@ -341,21 +341,68 @@ const CareRequestDetailPage = ({
           {loadingCareRequest ? (
             <SkeletonBody />
           ) : careRequestError ? null : (
-            <ContentSection>
-              <ContentText>{careRequest?.description}</ContentText>
-              {careRequest?.date && (
-                <DateInfo>
-                  <DateLabel>요청 날짜:</DateLabel>
-                  <DateValue>
-                    {new Date(careRequest.date).toLocaleDateString('ko-KR', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                    })}
-                  </DateValue>
-                </DateInfo>
+            <ContentWrapper>
+              <ContentSection>
+                <ContentText>{careRequest?.description}</ContentText>
+                {careRequest?.date && (
+                  <DateInfo>
+                    <DateLabel>요청 날짜:</DateLabel>
+                    <DateValue>
+                      {new Date(careRequest.date).toLocaleDateString('ko-KR', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                      })}
+                    </DateValue>
+                  </DateInfo>
+                )}
+              </ContentSection>
+
+              {careRequest?.pet && (
+                <PetInfoSection>
+                  <PetInfoTitle>관련 반려동물 정보</PetInfoTitle>
+                  <PetInfoCard>
+                    <PetImageWrapper>
+                      {careRequest.pet.profileImageUrl ? (
+                        <PetImage 
+                          src={careRequest.pet.profileImageUrl} 
+                          alt={careRequest.pet.petName}
+                          onError={(e) => {
+                            e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect width="200" height="200" fill="%23e2e8f0"/%3E%3Ctext x="100" y="100" font-family="Arial" font-size="16" fill="%2394a3b8" text-anchor="middle" dominant-baseline="middle"%3E사진 없음%3C/text%3E%3C/svg%3E';
+                          }}
+                        />
+                      ) : (
+                        <NoImagePlaceholder>
+                          <NoImageText>사진 없음</NoImageText>
+                        </NoImagePlaceholder>
+                      )}
+                    </PetImageWrapper>
+                    <PetDetails>
+                      <PetName>{careRequest.pet.petName}</PetName>
+                      <PetDetail>
+                        {careRequest.pet.petType === 'DOG' ? '강아지' : 
+                         careRequest.pet.petType === 'CAT' ? '고양이' : 
+                         careRequest.pet.petType === 'BIRD' ? '새' :
+                         careRequest.pet.petType === 'RABBIT' ? '토끼' :
+                         careRequest.pet.petType === 'HAMSTER' ? '햄스터' : '기타'}
+                        {' · '}
+                        {careRequest.pet.breed || '품종 미상'}
+                      </PetDetail>
+                      {careRequest.pet.age && <PetDetail>나이: {careRequest.pet.age}</PetDetail>}
+                      {careRequest.pet.gender && (
+                        <PetDetail>
+                          성별: {careRequest.pet.gender === 'M' ? '수컷' : careRequest.pet.gender === 'F' ? '암컷' : '미확인'}
+                        </PetDetail>
+                      )}
+                      {careRequest.pet.color && <PetDetail>색상: {careRequest.pet.color}</PetDetail>}
+                      {careRequest.pet.weight && <PetDetail>몸무게: {careRequest.pet.weight}kg</PetDetail>}
+                      {careRequest.pet.healthInfo && <PetDetail>건강 정보: {careRequest.pet.healthInfo}</PetDetail>}
+                      {careRequest.pet.specialNotes && <PetDetail>특이사항: {careRequest.pet.specialNotes}</PetDetail>}
+                    </PetDetails>
+                  </PetInfoCard>
+                </PetInfoSection>
               )}
-            </ContentSection>
+            </ContentWrapper>
           )}
 
           <CommentSection>
@@ -649,6 +696,16 @@ const AuthorBadge = styled.span`
   font-size: 0.9rem;
 `;
 
+const ContentWrapper = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${(props) => props.theme.spacing.xl};
+
+  @media (max-width: 1024px) {
+    gap: ${(props) => props.theme.spacing.lg};
+  }
+`;
+
 const ContentSection = styled.section`
   padding: ${(props) => props.theme.spacing.xl} ${(props) => props.theme.spacing.xl};
   border-bottom: 1px solid ${(props) => props.theme.colors.borderLight};
@@ -657,6 +714,92 @@ const ContentSection = styled.section`
   @media (max-width: 768px) {
     padding: ${(props) => props.theme.spacing.md};
   }
+`;
+
+const PetInfoSection = styled.section`
+  padding: ${(props) => props.theme.spacing.xl} ${(props) => props.theme.spacing.xl};
+  border-bottom: 1px solid ${(props) => props.theme.colors.borderLight};
+  background: ${(props) => props.theme.colors.surfaceElevated};
+
+  @media (max-width: 768px) {
+    padding: ${(props) => props.theme.spacing.md};
+  }
+`;
+
+const PetInfoTitle = styled.h3`
+  margin: 0 0 ${(props) => props.theme.spacing.md} 0;
+  font-size: 1.1rem;
+  color: ${(props) => props.theme.colors.text};
+  font-weight: 600;
+`;
+
+const PetInfoCard = styled.div`
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: ${(props) => props.theme.spacing.lg};
+  background: ${(props) => props.theme.colors.surface};
+  border: 1px solid ${(props) => props.theme.colors.border};
+  border-radius: ${(props) => props.theme.borderRadius.lg};
+  padding: ${(props) => props.theme.spacing.lg};
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
+`;
+
+const PetImageWrapper = styled.div`
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: ${(props) => props.theme.borderRadius.md};
+  overflow: hidden;
+  background: ${(props) => props.theme.colors.borderLight};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  @media (max-width: 768px) {
+    max-width: 200px;
+    margin: 0 auto;
+  }
+`;
+
+const PetImage = styled.img`
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+`;
+
+const NoImagePlaceholder = styled.div`
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: ${(props) => props.theme.colors.borderLight};
+`;
+
+const NoImageText = styled.div`
+  color: ${(props) => props.theme.colors.textSecondary};
+  font-size: 0.9rem;
+`;
+
+const PetDetails = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${(props) => props.theme.spacing.xs};
+`;
+
+const PetName = styled.div`
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: ${(props) => props.theme.colors.text};
+  margin-bottom: ${(props) => props.theme.spacing.xs};
+`;
+
+const PetDetail = styled.div`
+  font-size: 0.95rem;
+  color: ${(props) => props.theme.colors.textSecondary};
+  line-height: 1.6;
 `;
 
 const ContentText = styled.p`
