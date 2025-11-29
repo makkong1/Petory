@@ -160,14 +160,14 @@ export const authApi = {
     try {
       const response = await api.post('/login', { id, password });
       const { accessToken, refreshToken, user } = response.data;
-      
+
       if (accessToken) {
         setToken(accessToken);
       }
       if (refreshToken) {
         setRefreshToken(refreshToken);
       }
-      
+
       return response.data;
     } catch (error) {
       throw error;
@@ -340,14 +340,14 @@ export const setupApiInterceptors = () => {
 
         try {
           console.log('🔄 Access Token 재발급 시도 중...');
-          
+
           // Refresh Token으로 Access Token 갱신
           const response = await axios.post('http://localhost:8080/api/auth/refresh', {
             refreshToken: refreshToken
           });
 
           const { accessToken, refreshToken: newRefreshToken } = response.data;
-          
+
           console.log('✅ Access Token 재발급 성공:', {
             timestamp: new Date().toISOString(),
             hasNewAccessToken: !!accessToken,
@@ -375,11 +375,11 @@ export const setupApiInterceptors = () => {
             error: refreshError.response?.data?.error || refreshError.message,
             timestamp: new Date().toISOString()
           });
-          
+
           removeAllTokens();
           processQueueGlobal(refreshError);
           isRefreshingGlobal = false;
-          
+
           if (typeof window !== 'undefined' && window.redirectToLogin) {
             console.log('🔐 Refresh Token 만료로 인한 로그인 페이지 리다이렉트');
             window.redirectToLogin();
@@ -388,6 +388,11 @@ export const setupApiInterceptors = () => {
         }
       } else if (error.response?.status === 403) {
         // 403 에러 시 권한 모달 표시 이벤트 발생
+        console.warn('🚫 403 Forbidden 에러 발생:', {
+          url: originalRequest?.url,
+          method: originalRequest?.method,
+          timestamp: new Date().toISOString()
+        });
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('showPermissionModal'));
         }

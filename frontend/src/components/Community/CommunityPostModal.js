@@ -273,46 +273,50 @@ const Label = styled.label`
 `;
 
 const Input = styled.input`
-  padding: ${(props) => props.theme.spacing.sm} ${(props) => props.theme.spacing.md};
-  border-radius: ${(props) => props.theme.borderRadius.md};
+  width: 100%;
+  padding: 0.75rem;
   border: 1px solid ${(props) => props.theme.colors.border};
-  background: ${(props) => props.theme.colors.surfaceElevated};
-  font-size: 0.95rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  background: ${(props) => props.theme.colors.background};
+  color: ${(props) => props.theme.colors.text};
 
   &:focus {
     outline: none;
     border-color: ${(props) => props.theme.colors.primary};
-    box-shadow: 0 0 0 3px rgba(255, 126, 54, 0.2);
   }
 `;
 
 const Select = styled.select`
-  padding: ${(props) => props.theme.spacing.sm} ${(props) => props.theme.spacing.md};
-  border-radius: ${(props) => props.theme.borderRadius.md};
+  width: 100%;
+  padding: 0.75rem;
   border: 1px solid ${(props) => props.theme.colors.border};
-  background: ${(props) => props.theme.colors.surfaceElevated};
-  font-size: 0.95rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  background: ${(props) => props.theme.colors.background};
+  color: ${(props) => props.theme.colors.text};
 
   &:focus {
     outline: none;
     border-color: ${(props) => props.theme.colors.primary};
-    box-shadow: 0 0 0 3px rgba(255, 126, 54, 0.2);
   }
 `;
 
 const Textarea = styled.textarea`
-  padding: ${(props) => props.theme.spacing.md};
-  border-radius: ${(props) => props.theme.borderRadius.lg};
+  width: 100%;
+  padding: 0.75rem;
   border: 1px solid ${(props) => props.theme.colors.border};
-  background: ${(props) => props.theme.colors.surfaceElevated};
-  font-size: 0.95rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  background: ${(props) => props.theme.colors.background};
+  color: ${(props) => props.theme.colors.text};
+  font-family: inherit;
   resize: vertical;
   min-height: 160px;
 
   &:focus {
     outline: none;
     border-color: ${(props) => props.theme.colors.primary};
-    box-shadow: 0 0 0 3px rgba(255, 126, 54, 0.2);
   }
 `;
 

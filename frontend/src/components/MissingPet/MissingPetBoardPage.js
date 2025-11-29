@@ -376,6 +376,7 @@ const RefreshButton = styled.button`
   cursor: pointer;
   font-weight: 600;
   transition: all 0.2s ease;
+  color: ${(props) => props.theme.colors.text};
 
   &:hover:not(:disabled) {
     background: ${(props) => props.theme.colors.surfaceHover};
@@ -474,11 +475,15 @@ const CardImage = styled.div`
   width: 100%;
   height: 180px;
   background: ${(props) => props.theme.colors.surfaceHover};
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 
   img {
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: contain;
   }
 `;
 

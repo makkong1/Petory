@@ -344,18 +344,34 @@ const CareRequestDetailPage = ({
             <ContentWrapper>
               <ContentSection>
                 <ContentText>{careRequest?.description}</ContentText>
-                {careRequest?.date && (
+                {careRequest?.date ? (
                   <DateInfo>
-                    <DateLabel>요청 날짜:</DateLabel>
+                    <DateLabel>요청 일시</DateLabel>
                     <DateValue>
-                      {new Date(careRequest.date).toLocaleDateString('ko-KR', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                      })}
+                      <TimeIcon>🕐</TimeIcon>
+                      <span>
+                        {(() => {
+                          try {
+                            const dateObj = new Date(careRequest.date);
+                            if (!isNaN(dateObj.getTime())) {
+                              const year = dateObj.getFullYear();
+                              const month = dateObj.getMonth() + 1;
+                              const day = dateObj.getDate();
+                              const hour = dateObj.getHours();
+                              const minute = dateObj.getMinutes();
+                              const ampm = hour >= 12 ? '오후' : '오전';
+                              const displayHour = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
+                              return `${year}년 ${month}월 ${day}일 ${ampm} ${displayHour}:${String(minute).padStart(2, '0')}`;
+                            }
+                          } catch (e) {
+                            console.error('Date parsing error:', e);
+                          }
+                          return careRequest.date;
+                        })()}
+                      </span>
                     </DateValue>
                   </DateInfo>
-                )}
+                ) : null}
               </ContentSection>
 
               {careRequest?.pet && (
@@ -544,7 +560,9 @@ const PageContainer = styled.div`
   justify-content: center;
   align-items: flex-start;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: ${(props) => props.theme.spacing.xxl} ${(props) => props.theme.spacing.lg};
+  -webkit-overflow-scrolling: touch;
 
   @media (max-width: 768px) {
     padding: ${(props) => props.theme.spacing.md};
@@ -558,14 +576,18 @@ const DetailCard = styled.article`
   border-radius: ${(props) => props.theme.borderRadius.xl};
   box-shadow: 0 22px 48px rgba(15, 23, 42, 0.25);
   border: 1px solid ${(props) => props.theme.colors.border};
-  overflow: hidden;
+  overflow: visible;
   display: flex;
   flex-direction: column;
+  max-height: calc(100vh - ${(props) => props.theme.spacing.xxl} * 2);
+  margin: ${(props) => props.theme.spacing.xl} 0;
 
   @media (max-width: 768px) {
     width: 100%;
     border-radius: ${(props) => props.theme.borderRadius.lg};
     box-shadow: 0 8px 24px rgba(15, 23, 42, 0.2);
+    max-height: calc(100vh - ${(props) => props.theme.spacing.md} * 2);
+    margin: ${(props) => props.theme.spacing.md} 0;
   }
 `;
 
@@ -700,6 +722,9 @@ const ContentWrapper = styled.div`
   display: flex;
   flex-direction: column;
   gap: ${(props) => props.theme.spacing.xl};
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
 
   @media (max-width: 1024px) {
     gap: ${(props) => props.theme.spacing.lg};
@@ -812,19 +837,35 @@ const ContentText = styled.p`
 
 const DateInfo = styled.div`
   display: flex;
-  align-items: center;
-  gap: ${(props) => props.theme.spacing.sm};
-  padding-top: ${(props) => props.theme.spacing.md};
-  border-top: 1px solid ${(props) => props.theme.colors.borderLight};
+  flex-direction: column;
+  gap: ${(props) => props.theme.spacing.xs};
+  padding: ${(props) => props.theme.spacing.md};
+  background: ${(props) => props.theme.colors.surfaceElevated};
+  border-radius: ${(props) => props.theme.borderRadius.md};
+  border: 1px solid ${(props) => props.theme.colors.borderLight};
+  margin-top: ${(props) => props.theme.spacing.md};
 `;
 
 const DateLabel = styled.span`
   font-weight: 600;
   color: ${(props) => props.theme.colors.textSecondary};
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 `;
 
 const DateValue = styled.span`
   color: ${(props) => props.theme.colors.text};
+  font-weight: 500;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  gap: ${(props) => props.theme.spacing.sm};
+`;
+
+const TimeIcon = styled.span`
+  font-size: 1.1rem;
+  line-height: 1;
 `;
 
 const CommentSection = styled.section`

@@ -18,6 +18,7 @@ public class MissingPetConverter {
         List<MissingPetCommentDTO> commentDTOs = board.getComments() == null
                 ? Collections.emptyList()
                 : board.getComments().stream()
+                        .filter(comment -> !comment.getIsDeleted()) // 삭제된 댓글 제외
                         .map(this::toCommentDTO)
                         .collect(Collectors.toList());
 
