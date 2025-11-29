@@ -41,14 +41,12 @@
 
 ### 엔티티 (Entity)
 - `Pet.java`: 반려동물 엔티티
-- `PetImage.java`: 반려동물 이미지 엔티티
 - `PetVaccination.java`: 예방접종 기록 엔티티
 - `PetType.java`: 펫 종류 Enum
 - `PetGender.java`: 펫 성별 Enum
 
 ### DTO
 - `PetDTO.java`: 펫 데이터 전송 객체
-- `PetImageDTO.java`: 펫 이미지 데이터 전송 객체
 - `PetVaccinationDTO.java`: 예방접종 데이터 전송 객체
 
 ### Repository

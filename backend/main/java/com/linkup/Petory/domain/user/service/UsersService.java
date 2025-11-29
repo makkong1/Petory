@@ -10,11 +10,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.linkup.Petory.domain.user.converter.UsersConverter;
+import com.linkup.Petory.domain.user.dto.PetDTO;
 import com.linkup.Petory.domain.user.dto.UsersDTO;
 import com.linkup.Petory.domain.user.dto.UserPageResponseDTO;
 import com.linkup.Petory.domain.user.entity.UserStatus;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
+import com.linkup.Petory.domain.user.service.PetService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +30,7 @@ public class UsersService {
     private final UsersRepository usersRepository;
     private final UsersConverter usersConverter;
     private final PasswordEncoder passwordEncoder;
+    private final PetService petService;
 
     // 전체 조회
     public List<UsersDTO> getAllUsers() {
@@ -65,11 +68,9 @@ public class UsersService {
                 .build();
     }
 
-    // 단일 조회
+    // 단일 조회 (펫 정보 포함)
     public UsersDTO getUser(long idx) {
-        Users user = usersRepository.findById(idx)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-        return usersConverter.toDTO(user);
+        return getUserWithPets(idx);
     }
 
     // username으로 조회
@@ -182,13 +183,46 @@ public class UsersService {
     // ========== 일반 사용자용 프로필 관리 메서드 ==========
 
     /**
-     * 자신의 프로필 조회
+     * 자신의 프로필 조회 (펫 정보 포함)
      */
     @Transactional(readOnly = true)
     public UsersDTO getMyProfile(String userId) {
         Users user = usersRepository.findByIdString(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
-        return usersConverter.toDTO(user);
+        UsersDTO userDTO = usersConverter.toDTO(user);
+        
+        // 펫 정보 추가
+        try {
+            List<PetDTO> pets = petService.getPetsByUserId(userId);
+            userDTO.setPets(pets);
+        } catch (Exception e) {
+            // 펫 정보 조회 실패해도 사용자 정보는 반환
+            log.warn("펫 정보 조회 실패: {}", e.getMessage());
+            userDTO.setPets(List.of());
+        }
+        
+        return userDTO;
+    }
+    
+    /**
+     * 사용자 프로필 조회 (펫 정보 포함) - 관리자용
+     */
+    @Transactional(readOnly = true)
+    public UsersDTO getUserWithPets(Long userIdx) {
+        Users user = usersRepository.findById(userIdx)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        UsersDTO userDTO = usersConverter.toDTO(user);
+        
+        // 펫 정보 추가
+        try {
+            List<PetDTO> pets = petService.getPetsByUserIdx(userIdx);
+            userDTO.setPets(pets);
+        } catch (Exception e) {
+            log.warn("펫 정보 조회 실패: {}", e.getMessage());
+            userDTO.setPets(List.of());
+        }
+        
+        return userDTO;
     }
 
     /**

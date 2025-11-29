@@ -96,9 +96,6 @@ public class Pet {
     }
 
     @OneToMany(mappedBy = "pet", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<PetImage> images; // 펫 이미지 목록
-
-    @OneToMany(mappedBy = "pet", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<PetVaccination> vaccinations; // 예방접종 기록 목록
 
     @PreUpdate

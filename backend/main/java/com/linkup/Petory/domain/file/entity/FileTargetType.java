@@ -5,6 +5,7 @@ public enum FileTargetType {
     COMMENT,
     CARE_COMMENT,
     MISSING_PET,
-    MISSING_PET_COMMENT
+    MISSING_PET_COMMENT,
+    PET
 }
 
