@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
 import { careRequestApi } from '../../api/careRequestApi';
 import { petApiClient } from '../../api/userApi';
@@ -16,6 +16,12 @@ const CareRequestForm = ({ onCancel, onCreated }) => {
   const [pets, setPets] = useState([]);
   const [selectedPetIdx, setSelectedPetIdx] = useState(null);
   const [loadingPets, setLoadingPets] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [selectedTime, setSelectedTime] = useState({ hour: '12', minute: '00' });
+  const [datePickerPosition, setDatePickerPosition] = useState({ top: 0, left: 0 });
+  const datePickerButtonRef = useRef(null);
+  const formContainerRef = useRef(null);
 
   // 펫 목록 불러오기
   useEffect(() => {
@@ -34,6 +40,211 @@ const CareRequestForm = ({ onCancel, onCreated }) => {
       fetchPets();
     }
   }, [user]);
+
+  // 날짜/시간 초기화
+  useEffect(() => {
+    if (form.date) {
+      const date = new Date(form.date);
+      setSelectedDate(date);
+      setSelectedTime({
+        hour: String(date.getHours()).padStart(2, '0'),
+        minute: String(date.getMinutes()).padStart(2, '0'),
+      });
+    } else {
+      // 기본값: 현재 시간 + 1시간
+      const defaultDate = new Date();
+      defaultDate.setHours(defaultDate.getHours() + 1, 0, 0, 0);
+      setSelectedDate(defaultDate);
+      setSelectedTime({
+        hour: String(defaultDate.getHours()).padStart(2, '0'),
+        minute: '00',
+      });
+    }
+  }, []);
+
+  // 달력 버튼 위치 계산
+  const handleDatePickerToggle = () => {
+    if (!showDatePicker) {
+      if (datePickerButtonRef.current) {
+        const rect = datePickerButtonRef.current.getBoundingClientRect();
+        const calendarWidth = 320;
+        const rightPosition = rect.right + window.scrollX - calendarWidth;
+
+        setDatePickerPosition({
+          top: rect.bottom + window.scrollY + 8,
+          left: Math.max(10, rightPosition),
+        });
+      }
+    }
+    setShowDatePicker(!showDatePicker);
+  };
+
+  // 달력 외부 클릭 시 닫기
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showDatePicker &&
+        !event.target.closest('.date-picker-wrapper') &&
+        !event.target.closest('.date-picker-dropdown')) {
+        setShowDatePicker(false);
+      }
+    };
+
+    if (showDatePicker) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [showDatePicker]);
+
+  // 날짜 포맷팅
+  const formatDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return '';
+
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    const hour = date.getHours();
+    const minute = date.getMinutes();
+
+    const ampm = hour >= 12 ? '오후' : '오전';
+    const displayHour = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
+
+    return `${year}년 ${month}월 ${day}일 ${ampm} ${displayHour}:${String(minute).padStart(2, '0')}`;
+  };
+
+  // 달력 날짜 생성
+  const getCalendarDays = (date) => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const startDate = new Date(firstDay);
+    startDate.setDate(startDate.getDate() - startDate.getDay());
+
+    const days = [];
+    const currentDate = new Date(startDate);
+
+    for (let i = 0; i < 42; i++) {
+      days.push(new Date(currentDate));
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    return days;
+  };
+
+  // 날짜 선택 핸들러
+  const handleDateSelect = (day) => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const selectedDay = new Date(day.getFullYear(), day.getMonth(), day.getDate());
+
+    // 과거 날짜는 선택 불가
+    if (selectedDay < today) {
+      return;
+    }
+
+    const hour = parseInt(selectedTime.hour) || 0;
+    const minute = parseInt(selectedTime.minute) || 0;
+
+    const newDate = new Date(day.getFullYear(), day.getMonth(), day.getDate());
+    newDate.setHours(hour, minute, 0, 0);
+
+    // 오늘 날짜이고 과거 시간이면 현재 시간 + 1시간으로 설정
+    if (selectedDay.getTime() === today.getTime() && newDate < now) {
+      const futureDate = new Date(now);
+      futureDate.setHours(futureDate.getHours() + 1, 0, 0, 0);
+      setSelectedDate(futureDate);
+      setSelectedTime({
+        hour: String(futureDate.getHours()).padStart(2, '0'),
+        minute: String(futureDate.getMinutes()).padStart(2, '0'),
+      });
+      const localDateString = `${futureDate.getFullYear()}-${String(futureDate.getMonth() + 1).padStart(2, '0')}-${String(futureDate.getDate()).padStart(2, '0')}T${String(futureDate.getHours()).padStart(2, '0')}:${String(futureDate.getMinutes()).padStart(2, '0')}`;
+      setForm(prev => ({
+        ...prev,
+        date: localDateString,
+      }));
+    } else {
+      setSelectedDate(newDate);
+      setSelectedTime({
+        hour: String(hour).padStart(2, '0'),
+        minute: String(minute).padStart(2, '0'),
+      });
+      const localDateString = `${newDate.getFullYear()}-${String(newDate.getMonth() + 1).padStart(2, '0')}-${String(newDate.getDate()).padStart(2, '0')}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+      setForm(prev => ({
+        ...prev,
+        date: localDateString,
+      }));
+    }
+  };
+
+  // 시간 변경 핸들러
+  const handleTimeChange = (type, value) => {
+    let baseDate = selectedDate;
+    if (!baseDate && form.date) {
+      baseDate = new Date(form.date);
+    }
+    if (!baseDate) {
+      const defaultDate = new Date();
+      defaultDate.setHours(defaultDate.getHours() + 1, 0, 0, 0);
+      setSelectedDate(defaultDate);
+      setSelectedTime({
+        hour: String(defaultDate.getHours()).padStart(2, '0'),
+        minute: '00',
+      });
+      const localDateString = `${defaultDate.getFullYear()}-${String(defaultDate.getMonth() + 1).padStart(2, '0')}-${String(defaultDate.getDate()).padStart(2, '0')}T${String(defaultDate.getHours()).padStart(2, '0')}:${String(defaultDate.getMinutes()).padStart(2, '0')}`;
+      setForm(prev => ({
+        ...prev,
+        date: localDateString,
+      }));
+      return;
+    }
+
+    const dateOnly = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate());
+
+    let hour = parseInt(selectedTime.hour) || 0;
+    let minute = parseInt(selectedTime.minute) || 0;
+
+    if (type === 'hour') {
+      hour = Math.max(0, Math.min(23, parseInt(value) || 0));
+    } else if (type === 'minute') {
+      minute = Math.max(0, Math.min(59, parseInt(value) || 0));
+    }
+
+    const newDate = new Date(dateOnly);
+    newDate.setHours(hour, minute, 0, 0);
+
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const selectedDay = new Date(dateOnly.getFullYear(), dateOnly.getMonth(), dateOnly.getDate());
+
+    if (selectedDay.getTime() === today.getTime() && newDate < now) {
+      const futureDate = new Date(now);
+      futureDate.setHours(futureDate.getHours() + 1, 0, 0, 0);
+      setSelectedDate(futureDate);
+      setSelectedTime({
+        hour: String(futureDate.getHours()).padStart(2, '0'),
+        minute: String(futureDate.getMinutes()).padStart(2, '0'),
+      });
+      const localDateString = `${futureDate.getFullYear()}-${String(futureDate.getMonth() + 1).padStart(2, '0')}-${String(futureDate.getDate()).padStart(2, '0')}T${String(futureDate.getHours()).padStart(2, '0')}:${String(futureDate.getMinutes()).padStart(2, '0')}`;
+      setForm(prev => ({
+        ...prev,
+        date: localDateString,
+      }));
+    } else {
+      setSelectedDate(newDate);
+      setSelectedTime({
+        hour: String(hour).padStart(2, '0'),
+        minute: String(minute).padStart(2, '0'),
+      });
+      const localDateString = `${newDate.getFullYear()}-${String(newDate.getMonth() + 1).padStart(2, '0')}-${String(newDate.getDate()).padStart(2, '0')}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+      setForm(prev => ({
+        ...prev,
+        date: localDateString,
+      }));
+    }
+  };
 
 
   const handleChange = (event) => {
@@ -125,14 +336,142 @@ const CareRequestForm = ({ onCancel, onCreated }) => {
 
         <Field>
           <Label htmlFor="care-request-date">요청 일시</Label>
-          <TextInput
-            id="care-request-date"
-            name="date"
-            type="datetime-local"
-            value={form.date}
-            onChange={handleChange}
-            disabled={submitting}
-          />
+          <DatePickerWrapper className="date-picker-wrapper">
+            <DateInputButton
+              ref={datePickerButtonRef}
+              type="button"
+              onClick={handleDatePickerToggle}
+              hasValue={!!form.date}
+              disabled={submitting}
+            >
+              {form.date
+                ? formatDate(form.date)
+                : '날짜와 시간을 선택해주세요'}
+              <CalendarIcon>📅</CalendarIcon>
+            </DateInputButton>
+          </DatePickerWrapper>
+          {showDatePicker && (
+            <DatePickerDropdown
+              className="date-picker-dropdown"
+              style={{
+                top: `${datePickerPosition.top}px`,
+                left: `${datePickerPosition.left}px`,
+              }}
+            >
+              <CalendarContainer>
+                <CalendarHeader>
+                  <NavButton
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const current = selectedDate || new Date();
+                      const newDate = new Date(current.getFullYear(), current.getMonth() - 1, 1);
+                      setSelectedDate(newDate);
+                    }}
+                  >
+                    ‹
+                  </NavButton>
+                  <MonthYear>
+                    {selectedDate
+                      ? `${selectedDate.getFullYear()}년 ${selectedDate.getMonth() + 1}월`
+                      : `${new Date().getFullYear()}년 ${new Date().getMonth() + 1}월`}
+                  </MonthYear>
+                  <NavButton
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const current = selectedDate || new Date();
+                      const newDate = new Date(current.getFullYear(), current.getMonth() + 1, 1);
+                      setSelectedDate(newDate);
+                    }}
+                  >
+                    ›
+                  </NavButton>
+                </CalendarHeader>
+                <CalendarGrid>
+                  {['일', '월', '화', '수', '목', '금', '토'].map((day) => (
+                    <CalendarDayHeader key={day}>{day}</CalendarDayHeader>
+                  ))}
+                  {getCalendarDays(selectedDate || new Date()).map((day, index) => {
+                    const now = new Date();
+                    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                    const dayDate = new Date(day.getFullYear(), day.getMonth(), day.getDate());
+
+                    const isToday = dayDate.getTime() === today.getTime();
+                    const isSelected = selectedDate &&
+                      dayDate.getTime() === new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate()).getTime();
+                    const isPast = dayDate < today;
+                    const isCurrentMonth = day.getMonth() === (selectedDate || new Date()).getMonth();
+
+                    return (
+                      <CalendarDay
+                        key={index}
+                        type="button"
+                        isToday={isToday}
+                        isSelected={isSelected}
+                        isPast={isPast}
+                        isCurrentMonth={isCurrentMonth}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (!isPast && isCurrentMonth) {
+                            handleDateSelect(day);
+                          }
+                        }}
+                      >
+                        {day.getDate()}
+                      </CalendarDay>
+                    );
+                  })}
+                </CalendarGrid>
+                <TimeSelector>
+                  <TimeLabel>시간 선택:</TimeLabel>
+                  <TimeInputs>
+                    <TimeInput
+                      type="number"
+                      min="0"
+                      max="23"
+                      value={selectedTime.hour}
+                      onChange={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleTimeChange('hour', e.target.value);
+                      }}
+                      onBlur={(e) => {
+                        if (e.target.value === '' || parseInt(e.target.value) < 0) {
+                          handleTimeChange('hour', '0');
+                        }
+                      }}
+                    />
+                    <TimeSeparator>:</TimeSeparator>
+                    <TimeInput
+                      type="number"
+                      min="0"
+                      max="59"
+                      value={selectedTime.minute}
+                      onChange={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleTimeChange('minute', e.target.value);
+                      }}
+                      onBlur={(e) => {
+                        if (e.target.value === '' || parseInt(e.target.value) < 0) {
+                          handleTimeChange('minute', '0');
+                        }
+                      }}
+                    />
+                  </TimeInputs>
+                </TimeSelector>
+                <DatePickerActions>
+                  <DatePickerButton onClick={() => setShowDatePicker(false)}>
+                    확인
+                  </DatePickerButton>
+                </DatePickerActions>
+              </CalendarContainer>
+            </DatePickerDropdown>
+          )}
           <HelperText>선택 사항입니다. 필요한 경우 정확한 일시를 입력하세요.</HelperText>
         </Field>
 
@@ -492,6 +831,226 @@ const SecondaryButton = styled.button`
   &:disabled {
     opacity: 0.6;
     cursor: not-allowed;
+  }
+`;
+
+const DatePickerWrapper = styled.div`
+  position: relative;
+`;
+
+const DateInputButton = styled.button`
+  width: 100%;
+  padding: ${(props) => props.theme.spacing.md};
+  border: 1px solid ${(props) => props.theme.colors.border};
+  border-radius: ${(props) => props.theme.borderRadius.lg};
+  background: ${(props) => props.theme.colors.surfaceElevated};
+  color: ${(props) => props.hasValue ? props.theme.colors.text : props.theme.colors.textSecondary};
+  font-size: 1rem;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: all 0.2s;
+
+  &:hover:not(:disabled) {
+    border-color: ${(props) => props.theme.colors.primary};
+  }
+
+  &:focus:not(:disabled) {
+    outline: none;
+    border-color: ${(props) => props.theme.colors.primary};
+    box-shadow: 0 0 0 3px rgba(255, 126, 54, 0.2);
+  }
+
+  &:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+  }
+`;
+
+const CalendarIcon = styled.span`
+  font-size: 1.2rem;
+`;
+
+const DatePickerDropdown = styled.div`
+  position: fixed;
+  z-index: 2000;
+  background: ${(props) => props.theme.colors.surface};
+  border: 1px solid ${(props) => props.theme.colors.border};
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  padding: 1rem;
+  min-width: 320px;
+  animation: slideDown 0.2s ease-out;
+  
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @media (max-width: 768px) {
+    min-width: 280px;
+    max-width: 90vw;
+    padding: 0.75rem;
+  }
+`;
+
+const CalendarContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+`;
+
+const CalendarHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+`;
+
+const NavButton = styled.button`
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: ${(props) => props.theme.colors.background};
+  color: ${(props) => props.theme.colors.text};
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+
+  &:hover {
+    background: ${(props) => props.theme.colors.primary};
+    color: white;
+  }
+`;
+
+const MonthYear = styled.div`
+  font-weight: 600;
+  font-size: 1.1rem;
+  color: ${(props) => props.theme.colors.text};
+`;
+
+const CalendarGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.25rem;
+`;
+
+const CalendarDayHeader = styled.div`
+  text-align: center;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: ${(props) => props.theme.colors.textSecondary};
+  padding: 0.5rem 0;
+`;
+
+const CalendarDay = styled.button`
+  aspect-ratio: 1;
+  border: none;
+  background: ${(props) => {
+    if (props.isSelected) return props.theme.colors.primary;
+    if (props.isToday) return props.theme.colors.primary + '20';
+    return 'transparent';
+  }};
+  color: ${(props) => {
+    if (props.isSelected) return 'white';
+    if (!props.isCurrentMonth) return props.theme.colors.textSecondary + '60';
+    if (props.isPast) return props.theme.colors.textSecondary + '80';
+    return props.theme.colors.text;
+  }};
+  border-radius: 6px;
+  cursor: ${(props) => (props.isPast || !props.isCurrentMonth) ? 'not-allowed' : 'pointer'};
+  font-size: 0.9rem;
+  font-weight: ${(props) => (props.isToday || props.isSelected) ? '600' : '400'};
+  transition: all 0.2s;
+  opacity: ${(props) => (props.isPast || !props.isCurrentMonth) ? 0.5 : 1};
+
+  &:hover:not(:disabled) {
+    background: ${(props) => {
+    if (props.isSelected) return props.theme.colors.primary;
+    if (props.isPast || !props.isCurrentMonth) return 'transparent';
+    return props.theme.colors.primary + '20';
+  }};
+    transform: ${(props) => (props.isPast || !props.isCurrentMonth) ? 'none' : 'scale(1.1)'};
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+  }
+`;
+
+const TimeSelector = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: ${(props) => props.theme.colors.background};
+  border-radius: 8px;
+  border: 1px solid ${(props) => props.theme.colors.border};
+`;
+
+const TimeLabel = styled.div`
+  font-weight: 600;
+  color: ${(props) => props.theme.colors.text};
+`;
+
+const TimeInputs = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+`;
+
+const TimeInput = styled.input`
+  width: 60px;
+  padding: 0.5rem;
+  border: 1px solid ${(props) => props.theme.colors.border};
+  border-radius: 6px;
+  text-align: center;
+  font-size: 1rem;
+  background: ${(props) => props.theme.colors.surface};
+  color: ${(props) => props.theme.colors.text};
+
+  &:focus {
+    outline: none;
+    border-color: ${(props) => props.theme.colors.primary};
+  }
+`;
+
+const TimeSeparator = styled.span`
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: ${(props) => props.theme.colors.text};
+`;
+
+const DatePickerActions = styled.div`
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+`;
+
+const DatePickerButton = styled.button`
+  padding: 0.5rem 1.5rem;
+  border: none;
+  border-radius: 6px;
+  background: ${(props) => props.theme.colors.primary};
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    background: ${(props) => props.theme.colors.primary}dd;
   }
 `;
 

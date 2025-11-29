@@ -49,6 +49,12 @@ public class MissingPetBoardService {
     public MissingPetBoardDTO getBoard(Long id) {
         MissingPetBoard board = boardRepository.findByIdWithUser(id)
                 .orElseThrow(() -> new IllegalArgumentException("Missing pet board not found"));
+
+        // 삭제된 게시글인지 확인
+        if (board.getIsDeleted()) {
+            throw new IllegalArgumentException("Missing pet board not found");
+        }
+
         return mapBoardWithAttachments(board);
     }
 
@@ -76,7 +82,8 @@ public class MissingPetBoardService {
 
         MissingPetBoard saved = boardRepository.save(board);
         if (dto.getImageUrl() != null) {
-            attachmentFileService.syncSingleAttachment(FileTargetType.MISSING_PET, saved.getIdx(), dto.getImageUrl(), null);
+            attachmentFileService.syncSingleAttachment(FileTargetType.MISSING_PET, saved.getIdx(), dto.getImageUrl(),
+                    null);
         }
         return mapBoardWithAttachments(saved);
     }
@@ -126,7 +133,8 @@ public class MissingPetBoardService {
             board.setStatus(dto.getStatus());
         }
         if (dto.getImageUrl() != null) {
-            attachmentFileService.syncSingleAttachment(FileTargetType.MISSING_PET, board.getIdx(), dto.getImageUrl(), null);
+            attachmentFileService.syncSingleAttachment(FileTargetType.MISSING_PET, board.getIdx(), dto.getImageUrl(),
+                    null);
         }
 
         return mapBoardWithAttachments(board);

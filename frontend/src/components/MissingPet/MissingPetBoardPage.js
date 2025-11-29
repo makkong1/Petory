@@ -474,11 +474,15 @@ const CardImage = styled.div`
   width: 100%;
   height: 180px;
   background: ${(props) => props.theme.colors.surfaceHover};
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 
   img {
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: contain;
   }
 `;
 

@@ -645,11 +645,23 @@ const Divider = styled.hr`
 const Preview = styled.div`
   border-left: 1px solid ${(props) => props.theme.colors.border};
   background: ${(props) => props.theme.colors.surface};
+  min-height: 300px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
 
   img {
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: contain;
+    max-height: 500px;
+  }
+
+  @media (max-width: 720px) {
+    border-left: none;
+    border-top: 1px solid ${(props) => props.theme.colors.border};
+    min-height: 250px;
   }
 `;
 
