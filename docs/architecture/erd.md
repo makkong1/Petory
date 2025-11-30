@@ -1,21 +1,23 @@
 # 데이터베이스 ERD
 
-## 핵심 테이블 관계도
+## 전체 데이터베이스 ERD
 
 ```mermaid
 erDiagram
+    %% User 도메인
     users ||--o{ pet : "소유"
+    users ||--o{ social_user : "소셜계정"
+    users ||--o{ user_sanction : "제재받음"
+    users ||--o{ user_sanction_admin : "제재처리"
+    
+    pet ||--o{ pet_vaccination : "백신접종"
+    
+    %% Board 도메인
     users ||--o{ board : "작성"
     users ||--o{ comment : "작성"
     users ||--o{ board_reaction : "반응"
-    users ||--o{ care_request : "요청"
-    users ||--o{ care_application : "지원"
-    users ||--o{ missing_pet_board : "신고"
-    users ||--o{ meetup : "주최"
-    users ||--o{ meetup_participants : "참여"
-    users ||--o{ notification : "수신"
-    users ||--o{ report : "신고"
-    users ||--o{ user_sanction : "제재받음"
+    users ||--o{ comment_reaction : "반응"
+    users ||--o{ board_view_log : "조회"
     
     board ||--o{ comment : "포함"
     board ||--o{ board_reaction : "반응받음"
@@ -24,30 +26,71 @@ erDiagram
     
     comment ||--o{ comment_reaction : "반응받음"
     
+    %% Missing Pet 도메인
+    users ||--o{ missing_pet_board : "신고"
+    missing_pet_board ||--o{ missing_pet_comment : "댓글"
+    users ||--o{ missing_pet_comment : "작성"
+    
+    %% Care 도메인
+    users ||--o{ care_request : "요청"
+    users ||--o{ care_application : "지원"
+    users ||--o{ care_request_comment : "댓글작성"
+    users ||--o{ care_review_reviewer : "리뷰작성"
+    users ||--o{ care_review_reviewee : "리뷰받음"
+    
+    pet ||--o{ care_request : "대상"
     care_request ||--o{ care_application : "지원받음"
     care_request ||--o{ care_request_comment : "댓글"
     care_request ||--|| care_review : "리뷰"
-    care_request }o--|| pet : "대상"
     
+    %% Meetup 도메인
+    users ||--o{ meetup : "주최"
+    users ||--o{ meetup_participants : "참여"
     meetup ||--o{ meetup_participants : "참여자"
     
-    location_service ||--o{ location_service_review : "리뷰"
+    %% Location 도메인
+    users ||--o{ location_service_review : "리뷰작성"
+    location_service ||--o{ location_service_review : "리뷰받음"
+    
+    %% Notification 도메인
+    users ||--o{ notification : "수신"
+    
+    %% Report 도메인
+    users ||--o{ report_reporter : "신고"
+    users ||--o{ report_handler : "처리"
+    report ||--o{ report_reporter : "신고자"
+    report ||--o{ report_handler : "처리자"
+    
+    %% File 도메인 (폴리모픽)
+    attachment_file }o--|| users : "USER_PROFILE"
+    attachment_file }o--|| pet : "PET_PROFILE"
+    attachment_file }o--|| board : "BOARD"
+    attachment_file }o--|| care_request : "CARE_REQUEST"
+    attachment_file }o--|| missing_pet_board : "MISSING_PET"
+    attachment_file }o--|| location_service : "LOCATION_SERVICE"
+    
+    %% Statistics 도메인 (집계 데이터, 연관관계 없음)
     
     users {
         bigint idx PK
         varchar id UK "로그인ID"
         varchar username UK
         varchar email UK
+        varchar phone
         varchar password
-        enum role "USER,ADMIN"
+        enum role "USER,ADMIN,SERVICE_PROVIDER,MASTER"
         varchar location
         text pet_info
         varchar refresh_token
+        datetime refresh_expiration
         datetime last_login_at
         enum status "ACTIVE,SUSPENDED,BANNED"
         int warning_count
         datetime suspended_until
         boolean is_deleted
+        datetime deleted_at
+        datetime created_at
+        datetime updated_at
     }
     
     pet {
@@ -59,6 +102,40 @@ erDiagram
         int age
         varchar gender
         varchar image_url
+        text description
+        datetime created_at
+        datetime updated_at
+    }
+    
+    pet_vaccination {
+        bigint idx PK
+        bigint pet_idx FK
+        varchar vaccine_name
+        date vaccinated_at
+        date next_due
+        varchar notes
+        boolean is_deleted
+        datetime created_at
+        datetime updated_at
+    }
+    
+    social_user {
+        bigint idx PK
+        bigint users_idx FK
+        enum provider "KAKAO,GOOGLE,NAVER"
+        varchar provider_id
+        datetime created_at
+        datetime updated_at
+    }
+    
+    user_sanction {
+        bigint idx PK
+        bigint user_idx FK
+        bigint sanctioned_by FK
+        enum type "WARNING,SUSPENSION,BAN"
+        text reason
+        datetime started_at
+        datetime ended_at
     }
     
     board {
@@ -74,6 +151,7 @@ erDiagram
         int comment_count
         datetime last_reaction_at
         boolean is_deleted
+        datetime deleted_at
     }
     
     comment {
@@ -81,9 +159,10 @@ erDiagram
         bigint board_idx FK
         bigint user_idx FK
         text content
-        enum status
+        enum status "ACTIVE,HIDDEN,DELETED"
         datetime created_at
         boolean is_deleted
+        datetime deleted_at
     }
     
     board_reaction {
@@ -94,131 +173,12 @@ erDiagram
         datetime created_at
     }
     
-    care_request {
+    comment_reaction {
         bigint idx PK
+        bigint comment_idx FK
         bigint user_idx FK
-        bigint pet_idx FK
-        varchar title
-        text description
-        datetime date
-        enum status "OPEN,IN_PROGRESS,COMPLETED,CANCELLED"
+        enum type "LIKE,DISLIKE"
         datetime created_at
-        boolean is_deleted
-    }
-    
-    care_application {
-        bigint idx PK
-        bigint care_request_idx FK
-        bigint applicant_idx FK
-        text message
-        enum status "PENDING,APPROVED,REJECTED"
-        datetime created_at
-    }
-    
-    care_review {
-        bigint idx PK
-        bigint care_request_idx FK
-        bigint reviewer_idx FK
-        bigint reviewee_idx FK
-        int rating "1-5"
-        text content
-        datetime created_at
-    }
-    
-    missing_pet_board {
-        bigint idx PK
-        bigint user_idx FK
-        varchar title
-        text content
-        varchar pet_name
-        varchar species
-        varchar breed
-        enum gender "MALE,FEMALE,UNKNOWN"
-        varchar color
-        date lost_date
-        varchar lost_location
-        decimal latitude
-        decimal longitude
-        enum status "MISSING,FOUND,CLOSED"
-        boolean is_deleted
-    }
-    
-    meetup {
-        bigint idx PK
-        bigint organizer_idx FK
-        varchar title
-        text description
-        varchar location
-        decimal latitude
-        decimal longitude
-        datetime date
-        int max_participants
-        int current_participants
-        enum status "RECRUITING,CONFIRMED,COMPLETED,CANCELLED"
-    }
-    
-    meetup_participants {
-        bigint idx PK
-        bigint meetup_idx FK
-        bigint user_idx FK
-        datetime joined_at
-    }
-    
-    location_service {
-        bigint idx PK
-        varchar name
-        varchar category
-        varchar address
-        decimal latitude
-        decimal longitude
-        double rating
-        varchar phone
-        time opening_time
-        time closing_time
-        boolean pet_friendly
-    }
-    
-    location_service_review {
-        bigint idx PK
-        bigint service_idx FK
-        bigint user_idx FK
-        int rating
-        text content
-        datetime created_at
-    }
-    
-    notification {
-        bigint idx PK
-        bigint user_idx FK
-        enum type "COMMENT,REPLY,LIKE,CARE_APPLICATION..."
-        varchar title
-        varchar content
-        bigint related_id
-        varchar related_type
-        boolean is_read
-        datetime created_at
-    }
-    
-    report {
-        bigint idx PK
-        enum target_type "BOARD,COMMENT,CARE_REQUEST,USER"
-        bigint target_idx
-        bigint reporter_idx FK
-        text reason
-        enum status "PENDING,REVIEWING,RESOLVED,REJECTED"
-        bigint handled_by FK
-        datetime handled_at
-        enum action_taken "NONE,WARNING,CONTENT_HIDE,USER_SUSPEND"
-    }
-    
-    user_sanction {
-        bigint idx PK
-        bigint user_idx FK
-        enum type "WARNING,SUSPENSION,BAN"
-        text reason
-        datetime started_at
-        datetime ended_at
-        bigint sanctioned_by FK
     }
     
     board_view_log {
@@ -239,17 +199,181 @@ erDiagram
         double popularity_score
     }
     
+    missing_pet_board {
+        bigint idx PK
+        bigint user_idx FK
+        varchar title
+        text content
+        varchar pet_name
+        varchar species
+        varchar breed
+        enum gender "MALE,FEMALE,UNKNOWN"
+        varchar age
+        varchar color
+        date lost_date
+        varchar lost_location
+        decimal latitude
+        decimal longitude
+        enum status "MISSING,FOUND,CLOSED"
+        boolean is_deleted
+        datetime deleted_at
+        datetime created_at
+        datetime updated_at
+    }
+    
+    missing_pet_comment {
+        bigint idx PK
+        bigint board_idx FK
+        bigint user_idx FK
+        text content
+        boolean is_deleted
+        datetime created_at
+    }
+    
+    care_request {
+        bigint idx PK
+        bigint user_idx FK
+        bigint pet_idx FK
+        varchar title
+        text description
+        datetime date
+        enum status "OPEN,IN_PROGRESS,COMPLETED,CANCELLED"
+        boolean is_deleted
+        datetime deleted_at
+        datetime created_at
+        datetime updated_at
+    }
+    
+    care_application {
+        bigint idx PK
+        bigint care_request_idx FK
+        bigint applicant_idx FK
+        text message
+        enum status "PENDING,APPROVED,REJECTED"
+        datetime created_at
+        datetime updated_at
+    }
+    
+    care_request_comment {
+        bigint idx PK
+        bigint care_request_idx FK
+        bigint user_idx FK
+        text content
+        boolean is_deleted
+        datetime created_at
+    }
+    
+    care_review {
+        bigint idx PK
+        bigint care_request_idx FK
+        bigint reviewer_idx FK
+        bigint reviewee_idx FK
+        int rating "1-5"
+        text content
+        datetime created_at
+    }
+    
+    meetup {
+        bigint idx PK
+        bigint organizer_idx FK
+        varchar title
+        text description
+        varchar location
+        decimal latitude
+        decimal longitude
+        datetime date
+        int max_participants
+        int current_participants
+        enum status "RECRUITING,CONFIRMED,COMPLETED,CANCELLED"
+        datetime created_at
+        datetime updated_at
+    }
+    
+    meetup_participants {
+        bigint idx PK
+        bigint meetup_idx FK
+        bigint user_idx FK
+        datetime joined_at
+    }
+    
+    location_service {
+        bigint idx PK
+        varchar name
+        varchar category
+        varchar address
+        varchar detail_address
+        decimal latitude
+        decimal longitude
+        double rating
+        varchar phone
+        time opening_time
+        time closing_time
+        varchar image_url
+        varchar website
+        text description
+        boolean pet_friendly
+        varchar pet_policy
+        datetime created_at
+        datetime updated_at
+    }
+    
+    location_service_review {
+        bigint idx PK
+        bigint service_idx FK
+        bigint user_idx FK
+        int rating "1-5"
+        text comment
+        datetime created_at
+        datetime updated_at
+    }
+    
+    notification {
+        bigint idx PK
+        bigint user_idx FK
+        enum type "COMMENT,REPLY,LIKE,CARE_APPLICATION,CARE_APPROVED,MEETUP_JOINED,REPORT_HANDLED,SYSTEM"
+        varchar title
+        varchar content
+        bigint related_id
+        varchar related_type
+        boolean is_read
+        datetime created_at
+    }
+    
+    report {
+        bigint idx PK
+        enum target_type "BOARD,COMMENT,CARE_REQUEST,MISSING_PET,USER,LOCATION_SERVICE"
+        bigint target_idx
+        bigint reporter_idx FK
+        text reason
+        enum status "PENDING,REVIEWING,RESOLVED,REJECTED"
+        bigint handled_by FK
+        datetime handled_at
+        enum action_taken "NONE,WARNING,CONTENT_HIDE,CONTENT_DELETE,USER_SUSPEND,USER_BAN"
+        text admin_note
+        datetime created_at
+        datetime updated_at
+    }
+    
     attachment_file {
         bigint idx PK
-        enum target_type "BOARD,CARE_REQUEST,MISSING_PET,USER_PROFILE"
+        enum target_type "BOARD,CARE_REQUEST,MISSING_PET,USER_PROFILE,PET_PROFILE,LOCATION_SERVICE"
         bigint target_idx
-        varchar original_filename
-        varchar stored_filename
         varchar file_path
-        varchar file_extension
-        bigint file_size
-        varchar content_type
-        datetime uploaded_at
+        varchar file_type
+        datetime created_at
+    }
+    
+    daily_statistics {
+        bigint id PK
+        date stat_date UK
+        int new_users
+        int new_posts
+        int new_care_requests
+        int completed_cares
+        decimal total_revenue
+        int active_users
+        datetime created_at
+        datetime updated_at
     }
 ```
 
@@ -377,21 +501,6 @@ ON care_request(title, description);
 - **DECIMAL(15,12)**: 정확한 좌표값 (latitude, longitude)
 - **DOUBLE**: 근사값 허용 (rating, popularity_score)
 
-### 테이블 크기 예상
-
-| 테이블 | 예상 행 수 | 평균 행 크기 | 예상 크기 |
-|--------|-----------|-------------|----------|
-| users | 100,000 | ~500B | 50MB |
-| board | 500,000 | ~2KB | 1GB |
-| comment | 2,000,000 | ~500B | 1GB |
-| board_reaction | 5,000,000 | ~50B | 250MB |
-| board_view_log | 10,000,000 | ~30B | 300MB |
-| care_request | 50,000 | ~1KB | 50MB |
-| missing_pet_board | 10,000 | ~1KB | 10MB |
-| notification | 1,000,000 | ~200B | 200MB |
-
-**총 예상 크기:** ~3GB (데이터만, 인덱스 제외)
-
 ### 파티셔닝 전략 (대용량 데이터 대비)
 
 #### 날짜 기반 파티셔닝
@@ -464,81 +573,3 @@ PARTITIONS 10;
    ```sql
    DELETE FROM notification WHERE is_read = true AND created_at < DATE_SUB(NOW(), INTERVAL 30 DAY);
    ```
-
-### 마이그레이션 스크립트 예시
-
-#### 1단계: 테이블 생성
-```sql
-CREATE DATABASE petory CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
-USE petory;
-
--- users 테이블
-CREATE TABLE users (
-    idx BIGINT AUTO_INCREMENT PRIMARY KEY,
-    id VARCHAR(50) NOT NULL UNIQUE,
-    username VARCHAR(50) NOT NULL UNIQUE,
-    email VARCHAR(255) NOT NULL UNIQUE,
-    password VARCHAR(255) NOT NULL,
-    role ENUM('USER', 'ADMIN') NOT NULL DEFAULT 'USER',
-    status ENUM('ACTIVE', 'SUSPENDED', 'BANNED') NOT NULL DEFAULT 'ACTIVE',
-    warning_count INT NOT NULL DEFAULT 0,
-    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_users_status (status, is_deleted),
-    INDEX idx_users_created (created_at DESC)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- board 테이블
-CREATE TABLE board (
-    idx BIGINT AUTO_INCREMENT PRIMARY KEY,
-    user_idx BIGINT NOT NULL,
-    title VARCHAR(200) NOT NULL,
-    content TEXT,
-    category VARCHAR(50),
-    status ENUM('ACTIVE', 'HIDDEN', 'DELETED') NOT NULL DEFAULT 'ACTIVE',
-    view_count INT NOT NULL DEFAULT 0,
-    like_count INT NOT NULL DEFAULT 0,
-    comment_count INT NOT NULL DEFAULT 0,
-    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY fk_board_user (user_idx) REFERENCES users(idx) ON DELETE CASCADE,
-    INDEX idx_board_user (user_idx, is_deleted, created_at DESC),
-    INDEX idx_board_category (category, is_deleted, created_at DESC),
-    FULLTEXT INDEX idx_board_fulltext (title, content)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-```
-
-#### 2단계: 초기 데이터
-```sql
--- 관리자 계정 생성
-INSERT INTO users (id, username, email, password, role) 
-VALUES ('admin', 'Administrator', 'admin@petory.com', '$2a$10$hashed_password', 'ADMIN');
-```
-
-### 성능 모니터링 쿼리
-
-```sql
--- 느린 쿼리 확인
-SELECT * FROM mysql.slow_log ORDER BY query_time DESC LIMIT 10;
-
--- 테이블 크기 확인
-SELECT 
-    table_name,
-    ROUND(((data_length + index_length) / 1024 / 1024), 2) AS "Size (MB)"
-FROM information_schema.tables
-WHERE table_schema = 'petory'
-ORDER BY (data_length + index_length) DESC;
-
--- 인덱스 사용률 확인
-SELECT 
-    table_name,
-    index_name,
-    cardinality,
-    seq_in_index
-FROM information_schema.statistics
-WHERE table_schema = 'petory'
-ORDER BY table_name, index_name;
-```
-
