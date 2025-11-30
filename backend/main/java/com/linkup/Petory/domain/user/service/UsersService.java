@@ -16,7 +16,6 @@ import com.linkup.Petory.domain.user.dto.UserPageResponseDTO;
 import com.linkup.Petory.domain.user.entity.UserStatus;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
-import com.linkup.Petory.domain.user.service.PetService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -190,7 +189,7 @@ public class UsersService {
         Users user = usersRepository.findByIdString(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
         UsersDTO userDTO = usersConverter.toDTO(user);
-        
+
         // 펫 정보 추가
         try {
             List<PetDTO> pets = petService.getPetsByUserId(userId);
@@ -200,10 +199,10 @@ public class UsersService {
             log.warn("펫 정보 조회 실패: {}", e.getMessage());
             userDTO.setPets(List.of());
         }
-        
+
         return userDTO;
     }
-    
+
     /**
      * 사용자 프로필 조회 (펫 정보 포함) - 관리자용
      */
@@ -212,7 +211,7 @@ public class UsersService {
         Users user = usersRepository.findById(userIdx)
                 .orElseThrow(() -> new RuntimeException("User not found"));
         UsersDTO userDTO = usersConverter.toDTO(user);
-        
+
         // 펫 정보 추가
         try {
             List<PetDTO> pets = petService.getPetsByUserIdx(userIdx);
@@ -221,7 +220,7 @@ public class UsersService {
             log.warn("펫 정보 조회 실패: {}", e.getMessage());
             userDTO.setPets(List.of());
         }
-        
+
         return userDTO;
     }
 
