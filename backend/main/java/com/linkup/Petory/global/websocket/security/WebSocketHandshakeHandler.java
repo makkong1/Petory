@@ -7,8 +7,6 @@ import org.springframework.http.server.ServerHttpRequest;
 import org.springframework.web.socket.WebSocketHandler;
 import org.springframework.web.socket.server.support.DefaultHandshakeHandler;
 
-import com.linkup.Petory.global.websocket.security.StompPrincipal;
-
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -22,18 +20,17 @@ public class WebSocketHandshakeHandler extends DefaultHandshakeHandler {
     protected Principal determineUser(ServerHttpRequest request,
             WebSocketHandler wsHandler,
             Map<String, Object> attributes) {
-        
+
         // WebSocketAuthenticationInterceptor에서 저장한 userId 사용
         String userId = (String) attributes.get("userId");
-        
+
         if (userId != null) {
             log.debug("WebSocket Principal 설정: userId={}", userId);
             return new StompPrincipal(userId);
         }
-        
+
         log.warn("WebSocket Principal 설정 실패: userId가 없음");
         return null;
     }
 
 }
-

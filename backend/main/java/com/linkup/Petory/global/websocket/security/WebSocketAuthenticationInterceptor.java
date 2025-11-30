@@ -1,14 +1,10 @@
 package com.linkup.Petory.global.websocket.security;
 
-import java.security.Principal;
 import java.util.Map;
 
 import org.springframework.http.server.ServerHttpRequest;
 import org.springframework.http.server.ServerHttpResponse;
 import org.springframework.lang.NonNull;
-import org.springframework.messaging.simp.stomp.StompCommand;
-import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
-import org.springframework.messaging.support.MessageHeaderAccessor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -17,7 +13,6 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.WebSocketHandler;
 import org.springframework.web.socket.server.HandshakeInterceptor;
-import org.springframework.web.socket.server.support.DefaultHandshakeHandler;
 
 import com.linkup.Petory.util.JwtUtil;
 
@@ -44,7 +39,7 @@ public class WebSocketAuthenticationInterceptor implements HandshakeInterceptor 
             @NonNull ServerHttpResponse response,
             @NonNull WebSocketHandler wsHandler,
             @NonNull Map<String, Object> attributes) throws Exception {
-        
+
         try {
             // 쿼리 파라미터에서 JWT 토큰 추출
             String token = request.getURI().getQuery();
@@ -62,32 +57,32 @@ public class WebSocketAuthenticationInterceptor implements HandshakeInterceptor 
 
             if (token != null && jwtUtil.validateToken(token)) {
                 String userId = jwtUtil.getIdFromToken(token);
-                
+
                 if (userId != null) {
                     // 사용자 정보 로드
                     UserDetails userDetails = userDetailsService.loadUserByUsername(userId);
-                    
+
                     // 인증 객체 생성 및 저장
                     Authentication authentication = new UsernamePasswordAuthenticationToken(
                             userDetails,
                             null,
                             userDetails.getAuthorities());
-                    
+
                     SecurityContextHolder.getContext().setAuthentication(authentication);
-                    
+
                     // WebSocket 세션에 사용자 ID 저장
                     attributes.put("userId", userId);
                     attributes.put("authentication", authentication);
-                    
+
                     log.info("WebSocket 인증 성공: userId={}", userId);
                     return true;
                 }
             }
-            
+
             log.warn("WebSocket 인증 실패: 토큰이 없거나 유효하지 않음");
             response.setStatusCode(org.springframework.http.HttpStatus.UNAUTHORIZED);
             return false;
-            
+
         } catch (Exception e) {
             log.error("WebSocket 인증 처리 중 오류: {}", e.getMessage(), e);
             response.setStatusCode(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR);
@@ -109,4 +104,3 @@ public class WebSocketAuthenticationInterceptor implements HandshakeInterceptor 
         }
     }
 }
-

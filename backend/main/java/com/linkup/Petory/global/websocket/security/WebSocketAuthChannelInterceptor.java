@@ -1,7 +1,5 @@
 package com.linkup.Petory.global.websocket.security;
 
-import java.security.Principal;
-
 import org.springframework.lang.NonNull;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
@@ -16,7 +14,6 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.stereotype.Component;
 
-import com.linkup.Petory.global.websocket.security.StompPrincipal;
 import com.linkup.Petory.util.JwtUtil;
 
 import lombok.RequiredArgsConstructor;
@@ -37,18 +34,18 @@ public class WebSocketAuthChannelInterceptor implements ChannelInterceptor {
     @Override
     public Message<?> preSend(@NonNull Message<?> message, @NonNull MessageChannel channel) {
         StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
-        
+
         if (accessor == null) {
             return message;
         }
 
         StompCommand command = accessor.getCommand();
-        
+
         // CONNECT, SUBSCRIBE, SEND 명령어에 대해서만 인증 체크
-        if (command == StompCommand.CONNECT || 
-            command == StompCommand.SUBSCRIBE || 
-            command == StompCommand.SEND) {
-            
+        if (command == StompCommand.CONNECT ||
+                command == StompCommand.SUBSCRIBE ||
+                command == StompCommand.SEND) {
+
             // JWT 토큰 추출 (헤더 또는 세션에서)
             String token = accessor.getFirstNativeHeader("Authorization");
             if (token != null && token.startsWith("Bearer ")) {
@@ -57,10 +54,10 @@ public class WebSocketAuthChannelInterceptor implements ChannelInterceptor {
 
             // 세션에서 토큰 또는 인증 정보 가져오기
             Authentication auth = (Authentication) accessor.getSessionAttributes().get("authentication");
-            
+
             if (auth == null && token != null && jwtUtil.validateToken(token)) {
                 String userId = jwtUtil.getIdFromToken(token);
-                
+
                 if (userId != null) {
                     try {
                         UserDetails userDetails = userDetailsService.loadUserByUsername(userId);
@@ -68,17 +65,17 @@ public class WebSocketAuthChannelInterceptor implements ChannelInterceptor {
                                 userDetails,
                                 null,
                                 userDetails.getAuthorities());
-                        
+
                         // 세션에 저장
                         accessor.getSessionAttributes().put("authentication", auth);
                         accessor.getSessionAttributes().put("userId", userId);
-                        
+
                         // SecurityContext에 설정
                         SecurityContextHolder.getContext().setAuthentication(auth);
-                        
+
                         // Principal 설정 (STOMP에서 사용)
                         accessor.setUser(new StompPrincipal(userId));
-                        
+
                         log.debug("WebSocket 메시지 인증 성공: userId={}, command={}", userId, command);
                     } catch (Exception e) {
                         log.error("WebSocket 메시지 인증 실패: {}", e.getMessage());
@@ -90,7 +87,7 @@ public class WebSocketAuthChannelInterceptor implements ChannelInterceptor {
             // 이미 인증된 경우
             if (auth != null) {
                 SecurityContextHolder.getContext().setAuthentication(auth);
-                
+
                 // Principal이 없으면 설정
                 if (accessor.getUser() == null) {
                     String userId = (String) accessor.getSessionAttributes().get("userId");
@@ -109,4 +106,3 @@ public class WebSocketAuthChannelInterceptor implements ChannelInterceptor {
     }
 
 }
-

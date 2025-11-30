@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
 import com.linkup.Petory.domain.user.entity.Users;
 
 @Entity
-@Table(name = "conversation_participant")
+@Table(name = "conversationparticipant")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -106,4 +106,3 @@ public class ConversationParticipant {
         }
     }
 }
-
