@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@stomp/stompjs": "^7.2.1",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.0",
@@ -13,6 +14,7 @@
     "react-scripts": "5.0.1",
     "react-window": "^2.2.3",
     "recharts": "^3.4.1",
+    "socketjs-client": "^1.0.2",
     "styled-components": "^6.1.19",
     "web-vitals": "^2.1.4"
   },

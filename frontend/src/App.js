@@ -16,6 +16,7 @@ import ScrollToTopBottom from './components/Common/ScrollToTopBottom';
 import MissingPetBoardPage from './components/MissingPet/MissingPetBoardPage';
 import ActivityPage from './components/Activity/ActivityPage';
 import MeetupPage from './components/Meetup/MeetupPage';
+import ChatWidget from './components/Chat/ChatWidget';
 import { setupApiInterceptors } from './api/authApi';
 
 
@@ -143,6 +144,7 @@ function AppContent() {
         {renderContent()}
       </MainContent>
       <ScrollToTopBottom />
+      <ChatWidget />
     </>
   );
 }

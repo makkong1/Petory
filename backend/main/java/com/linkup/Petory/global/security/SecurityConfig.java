@@ -46,6 +46,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/users/register").permitAll() // 회원가입 허용
                         .requestMatchers(HttpMethod.GET, "/api/uploads/**").permitAll() // 업로드 파일 공개 조회
                         .requestMatchers("/error").permitAll() // 에러 페이지
+                        .requestMatchers("/ws/**", "/chat/**").permitAll() // WebSocket 엔드포인트 (인증은 인터셉터에서 처리)
                         // MASTER 전용 API - 최상위 권한만 접근 가능
                         .requestMatchers("/api/master/**").hasRole("MASTER")
                         // 관리자 전용 API - ADMIN 또는 MASTER 권한 필요
