@@ -284,6 +284,46 @@ GET    /api/admin/boards        # 게시글 관리
 - **공간 인덱스**: 위치 기반 검색 성능 향상
 - **페이징 처리**: 대량 데이터 조회 시 페이징 적용
 - **지연 로딩**: `@ManyToOne(fetch = FetchType.LAZY)` 적용
+- **N+1 문제 해결**: IN 절을 활용한 배치 조회 (500개 단위)
+  - 효과: 1000개 게시글 기준 2001개 쿼리 → 3개 쿼리로 감소 (99.8% 개선)
+
+---
+
+## 🔄 트랜잭션 관리
+
+### 트랜잭션 전략
+- **@Transactional**: Service 레이어에서 트랜잭션 경계 명확히 설정
+- **읽기 전용 최적화**: `@Transactional(readOnly = true)` 기본값으로 설정 후 쓰기 작업만 명시
+- **격리 수준**: 기본값(REPEATABLE_READ) 사용, 필요 시 명시적 설정
+- **롤백 정책**: RuntimeException 발생 시 자동 롤백
+
+### 주요 사례
+1. **게시글 삭제 시 댓글 일괄 삭제**: 게시글과 댓글을 하나의 트랜잭션으로 처리하여 데이터 일관성 유지
+2. **댓글 추가 시 게시글 카운트 동기화**: 댓글 저장과 카운트 업데이트를 원자적으로 처리
+3. **펫케어 요청 생성 시 펫 소유자 검증**: 펫 검증과 요청 저장을 같은 트랜잭션에서 처리
+
+**상세 사례**: [트랜잭션 관리 & 동시성 제어 사례](./docs/transaction-concurrency-cases.md#트랜잭션-관리-사례)
+
+---
+
+## 🔒 동시성 제어
+
+### 구현 완료 ✅
+- **조회수 중복 방지**: `BoardViewLog`를 통한 사용자별 1회 조회 제한
+- **반응 중복 방지**: Unique 제약조건으로 중복 좋아요/싫어요 방지
+- **스케줄러 중복 실행 방지**: ShedLock을 통한 분산 환경 대응
+
+### 주요 사례
+1. **게시글 조회수 중복 방지**: BoardViewLog 테이블로 사용자당 1회만 조회수 증가
+2. **좋아요/싫어요 중복 방지**: Unique 제약조건 + 예외 처리로 동시 클릭 시 하나만 저장
+3. **댓글 수 동기화**: UPDATE 쿼리로 원자적 증가 (개선 계획)
+
+### 개선 계획 🔄
+- **낙관적 락**: `@Version`을 활용한 동시 수정 방지
+- **비관적 락**: `@Lock(LockModeType.PESSIMISTIC_WRITE)`를 통한 동시성 제어
+- **분산 락**: Redis 기반 분산 락 도입 (Redisson)
+
+**상세 사례**: [트랜잭션 관리 & 동시성 제어 사례](./docs/transaction-concurrency-cases.md#동시성-제어-사례)
 
 ---
 
@@ -299,6 +339,11 @@ GET    /api/admin/boards        # 게시글 관리
 
 ## 📚 상세 문서
 
+### 백엔드 아키텍처
+- [백엔드 아키텍처 문서](./docs/README.md) - 도메인별 상세 설명, ERD, 성능 최적화
+- [트랜잭션 관리 & 동시성 제어 사례](./docs/transaction-concurrency-cases.md) - 실제 코드 기반 사례
+
+### 전략 문서
 - [통계 시스템 전략](./md/ADMIN_STATISTICS_STRATEGY.md)
 - [알림 시스템 전략](./md/NOTIFICATION_STRATEGY.md)
 - [실시간 알림 구현](./md/REALTIME_NOTIFICATION_IMPLEMENTATION.md)
