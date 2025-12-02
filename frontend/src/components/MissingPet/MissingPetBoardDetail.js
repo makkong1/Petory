@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import styled from 'styled-components';
 import { missingPetApi } from '../../api/missingPetApi';
 import { reportApi } from '../../api/reportApi';
+import { startMissingPetChat } from '../../api/chatApi';
 import AddressMapSelector from './AddressMapSelector';
 
 const statusLabel = {
@@ -102,6 +103,7 @@ const MissingPetBoardDetail = ({
 
   const canManageStatus = currentUser && currentUser.idx === board.userId;
   const canDeleteBoard = currentUser && currentUser.idx === board.userId;
+  const isReporter = currentUser && currentUser.idx === board.userId;
 
   const handleDeleteBoard = async () => {
     if (!canDeleteBoard) {
@@ -166,6 +168,30 @@ const MissingPetBoardDetail = ({
       alert('신고가 접수되었습니다.');
     } catch (err) {
       alert(err.response?.data?.error || err.message || '신고 처리에 실패했습니다.');
+    }
+  };
+
+  const handleStartChat = async () => {
+    if (!currentUser) {
+      window.dispatchEvent(new Event('showPermissionModal'));
+      return;
+    }
+
+    if (isReporter) {
+      alert('본인의 제보에는 채팅을 시작할 수 없습니다.');
+      return;
+    }
+
+    try {
+      const conversation = await startMissingPetChat(board.idx, currentUser.idx);
+      // 채팅 위젯 열기
+      if (window.openChatWidget) {
+        window.openChatWidget(conversation.idx);
+      } else {
+        alert('채팅방이 생성되었습니다. 채팅 목록에서 확인해주세요.');
+      }
+    } catch (err) {
+      alert(err.response?.data?.error || err.message || '채팅 시작에 실패했습니다.');
     }
   };
 
@@ -269,6 +295,17 @@ const MissingPetBoardDetail = ({
                 </InfoItem>
               )}
             </InfoGrid>
+
+            {!isReporter && currentUser && (
+              <>
+                <Divider />
+                <WitnessButtonContainer>
+                  <WitnessButton type="button" onClick={handleStartChat}>
+                    실종동물 목격했어요
+                  </WitnessButton>
+                </WitnessButtonContainer>
+              </>
+            )}
 
             {canManageStatus && (
               <>
@@ -865,6 +902,42 @@ const CommentLocation = styled.div`
   font-size: 0.9rem;
   color: ${(props) => props.theme.colors.text};
   font-weight: 500;
+`;
+
+const WitnessButtonContainer = styled.div`
+  display: flex;
+  justify-content: center;
+  margin: ${(props) => props.theme.spacing.md} 0;
+`;
+
+const WitnessButton = styled.button`
+  background: ${(props) => props.theme.colors.primary};
+  color: white;
+  border: none;
+  border-radius: ${(props) => props.theme.borderRadius.md};
+  padding: ${(props) => props.theme.spacing.md} ${(props) => props.theme.spacing.xl};
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+  max-width: 300px;
+
+  &:hover:not(:disabled) {
+    background: ${(props) => props.theme.colors.primaryHover || props.theme.colors.primary};
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
 `;
 
 const AddressToggleButton = styled.button`

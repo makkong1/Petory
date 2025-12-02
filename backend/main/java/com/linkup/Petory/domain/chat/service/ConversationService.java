@@ -378,5 +378,52 @@ public class ConversationService {
             participantRepository.save(participant.get());
         }
     }
+
+    /**
+     * 실종제보 채팅방 생성 또는 조회
+     * 같은 제보에 대해 여러 목격자가 있을 수 있으므로,
+     * 제보자-목격자 조합별로 개별 채팅방 생성
+     */
+    @Transactional
+    public ConversationDTO createMissingPetChat(Long boardIdx, Long reporterId, Long witnessId) {
+        // 목격자가 제보자와 같은 경우 체크
+        if (reporterId.equals(witnessId)) {
+            throw new IllegalArgumentException("본인의 제보에는 채팅을 시작할 수 없습니다.");
+        }
+
+        // 같은 제보(boardIdx)에 대한 모든 채팅방 조회
+        List<Conversation> conversations = conversationRepository
+                .findByRelatedTypeAndRelatedIdxInAndIsDeletedFalse(
+                    RelatedType.MISSING_PET_BOARD, 
+                    List.of(boardIdx));
+
+        // 제보자와 목격자가 모두 참여한 채팅방 찾기
+        Optional<Conversation> existing = conversations.stream()
+                .filter(conv -> {
+                    List<ConversationParticipant> participants = participantRepository
+                            .findByConversationIdxAndStatus(conv.getIdx(), ParticipantStatus.ACTIVE);
+                    
+                    java.util.Set<Long> participantIds = participants.stream()
+                            .map(p -> p.getUser().getIdx())
+                            .collect(Collectors.toSet());
+                    
+                    return participantIds.contains(reporterId) && participantIds.contains(witnessId);
+                })
+                .findFirst();
+
+        if (existing.isPresent()) {
+            // 기존 채팅방 반환
+            return conversationConverter.toDTO(existing.get());
+        }
+
+        // 새 채팅방 생성
+        return createConversation(
+                ConversationType.MISSING_PET,
+                RelatedType.MISSING_PET_BOARD,
+                boardIdx,
+                null,  // 1:1이므로 제목 없음
+                List.of(reporterId, witnessId)
+        );
+    }
 }
 
