@@ -5,12 +5,16 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
+import com.linkup.Petory.domain.care.dto.CareReviewDTO;
+import com.linkup.Petory.domain.care.service.CareReviewService;
 import com.linkup.Petory.domain.user.dto.UsersDTO;
+import com.linkup.Petory.domain.user.dto.UserProfileWithReviewsDTO;
 import com.linkup.Petory.domain.user.service.UsersService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -24,6 +28,7 @@ import java.util.Map;
 public class UserProfileController {
 
     private final UsersService usersService;
+    private final CareReviewService careReviewService;
 
     /**
      * 현재 로그인한 사용자의 ID 추출
@@ -88,6 +93,35 @@ public class UserProfileController {
 
         UsersDTO updated = usersService.updateMyUsername(userId, newUsername);
         return ResponseEntity.ok(updated);
+    }
+
+    /**
+     * 다른 사용자의 프로필 조회 (리뷰 포함)
+     * - 인증된 사용자는 다른 사용자의 프로필을 조회할 수 있음
+     */
+    @GetMapping("/{userId}/profile")
+    public ResponseEntity<UserProfileWithReviewsDTO> getUserProfile(@PathVariable Long userId) {
+        UsersDTO user = usersService.getUser(userId);
+        List<CareReviewDTO> reviews = careReviewService.getReviewsByReviewee(userId);
+        Double averageRating = careReviewService.getAverageRating(userId);
+        
+        UserProfileWithReviewsDTO profile = UserProfileWithReviewsDTO.builder()
+            .user(user)
+            .reviews(reviews)
+            .averageRating(averageRating)
+            .reviewCount(reviews.size())
+            .build();
+        
+        return ResponseEntity.ok(profile);
+    }
+
+    /**
+     * 특정 사용자의 리뷰 목록 조회
+     */
+    @GetMapping("/{userId}/reviews")
+    public ResponseEntity<List<CareReviewDTO>> getUserReviews(@PathVariable Long userId) {
+        List<CareReviewDTO> reviews = careReviewService.getReviewsByReviewee(userId);
+        return ResponseEntity.ok(reviews);
     }
 }
 

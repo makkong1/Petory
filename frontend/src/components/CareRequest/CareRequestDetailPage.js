@@ -3,8 +3,10 @@ import styled from 'styled-components';
 import { careRequestApi } from '../../api/careRequestApi';
 import { uploadApi } from '../../api/uploadApi';
 import { reportApi } from '../../api/reportApi';
+import { getOrCreateDirectConversation } from '../../api/chatApi';
 import { usePermission } from '../../hooks/usePermission';
 import { useAuth } from '../../contexts/AuthContext';
+import UserProfileModal from '../User/UserProfileModal';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
@@ -31,6 +33,9 @@ const CareRequestDetailPage = ({
   const [commentFilePath, setCommentFilePath] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
+  const [selectedUserId, setSelectedUserId] = useState(null);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isStartingChat, setIsStartingChat] = useState(false);
 
   const formattedDate = useMemo(() => {
     if (!careRequest?.createdAt) {
@@ -280,6 +285,45 @@ const CareRequestDetailPage = ({
     }
   }, [careRequestId, currentUser, careRequest, onCareRequestDeleted, onClose]);
 
+  const handleViewProfile = useCallback((userId) => {
+    setSelectedUserId(userId);
+    setIsProfileModalOpen(true);
+  }, []);
+
+  const handleStartChat = useCallback(async (otherUserId) => {
+    if (!currentUser || !otherUserId) {
+      return;
+    }
+
+    const { requiresRedirect } = requireLogin();
+    if (requiresRedirect) {
+      redirectToLogin();
+      return;
+    }
+
+    try {
+      setIsStartingChat(true);
+      const conversation = await getOrCreateDirectConversation(currentUser.idx, otherUserId);
+      
+      // 채팅 위젯 열기 (ChatWidget가 전역적으로 관리된다고 가정)
+      if (window.openChatWidget) {
+        window.openChatWidget(conversation.idx);
+      } else {
+        // 채팅 탭으로 이동
+        if (window.setActiveTab) {
+          window.setActiveTab('chat');
+        }
+      }
+      
+      alert('채팅방이 열렸습니다.');
+    } catch (err) {
+      const message = err.response?.data?.error || err.message || '채팅 시작에 실패했습니다.';
+      alert(message);
+    } finally {
+      setIsStartingChat(false);
+    }
+  }, [currentUser, requireLogin, redirectToLogin]);
+
   if (!isOpen) {
     return null;
   }
@@ -445,7 +489,10 @@ const CareRequestDetailPage = ({
                         {comment.username ? comment.username.charAt(0).toUpperCase() : 'U'}
                       </CommentAvatar>
                       <CommentAuthorInfo>
-                        <CommentAuthorName>
+                        <CommentAuthorName
+                          onClick={() => handleViewProfile(comment.userId)}
+                          style={{ cursor: 'pointer' }}
+                        >
                           {comment.username || '알 수 없음'}
                           {comment.userRole === 'SERVICE_PROVIDER' && (
                             <ProviderBadge>서비스 제공자</ProviderBadge>
@@ -470,6 +517,17 @@ const CareRequestDetailPage = ({
                           삭제
                         </DeleteCommentButton>
                       )}
+                      {currentUser &&
+                        careRequest?.userId === currentUser.idx &&
+                        comment.userId !== currentUser.idx && (
+                          <ChatButton
+                            type="button"
+                            onClick={() => handleStartChat(comment.userId)}
+                            disabled={isStartingChat}
+                          >
+                            {isStartingChat ? '연결 중...' : '💬 채팅하기'}
+                          </ChatButton>
+                        )}
                       {currentUser &&
                         comment.userRole === 'SERVICE_PROVIDER' &&
                         comment.userId !== currentUser.idx && (
@@ -538,6 +596,15 @@ const CareRequestDetailPage = ({
           </CommentSection>
         </DetailCard>
       </PageContainer>
+
+      <UserProfileModal
+        isOpen={isProfileModalOpen}
+        userId={selectedUserId}
+        onClose={() => {
+          setIsProfileModalOpen(false);
+          setSelectedUserId(null);
+        }}
+      />
     </>
   );
 };
@@ -1045,6 +1112,31 @@ const ReportProviderButton = styled.button`
   &:hover {
     background: rgba(249, 115, 22, 0.12);
     transform: translateY(-1px);
+  }
+`;
+
+const ChatButton = styled.button`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: ${(props) => props.theme.spacing.xs} ${(props) => props.theme.spacing.md};
+  border-radius: ${(props) => props.theme.borderRadius.md};
+  border: 1px solid ${(props) => props.theme.colors.primary};
+  background: ${(props) => props.theme.colors.primary};
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover:not(:disabled) {
+    background: ${(props) => props.theme.colors.primaryDark};
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(255, 126, 54, 0.3);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
   }
 `;
 
