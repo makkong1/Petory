@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { missingPetApi } from './missingPetApi';
 
 const BASE_URL = 'http://localhost:8080/api/chat';
 
@@ -142,10 +143,11 @@ export const sendMessage = async (conversationIdx, senderIdx, content, messageTy
 
 /**
  * 채팅방 메시지 조회 (페이징)
+ * 재참여한 경우 joinedAt 이후 메시지만 조회
  */
-export const getMessages = async (conversationIdx, page = 0, size = 50) => {
+export const getMessages = async (conversationIdx, userId, page = 0, size = 50) => {
   const response = await api.get(`/messages/conversation/${conversationIdx}`, {
-    params: { page, size },
+    params: { userId, page, size },
   });
   return response.data;
 };
@@ -195,6 +197,36 @@ export const getUnreadCount = async (conversationIdx, userId) => {
   const response = await api.get(`/messages/conversation/${conversationIdx}/unread-count`, {
     params: { userId },
   });
+  return response.data;
+};
+
+// ==================== Meetup Chat API ====================
+
+/**
+ * 산책모임 채팅방 참여
+ */
+export const joinMeetupChat = async (meetupIdx, userId) => {
+  const response = await api.post(`/conversations/meetup/${meetupIdx}/join`, null, {
+    params: { userId },
+  });
+  return response.data;
+};
+
+/**
+ * 산책모임 채팅방 참여 인원 수 조회
+ */
+export const getMeetupChatParticipantCount = async (meetupIdx) => {
+  const response = await api.get(`/conversations/meetup/${meetupIdx}/participant-count`);
+  return response.data;
+};
+
+// ==================== Missing Pet Chat API ====================
+
+/**
+ * 실종제보 채팅 시작 ("목격했어요" 버튼 클릭)
+ */
+export const startMissingPetChat = async (boardIdx, witnessId) => {
+  const response = await missingPetApi.startChat(boardIdx, witnessId);
   return response.data;
 };
 

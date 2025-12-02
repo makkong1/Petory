@@ -35,5 +35,8 @@ export const missingPetApi = {
   getComments: (id) => api.get(`/${id}/comments`),
   addComment: (id, payload) => api.post(`/${id}/comments`, payload),
   deleteComment: (boardId, commentId) => api.delete(`/${boardId}/comments/${commentId}`),
+  startChat: (boardIdx, witnessId) => api.post(`/${boardIdx}/start-chat`, null, {
+    params: { witnessId },
+  }),
 };
 

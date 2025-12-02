@@ -88,5 +88,14 @@ public interface ConversationParticipantRepository extends JpaRepository<Convers
            "  AND p.isDeleted = false " +
            "GROUP BY p.conversation.idx")
     List<Object[]> countActiveParticipantsByConversationIdxs(@Param("conversationIdxs") List<Long> conversationIdxs);
+
+    // 특정 채팅방의 특정 상태 참여자 수 조회
+    @Query("SELECT COUNT(p) FROM ConversationParticipant p " +
+           "WHERE p.conversation.idx = :conversationIdx " +
+           "  AND p.status = :status " +
+           "  AND p.isDeleted = false")
+    Integer countByConversationIdxAndStatus(
+        @Param("conversationIdx") Long conversationIdx,
+        @Param("status") ParticipantStatus status);
 }
 

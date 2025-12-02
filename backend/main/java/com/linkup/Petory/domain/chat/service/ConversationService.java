@@ -226,6 +226,8 @@ public class ConversationService {
 
         participant.setStatus(ParticipantStatus.LEFT);
         participant.setLeftAt(LocalDateTime.now());
+        participant.setIsDeleted(true);
+        participant.setDeletedAt(LocalDateTime.now());
         participantRepository.save(participant);
 
         // 참여자가 없으면 채팅방 비활성화
@@ -269,6 +271,161 @@ public class ConversationService {
         conversation = conversationRepository.save(conversation);
 
         return conversationConverter.toDTO(conversation);
+    }
+
+    /**
+     * 산책모임 채팅방 참여
+     */
+    @Transactional
+    public ConversationDTO joinMeetupChat(Long meetupIdx, Long userId) {
+        // 모임의 채팅방 찾기
+        Conversation conversation = conversationRepository
+                .findByRelatedTypeAndRelatedIdxAndIsDeletedFalse(RelatedType.MEETUP, meetupIdx)
+                .orElseThrow(() -> new IllegalArgumentException("채팅방을 찾을 수 없습니다."));
+
+        // 이미 참여 중인지 확인
+        Optional<ConversationParticipant> existing = participantRepository
+                .findByConversationIdxAndUserIdx(conversation.getIdx(), userId);
+
+        if (existing.isPresent()) {
+            ConversationParticipant participant = existing.get();
+            // LEFT 상태였다면 ACTIVE로 변경 (재참여)
+            if (participant.getStatus() == ParticipantStatus.LEFT) {
+                participant.setStatus(ParticipantStatus.ACTIVE);
+                participant.setJoinedAt(LocalDateTime.now());
+                // 이전 대화 내용 못 보도록 lastReadMessageIdx 초기화
+                participant.setLastReadMessage(null);
+                participant.setLastReadAt(null);
+                participant.setUnreadCount(0);
+                participantRepository.save(participant);
+            }
+            return conversationConverter.toDTO(conversation);
+        }
+
+        // 새로 참여
+        Users user = usersRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+
+        ConversationParticipant participant = ConversationParticipant.builder()
+                .conversation(conversation)
+                .user(user)
+                .role(ParticipantRole.MEMBER)
+                .status(ParticipantStatus.ACTIVE)
+                .unreadCount(0)
+                .lastReadMessage(null) // 새 참여자는 이전 메시지 못 봄
+                .build();
+        participantRepository.save(participant);
+
+        return conversationConverter.toDTO(conversation);
+    }
+
+    /**
+     * 산책모임 채팅방 나가기
+     */
+    @Transactional
+    public void leaveMeetupChat(Long meetupIdx, Long userId) {
+        // 모임의 채팅방 찾기
+        Conversation conversation = conversationRepository
+                .findByRelatedTypeAndRelatedIdxAndIsDeletedFalse(RelatedType.MEETUP, meetupIdx)
+                .orElse(null);
+
+        if (conversation == null) {
+            return; // 채팅방이 없으면 무시
+        }
+
+        // 참여자 확인
+        Optional<ConversationParticipant> participant = participantRepository
+                .findByConversationIdxAndUserIdx(conversation.getIdx(), userId);
+
+        if (participant.isPresent()) {
+            ConversationParticipant p = participant.get();
+            p.setStatus(ParticipantStatus.LEFT);
+            p.setLeftAt(LocalDateTime.now());
+            participantRepository.save(p);
+        }
+    }
+
+    /**
+     * 산책모임 채팅방 참여 인원 수 조회
+     */
+    public Integer getMeetupChatParticipantCount(Long meetupIdx) {
+        Optional<Conversation> conversation = conversationRepository
+                .findByRelatedTypeAndRelatedIdxAndIsDeletedFalse(RelatedType.MEETUP, meetupIdx);
+
+        if (conversation.isEmpty()) {
+            return 0;
+        }
+
+        return participantRepository
+                .countByConversationIdxAndStatus(conversation.get().getIdx(), ParticipantStatus.ACTIVE);
+    }
+
+    /**
+     * 채팅방 참여자 역할 설정
+     */
+    @Transactional
+    public void setParticipantRole(RelatedType relatedType, Long relatedIdx, Long userId, ParticipantRole role) {
+        Optional<Conversation> conversation = conversationRepository
+                .findByRelatedTypeAndRelatedIdxAndIsDeletedFalse(relatedType, relatedIdx);
+
+        if (conversation.isEmpty()) {
+            return;
+        }
+
+        Optional<ConversationParticipant> participant = participantRepository
+                .findByConversationIdxAndUserIdx(conversation.get().getIdx(), userId);
+
+        if (participant.isPresent()) {
+            participant.get().setRole(role);
+            participantRepository.save(participant.get());
+        }
+    }
+
+    /**
+     * 실종제보 채팅방 생성 또는 조회
+     * 같은 제보에 대해 여러 목격자가 있을 수 있으므로,
+     * 제보자-목격자 조합별로 개별 채팅방 생성
+     */
+    @Transactional
+    public ConversationDTO createMissingPetChat(Long boardIdx, Long reporterId, Long witnessId) {
+        // 목격자가 제보자와 같은 경우 체크
+        if (reporterId.equals(witnessId)) {
+            throw new IllegalArgumentException("본인의 제보에는 채팅을 시작할 수 없습니다.");
+        }
+
+        // 같은 제보(boardIdx)에 대한 모든 채팅방 조회
+        List<Conversation> conversations = conversationRepository
+                .findByRelatedTypeAndRelatedIdxInAndIsDeletedFalse(
+                    RelatedType.MISSING_PET_BOARD, 
+                    List.of(boardIdx));
+
+        // 제보자와 목격자가 모두 참여한 채팅방 찾기
+        Optional<Conversation> existing = conversations.stream()
+                .filter(conv -> {
+                    List<ConversationParticipant> participants = participantRepository
+                            .findByConversationIdxAndStatus(conv.getIdx(), ParticipantStatus.ACTIVE);
+                    
+                    java.util.Set<Long> participantIds = participants.stream()
+                            .map(p -> p.getUser().getIdx())
+                            .collect(Collectors.toSet());
+                    
+                    return participantIds.contains(reporterId) && participantIds.contains(witnessId);
+                })
+                .findFirst();
+
+        if (existing.isPresent()) {
+            // 기존 채팅방 반환
+            return conversationConverter.toDTO(existing.get());
+        }
+
+        // 새 채팅방 생성
+        return createConversation(
+                ConversationType.MISSING_PET,
+                RelatedType.MISSING_PET_BOARD,
+                boardIdx,
+                null,  // 1:1이므로 제목 없음
+                List.of(reporterId, witnessId)
+        );
     }
 }
 

@@ -1,5 +1,9 @@
 package com.linkup.Petory.domain.meetup.service;
 
+import com.linkup.Petory.domain.chat.entity.ConversationType;
+import com.linkup.Petory.domain.chat.entity.ParticipantRole;
+import com.linkup.Petory.domain.chat.entity.RelatedType;
+import com.linkup.Petory.domain.chat.service.ConversationService;
 import com.linkup.Petory.domain.meetup.converter.MeetupConverter;
 import com.linkup.Petory.domain.meetup.converter.MeetupParticipantsConverter;
 import com.linkup.Petory.domain.meetup.dto.MeetupDTO;
@@ -31,6 +35,7 @@ public class MeetupService {
     private final UsersRepository usersRepository;
     private final MeetupConverter converter;
     private final MeetupParticipantsConverter participantsConverter;
+    private final ConversationService conversationService;
 
     // 모임 생성
     @Transactional
@@ -70,6 +75,30 @@ public class MeetupService {
         // currentParticipants를 1로 설정 (주최자 포함)
         savedMeetup.setCurrentParticipants(1);
         meetupRepository.save(savedMeetup);
+
+        // 그룹 채팅방 자동 생성 (주최자만 초기 참여)
+        try {
+            conversationService.createConversation(
+                ConversationType.MEETUP,
+                RelatedType.MEETUP,
+                savedMeetup.getIdx(),
+                savedMeetup.getTitle(),
+                List.of(organizer.getIdx())
+            );
+            
+            // 주최자를 ADMIN 역할로 설정
+            conversationService.setParticipantRole(
+                RelatedType.MEETUP,
+                savedMeetup.getIdx(),
+                organizer.getIdx(),
+                ParticipantRole.ADMIN
+            );
+            
+            log.info("모임 채팅방 생성 완료: meetupIdx={}, organizer={}", savedMeetup.getIdx(), userId);
+        } catch (Exception e) {
+            log.error("모임 채팅방 생성 실패: meetupIdx={}, error={}", savedMeetup.getIdx(), e.getMessage());
+            // 채팅방 생성 실패해도 모임 생성은 성공으로 처리
+        }
 
         log.info("모임 생성 완료: meetupIdx={}, organizer={}", savedMeetup.getIdx(), userId);
         return converter.toDTO(savedMeetup);
@@ -287,6 +316,15 @@ public class MeetupService {
         // currentParticipants 감소
         meetup.setCurrentParticipants(Math.max(0, meetup.getCurrentParticipants() - 1));
         meetupRepository.save(meetup);
+
+        // 채팅방에서도 자동으로 나가기
+        try {
+            conversationService.leaveMeetupChat(meetupIdx, userIdx);
+            log.info("채팅방에서 나가기 완료: meetupIdx={}, userIdx={}", meetupIdx, userIdx);
+        } catch (Exception e) {
+            log.error("채팅방 나가기 실패: meetupIdx={}, userIdx={}, error={}", meetupIdx, userIdx, e.getMessage());
+            // 채팅방 나가기 실패해도 모임 참여 취소는 성공으로 처리
+        }
 
         log.info("모임 참가 취소 완료: meetupIdx={}, userId={}, userIdx={}", meetupIdx, userId, userIdx);
     }

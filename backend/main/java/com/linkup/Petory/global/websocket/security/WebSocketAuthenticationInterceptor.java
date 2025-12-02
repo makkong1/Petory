@@ -41,14 +41,29 @@ public class WebSocketAuthenticationInterceptor implements HandshakeInterceptor 
             @NonNull Map<String, Object> attributes) throws Exception {
 
         try {
+            String token = null;
+            
             // 쿼리 파라미터에서 JWT 토큰 추출
-            String token = request.getURI().getQuery();
-            if (token != null && token.startsWith("token=")) {
-                token = token.substring(6); // "token=" 제거
+            String query = request.getURI().getQuery();
+            if (query != null) {
+                // "token=xxx" 형식에서 토큰 추출
+                String[] params = query.split("&");
+                for (String param : params) {
+                    if (param.startsWith("token=")) {
+                        token = param.substring(6); // "token=" 제거
+                        // URL 디코딩
+                        try {
+                            token = java.net.URLDecoder.decode(token, "UTF-8");
+                        } catch (Exception e) {
+                            log.warn("토큰 URL 디코딩 실패: {}", e.getMessage());
+                        }
+                        break;
+                    }
+                }
             }
 
             // 헤더에서 JWT 토큰 추출 (Sec-WebSocket-Protocol 또는 Authorization)
-            if (token == null) {
+            if (token == null || token.isEmpty()) {
                 String authHeader = request.getHeaders().getFirst("Authorization");
                 if (authHeader != null && authHeader.startsWith("Bearer ")) {
                     token = authHeader.substring(7);

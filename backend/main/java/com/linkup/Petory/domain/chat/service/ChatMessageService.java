@@ -99,12 +99,32 @@ public class ChatMessageService {
 
     /**
      * 채팅방 메시지 조회 (페이징)
+     * 재참여한 경우 joinedAt 이후 메시지만 조회
      */
-    public Page<ChatMessageDTO> getMessages(Long conversationIdx, int page, int size) {
+    public Page<ChatMessageDTO> getMessages(Long conversationIdx, Long userId, int page, int size) {
+        // 참여자 정보 확인 (재참여 여부 체크)
+        ConversationParticipant participant = participantRepository
+                .findByConversationIdxAndUserIdx(conversationIdx, userId)
+                .orElse(null);
+
+        LocalDateTime readFrom = null;
+        if (participant != null && participant.getLastReadMessage() == null && participant.getJoinedAt() != null) {
+            // 재참여한 경우: lastReadMessage가 null이고 joinedAt이 있으면 재참여로 간주
+            readFrom = participant.getJoinedAt();
+        }
+
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
 
-        Page<ChatMessage> messages = chatMessageRepository
-                .findByConversationIdxOrderByCreatedAtDesc(conversationIdx, pageable);
+        Page<ChatMessage> messages;
+        if (readFrom != null) {
+            // 재참여한 경우: joinedAt 이후 메시지만 조회
+            messages = chatMessageRepository
+                    .findByConversationIdxAndCreatedAtAfterOrderByCreatedAtDesc(conversationIdx, readFrom, pageable);
+        } else {
+            // 기존 참여자: 전체 메시지 조회
+            messages = chatMessageRepository
+                    .findByConversationIdxOrderByCreatedAtDesc(conversationIdx, pageable);
+        }
 
         return messages.map(messageConverter::toDTO);
     }

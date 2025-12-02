@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
 import com.linkup.Petory.domain.user.entity.Users;
 
 @Entity
-@Table(name = "message_read_status")
+@Table(name = "messagereadstatus")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -37,4 +37,3 @@ public class MessageReadStatus {
         }
     }
 }
-

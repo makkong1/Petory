@@ -121,5 +121,25 @@ public class ConversationController {
         ConversationStatus conversationStatus = ConversationStatus.valueOf(status);
         return ResponseEntity.ok(conversationService.updateConversationStatus(conversationIdx, conversationStatus));
     }
+
+    /**
+     * 산책모임 채팅방 참여
+     */
+    @PostMapping("/meetup/{meetupIdx}/join")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ConversationDTO> joinMeetupChat(
+            @PathVariable Long meetupIdx,
+            @RequestParam Long userId) {
+        return ResponseEntity.ok(conversationService.joinMeetupChat(meetupIdx, userId));
+    }
+
+    /**
+     * 산책모임 채팅방 참여 인원 수 조회
+     */
+    @GetMapping("/meetup/{meetupIdx}/participant-count")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Integer> getMeetupChatParticipantCount(@PathVariable Long meetupIdx) {
+        return ResponseEntity.ok(conversationService.getMeetupChatParticipantCount(meetupIdx));
+    }
 }
 
