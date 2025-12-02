@@ -66,6 +66,15 @@ const ChatWidget = () => {
     }
   };
 
+  // 채팅방 나가기/삭제 후 콜백
+  const handleConversationAction = () => {
+    setSelectedConversationIdx(null);
+    // 채팅방 목록 새로고침
+    if (isAuthenticated && user?.idx) {
+      fetchConversations();
+    }
+  };
+
   // 전역 함수 등록: 다른 컴포넌트에서 채팅방 열기
   useEffect(() => {
     window.openChatWidget = (conversationIdx) => {
@@ -97,6 +106,7 @@ const ChatWidget = () => {
               conversationIdx={selectedConversationIdx}
               onClose={handleCloseChatRoom}
               onBack={handleCloseChatRoom}
+              onAction={handleConversationAction}
             />
           </ChatRoomModal>
         </>

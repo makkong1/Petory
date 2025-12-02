@@ -226,6 +226,8 @@ public class ConversationService {
 
         participant.setStatus(ParticipantStatus.LEFT);
         participant.setLeftAt(LocalDateTime.now());
+        participant.setIsDeleted(true);
+        participant.setDeletedAt(LocalDateTime.now());
         participantRepository.save(participant);
 
         // 참여자가 없으면 채팅방 비활성화

@@ -2,16 +2,15 @@ package com.linkup.Petory.domain.chat.controller;
 
 import java.security.Principal;
 
-import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
-import org.springframework.messaging.handler.annotation.SendTo;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 
 import com.linkup.Petory.domain.chat.dto.ChatMessageDTO;
 import com.linkup.Petory.domain.chat.entity.MessageType;
 import com.linkup.Petory.domain.chat.service.ChatMessageService;
+import com.linkup.Petory.domain.user.repository.UsersRepository;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,6 +26,7 @@ public class ChatWebSocketController {
 
     private final ChatMessageService chatMessageService;
     private final SimpMessagingTemplate messagingTemplate;
+    private final UsersRepository usersRepository;
 
     /**
      * 메시지 전송
@@ -41,8 +41,11 @@ public class ChatWebSocketController {
             Principal principal) {
 
         try {
-            // 사용자 ID 추출
-            Long senderIdx = Long.parseLong(principal.getName());
+            // 사용자 ID 추출 (principal.getName()은 로그인 ID를 반환하므로 Users 테이블에서 조회)
+            String loginId = principal.getName();
+            Long senderIdx = usersRepository.findByIdString(loginId)
+                    .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다: " + loginId))
+                    .getIdx();
             Long conversationIdx = messageRequest.getConversationIdx();
 
             log.info("WebSocket 메시지 전송: conversationIdx={}, senderIdx={}, content={}",
@@ -87,7 +90,11 @@ public class ChatWebSocketController {
             Principal principal) {
 
         try {
-            Long userId = Long.parseLong(principal.getName());
+            // 사용자 ID 추출
+            String loginId = principal.getName();
+            Long userId = usersRepository.findByIdString(loginId)
+                    .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다: " + loginId))
+                    .getIdx();
 
             log.info("WebSocket 읽음 처리: conversationIdx={}, userId={}",
                     readRequest.getConversationIdx(), userId);
@@ -118,7 +125,11 @@ public class ChatWebSocketController {
             Principal principal) {
 
         try {
-            Long userId = Long.parseLong(principal.getName());
+            // 사용자 ID 추출
+            String loginId = principal.getName();
+            Long userId = usersRepository.findByIdString(loginId)
+                    .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다: " + loginId))
+                    .getIdx();
 
             log.debug("WebSocket 타이핑: conversationIdx={}, userId={}, isTyping={}",
                     typingRequest.getConversationIdx(), userId, typingRequest.isTyping());
