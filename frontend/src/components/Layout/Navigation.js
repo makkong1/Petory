@@ -202,6 +202,7 @@ const Navigation = ({ activeTab, setActiveTab, user, onNavigateToBoard }) => {
     { id: 'community', label: '커뮤니티', icon: '💬' },
     ...(user ? [
       { id: 'activity', label: '내 활동', icon: '📋' },
+      { id: 'my-profile', label: '내 프로필', icon: '👤' },
     ] : []),
     ...(isAdmin ? [
       { id: 'admin', label: '관리자', icon: '🔧' },

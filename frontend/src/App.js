@@ -17,6 +17,7 @@ import MissingPetBoardPage from './components/MissingPet/MissingPetBoardPage';
 import ActivityPage from './components/Activity/ActivityPage';
 import MeetupPage from './components/Meetup/MeetupPage';
 import ChatWidget from './components/Chat/ChatWidget';
+import MyProfilePage from './components/User/MyProfilePage';
 import { setupApiInterceptors } from './api/authApi';
 
 
@@ -123,6 +124,8 @@ function AppContent() {
         return <AdminPanel />;
       case 'activity':
         return <ActivityPage />;
+      case 'my-profile':
+        return <MyProfilePage />;
       case 'home':
       default:
         return <HomePage setActiveTab={setActiveTab} />;

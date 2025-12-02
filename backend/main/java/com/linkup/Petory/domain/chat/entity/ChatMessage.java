@@ -8,7 +8,7 @@ import java.util.List;
 import com.linkup.Petory.domain.user.entity.Users;
 
 @Entity
-@Table(name = "chat_message")
+@Table(name = "chatmessage")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -74,4 +74,3 @@ public class ChatMessage {
         this.updatedAt = LocalDateTime.now();
     }
 }
-

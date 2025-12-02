@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { missingPetApi } from './missingPetApi';
 
 const BASE_URL = 'http://localhost:8080/api/chat';
 
@@ -225,9 +226,7 @@ export const getMeetupChatParticipantCount = async (meetupIdx) => {
  * 실종제보 채팅 시작 ("목격했어요" 버튼 클릭)
  */
 export const startMissingPetChat = async (boardIdx, witnessId) => {
-  const response = await api.post(`/missing-pets/${boardIdx}/start-chat`, null, {
-    params: { witnessId },
-  });
+  const response = await missingPetApi.startChat(boardIdx, witnessId);
   return response.data;
 };
 
