@@ -270,5 +270,113 @@ public class ConversationService {
 
         return conversationConverter.toDTO(conversation);
     }
+
+    /**
+     * 산책모임 채팅방 참여
+     */
+    @Transactional
+    public ConversationDTO joinMeetupChat(Long meetupIdx, Long userId) {
+        // 모임의 채팅방 찾기
+        Conversation conversation = conversationRepository
+                .findByRelatedTypeAndRelatedIdxAndIsDeletedFalse(RelatedType.MEETUP, meetupIdx)
+                .orElseThrow(() -> new IllegalArgumentException("채팅방을 찾을 수 없습니다."));
+
+        // 이미 참여 중인지 확인
+        Optional<ConversationParticipant> existing = participantRepository
+                .findByConversationIdxAndUserIdx(conversation.getIdx(), userId);
+
+        if (existing.isPresent()) {
+            ConversationParticipant participant = existing.get();
+            // LEFT 상태였다면 ACTIVE로 변경 (재참여)
+            if (participant.getStatus() == ParticipantStatus.LEFT) {
+                participant.setStatus(ParticipantStatus.ACTIVE);
+                participant.setJoinedAt(LocalDateTime.now());
+                // 이전 대화 내용 못 보도록 lastReadMessageIdx 초기화
+                participant.setLastReadMessage(null);
+                participant.setLastReadAt(null);
+                participant.setUnreadCount(0);
+                participantRepository.save(participant);
+            }
+            return conversationConverter.toDTO(conversation);
+        }
+
+        // 새로 참여
+        Users user = usersRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+
+        ConversationParticipant participant = ConversationParticipant.builder()
+                .conversation(conversation)
+                .user(user)
+                .role(ParticipantRole.MEMBER)
+                .status(ParticipantStatus.ACTIVE)
+                .unreadCount(0)
+                .lastReadMessage(null) // 새 참여자는 이전 메시지 못 봄
+                .build();
+        participantRepository.save(participant);
+
+        return conversationConverter.toDTO(conversation);
+    }
+
+    /**
+     * 산책모임 채팅방 나가기
+     */
+    @Transactional
+    public void leaveMeetupChat(Long meetupIdx, Long userId) {
+        // 모임의 채팅방 찾기
+        Conversation conversation = conversationRepository
+                .findByRelatedTypeAndRelatedIdxAndIsDeletedFalse(RelatedType.MEETUP, meetupIdx)
+                .orElse(null);
+
+        if (conversation == null) {
+            return; // 채팅방이 없으면 무시
+        }
+
+        // 참여자 확인
+        Optional<ConversationParticipant> participant = participantRepository
+                .findByConversationIdxAndUserIdx(conversation.getIdx(), userId);
+
+        if (participant.isPresent()) {
+            ConversationParticipant p = participant.get();
+            p.setStatus(ParticipantStatus.LEFT);
+            p.setLeftAt(LocalDateTime.now());
+            participantRepository.save(p);
+        }
+    }
+
+    /**
+     * 산책모임 채팅방 참여 인원 수 조회
+     */
+    public Integer getMeetupChatParticipantCount(Long meetupIdx) {
+        Optional<Conversation> conversation = conversationRepository
+                .findByRelatedTypeAndRelatedIdxAndIsDeletedFalse(RelatedType.MEETUP, meetupIdx);
+
+        if (conversation.isEmpty()) {
+            return 0;
+        }
+
+        return participantRepository
+                .countByConversationIdxAndStatus(conversation.get().getIdx(), ParticipantStatus.ACTIVE);
+    }
+
+    /**
+     * 채팅방 참여자 역할 설정
+     */
+    @Transactional
+    public void setParticipantRole(RelatedType relatedType, Long relatedIdx, Long userId, ParticipantRole role) {
+        Optional<Conversation> conversation = conversationRepository
+                .findByRelatedTypeAndRelatedIdxAndIsDeletedFalse(relatedType, relatedIdx);
+
+        if (conversation.isEmpty()) {
+            return;
+        }
+
+        Optional<ConversationParticipant> participant = participantRepository
+                .findByConversationIdxAndUserIdx(conversation.get().getIdx(), userId);
+
+        if (participant.isPresent()) {
+            participant.get().setRole(role);
+            participantRepository.save(participant.get());
+        }
+    }
 }
 

@@ -44,6 +44,20 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
         @Param("beforeDate") LocalDateTime beforeDate,
         Pageable pageable);
 
+    // 채팅방별 메시지 조회 (특정 시점 이후, 페이징, 최신순) - 재참여 시 사용
+    @Query("SELECT m FROM ChatMessage m " +
+           "JOIN FETCH m.sender s " +
+           "LEFT JOIN FETCH m.replyToMessage " +
+           "WHERE m.conversation.idx = :conversationIdx " +
+           "  AND m.createdAt >= :afterDate " +
+           "  AND m.isDeleted = false " +
+           "  AND s.isDeleted = false " +
+           "ORDER BY m.createdAt DESC")
+    Page<ChatMessage> findByConversationIdxAndCreatedAtAfterOrderByCreatedAtDesc(
+        @Param("conversationIdx") Long conversationIdx,
+        @Param("afterDate") LocalDateTime afterDate,
+        Pageable pageable);
+
     // 채팅방별 메시지 조회 (전체, 최신순)
     @Query("SELECT m FROM ChatMessage m " +
            "JOIN FETCH m.sender s " +

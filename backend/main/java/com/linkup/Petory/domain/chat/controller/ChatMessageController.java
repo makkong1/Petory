@@ -46,14 +46,16 @@ public class ChatMessageController {
 
     /**
      * 채팅방 메시지 조회 (페이징)
+     * 재참여한 경우 joinedAt 이후 메시지만 조회
      */
     @GetMapping("/conversation/{conversationIdx}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Page<ChatMessageDTO>> getMessages(
             @PathVariable Long conversationIdx,
+            @RequestParam Long userId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
-        return ResponseEntity.ok(chatMessageService.getMessages(conversationIdx, page, size));
+        return ResponseEntity.ok(chatMessageService.getMessages(conversationIdx, userId, page, size));
     }
 
     /**
