@@ -157,17 +157,27 @@ public class LocationServiceAdminService {
     }
 
     private LocationService convertToEntity(KakaoPlaceDTO.Document document) {
+        // 카카오맵 데이터는 기본 필드만 채우고, 공공데이터 상세 필드는 null
+        // 카테고리 파싱
+        String categoryName = document.getCategoryName();
+        String[] categoryParts = categoryName != null ? categoryName.split(" > ") : new String[0];
+        String category3 = categoryParts.length > 2 ? categoryParts[2] : categoryName;
+        
         return LocationService.builder()
                 .name(document.getPlaceName())
-                .category(document.getCategoryName())
-                .address(document.getAddressName())
-                .detailAddress(document.getRoadAddressName())
+                .category(category3) // category 필드도 설정
+                .category1(categoryParts.length > 0 ? categoryParts[0] : null)
+                .category2(categoryParts.length > 1 ? categoryParts[1] : null)
+                .category3(category3) // 기본 카테고리
+                .address(document.getAddressName()) // 지번주소
+                .detailAddress(document.getRoadAddressName()) // 도로명주소
                 .latitude(parseDouble(document.getY()))
                 .longitude(parseDouble(document.getX()))
                 .phone(document.getPhone())
                 .website(resolveWebsite(document))
                 .description(document.getCategoryGroupName())
                 .petFriendly(true)
+                .dataSource("KAKAO") // 카카오맵 데이터임을 명시
                 .build();
     }
 
