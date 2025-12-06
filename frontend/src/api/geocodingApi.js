@@ -37,5 +37,17 @@ export const geocodingApi = {
     const response = await api.get('/geocoding/address', { params: { address } });
     return response.data; // response.data에 실제 데이터가 있음
   },
+  
+  // 네이버맵 길찾기 (Directions API)
+  getDirections: async (startLat, startLng, endLat, endLng, option = 'traoptimal') => {
+    const response = await api.get('/geocoding/directions', {
+      params: {
+        start: `${startLng},${startLat}`, // 경도,위도 순서
+        goal: `${endLng},${endLat}`,
+        option: option // traoptimal=최적, trafast=최단, tracomfort=편한길
+      }
+    });
+    return response.data;
+  },
 };
 

@@ -3,10 +3,19 @@ import styled from 'styled-components';
 import MapContainer from './MapContainer';
 import { locationServiceApi } from '../../api/locationServiceApi';
 import { geocodingApi } from '../../api/geocodingApi';
+import {
+  loadSidoGeoJSON,
+  loadSigunguGeoJSON,
+  loadDongGeoJSON,
+  getSidoCode,
+  getSigunguCodeByName,
+  getBoundingBox,
+  calculateZoomFromBoundingBox
+} from '../../utils/geojsonUtils';
 
 const DEFAULT_CENTER = { lat: 36.5, lng: 127.5 }; // 대한민국 중심 좌표
 const DEFAULT_RADIUS = 3000;
-const MAP_DEFAULT_LEVEL = 12; // 전국이 보이도록 레벨 1로 설정 (가장 넓은 범위)
+const MAP_DEFAULT_LEVEL = 14; // 전국 뷰: 레벨 14 (줌 8) - 전국이 완전히 보이는 레벨
 
 const CATEGORY_DEFAULT = 'all';
 const CATEGORY_CUSTOM = 'custom';
@@ -28,7 +37,6 @@ const KEYWORD_CATEGORIES = [
   { value: '박물관', label: '박물관' },
   { value: '호텔', label: '호텔' },
 ];
-
 
 const SIDOS = [
   '서울특별시',
@@ -183,6 +191,8 @@ const LocationServiceMap = () => {
   const [selectedSigungu, setSelectedSigungu] = useState('');
   const [selectedEupmyeondong, setSelectedEupmyeondong] = useState('');
   const [selectedService, setSelectedService] = useState(null);
+  const [showDirections, setShowDirections] = useState(false);
+  const [directionsData, setDirectionsData] = useState(null);
   const [hoveredSido, setHoveredSido] = useState(null); // 마우스 호버된 시/도
   const [currentMapView, setCurrentMapView] = useState('nation'); // 'nation', 'sido', 'sigungu'
 
@@ -190,6 +200,7 @@ const LocationServiceMap = () => {
   const [availableSigungus, setAvailableSigungus] = useState([]); // 선택된 시도의 시군구 목록
   const [availableEupmyeondongs, setAvailableEupmyeondongs] = useState([]); // 선택된 시군구의 읍면동 목록
   const [userLocation, setUserLocation] = useState(null);
+  const [userLocationAddress, setUserLocationAddress] = useState(null);
   const [mapCenter, setMapCenter] = useState(DEFAULT_CENTER);
   const [mapLevel, setMapLevel] = useState(MAP_DEFAULT_LEVEL);
   const [mapBounds, setMapBounds] = useState(null); // 지도 bounds (하이브리드용)
@@ -367,7 +378,47 @@ const LocationServiceMap = () => {
           return;
         }
 
-        // 초기 로드가 아니면 allServices에서 클라이언트 사이드 필터링만 수행
+        // 지역 검색이 명시적으로 요청된 경우 서버에서 데이터 가져오기
+        if (region) {
+          // region 파라미터를 파싱하여 sido, sigungu, eupmyeondong 추출
+          // region 형식: "서울특별시" 또는 "서울특별시 강남구" 또는 "서울특별시 강남구 역삼동"
+          const regionParts = region.trim().split(/\s+/);
+          let apiSido = regionParts[0] || undefined;
+          let apiSigungu = regionParts[1] || undefined;
+          let apiEupmyeondong = regionParts[2] || undefined;
+
+          console.log('지역 검색 API 호출:', { apiSido, apiSigungu, apiEupmyeondong, region });
+
+          const response = await locationServiceApi.searchPlaces({
+            sido: apiSido,
+            sigungu: apiSigungu,
+            eupmyeondong: apiEupmyeondong,
+            category: apiCategory,
+            size: effectiveSize,
+          });
+
+          if (latestRequestRef.current !== requestId) {
+            return;
+          }
+
+          const fetchedServices = (response.data?.services || []).map((service) => ({
+            ...service,
+          }));
+
+          console.log(`지역 검색 결과: ${fetchedServices.length}개 서비스`, { region, apiSido, apiSigungu, apiEupmyeondong });
+
+          // 지역별 데이터를 allServices에 업데이트하고 필터링
+          setAllServices(fetchedServices);
+          filterServicesByRegion(fetchedServices, selectedSido, selectedSigungu, selectedEupmyeondong, apiCategory);
+
+          isSearchModeRef.current = false;
+          setStatusMessage('');
+          setSelectedService(null);
+          setLoading(false);
+          return;
+        }
+
+        // 초기 로드가 아니고 지역 검색도 아닌 경우 allServices에서 클라이언트 사이드 필터링만 수행
         if (allServices.length > 0) {
           filterServicesByRegion(allServices, selectedSido, selectedSigungu, selectedEupmyeondong, apiCategory);
           setLoading(false);
@@ -424,13 +475,17 @@ const LocationServiceMap = () => {
       };
 
       navigator.geolocation.getCurrentPosition(
-        (position) => {
+        async (position) => {
           const location = {
             lat: position.coords.latitude,
             lng: position.coords.longitude,
           };
           // 내 위치는 길찾기/거리 계산용으로만 저장 (지도 중심은 변경하지 않음)
           setUserLocation(location);
+
+          // 주소 변환은 백엔드 API를 통해 처리하거나, 간단하게 "현재 위치"로 표시
+          // 네이버맵 API는 CORS 문제로 직접 호출 불가
+          setUserLocationAddress('현재 위치');
         },
         (error) => {
           console.warn('위치 정보를 가져올 수 없습니다:', error);
@@ -591,49 +646,6 @@ const LocationServiceMap = () => {
     [fetchServices, keyword, mapCenter, mapLevel]
   );
 
-  const handleAddressSearch = useCallback(async () => {
-    if (!addressQuery.trim()) {
-      return;
-    }
-
-    try {
-      setStatusMessage('주소를 찾는 중...');
-      setError(null);
-
-      const response = await geocodingApi.addressToCoordinates(addressQuery.trim());
-      if (!response.success || !response.latitude || !response.longitude) {
-        setStatusMessage('해당 주소를 찾을 수 없습니다.');
-        return;
-      }
-
-      const location = {
-        lat: response.latitude,
-        lng: response.longitude,
-      };
-
-      setMapCenter(location);
-      programmaticCenterRef.current = location;
-      lastFetchedRef.current = {
-        lat: location.lat,
-        lng: location.lng,
-        level: mapLevel,
-      };
-
-      fetchServices({
-        latitude: location.lat,
-        longitude: location.lng,
-        keywordOverride: keyword,
-        level: mapLevel,
-        region: addressQuery.trim(),
-        categoryOverride: categoryType,
-      });
-    } catch (err) {
-      const message = err.response?.data?.error || err.message;
-      setError(`주소 검색에 실패했습니다: ${message}`);
-      setStatusMessage('');
-    }
-  }, [addressQuery, categoryType, fetchServices, keyword, mapLevel]);
-
   const handleRegionSearch = useCallback(async (sidoOverride = null, sigunguOverride = null, eupmyeondongOverride = null) => {
     const targetSido = sidoOverride !== null ? sidoOverride : selectedSido;
     const targetSigungu = sigunguOverride !== null ? sigunguOverride : selectedSigungu;
@@ -656,64 +668,20 @@ const LocationServiceMap = () => {
       setStatusMessage(`'${targetRegion}' 주변 장소를 검색하는 중...`);
       setError(null);
 
-      // 시/도만 선택된 경우 미리 정의된 중심 좌표와 레벨 사용 (성능 최적화 및 확대 기능)
-      let location;
-      let zoomLevel;
+      // 지역 정보만으로 API 호출 (지도 관련 로직 제거)
+      const regionParam = targetEupmyeondong
+        ? `${targetSido} ${targetSigungu} ${targetEupmyeondong}`
+        : targetSigungu
+          ? `${targetSido} ${targetSigungu}`
+          : targetSido;
 
-      if (targetSido && !targetSigungu && !targetEupmyeondong && SIDO_CENTERS[targetSido]) {
-        // 시/도 중심 좌표와 레벨 사용 (지도 확대)
-        const sidoCenter = SIDO_CENTERS[targetSido];
-        location = {
-          lat: sidoCenter.lat,
-          lng: sidoCenter.lng,
-        };
-        zoomLevel = sidoCenter.level;
-      } else {
-        // 시/군/구나 읍/면/동이 선택된 경우 geocoding 사용
-        const response = await geocodingApi.addressToCoordinates(targetRegion);
-        if (!response.success || !response.latitude || !response.longitude) {
-          setStatusMessage('해당 지역의 좌표를 찾지 못했습니다. 다른 지역을 선택해 주세요.');
-          return;
-        }
-        location = {
-          lat: response.latitude,
-          lng: response.longitude,
-        };
-        // 시/군/구는 레벨 6, 읍/면/동은 레벨 7로 확대
-        zoomLevel = targetEupmyeondong ? 7 : (targetSigungu ? 6 : mapLevel);
-      }
-
-      // 지도 중심과 레벨을 즉시 설정 (확대 효과)
-      // 동시에 설정하여 확대 효과 즉시 적용
-      programmaticCenterRef.current = location; // 먼저 설정하여 MapContainer가 인식하도록
-
-      setMapLevel(zoomLevel);
-      setMapCenter(location);
-
-      lastFetchedRef.current = {
-        lat: location.lat,
-        lng: location.lng,
-        level: zoomLevel,
-      };
-
-      // 지도가 즉시 확대되도록 강제 업데이트
-      mapStateRef.current = {
-        center: location,
-        level: zoomLevel,
-      };
-
-      console.log('지도 확대:', targetSido, '레벨:', zoomLevel, '위치:', location);
-      console.log('programmaticCenterRef 설정:', programmaticCenterRef.current);
-
-      // 지역 선택 검색: region만 전달 (위도/경도는 지도 중심 이동용)
-      // 백엔드에서 region만으로 검색하도록 함
-      isSearchModeRef.current = false; // 지역 검색은 검색 모드 아님 (bounds 필터링 적용)
-      fetchServices({
-        latitude: undefined, // 지역 검색 시 위도/경도 제거
+      // API 호출만 수행 (지도 관련 로직 제거)
+      await fetchServices({
+        latitude: undefined,
         longitude: undefined,
         keywordOverride: keyword,
-        level: zoomLevel,
-        region: targetRegion,
+        level: undefined,
+        region: regionParam,
         categoryOverride: categoryType,
       });
     } catch (err) {
@@ -721,7 +689,52 @@ const LocationServiceMap = () => {
       setError(`지역 검색에 실패했습니다: ${message}`);
       setStatusMessage('');
     }
-  }, [selectedSido, selectedSigungu, selectedEupmyeondong, categoryType, fetchServices, keyword, mapLevel]);
+  }, [selectedSido, selectedSigungu, selectedEupmyeondong, categoryType, fetchServices, keyword]);
+
+  const handleAddressSearch = useCallback(async () => {
+    if (!addressQuery.trim()) {
+      return;
+    }
+
+    try {
+      setStatusMessage('주소를 찾는 중...');
+      setError(null);
+
+      // 주소를 지역명으로 인식하여 지역 검색 수행
+      const address = addressQuery.trim();
+
+      // 주소에서 시도 추출 시도
+      let foundSido = null;
+      for (const sido of SIDOS) {
+        if (address.includes(sido)) {
+          foundSido = sido;
+          break;
+        }
+      }
+
+      if (foundSido) {
+        // 시도가 포함된 경우 지역 검색으로 처리
+        setSelectedSido(foundSido);
+        setSelectedSigungu('');
+        setSelectedEupmyeondong('');
+        await handleRegionSearch(foundSido);
+      } else {
+        // 시도가 없으면 일반 지역 검색으로 처리
+        await fetchServices({
+          latitude: undefined,
+          longitude: undefined,
+          keywordOverride: keyword,
+          level: undefined,
+          region: address,
+          categoryOverride: categoryType,
+        });
+      }
+    } catch (err) {
+      const message = err.response?.data?.error || err.message;
+      setError(`주소 검색에 실패했습니다: ${message}`);
+      setStatusMessage('');
+    }
+  }, [addressQuery, categoryType, fetchServices, keyword, handleRegionSearch]);
 
   // 시도/시군구/읍면동 선택 시 자동으로 서비스 필터링 (클라이언트 사이드)
   useEffect(() => {
@@ -817,6 +830,29 @@ const LocationServiceMap = () => {
             >
               내 위치로 이동
             </CurrentLocationButton>
+            {(selectedSido || selectedSigungu || selectedEupmyeondong) && (
+              <CurrentLocationButton
+                type="button"
+                onClick={async () => {
+                  setSelectedSido('');
+                  setSelectedSigungu('');
+                  setSelectedEupmyeondong('');
+                  setCurrentMapView('nation');
+                  setMapCenter(DEFAULT_CENTER);
+                  setMapLevel(MAP_DEFAULT_LEVEL);
+                  await fetchServices({
+                    latitude: undefined,
+                    longitude: undefined,
+                    keywordOverride: keyword,
+                    level: MAP_DEFAULT_LEVEL,
+                    region: undefined,
+                    categoryOverride: categoryType,
+                  });
+                }}
+              >
+                전국 보기
+              </CurrentLocationButton>
+            )}
           </HeaderActions>
         </HeaderTop>
 
@@ -1001,46 +1037,7 @@ const LocationServiceMap = () => {
       )}
 
       <MapArea>
-        <MapWrapper>
-          <MapContainer
-            services={selectedService ? [selectedService] : []}
-            onServiceClick={setSelectedService}
-            userLocation={userLocation}
-            mapCenter={mapCenter}
-            mapLevel={mapLevel}
-            onMapDragStart={handleMapDragStart}
-            onMapIdle={handleMapIdle}
-            hoverMarker={hoveredSido && SIDO_CENTERS[hoveredSido] ? {
-              lat: SIDO_CENTERS[hoveredSido].lat,
-              lng: SIDO_CENTERS[hoveredSido].lng,
-              title: hoveredSido
-            } : null}
-            currentMapView={currentMapView}
-            selectedSido={selectedSido}
-            selectedSigungu={selectedSigungu}
-            onRegionClick={(regionType, regionName) => {
-              console.log('지역 클릭:', regionType, regionName);
-              if (regionType === 'sido') {
-                setSelectedSido(regionName);
-                setSelectedSigungu('');
-                setSelectedEupmyeondong('');
-                handleRegionSearch(regionName);
-                setCurrentMapView('sido');
-              } else if (regionType === 'sigungu') {
-                setSelectedSigungu(regionName);
-                setSelectedEupmyeondong('');
-                handleRegionSearch(selectedSido, regionName);
-                setCurrentMapView('sigungu');
-              }
-            }}
-          />
-
-          {loading && (
-            <LoadingOverlay>
-              <div>데이터 불러오는 중...</div>
-            </LoadingOverlay>
-          )}
-        </MapWrapper>
+        {/* 지도 제거 - 지역 선택 UI만 사용 */}
 
         <ServiceListPanel>
           <ServiceListHeader>
@@ -1090,147 +1087,384 @@ const LocationServiceMap = () => {
         </ServiceListPanel>
 
         {selectedService && (
-          <ServiceDetailPanel>
-            <CloseButton onClick={() => setSelectedService(null)}>✕</CloseButton>
-            <ServiceTitle>{selectedService.name}</ServiceTitle>
-            <ServiceInfo>
-              {selectedService.rating && (
-                <ServiceInfoItem>
-                  <strong>평점</strong>
-                  <span>⭐ {selectedService.rating.toFixed(1)}</span>
-                </ServiceInfoItem>
-              )}
-              {selectedService.category && (
-                <ServiceInfoItem>
-                  <strong>분류</strong>
-                  <span>{selectedService.category}</span>
-                </ServiceInfoItem>
-              )}
-              {selectedService.description && (
-                <ServiceInfoItem>
-                  <strong>설명</strong>
-                  <span>{selectedService.description}</span>
-                </ServiceInfoItem>
-              )}
-              {selectedService.address && (
-                <ServiceInfoItem>
-                  <strong>주소</strong>
-                  <span>{selectedService.address}</span>
-                </ServiceInfoItem>
-              )}
-              {selectedService.phone && (
-                <ServiceInfoItem>
-                  <strong>전화</strong>
-                  <span>
-                    <a href={`tel:${selectedService.phone}`} style={{ color: 'inherit', textDecoration: 'none' }}>
-                      {selectedService.phone}
-                    </a>
-                  </span>
-                </ServiceInfoItem>
-              )}
-              {selectedService.website && (
-                <ServiceInfoItem>
-                  <strong>웹사이트</strong>
-                  <span>
-                    <a href={selectedService.website} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>
-                      {selectedService.website}
-                    </a>
-                  </span>
-                </ServiceInfoItem>
-              )}
-              {selectedService.operatingHours && (
-                <ServiceInfoItem>
-                  <strong>운영시간</strong>
-                  <span>{selectedService.operatingHours}</span>
-                </ServiceInfoItem>
-              )}
-              {selectedService.closedDay && (
-                <ServiceInfoItem>
-                  <strong>휴무일</strong>
-                  <span>{selectedService.closedDay}</span>
-                </ServiceInfoItem>
-              )}
-              {selectedService.priceInfo && (
-                <ServiceInfoItem>
-                  <strong>가격 정보</strong>
-                  <span>{selectedService.priceInfo}</span>
-                </ServiceInfoItem>
-              )}
-              {selectedService.parkingAvailable !== null && selectedService.parkingAvailable !== undefined && (
-                <ServiceInfoItem>
-                  <strong>주차</strong>
-                  <span>{selectedService.parkingAvailable ? '가능' : '불가능'}</span>
-                </ServiceInfoItem>
-              )}
-              {(selectedService.indoor !== null && selectedService.indoor !== undefined) ||
-                (selectedService.outdoor !== null && selectedService.outdoor !== undefined) ? (
-                <ServiceInfoItem>
-                  <strong>장소 유형</strong>
-                  <span>
-                    {selectedService.indoor ? '실내' : ''}
-                    {selectedService.indoor && selectedService.outdoor ? ' / ' : ''}
-                    {selectedService.outdoor ? '실외' : ''}
-                  </span>
-                </ServiceInfoItem>
-              ) : null}
-              {selectedService.petFriendly !== null && selectedService.petFriendly !== undefined && (
-                <ServiceInfoItem>
-                  <strong>반려동물 동반</strong>
-                  <span>{selectedService.petFriendly ? '✅ 가능' : '❌ 불가능'}</span>
-                </ServiceInfoItem>
-              )}
-              {selectedService.isPetOnly !== null && selectedService.isPetOnly !== undefined && selectedService.isPetOnly && (
-                <ServiceInfoItem>
-                  <strong>반려동물 전용</strong>
-                  <span>✅ 예</span>
-                </ServiceInfoItem>
-              )}
-              {selectedService.petSize && (
-                <ServiceInfoItem>
-                  <strong>입장 가능 동물 크기</strong>
-                  <span>{selectedService.petSize}</span>
-                </ServiceInfoItem>
-              )}
-              {selectedService.petRestrictions && (
-                <ServiceInfoItem>
-                  <strong>반려동물 제한사항</strong>
-                  <span>{selectedService.petRestrictions}</span>
-                </ServiceInfoItem>
-              )}
-              {selectedService.petExtraFee && (
-                <ServiceInfoItem>
-                  <strong>애견 동반 추가 요금</strong>
-                  <span>{selectedService.petExtraFee}</span>
-                </ServiceInfoItem>
-              )}
-              {selectedService.distanceLabel && (
-                <ServiceInfoItem>
-                  <strong>거리</strong>
-                  <span>{selectedService.distanceLabel}</span>
-                </ServiceInfoItem>
-              )}
-            </ServiceInfo>
-            <DetailActions>
-              {selectedService.placeUrl && (
-                <DetailLink
-                  href={selectedService.placeUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  카카오맵에서 자세히 보기 ↗
-                </DetailLink>
-              )}
-              {selectedService.website && (
-                <DetailLink
-                  href={selectedService.website}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ marginTop: '0.5rem' }}
-                >
-                  웹사이트 방문 ↗
-                </DetailLink>
-              )}
-            </DetailActions>
+          <ServiceDetailPanel onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setSelectedService(null);
+              setShowDirections(false);
+            }
+          }}>
+            <DetailContent onClick={(e) => e.stopPropagation()}>
+              <CloseButton onClick={() => {
+                setSelectedService(null);
+                setShowDirections(false);
+              }}>✕</CloseButton>
+              <DetailLeft>
+                <ServiceTitle>{selectedService.name}</ServiceTitle>
+                <ServiceInfo>
+                  {selectedService.rating && (
+                    <ServiceInfoItem>
+                      <strong>평점</strong>
+                      <span>⭐ {selectedService.rating.toFixed(1)}</span>
+                    </ServiceInfoItem>
+                  )}
+                  {selectedService.category && (
+                    <ServiceInfoItem>
+                      <strong>분류</strong>
+                      <span>{selectedService.category}</span>
+                    </ServiceInfoItem>
+                  )}
+                  {selectedService.description && (
+                    <ServiceInfoItem>
+                      <strong>설명</strong>
+                      <span>{selectedService.description}</span>
+                    </ServiceInfoItem>
+                  )}
+                  {selectedService.address && (
+                    <ServiceInfoItem>
+                      <strong>주소</strong>
+                      <span>{selectedService.address}</span>
+                    </ServiceInfoItem>
+                  )}
+                  {selectedService.phone && (
+                    <ServiceInfoItem>
+                      <strong>전화</strong>
+                      <span>
+                        <a href={`tel:${selectedService.phone}`} style={{ color: 'inherit', textDecoration: 'none' }}>
+                          {selectedService.phone}
+                        </a>
+                      </span>
+                    </ServiceInfoItem>
+                  )}
+                  {selectedService.website && (
+                    <ServiceInfoItem>
+                      <strong>웹사이트</strong>
+                      <span>
+                        <a href={selectedService.website} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>
+                          {selectedService.website}
+                        </a>
+                      </span>
+                    </ServiceInfoItem>
+                  )}
+                  {selectedService.operatingHours && (
+                    <ServiceInfoItem>
+                      <strong>운영시간</strong>
+                      <span>{selectedService.operatingHours}</span>
+                    </ServiceInfoItem>
+                  )}
+                  {selectedService.closedDay && (
+                    <ServiceInfoItem>
+                      <strong>휴무일</strong>
+                      <span>{selectedService.closedDay}</span>
+                    </ServiceInfoItem>
+                  )}
+                  {selectedService.priceInfo && (
+                    <ServiceInfoItem>
+                      <strong>가격 정보</strong>
+                      <span>{selectedService.priceInfo}</span>
+                    </ServiceInfoItem>
+                  )}
+                  {selectedService.parkingAvailable !== null && selectedService.parkingAvailable !== undefined && (
+                    <ServiceInfoItem>
+                      <strong>주차</strong>
+                      <span>{selectedService.parkingAvailable ? '가능' : '불가능'}</span>
+                    </ServiceInfoItem>
+                  )}
+                  {(selectedService.indoor !== null && selectedService.indoor !== undefined) ||
+                    (selectedService.outdoor !== null && selectedService.outdoor !== undefined) ? (
+                    <ServiceInfoItem>
+                      <strong>장소 유형</strong>
+                      <span>
+                        {selectedService.indoor ? '실내' : ''}
+                        {selectedService.indoor && selectedService.outdoor ? ' / ' : ''}
+                        {selectedService.outdoor ? '실외' : ''}
+                      </span>
+                    </ServiceInfoItem>
+                  ) : null}
+                  {selectedService.petFriendly !== null && selectedService.petFriendly !== undefined && (
+                    <ServiceInfoItem>
+                      <strong>반려동물 동반</strong>
+                      <span>{selectedService.petFriendly ? '✅ 가능' : '❌ 불가능'}</span>
+                    </ServiceInfoItem>
+                  )}
+                  {selectedService.isPetOnly !== null && selectedService.isPetOnly !== undefined && selectedService.isPetOnly && (
+                    <ServiceInfoItem>
+                      <strong>반려동물 전용</strong>
+                      <span>✅ 예</span>
+                    </ServiceInfoItem>
+                  )}
+                  {selectedService.petSize && (
+                    <ServiceInfoItem>
+                      <strong>입장 가능 동물 크기</strong>
+                      <span>{selectedService.petSize}</span>
+                    </ServiceInfoItem>
+                  )}
+                  {selectedService.petRestrictions && (
+                    <ServiceInfoItem>
+                      <strong>반려동물 제한사항</strong>
+                      <span>{selectedService.petRestrictions}</span>
+                    </ServiceInfoItem>
+                  )}
+                  {selectedService.petExtraFee && (
+                    <ServiceInfoItem>
+                      <strong>애견 동반 추가 요금</strong>
+                      <span>{selectedService.petExtraFee}</span>
+                    </ServiceInfoItem>
+                  )}
+                  {selectedService.distanceLabel && (
+                    <ServiceInfoItem>
+                      <strong>거리</strong>
+                      <span>{selectedService.distanceLabel}</span>
+                    </ServiceInfoItem>
+                  )}
+                </ServiceInfo>
+              </DetailLeft>
+              <DetailRight>
+                {showDirections && selectedService.latitude && selectedService.longitude ? (
+                  <DirectionsContainer>
+                    <DirectionsHeader>
+                      <DirectionsTitle>길찾기</DirectionsTitle>
+                      <CloseDirectionsButton onClick={() => setShowDirections(false)}>✕</CloseDirectionsButton>
+                    </DirectionsHeader>
+                    <DirectionsInfo>
+                      <div style={{ marginBottom: '1rem' }}>
+                        <strong>도착지:</strong> {selectedService.name || selectedService.address}
+                        {selectedService.latitude && selectedService.longitude && (
+                          <div style={{ fontSize: '0.85rem', color: '#666', marginTop: '0.5rem' }}>
+                            좌표: ({selectedService.latitude.toFixed(6)}, {selectedService.longitude.toFixed(6)})
+                          </div>
+                        )}
+                      </div>
+                      {userLocation && (
+                        <div style={{ marginBottom: '1rem', padding: '0.75rem', background: 'rgba(3, 199, 90, 0.1)', borderRadius: '6px' }}>
+                          <strong>출발지:</strong> {userLocationAddress || '현재 위치'}
+                          <div style={{ fontSize: '0.85rem', color: '#666', marginTop: '0.5rem' }}>
+                            좌표: ({userLocation.lat.toFixed(6)}, {userLocation.lng.toFixed(6)})
+                          </div>
+                        </div>
+                      )}
+                      <DirectionsLink
+                        href={`https://map.naver.com/p/search/${encodeURIComponent(selectedService.name || selectedService.address || '')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={async (e) => {
+                          // 네이버맵 Directions API 호출하여 경로 정보 표시
+                          if (userLocation && selectedService.latitude && selectedService.longitude) {
+                            try {
+                              console.log('🔍 길찾기 API 호출 시작...');
+                              const directionsData = await geocodingApi.getDirections(
+                                userLocation.lat,
+                                userLocation.lng,
+                                selectedService.latitude,
+                                selectedService.longitude,
+                                'traoptimal'
+                              );
+                              console.log('📊 길찾기 API 응답:', directionsData);
+                              if (directionsData.success && directionsData.data) {
+                                console.log('✅ 경로 데이터 수신 성공:', directionsData.data);
+                                setDirectionsData(directionsData.data);
+                              } else {
+                                console.warn('⚠️ 경로 데이터 수신 실패:', directionsData);
+                                setDirectionsData(null);
+                              }
+                            } catch (error) {
+                              console.error('❌ 길찾기 API 호출 실패:', error);
+                              setDirectionsData(null);
+                            }
+                          }
+                        }}
+                      >
+                        네이버맵에서 장소 검색 ↗
+                      </DirectionsLink>
+                    </DirectionsInfo>
+                    <DirectionsMessage>
+                      <strong>안내:</strong> 네이버맵은 보안상의 이유로 외부에서 출발지/도착지를 자동으로 입력할 수 없습니다.
+                      <br />
+                      위 링크를 클릭하여 네이버맵에서 도착지를 검색한 후, 출발지를 직접 입력해주세요.
+                      {userLocation && (
+                        <>
+                          <br />
+                          <br />
+                          <strong>출발지 좌표:</strong> {userLocation.lat.toFixed(6)}, {userLocation.lng.toFixed(6)}
+                          <br />
+                          네이버맵에서 이 좌표를 검색하거나 "현재 위치"를 선택하세요.
+                        </>
+                      )}
+                    </DirectionsMessage>
+                    {directionsData && (
+                      <DirectionsSummary>
+                        <div style={{ marginBottom: '0.5rem', fontWeight: 600, color: '#03C75A' }}>
+                          📍 경로 정보 (백엔드 API 응답)
+                        </div>
+                        <SummaryItem>
+                          <strong>예상 소요 시간:</strong>
+                          <span>
+                            {(() => {
+                              // 실시간 교통 상황을 반영한 예상 시간
+                              try {
+                                // duration을 분으로 변환하는 함수 (네이버 Directions API는 밀리초 단위)
+                                const convertDurationToMinutes = (duration) => {
+                                  if (!duration) return null;
+                                  // duration이 밀리초 단위인지 확인 (일반적으로 1000 이상)
+                                  // 네이버 Directions API는 보통 밀리초 단위
+                                  if (duration > 1000) {
+                                    return Math.round(duration / 1000 / 60); // 밀리초 -> 초 -> 분
+                                  } else {
+                                    return Math.round(duration / 60); // 초 -> 분
+                                  }
+                                };
+
+                                // 시간과 분으로 포맷팅하는 함수
+                                const formatDuration = (minutes) => {
+                                  if (!minutes || minutes < 0) return '정보 없음';
+                                  const hours = Math.floor(minutes / 60);
+                                  const mins = minutes % 60;
+                                  
+                                  if (hours > 0 && mins > 0) {
+                                    return `${hours}시간 ${mins}분`;
+                                  } else if (hours > 0) {
+                                    return `${hours}시간`;
+                                  } else {
+                                    return `${mins}분`;
+                                  }
+                                };
+
+                                const route = directionsData.route;
+                                let durationMinutes = null;
+
+                                // 최적 경로(traoptimal) 확인
+                                if (route && route.traoptimal && Array.isArray(route.traoptimal) && route.traoptimal.length > 0) {
+                                  const summary = route.traoptimal[0].summary;
+                                  if (summary && summary.duration) {
+                                    console.log('📊 duration 값 (traoptimal):', summary.duration, '타입:', typeof summary.duration);
+                                    durationMinutes = convertDurationToMinutes(summary.duration);
+                                  }
+                                }
+                                
+                                // 최단 경로(trafast) 확인 (traoptimal이 없을 경우)
+                                if (!durationMinutes && route && route.trafast && Array.isArray(route.trafast) && route.trafast.length > 0) {
+                                  const summary = route.trafast[0].summary;
+                                  if (summary && summary.duration) {
+                                    console.log('📊 duration 값 (trafast):', summary.duration, '타입:', typeof summary.duration);
+                                    durationMinutes = convertDurationToMinutes(summary.duration);
+                                  }
+                                }
+
+                                if (durationMinutes !== null) {
+                                  return formatDuration(durationMinutes);
+                                }
+                                return '정보 없음';
+                              } catch (e) {
+                                console.error('경로 데이터 파싱 오류:', e, directionsData);
+                                return '파싱 오류';
+                              }
+                            })()}
+                          </span>
+                        </SummaryItem>
+                        <SummaryItem>
+                          <strong>예상 거리:</strong>
+                          <span>
+                            {(() => {
+                              try {
+                                const route = directionsData.route;
+                                if (route && route.traoptimal && Array.isArray(route.traoptimal) && route.traoptimal.length > 0) {
+                                  const summary = route.traoptimal[0].summary;
+                                  if (summary && summary.distance) {
+                                    return `${(summary.distance / 1000).toFixed(1)}km`;
+                                  }
+                                }
+                                // 다른 경로 옵션 확인
+                                if (route && route.trafast && Array.isArray(route.trafast) && route.trafast.length > 0) {
+                                  const summary = route.trafast[0].summary;
+                                  if (summary && summary.distance) {
+                                    return `${(summary.distance / 1000).toFixed(1)}km`;
+                                  }
+                                }
+                                return '정보 없음';
+                              } catch (e) {
+                                console.error('경로 데이터 파싱 오류:', e, directionsData);
+                                return '파싱 오류';
+                              }
+                            })()}
+                          </span>
+                        </SummaryItem>
+                        <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: '#666', lineHeight: '1.5' }}>
+                          * 실시간 교통 상황(정체, 공사 등)을 반영한 예상 시간입니다.
+                          <br />
+                          * 실제 소요 시간은 교통 상황에 따라 달라질 수 있습니다.
+                          <br />
+                          (네이버맵 웹사이트는 별도로 열어야 합니다)
+                        </div>
+                      </DirectionsSummary>
+                    )}
+                  </DirectionsContainer>
+                ) : (
+                  <>
+                    <ActionSectionTitle>편의 기능</ActionSectionTitle>
+                    <ActionButtons>
+                      {selectedService.latitude && selectedService.longitude && (
+                        <ActionButton
+                          onClick={() => setShowDirections(true)}
+                          primary
+                        >
+                          🗺️ 네이버맵 길찾기
+                        </ActionButton>
+                      )}
+                      {selectedService.phone && (
+                        <ActionButton
+                          as="a"
+                          href={`tel:${selectedService.phone}`}
+                        >
+                          📞 전화하기
+                        </ActionButton>
+                      )}
+                      {selectedService.address && (
+                        <ActionButton
+                          onClick={() => {
+                            navigator.clipboard.writeText(selectedService.address);
+                            setStatusMessage('주소가 클립보드에 복사되었습니다.');
+                            setTimeout(() => setStatusMessage(''), 2000);
+                          }}
+                        >
+                          📋 주소 복사
+                        </ActionButton>
+                      )}
+                      {selectedService.latitude && selectedService.longitude && (
+                        <ActionButton
+                          onClick={() => {
+                            const url = `https://map.naver.com/v5/search/${encodeURIComponent(selectedService.name || '')}`;
+                            navigator.clipboard.writeText(url);
+                            setStatusMessage('네이버맵 링크가 클립보드에 복사되었습니다.');
+                            setTimeout(() => setStatusMessage(''), 2000);
+                          }}
+                        >
+                          🔗 링크 공유
+                        </ActionButton>
+                      )}
+                      {selectedService.placeUrl && (
+                        <ActionButton
+                          as="a"
+                          href={selectedService.placeUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          📍 카카오맵 보기
+                        </ActionButton>
+                      )}
+                      {selectedService.website && (
+                        <ActionButton
+                          as="a"
+                          href={selectedService.website}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          🌐 웹사이트 방문
+                        </ActionButton>
+                      )}
+                    </ActionButtons>
+                  </>
+                )}
+              </DetailRight>
+            </DetailContent>
           </ServiceDetailPanel>
         )}
       </MapArea>
@@ -1499,6 +1733,9 @@ const ErrorBanner = styled.div`
 `;
 
 const MapArea = styled.div`
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 200px);
   flex: 1;
   position: relative;
   display: flex;
@@ -1526,9 +1763,8 @@ const LoadingOverlay = styled.div`
 `;
 
 const ServiceListPanel = styled.div`
-  width: 350px;
+  width: 100%;
   background: ${props => props.theme.colors.surface};
-  border-left: 1px solid ${props => props.theme.colors.border};
   display: flex;
   flex-direction: column;
   z-index: 150;
@@ -1633,46 +1869,249 @@ const EmptyMessage = styled.div`
 `;
 
 const ServiceDetailPanel = styled.div`
-  position: absolute;
-  top: 1rem;
-  left: 1rem;
-  width: 320px;
-  background: ${props => props.theme.colors.surface};
-  border-radius: 12px;
-  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
-  padding: 1.25rem;
-  z-index: 300;
-  max-height: calc(100vh - 2rem);
-  overflow-y: auto;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
 `;
 
-const CloseButton = styled.button`
-  position: absolute;
-  top: 0.7rem;
-  right: 0.8rem;
+const DetailContent = styled.div`
+  position: relative;
+  background: ${props => props.theme.colors.surface};
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  width: 95%;
+  max-width: 1800px;
+  max-height: 90vh;
+  display: flex;
+  overflow: hidden;
+`;
+
+const DetailLeft = styled.div`
+  flex: 0 0 450px;
+  padding: 2rem;
+  overflow-y: auto;
+  border-right: 2px solid ${props => props.theme.colors.border};
+`;
+
+const DetailRight = styled.div`
+  flex: 1;
+  padding: 2rem;
+  background: ${props => props.theme.colors.background};
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  min-width: 0;
+`;
+
+const ActionSectionTitle = styled.h4`
+  margin: 0;
+  color: ${props => props.theme.colors.text};
+  font-size: 1.1rem;
+  font-weight: 600;
+`;
+
+const ActionButtons = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+`;
+
+const ActionButton = styled.button`
+  width: 100%;
+  padding: 0.9rem 1.2rem;
+  border: 1px solid ${props => props.primary ? props.theme.colors.primary : props.theme.colors.border};
+  border-radius: 8px;
+  background: ${props => props.primary ? props.theme.colors.primary : props.theme.colors.surface};
+  color: ${props => props.primary ? '#fff' : props.theme.colors.text};
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+
+  &:hover {
+    background: ${props => props.primary ? props.theme.colors.primary : props.theme.colors.border};
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+`;
+
+const DirectionsContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+`;
+
+const DirectionsHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid ${props => props.theme.colors.border};
+`;
+
+const DirectionsInfo = styled.div`
+  padding: 1rem;
+  background: ${props => props.theme.colors.primary}15;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  color: ${props => props.theme.colors.primary};
+  font-weight: 500;
+  margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+`;
+
+const DirectionsLink = styled.a`
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  background: ${props => props.theme.colors.primary};
+  color: white;
+  border-radius: 8px;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 1rem;
+  transition: all 0.2s;
+  width: fit-content;
+
+  &:hover {
+    background: ${props => props.theme.colors.primary}dd;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+`;
+
+const DirectionsMessage = styled.div`
+  padding: 2rem;
+  text-align: center;
+  color: ${props => props.theme.colors.textSecondary};
+  font-size: 0.95rem;
+  line-height: 1.6;
+  background: ${props => props.theme.colors.background};
+  border-radius: 8px;
+  border: 1px dashed ${props => props.theme.colors.border};
+`;
+
+const DirectionsSummary = styled.div`
+  margin-top: 1rem;
+  padding: 1rem;
+  background: ${props => props.theme.colors.surface};
+  border-radius: 8px;
+  border: 1px solid ${props => props.theme.colors.border};
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+`;
+
+const SummaryItem = styled.div`
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.9rem;
+  color: ${props => props.theme.colors.text};
+  
+  strong {
+    color: ${props => props.theme.colors.primary};
+    font-weight: 600;
+  }
+`;
+
+const DirectionsTitle = styled.h4`
+  margin: 0;
+  color: ${props => props.theme.colors.text};
+  font-size: 1.1rem;
+  font-weight: 600;
+`;
+
+const CloseDirectionsButton = styled.button`
   background: none;
   border: none;
   font-size: 1.2rem;
   cursor: pointer;
   color: ${props => props.theme.colors.textSecondary};
   line-height: 1;
+  padding: 0.25rem;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
 
   &:hover {
+    background: ${props => props.theme.colors.border};
     color: ${props => props.theme.colors.text};
   }
 `;
 
-const ServiceTitle = styled.h3`
-  margin: 0 0 1rem 0;
+const DirectionsIframe = styled.iframe`
+  width: 100%;
+  flex: 1;
+  border: none;
+  border-radius: 8px;
+  min-height: 700px;
+  height: calc(90vh - 100px);
+`;
+
+const CloseButton = styled.button`
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: rgba(0, 0, 0, 0.1);
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
   color: ${props => props.theme.colors.text};
-  font-size: 1.25rem;
-  font-weight: 600;
+  line-height: 1;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  transition: all 0.2s;
+
+  &:hover {
+    background: rgba(0, 0, 0, 0.2);
+    transform: rotate(90deg);
+  }
+`;
+
+const ServiceTitle = styled.h3`
+  margin: 0 0 2rem 0;
+  color: ${props => props.theme.colors.text};
+  font-size: 1.75rem;
+  font-weight: 700;
+  padding-bottom: 1.5rem;
+  border-bottom: 2px solid ${props => props.theme.colors.border};
 `;
 
 const ServiceInfo = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
+  gap: 1rem;
   font-size: 0.95rem;
   color: ${props => props.theme.colors.text};
 `;
@@ -1680,16 +2119,31 @@ const ServiceInfo = styled.div`
 const ServiceInfoItem = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: ${props => props.theme.colors.background};
+  border-radius: 8px;
+  border: 1px solid ${props => props.theme.colors.border};
+  transition: all 0.2s;
+
+  &:hover {
+    border-color: ${props => props.theme.colors.primary};
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  }
 
   strong {
-    color: ${props => props.theme.colors.textSecondary};
-    font-size: 0.85rem;
-    font-weight: 600;
+    color: ${props => props.theme.colors.primary};
+    font-size: 0.9rem;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
   }
 
   span {
     color: ${props => props.theme.colors.text};
+    font-size: 1rem;
+    line-height: 1.6;
   }
 `;
 
