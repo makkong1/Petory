@@ -11,8 +11,26 @@ const MAP_DEFAULT_LEVEL = 4;
 const CATEGORY_DEFAULT = 'all';
 const CATEGORY_CUSTOM = 'custom';
 
+// 키워드 검색 카테고리 목록
+const KEYWORD_CATEGORIES = [
+  { value: '', label: '전체' },
+  { value: '동물약국', label: '동물약국' },
+  { value: '미술관', label: '미술관' },
+  { value: '카페', label: '카페' },
+  { value: '동물병원', label: '동물병원' },
+  { value: '반려동물용품', label: '반려동물용품' },
+  { value: '미용', label: '미용' },
+  { value: '문예회관', label: '문예회관' },
+  { value: '펜션', label: '펜션' },
+  { value: '식당', label: '식당' },
+  { value: '여행지', label: '여행지' },
+  { value: '위탁관리', label: '위탁관리' },
+  { value: '박물관', label: '박물관' },
+  { value: '호텔', label: '호텔' },
+];
+
 const CATEGORY_PRESETS = {
-  [CATEGORY_DEFAULT]: { label: '전체', keyword: '반려동물', categoryType: undefined },
+  [CATEGORY_DEFAULT]: { label: '전체', keyword: '', categoryType: undefined },
   hospital: { label: '병원', keyword: '동물병원', categoryType: 'hospital' },
   cafe: { label: '애견카페', keyword: '애견카페', categoryType: 'cafe' },
   playground: { label: '놀이터', keyword: '반려견 놀이터', categoryType: 'playground' },
@@ -116,7 +134,7 @@ const calculateDistance = (lat1, lng1, lat2, lng2) => {
   const a =
     Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
     Math.cos(φ1) * Math.cos(φ2) *
-      Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return Math.round(R * c); // meters
 };
@@ -130,11 +148,12 @@ const formatDistance = (meters) => {
 };
 
 const LocationServiceMap = () => {
-  const [services, setServices] = useState([]);
+  const [allServices, setAllServices] = useState([]); // 전체 서비스 데이터 (하이브리드용)
+  const [services, setServices] = useState([]); // 현재 표시할 서비스 (필터링된 데이터)
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [statusMessage, setStatusMessage] = useState('지도 준비 중...');
-  const [keyword, setKeyword] = useState('반려동물');
+  const [keyword, setKeyword] = useState('');
   const [addressQuery, setAddressQuery] = useState('');
   const [categoryType, setCategoryType] = useState(CATEGORY_DEFAULT);
   const [searchMode, setSearchMode] = useState('keyword');
@@ -144,6 +163,7 @@ const LocationServiceMap = () => {
   const [userLocation, setUserLocation] = useState(null);
   const [mapCenter, setMapCenter] = useState(DEFAULT_CENTER);
   const [mapLevel, setMapLevel] = useState(MAP_DEFAULT_LEVEL);
+  const [mapBounds, setMapBounds] = useState(null); // 지도 bounds (하이브리드용)
   const programmaticCenterRef = useRef(null);
   const latestRequestRef = useRef(0);
   const lastFetchedRef = useRef({ lat: null, lng: null, level: null });
@@ -153,6 +173,7 @@ const LocationServiceMap = () => {
   });
   const fetchServicesRef = useRef(null);
   const suppressNextFetchRef = useRef(false);
+  const isInitialLoadRef = useRef(true); // 초기 로드 여부
 
   useEffect(() => {
     mapStateRef.current = {
@@ -160,6 +181,26 @@ const LocationServiceMap = () => {
       level: mapLevel,
     };
   }, [mapCenter, mapLevel]);
+
+  // 클라이언트에서 지도 bounds 기반 필터링 (하이브리드용)
+  const filterServicesByBounds = useCallback((bounds, allServicesData) => {
+    if (!bounds || !allServicesData || allServicesData.length === 0) {
+      return [];
+    }
+
+    const { sw, ne } = bounds; // southwest, northeast
+    return allServicesData.filter((service) => {
+      if (typeof service.latitude !== 'number' || typeof service.longitude !== 'number') {
+        return false;
+      }
+      return (
+        service.latitude >= sw.lat &&
+        service.latitude <= ne.lat &&
+        service.longitude >= sw.lng &&
+        service.longitude <= ne.lng
+      );
+    });
+  }, []);
 
   const fetchServices = useCallback(
     async ({
@@ -170,6 +211,7 @@ const LocationServiceMap = () => {
       level,
       categoryOverride,
       append = false, // 기존 서비스에 추가할지 여부
+      isInitialLoad = false, // 초기 로드 여부 (하이브리드용)
     }) => {
       const requestId = Date.now();
       latestRequestRef.current = requestId;
@@ -183,23 +225,27 @@ const LocationServiceMap = () => {
       const effectiveLongitude = typeof longitude === 'number' ? longitude : center.lng;
       const effectiveLevel = typeof level === 'number' ? level : currentLevel;
       const effectiveRadius = levelToRadius(effectiveLevel);
-      const effectiveSize = levelToSize(effectiveLevel); // 레벨에 따라 동적으로 크기 결정
+      const effectiveSize = levelToSize(effectiveLevel);
       const effectiveCategoryType = categoryOverride ?? categoryType;
       const apiCategoryType =
         effectiveCategoryType &&
-        effectiveCategoryType !== CATEGORY_DEFAULT &&
-        effectiveCategoryType !== CATEGORY_CUSTOM
+          effectiveCategoryType !== CATEGORY_DEFAULT &&
+          effectiveCategoryType !== CATEGORY_CUSTOM
           ? effectiveCategoryType
           : undefined;
 
       try {
+        // 초기 로드이거나 키워드/지역 검색이 아닌 경우 넓은 범위로 로드 (하이브리드)
+        const shouldLoadWideRange = isInitialLoad || (!keywordOverride && !region);
+        const requestRadius = shouldLoadWideRange ? null : effectiveRadius; // null이면 서버에서 20km로 처리
+
         const response = await locationServiceApi.searchPlaces({
           keyword: keywordOverride ?? keyword,
           region,
           latitude: effectiveLatitude,
           longitude: effectiveLongitude,
-          radius: effectiveRadius,
-          size: effectiveSize, // 레벨에 따라 동적으로 설정
+          radius: requestRadius, // 초기 로드 시 null (서버에서 20km 처리)
+          size: shouldLoadWideRange ? 500 : effectiveSize, // 넓은 범위일 때 더 많이 가져오기
           categoryType: apiCategoryType,
         });
 
@@ -221,34 +267,57 @@ const LocationServiceMap = () => {
           };
         });
 
-        if (append) {
+        if (isInitialLoad || shouldLoadWideRange) {
+          // 초기 로드: 전체 데이터를 allServices에 저장
+          setAllServices(fetchedServices);
+          // 현재 지도 bounds에 맞게 필터링
+          if (mapBounds) {
+            const filtered = filterServicesByBounds(mapBounds, fetchedServices);
+            setServices(filtered);
+          } else {
+            // bounds가 없으면 일단 전체 표시 (나중에 bounds 업데이트 시 필터링)
+            setServices(fetchedServices);
+          }
+          isInitialLoadRef.current = false;
+        } else if (append) {
           // 기존 서비스에 추가 (중복 제거)
-          setServices((prevServices) => {
-            const existingIds = new Set(prevServices.map(s => s.externalId || `${s.latitude}-${s.longitude}`));
+          setAllServices((prevAll) => {
+            const existingIds = new Set(prevAll.map(s => s.externalId || `${s.latitude}-${s.longitude}`));
             const newServices = fetchedServices.filter(
               s => !existingIds.has(s.externalId || `${s.latitude}-${s.longitude}`)
             );
-            const finalServices = [...prevServices, ...newServices];
-            
-            // 상태 메시지 업데이트
-            if (finalServices.length === 0) {
-              setStatusMessage('주변에 표시할 장소가 없습니다.');
+            const updated = [...prevAll, ...newServices];
+            // bounds가 있으면 필터링
+            if (mapBounds) {
+              const filtered = filterServicesByBounds(mapBounds, updated);
+              setServices(filtered);
             } else {
-              setStatusMessage('');
+              setServices(updated);
             }
-            
-            return finalServices;
+            return updated;
           });
         } else {
-          // 기존 서비스 교체
-          setServices(fetchedServices);
-          if (fetchedServices.length === 0) {
-            setStatusMessage('주변에 표시할 장소가 없습니다.');
+          // 키워드/지역 검색: allServices 업데이트 및 필터링
+          setAllServices(fetchedServices);
+          if (mapBounds) {
+            const filtered = filterServicesByBounds(mapBounds, fetchedServices);
+            setServices(filtered);
           } else {
-            setStatusMessage('');
+            setServices(fetchedServices);
           }
         }
-        
+
+        // 상태 메시지 업데이트
+        const displayServices = mapBounds && allServices.length > 0
+          ? filterServicesByBounds(mapBounds, allServices)
+          : fetchedServices;
+
+        if (displayServices.length === 0) {
+          setStatusMessage('주변에 표시할 장소가 없습니다.');
+        } else {
+          setStatusMessage('');
+        }
+
         setSelectedService(null);
       } catch (err) {
         if (latestRequestRef.current !== requestId) {
@@ -269,7 +338,7 @@ const LocationServiceMap = () => {
         };
       }
     },
-    [keyword, categoryType]
+    [keyword, categoryType, mapBounds, filterServicesByBounds]
   );
 
   useEffect(() => {
@@ -279,13 +348,23 @@ const LocationServiceMap = () => {
   useEffect(() => {
     const tryGeolocation = () => {
       if (!navigator.geolocation) {
+        // geolocation이 없으면 기본값 사용
+        setMapCenter(DEFAULT_CENTER);
         fetchServicesRef.current?.({
           latitude: DEFAULT_CENTER.lat,
           longitude: DEFAULT_CENTER.lng,
           level: MAP_DEFAULT_LEVEL,
+          isInitialLoad: true, // 초기 로드
         });
         return;
       }
+
+      // geolocation 옵션: 빠른 응답 우선
+      const options = {
+        enableHighAccuracy: false, // 빠른 응답을 위해 false
+        timeout: 5000, // 5초 타임아웃
+        maximumAge: 0, // 캐시 사용 안 함
+      };
 
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -293,22 +372,30 @@ const LocationServiceMap = () => {
             lat: position.coords.latitude,
             lng: position.coords.longitude,
           };
+          // userLocation을 먼저 설정 (MapContainer에서 우선 사용)
           setUserLocation(location);
+          // 그 다음 mapCenter 설정
           setMapCenter(location);
           programmaticCenterRef.current = location;
           fetchServicesRef.current?.({
             latitude: location.lat,
             longitude: location.lng,
             level: MAP_DEFAULT_LEVEL,
+            isInitialLoad: true, // 초기 로드
           });
         },
-        () => {
+        (error) => {
+          // 위치 정보를 가져오지 못하면 기본값 사용
+          console.warn('위치 정보를 가져올 수 없습니다:', error);
+          setMapCenter(DEFAULT_CENTER);
           fetchServicesRef.current?.({
             latitude: DEFAULT_CENTER.lat,
             longitude: DEFAULT_CENTER.lng,
             level: MAP_DEFAULT_LEVEL,
+            isInitialLoad: true, // 초기 로드
           });
-        }
+        },
+        options
       );
     };
 
@@ -320,11 +407,10 @@ const LocationServiceMap = () => {
   }, []);
 
   const handleMapIdle = useCallback(
-    ({ lat, lng, level }) => {
+    ({ lat, lng, level, bounds }) => {
       const nextCenter = { lat, lng };
       const prevLevel = mapLevel;
       const levelChanged = prevLevel !== level;
-      const isZoomingOut = levelChanged && level > prevLevel; // 레벨이 높아지면 축소 (넓어짐)
 
       if (
         !mapCenter ||
@@ -338,6 +424,11 @@ const LocationServiceMap = () => {
         setMapLevel(level);
       }
 
+      // bounds 업데이트 (하이브리드용)
+      if (bounds) {
+        setMapBounds(bounds);
+      }
+
       const plannedCenter = programmaticCenterRef.current;
       const centersAreClose = (a, b) =>
         a &&
@@ -347,6 +438,11 @@ const LocationServiceMap = () => {
 
       if (centersAreClose(plannedCenter, nextCenter)) {
         programmaticCenterRef.current = null;
+        // bounds가 있으면 클라이언트 필터링만 수행
+        if (bounds && allServices.length > 0) {
+          const filtered = filterServicesByBounds(bounds, allServices);
+          setServices(filtered);
+        }
         return;
       }
 
@@ -356,6 +452,38 @@ const LocationServiceMap = () => {
         return;
       }
 
+      // 하이브리드: allServices가 있고 키워드/지역 검색이 아닌 경우 클라이언트 필터링만 수행
+      // 단, 지도가 너무 멀리 이동했으면 추가 요청 필요
+      if (allServices.length > 0 && bounds) {
+        const prevFetch = lastFetchedRef.current;
+        let shouldFetchFromServer = false;
+
+        // 이전 위치와의 거리 확인
+        if (prevFetch.lat != null && prevFetch.lng != null) {
+          const movedDistance = calculateDistance(prevFetch.lat, prevFetch.lng, lat, lng);
+          // 20km 이상 이동했으면 서버에서 추가 데이터 가져오기
+          if (movedDistance != null && movedDistance > 20000) {
+            shouldFetchFromServer = true;
+          }
+        }
+
+        if (!shouldFetchFromServer) {
+          // 클라이언트 필터링만 수행
+          const filtered = filterServicesByBounds(bounds, allServices);
+          setServices(filtered);
+          // 상태 메시지 업데이트
+          if (filtered.length === 0) {
+            setStatusMessage('주변에 표시할 장소가 없습니다.');
+          } else {
+            setStatusMessage('');
+          }
+          lastFetchedRef.current = { lat, lng, level };
+          programmaticCenterRef.current = null;
+          return;
+        }
+      }
+
+      // allServices가 없거나 범위를 벗어나면 서버 요청
       const prevFetch = lastFetchedRef.current;
       if (prevFetch.lat != null && prevFetch.lng != null) {
         const movedDistance = calculateDistance(prevFetch.lat, prevFetch.lng, lat, lng);
@@ -368,17 +496,15 @@ const LocationServiceMap = () => {
 
       lastFetchedRef.current = { lat, lng, level };
       programmaticCenterRef.current = null;
-      
-      // 축소(레벨 증가) 시 기존 서비스 유지하고 추가로 가져오기
-      // 확대(레벨 감소) 또는 이동 시 기존 서비스 교체
+
+      // 서버에서 데이터 가져오기
       fetchServices({
         latitude: lat,
         longitude: lng,
         level,
-        append: isZoomingOut, // 축소 시에만 append 모드
       });
     },
-    [fetchServices, mapCenter, mapLevel]
+    [fetchServices, mapCenter, mapLevel, allServices, filterServicesByBounds]
   );
 
   const handleKeywordSubmit = useCallback(
@@ -599,13 +725,47 @@ const LocationServiceMap = () => {
         {searchMode === 'keyword' ? (
           <SearchControls>
             <SearchBar onSubmit={handleKeywordSubmit}>
+              <KeywordCategorySelect
+                value={selectedKeywordCategory}
+                onChange={(e) => {
+                  const categoryValue = e.target.value;
+                  setSelectedKeywordCategory(categoryValue);
+                  setKeyword(categoryValue);
+                  setCategoryType(CATEGORY_CUSTOM);
+                  if (categoryValue) {
+                    // 카테고리 선택 시 자동 검색
+                    if (mapCenter) {
+                      programmaticCenterRef.current = { ...mapCenter };
+                      lastFetchedRef.current = {
+                        lat: mapCenter.lat,
+                        lng: mapCenter.lng,
+                        level: mapLevel,
+                      };
+                    }
+                    fetchServices({
+                      latitude: mapCenter?.lat,
+                      longitude: mapCenter?.lng,
+                      keywordOverride: categoryValue,
+                      level: mapLevel,
+                      categoryOverride: CATEGORY_CUSTOM,
+                    });
+                  }
+                }}
+              >
+                {KEYWORD_CATEGORIES.map((cat) => (
+                  <option key={cat.value} value={cat.value}>
+                    {cat.label}
+                  </option>
+                ))}
+              </KeywordCategorySelect>
               <SearchInput
                 value={keyword}
                 onChange={(e) => {
                   setKeyword(e.target.value);
+                  setSelectedKeywordCategory('');
                   setCategoryType(CATEGORY_CUSTOM);
                 }}
-                placeholder="검색어 (예: 반려동물카페, 동물병원 등)"
+                placeholder="직접 검색어 입력 (예: 반려동물카페, 동물병원 등)"
               />
               <SearchButton type="submit">검색</SearchButton>
             </SearchBar>
@@ -755,10 +915,22 @@ const LocationServiceMap = () => {
             <CloseButton onClick={() => setSelectedService(null)}>✕</CloseButton>
             <ServiceTitle>{selectedService.name}</ServiceTitle>
             <ServiceInfo>
+              {selectedService.rating && (
+                <ServiceInfoItem>
+                  <strong>평점</strong>
+                  <span>⭐ {selectedService.rating.toFixed(1)}</span>
+                </ServiceInfoItem>
+              )}
               {selectedService.category && (
                 <ServiceInfoItem>
                   <strong>분류</strong>
                   <span>{selectedService.category}</span>
+                </ServiceInfoItem>
+              )}
+              {selectedService.description && (
+                <ServiceInfoItem>
+                  <strong>설명</strong>
+                  <span>{selectedService.description}</span>
                 </ServiceInfoItem>
               )}
               {selectedService.address && (
@@ -770,7 +942,86 @@ const LocationServiceMap = () => {
               {selectedService.phone && (
                 <ServiceInfoItem>
                   <strong>전화</strong>
-                  <span>{selectedService.phone}</span>
+                  <span>
+                    <a href={`tel:${selectedService.phone}`} style={{ color: 'inherit', textDecoration: 'none' }}>
+                      {selectedService.phone}
+                    </a>
+                  </span>
+                </ServiceInfoItem>
+              )}
+              {selectedService.website && (
+                <ServiceInfoItem>
+                  <strong>웹사이트</strong>
+                  <span>
+                    <a href={selectedService.website} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>
+                      {selectedService.website}
+                    </a>
+                  </span>
+                </ServiceInfoItem>
+              )}
+              {selectedService.operatingHours && (
+                <ServiceInfoItem>
+                  <strong>운영시간</strong>
+                  <span>{selectedService.operatingHours}</span>
+                </ServiceInfoItem>
+              )}
+              {selectedService.closedDay && (
+                <ServiceInfoItem>
+                  <strong>휴무일</strong>
+                  <span>{selectedService.closedDay}</span>
+                </ServiceInfoItem>
+              )}
+              {selectedService.priceInfo && (
+                <ServiceInfoItem>
+                  <strong>가격 정보</strong>
+                  <span>{selectedService.priceInfo}</span>
+                </ServiceInfoItem>
+              )}
+              {selectedService.parkingAvailable !== null && selectedService.parkingAvailable !== undefined && (
+                <ServiceInfoItem>
+                  <strong>주차</strong>
+                  <span>{selectedService.parkingAvailable ? '가능' : '불가능'}</span>
+                </ServiceInfoItem>
+              )}
+              {(selectedService.indoor !== null && selectedService.indoor !== undefined) ||
+                (selectedService.outdoor !== null && selectedService.outdoor !== undefined) ? (
+                <ServiceInfoItem>
+                  <strong>장소 유형</strong>
+                  <span>
+                    {selectedService.indoor ? '실내' : ''}
+                    {selectedService.indoor && selectedService.outdoor ? ' / ' : ''}
+                    {selectedService.outdoor ? '실외' : ''}
+                  </span>
+                </ServiceInfoItem>
+              ) : null}
+              {selectedService.petFriendly !== null && selectedService.petFriendly !== undefined && (
+                <ServiceInfoItem>
+                  <strong>반려동물 동반</strong>
+                  <span>{selectedService.petFriendly ? '✅ 가능' : '❌ 불가능'}</span>
+                </ServiceInfoItem>
+              )}
+              {selectedService.isPetOnly !== null && selectedService.isPetOnly !== undefined && selectedService.isPetOnly && (
+                <ServiceInfoItem>
+                  <strong>반려동물 전용</strong>
+                  <span>✅ 예</span>
+                </ServiceInfoItem>
+              )}
+              {selectedService.petSize && (
+                <ServiceInfoItem>
+                  <strong>입장 가능 동물 크기</strong>
+                  <span>{selectedService.petSize}</span>
+                </ServiceInfoItem>
+              )}
+              {selectedService.petRestrictions && (
+                <ServiceInfoItem>
+                  <strong>반려동물 제한사항</strong>
+                  <span>{selectedService.petRestrictions}</span>
+                </ServiceInfoItem>
+              )}
+              {selectedService.petExtraFee && (
+                <ServiceInfoItem>
+                  <strong>애견 동반 추가 요금</strong>
+                  <span>{selectedService.petExtraFee}</span>
                 </ServiceInfoItem>
               )}
               {selectedService.distanceLabel && (
@@ -780,15 +1031,27 @@ const LocationServiceMap = () => {
                 </ServiceInfoItem>
               )}
             </ServiceInfo>
-            {selectedService.placeUrl && (
-              <DetailLink
-                href={selectedService.placeUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                카카오맵에서 자세히 보기 ↗
-              </DetailLink>
-            )}
+            <DetailActions>
+              {selectedService.placeUrl && (
+                <DetailLink
+                  href={selectedService.placeUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  카카오맵에서 자세히 보기 ↗
+                </DetailLink>
+              )}
+              {selectedService.website && (
+                <DetailLink
+                  href={selectedService.website}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ marginTop: '0.5rem' }}
+                >
+                  웹사이트 방문 ↗
+                </DetailLink>
+              )}
+            </DetailActions>
           </ServiceDetailPanel>
         )}
       </MapArea>
@@ -1007,6 +1270,23 @@ const RegionSelect = styled.select`
     background: ${props => props.theme.colors.background};
     color: ${props => props.theme.colors.textSecondary};
     cursor: not-allowed;
+  }
+`;
+
+const KeywordCategorySelect = styled.select`
+  padding: 0.6rem 1rem;
+  border: 1px solid ${props => props.theme.colors.border};
+  border-radius: 8px;
+  font-size: 0.95rem;
+  min-width: 150px;
+  background: ${props => props.theme.colors.surface};
+  color: ${props => props.theme.colors.text};
+  cursor: pointer;
+
+  &:focus {
+    outline: none;
+    border-color: ${props => props.theme.colors.primary};
+    box-shadow: 0 0 0 3px ${props => props.theme.colors.primary}33;
   }
 `;
 
@@ -1239,9 +1519,15 @@ const ServiceInfoItem = styled.div`
   }
 `;
 
+const DetailActions = styled.div`
+  margin-top: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+`;
+
 const DetailLink = styled.a`
   display: block;
-  margin-top: 1.25rem;
   text-align: center;
   padding: 0.6rem 1rem;
   background: ${props => props.theme.colors.primary};

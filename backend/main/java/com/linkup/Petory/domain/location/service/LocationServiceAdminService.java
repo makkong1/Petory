@@ -78,11 +78,12 @@ public class LocationServiceAdminService {
                     continue;
                 }
 
-                if (locationServiceRepository.existsByNameAndAddress(document.getPlaceName(),
-                        document.getAddressName())
-                        || (StringUtils.hasText(document.getRoadAddressName())
-                                && locationServiceRepository.existsByNameAndDetailAddress(document.getPlaceName(),
-                                        document.getRoadAddressName()))) {
+                // 주소: 도로명주소 우선, 없으면 지번주소
+                String address = StringUtils.hasText(document.getRoadAddressName())
+                        ? document.getRoadAddressName()
+                        : document.getAddressName();
+
+                if (locationServiceRepository.existsByNameAndAddress(document.getPlaceName(), address)) {
                     duplicateCount++;
                     continue;
                 }
@@ -162,12 +163,12 @@ public class LocationServiceAdminService {
         String categoryName = document.getCategoryName();
         String[] categoryParts = categoryName != null ? categoryName.split(" > ") : new String[0];
         String category3 = categoryParts.length > 2 ? categoryParts[2] : categoryName;
-        
+
         // 주소: 도로명주소 우선, 없으면 지번주소
-        String address = StringUtils.hasText(document.getRoadAddressName()) 
-                ? document.getRoadAddressName() 
+        String address = StringUtils.hasText(document.getRoadAddressName())
+                ? document.getRoadAddressName()
                 : document.getAddressName();
-        
+
         return LocationService.builder()
                 .name(document.getPlaceName())
                 // category 필드 제거됨
@@ -210,4 +211,3 @@ public class LocationServiceAdminService {
         return null;
     }
 }
-

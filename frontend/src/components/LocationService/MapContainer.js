@@ -20,7 +20,8 @@ const MapContainer = React.forwardRef(
         return;
       }
 
-      const initial = mapCenter || userLocation || DEFAULT_CENTER;
+      // userLocation을 우선적으로 사용 (내 위치가 있으면 먼저 사용)
+      const initial = userLocation || mapCenter || DEFAULT_CENTER;
       const map = new window.kakao.maps.Map(mapRef.current, {
         center: new window.kakao.maps.LatLng(initial.lat, initial.lng),
         level: DEFAULT_LEVEL,
@@ -35,14 +36,26 @@ const MapContainer = React.forwardRef(
     useEffect(() => {
       const waitForKakao = () => {
         if (window.kakao?.maps) {
-          window.kakao.maps.load(() => ensureMap());
+          window.kakao.maps.load(() => {
+            // userLocation이 있으면 즉시 초기화, 없으면 약간 대기 후 초기화
+            if (userLocation) {
+              ensureMap();
+            } else {
+              // geolocation이 완료될 시간을 주기 위해 약간 지연
+              setTimeout(() => {
+                if (!mapInstanceRef.current) {
+                  ensureMap();
+                }
+              }, 500);
+            }
+          });
         } else {
           setTimeout(waitForKakao, 100);
         }
       };
 
       waitForKakao();
-    }, [ensureMap]);
+    }, [ensureMap, userLocation]);
 
     const clearMarkers = useCallback(() => {
       markersRef.current.forEach((marker) => marker.setMap(null));
@@ -81,9 +94,13 @@ const MapContainer = React.forwardRef(
     }, [services, onServiceClick, clearMarkers]);
 
     useEffect(() => {
-      if (!mapReadyRef.current || !mapInstanceRef.current || !mapCenter) return;
+      if (!mapReadyRef.current || !mapInstanceRef.current) return;
 
       const map = mapInstanceRef.current;
+      
+      // mapCenter 업데이트 (userLocation은 초기 로드 시에만 사용)
+      if (!mapCenter) return;
+
       const currentCenter = map.getCenter();
       const isAlreadyAtCenter =
         Math.abs(currentCenter.getLat() - mapCenter.lat) < COORD_EPSILON &&
@@ -99,6 +116,12 @@ const MapContainer = React.forwardRef(
     }, [mapCenter]);
 
     useEffect(() => {
+      // userLocation이 설정되면 지도가 아직 초기화되지 않았으면 초기화
+      if (userLocation && !mapInstanceRef.current && window.kakao?.maps) {
+        ensureMap();
+        return;
+      }
+
       if (!mapReadyRef.current || !mapInstanceRef.current || !userLocation) return;
 
       const position = new window.kakao.maps.LatLng(userLocation.lat, userLocation.lng);
@@ -111,7 +134,7 @@ const MapContainer = React.forwardRef(
       } else {
         userMarkerRef.current.setPosition(position);
       }
-    }, [userLocation]);
+    }, [userLocation, ensureMap]);
 
     useEffect(() => {
       if (!mapReadyRef.current || !mapInstanceRef.current || !window.kakao?.maps) return;
@@ -134,16 +157,33 @@ const MapContainer = React.forwardRef(
 
           if (isSame) {
             lastProgrammaticCenterRef.current = null;
+            // bounds 정보는 계속 전달
+            const bounds = map.getBounds();
+            onMapIdle?.({
+              lat: center.getLat(),
+              lng: center.getLng(),
+              level: map.getLevel(),
+              bounds: {
+                sw: { lat: bounds.getSouthWest().getLat(), lng: bounds.getSouthWest().getLng() },
+                ne: { lat: bounds.getNorthEast().getLat(), lng: bounds.getNorthEast().getLng() },
+              },
+            });
             return;
           }
 
           lastProgrammaticCenterRef.current = null;
         }
 
+        // bounds 정보 추가 (하이브리드용)
+        const bounds = map.getBounds();
         onMapIdle?.({
           lat: center.getLat(),
           lng: center.getLng(),
           level: map.getLevel(),
+          bounds: {
+            sw: { lat: bounds.getSouthWest().getLat(), lng: bounds.getSouthWest().getLng() },
+            ne: { lat: bounds.getNorthEast().getLat(), lng: bounds.getNorthEast().getLng() },
+          },
         });
       };
 

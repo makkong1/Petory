@@ -40,9 +40,13 @@ public interface LocationServiceRepository extends JpaRepository<LocationService
                         "ORDER BY ls.rating DESC")
         List<LocationService> findTop10ByCategoryOrderByRatingDesc(@Param("category") String category);
 
-        // 이름으로 서비스 검색
+        // 이름으로 서비스 검색 (이름, 설명, 카테고리 포함)
         @Query("SELECT ls FROM LocationService ls WHERE " +
-                        "ls.name LIKE %:keyword% OR ls.description LIKE %:keyword% " +
+                        "ls.name LIKE CONCAT('%', :keyword, '%') " +
+                        "OR ls.description LIKE CONCAT('%', :keyword, '%') " +
+                        "OR ls.category1 LIKE CONCAT('%', :keyword, '%') " +
+                        "OR ls.category2 LIKE CONCAT('%', :keyword, '%') " +
+                        "OR ls.category3 LIKE CONCAT('%', :keyword, '%') " +
                         "ORDER BY ls.rating DESC")
         List<LocationService> findByNameContaining(@Param("keyword") String keyword);
 
@@ -58,18 +62,20 @@ public interface LocationServiceRepository extends JpaRepository<LocationService
         List<LocationService> findByAddress(String address);
 
 
-        // 주소로 서비스 검색 (지역 검색) - 기본 검색
+        // 주소로 서비스 검색 (지역 검색) - 주소, 시도, 시군구 포함
         @Query("SELECT ls FROM LocationService ls WHERE " +
-                        "ls.address LIKE %:address% " +
+                        "ls.address LIKE CONCAT('%', :address, '%') " +
+                        "OR ls.sido LIKE CONCAT('%', :address, '%') " +
+                        "OR ls.sigungu LIKE CONCAT('%', :address, '%') " +
+                        "OR ls.eupmyeondong LIKE CONCAT('%', :address, '%') " +
                         "ORDER BY ls.rating DESC")
         List<LocationService> findByAddressContaining(@Param("address") String address);
 
-        // 반경 검색 (ST_Distance_Sphere 사용) - 3km 이내
-        // POINT 형식: 이 데이터베이스에서는 POINT(위도 경도) = POINT(latitude longitude) 순서 사용
-        // ?1 = latitude, ?2 = longitude 이므로 POINT(?1 ?2) = POINT(위도 경도) 순서
+        // 반경 검색 (ST_Distance_Sphere 사용) - latitude, longitude 직접 사용
+        // POINT 형식: POINT(경도 위도) = POINT(longitude latitude) 순서 사용 (MySQL 표준)
         @Query(value = "SELECT * FROM locationservice WHERE " +
-                        "ST_Distance_Sphere(coordinates, ST_GeomFromText(CONCAT('POINT(', ?1, ' ', ?2, ')'), 4326)) <= ?3 "
-                        +
+                        "latitude IS NOT NULL AND longitude IS NOT NULL AND " +
+                        "ST_Distance_Sphere(POINT(longitude, latitude), POINT(?2, ?1)) <= ?3 " +
                         "ORDER BY rating DESC", nativeQuery = true)
         List<LocationService> findByRadius(@Param("latitude") Double latitude,
                         @Param("longitude") Double longitude,

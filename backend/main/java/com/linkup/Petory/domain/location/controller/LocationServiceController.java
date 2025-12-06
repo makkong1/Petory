@@ -36,8 +36,10 @@ public class LocationServiceController {
             // 카테고리 타입을 실제 카테고리명으로 매핑
             String category = mapCategoryTypeToCategory(categoryType);
             
-            // DB에서 반경 기반 검색
+            // DB에서 검색 (반경, 지역, 키워드 기반)
             List<LocationServiceDTO> services = locationServiceService.searchLocationServices(
+                    keyword,
+                    region,
                     latitude,
                     longitude,
                     radius,

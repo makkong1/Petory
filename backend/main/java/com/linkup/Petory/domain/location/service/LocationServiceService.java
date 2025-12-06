@@ -221,24 +221,57 @@ public class LocationServiceService {
                 .collect(Collectors.toList());
     }
 
-    // DB에서 반경 기반 위치 서비스 검색
+    // DB에서 위치 서비스 검색 (반경, 지역, 키워드 기반)
     public List<LocationServiceDTO> searchLocationServices(
+            String keyword,
+            String region,
             Double latitude,
             Double longitude,
             Integer radius,
             Integer maxResults,
             String category) {
 
-        if (latitude == null || longitude == null) {
-            throw new IllegalArgumentException("위도와 경도는 필수입니다.");
+        List<com.linkup.Petory.domain.location.entity.LocationService> services;
+
+        // 1. 키워드 검색 우선
+        if (StringUtils.hasText(keyword)) {
+            services = locationServiceRepository.findByNameContaining(keyword);
+        }
+        // 2. 지역 검색
+        else if (StringUtils.hasText(region)) {
+            services = locationServiceRepository.findByAddressContaining(region);
+        }
+        // 3. 위도/경도가 있으면 반경 검색
+        else if (latitude != null && longitude != null) {
+            // 반경 기본값: 3000m (3km), 초기 로드 시 넓은 범위(20km) 사용
+            double radiusInMeters = (radius != null && radius > 0) ? radius : 3000.0;
+            // 초기 로드(radius가 null이거나 기본값)이면 넓은 범위로 검색
+            if (radius == null || radius <= 3000) {
+                radiusInMeters = 20000.0; // 20km로 넓은 범위 검색
+            }
+            services = locationServiceRepository.findByRadius(latitude, longitude, radiusInMeters);
+        }
+        // 4. 모두 없으면 전체 조회 (평점순)
+        else {
+            services = locationServiceRepository.findByOrderByRatingDesc();
         }
 
-        // 반경 기본값: 3000m (3km)
-        double radiusInMeters = (radius != null && radius > 0) ? radius : 3000.0;
+        // services가 null이면 빈 리스트로 초기화
+        if (services == null) {
+            services = new java.util.ArrayList<>();
+        }
 
-        // DB에서 반경 내 LocationService 조회
-        List<com.linkup.Petory.domain.location.entity.LocationService> services = locationServiceRepository
-                .findByRadius(latitude, longitude, radiusInMeters);
+        // 위도/경도가 있고 반경 검색 결과가 있으면, 추가로 지역 필터링 적용
+        if (latitude != null && longitude != null && StringUtils.hasText(region) && !services.isEmpty()) {
+            String regionLower = region.toLowerCase(Locale.ROOT);
+            services = services.stream()
+                    .filter(service -> {
+                        String address = service.getAddress() != null ? service.getAddress().toLowerCase(Locale.ROOT)
+                                : "";
+                        return address.contains(regionLower);
+                    })
+                    .collect(Collectors.toList());
+        }
 
         // 카테고리 필터링 (category3, category2, category1 순서로 확인)
         if (StringUtils.hasText(category)) {
@@ -247,7 +280,9 @@ public class LocationServiceService {
                         String serviceCategory = service.getCategory3() != null ? service.getCategory3()
                                 : service.getCategory2() != null ? service.getCategory2() : service.getCategory1();
                         return serviceCategory != null &&
-                                (serviceCategory.contains(category) || category.contains(serviceCategory));
+                                (serviceCategory.toLowerCase(Locale.ROOT).contains(category.toLowerCase(Locale.ROOT))
+                                        || category.toLowerCase(Locale.ROOT)
+                                                .contains(serviceCategory.toLowerCase(Locale.ROOT)));
                     })
                     .collect(Collectors.toList());
         }
