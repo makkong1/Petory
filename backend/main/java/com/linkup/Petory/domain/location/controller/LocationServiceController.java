@@ -23,24 +23,35 @@ public class LocationServiceController {
 
     private final LocationServiceService locationServiceService;
 
+    /**
+     * DB에서 위치 서비스 검색
+     * 지역 계층별 검색만 수행 (내 위치는 거리 계산/길찾기용으로만 사용)
+     * 
+     * @param sido         시도 (선택, 예: "서울특별시", "경기도")
+     * @param sigungu      시군구 (선택, 예: "노원구", "고양시 덕양구")
+     * @param eupmyeondong 읍면동 (선택, 예: "상계동", "동산동")
+     * @param roadName     도로명 (선택, 예: "상계로", "동세로")
+     * @param category     카테고리 (선택, 예: "동물약국", "미술관")
+     * @param size         최대 결과 수 (선택, 기본값: 500)
+     * @return 검색 결과
+     */
     @GetMapping("/search")
-    public ResponseEntity<Map<String, Object>> searchKakaoPlaces(
-            @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) String region,
-            @RequestParam(required = false) Double latitude,
-            @RequestParam(required = false) Double longitude,
-            @RequestParam(required = false) Integer radius,
-            @RequestParam(required = false) Integer size,
-            @RequestParam(required = false) String categoryType) {
+    public ResponseEntity<Map<String, Object>> searchLocationServices(
+            @RequestParam(required = false) String sido,
+            @RequestParam(required = false) String sigungu,
+            @RequestParam(required = false) String eupmyeondong,
+            @RequestParam(required = false) String roadName,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) Integer size) {
         try {
-            List<LocationServiceDTO> services = locationServiceService.searchKakaoPlaces(
-                    keyword,
-                    region,
-                    latitude,
-                    longitude,
-                    radius,
-                    size,
-                    categoryType);
+            // 지역 계층별 검색만 수행
+            List<LocationServiceDTO> services = locationServiceService.searchLocationServicesByRegion(
+                    sido,
+                    sigungu,
+                    eupmyeondong,
+                    roadName,
+                    category,
+                    size);
 
             Map<String, Object> response = new HashMap<>();
             response.put("services", services);
@@ -48,14 +59,14 @@ public class LocationServiceController {
 
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
-            log.warn("카카오 장소 검색 요청이 유효하지 않습니다: {}", e.getMessage());
+            log.warn("위치 서비스 검색 요청이 유효하지 않습니다: {}", e.getMessage());
             Map<String, Object> response = new HashMap<>();
             response.put("error", e.getMessage());
             return ResponseEntity.badRequest().body(response);
         } catch (Exception e) {
-            log.error("카카오 장소 검색 실패: {}", e.getMessage());
+            log.error("위치 서비스 검색 실패: {}", e.getMessage(), e);
             Map<String, Object> response = new HashMap<>();
-            response.put("error", "카카오 장소 검색 중 오류가 발생했습니다.");
+            response.put("error", "위치 서비스 검색 중 오류가 발생했습니다.");
             return ResponseEntity.internalServerError().body(response);
         }
     }

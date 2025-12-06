@@ -4,21 +4,31 @@ import MapContainer from './MapContainer';
 import { locationServiceApi } from '../../api/locationServiceApi';
 import { geocodingApi } from '../../api/geocodingApi';
 
-const DEFAULT_CENTER = { lat: 37.5665, lng: 126.9780 }; // 서울 시청
+const DEFAULT_CENTER = { lat: 36.5, lng: 127.5 }; // 대한민국 중심 좌표
 const DEFAULT_RADIUS = 3000;
-const MAP_DEFAULT_LEVEL = 4;
+const MAP_DEFAULT_LEVEL = 12; // 전국이 보이도록 레벨 1로 설정 (가장 넓은 범위)
 
 const CATEGORY_DEFAULT = 'all';
 const CATEGORY_CUSTOM = 'custom';
 
-const CATEGORY_PRESETS = {
-  [CATEGORY_DEFAULT]: { label: '전체', keyword: '반려동물', categoryType: undefined },
-  hospital: { label: '병원', keyword: '동물병원', categoryType: 'hospital' },
-  cafe: { label: '애견카페', keyword: '애견카페', categoryType: 'cafe' },
-  playground: { label: '놀이터', keyword: '반려견 놀이터', categoryType: 'playground' },
-};
+// 키워드 검색 카테고리 목록
+const KEYWORD_CATEGORIES = [
+  { value: '', label: '전체' },
+  { value: '동물약국', label: '동물약국' },
+  { value: '미술관', label: '미술관' },
+  { value: '카페', label: '카페' },
+  { value: '동물병원', label: '동물병원' },
+  { value: '반려동물용품', label: '반려동물용품' },
+  { value: '미용', label: '미용' },
+  { value: '문예회관', label: '문예회관' },
+  { value: '펜션', label: '펜션' },
+  { value: '식당', label: '식당' },
+  { value: '여행지', label: '여행지' },
+  { value: '위탁관리', label: '위탁관리' },
+  { value: '박물관', label: '박물관' },
+  { value: '호텔', label: '호텔' },
+];
 
-const CATEGORY_BUTTONS = ['hospital', 'cafe', 'playground'];
 
 const SIDOS = [
   '서울특별시',
@@ -39,6 +49,27 @@ const SIDOS = [
   '경상남도',
   '제주특별자치도',
 ];
+
+// 각 시/도의 중심 좌표와 적절한 지도 레벨 (확대 레벨) - 레벨이 낮을수록 더 확대됨
+const SIDO_CENTERS = {
+  '서울특별시': { lat: 37.5665, lng: 126.9780, level: 6 },
+  '부산광역시': { lat: 35.1796, lng: 129.0756, level: 6 },
+  '대구광역시': { lat: 35.8714, lng: 128.6014, level: 6 },
+  '인천광역시': { lat: 37.4563, lng: 126.7052, level: 6 },
+  '광주광역시': { lat: 35.1595, lng: 126.8526, level: 6 },
+  '대전광역시': { lat: 36.3504, lng: 127.3845, level: 6 },
+  '울산광역시': { lat: 35.5384, lng: 129.3114, level: 6 },
+  '세종특별자치시': { lat: 36.4800, lng: 127.2890, level: 7 },
+  '경기도': { lat: 37.4138, lng: 127.5183, level: 5 },
+  '강원특별자치도': { lat: 37.8228, lng: 128.1555, level: 5 },
+  '충청북도': { lat: 36.8000, lng: 127.7000, level: 5 },
+  '충청남도': { lat: 36.5184, lng: 126.8000, level: 5 },
+  '전북특별자치도': { lat: 35.7175, lng: 127.1530, level: 5 },
+  '전라남도': { lat: 34.8679, lng: 126.9910, level: 5 },
+  '경상북도': { lat: 36.4919, lng: 128.8889, level: 5 },
+  '경상남도': { lat: 35.4606, lng: 128.2132, level: 5 },
+  '제주특별자치도': { lat: 33.4996, lng: 126.5312, level: 6 },
+};
 
 const SIGUNGUS = {
   '서울특별시': [
@@ -96,6 +127,14 @@ const levelToSize = (level) => {
   return mapping[level] || 50; // 기본값 50개
 };
 
+// 지도 레벨에 따라 표시할 지역 단위 결정
+const getRegionLevel = (mapLevel) => {
+  if (mapLevel >= 7) return 'sido';        // 전국 범위: 시도
+  if (mapLevel >= 5) return 'sigungu';    // 시도 범위: 시군구
+  if (mapLevel >= 3) return 'eupmyeondong'; // 시군구 범위: 읍면동
+  return 'roadName';                      // 읍면동 범위: 도로명
+};
+
 const calculateDistance = (lat1, lng1, lat2, lng2) => {
   if (
     typeof lat1 !== 'number' ||
@@ -116,7 +155,7 @@ const calculateDistance = (lat1, lng1, lat2, lng2) => {
   const a =
     Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
     Math.cos(φ1) * Math.cos(φ2) *
-      Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return Math.round(R * c); // meters
 };
@@ -130,20 +169,31 @@ const formatDistance = (meters) => {
 };
 
 const LocationServiceMap = () => {
-  const [services, setServices] = useState([]);
+  const [allServices, setAllServices] = useState([]); // 전체 서비스 데이터 (하이브리드용)
+  const [services, setServices] = useState([]); // 현재 표시할 서비스 (필터링된 데이터)
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [statusMessage, setStatusMessage] = useState('지도 준비 중...');
-  const [keyword, setKeyword] = useState('반려동물');
+  const [keyword, setKeyword] = useState('');
+  const [selectedKeywordCategory, setSelectedKeywordCategory] = useState('');
   const [addressQuery, setAddressQuery] = useState('');
   const [categoryType, setCategoryType] = useState(CATEGORY_DEFAULT);
   const [searchMode, setSearchMode] = useState('keyword');
   const [selectedSido, setSelectedSido] = useState('');
   const [selectedSigungu, setSelectedSigungu] = useState('');
+  const [selectedEupmyeondong, setSelectedEupmyeondong] = useState('');
   const [selectedService, setSelectedService] = useState(null);
+  const [hoveredSido, setHoveredSido] = useState(null); // 마우스 호버된 시/도
+  const [currentMapView, setCurrentMapView] = useState('nation'); // 'nation', 'sido', 'sigungu'
+
+  // 선택된 지역의 하위 지역 목록 (서비스 데이터에서 추출)
+  const [availableSigungus, setAvailableSigungus] = useState([]); // 선택된 시도의 시군구 목록
+  const [availableEupmyeondongs, setAvailableEupmyeondongs] = useState([]); // 선택된 시군구의 읍면동 목록
   const [userLocation, setUserLocation] = useState(null);
   const [mapCenter, setMapCenter] = useState(DEFAULT_CENTER);
   const [mapLevel, setMapLevel] = useState(MAP_DEFAULT_LEVEL);
+  const [mapBounds, setMapBounds] = useState(null); // 지도 bounds (하이브리드용)
+  const isSearchModeRef = useRef(false); // 검색 모드 여부 (카테고리/키워드 검색)
   const programmaticCenterRef = useRef(null);
   const latestRequestRef = useRef(0);
   const lastFetchedRef = useRef({ lat: null, lng: null, level: null });
@@ -153,6 +203,7 @@ const LocationServiceMap = () => {
   });
   const fetchServicesRef = useRef(null);
   const suppressNextFetchRef = useRef(false);
+  const isInitialLoadRef = useRef(true); // 초기 로드 여부
 
   useEffect(() => {
     mapStateRef.current = {
@@ -160,6 +211,85 @@ const LocationServiceMap = () => {
       level: mapLevel,
     };
   }, [mapCenter, mapLevel]);
+
+  // 클라이언트에서 지역별 필터링 (시도, 시군구, 읍면동) - 최적화: 한 번의 순회로 처리
+  const filterServicesByRegion = useCallback((allServicesData, sido, sigungu, eupmyeondong, category) => {
+    if (!allServicesData || allServicesData.length === 0) {
+      setServices([]);
+      setAvailableSigungus([]);
+      setAvailableEupmyeondongs([]);
+      return;
+    }
+
+    // 한 번의 순회로 필터링과 목록 추출을 동시에 처리 (성능 최적화)
+    const filtered = [];
+    const sigunguSet = new Set();
+    const eupmyeondongSet = new Set();
+
+    for (const service of allServicesData) {
+      // 시도 필터링
+      if (sido && service.sido !== sido) continue;
+
+      // 시군구 필터링
+      if (sigungu && service.sigungu !== sigungu) continue;
+
+      // 읍면동 필터링
+      if (eupmyeondong && service.eupmyeondong !== eupmyeondong) continue;
+
+      // 카테고리 필터링
+      if (category && service.category3 !== category && service.category2 !== category && service.category1 !== category) continue;
+
+      // 시군구 목록 추출 (시도만 선택된 경우)
+      if (sido && !sigungu && service.sigungu) {
+        sigunguSet.add(service.sigungu);
+      }
+
+      // 읍면동 목록 추출 (시군구만 선택된 경우)
+      if (sigungu && !eupmyeondong && service.eupmyeondong) {
+        eupmyeondongSet.add(service.eupmyeondong);
+      }
+
+      filtered.push(service);
+    }
+
+    // 시군구 목록 설정
+    if (sido && !sigungu) {
+      const sigunguList = Array.from(sigunguSet).sort();
+      setAvailableSigungus(sigunguList.length > 0 ? sigunguList : (SIGUNGUS[sido] || []));
+    } else {
+      setAvailableSigungus([]);
+    }
+
+    // 읍면동 목록 설정
+    if (sigungu && !eupmyeondong) {
+      setAvailableEupmyeondongs(Array.from(eupmyeondongSet).sort());
+    } else {
+      setAvailableEupmyeondongs([]);
+    }
+
+    setServices(filtered);
+    setStatusMessage(filtered.length === 0 ? '해당 지역에 표시할 장소가 없습니다.' : `총 ${filtered.length}개의 장소가 있습니다.`);
+  }, []);
+
+  // 클라이언트에서 지도 bounds 기반 필터링 (하이브리드용)
+  const filterServicesByBounds = useCallback((bounds, allServicesData) => {
+    if (!bounds || !allServicesData || allServicesData.length === 0) {
+      return [];
+    }
+
+    const { sw, ne } = bounds; // southwest, northeast
+    return allServicesData.filter((service) => {
+      if (typeof service.latitude !== 'number' || typeof service.longitude !== 'number') {
+        return false;
+      }
+      return (
+        service.latitude >= sw.lat &&
+        service.latitude <= ne.lat &&
+        service.longitude >= sw.lng &&
+        service.longitude <= ne.lng
+      );
+    });
+  }, []);
 
   const fetchServices = useCallback(
     async ({
@@ -170,6 +300,7 @@ const LocationServiceMap = () => {
       level,
       categoryOverride,
       append = false, // 기존 서비스에 추가할지 여부
+      isInitialLoad = false, // 초기 로드 여부 (하이브리드용)
     }) => {
       const requestId = Date.now();
       latestRequestRef.current = requestId;
@@ -179,77 +310,73 @@ const LocationServiceMap = () => {
       setError(null);
 
       const { center, level: currentLevel } = mapStateRef.current;
-      const effectiveLatitude = typeof latitude === 'number' ? latitude : center.lat;
-      const effectiveLongitude = typeof longitude === 'number' ? longitude : center.lng;
+      // 지역 검색 시에는 위도/경도를 전달하지 않음 (명시적으로 null 체크)
+      const isRegionOnlySearch = region && latitude === undefined && longitude === undefined;
+      const effectiveLatitude = isRegionOnlySearch ? undefined : (typeof latitude === 'number' ? latitude : center.lat);
+      const effectiveLongitude = isRegionOnlySearch ? undefined : (typeof longitude === 'number' ? longitude : center.lng);
       const effectiveLevel = typeof level === 'number' ? level : currentLevel;
       const effectiveRadius = levelToRadius(effectiveLevel);
-      const effectiveSize = levelToSize(effectiveLevel); // 레벨에 따라 동적으로 크기 결정
+      const effectiveSize = levelToSize(effectiveLevel);
       const effectiveCategoryType = categoryOverride ?? categoryType;
       const apiCategoryType =
         effectiveCategoryType &&
-        effectiveCategoryType !== CATEGORY_DEFAULT &&
-        effectiveCategoryType !== CATEGORY_CUSTOM
+          effectiveCategoryType !== CATEGORY_DEFAULT &&
+          effectiveCategoryType !== CATEGORY_CUSTOM
           ? effectiveCategoryType
           : undefined;
 
       try {
-        const response = await locationServiceApi.searchPlaces({
-          keyword: keywordOverride ?? keyword,
-          region,
-          latitude: effectiveLatitude,
-          longitude: effectiveLongitude,
-          radius: effectiveRadius,
-          size: effectiveSize, // 레벨에 따라 동적으로 설정
-          categoryType: apiCategoryType,
-        });
+        // 지도 레벨에 따라 지역 단위 결정
+        const regionLevel = getRegionLevel(effectiveLevel);
+        const effectiveCategoryType = categoryOverride ?? categoryType;
+        const apiCategory = effectiveCategoryType &&
+          effectiveCategoryType !== CATEGORY_DEFAULT &&
+          effectiveCategoryType !== CATEGORY_CUSTOM
+          ? effectiveCategoryType
+          : undefined;
 
-        if (latestRequestRef.current !== requestId) {
+        // 지역 계층별 검색만 수행 (내 위치는 거리 계산용으로만 사용)
+        const regionParams = {};
+
+        // 초기 로드 시에만 전체 데이터 가져오기
+        if (isInitialLoad) {
+          const response = await locationServiceApi.searchPlaces({
+            category: apiCategory,
+            size: 5000, // 초기 로드 시 적절한 크기로 제한 (성능 최적화)
+          });
+
+          if (latestRequestRef.current !== requestId) {
+            return;
+          }
+
+          // 거리 계산은 나중에 필요할 때만 수행 (초기 로드 시 성능 최적화)
+          const fetchedServices = (response.data?.services || []).map((service) => ({
+            ...service,
+            // distance는 나중에 필요할 때 계산
+          }));
+
+          // 전체 데이터를 allServices에 저장하고, 선택된 지역에 따라 필터링
+          setAllServices(fetchedServices);
+          filterServicesByRegion(fetchedServices, selectedSido, selectedSigungu, selectedEupmyeondong, apiCategory);
+
+          isInitialLoadRef.current = false;
+          isSearchModeRef.current = false;
+          setStatusMessage('');
+          setSelectedService(null);
+          setLoading(false);
           return;
         }
 
-        const fetchedServices = (response.data?.services || []).map((service) => {
-          const distance = calculateDistance(
-            effectiveLatitude,
-            effectiveLongitude,
-            service.latitude,
-            service.longitude
-          );
-
-          return {
-            ...service,
-            distance,
-          };
-        });
-
-        if (append) {
-          // 기존 서비스에 추가 (중복 제거)
-          setServices((prevServices) => {
-            const existingIds = new Set(prevServices.map(s => s.externalId || `${s.latitude}-${s.longitude}`));
-            const newServices = fetchedServices.filter(
-              s => !existingIds.has(s.externalId || `${s.latitude}-${s.longitude}`)
-            );
-            const finalServices = [...prevServices, ...newServices];
-            
-            // 상태 메시지 업데이트
-            if (finalServices.length === 0) {
-              setStatusMessage('주변에 표시할 장소가 없습니다.');
-            } else {
-              setStatusMessage('');
-            }
-            
-            return finalServices;
-          });
-        } else {
-          // 기존 서비스 교체
-          setServices(fetchedServices);
-          if (fetchedServices.length === 0) {
-            setStatusMessage('주변에 표시할 장소가 없습니다.');
-          } else {
-            setStatusMessage('');
-          }
+        // 초기 로드가 아니면 allServices에서 클라이언트 사이드 필터링만 수행
+        if (allServices.length > 0) {
+          filterServicesByRegion(allServices, selectedSido, selectedSigungu, selectedEupmyeondong, apiCategory);
+          setLoading(false);
+          return;
         }
-        
-        setSelectedService(null);
+
+        // allServices가 없으면 다시 로드
+        setLoading(false);
+        return;
       } catch (err) {
         if (latestRequestRef.current !== requestId) {
           return;
@@ -269,7 +396,7 @@ const LocationServiceMap = () => {
         };
       }
     },
-    [keyword, categoryType]
+    [keyword, categoryType, mapBounds, filterServicesByBounds, userLocation, selectedSido, selectedSigungu, selectedEupmyeondong, filterServicesByRegion, allServices]
   );
 
   useEffect(() => {
@@ -277,15 +404,24 @@ const LocationServiceMap = () => {
   }, [fetchServices]);
 
   useEffect(() => {
+    // 초기 로드: 전국 데이터 가져오기 (내 위치와 관계없이)
+    setMapCenter(DEFAULT_CENTER);
+    setMapLevel(MAP_DEFAULT_LEVEL); // 전국이 보이도록 레벨 1로 설정
+    fetchServicesRef.current?.({
+      isInitialLoad: true, // 초기 로드 - 전국 데이터
+    });
+
+    // 내 위치는 나중에 가져오기 (길찾기/거리 계산용으로만 사용)
     const tryGeolocation = () => {
       if (!navigator.geolocation) {
-        fetchServicesRef.current?.({
-          latitude: DEFAULT_CENTER.lat,
-          longitude: DEFAULT_CENTER.lng,
-          level: MAP_DEFAULT_LEVEL,
-        });
         return;
       }
+
+      const options = {
+        enableHighAccuracy: false,
+        timeout: 5000,
+        maximumAge: 0,
+      };
 
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -293,22 +429,13 @@ const LocationServiceMap = () => {
             lat: position.coords.latitude,
             lng: position.coords.longitude,
           };
+          // 내 위치는 길찾기/거리 계산용으로만 저장 (지도 중심은 변경하지 않음)
           setUserLocation(location);
-          setMapCenter(location);
-          programmaticCenterRef.current = location;
-          fetchServicesRef.current?.({
-            latitude: location.lat,
-            longitude: location.lng,
-            level: MAP_DEFAULT_LEVEL,
-          });
         },
-        () => {
-          fetchServicesRef.current?.({
-            latitude: DEFAULT_CENTER.lat,
-            longitude: DEFAULT_CENTER.lng,
-            level: MAP_DEFAULT_LEVEL,
-          });
-        }
+        (error) => {
+          console.warn('위치 정보를 가져올 수 없습니다:', error);
+        },
+        options
       );
     };
 
@@ -320,22 +447,42 @@ const LocationServiceMap = () => {
   }, []);
 
   const handleMapIdle = useCallback(
-    ({ lat, lng, level }) => {
+    ({ lat, lng, level, bounds, isManualOperation = false }) => {
       const nextCenter = { lat, lng };
       const prevLevel = mapLevel;
       const levelChanged = prevLevel !== level;
-      const isZoomingOut = levelChanged && level > prevLevel; // 레벨이 높아지면 축소 (넓어짐)
 
-      if (
-        !mapCenter ||
-        Math.abs(mapCenter.lat - lat) > 0.00001 ||
-        Math.abs(mapCenter.lng - lng) > 0.00001
-      ) {
-        setMapCenter(nextCenter);
+      // 초기 로드가 완료되기 전에는 mapCenter를 변경하지 않음 (DEFAULT_CENTER 유지)
+      // 프로그래밍 방식으로 이동 중일 때는 mapCenter를 업데이트하지 않음 (무한 루프 방지)
+      if (!isInitialLoadRef.current && !isManualOperation) {
+        // 프로그래밍 이동 중이 아니고, 실제로 중심이 변경되었을 때만 업데이트
+        const plannedCenter = programmaticCenterRef.current;
+        const COORD_EPSILON = 0.0001; // 좌표 비교 오차 범위
+
+        // 프로그래밍 이동이 진행 중이 아니거나, 목표 위치와 다를 때만 업데이트
+        if (!plannedCenter ||
+          Math.abs(plannedCenter.lat - lat) > COORD_EPSILON ||
+          Math.abs(plannedCenter.lng - lng) > COORD_EPSILON) {
+          // 실제로 중심이 변경되었을 때만 업데이트
+          if (
+            !mapCenter ||
+            Math.abs(mapCenter.lat - lat) > 0.00001 ||
+            Math.abs(mapCenter.lng - lng) > 0.00001
+          ) {
+            setMapCenter(nextCenter);
+          }
+        }
       }
 
-      if (levelChanged) {
+      // 수동 조작이 아닐 때만 mapLevel 업데이트 (프로그래밍 방식으로 이동한 경우)
+      // 수동 조작 시에는 mapLevel을 업데이트하지 않아서 useEffect가 다시 실행되지 않음
+      if (levelChanged && !isManualOperation) {
         setMapLevel(level);
+      }
+
+      // bounds 업데이트 (하이브리드용)
+      if (bounds) {
+        setMapBounds(bounds);
       }
 
       const plannedCenter = programmaticCenterRef.current;
@@ -345,8 +492,16 @@ const LocationServiceMap = () => {
         Math.abs(a.lat - b.lat) < 0.00001 &&
         Math.abs(a.lng - b.lng) < 0.00001;
 
+      // 프로그래밍 방식으로 이동한 경우, 지도가 목표 위치에 도달했으면 서버 요청 수행
       if (centersAreClose(plannedCenter, nextCenter)) {
         programmaticCenterRef.current = null;
+        // 지도 이동이 완료되었으므로 서버에서 데이터 가져오기
+        lastFetchedRef.current = { lat, lng, level };
+        fetchServices({
+          latitude: lat,
+          longitude: lng,
+          level,
+        });
         return;
       }
 
@@ -356,6 +511,40 @@ const LocationServiceMap = () => {
         return;
       }
 
+      // 하이브리드: allServices가 있고 키워드/지역 검색이 아닌 경우 클라이언트 필터링만 수행
+      // 단, 지도가 너무 멀리 이동했으면 추가 요청 필요
+      // 카테고리/키워드 검색 결과는 bounds 필터링을 하지 않음 (전체 표시)
+      if (allServices.length > 0 && bounds && !isSearchModeRef.current) {
+        const prevFetch = lastFetchedRef.current;
+        let shouldFetchFromServer = false;
+
+        // 이전 위치와의 거리 확인
+        if (prevFetch.lat != null && prevFetch.lng != null) {
+          const movedDistance = calculateDistance(prevFetch.lat, prevFetch.lng, lat, lng);
+          // 20km 이상 이동했으면 서버에서 추가 데이터 가져오기
+          if (movedDistance != null && movedDistance > 20000) {
+            shouldFetchFromServer = true;
+          }
+        }
+
+        if (!shouldFetchFromServer) {
+          // 클라이언트 필터링만 수행 (bounds에 맞는 서비스만 표시)
+          // 초기 로드 직후에는 allServices가 많을 수 있으므로 bounds로 필터링
+          const filtered = filterServicesByBounds(bounds, allServices);
+          setServices(filtered);
+          // 상태 메시지 업데이트
+          if (filtered.length === 0) {
+            setStatusMessage('현재 지도 영역에 표시할 장소가 없습니다.');
+          } else {
+            setStatusMessage('');
+          }
+          lastFetchedRef.current = { lat, lng, level };
+          programmaticCenterRef.current = null;
+          return;
+        }
+      }
+
+      // allServices가 없거나 범위를 벗어나면 서버 요청
       const prevFetch = lastFetchedRef.current;
       if (prevFetch.lat != null && prevFetch.lng != null) {
         const movedDistance = calculateDistance(prevFetch.lat, prevFetch.lng, lat, lng);
@@ -368,17 +557,15 @@ const LocationServiceMap = () => {
 
       lastFetchedRef.current = { lat, lng, level };
       programmaticCenterRef.current = null;
-      
-      // 축소(레벨 증가) 시 기존 서비스 유지하고 추가로 가져오기
-      // 확대(레벨 감소) 또는 이동 시 기존 서비스 교체
+
+      // 서버에서 데이터 가져오기
       fetchServices({
         latitude: lat,
         longitude: lng,
         level,
-        append: isZoomingOut, // 축소 시에만 append 모드
       });
     },
-    [fetchServices, mapCenter, mapLevel]
+    [fetchServices, mapCenter, mapLevel, allServices, filterServicesByBounds]
   );
 
   const handleKeywordSubmit = useCallback(
@@ -447,42 +634,85 @@ const LocationServiceMap = () => {
     }
   }, [addressQuery, categoryType, fetchServices, keyword, mapLevel]);
 
-  const handleRegionSearch = useCallback(async () => {
-    if (!selectedSido) {
+  const handleRegionSearch = useCallback(async (sidoOverride = null, sigunguOverride = null, eupmyeondongOverride = null) => {
+    const targetSido = sidoOverride !== null ? sidoOverride : selectedSido;
+    const targetSigungu = sigunguOverride !== null ? sigunguOverride : selectedSigungu;
+    const targetEupmyeondong = eupmyeondongOverride !== null ? eupmyeondongOverride : selectedEupmyeondong;
+
+    if (!targetSido) {
       setStatusMessage('검색할 시/도를 선택해주세요.');
       return;
     }
 
-    const targetRegion = selectedSigungu ? `${selectedSido} ${selectedSigungu}` : selectedSido;
+    let targetRegion = targetSido;
+    if (targetSigungu) {
+      targetRegion = `${targetSido} ${targetSigungu}`;
+    }
+    if (targetEupmyeondong) {
+      targetRegion = `${targetSido} ${targetSigungu} ${targetEupmyeondong}`;
+    }
 
     try {
       setStatusMessage(`'${targetRegion}' 주변 장소를 검색하는 중...`);
       setError(null);
 
-      const response = await geocodingApi.addressToCoordinates(targetRegion);
-      if (!response.success || !response.latitude || !response.longitude) {
-        setStatusMessage('해당 지역의 좌표를 찾지 못했습니다. 다른 지역을 선택해 주세요.');
-        return;
+      // 시/도만 선택된 경우 미리 정의된 중심 좌표와 레벨 사용 (성능 최적화 및 확대 기능)
+      let location;
+      let zoomLevel;
+
+      if (targetSido && !targetSigungu && !targetEupmyeondong && SIDO_CENTERS[targetSido]) {
+        // 시/도 중심 좌표와 레벨 사용 (지도 확대)
+        const sidoCenter = SIDO_CENTERS[targetSido];
+        location = {
+          lat: sidoCenter.lat,
+          lng: sidoCenter.lng,
+        };
+        zoomLevel = sidoCenter.level;
+      } else {
+        // 시/군/구나 읍/면/동이 선택된 경우 geocoding 사용
+        const response = await geocodingApi.addressToCoordinates(targetRegion);
+        if (!response.success || !response.latitude || !response.longitude) {
+          setStatusMessage('해당 지역의 좌표를 찾지 못했습니다. 다른 지역을 선택해 주세요.');
+          return;
+        }
+        location = {
+          lat: response.latitude,
+          lng: response.longitude,
+        };
+        // 시/군/구는 레벨 6, 읍/면/동은 레벨 7로 확대
+        zoomLevel = targetEupmyeondong ? 7 : (targetSigungu ? 6 : mapLevel);
       }
 
-      const location = {
-        lat: response.latitude,
-        lng: response.longitude,
-      };
+      // 지도 중심과 레벨을 즉시 설정 (확대 효과)
+      // 동시에 설정하여 확대 효과 즉시 적용
+      programmaticCenterRef.current = location; // 먼저 설정하여 MapContainer가 인식하도록
 
+      setMapLevel(zoomLevel);
       setMapCenter(location);
-      programmaticCenterRef.current = location;
+
       lastFetchedRef.current = {
         lat: location.lat,
         lng: location.lng,
-        level: mapLevel,
+        level: zoomLevel,
       };
 
+      // 지도가 즉시 확대되도록 강제 업데이트
+      mapStateRef.current = {
+        center: location,
+        level: zoomLevel,
+      };
+
+      console.log('지도 확대:', targetSido, '레벨:', zoomLevel, '위치:', location);
+      console.log('programmaticCenterRef 설정:', programmaticCenterRef.current);
+
+      // 지역 선택 검색: region만 전달 (위도/경도는 지도 중심 이동용)
+      // 백엔드에서 region만으로 검색하도록 함
+      isSearchModeRef.current = false; // 지역 검색은 검색 모드 아님 (bounds 필터링 적용)
       fetchServices({
-        latitude: location.lat,
-        longitude: location.lng,
+        latitude: undefined, // 지역 검색 시 위도/경도 제거
+        longitude: undefined,
         keywordOverride: keyword,
-        level: mapLevel,
+        level: zoomLevel,
         region: targetRegion,
         categoryOverride: categoryType,
       });
@@ -491,47 +721,41 @@ const LocationServiceMap = () => {
       setError(`지역 검색에 실패했습니다: ${message}`);
       setStatusMessage('');
     }
-  }, [categoryType, fetchServices, keyword, selectedSido, selectedSigungu, mapLevel]);
+  }, [selectedSido, selectedSigungu, selectedEupmyeondong, categoryType, fetchServices, keyword, mapLevel]);
 
-  const handleCategorySelect = useCallback(
-    (nextCategory) => {
-      if (!nextCategory || !CATEGORY_PRESETS[nextCategory]) {
-        return;
+  // 시도/시군구/읍면동 선택 시 자동으로 서비스 필터링 (클라이언트 사이드)
+  useEffect(() => {
+    if (!isInitialLoadRef.current && allServices.length > 0) {
+      const effectiveCategoryType = categoryType !== CATEGORY_DEFAULT && categoryType !== CATEGORY_CUSTOM
+        ? categoryType
+        : undefined;
+      filterServicesByRegion(allServices, selectedSido, selectedSigungu, selectedEupmyeondong, effectiveCategoryType);
+    }
+  }, [selectedSido, selectedSigungu, selectedEupmyeondong, categoryType, allServices, filterServicesByRegion]);
+
+
+  // 거리 계산을 지연 로딩 (필요할 때만 계산)
+  const servicesWithDisplay = useMemo(() => {
+    return services.map((service, index) => {
+      // 거리는 필요할 때만 계산 (userLocation이 있고 아직 계산되지 않은 경우)
+      let distance = service.distance;
+      if (distance == null && userLocation && service.latitude && service.longitude) {
+        distance = calculateDistance(
+          userLocation.lat,
+          userLocation.lng,
+          service.latitude,
+          service.longitude
+        );
       }
 
-      const preset = CATEGORY_PRESETS[nextCategory];
-      setCategoryType(nextCategory);
-      if (preset.keyword) {
-        setKeyword(preset.keyword);
-      }
-
-      const targetCenter = mapCenter || DEFAULT_CENTER;
-      programmaticCenterRef.current = { ...targetCenter };
-      lastFetchedRef.current = {
-        lat: targetCenter.lat,
-        lng: targetCenter.lng,
-        level: mapLevel,
+      return {
+        ...service,
+        key: service.externalId || service.placeUrl || `${service.latitude}-${service.longitude}-${index}`,
+        distance,
+        distanceLabel: formatDistance(distance),
       };
-
-      fetchServices({
-        latitude: targetCenter.lat,
-        longitude: targetCenter.lng,
-        keywordOverride: preset.keyword ?? keyword,
-        level: mapLevel,
-        categoryOverride: nextCategory,
-      });
-    },
-    [fetchServices, keyword, mapCenter, mapLevel]
-  );
-
-  const servicesWithDisplay = useMemo(() =>
-    services.map((service, index) => ({
-      ...service,
-      key: service.externalId || service.placeUrl || `${service.latitude}-${service.longitude}-${index}`,
-      distanceLabel: formatDistance(service.distance),
-    })),
-    [services]
-  );
+    });
+  }, [services, userLocation]);
 
   const handleServiceSelect = useCallback((service) => {
     setSelectedService(service);
@@ -599,13 +823,47 @@ const LocationServiceMap = () => {
         {searchMode === 'keyword' ? (
           <SearchControls>
             <SearchBar onSubmit={handleKeywordSubmit}>
+              <KeywordCategorySelect
+                value={selectedKeywordCategory}
+                onChange={(e) => {
+                  const categoryValue = e.target.value;
+                  setSelectedKeywordCategory(categoryValue);
+                  setKeyword(categoryValue);
+                  setCategoryType(CATEGORY_CUSTOM);
+                  if (categoryValue) {
+                    // 카테고리 선택 시 자동 검색
+                    if (mapCenter) {
+                      programmaticCenterRef.current = { ...mapCenter };
+                      lastFetchedRef.current = {
+                        lat: mapCenter.lat,
+                        lng: mapCenter.lng,
+                        level: mapLevel,
+                      };
+                    }
+                    fetchServices({
+                      latitude: mapCenter?.lat,
+                      longitude: mapCenter?.lng,
+                      keywordOverride: categoryValue,
+                      level: mapLevel,
+                      categoryOverride: CATEGORY_CUSTOM,
+                    });
+                  }
+                }}
+              >
+                {KEYWORD_CATEGORIES.map((cat) => (
+                  <option key={cat.value} value={cat.value}>
+                    {cat.label}
+                  </option>
+                ))}
+              </KeywordCategorySelect>
               <SearchInput
                 value={keyword}
                 onChange={(e) => {
                   setKeyword(e.target.value);
+                  setSelectedKeywordCategory('');
                   setCategoryType(CATEGORY_CUSTOM);
                 }}
-                placeholder="검색어 (예: 반려동물카페, 동물병원 등)"
+                placeholder="직접 검색어 입력 (예: 반려동물카페, 동물병원 등)"
               />
               <SearchButton type="submit">검색</SearchButton>
             </SearchBar>
@@ -622,56 +880,113 @@ const LocationServiceMap = () => {
           </SearchControls>
         ) : (
           <RegionControls>
-            <RegionSelect
-              value={selectedSido}
-              onChange={(e) => {
-                setSelectedSido(e.target.value);
-                setSelectedSigungu('');
-              }}
-            >
-              <option value="">시/도 선택</option>
-              {SIDOS.map((sido) => (
-                <option key={sido} value={sido}>
-                  {sido}
-                </option>
-              ))}
-            </RegionSelect>
-            <RegionSelect
-              value={selectedSigungu}
-              onChange={(e) => setSelectedSigungu(e.target.value)}
-              disabled={!selectedSido || !SIGUNGUS[selectedSido]}
-            >
-              <option value="">시/군/구 선택 (선택)</option>
-              {selectedSido && SIGUNGUS[selectedSido]?.map((sigungu) => (
-                <option key={sigungu} value={sigungu}>
-                  {sigungu}
-                </option>
-              ))}
-            </RegionSelect>
-            <RegionSearchButton
-              type="button"
-              disabled={!selectedSido}
-              onClick={handleRegionSearch}
-            >
-              지역 검색
-            </RegionSearchButton>
+            {!selectedSido ? (
+              // 시/도 선택 화면
+              <RegionButtonGrid>
+                <RegionButton
+                  onClick={async () => {
+                    setSelectedSido('');
+                    setSelectedSigungu('');
+                    setSelectedEupmyeondong('');
+                    setMapCenter(DEFAULT_CENTER);
+                    setMapLevel(MAP_DEFAULT_LEVEL);
+                    // 전국 검색
+                    await fetchServices({
+                      latitude: undefined,
+                      longitude: undefined,
+                      keywordOverride: keyword,
+                      level: MAP_DEFAULT_LEVEL,
+                      region: undefined,
+                      categoryOverride: categoryType,
+                    });
+                  }}
+                  active={!selectedSido && !selectedSigungu && !selectedEupmyeondong}
+                >
+                  전국
+                </RegionButton>
+                {SIDOS.map((sido) => (
+                  <RegionButton
+                    key={sido}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      console.log('시/도 클릭:', sido);
+                      setSelectedSido(sido);
+                      setSelectedSigungu('');
+                      setSelectedEupmyeondong('');
+                      // 시/도 검색
+                      handleRegionSearch(sido);
+                    }}
+                    onMouseEnter={() => {
+                      console.log('시/도 호버:', sido);
+                      setHoveredSido(sido);
+                    }}
+                    onMouseLeave={() => {
+                      setHoveredSido(null);
+                    }}
+                    active={selectedSido === sido}
+                  >
+                    {sido}
+                  </RegionButton>
+                ))}
+              </RegionButtonGrid>
+            ) : !selectedSigungu ? (
+              // 시/군/구 선택 화면
+              <RegionButtonGrid>
+                <RegionButton
+                  onClick={() => {
+                    setSelectedSido('');
+                    setSelectedSigungu('');
+                    setSelectedEupmyeondong('');
+                    setMapCenter(DEFAULT_CENTER);
+                    setMapLevel(MAP_DEFAULT_LEVEL);
+                  }}
+                >
+                  ← 뒤로
+                </RegionButton>
+                {(availableSigungus.length > 0 ? availableSigungus : (SIGUNGUS[selectedSido] || [])).map((sigungu) => (
+                  <RegionButton
+                    key={sigungu}
+                    onClick={async () => {
+                      setSelectedSigungu(sigungu);
+                      setSelectedEupmyeondong('');
+                      // 시/군/구 검색
+                      await handleRegionSearch(selectedSido, sigungu);
+                    }}
+                    active={selectedSigungu === sigungu}
+                  >
+                    {sigungu}
+                  </RegionButton>
+                ))}
+              </RegionButtonGrid>
+            ) : (
+              // 읍/면/동 선택 화면
+              <RegionButtonGrid>
+                <RegionButton
+                  onClick={() => {
+                    setSelectedSigungu('');
+                    setSelectedEupmyeondong('');
+                  }}
+                >
+                  ← 뒤로
+                </RegionButton>
+                {availableEupmyeondongs.map((eupmyeondong) => (
+                  <RegionButton
+                    key={eupmyeondong}
+                    onClick={async () => {
+                      setSelectedEupmyeondong(eupmyeondong);
+                      // 읍/면/동 검색
+                      await handleRegionSearch(selectedSido, selectedSigungu, eupmyeondong);
+                    }}
+                    active={selectedEupmyeondong === eupmyeondong}
+                  >
+                    {eupmyeondong}
+                  </RegionButton>
+                ))}
+              </RegionButtonGrid>
+            )}
           </RegionControls>
         )}
-        <CategoryFilterBar>
-          {CATEGORY_BUTTONS.map((buttonType) => {
-            const preset = CATEGORY_PRESETS[buttonType];
-            return (
-              <CategoryButton
-                key={buttonType}
-                type="button"
-                active={categoryType === buttonType}
-                onClick={() => handleCategorySelect(buttonType)}
-              >
-                {preset.label}
-              </CategoryButton>
-            );
-          })}
-        </CategoryFilterBar>
       </Header>
 
       {statusMessage && (
@@ -688,12 +1003,36 @@ const LocationServiceMap = () => {
       <MapArea>
         <MapWrapper>
           <MapContainer
-            services={servicesWithDisplay}
+            services={selectedService ? [selectedService] : []}
             onServiceClick={setSelectedService}
             userLocation={userLocation}
             mapCenter={mapCenter}
+            mapLevel={mapLevel}
             onMapDragStart={handleMapDragStart}
             onMapIdle={handleMapIdle}
+            hoverMarker={hoveredSido && SIDO_CENTERS[hoveredSido] ? {
+              lat: SIDO_CENTERS[hoveredSido].lat,
+              lng: SIDO_CENTERS[hoveredSido].lng,
+              title: hoveredSido
+            } : null}
+            currentMapView={currentMapView}
+            selectedSido={selectedSido}
+            selectedSigungu={selectedSigungu}
+            onRegionClick={(regionType, regionName) => {
+              console.log('지역 클릭:', regionType, regionName);
+              if (regionType === 'sido') {
+                setSelectedSido(regionName);
+                setSelectedSigungu('');
+                setSelectedEupmyeondong('');
+                handleRegionSearch(regionName);
+                setCurrentMapView('sido');
+              } else if (regionType === 'sigungu') {
+                setSelectedSigungu(regionName);
+                setSelectedEupmyeondong('');
+                handleRegionSearch(selectedSido, regionName);
+                setCurrentMapView('sigungu');
+              }
+            }}
           />
 
           {loading && (
@@ -755,10 +1094,22 @@ const LocationServiceMap = () => {
             <CloseButton onClick={() => setSelectedService(null)}>✕</CloseButton>
             <ServiceTitle>{selectedService.name}</ServiceTitle>
             <ServiceInfo>
+              {selectedService.rating && (
+                <ServiceInfoItem>
+                  <strong>평점</strong>
+                  <span>⭐ {selectedService.rating.toFixed(1)}</span>
+                </ServiceInfoItem>
+              )}
               {selectedService.category && (
                 <ServiceInfoItem>
                   <strong>분류</strong>
                   <span>{selectedService.category}</span>
+                </ServiceInfoItem>
+              )}
+              {selectedService.description && (
+                <ServiceInfoItem>
+                  <strong>설명</strong>
+                  <span>{selectedService.description}</span>
                 </ServiceInfoItem>
               )}
               {selectedService.address && (
@@ -770,7 +1121,86 @@ const LocationServiceMap = () => {
               {selectedService.phone && (
                 <ServiceInfoItem>
                   <strong>전화</strong>
-                  <span>{selectedService.phone}</span>
+                  <span>
+                    <a href={`tel:${selectedService.phone}`} style={{ color: 'inherit', textDecoration: 'none' }}>
+                      {selectedService.phone}
+                    </a>
+                  </span>
+                </ServiceInfoItem>
+              )}
+              {selectedService.website && (
+                <ServiceInfoItem>
+                  <strong>웹사이트</strong>
+                  <span>
+                    <a href={selectedService.website} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>
+                      {selectedService.website}
+                    </a>
+                  </span>
+                </ServiceInfoItem>
+              )}
+              {selectedService.operatingHours && (
+                <ServiceInfoItem>
+                  <strong>운영시간</strong>
+                  <span>{selectedService.operatingHours}</span>
+                </ServiceInfoItem>
+              )}
+              {selectedService.closedDay && (
+                <ServiceInfoItem>
+                  <strong>휴무일</strong>
+                  <span>{selectedService.closedDay}</span>
+                </ServiceInfoItem>
+              )}
+              {selectedService.priceInfo && (
+                <ServiceInfoItem>
+                  <strong>가격 정보</strong>
+                  <span>{selectedService.priceInfo}</span>
+                </ServiceInfoItem>
+              )}
+              {selectedService.parkingAvailable !== null && selectedService.parkingAvailable !== undefined && (
+                <ServiceInfoItem>
+                  <strong>주차</strong>
+                  <span>{selectedService.parkingAvailable ? '가능' : '불가능'}</span>
+                </ServiceInfoItem>
+              )}
+              {(selectedService.indoor !== null && selectedService.indoor !== undefined) ||
+                (selectedService.outdoor !== null && selectedService.outdoor !== undefined) ? (
+                <ServiceInfoItem>
+                  <strong>장소 유형</strong>
+                  <span>
+                    {selectedService.indoor ? '실내' : ''}
+                    {selectedService.indoor && selectedService.outdoor ? ' / ' : ''}
+                    {selectedService.outdoor ? '실외' : ''}
+                  </span>
+                </ServiceInfoItem>
+              ) : null}
+              {selectedService.petFriendly !== null && selectedService.petFriendly !== undefined && (
+                <ServiceInfoItem>
+                  <strong>반려동물 동반</strong>
+                  <span>{selectedService.petFriendly ? '✅ 가능' : '❌ 불가능'}</span>
+                </ServiceInfoItem>
+              )}
+              {selectedService.isPetOnly !== null && selectedService.isPetOnly !== undefined && selectedService.isPetOnly && (
+                <ServiceInfoItem>
+                  <strong>반려동물 전용</strong>
+                  <span>✅ 예</span>
+                </ServiceInfoItem>
+              )}
+              {selectedService.petSize && (
+                <ServiceInfoItem>
+                  <strong>입장 가능 동물 크기</strong>
+                  <span>{selectedService.petSize}</span>
+                </ServiceInfoItem>
+              )}
+              {selectedService.petRestrictions && (
+                <ServiceInfoItem>
+                  <strong>반려동물 제한사항</strong>
+                  <span>{selectedService.petRestrictions}</span>
+                </ServiceInfoItem>
+              )}
+              {selectedService.petExtraFee && (
+                <ServiceInfoItem>
+                  <strong>애견 동반 추가 요금</strong>
+                  <span>{selectedService.petExtraFee}</span>
                 </ServiceInfoItem>
               )}
               {selectedService.distanceLabel && (
@@ -780,15 +1210,27 @@ const LocationServiceMap = () => {
                 </ServiceInfoItem>
               )}
             </ServiceInfo>
-            {selectedService.placeUrl && (
-              <DetailLink
-                href={selectedService.placeUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                카카오맵에서 자세히 보기 ↗
-              </DetailLink>
-            )}
+            <DetailActions>
+              {selectedService.placeUrl && (
+                <DetailLink
+                  href={selectedService.placeUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  카카오맵에서 자세히 보기 ↗
+                </DetailLink>
+              )}
+              {selectedService.website && (
+                <DetailLink
+                  href={selectedService.website}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ marginTop: '0.5rem' }}
+                >
+                  웹사이트 방문 ↗
+                </DetailLink>
+              )}
+            </DetailActions>
           </ServiceDetailPanel>
         )}
       </MapArea>
@@ -814,33 +1256,6 @@ const Header = styled.div`
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
-`;
-
-const CategoryFilterBar = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-`;
-
-const CategoryButton = styled.button.withConfig({
-  shouldForwardProp: (prop) => prop !== 'active',
-})`
-  padding: 0.5rem 1rem;
-  border-radius: 8px;
-  border: 1px solid ${(props) => (props.active ? props.theme.colors.primary : props.theme.colors.border)};
-  background: ${(props) => (props.active ? props.theme.colors.primary : props.theme.colors.surface)};
-  color: ${(props) => (props.active ? '#ffffff' : props.theme.colors.text)};
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-
-  &:hover {
-    border-color: ${props => props.theme.colors.primary};
-    background: ${(props) => (props.active ? props.theme.colors.primary + 'dd' : props.theme.colors.primary)};
-    color: white;
-    transform: translateY(-1px);
-  }
 `;
 
 const HeaderTop = styled.div`
@@ -985,14 +1400,59 @@ const RegionControls = styled.div`
   flex-wrap: wrap;
   align-items: center;
   gap: 0.75rem;
+  width: 100%;
 `;
 
-const RegionSelect = styled.select`
-  padding: 0.5rem 1rem;
-  border: 1px solid ${props => props.theme.colors.border};
+const RegionButtonGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 0.5rem;
+  width: 100%;
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 0.5rem;
+  position: relative;
+  z-index: 1000;
+  pointer-events: auto;
+`;
+
+const RegionButton = styled.button.withConfig({
+  shouldForwardProp: (prop) => prop !== 'active',
+})`
+  padding: 0.6rem 1rem;
+  border: 1px solid ${props => props.active ? props.theme.colors.primary : props.theme.colors.border};
   border-radius: 8px;
   font-size: 0.9rem;
-  min-width: 200px;
+  font-weight: ${props => props.active ? 600 : 500};
+  cursor: pointer;
+  background: ${props => props.active ? props.theme.colors.primary : props.theme.colors.surface};
+  color: ${props => props.active ? 'white' : props.theme.colors.text};
+  transition: all 0.2s;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  position: relative;
+  z-index: 1000;
+  pointer-events: auto;
+
+  &:hover {
+    background: ${props => props.active ? props.theme.colors.primary + 'dd' : props.theme.colors.primary + '20'};
+    border-color: ${props => props.theme.colors.primary};
+    color: ${props => props.active ? 'white' : props.theme.colors.primary};
+  }
+
+  &:active {
+    transform: translateY(1px);
+  }
+`;
+
+const KeywordCategorySelect = styled.select`
+  padding: 0.6rem 1rem;
+  border: 1px solid ${props => props.theme.colors.border};
+  border-radius: 8px;
+  font-size: 0.95rem;
+  min-width: 150px;
   background: ${props => props.theme.colors.surface};
   color: ${props => props.theme.colors.text};
   cursor: pointer;
@@ -1001,12 +1461,6 @@ const RegionSelect = styled.select`
     outline: none;
     border-color: ${props => props.theme.colors.primary};
     box-shadow: 0 0 0 3px ${props => props.theme.colors.primary}33;
-  }
-
-  &:disabled {
-    background: ${props => props.theme.colors.background};
-    color: ${props => props.theme.colors.textSecondary};
-    cursor: not-allowed;
   }
 `;
 
@@ -1239,9 +1693,15 @@ const ServiceInfoItem = styled.div`
   }
 `;
 
+const DetailActions = styled.div`
+  margin-top: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+`;
+
 const DetailLink = styled.a`
   display: block;
-  margin-top: 1.25rem;
   text-align: center;
   padding: 0.6rem 1rem;
   background: ${props => props.theme.colors.primary};
