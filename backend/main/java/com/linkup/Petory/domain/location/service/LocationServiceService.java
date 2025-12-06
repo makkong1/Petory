@@ -2,11 +2,14 @@ package com.linkup.Petory.domain.location.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import com.linkup.Petory.domain.location.converter.LocationServiceConverter;
 import com.linkup.Petory.domain.location.dto.KakaoPlaceDTO;
 import com.linkup.Petory.domain.location.dto.LocationServiceDTO;
+import com.linkup.Petory.domain.location.repository.LocationServiceRepository;
 
 import java.util.Arrays;
 import java.util.List;
@@ -21,7 +24,8 @@ import java.util.stream.Collectors;
 public class LocationServiceService {
 
     private final KakaoMapService kakaoMapService;
-    private final com.linkup.Petory.domain.location.converter.LocationServiceConverter locationServiceConverter;
+    private final LocationServiceConverter locationServiceConverter;
+    private final LocationServiceRepository locationServiceRepository;
 
     private static final List<String> PET_KEYWORDS = Arrays.asList(
             "반려", "애완", "애견", "펫", "pet", "도그", "캣", "dog", "cat",
@@ -206,5 +210,58 @@ public class LocationServiceService {
             return 200; // 기본값을 200으로 증가
         }
         return Math.min(maxResults, 200); // 최대값을 200으로 증가
+    }
+
+    // 인기 위치 서비스 캐싱
+    @Cacheable(value = "popularLocationServices", key = "#category")
+    public List<LocationServiceDTO> getPopularLocationServices(String category) {
+        return locationServiceRepository.findTop10ByCategoryOrderByRatingDesc(category)
+                .stream()
+                .map(locationServiceConverter::toDTO)
+                .collect(Collectors.toList());
+    }
+
+    // DB에서 반경 기반 위치 서비스 검색
+    public List<LocationServiceDTO> searchLocationServices(
+            Double latitude,
+            Double longitude,
+            Integer radius,
+            Integer maxResults,
+            String category) {
+
+        if (latitude == null || longitude == null) {
+            throw new IllegalArgumentException("위도와 경도는 필수입니다.");
+        }
+
+        // 반경 기본값: 3000m (3km)
+        double radiusInMeters = (radius != null && radius > 0) ? radius : 3000.0;
+
+        // DB에서 반경 내 LocationService 조회
+        List<com.linkup.Petory.domain.location.entity.LocationService> services = locationServiceRepository
+                .findByRadius(latitude, longitude, radiusInMeters);
+
+        // 카테고리 필터링 (category3, category2, category1 순서로 확인)
+        if (StringUtils.hasText(category)) {
+            services = services.stream()
+                    .filter(service -> {
+                        String serviceCategory = service.getCategory3() != null ? service.getCategory3()
+                                : service.getCategory2() != null ? service.getCategory2() : service.getCategory1();
+                        return serviceCategory != null &&
+                                (serviceCategory.contains(category) || category.contains(serviceCategory));
+                    })
+                    .collect(Collectors.toList());
+        }
+
+        // 최대 결과 수 제한
+        if (maxResults != null && maxResults > 0) {
+            services = services.stream()
+                    .limit(maxResults)
+                    .collect(Collectors.toList());
+        }
+
+        // DTO로 변환
+        return services.stream()
+                .map(locationServiceConverter::toDTO)
+                .collect(Collectors.toList());
     }
 }

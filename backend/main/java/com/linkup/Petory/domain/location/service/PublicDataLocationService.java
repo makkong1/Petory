@@ -414,13 +414,11 @@ public class PublicDataLocationService {
      * DB에 이미 존재하는지 확인
      */
     private boolean isDuplicateInDb(PublicDataLocationDTO dto) {
-        if (StringUtils.hasText(dto.getRoadAddress())) {
-            return locationServiceRepository.existsByNameAndDetailAddress(
-                    dto.getFacilityName(), dto.getRoadAddress());
-        }
-        if (StringUtils.hasText(dto.getJibunAddress())) {
+        // 도로명주소 우선, 없으면 지번주소로 중복 체크
+        String address = StringUtils.hasText(dto.getRoadAddress()) ? dto.getRoadAddress() : dto.getJibunAddress();
+        if (StringUtils.hasText(address)) {
             return locationServiceRepository.existsByNameAndAddress(
-                    dto.getFacilityName(), dto.getJibunAddress());
+                    dto.getFacilityName(), address);
         }
         return false;
     }
@@ -451,7 +449,6 @@ public class PublicDataLocationService {
 
         // 주소 통합 (도로명주소 우선, 없으면 지번주소)
         String address = StringUtils.hasText(dto.getRoadAddress()) ? dto.getRoadAddress() : dto.getJibunAddress();
-        String detailAddress = dto.getRoadAddress(); // 도로명주소
 
         // Boolean 필드 파싱
         Boolean parkingAvailable = parseBoolean(dto.getParkingAvailable());
@@ -465,20 +462,17 @@ public class PublicDataLocationService {
         // 이 시점에서 예외가 발생해도 영속성 컨텍스트에 들어가지 않음
         return LocationService.builder()
                 .name(dto.getFacilityName())
-                .category(category) // category 필드도 설정
+                // category 필드 제거됨
                 .category1(dto.getCategory1())
                 .category2(dto.getCategory2())
                 .category3(dto.getCategory3() != null ? dto.getCategory3() : category) // 기본 카테고리로 사용
                 .sido(dto.getSidoName())
                 .sigungu(dto.getSigunguName())
                 .eupmyeondong(dto.getEupmyeondongName())
-                .ri(dto.getRiName())
-                .bunji(dto.getBunji())
                 .roadName(dto.getRoadName())
-                .buildingNumber(dto.getBuildingNumber())
                 .address(address) // 도로명주소 우선, 없으면 지번주소
-                .detailAddress(detailAddress) // 도로명주소
-                .zipCode(dto.getPostalCode())
+                // detailAddress 필드 제거됨
+                .zipCode(cleanZipCode(dto.getPostalCode())) // 소수점 제거
                 .latitude(latitude)
                 .longitude(longitude)
                 .phone(dto.getPhone())
@@ -494,7 +488,7 @@ public class PublicDataLocationService {
                 .petExtraFee(dto.getPetAdditionalFee())
                 .indoor(indoor)
                 .outdoor(outdoor)
-                .description(dto.getDescription())
+                .description(cleanDescription(dto.getDescription(), category)) // category와 중복 제거
                 .lastUpdated(lastUpdated)
                 .dataSource("PUBLIC")
                 .build();
@@ -528,6 +522,37 @@ public class PublicDataLocationService {
         }
         String upper = value.trim().toUpperCase();
         return "Y".equals(upper) || "YES".equals(upper) || "TRUE".equals(upper);
+    }
+
+    /**
+     * 우편번호 정리 (소수점 제거)
+     */
+    private String cleanZipCode(String zipCode) {
+        if (!StringUtils.hasText(zipCode)) {
+            return null;
+        }
+        // 소수점 제거 (예: "47596.0" -> "47596")
+        String cleaned = zipCode.trim().replace(".0", "").replace(".", "");
+        return cleaned.isEmpty() ? null : cleaned;
+    }
+
+    /**
+     * description 정리 (category와 중복 제거)
+     */
+    private String cleanDescription(String description, String category) {
+        if (!StringUtils.hasText(description)) {
+            return null;
+        }
+        String desc = description.trim();
+        // category와 같거나 간단한 값이면 null
+        if (category != null && desc.equals(category)) {
+            return null;
+        }
+        // 너무 짧은 설명도 제거 (2글자 이하)
+        if (desc.length() <= 2) {
+            return null;
+        }
+        return desc;
     }
 
     /**

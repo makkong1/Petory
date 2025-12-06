@@ -2,7 +2,6 @@ package com.linkup.Petory.domain.location.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-import java.time.LocalDateTime;
 import java.util.List;
 
 @Entity
@@ -21,9 +20,7 @@ public class LocationService {
     @Column(nullable = false, length = 150)
     private String name;
 
-    // 카테고리 (기존 필드 유지 - 하위 호환성)
-    @Column(name = "category", length = 255)
-    private String category; // 카테고리 (category3 우선 사용, 없으면 category2, category1)
+    // 카테고리 필드 제거됨 - category3, category2, category1 사용
 
     // 카테고리 계층 구조
     @Column(name = "category1", length = 100)
@@ -45,24 +42,12 @@ public class LocationService {
     @Column(name = "eupmyeondong", length = 50)
     private String eupmyeondong; // 읍면동
 
-    @Column(name = "ri", length = 50)
-    private String ri; // 리
-
-    @Column(name = "bunji", length = 100)
-    private String bunji; // 번지
-
     @Column(name = "road_name", length = 100)
     private String roadName; // 도로명
 
-    @Column(name = "building_number", length = 50)
-    private String buildingNumber; // 건물 번호
-
-    // 주소 전체 (roadAddress, jibunAddress 제거, 통합)
+    // 주소 전체 (도로명주소 우선, 없으면 지번주소)
     @Column(name = "address", length = 255)
-    private String address; // 기본 주소 (도로명주소 우선, 없으면 지번주소)
-
-    @Column(name = "detail_address", length = 255)
-    private String detailAddress; // 상세 주소 (도로명주소)
+    private String address; // 기본 주소
 
     @Column(name = "zip_code", length = 10)
     private String zipCode; // 우편번호

@@ -24,7 +24,7 @@ public class LocationServiceController {
     private final LocationServiceService locationServiceService;
 
     @GetMapping("/search")
-    public ResponseEntity<Map<String, Object>> searchKakaoPlaces(
+    public ResponseEntity<Map<String, Object>> searchLocationServices(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String region,
             @RequestParam(required = false) Double latitude,
@@ -33,14 +33,16 @@ public class LocationServiceController {
             @RequestParam(required = false) Integer size,
             @RequestParam(required = false) String categoryType) {
         try {
-            List<LocationServiceDTO> services = locationServiceService.searchKakaoPlaces(
-                    keyword,
-                    region,
+            // 카테고리 타입을 실제 카테고리명으로 매핑
+            String category = mapCategoryTypeToCategory(categoryType);
+            
+            // DB에서 반경 기반 검색
+            List<LocationServiceDTO> services = locationServiceService.searchLocationServices(
                     latitude,
                     longitude,
                     radius,
                     size,
-                    categoryType);
+                    category);
 
             Map<String, Object> response = new HashMap<>();
             response.put("services", services);
@@ -48,15 +50,43 @@ public class LocationServiceController {
 
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
-            log.warn("카카오 장소 검색 요청이 유효하지 않습니다: {}", e.getMessage());
+            log.warn("위치 서비스 검색 요청이 유효하지 않습니다: {}", e.getMessage());
             Map<String, Object> response = new HashMap<>();
             response.put("error", e.getMessage());
             return ResponseEntity.badRequest().body(response);
         } catch (Exception e) {
-            log.error("카카오 장소 검색 실패: {}", e.getMessage());
+            log.error("위치 서비스 검색 실패: {}", e.getMessage(), e);
             Map<String, Object> response = new HashMap<>();
-            response.put("error", "카카오 장소 검색 중 오류가 발생했습니다.");
+            response.put("error", "위치 서비스 검색 중 오류가 발생했습니다.");
             return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    // 카테고리 타입을 실제 카테고리명으로 매핑
+    private String mapCategoryTypeToCategory(String categoryType) {
+        if (categoryType == null || categoryType.isEmpty()) {
+            return null;
+        }
+        
+        String upperType = categoryType.toUpperCase();
+        switch (upperType) {
+            case "HOSPITAL":
+                return "동물병원";
+            case "CAFE":
+                return "애견카페";
+            case "PLAYGROUND":
+                return "애견놀이터";
+            default:
+                // 소문자로 들어온 경우도 처리
+                String lowerType = categoryType.toLowerCase();
+                if ("hospital".equals(lowerType)) {
+                    return "동물병원";
+                } else if ("cafe".equals(lowerType)) {
+                    return "애견카페";
+                } else if ("playground".equals(lowerType)) {
+                    return "애견놀이터";
+                }
+                return categoryType; // 그대로 사용
         }
     }
 }

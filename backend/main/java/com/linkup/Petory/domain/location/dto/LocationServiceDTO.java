@@ -14,9 +14,8 @@ public class LocationServiceDTO {
     private Long idx;
     private String externalId;
     private String name;
-    private String category; // category3 우선, 없으면 category2, category1
+    private String category; // category3 우선, 없으면 category2, category1 (DTO에서만 사용, DB에는 저장 안 됨)
     private String address;
-    private String detailAddress;
     private Double latitude;
     private Double longitude;
     private Double rating;
@@ -36,10 +35,7 @@ public class LocationServiceDTO {
     private String sido;
     private String sigungu;
     private String eupmyeondong;
-    private String ri;
-    private String bunji;
     private String roadName;
-    private String buildingNumber;
     private String zipCode;
     
     // 운영 정보

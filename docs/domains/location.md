@@ -15,33 +15,26 @@ public class LocationService {
     // 기본 필드
     Long idx;                    // PK (bigint, auto_increment)
     String name;                 // 서비스 이름 (varchar(255))
-    String category;             // 카테고리 (varchar(255)) - 기존 필드 유지
-    String address;              // 주소 (varchar(255))
-    String detailAddress;        // 상세 주소 (varchar(255))
+    String address;              // 주소 (varchar(255)) - 도로명주소 우선, 없으면 지번주소
     Double latitude;            // 위도 (double)
     Double longitude;            // 경도 (double)
     Double rating;               // 평균 평점 (double)
-    String description;          // 서비스 설명 (varchar(255))
+    String description;          // 서비스 설명 (TEXT)
     String phone;                // 전화번호 (varchar(255))
     String website;              // 웹사이트 (varchar(255))
     Boolean petFriendly;         // 반려동물 동반 가능 여부 (tinyint(1), default 0)
-    Point coordinates;           // 공간 좌표 (POINT, NOT NULL, Spatial Index)
-    LocalDateTime createdAt;
-    LocalDateTime updatedAt;
+    // Point coordinates;        // 공간 좌표 (POINT) - 주석 처리됨, DB에는 존재
     
-    // 카테고리 계층 구조
+    // 카테고리 계층 구조 (category 필드 제거됨)
     String category1;             // 카테고리1 (대분류, varchar(100))
     String category2;             // 카테고리2 (중분류, varchar(100))
-    String category3;             // 카테고리3 (소분류, varchar(100))
+    String category3;             // 카테고리3 (소분류, varchar(100)) - 기본 카테고리로 사용
     
     // 주소 구성 요소
     String sido;                  // 시도 (varchar(50))
     String sigungu;              // 시군구 (varchar(50))
     String eupmyeondong;         // 읍면동 (varchar(50))
-    String ri;                   // 리 (varchar(50))
-    String bunji;                // 번지 (varchar(100))
     String roadName;             // 도로명 (varchar(100))
-    String buildingNumber;       // 건물 번호 (varchar(50))
     String zipCode;              // 우편번호 (varchar(10))
     
     // 운영 정보
@@ -73,10 +66,11 @@ public class LocationService {
 - `openingTime`, `closingTime` 제거 → `operatingHours` (문자열)로 통합
 - `imageUrl` 제거 (사용하지 않음)
 - `petPolicy` 제거 → `petRestrictions`로 통합
-- 필드명 변경: `sidoName` → `sido`, `sigunguName` → `sigungu`, `eupmyeondongName` → `eupmyeondong`, `riName` → `ri`, `postalCode` → `zipCode`, `closedDays` → `closedDay`, `entranceFee` → `priceInfo`, `petOnly` → `isPetOnly`, `petSizeLimit` → `petSize`, `petAdditionalFee` → `petExtraFee`, `lastUpdatedDate` → `lastUpdated`
+- 필드명 변경: `sidoName` → `sido`, `sigunguName` → `sigungu`, `eupmyeondongName` → `eupmyeondong`, `postalCode` → `zipCode`, `closedDays` → `closedDay`, `entranceFee` → `priceInfo`, `petOnly` → `isPetOnly`, `petSizeLimit` → `petSize`, `petAdditionalFee` → `petExtraFee`, `lastUpdatedDate` → `lastUpdated`
 - 타입 변경: `parkingAvailable`, `isPetOnly`, `indoor`, `outdoor` → Boolean
-- `coordinates` 필드 추가 (POINT 타입, Spatial Index)
-- `category` 필드 유지 (기존 데이터 호환성)
+- **삭제된 필드**: `category` (category3, category2, category1로 대체), `detailAddress` (address로 통합), `ri`, `bunji`, `buildingNumber` (사용 안 됨)
+- `coordinates` 필드 주석 처리 (DB에는 존재하지만 엔티티에서 사용 안 함)
+- `createdAt`, `updatedAt` 필드 주석 처리 (DB에 없음)
 
 **연관관계:**
 - `OneToMany` → LocationServiceReview (리뷰 목록)
@@ -183,11 +177,11 @@ LocationServiceDTO fromKakaoDocument(KakaoPlaceDTO.Document document)
 ```
 
 **필드 매핑 전략:**
-- **카테고리**: `category` 필드 우선 사용, 없으면 category3 → category2 → category1 순서
+- **카테고리**: category3 → category2 → category1 순서로 사용 (category 필드 제거됨)
 - **운영시간**: `operatingHours` 문자열로 저장 (예: "월~금 09:00~18:00")
   - 하위 호환성: `openingTime`/`closingTime`이 있으면 `operatingHours` 문자열로 변환
 - **반려동물 정책**: `petRestrictions` 사용, `petPolicy`는 하위 호환성 유지
-- **주소**: 도로명주소 우선, 없으면 지번주소를 `address`에 저장
+- **주소**: 도로명주소 우선, 없으면 지번주소를 `address`에 저장 (detailAddress 필드 제거됨)
 - **데이터 소스**: `dataSource` 필드로 구분 (PUBLIC: 공공데이터, KAKAO: 카카오맵)
 
 ### PublicDataLocationService
@@ -433,7 +427,7 @@ List<LocationService> findByLocationWithinUsingLatLng(
 
 -- 카테고리별 조회
 CREATE INDEX idx_category ON locationservice(category1, category2, category3);
-CREATE INDEX idx_location_service_category ON locationservice(category, pet_friendly);
+CREATE INDEX idx_location_service_category ON locationservice(category3, pet_friendly);
 
 -- 평점 정렬
 CREATE INDEX idx_location_service_rating ON locationservice(rating DESC);
@@ -465,7 +459,7 @@ public List<LocationServiceDTO> getPopularLocationServices(String category) {
 }
 ```
 
-### 3. N+1 문제 해결
+<!-- ### 3. N+1 문제 해결
 
 ```java
 // 리뷰와 작성자 정보를 함께 조회
@@ -474,7 +468,7 @@ public List<LocationServiceDTO> getPopularLocationServices(String category) {
        "WHERE r.service.idx = :serviceId " +
        "ORDER BY r.createdAt DESC")
 List<LocationServiceReview> findByServiceWithUser(@Param("serviceId") Long serviceId);
-```
+``` -->
 
 ## API 엔드포인트
 
@@ -492,13 +486,13 @@ List<LocationServiceReview> findByServiceWithUser(@Param("serviceId") Long servi
   - **기능:** 카카오맵 API 연동, 반려동물 친화적 장소 자동 필터링
 
 ### 위치 서비스 관리자 (/api/admin/location-services)
-- `POST /load-data` - 카카오맵 API를 통한 초기 데이터 로드
+<!-- - `POST /load-data` - 카카오맵 API를 통한 초기 데이터 로드
   - **파라미터:**
     - `region` (기본값: "서울특별시"): 검색할 지역
     - `maxResultsPerKeyword` (기본값: 10): 키워드당 최대 결과 수
     - `customKeywords` (선택): 커스텀 키워드 (쉼표 구분, 최대 20개)
   - **반환:** `LocationServiceLoadResponse` (저장 통계)
-  - **기능:** 기본 키워드 목록 또는 커스텀 키워드로 장소 검색 및 저장
+  - **기능:** 기본 키워드 목록 또는 커스텀 키워드로 장소 검색 및 저장 --> -->
 
 - `POST /import-public-data` - 공공데이터 CSV 파일 임포트
   - **파라미터:**
@@ -618,19 +612,6 @@ List<LocationServiceReview> findByServiceWithUser(@Param("serviceId") Long servi
    - 리뷰에 이미지 첨부
    - 다중 이미지 업로드
 
-### 성능
-1. **ElasticSearch 도입**
-   - 위치 기반 검색 성능 향상
-   - 복잡한 필터링 지원
-
-2. **Redis 캐싱**
-   - 인기 서비스 목록 캐싱
-   - 평균 평점 캐싱
-
-3. **CDN**
-   - 이미지 CDN 사용
-   - 로딩 속도 개선
-
 ## 공공데이터 연동
 
 ### 데이터 소스 구분
@@ -649,13 +630,14 @@ List<LocationServiceReview> findByServiceWithUser(@Param("serviceId") Long servi
 #### 카테고리 계층 구조
 - `category1`: 대분류 (예: "반려동물업")
 - `category2`: 중분류 (예: "반려의료")
-- `category3`: 소분류 (예: "동물약국")
-- `category`: category3 우선 저장 (하위 호환성)
+- `category3`: 소분류 (예: "동물약국") - 기본 카테고리로 사용
+- `category`: 필드 제거됨 (category3, category2, category1로 대체)
 
 #### 주소 정보
-- **상세 주소 구성 요소**: sido, sigungu, eupmyeondong, ri, bunji, road_name, building_number
-- **주소 전체**: address (도로명주소 우선), detail_address (도로명주소), zip_code
+- **상세 주소 구성 요소**: sido, sigungu, eupmyeondong, road_name, zip_code
+- **주소 전체**: address (도로명주소 우선, 없으면 지번주소)
 - **주소 통합 전략**: 도로명주소가 있으면 우선 사용, 없으면 지번주소 사용
+- **삭제된 필드**: ri, bunji, building_number, detail_address (사용 안 됨 또는 중복)
 
 #### 운영 정보
 - `closed_day`: 휴무일 (예: "매주 토, 일, 법정공휴일")
@@ -687,9 +669,10 @@ List<LocationServiceReview> findByServiceWithUser(@Param("serviceId") Long servi
   - MySQL Spatial 함수 사용 가능 (ST_Distance_Sphere 등)
 
 ### 카카오맵 데이터 저장 전략
-- **기본 필드만 저장**: name, category, address, detailAddress, latitude, longitude, phone, website, description, petFriendly
-- **카테고리 파싱**: 카테고리명을 " > " 구분자로 분리
+- **기본 필드만 저장**: name, address, latitude, longitude, phone, website, description, petFriendly
+- **카테고리 파싱**: 카테고리명을 " > " 구분자로 분리하여 category1, category2, category3에 저장
   - 예: "음식점 > 카페 > 애견카페" → category1: "음식점", category2: "카페", category3: "애견카페"
+- **주소**: 도로명주소 우선 → address, 없으면 지번주소 → address (detailAddress 필드 제거됨)
 - **공공데이터 필드**: null (상세 정보 없음)
 - **dataSource**: "KAKAO"로 설정하여 구분
 
@@ -709,8 +692,10 @@ List<LocationServiceReview> findByServiceWithUser(@Param("serviceId") Long servi
    - Boolean 필드 변환 (Y/N → true/false)
    - 날짜 파싱 (yyyy-MM-dd)
    - 위도/경도 파싱
-   - 카테고리 통합 (category3 → category2 → category1)
-   - 주소 통합 (도로명주소 우선)
+   - 카테고리 저장 (category1, category2, category3 각각 저장, category 필드 제거됨)
+   - 주소 통합 (도로명주소 우선 → address, detailAddress 필드 제거됨)
+   - 우편번호 정리 (소수점 제거)
+   - description 간단한 값 제거 (category와 중복 시)
 7. **배치 저장**: 
    - 1000개씩 청크 단위로 `saveAll()` 호출
    - 각 청크마다 트랜잭션 커밋
@@ -720,32 +705,32 @@ List<LocationServiceReview> findByServiceWithUser(@Param("serviceId") Long servi
 ### 데이터 소스별 저장 전략
 
 #### 카카오맵 데이터 (dataSource = "KAKAO")
-- **저장 필드**: 기본 필드만 (name, category, address, detailAddress, latitude, longitude, phone, website, description, petFriendly)
-- **카테고리**: 카테고리명을 " > " 구분자로 분리하여 category1, category2, category3에 저장
-- **주소**: 지번주소 → address, 도로명주소 → detailAddress
+- **저장 필드**: 기본 필드만 (name, address, latitude, longitude, phone, website, description, petFriendly)
+- **카테고리**: 카테고리명을 " > " 구분자로 분리하여 category1, category2, category3에 저장 (category 필드 제거됨)
+- **주소**: 도로명주소 우선 → address, 없으면 지번주소 → address (detailAddress 필드 제거됨)
 - **공공데이터 필드**: null (상세 주소 정보, 운영 정보 등)
 
 #### 공공데이터 (dataSource = "PUBLIC")
 - **저장 필드**: 모든 필드 저장
-- **카테고리**: category1, category2, category3 모두 저장, category 필드에는 category3 우선 저장
-- **주소**: 상세 주소 구성 요소 모두 저장 (sido, sigungu, eupmyeondong, ri, bunji, roadName, buildingNumber)
+- **카테고리**: category1, category2, category3 모두 저장 (category 필드 제거됨)
+- **주소**: 상세 주소 구성 요소 저장 (sido, sigungu, eupmyeondong, roadName, zipCode)
 - **운영 정보**: closedDay, operatingHours, parkingAvailable, priceInfo
 - **반려동물 정보**: isPetOnly, petSize, petRestrictions, petExtraFee
 - **장소 정보**: indoor, outdoor
+- **삭제된 필드**: ri, bunji, buildingNumber, detailAddress
 
 ### LocationServiceConverter 주요 로직
 
 #### toDTO (엔티티 → DTO)
 ```java
 public LocationServiceDTO toDTO(LocationService service) {
-    // 카테고리: category 필드 우선, 없으면 category3 → category2 → category1
-    String category = service.getCategory() != null ? service.getCategory() :
-                     service.getCategory3() != null ? service.getCategory3() :
+    // 카테고리: category3 → category2 → category1 순서
+    String category = service.getCategory3() != null ? service.getCategory3() :
                      service.getCategory2() != null ? service.getCategory2() :
                      service.getCategory1();
     
     return LocationServiceDTO.builder()
-        .category(category)
+        .category(category) // DTO에서만 사용 (DB에는 저장 안 됨)
         .category1(service.getCategory1())
         .category2(service.getCategory2())
         .category3(service.getCategory3())
@@ -756,7 +741,7 @@ public LocationServiceDTO toDTO(LocationService service) {
         .build();
 }
 ```
-- **카테고리**: category 필드 우선, 없으면 category3 → category2 → category1
+- **카테고리**: category3 → category2 → category1 순서 (category 필드 제거됨)
 - **운영시간**: operatingHours 문자열 그대로 전달 (파싱 없음)
 - **하위 호환성**: openingTime/closingTime은 null로 설정 (deprecated)
 - **모든 필드 매핑**: 엔티티의 모든 필드를 DTO에 매핑
@@ -770,21 +755,21 @@ public LocationService fromDTO(LocationServiceDTO dto) {
         operatingHours = String.format("%02d:%02d~%02d:%02d", ...);
     }
     
-    // 카테고리: category3 우선, 없으면 category 필드를 category3에 저장
+    // 카테고리: category3 우선, 없으면 category2, category1 순서
     String categoryValue = dto.getCategory3() != null ? dto.getCategory3() : 
                           dto.getCategory2() != null ? dto.getCategory2() :
                           dto.getCategory1() != null ? dto.getCategory1() : dto.getCategory();
     
     return LocationService.builder()
-        .category(categoryValue) // category 필드도 설정
-        .category3(dto.getCategory3() != null ? dto.getCategory3() : dto.getCategory())
+        // category 필드 제거됨
+        .category3(dto.getCategory3() != null ? dto.getCategory3() : categoryValue)
         .operatingHours(operatingHours)
         .petRestrictions(dto.getPetRestrictions() != null ? dto.getPetRestrictions() : dto.getPetPolicy())
         // ... 모든 필드 매핑
         .build();
 }
 ```
-- **카테고리**: category3 우선, 없으면 category 필드를 category3에 저장
+- **카테고리**: category3 우선, 없으면 category2, category1 순서 (category 필드 제거됨)
 - **운영시간**: operatingHours 우선, 없으면 openingTime/closingTime에서 문자열 생성
 - **반려동물 정책**: petRestrictions 우선, 없으면 petPolicy 사용
 - **데이터 소스**: 기본값 "KAKAO" (공공데이터는 "PUBLIC"으로 명시)
@@ -792,12 +777,17 @@ public LocationService fromDTO(LocationServiceDTO dto) {
 #### fromKakaoDocument (카카오맵 → DTO)
 ```java
 public LocationServiceDTO fromKakaoDocument(KakaoPlaceDTO.Document document) {
+    // 주소: 도로명주소 우선, 없으면 지번주소
+    String address = StringUtils.hasText(document.getRoadAddressName()) 
+            ? document.getRoadAddressName() 
+            : document.getAddressName();
+    
     return LocationServiceDTO.builder()
         .externalId(document.getId()) // 카카오맵 place ID
         .name(document.getPlaceName())
         .category(document.getCategoryName())
-        .address(document.getAddressName()) // 지번주소
-        .detailAddress(document.getRoadAddressName()) // 도로명주소
+        .address(address) // 도로명주소 우선, 없으면 지번주소
+        // detailAddress 필드 제거됨
         .latitude(parseDouble(document.getY()))
         .longitude(parseDouble(document.getX()))
         .phone(document.getPhone())
@@ -810,6 +800,7 @@ public LocationServiceDTO fromKakaoDocument(KakaoPlaceDTO.Document document) {
 - 카카오맵 Document를 LocationServiceDTO로 변환
 - externalId에 카카오맵 place ID 저장
 - placeUrl에 카카오맵 URL 저장
+- 주소: 도로명주소 우선, 없으면 지번주소 (detailAddress 필드 제거됨)
 - 운영시간 정보 없음 (null)
 
 ## 프론트엔드 변경사항

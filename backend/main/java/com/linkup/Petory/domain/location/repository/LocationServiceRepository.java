@@ -28,8 +28,17 @@ public interface LocationServiceRepository extends JpaRepository<LocationService
         // 평점순 서비스 조회
         List<LocationService> findByOrderByRatingDesc();
 
-        // 카테고리별 평점순 서비스 조회
-        List<LocationService> findByCategoryOrderByRatingDesc(String category);
+        // 카테고리별 평점순 서비스 조회 (category3, category2, category1 순서로 검색)
+        @Query("SELECT ls FROM LocationService ls WHERE " +
+                        "(:category IS NULL OR ls.category3 = :category OR ls.category2 = :category OR ls.category1 = :category) " +
+                        "ORDER BY ls.rating DESC")
+        List<LocationService> findByCategoryOrderByRatingDesc(@Param("category") String category);
+
+        // 카테고리별 상위 10개 평점순 서비스 조회 (category3, category2, category1 순서로 검색)
+        @Query("SELECT ls FROM LocationService ls WHERE " +
+                        "(:category IS NULL OR ls.category3 = :category OR ls.category2 = :category OR ls.category1 = :category) " +
+                        "ORDER BY ls.rating DESC")
+        List<LocationService> findTop10ByCategoryOrderByRatingDesc(@Param("category") String category);
 
         // 이름으로 서비스 검색
         @Query("SELECT ls FROM LocationService ls WHERE " +
@@ -45,13 +54,9 @@ public interface LocationServiceRepository extends JpaRepository<LocationService
 
         boolean existsByNameAndAddress(String name, String address);
 
-        boolean existsByNameAndDetailAddress(String name, String detailAddress);
-
         // 주소로 중복 체크
         List<LocationService> findByAddress(String address);
 
-        // 주소와 상세주소로 중복 체크
-        List<LocationService> findByAddressAndDetailAddress(String address, String detailAddress);
 
         // 주소로 서비스 검색 (지역 검색) - 기본 검색
         @Query("SELECT ls FROM LocationService ls WHERE " +

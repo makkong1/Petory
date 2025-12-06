@@ -163,14 +163,19 @@ public class LocationServiceAdminService {
         String[] categoryParts = categoryName != null ? categoryName.split(" > ") : new String[0];
         String category3 = categoryParts.length > 2 ? categoryParts[2] : categoryName;
         
+        // 주소: 도로명주소 우선, 없으면 지번주소
+        String address = StringUtils.hasText(document.getRoadAddressName()) 
+                ? document.getRoadAddressName() 
+                : document.getAddressName();
+        
         return LocationService.builder()
                 .name(document.getPlaceName())
-                .category(category3) // category 필드도 설정
+                // category 필드 제거됨
                 .category1(categoryParts.length > 0 ? categoryParts[0] : null)
                 .category2(categoryParts.length > 1 ? categoryParts[1] : null)
                 .category3(category3) // 기본 카테고리
-                .address(document.getAddressName()) // 지번주소
-                .detailAddress(document.getRoadAddressName()) // 도로명주소
+                .address(address) // 도로명주소 우선, 없으면 지번주소
+                // detailAddress 필드 제거됨
                 .latitude(parseDouble(document.getY()))
                 .longitude(parseDouble(document.getX()))
                 .phone(document.getPhone())
