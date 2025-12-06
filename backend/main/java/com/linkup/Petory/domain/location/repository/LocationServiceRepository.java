@@ -97,4 +97,49 @@ public interface LocationServiceRepository extends JpaRepository<LocationService
         List<LocationService> findByRegion(@Param("sido") String sido,
                         @Param("sigungu") String sigungu,
                         @Param("dong") String dong);
+
+        // sigungu 필드로 직접 검색 (정확한 매칭)
+        @Query("SELECT ls FROM LocationService ls WHERE " +
+                        "ls.sigungu = :sigungu " +
+                        "ORDER BY ls.rating DESC")
+        List<LocationService> findBySigungu(@Param("sigungu") String sigungu);
+
+        // 지역 계층별 검색
+        // 시도별 조회
+        @Query("SELECT ls FROM LocationService ls WHERE " +
+                        "ls.sido = :sido " +
+                        "ORDER BY ls.rating DESC")
+        List<LocationService> findBySido(@Param("sido") String sido);
+
+        // 읍면동별 조회
+        @Query("SELECT ls FROM LocationService ls WHERE " +
+                        "ls.eupmyeondong = :eupmyeondong " +
+                        "ORDER BY ls.rating DESC")
+        List<LocationService> findByEupmyeondong(@Param("eupmyeondong") String eupmyeondong);
+
+        // 도로명별 조회
+        @Query("SELECT ls FROM LocationService ls WHERE " +
+                        "ls.roadName = :roadName " +
+                        "ORDER BY ls.rating DESC")
+        List<LocationService> findByRoadName(@Param("roadName") String roadName);
+
+        // 사용자 위치 기반 검색 (시군구/읍면동)
+        @Query("SELECT ls FROM LocationService ls WHERE " +
+                        "(:sigungu IS NULL OR ls.sigungu = :sigungu) AND " +
+                        "(:eupmyeondong IS NULL OR ls.eupmyeondong = :eupmyeondong) " +
+                        "ORDER BY ls.rating DESC")
+        List<LocationService> findByUserLocation(
+                        @Param("sigungu") String sigungu,
+                        @Param("eupmyeondong") String eupmyeondong);
+
+        // 거리 순 정렬 반경 검색 (길찾기용)
+        @Query(value = "SELECT * FROM locationservice WHERE " +
+                        "latitude IS NOT NULL AND longitude IS NOT NULL AND " +
+                        "ST_Distance_Sphere(POINT(longitude, latitude), POINT(?2, ?1)) <= ?3 " +
+                        "ORDER BY ST_Distance_Sphere(POINT(longitude, latitude), POINT(?2, ?1)) ASC",
+                        nativeQuery = true)
+        List<LocationService> findByRadiusOrderByDistance(
+                        @Param("latitude") Double latitude,
+                        @Param("longitude") Double longitude,
+                        @Param("radiusInMeters") Double radiusInMeters);
 }

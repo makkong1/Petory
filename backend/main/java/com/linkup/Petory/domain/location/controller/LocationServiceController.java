@@ -23,28 +23,35 @@ public class LocationServiceController {
 
     private final LocationServiceService locationServiceService;
 
+    /**
+     * DB에서 위치 서비스 검색
+     * 지역 계층별 검색만 수행 (내 위치는 거리 계산/길찾기용으로만 사용)
+     * 
+     * @param sido         시도 (선택, 예: "서울특별시", "경기도")
+     * @param sigungu      시군구 (선택, 예: "노원구", "고양시 덕양구")
+     * @param eupmyeondong 읍면동 (선택, 예: "상계동", "동산동")
+     * @param roadName     도로명 (선택, 예: "상계로", "동세로")
+     * @param category     카테고리 (선택, 예: "동물약국", "미술관")
+     * @param size         최대 결과 수 (선택, 기본값: 500)
+     * @return 검색 결과
+     */
     @GetMapping("/search")
     public ResponseEntity<Map<String, Object>> searchLocationServices(
-            @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) String region,
-            @RequestParam(required = false) Double latitude,
-            @RequestParam(required = false) Double longitude,
-            @RequestParam(required = false) Integer radius,
-            @RequestParam(required = false) Integer size,
-            @RequestParam(required = false) String categoryType) {
+            @RequestParam(required = false) String sido,
+            @RequestParam(required = false) String sigungu,
+            @RequestParam(required = false) String eupmyeondong,
+            @RequestParam(required = false) String roadName,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) Integer size) {
         try {
-            // 카테고리 타입을 실제 카테고리명으로 매핑
-            String category = mapCategoryTypeToCategory(categoryType);
-            
-            // DB에서 검색 (반경, 지역, 키워드 기반)
-            List<LocationServiceDTO> services = locationServiceService.searchLocationServices(
-                    keyword,
-                    region,
-                    latitude,
-                    longitude,
-                    radius,
-                    size,
-                    category);
+            // 지역 계층별 검색만 수행
+            List<LocationServiceDTO> services = locationServiceService.searchLocationServicesByRegion(
+                    sido,
+                    sigungu,
+                    eupmyeondong,
+                    roadName,
+                    category,
+                    size);
 
             Map<String, Object> response = new HashMap<>();
             response.put("services", services);
@@ -61,34 +68,6 @@ public class LocationServiceController {
             Map<String, Object> response = new HashMap<>();
             response.put("error", "위치 서비스 검색 중 오류가 발생했습니다.");
             return ResponseEntity.internalServerError().body(response);
-        }
-    }
-
-    // 카테고리 타입을 실제 카테고리명으로 매핑
-    private String mapCategoryTypeToCategory(String categoryType) {
-        if (categoryType == null || categoryType.isEmpty()) {
-            return null;
-        }
-        
-        String upperType = categoryType.toUpperCase();
-        switch (upperType) {
-            case "HOSPITAL":
-                return "동물병원";
-            case "CAFE":
-                return "애견카페";
-            case "PLAYGROUND":
-                return "애견놀이터";
-            default:
-                // 소문자로 들어온 경우도 처리
-                String lowerType = categoryType.toLowerCase();
-                if ("hospital".equals(lowerType)) {
-                    return "동물병원";
-                } else if ("cafe".equals(lowerType)) {
-                    return "애견카페";
-                } else if ("playground".equals(lowerType)) {
-                    return "애견놀이터";
-                }
-                return categoryType; // 그대로 사용
         }
     }
 }

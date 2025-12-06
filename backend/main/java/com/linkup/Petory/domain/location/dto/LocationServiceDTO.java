@@ -69,4 +69,7 @@ public class LocationServiceDTO {
     // 리뷰 정보
     private Integer reviewCount; // 리뷰 개수
     private List<LocationServiceReviewDTO> reviews;
+    
+    // 거리 정보 (내 위치 기반 검색 시 사용)
+    private Double distance; // 미터 단위
 }
