@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import styled from 'styled-components';
 import { missingPetApi } from '../../api/missingPetApi';
 import { reportApi } from '../../api/reportApi';
 import { startMissingPetChat } from '../../api/chatApi';
 import AddressMapSelector from './AddressMapSelector';
+import MapContainer from '../LocationService/MapContainer';
 
 const statusLabel = {
   MISSING: '실종',
@@ -226,214 +227,236 @@ const MissingPetBoardDetail = ({
             </DetailTitleRow>
           </DetailHeader>
           <DetailBody>
-        <InfoCard>
-          <InfoContent>
-            <InfoGrid>
-              <InfoItem>
-                <InfoLabel>제보자</InfoLabel>
-                <InfoValue>{board.username || '알 수 없음'}</InfoValue>
-              </InfoItem>
-              <InfoItem>
-                <InfoLabel>실종일</InfoLabel>
-                <InfoValue>{board.lostDate || '미등록'}</InfoValue>
-              </InfoItem>
-              <InfoItem>
-                <InfoLabel>실종 위치</InfoLabel>
-                <InfoValue>{board.lostLocation || '미등록'}</InfoValue>
-              </InfoItem>
-              <InfoItem>
-                <InfoLabel>연락처</InfoLabel>
-                <InfoValue>
-                  {board.phoneNumber ? (
-                    <a href={`tel:${board.phoneNumber}`} style={{ color: 'inherit', textDecoration: 'none' }}>
-                      {board.phoneNumber}
-                    </a>
-                  ) : (
-                    '댓글로 제보해주세요'
-                  )}
-                </InfoValue>
-              </InfoItem>
-            </InfoGrid>
-
-            <Divider />
-
-            <InfoGrid columns={2}>
-              {board.petName && (
-                <InfoItem>
-                  <InfoLabel>반려동물 이름</InfoLabel>
-                  <InfoValue>{board.petName}</InfoValue>
-                </InfoItem>
-              )}
-              {board.species && (
-                <InfoItem>
-                  <InfoLabel>동물 종</InfoLabel>
-                  <InfoValue>{board.species}</InfoValue>
-                </InfoItem>
-              )}
-              {board.breed && (
-                <InfoItem>
-                  <InfoLabel>품종</InfoLabel>
-                  <InfoValue>{board.breed}</InfoValue>
-                </InfoItem>
-              )}
-              {board.color && (
-                <InfoItem>
-                  <InfoLabel>색상</InfoLabel>
-                  <InfoValue>{board.color}</InfoValue>
-                </InfoItem>
-              )}
-              {board.gender && (
-                <InfoItem>
-                  <InfoLabel>성별</InfoLabel>
-                  <InfoValue>{board.gender === 'M' ? '수컷' : '암컷'}</InfoValue>
-                </InfoItem>
-              )}
-              {board.age && (
-                <InfoItem>
-                  <InfoLabel>나이</InfoLabel>
-                  <InfoValue>{board.age}</InfoValue>
-                </InfoItem>
-              )}
-            </InfoGrid>
-
-            {!isReporter && currentUser && (
-              <>
-                <Divider />
-                <WitnessButtonContainer>
-                  <WitnessButton type="button" onClick={handleStartChat}>
-                    실종동물 목격했어요
-                  </WitnessButton>
-                </WitnessButtonContainer>
-              </>
-            )}
-
-            {canManageStatus && (
-              <>
-                <Divider />
-                <StatusControl>
-                  <StatusControlLabel>상태 변경</StatusControlLabel>
-                  <StatusButtonRow>
-                    <StatusButton
-                      type="button"
-                      active={board.status === 'MISSING'}
-                      onClick={() => handleStatusUpdate('MISSING')}
-                      disabled={statusUpdating}
-                    >
-                      실종
-                    </StatusButton>
-                    <StatusButton
-                      type="button"
-                      active={board.status === 'FOUND'}
-                      onClick={() => handleStatusUpdate('FOUND')}
-                      disabled={statusUpdating}
-                    >
-                      발견
-                    </StatusButton>
-                    <StatusButton
-                      type="button"
-                      active={board.status === 'RESOLVED'}
-                      onClick={() => handleStatusUpdate('RESOLVED')}
-                      disabled={statusUpdating}
-                    >
-                      완료
-                    </StatusButton>
-                  </StatusButtonRow>
-                </StatusControl>
-              </>
-            )}
-          </InfoContent>
-          {board.imageUrl && (
-            <Preview>
-              <img src={board.imageUrl} alt={board.title} />
-            </Preview>
-          )}
-        </InfoCard>
-
-        <Section>
-          <SectionTitle>상세 설명</SectionTitle>
-          <ContentBox>{board.content || '상세 설명이 없습니다.'}</ContentBox>
-        </Section>
-
-        <Section>
-          <SectionTitle>댓글 및 제보</SectionTitle>
-          {board.comments && board.comments.length > 0 ? (
-            <CommentList>
-              {board.comments.map((item) => (
-                <CommentItem key={item.idx}>
-                  <CommentHeader>
-                    <CommentAuthor>{item.username || '익명'}</CommentAuthor>
-                    <CommentDate>
-                      {item.createdAt?.replace('T', ' ').substring(0, 16)}
-                    </CommentDate>
-                  </CommentHeader>
-                  <CommentContent>{item.content}</CommentContent>
-                  {item.address && (
-                    <CommentLocation>
-                      📍 목격 위치: {item.address}
-                    </CommentLocation>
-                  )}
-                  {currentUser && (
-                    <CommentActions>
-                      {currentUser.idx === item.userId || currentUser.idx === board.userId ? (
-                        <CommentDeleteButton onClick={() => handleDeleteComment(item.idx)}>
-                          삭제
-                        </CommentDeleteButton>
+            <InfoCard>
+              <InfoContent>
+                <InfoGrid>
+                  <InfoItem>
+                    <InfoLabel>제보자</InfoLabel>
+                    <InfoValue>{board.username || '알 수 없음'}</InfoValue>
+                  </InfoItem>
+                  <InfoItem>
+                    <InfoLabel>실종일</InfoLabel>
+                    <InfoValue>{board.lostDate || '미등록'}</InfoValue>
+                  </InfoItem>
+                  <InfoItem fullWidth>
+                    <InfoLabel>실종 위치</InfoLabel>
+                    <InfoValue>{board.lostLocation || '미등록'}</InfoValue>
+                    {board.latitude && board.longitude && (
+                      <MapWrapper>
+                        <MapContainer
+                          mapCenter={{
+                            lat: typeof board.latitude === 'object' ? board.latitude.doubleValue?.() || board.latitude : Number(board.latitude),
+                            lng: typeof board.longitude === 'object' ? board.longitude.doubleValue?.() || board.longitude : Number(board.longitude),
+                          }}
+                          mapLevel={7}
+                          services={[{
+                            idx: board.idx,
+                            name: board.petName || board.title || '실종신고',
+                            latitude: typeof board.latitude === 'object' ? board.latitude.doubleValue?.() || board.latitude : Number(board.latitude),
+                            longitude: typeof board.longitude === 'object' ? board.longitude.doubleValue?.() || board.longitude : Number(board.longitude),
+                            address: board.lostLocation || '',
+                            type: 'missingPet',
+                          }]}
+                          onServiceClick={(service) => {
+                            // 마커 클릭 시 상세 정보 표시 (이미 상세 페이지이므로 별도 처리 불필요)
+                          }}
+                        />
+                      </MapWrapper>
+                    )}
+                  </InfoItem>
+                  <InfoItem>
+                    <InfoLabel>연락처</InfoLabel>
+                    <InfoValue>
+                      {board.phoneNumber ? (
+                        <a href={`tel:${board.phoneNumber}`} style={{ color: 'inherit', textDecoration: 'none' }}>
+                          {board.phoneNumber}
+                        </a>
                       ) : (
-                        <CommentReportButton type="button" onClick={() => handleReportComment(item.idx)}>
-                          신고
-                        </CommentReportButton>
+                        '댓글로 제보해주세요'
                       )}
-                    </CommentActions>
-                  )}
-                </CommentItem>
-              ))}
-            </CommentList>
-          ) : (
-            <EmptyComments>아직 제보가 없습니다. 가장 먼저 댓글을 남겨보세요!</EmptyComments>
-          )}
+                    </InfoValue>
+                  </InfoItem>
+                </InfoGrid>
 
-          <CommentForm onSubmit={handleAddComment}>
-            <CommentTextArea
-              placeholder={
-                currentUser
-                  ? '목격 정보나 도움이 될 만한 내용을 남겨주세요.'
-                  : '로그인 후 댓글을 작성할 수 있습니다.'
-              }
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              rows={3}
-              disabled={!currentUser || submitting}
-            />
-            {currentUser && (
-              <>
-                <AddressToggleButton
-                  type="button"
-                  onClick={() => setShowAddressMap(!showAddressMap)}
-                  disabled={submitting}
-                >
-                  {showAddressMap ? '📍 주소 입력 숨기기' : '📍 목격 위치 추가하기'}
-                </AddressToggleButton>
-                {showAddressMap && (
-                  <AddressMapContainer>
-                    <AddressMapSelector
-                      onAddressSelect={(location) => {
-                        setCommentAddress(location.address);
-                        setCommentLat(location.latitude);
-                        setCommentLng(location.longitude);
-                      }}
-                      initialAddress={commentAddress}
-                      initialLat={commentLat}
-                      initialLng={commentLng}
-                    />
-                  </AddressMapContainer>
+                <Divider />
+
+                <InfoGrid columns={2}>
+                  {board.petName && (
+                    <InfoItem>
+                      <InfoLabel>반려동물 이름</InfoLabel>
+                      <InfoValue>{board.petName}</InfoValue>
+                    </InfoItem>
+                  )}
+                  {board.species && (
+                    <InfoItem>
+                      <InfoLabel>동물 종</InfoLabel>
+                      <InfoValue>{board.species}</InfoValue>
+                    </InfoItem>
+                  )}
+                  {board.breed && (
+                    <InfoItem>
+                      <InfoLabel>품종</InfoLabel>
+                      <InfoValue>{board.breed}</InfoValue>
+                    </InfoItem>
+                  )}
+                  {board.color && (
+                    <InfoItem>
+                      <InfoLabel>색상</InfoLabel>
+                      <InfoValue>{board.color}</InfoValue>
+                    </InfoItem>
+                  )}
+                  {board.gender && (
+                    <InfoItem>
+                      <InfoLabel>성별</InfoLabel>
+                      <InfoValue>{board.gender === 'M' ? '수컷' : '암컷'}</InfoValue>
+                    </InfoItem>
+                  )}
+                  {board.age && (
+                    <InfoItem>
+                      <InfoLabel>나이</InfoLabel>
+                      <InfoValue>{board.age}</InfoValue>
+                    </InfoItem>
+                  )}
+                </InfoGrid>
+
+                {!isReporter && currentUser && (
+                  <>
+                    <Divider />
+                    <WitnessButtonContainer>
+                      <WitnessButton type="button" onClick={handleStartChat}>
+                        실종동물 목격했어요
+                      </WitnessButton>
+                    </WitnessButtonContainer>
+                  </>
                 )}
-              </>
-            )}
-            <CommentSubmit type="submit" disabled={!currentUser || submitting || (!comment.trim() && !commentAddress)}>
-              {submitting ? '등록 중...' : '댓글 등록'}
-            </CommentSubmit>
-          </CommentForm>
-        </Section>
+
+                {canManageStatus && (
+                  <>
+                    <Divider />
+                    <StatusControl>
+                      <StatusControlLabel>상태 변경</StatusControlLabel>
+                      <StatusButtonRow>
+                        <StatusButton
+                          type="button"
+                          active={board.status === 'MISSING'}
+                          onClick={() => handleStatusUpdate('MISSING')}
+                          disabled={statusUpdating}
+                        >
+                          실종
+                        </StatusButton>
+                        <StatusButton
+                          type="button"
+                          active={board.status === 'FOUND'}
+                          onClick={() => handleStatusUpdate('FOUND')}
+                          disabled={statusUpdating}
+                        >
+                          발견
+                        </StatusButton>
+                        <StatusButton
+                          type="button"
+                          active={board.status === 'RESOLVED'}
+                          onClick={() => handleStatusUpdate('RESOLVED')}
+                          disabled={statusUpdating}
+                        >
+                          완료
+                        </StatusButton>
+                      </StatusButtonRow>
+                    </StatusControl>
+                  </>
+                )}
+              </InfoContent>
+              {board.imageUrl && (
+                <Preview>
+                  <img src={board.imageUrl} alt={board.title} />
+                </Preview>
+              )}
+            </InfoCard>
+
+            <Section>
+              <SectionTitle>상세 설명</SectionTitle>
+              <ContentBox>{board.content || '상세 설명이 없습니다.'}</ContentBox>
+            </Section>
+
+            <Section>
+              <SectionTitle>댓글 및 제보</SectionTitle>
+              {board.comments && board.comments.length > 0 ? (
+                <CommentList>
+                  {board.comments.map((item) => (
+                    <CommentItem key={item.idx}>
+                      <CommentHeader>
+                        <CommentAuthor>{item.username || '익명'}</CommentAuthor>
+                        <CommentDate>
+                          {item.createdAt?.replace('T', ' ').substring(0, 16)}
+                        </CommentDate>
+                      </CommentHeader>
+                      <CommentContent>{item.content}</CommentContent>
+                      {item.address && (
+                        <CommentLocation>
+                          📍 목격 위치: {item.address}
+                        </CommentLocation>
+                      )}
+                      {currentUser && (
+                        <CommentActions>
+                          {currentUser.idx === item.userId || currentUser.idx === board.userId ? (
+                            <CommentDeleteButton onClick={() => handleDeleteComment(item.idx)}>
+                              삭제
+                            </CommentDeleteButton>
+                          ) : (
+                            <CommentReportButton type="button" onClick={() => handleReportComment(item.idx)}>
+                              신고
+                            </CommentReportButton>
+                          )}
+                        </CommentActions>
+                      )}
+                    </CommentItem>
+                  ))}
+                </CommentList>
+              ) : (
+                <EmptyComments>아직 제보가 없습니다. 가장 먼저 댓글을 남겨보세요!</EmptyComments>
+              )}
+
+              <CommentForm onSubmit={handleAddComment}>
+                <CommentTextArea
+                  placeholder={
+                    currentUser
+                      ? '목격 정보나 도움이 될 만한 내용을 남겨주세요.'
+                      : '로그인 후 댓글을 작성할 수 있습니다.'
+                  }
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  rows={3}
+                  disabled={!currentUser || submitting}
+                />
+                {currentUser && (
+                  <>
+                    <AddressToggleButton
+                      type="button"
+                      onClick={() => setShowAddressMap(!showAddressMap)}
+                      disabled={submitting}
+                    >
+                      {showAddressMap ? '📍 주소 입력 숨기기' : '📍 목격 위치 추가하기'}
+                    </AddressToggleButton>
+                    {showAddressMap && (
+                      <AddressMapContainer>
+                        <AddressMapSelector
+                          onAddressSelect={(location) => {
+                            setCommentAddress(location.address);
+                            setCommentLat(location.latitude);
+                            setCommentLng(location.longitude);
+                          }}
+                          initialAddress={commentAddress}
+                          initialLat={commentLat}
+                          initialLng={commentLng}
+                        />
+                      </AddressMapContainer>
+                    )}
+                  </>
+                )}
+                <CommentSubmit type="submit" disabled={!currentUser || submitting || (!comment.trim() && !commentAddress)}>
+                  {submitting ? '등록 중...' : '댓글 등록'}
+                </CommentSubmit>
+              </CommentForm>
+            </Section>
           </DetailBody>
         </DetailCard>
       </PageContainer>
@@ -649,12 +672,17 @@ const InfoGrid = styled.div.withConfig({
   box-sizing: border-box;
 `;
 
-const InfoItem = styled.div`
+const InfoItem = styled.div.withConfig({
+  shouldForwardProp: (prop) => prop !== 'fullWidth',
+})`
   display: flex;
   flex-direction: column;
   gap: 4px;
   min-width: 0;
   width: 100%;
+  ${(props) => props.fullWidth && `
+    grid-column: 1 / -1;
+  `}
 `;
 
 const InfoLabel = styled.span`
@@ -969,6 +997,15 @@ const AddressToggleButton = styled.button`
     opacity: 0.6;
     cursor: not-allowed;
   }
+`;
+
+const MapWrapper = styled.div`
+  width: 100%;
+  height: 300px;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-top: 12px;
+  border: 1px solid #e2e8f0;
 `;
 
 const AddressMapContainer = styled.div`

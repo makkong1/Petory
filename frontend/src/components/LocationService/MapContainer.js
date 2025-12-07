@@ -1,32 +1,35 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
-import {
-  loadGeoJSON,
-  groupBySido,
-  groupBySigungu,
-  groupByDong,
-  convertCoordinatesToPaths,
-  getAllSidoCodes,
-  loadSidoGeoJSON,
-  loadSigunguGeoJSON,
-  loadDongGeoJSON,
-  getSidoCode,
-  getSidoName,
-  getSigunguCodeByName,
-  getSigunguCodesBySidoCode,
-  getDongCodesBySigungu,
-  getBoundingBox,
-  calculateZoomFromBoundingBox
-} from '../../utils/geojsonUtils';
+// GeoJSON 관련 import 제거됨 (geojsonUtils 파일 없음)
 
 const DEFAULT_CENTER = { lat: 36.5, lng: 127.5 }; // 대한민국 중심 좌표
-const DEFAULT_ZOOM = 8; // 전국이 보이도록 줌 레벨 8로 설정 (카카오맵 레벨 13과 동일)
+// DEFAULT_ZOOM 제거: 각 페이지에서 mapLevel prop으로 줌 레벨을 명시적으로 전달해야 함
 const COORD_EPSILON = 0.00001;
 
 // 네이버맵 API 키 (환경변수에서 가져오거나 직접 설정)
 // 최신 버전에서는 ncpKeyId를 사용합니다
 const NAVER_MAPS_KEY_ID = process.env.REACT_APP_NAVER_MAPS_KEY_ID || process.env.REACT_APP_NAVER_MAPS_CLIENT_ID || '';
 
+/**
+ * 범용 지도 컨테이너 컴포넌트
+ * 
+ * @param {number} mapLevel - 카카오맵 레벨 (1-14, 낮을수록 확대). 필수 prop.
+ *                            각 페이지에서 사용 목적에 맞는 레벨을 명시적으로 전달해야 함.
+ *                            예: 동 단위(11), 시군구 단위(12), 시도 단위(13), 전국(14)
+ * @param {Object} mapCenter - 지도 중심 좌표 {lat, lng}
+ * @param {Array} services - 표시할 서비스/마커 목록
+ * @param {Function} onServiceClick - 마커 클릭 핸들러
+ * @param {Object} userLocation - 사용자 위치 {lat, lng}
+ * @param {Function} onMapIdle - 지도 이동/줌 완료 시 호출되는 콜백
+ * @param {Function} onMapDragStart - 지도 드래그 시작 시 호출되는 콜백
+ * @param {Function} onMapClick - 지도 클릭 핸들러
+ * @param {Object} hoverMarker - 호버 중인 마커 정보
+ * @param {string} currentMapView - 현재 지도 뷰 ('nation', 'sido', 'sigungu', 'dong')
+ * @param {string} selectedSido - 선택된 시도
+ * @param {string} selectedSigungu - 선택된 시군구
+ * @param {string} selectedEupmyeondong - 선택된 읍면동
+ * @param {Function} onRegionClick - 지역 클릭 핸들러
+ */
 const MapContainer = React.forwardRef(
   ({ services = [], onServiceClick, userLocation, mapCenter, mapLevel, onMapDragStart, onMapIdle, hoverMarker = null, currentMapView = 'nation', selectedSido = null, selectedSigungu = null, selectedEupmyeondong = null, onRegionClick = null, onMapClick = null }, ref) => {
     const mapRef = useRef(null);
@@ -34,21 +37,11 @@ const MapContainer = React.forwardRef(
     const markersRef = useRef([]);
     const userMarkerRef = useRef(null);
     const hoverMarkerRef = useRef(null);
-    const regionPolygonsRef = useRef([]); // 지역 폴리곤
     const lastProgrammaticCenterRef = useRef(null);
     const mapReadyRef = useRef(false);
     const [mapReady, setMapReady] = useState(false);
-    const geoJsonDataRef = useRef(null); // GeoJSON 데이터 캐시
-    const loadingSggCodesRef = useRef(new Set()); // 로드 중인 sgg 코드 추적
-    const loadedSggCodesBySidoRef = useRef(new Map()); // 시도별 로드된 sgg 코드 캐시
-    const polygonLoadingAbortRef = useRef(null); // 진행 중인 폴리곤 로드 취소용
-    const onRegionClickRef = useRef(onRegionClick);
-    const lastPolygonStateRef = useRef(''); // 폴리곤 상태 추적용 (중복 실행 방지)
-
-    // onRegionClick이 변경될 때마다 ref 업데이트
-    useEffect(() => {
-      onRegionClickRef.current = onRegionClick;
-    }, [onRegionClick]);
+    const userZoomedRef = useRef(false); // 사용자가 직접 줌 조정했는지 여부
+    // GeoJSON 관련 ref 제거됨
 
     // 카카오맵 레벨을 네이버맵 줌으로 변환
     const mapLevelToZoom = useCallback((kakaoLevel) => {
@@ -80,13 +73,19 @@ const MapContainer = React.forwardRef(
 
       try {
         const initial = mapCenter || DEFAULT_CENTER;
-        const initialZoom = mapLevel ? mapLevelToZoom(mapLevel) : DEFAULT_ZOOM;
+        // mapLevel은 필수 prop이어야 하며, 각 페이지에서 명시적으로 전달해야 함
+        if (!mapLevel) {
+          console.warn('MapContainer: mapLevel prop이 제공되지 않았습니다. 기본값(전국 뷰, level 14)을 사용합니다.');
+        }
+        const initialZoom = mapLevel ? mapLevelToZoom(mapLevel) : mapLevelToZoom(14); // 기본값: 전국 뷰 (level 14)
 
         const mapOptions = {
           center: new window.naver.maps.LatLng(initial.lat, initial.lng),
           zoom: initialZoom,
+          minZoom: 1, // 최소 줌 레벨 (최대 축소)
+          maxZoom: 21, // 최대 줌 레벨 (최대 확대)
           zoomControl: false, // 기본 컨트롤 비활성화 (커스텀 버튼 사용)
-          scrollWheel: true, // 마우스 휠 확대/축소 활성화
+          scrollWheel: false, // 마우스 휠 확대/축소 비활성화
           disableDoubleClickZoom: false, // 더블클릭 확대 활성화
           disableDoubleClick: false,
         };
@@ -103,36 +102,29 @@ const MapContainer = React.forwardRef(
           onMapDragStart?.();
         });
 
-        // 지도 클릭 이벤트로 폴리곤 클릭 감지 (폴리곤 직접 클릭이 안 될 때 대비)
-        const sidoPolygonsMap = new Map(); // 폴리곤 저장용
-        window.naver.maps.Event.addListener(map, 'click', (e) => {
-          const clickPoint = e.coord;
-          let clickedOnPolygon = false;
-
-          // 클릭한 위치가 어떤 폴리곤 안에 있는지 확인
-          sidoPolygonsMap.forEach((polygonData, sidoName) => {
-            const polygon = polygonData.polygon;
-            if (polygon && window.naver.maps.geometry.polygon) {
-              const isInside = window.naver.maps.geometry.polygon.containsLocation(clickPoint, polygon);
-              if (isInside) {
-                clickedOnPolygon = true;
-                console.log('지도 클릭으로 폴리곤 감지:', sidoName);
-                if (onRegionClickRef.current) {
-                  onRegionClickRef.current('sido', sidoName);
-                }
-              }
+        // 줌 변경 이벤트: 사용자가 직접 마우스 휠로 조정한 경우 감지
+        window.naver.maps.Event.addListener(map, 'zoom_changed', () => {
+          // 프로그래밍 방식이 아닌 경우 (사용자가 직접 조정)
+          if (lastProgrammaticCenterRef.current !== null) {
+            // 중심이 변경되지 않았는데 줌만 변경된 경우 = 사용자가 마우스 휠로 조정
+            const currentCenter = map.getCenter();
+            const planned = lastProgrammaticCenterRef.current;
+            if (planned &&
+              Math.abs(planned.lat - currentCenter.lat()) < COORD_EPSILON &&
+              Math.abs(planned.lng - currentCenter.lng()) < COORD_EPSILON) {
+              userZoomedRef.current = true; // 사용자가 직접 줌 조정함
             }
-          });
-
-          // 폴리곤이 아닌 빈 공간을 클릭한 경우 전국 뷰로 리셋
-          if (!clickedOnPolygon && (selectedSido || selectedSigungu || selectedEupmyeondong)) {
-            // 전국 뷰로 리셋하는 콜백이 있으면 호출
-            if (onRegionClickRef.current) {
-              // 전국 뷰로 리셋하는 특별한 이벤트
-              onRegionClickRef.current('reset', '전국');
-            }
+          } else {
+            userZoomedRef.current = true; // 사용자가 직접 조정함
           }
         });
+
+        // 지도 클릭 이벤트 (GeoJSON 폴리곤 기능 제거됨)
+        if (onMapClick) {
+          window.naver.maps.Event.addListener(map, 'click', (e) => {
+            onMapClick(e);
+          });
+        }
 
         // idle 이벤트 디바운싱 (성능 최적화)
         let idleTimeout = null;
@@ -199,8 +191,27 @@ const MapContainer = React.forwardRef(
         return;
       }
 
+      // 이미 스크립트가 있는지 확인 (중복 로드 방지)
+      const existingScript = document.querySelector(`script[src*="map.naver.com"]`);
+      if (existingScript) {
+        // 이미 스크립트가 있으면 로드 완료를 기다림
+        let retryCount = 0;
+        const checkInterval = setInterval(() => {
+          if (window.naver?.maps) {
+            clearInterval(checkInterval);
+            if (!mapInstanceRef.current) {
+              ensureMap();
+            }
+          } else if (retryCount++ > 100) {
+            clearInterval(checkInterval);
+            console.error('네이버맵 API 로드 타임아웃');
+          }
+        }, 100);
+        return () => clearInterval(checkInterval);
+      }
+
       const script = document.createElement('script');
-      // 최신 버전에서는 ncpKeyId를 사용합니다
+      // 네이버맵 API v3는 ncpClientId를 사용합니다
       const scriptUrl = `https://openapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${NAVER_MAPS_KEY_ID}`;
       script.src = scriptUrl;
       script.async = true;
@@ -214,21 +225,18 @@ const MapContainer = React.forwardRef(
       };
       script.onerror = (error) => {
         console.error('네이버맵 API 스크립트 로드 실패:', error);
-        console.error('Key ID:', NAVER_MAPS_KEY_ID);
         console.error('가능한 원인:');
         console.error('1. 네이버 클라우드 플랫폼에서 Maps API가 활성화되지 않았습니다.');
         console.error('2. Key ID가 잘못되었거나 불완전합니다.');
         console.error('3. 웹 서비스 URL이 등록되지 않았습니다.');
-        console.error('   - localhost는 자동 허용되지만, 다른 도메인은 등록이 필요합니다.');
-        console.error('   - 네이버 클라우드 플랫폼 > Application > Web Service URL에 등록하세요.');
+        console.error('4. 신규 Maps API 클라이언트 ID를 발급받아야 할 수 있습니다.');
+        console.error('   - 네이버 클라우드 플랫폼 콘솔 > Services > AI·NAVER API > Application');
+        console.error('   - 클라이언트 ID 선택 > Web Service URL에 "http://localhost:3000" 추가');
       };
       document.head.appendChild(script);
 
       return () => {
-        const existingScript = document.querySelector(`script[src*="openapi.map.naver.com"]`);
-        if (existingScript) {
-          document.head.removeChild(existingScript);
-        }
+        // cleanup은 스크립트를 제거하지 않음 (다른 컴포넌트에서도 사용할 수 있음)
       };
     }, [ensureMap]);
 
@@ -240,13 +248,7 @@ const MapContainer = React.forwardRef(
       markersRef.current = [];
     }, []);
 
-    // 지역 폴리곤 정리
-    const clearRegionPolygons = useCallback(() => {
-      regionPolygonsRef.current.forEach((polygon) => {
-        if (polygon.setMap) polygon.setMap(null);
-      });
-      regionPolygonsRef.current = [];
-    }, []);
+    // 지역 폴리곤 정리 함수 제거됨 (GeoJSON 미사용)
 
     // 서비스 마커 표시 - 성능 최적화: 마커 개수 제한 및 배치 처리
     const lastServicesKeyRef = useRef('');
@@ -254,21 +256,13 @@ const MapContainer = React.forwardRef(
     useEffect(() => {
       if (!mapReadyRef.current || !mapInstanceRef.current || !window.naver?.maps) return;
 
-      console.log('마커 useEffect 실행:', {
-        servicesCount: services.length,
-        mapReady: mapReadyRef.current,
-        mapInstance: !!mapInstanceRef.current
-      });
-
       // 마커가 변경되지 않았으면 스킵
       const servicesKey = services.map(s => `${s.latitude},${s.longitude}`).join('|');
       if (servicesKey === lastServicesKeyRef.current && markersRef.current.length > 0) {
-        console.log('마커 변경 없음, 스킵');
         return;
       }
       lastServicesKeyRef.current = servicesKey;
 
-      console.log('마커 생성 시작:', services.length, '개');
       clearMarkers();
 
       // 마커 개수 제한 (성능 최적화)
@@ -290,10 +284,21 @@ const MapContainer = React.forwardRef(
           }
 
           const position = new window.naver.maps.LatLng(service.latitude, service.longitude);
+
+          // 실종신고는 다른 색상 마커 사용
+          const isMissingPet = service.type === 'missingPet';
+          const markerIcon = isMissingPet
+            ? {
+              content: '<div style="width:20px;height:20px;background:#FF6B6B;border-radius:50%;border:2px solid #fff;box-shadow:0 2px 4px rgba(0,0,0,0.3);"></div>',
+              anchor: new window.naver.maps.Point(10, 10),
+            }
+            : undefined; // 기본 마커 사용
+
           const marker = new window.naver.maps.Marker({
             position,
             map: mapInstanceRef.current,
             title: service.name || '서비스',
+            icon: markerIcon,
           });
 
           window.naver.maps.Event.addListener(marker, 'click', () => {
@@ -311,12 +316,30 @@ const MapContainer = React.forwardRef(
           // 다음 배치를 비동기로 처리
           requestAnimationFrame(createMarkerBatch);
         } else {
-          console.log('마커 생성 완료:', markersRef.current.length, '개');
+
+          // 마커가 하나만 있고 mapCenter가 설정되어 있으면, 마커 위치로 지도 중심 조정
+          if (markersRef.current.length === 1 && mapCenter && mapInstanceRef.current) {
+            const marker = markersRef.current[0];
+            const markerPosition = marker.getPosition();
+            const currentCenter = mapInstanceRef.current.getCenter();
+
+            // 마커 위치와 현재 중심이 다르면 마커 위치로 이동
+            if (currentCenter && (
+              Math.abs(currentCenter.lat() - markerPosition.lat()) > COORD_EPSILON ||
+              Math.abs(currentCenter.lng() - markerPosition.lng()) > COORD_EPSILON
+            )) {
+              setTimeout(() => {
+                if (mapInstanceRef.current && marker) {
+                  mapInstanceRef.current.setCenter(markerPosition);
+                }
+              }, 100);
+            }
+          }
         }
       };
 
       createMarkerBatch();
-    }, [services, onServiceClick, clearMarkers]);
+    }, [services, onServiceClick, clearMarkers, mapCenter]);
 
     // 지도 중심 및 줌 변경 (프로그래밍 방식으로만 실행)
     useEffect(() => {
@@ -332,31 +355,41 @@ const MapContainer = React.forwardRef(
       const targetZoom = mapLevelToZoom(mapLevel);
       const isSameZoom = currentZoom === targetZoom;
 
-      // 이미 목표 위치와 줌에 있으면 스킵
-      if (isAlreadyAtCenter && isSameZoom) {
-        // 프로그래밍 방식으로 이동한 경우 ref 설정
+      // mapLevel이 변경되었고, 실제 줌이 다를 때만 강제로 줌 변경 (레벨 선택 드롭다운 변경 시)
+      if (!isSameZoom) {
+        // 사용자가 마우스 휠로 조정했더라도, mapLevel prop이 명시적으로 변경되었으면 줌 변경 허용
+        userZoomedRef.current = false; // 레벨 선택 드롭다운 변경 시 강제로 리셋
+        map.setZoom(targetZoom);
         lastProgrammaticCenterRef.current = { ...mapCenter };
+        if (!isAlreadyAtCenter) {
+          setTimeout(() => {
+            map.setCenter(new window.naver.maps.LatLng(mapCenter.lat, mapCenter.lng));
+            lastProgrammaticCenterRef.current = { ...mapCenter };
+            console.log('지도 줌 변경 완료:', mapCenter, '줌:', targetZoom);
+          }, 300);
+        } else {
+          console.log('지도 줌 변경 완료:', mapCenter, '줌:', targetZoom);
+        }
         return;
       }
 
-      // mapCenter/mapLevel이 변경되었으므로 프로그래밍 방식으로 간주
-      // (LocationServiceMap에서 setMapCenter/setMapLevel을 호출했을 때)
-      // lastProgrammaticCenterRef를 먼저 설정하여 수동 조작이 아님을 표시
-      lastProgrammaticCenterRef.current = { ...mapCenter };
-
-      // 줌을 먼저 설정하고 중심 이동
-      if (!isSameZoom) {
-        map.setZoom(targetZoom);
-        // 줌 변경 후 중심 이동 (더 긴 지연으로 안정성 확보)
-        setTimeout(() => {
-          map.setCenter(new window.naver.maps.LatLng(mapCenter.lat, mapCenter.lng));
-          // 중심 이동 후에도 ref 유지
+      // 사용자가 직접 마우스 휠로 줌을 조정한 경우, mapLevel prop 변경을 무시 (단, 줌이 같을 때만)
+      if (userZoomedRef.current && isSameZoom) {
+        // 중심만 이동하고 줌은 사용자가 조정한 대로 유지
+        if (!isAlreadyAtCenter) {
           lastProgrammaticCenterRef.current = { ...mapCenter };
-          console.log('지도 확대 완료:', mapCenter, '줌:', targetZoom);
-        }, 300); // 200ms -> 300ms로 증가하여 줌 변경 완료 대기
-      } else {
+          map.setCenter(new window.naver.maps.LatLng(mapCenter.lat, mapCenter.lng));
+        }
+        return; // 줌은 사용자가 조정한 대로 유지
+      }
+
+      // 중심만 이동 (줌은 이미 변경됨)
+      if (!isAlreadyAtCenter) {
+        lastProgrammaticCenterRef.current = { ...mapCenter };
         map.setCenter(new window.naver.maps.LatLng(mapCenter.lat, mapCenter.lng));
-        console.log('지도 중심 이동 완료:', mapCenter);
+      } else {
+        lastProgrammaticCenterRef.current = { ...mapCenter };
+        userZoomedRef.current = false; // 리셋
       }
     }, [mapCenter, mapLevel, mapLevelToZoom]);
 
@@ -404,572 +437,13 @@ const MapContainer = React.forwardRef(
       }
     }, [hoverMarker]);
 
-    // GeoJSON 데이터 로드 (더 이상 전체 파일을 로드하지 않음, 필요시 동적 로드)
-    // 이제 각 레벨별로 필요한 파일만 로드
-
-    // 지역 폴리곤 표시 (계층적 지도 탐색) - 분리된 GeoJSON 파일 기반
-    useEffect(() => {
-      // 지도가 준비될 때까지 기다림
-      if (!mapReady || !mapInstanceRef.current || !window.naver?.maps) {
-        return;
-      }
-
-      // 상태가 변경되지 않았으면 스킵 (중복 실행 방지)
-      const currentState = `${currentMapView || 'nation'}-${selectedSido || ''}-${selectedSigungu || ''}-${selectedEupmyeondong || ''}`;
-      const isInitialLoad = lastPolygonStateRef.current === '';
-
-      if (!isInitialLoad && currentState === lastPolygonStateRef.current) {
-        console.log('⏭️ 상태 변경 없음, 스킵');
-        return;
-      }
-
-      console.log('✅ 폴리곤 로드 시작:', currentState);
-      lastPolygonStateRef.current = currentState;
-
-      // 이전 로드 취소
-      if (polygonLoadingAbortRef.current) {
-        polygonLoadingAbortRef.current.aborted = true;
-      }
-      const abortController = { aborted: false };
-      polygonLoadingAbortRef.current = abortController;
-
-      // 디바운싱 제거 - 즉시 실행
-      (async () => {
-        if (!mapInstanceRef.current) {
-          console.warn('⚠️ 지도 없음');
-          return;
-        }
-
-        if (abortController.aborted) {
-          console.log('❌ 취소됨');
-          return;
-        }
-
-        console.log('🧹 기존 폴리곤 정리');
-        clearRegionPolygons();
-
-        const map = mapInstanceRef.current;
-        const naverMaps = window.naver.maps;
-        const polygonsMap = new Map();
-
-        // 선택 상태에 따라 다른 단위의 폴리곤 표시
-        // 1단계: 전국 뷰 → 시도 폴리곤만 표시
-        if (!selectedSido || currentMapView === 'nation') {
-          console.log('📍 시도 폴리곤 표시 시작');
-          // 모든 시도 파일 로드
-          const sidoCodes = getAllSidoCodes();
-          console.log('시도 파일 수:', sidoCodes.length);
-
-          // 모든 시도 파일을 병렬로 로드 (실패한 파일은 무시)
-          Promise.allSettled(sidoCodes.map(code => loadSidoGeoJSON(code)))
-            .then(results => {
-              // 취소되었는지 다시 확인
-              if (abortController.aborted) {
-                console.log('❌ 폴리곤 로드 취소됨 (시도 로드 중)');
-                return;
-              }
-
-              // 성공한 결과만 필터링
-              const sidoDataList = results
-                .filter(result => result.status === 'fulfilled' && result.value)
-                .map(result => result.value);
-
-              console.log(`시도 파일 로드 완료: ${sidoDataList.length}/${sidoCodes.length}`);
-
-              if (sidoDataList.length === 0) {
-                console.error('⚠️ 시도 파일이 하나도 로드되지 않았습니다!');
-                return;
-              }
-
-              // 성능 최적화: 배치 처리로 폴리곤 생성
-              const batchSize = 5; // 한 번에 5개씩 처리
-              let batchIndex = 0;
-              const sidoEntries = sidoDataList
-                .filter(data => {
-                  // 데이터 유효성 검사
-                  if (!data || !data.features || data.features.length === 0) return false;
-                  // sido 파일은 sidonm이 없고 sido 코드만 있음
-                  const sidoCode = data.features[0]?.properties?.sido;
-                  if (!sidoCode) {
-                    console.warn('시도 코드가 없는 데이터:', data);
-                    return false;
-                  }
-                  // 시도 코드로 시도명 가져오기
-                  const sidoName = getSidoName(sidoCode);
-                  if (!sidoName) {
-                    console.warn('시도명을 찾을 수 없음:', sidoCode);
-                    return false;
-                  }
-                  return true;
-                })
-                .map(data => {
-                  const sidoCode = data.features[0].properties.sido;
-                  const sidoName = getSidoName(sidoCode);
-                  return [sidoName, data.features];
-                });
-
-              const createSidoPolygonBatch = () => {
-                const start = batchIndex * batchSize;
-                const end = Math.min(start + batchSize, sidoEntries.length);
-
-                for (let i = start; i < end; i++) {
-                  const [sidoName, sidoFeatures] = sidoEntries[i];
-
-                  // 각 시도의 모든 동 폴리곤을 하나의 MultiPolygon으로 표시
-                  const allPaths = [];
-
-                  sidoFeatures.forEach(feature => {
-                    const paths = convertCoordinatesToPaths(feature.geometry.coordinates, naverMaps);
-                    allPaths.push(...paths);
-                  });
-
-                  if (allPaths.length === 0) {
-                    console.warn(`시도 ${sidoName}의 경로가 없습니다`);
-                    continue;
-                  }
-
-                  // MultiPolygon으로 폴리곤 생성
-                  const polygon = new naverMaps.Polygon({
-                    map: mapInstanceRef.current,
-                    paths: allPaths,
-                    fillColor: '#75B8FA',
-                    fillOpacity: 0.1,
-                    strokeColor: '#75B8FA',
-                    strokeOpacity: 0.5,
-                    strokeWeight: 1.5,
-                    clickable: true,
-                    zIndex: 100,
-                  });
-
-                  polygonsMap.set(sidoName, { polygon, paths: allPaths });
-
-                  // 클릭 이벤트
-                  const handlePolygonClick = (e) => {
-                    if (e && typeof e.stopPropagation === 'function') {
-                      e.stopPropagation();
-                    }
-                    console.log('시도 폴리곤 클릭:', sidoName);
-                    if (onRegionClickRef.current) {
-                      onRegionClickRef.current('sido', sidoName);
-                    }
-                  };
-
-                  naverMaps.Event.addListener(polygon, 'click', handlePolygonClick);
-                  naverMaps.Event.addListener(polygon, 'mousedown', (e) => {
-                    if (e && typeof e.stopPropagation === 'function') {
-                      e.stopPropagation();
-                    }
-                    handlePolygonClick(e);
-                  });
-
-                  // 호버 효과
-                  naverMaps.Event.addListener(polygon, 'mouseover', () => {
-                    polygon.setOptions({
-                      fillOpacity: 0.25,
-                      strokeWeight: 2,
-                      strokeOpacity: 0.7,
-                    });
-                  });
-
-                  naverMaps.Event.addListener(polygon, 'mouseout', () => {
-                    polygon.setOptions({
-                      fillOpacity: 0.1,
-                      strokeWeight: 1.5,
-                      strokeOpacity: 0.5,
-                    });
-                  });
-
-                  regionPolygonsRef.current.push(polygon);
-                }
-
-                batchIndex++;
-                if (end < sidoEntries.length) {
-                  // 다음 배치를 비동기로 처리
-                  requestAnimationFrame(createSidoPolygonBatch);
-                } else {
-                  console.log('시도 폴리곤 렌더링 완료:', regionPolygonsRef.current.length);
-                }
-              };
-
-              createSidoPolygonBatch();
-            })
-            .catch(error => {
-              console.error('시도 폴리곤 로드 실패:', error);
-            });
-        }
-        // 2단계: 시도 뷰 → 선택된 시도의 시군구 폴리곤만 표시
-        else if (selectedSido && !selectedSigungu) {
-          console.log('📍 시군구 폴리곤 표시 시작:', selectedSido);
-          // 선택된 시도의 sido 파일을 로드하여 시군구 코드 추출
-          const sidoCode = getSidoCode(selectedSido);
-          if (!sidoCode) {
-            console.error('시도 코드를 찾을 수 없음:', selectedSido);
-            return;
-          }
-
-          // sido 파일에는 sgg 정보가 없으므로, sgg 파일을 직접 로드해서 시도 코드 확인
-          // sgg 파일명은 시도 코드로 시작함 (예: 11110.json은 서울특별시의 종로구)
-          // 하지만 브라우저에서는 파일 목록을 가져올 수 없으므로
-          // sgg 파일을 하나씩 로드해서 시도 코드를 확인해야 함
-
-          // 해결책: sgg 파일을 로드해서 시도 코드 확인
-          // sgg 파일명 패턴: 시도 코드(2자리) + 시군구 코드(3자리) = 5자리
-          // 예: 서울특별시(11) -> 11110, 11140, 11170 등
-
-          // 모든 sgg 파일을 로드하는 것은 비효율적이므로
-          // 대신 sgg 파일을 로드해서 시도 코드를 확인
-          // 실제로는 서버에서 시도별 sgg 목록을 제공하거나 미리 정의된 매핑 사용 권장
-
-          // 임시 해결책: sgg 파일을 로드해서 시도 코드 확인
-          // sgg 파일명 패턴을 사용하여 가능한 sgg 코드 생성 후 확인
-          // 하지만 모든 조합을 시도하는 것은 비효율적
-
-          // 더 나은 방법: sgg 파일을 하나씩 로드해서 시도 코드 확인
-          // 하지만 252개 파일을 모두 로드하는 것은 비효율적
-
-          // 캐시 확인: 이미 로드된 sgg 코드 목록이 있으면 재사용
-          const cacheKey = sidoCode;
-          let sggCodesPromise;
-
-          if (loadedSggCodesBySidoRef.current.has(cacheKey)) {
-            const cachedSggCodes = loadedSggCodesBySidoRef.current.get(cacheKey);
-            console.log('캐시된 시군구 코드 사용:', cachedSggCodes.length);
-            sggCodesPromise = Promise.resolve(cachedSggCodes);
-          } else {
-            // 캐시에 없으면 새로 로드
-            sggCodesPromise = getSigunguCodesBySidoCode(sidoCode)
-              .then(sggCodes => {
-                if (abortController.aborted) return [];
-                // 캐시에 저장
-                loadedSggCodesBySidoRef.current.set(cacheKey, sggCodes);
-                return sggCodes;
-              });
-          }
-
-          sggCodesPromise
-            .then(sggCodes => {
-              if (abortController.aborted) {
-                console.log('[MapContainer] 폴리곤 로드 취소됨 (aborted)');
-                return [];
-              }
-
-              console.log('[MapContainer] 선택된 시도의 시군구 수:', sggCodes.length, 'sggCodes:', sggCodes);
-
-              if (!sggCodes || sggCodes.length === 0) {
-                console.warn('[MapContainer] 시군구 코드를 찾을 수 없습니다. sido 파일에서 sgg 코드 추출 실패 또는 sido 파일에 sgg 정보가 없을 수 있습니다.');
-                return Promise.resolve([]);
-              }
-
-              // 모든 시군구 파일을 병렬로 로드 (중복 로드 방지)
-              console.log('[MapContainer] 시군구 파일 로드 시작:', sggCodes);
-              const loadPromises = sggCodes.map((code, index) => {
-                // 이미 로드 중이면 스킵
-                if (loadingSggCodesRef.current.has(code)) {
-                  console.log(`[MapContainer] sgg 파일 ${code} 이미 로드 중, 스킵`);
-                  return Promise.resolve({ status: 'fulfilled', value: null, skipped: true, code, index });
-                }
-                loadingSggCodesRef.current.add(code);
-                console.log(`[MapContainer] sgg 파일 로드 시작: ${code}`);
-                return loadSigunguGeoJSON(code)
-                  .then(data => {
-                    loadingSggCodesRef.current.delete(code);
-                    console.log(`[MapContainer] sgg 파일 로드 성공: ${code}`, data ? `features: ${data.features?.length || 0}` : 'data 없음');
-                    return { status: 'fulfilled', value: data, code, index };
-                  })
-                  .catch(error => {
-                    loadingSggCodesRef.current.delete(code);
-                    console.error(`[MapContainer] sgg 파일 로드 실패: ${code}`, error);
-                    return { status: 'rejected', reason: error, code, index };
-                  });
-              });
-
-              return Promise.allSettled(loadPromises);
-            })
-            .then(results => {
-              if (abortController.aborted) {
-                console.log('폴리곤 로드 취소됨');
-                return;
-              }
-              if (!results) return;
-
-              // 성공한 결과만 필터링 (skipped 제외)
-              const sigunguDataList = results
-                .filter(result => result.status === 'fulfilled' && result.value && result.value.value && !result.value.skipped)
-                .map(result => result.value.value);
-
-              const failedCount = results.filter(r => r.status === 'rejected').length;
-              console.log(`[MapContainer] 시군구 파일 로드 완료: 성공 ${sigunguDataList.length}/${results.length}, 실패 ${failedCount}개`);
-
-              if (failedCount > 0) {
-                const failedCodes = results
-                  .filter(r => {
-                    // Promise.allSettled의 rejected 결과는 reason에, fulfilled 결과는 value에 우리 객체가 있음
-                    const innerResult = r.status === 'rejected' ? r.reason : r.value;
-                    return innerResult && innerResult.status === 'rejected' && innerResult.code;
-                  })
-                  .map(r => {
-                    const innerResult = r.status === 'rejected' ? r.reason : r.value;
-                    return innerResult?.code;
-                  })
-                  .filter(Boolean);
-                console.warn(`[MapContainer] 로드 실패한 sgg 코드:`, failedCodes);
-              }
-
-              // 시군구별로 그룹화
-              const sigunguGroups = new Map();
-              sigunguDataList.forEach((data) => {
-                if (!data || !data.features || data.features.length === 0) return;
-                const sggName = data.features[0].properties.sggnm;
-                if (sggName) {
-                  sigunguGroups.set(`${selectedSido}_${sggName}`, {
-                    sido: selectedSido,
-                    sigungu: sggName,
-                    features: data.features
-                  });
-                }
-              });
-
-              const filteredSigunguGroups = Array.from(sigunguGroups.entries());
-              console.log('필터링된 시군구 수:', filteredSigunguGroups.length);
-
-              // 배치 처리
-              const batchSize = 3;
-              let batchIndex = 0;
-
-              const createSigunguPolygonBatch = () => {
-                const start = batchIndex * batchSize;
-                const end = Math.min(start + batchSize, filteredSigunguGroups.length);
-
-                for (let i = start; i < end; i++) {
-                  const [key, group] = filteredSigunguGroups[i];
-
-                  const allPaths = [];
-                  group.features.forEach(feature => {
-                    const paths = convertCoordinatesToPaths(feature.geometry.coordinates, naverMaps);
-                    allPaths.push(...paths);
-                  });
-
-                  if (allPaths.length === 0) continue;
-
-                  const polygon = new naverMaps.Polygon({
-                    map: mapInstanceRef.current,
-                    paths: allPaths,
-                    fillColor: '#75B8FA',
-                    fillOpacity: 0.15,
-                    strokeColor: '#75B8FA',
-                    strokeOpacity: 0.6,
-                    strokeWeight: 2,
-                    clickable: true,
-                    zIndex: 100,
-                  });
-
-                  polygonsMap.set(key, { polygon, paths: allPaths });
-
-                  const handlePolygonClick = (e) => {
-                    if (e && typeof e.stopPropagation === 'function') {
-                      e.stopPropagation();
-                    }
-                    console.log('시군구 폴리곤 클릭:', group.sigungu);
-                    if (onRegionClickRef.current) {
-                      onRegionClickRef.current('sigungu', group.sigungu);
-                    }
-                  };
-
-                  naverMaps.Event.addListener(polygon, 'click', handlePolygonClick);
-                  naverMaps.Event.addListener(polygon, 'mousedown', (e) => {
-                    if (e && typeof e.stopPropagation === 'function') {
-                      e.stopPropagation();
-                    }
-                    handlePolygonClick(e);
-                  });
-
-                  naverMaps.Event.addListener(polygon, 'mouseover', () => {
-                    polygon.setOptions({
-                      fillOpacity: 0.3,
-                      strokeWeight: 2.5,
-                      strokeOpacity: 0.8,
-                    });
-                  });
-
-                  naverMaps.Event.addListener(polygon, 'mouseout', () => {
-                    polygon.setOptions({
-                      fillOpacity: 0.15,
-                      strokeWeight: 2,
-                      strokeOpacity: 0.6,
-                    });
-                  });
-
-                  regionPolygonsRef.current.push(polygon);
-                }
-
-                batchIndex++;
-                if (end < filteredSigunguGroups.length) {
-                  requestAnimationFrame(createSigunguPolygonBatch);
-                } else {
-                  console.log('시군구 폴리곤 렌더링 완료:', regionPolygonsRef.current.length);
-                }
-              };
-
-              createSigunguPolygonBatch();
-            })
-            .catch(error => {
-              console.error('시군구 폴리곤 로드 실패:', error);
-            });
-        }
-        // 3단계: 시군구 뷰 → 선택된 시군구의 동 폴리곤만 표시 (동이 선택되어도 표시)
-        else if (selectedSido && selectedSigungu) {
-          console.log('📍 동 폴리곤 표시 시작:', selectedSido, selectedSigungu);
-          // 선택된 시군구의 sgg 코드 가져오기
-          getSigunguCodeByName(selectedSido, selectedSigungu)
-            .then(sggCode => {
-              if (!sggCode) {
-                console.error('시군구 코드를 찾을 수 없음:', selectedSido, selectedSigungu);
-                return;
-              }
-
-              // 시군구 파일을 로드하여 동 코드 추출
-              return loadSigunguGeoJSON(sggCode);
-            })
-            .then(sigunguData => {
-              if (!sigunguData || !sigunguData.features) {
-                console.error('시군구 데이터 로드 실패:', selectedSido, selectedSigungu, '파일이 존재하지 않을 수 있습니다.');
-                return;
-              }
-
-              // 동 코드 추출
-              const dongCodes = new Set();
-              sigunguData.features.forEach(feature => {
-                const dongCode = feature.properties.adm_cd2;
-                if (dongCode) {
-                  dongCodes.add(dongCode);
-                }
-              });
-
-              console.log('선택된 시군구의 동 수:', dongCodes.size);
-
-              // 모든 동 파일을 병렬로 로드 (일부 실패해도 계속 진행)
-              return Promise.allSettled(Array.from(dongCodes).map(code => loadDongGeoJSON(code)));
-            })
-            .then(results => {
-              if (!results) return;
-
-              // 성공한 결과만 필터링
-              const dongDataList = results
-                .filter(result => result.status === 'fulfilled' && result.value)
-                .map(result => result.value);
-
-              console.log(`동 파일 로드 완료: ${dongDataList.length}/${results.length}`);
-
-              // 동 데이터를 필터링하여 정리
-              const filteredDongGroups = dongDataList
-                .filter(data => data && data.features && data.features.length > 0)
-                .map(data => {
-                  const feature = data.features[0];
-                  const key = feature.properties.adm_nm || feature.properties.adm_cd2;
-                  return { key, feature };
-                });
-
-              console.log('필터링된 동 수:', filteredDongGroups.length);
-
-              const batchSize = 10;
-              let batchIndex = 0;
-
-              const createDongPolygonBatch = () => {
-                const start = batchIndex * batchSize;
-                const end = Math.min(start + batchSize, filteredDongGroups.length);
-
-                for (let i = start; i < end; i++) {
-                  const { key, feature } = filteredDongGroups[i];
-                  const props = feature.properties;
-
-                  const paths = convertCoordinatesToPaths(feature.geometry.coordinates, naverMaps);
-                  if (paths.length === 0) continue;
-
-                  const polygon = new naverMaps.Polygon({
-                    map: mapInstanceRef.current,
-                    paths: paths,
-                    fillColor: '#75B8FA',
-                    fillOpacity: 0.2,
-                    strokeColor: '#75B8FA',
-                    strokeOpacity: 0.7,
-                    strokeWeight: 2.5,
-                    clickable: true,
-                    zIndex: 100,
-                  });
-
-                  polygonsMap.set(key, { polygon, paths });
-
-                  const handlePolygonClick = (e) => {
-                    if (e && typeof e.stopPropagation === 'function') {
-                      e.stopPropagation();
-                    }
-                    console.log('동 폴리곤 클릭:', props.adm_nm);
-                    if (onRegionClickRef.current) {
-                      onRegionClickRef.current('dong', props.adm_nm);
-                    }
-                  };
-
-                  naverMaps.Event.addListener(polygon, 'click', handlePolygonClick);
-                  naverMaps.Event.addListener(polygon, 'mousedown', (e) => {
-                    if (e && typeof e.stopPropagation === 'function') {
-                      e.stopPropagation();
-                    }
-                    handlePolygonClick(e);
-                  });
-
-                  naverMaps.Event.addListener(polygon, 'mouseover', () => {
-                    polygon.setOptions({
-                      fillOpacity: 0.35,
-                      strokeWeight: 3,
-                      strokeOpacity: 0.9,
-                    });
-                  });
-
-                  naverMaps.Event.addListener(polygon, 'mouseout', () => {
-                    polygon.setOptions({
-                      fillOpacity: 0.2,
-                      strokeWeight: 2.5,
-                      strokeOpacity: 0.7,
-                    });
-                  });
-
-                  regionPolygonsRef.current.push(polygon);
-                }
-
-                batchIndex++;
-                if (end < filteredDongGroups.length) {
-                  requestAnimationFrame(createDongPolygonBatch);
-                } else {
-                  console.log('동 폴리곤 렌더링 완료:', regionPolygonsRef.current.length);
-                }
-              };
-
-              createDongPolygonBatch();
-            })
-            .catch(error => {
-              console.error('동 폴리곤 로드 실패:', error);
-            });
-        }
-        // 조건 불일치 시에도 조용히 처리 (경고 제거)
-
-        // 지도 클릭 이벤트로 폴리곤 감지 (폴리곤 직접 클릭이 안 될 때 대비)
-        // 비동기 로딩이 완료된 후에 등록되도록 각 폴리곤 렌더링 로직 내에서 처리
-        // 여기서는 기본 핸들러만 등록 (실제 핸들링은 각 폴리곤 렌더링 로직에서 처리)
-      })(); // 즉시 실행
-
-      return () => {
-        // 진행 중인 로드 취소
-        if (polygonLoadingAbortRef.current) {
-          polygonLoadingAbortRef.current.aborted = true;
-        }
-      };
-    }, [mapReady, currentMapView, selectedSido, selectedSigungu, selectedEupmyeondong]);
+    // GeoJSON 폴리곤 표시 기능 제거됨 (geojsonUtils 파일 없음)
 
     // 정리
     useEffect(() => {
       return () => {
         clearMarkers();
-        clearRegionPolygons();
+        // clearRegionPolygons 제거됨 (GeoJSON 미사용)
         if (userMarkerRef.current) {
           userMarkerRef.current.setMap(null);
         }
@@ -977,12 +451,13 @@ const MapContainer = React.forwardRef(
           hoverMarkerRef.current.setMap(null);
         }
       };
-    }, [clearMarkers, clearRegionPolygons]);
+    }, [clearMarkers]);
 
     const handleZoomIn = useCallback(() => {
       if (mapInstanceRef.current) {
         // 수동 조작임을 표시하여 자동 이동 방지
         lastProgrammaticCenterRef.current = null;
+        userZoomedRef.current = true; // 사용자가 직접 줌 조정
         const currentZoom = mapInstanceRef.current.getZoom();
         mapInstanceRef.current.setZoom(currentZoom + 1);
       }
@@ -992,6 +467,7 @@ const MapContainer = React.forwardRef(
       if (mapInstanceRef.current) {
         // 수동 조작임을 표시하여 자동 이동 방지
         lastProgrammaticCenterRef.current = null;
+        userZoomedRef.current = true; // 사용자가 직접 줌 조정
         const currentZoom = mapInstanceRef.current.getZoom();
         mapInstanceRef.current.setZoom(currentZoom - 1);
       }

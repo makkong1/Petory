@@ -88,4 +88,24 @@ public class GeocodingController {
             return ResponseEntity.badRequest().body(response);
         }
     }
+
+    /**
+     * 위도/경도를 주소로 변환 (역지오코딩)
+     * GET /api/geocoding/coordinates?lat=37.5665&lng=126.9780
+     */
+    @GetMapping("/coordinates")
+    public ResponseEntity<Map<String, Object>> coordinatesToAddress(
+            @RequestParam double lat,
+            @RequestParam double lng) {
+        try {
+            Map<String, Object> result = naverMapService.coordinatesToAddress(lat, lng);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            log.error("역지오코딩 실패: {}", e.getMessage(), e);
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
 }
