@@ -262,7 +262,32 @@ const MeetupPage = () => {
         mapCenter.lng,
         radius
       );
-      setMeetups(response.data.meetups || []);
+      const allMeetups = response.data.meetups || [];
+      setMeetups(allMeetups);
+
+      // 시군구만 선택된 경우 읍면동 목록 추출
+      if (selectedSigungu && !selectedEupmyeondong) {
+        const eupmyeondongSet = new Set();
+        for (const meetup of allMeetups) {
+          if (meetup.location) {
+            // location에서 읍면동 추출 시도 (예: "서울특별시 노원구 중계동" -> "중계동")
+            const locationParts = meetup.location.split(' ');
+            if (locationParts.length >= 3) {
+              const eupmyeondong = locationParts[2];
+              if (eupmyeondong && eupmyeondong.endsWith('동') || eupmyeondong.endsWith('면') || eupmyeondong.endsWith('읍')) {
+                eupmyeondongSet.add(eupmyeondong);
+              }
+            }
+          }
+        }
+        const extractedEupmyeondongs = Array.from(eupmyeondongSet).sort();
+        // 추출된 목록이 있으면 사용, 없으면 EUPMYEONDONGS 상수 사용
+        if (extractedEupmyeondongs.length > 0) {
+          setAvailableEupmyeondongs(extractedEupmyeondongs);
+        } else if (EUPMYEONDONGS[selectedSido] && EUPMYEONDONGS[selectedSido][selectedSigungu]) {
+          setAvailableEupmyeondongs(EUPMYEONDONGS[selectedSido][selectedSigungu]);
+        }
+      }
     } catch (error) {
       console.error('모임 조회 실패:', error);
       const errorMessage = error.response?.data?.error || error.message || '모임을 불러오는데 실패했습니다.';
@@ -271,7 +296,7 @@ const MeetupPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [mapCenter, radius]);
+  }, [mapCenter, radius, selectedSido, selectedSigungu, selectedEupmyeondong]);
 
   // 거리 계산 함수 (Haversine 공식)
   const calculateDistance = (lat1, lng1, lat2, lng2) => {
@@ -568,6 +593,12 @@ const MeetupPage = () => {
 
   // 지역 선택 핸들러 (LocationServiceMap 방식)
   const handleRegionSelect = async (sidoOverride = null, sigunguOverride = null, eupmyeondongOverride = null) => {
+    // 상태 업데이트를 먼저 수행 (뒤로 버튼 클릭 시 상태 변경 반영)
+    if (sidoOverride !== null) setSelectedSido(sidoOverride);
+    if (sigunguOverride !== null) setSelectedSigungu(sigunguOverride);
+    if (eupmyeondongOverride !== null) setSelectedEupmyeondong(eupmyeondongOverride);
+
+    // 업데이트된 상태를 사용하여 target 값 계산
     const targetSido = sidoOverride !== null ? sidoOverride : selectedSido;
     const targetSigungu = sigunguOverride !== null ? sigunguOverride : selectedSigungu;
     const targetEupmyeondong = eupmyeondongOverride !== null ? eupmyeondongOverride : selectedEupmyeondong;
@@ -660,9 +691,10 @@ const MeetupPage = () => {
           selectedMapLevel = calculateMapLevelFromRadius(selectedRadius);
         }
 
-        setSelectedSido(targetSido);
-        setSelectedSigungu(targetSigungu || '');
-        setSelectedEupmyeondong(targetEupmyeondong || '');
+        // 상태는 이미 함수 시작 부분에서 업데이트되었으므로 중복 업데이트 제거
+        // setSelectedSido(targetSido);
+        // setSelectedSigungu(targetSigungu || '');
+        // setSelectedEupmyeondong(targetEupmyeondong || '');
         setMapCenter({ lat: coordData.latitude, lng: coordData.longitude });
         setRadius(selectedRadius);
         setMapLevel(selectedMapLevel);
@@ -672,16 +704,24 @@ const MeetupPage = () => {
           eupmyeondong: (targetEupmyeondong && targetEupmyeondong !== '전체' && targetEupmyeondong.trim() !== '') ? targetEupmyeondong : '',
         });
 
-        // 읍면동 목록 설정
-        if (targetSigungu && EUPMYEONDONGS[targetSido] && EUPMYEONDONGS[targetSido][targetSigungu]) {
-          setAvailableEupmyeondongs(EUPMYEONDONGS[targetSido][targetSigungu]);
+        // 읍면동 목록 설정 (시군구만 선택된 경우에만, 동이 선택되지 않은 경우)
+        if (targetSigungu && (!targetEupmyeondong || targetEupmyeondong === '' || targetEupmyeondong === '전체')) {
+          // fetchMeetups에서 자동으로 설정되지만, EUPMYEONDONGS 상수도 확인
+          if (EUPMYEONDONGS[targetSido] && EUPMYEONDONGS[targetSido][targetSigungu]) {
+            setAvailableEupmyeondongs(EUPMYEONDONGS[targetSido][targetSigungu]);
+          } else {
+            // EUPMYEONDONGS에 없으면 빈 배열로 설정 (fetchMeetups에서 추출될 수 있음)
+            setAvailableEupmyeondongs([]);
+          }
         } else {
           setAvailableEupmyeondongs([]);
         }
 
         isProgrammaticMoveRef.current = true;
-        // 지역 선택 완료 시 RegionControls 닫기
-        setShowRegionControls(false);
+        // 동까지 선택했을 때만 RegionControls 닫기 (시군구만 선택했을 때는 계속 열어둠)
+        if (targetEupmyeondong && targetEupmyeondong !== '전체' && targetEupmyeondong.trim() !== '') {
+          setShowRegionControls(false);
+        }
       } else {
         alert('위치를 찾을 수 없습니다. 다시 시도해주세요.');
       }
@@ -1051,12 +1091,11 @@ const MeetupPage = () => {
               // 시/군/구 선택 화면
               <RegionButtonGrid>
                 <RegionButton
-                  onClick={() => {
-                    setSelectedSido('');
+                  onClick={async () => {
+                    // 시도만 선택된 상태로 검색
                     setSelectedSigungu('');
                     setSelectedEupmyeondong('');
-                    setAvailableSigungus([]);
-                    setAvailableEupmyeondongs([]);
+                    await handleRegionSelect(selectedSido, '', '');
                   }}
                 >
                   ← 뒤로
@@ -1079,26 +1118,32 @@ const MeetupPage = () => {
               // 읍/면/동 선택 화면
               <RegionButtonGrid>
                 <RegionButton
-                  onClick={() => {
-                    setSelectedSigungu('');
+                  onClick={async () => {
+                    // 시군구만 선택된 상태로 검색
                     setSelectedEupmyeondong('');
-                    setAvailableEupmyeondongs([]);
+                    await handleRegionSelect(selectedSido, selectedSigungu, '');
                   }}
                 >
                   ← 뒤로
                 </RegionButton>
-                {availableEupmyeondongs.map((eupmyeondong) => (
-                  <RegionButton
-                    key={eupmyeondong}
-                    onClick={async () => {
-                      setSelectedEupmyeondong(eupmyeondong);
-                      await handleRegionSelect(selectedSido, selectedSigungu, eupmyeondong);
-                    }}
-                    active={selectedEupmyeondong === eupmyeondong}
-                  >
-                    {eupmyeondong}
-                  </RegionButton>
-                ))}
+                {availableEupmyeondongs.length > 0 ? (
+                  availableEupmyeondongs.map((eupmyeondong) => (
+                    <RegionButton
+                      key={eupmyeondong}
+                      onClick={async () => {
+                        setSelectedEupmyeondong(eupmyeondong);
+                        await handleRegionSelect(selectedSido, selectedSigungu, eupmyeondong);
+                      }}
+                      active={selectedEupmyeondong === eupmyeondong}
+                    >
+                      {eupmyeondong}
+                    </RegionButton>
+                  ))
+                ) : (
+                  <div style={{ gridColumn: '1 / -1', padding: '1rem', textAlign: 'center', color: '#666' }}>
+                    선택 가능한 동이 없습니다.
+                  </div>
+                )}
               </RegionButtonGrid>
             )}
           </RegionControls>
