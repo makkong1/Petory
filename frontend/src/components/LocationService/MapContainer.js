@@ -256,12 +256,6 @@ const MapContainer = React.forwardRef(
     useEffect(() => {
       if (!mapReadyRef.current || !mapInstanceRef.current || !window.naver?.maps) return;
 
-      console.log('마커 useEffect 실행:', {
-        servicesCount: services.length,
-        mapReady: mapReadyRef.current,
-        mapInstance: !!mapInstanceRef.current
-      });
-
       // 마커가 변경되지 않았으면 스킵
       const servicesKey = services.map(s => `${s.latitude},${s.longitude}`).join('|');
       if (servicesKey === lastServicesKeyRef.current && markersRef.current.length > 0) {
@@ -270,7 +264,6 @@ const MapContainer = React.forwardRef(
       }
       lastServicesKeyRef.current = servicesKey;
 
-      console.log('마커 생성 시작:', services.length, '개');
       clearMarkers();
 
       // 마커 개수 제한 (성능 최적화)
@@ -324,12 +317,30 @@ const MapContainer = React.forwardRef(
           // 다음 배치를 비동기로 처리
           requestAnimationFrame(createMarkerBatch);
         } else {
-          console.log('마커 생성 완료:', markersRef.current.length, '개');
+
+          // 마커가 하나만 있고 mapCenter가 설정되어 있으면, 마커 위치로 지도 중심 조정
+          if (markersRef.current.length === 1 && mapCenter && mapInstanceRef.current) {
+            const marker = markersRef.current[0];
+            const markerPosition = marker.getPosition();
+            const currentCenter = mapInstanceRef.current.getCenter();
+
+            // 마커 위치와 현재 중심이 다르면 마커 위치로 이동
+            if (currentCenter && (
+              Math.abs(currentCenter.lat() - markerPosition.lat()) > COORD_EPSILON ||
+              Math.abs(currentCenter.lng() - markerPosition.lng()) > COORD_EPSILON
+            )) {
+              setTimeout(() => {
+                if (mapInstanceRef.current && marker) {
+                  mapInstanceRef.current.setCenter(markerPosition);
+                }
+              }, 100);
+            }
+          }
         }
       };
 
       createMarkerBatch();
-    }, [services, onServiceClick, clearMarkers]);
+    }, [services, onServiceClick, clearMarkers, mapCenter]);
 
     // 지도 중심 및 줌 변경 (프로그래밍 방식으로만 실행)
     useEffect(() => {
@@ -377,7 +388,6 @@ const MapContainer = React.forwardRef(
       if (!isAlreadyAtCenter) {
         lastProgrammaticCenterRef.current = { ...mapCenter };
         map.setCenter(new window.naver.maps.LatLng(mapCenter.lat, mapCenter.lng));
-        console.log('지도 중심 이동 완료:', mapCenter);
       } else {
         lastProgrammaticCenterRef.current = { ...mapCenter };
         userZoomedRef.current = false; // 리셋

@@ -587,54 +587,43 @@ const LocationServiceMap = () => {
 
         {searchMode === 'keyword' ? (
           <SearchControls>
-            <SearchBar onSubmit={handleKeywordSubmit}>
-              <KeywordCategorySelect
-                value={selectedKeywordCategory}
-                onChange={(e) => {
-                  const categoryValue = e.target.value;
-                  setSelectedKeywordCategory(categoryValue);
-                  setKeyword(categoryValue);
-                  setCategoryType(CATEGORY_CUSTOM);
-                  if (categoryValue) {
-                    // 카테고리 선택 시 자동 검색
-                    if (allServices.length > 0) {
-                      filterServicesByRegion(allServices, selectedSido, selectedSigungu, selectedEupmyeondong, categoryValue);
+            <RegionButtonGrid>
+              {KEYWORD_CATEGORIES.map((cat) => (
+                <RegionButton
+                  key={cat.value}
+                  onClick={() => {
+                    const categoryValue = cat.value;
+                    setSelectedKeywordCategory(categoryValue);
+                    setKeyword(categoryValue);
+                    if (categoryValue) {
+                      // 카테고리 선택 시 자동 필터링
+                      setCategoryType(CATEGORY_CUSTOM);
+                      if (allServices.length > 0) {
+                        filterServicesByRegion(allServices, selectedSido, selectedSigungu, selectedEupmyeondong, categoryValue);
+                      } else {
+                        fetchServices({
+                          isInitialLoad: true,
+                          categoryOverride: categoryValue,
+                        });
+                      }
                     } else {
-                      fetchServices({
-                        isInitialLoad: true,
-                        categoryOverride: categoryValue,
-                      });
+                      // 전체 선택 시 필터링 해제
+                      setCategoryType(CATEGORY_DEFAULT);
+                      if (allServices.length > 0) {
+                        filterServicesByRegion(allServices, selectedSido, selectedSigungu, selectedEupmyeondong, undefined);
+                      } else {
+                        fetchServices({
+                          isInitialLoad: true,
+                        });
+                      }
                     }
-                  }
-                }}
-              >
-                {KEYWORD_CATEGORIES.map((cat) => (
-                  <option key={cat.value} value={cat.value}>
-                    {cat.label}
-                  </option>
-                ))}
-              </KeywordCategorySelect>
-              <SearchInput
-                value={keyword}
-                onChange={(e) => {
-                  setKeyword(e.target.value);
-                  setSelectedKeywordCategory('');
-                  setCategoryType(CATEGORY_CUSTOM);
-                }}
-                placeholder="직접 검색어 입력 (예: 반려동물카페, 동물병원 등)"
-              />
-              <SearchButton type="submit">검색</SearchButton>
-            </SearchBar>
-            <AddressBox>
-              <SearchInput
-                value={addressQuery}
-                onChange={(e) => setAddressQuery(e.target.value)}
-                placeholder="원하는 위치를 입력하세요 (예: 서울 강남구)"
-              />
-              <SearchButton type="button" onClick={handleAddressSearch}>
-                위치 이동
-              </SearchButton>
-            </AddressBox>
+                  }}
+                  active={selectedKeywordCategory === cat.value}
+                >
+                  {cat.label}
+                </RegionButton>
+              ))}
+            </RegionButtonGrid>
           </SearchControls>
         ) : (
           <RegionControls>
@@ -1224,7 +1213,10 @@ const Title = styled.h1`
 const SearchControls = styled.div`
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 0.75rem;
+  width: 100%;
+  padding: 0.5rem 0;
 `;
 
 const SearchBar = styled.form`
@@ -1400,10 +1392,16 @@ const KeywordCategorySelect = styled.select`
   border: 1px solid ${props => props.theme.colors.border};
   border-radius: 8px;
   font-size: 0.95rem;
-  min-width: 150px;
+  min-width: 200px;
+  max-width: 300px;
   background: ${props => props.theme.colors.surface};
   color: ${props => props.theme.colors.text};
   cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    border-color: ${props => props.theme.colors.primary};
+  }
 
   &:focus {
     outline: none;
