@@ -162,6 +162,7 @@ const LocationServiceMap = () => {
   const [selectedSido, setSelectedSido] = useState('');
   const [selectedSigungu, setSelectedSigungu] = useState('');
   const [selectedEupmyeondong, setSelectedEupmyeondong] = useState('');
+  const [currentView, setCurrentView] = useState('sido'); // 현재 화면: 'sido', 'sigungu', 'eupmyeondong'
   const [selectedService, setSelectedService] = useState(null);
   const [showDirections, setShowDirections] = useState(false);
   const [directionsData, setDirectionsData] = useState(null);
@@ -229,10 +230,18 @@ const LocationServiceMap = () => {
       setAvailableSigungus([]);
     }
 
-    // 읍면동 목록 설정
-    if (sigungu && !eupmyeondong) {
-      setAvailableEupmyeondongs(Array.from(eupmyeondongSet).sort());
+    // 읍면동 목록 설정 (시군구가 선택된 경우)
+    if (sigungu) {
+      if (eupmyeondongSet.size > 0) {
+        // 동 목록이 있으면 설정 (동이 선택된 경우에도 목록 유지)
+        setAvailableEupmyeondongs(Array.from(eupmyeondongSet).sort());
+      } else if (availableEupmyeondongs.length === 0) {
+        // 목록이 없고 기존 목록도 없으면 빈 배열로 설정
+        setAvailableEupmyeondongs([]);
+      }
+      // 동이 선택된 경우에도 목록은 유지 (다른 동을 선택할 수 있도록)
     } else {
+      // 시군구가 선택되지 않은 경우 목록 초기화
       setAvailableEupmyeondongs([]);
     }
 
@@ -413,8 +422,6 @@ const LocationServiceMap = () => {
     tryGeolocation();
   }, []);
 
-  // 지도 이벤트 핸들러 제거됨 (지도 미사용)
-
   const handleKeywordSubmit = useCallback(
     (event) => {
       event.preventDefault();
@@ -434,17 +441,36 @@ const LocationServiceMap = () => {
   );
 
   const handleRegionSearch = useCallback(async (sidoOverride = null, sigunguOverride = null, eupmyeondongOverride = null) => {
-    const targetSido = sidoOverride !== null ? sidoOverride : selectedSido;
-    const targetSigungu = sigunguOverride !== null ? sigunguOverride : selectedSigungu;
-    const targetEupmyeondong = eupmyeondongOverride !== null ? eupmyeondongOverride : selectedEupmyeondong;
+    // target 값 계산: null이면 빈 문자열, 아니면 해당 값 사용
+    const targetSido = sidoOverride !== null ? sidoOverride : '';
+    const targetSigungu = sigunguOverride !== null ? sigunguOverride : '';
+    const targetEupmyeondong = eupmyeondongOverride !== null ? eupmyeondongOverride : '';
 
-    // 상태 업데이트 (뒤로 버튼 클릭 시 상태 변경 반영)
-    if (sidoOverride !== null) setSelectedSido(sidoOverride);
-    if (sigunguOverride !== null) setSelectedSigungu(sigunguOverride);
-    if (eupmyeondongOverride !== null) setSelectedEupmyeondong(eupmyeondongOverride);
+    // 상태는 무조건 세팅해야 UI가 정상적으로 넘어감
+    setSelectedSido(targetSido);
+    setSelectedSigungu(targetSigungu);
+    setSelectedEupmyeondong(targetEupmyeondong);
+
+    // 화면 상태 업데이트
+    if (!targetSido) {
+      setCurrentView('sido');
+    } else if (!targetSigungu) {
+      setCurrentView('sigungu');
+    } else if (!targetEupmyeondong) {
+      setCurrentView('eupmyeondong');
+    } else {
+      setCurrentView('eupmyeondong');
+    }
 
     if (!targetSido) {
-      setStatusMessage('검색할 시/도를 선택해주세요.');
+      // 전국 선택 시 - 상태는 이미 위에서 설정됨
+      setMapCenter(DEFAULT_CENTER);
+      setMapLevel(10);
+      isProgrammaticMoveRef.current = true;
+      await fetchServices({
+        isInitialLoad: true,
+        categoryOverride: categoryType,
+      });
       return;
     }
 
@@ -750,22 +776,13 @@ const LocationServiceMap = () => {
           </SearchControls>
         ) : (
           <RegionControls>
-            {!selectedSido ? (
+            {currentView === 'sido' ? (
               // 시/도 선택 화면
               <RegionButtonGrid>
                 <RegionButton
                   onClick={async () => {
-                    setSelectedSido('');
-                    setSelectedSigungu('');
-                    setSelectedEupmyeondong('');
-                    // 전국 검색 - 지도 중심을 기본 위치로
-                    setMapCenter(DEFAULT_CENTER);
-                    setMapLevel(10); // 전국 뷰
-                    isProgrammaticMoveRef.current = true;
-                    await fetchServices({
-                      isInitialLoad: true,
-                      categoryOverride: categoryType,
-                    });
+                    // 전국 검색
+                    await handleRegionSearch(null, null, null);
                   }}
                   active={!selectedSido && !selectedSigungu && !selectedEupmyeondong}
                 >
@@ -777,15 +794,10 @@ const LocationServiceMap = () => {
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      console.log('시/도 클릭:', sido);
-                      setSelectedSido(sido);
-                      setSelectedSigungu('');
-                      setSelectedEupmyeondong('');
                       // 시/도 검색
-                      handleRegionSearch(sido);
+                      handleRegionSearch(sido, null, null);
                     }}
                     onMouseEnter={() => {
-                      console.log('시/도 호버:', sido);
                       setHoveredSido(sido);
                     }}
                     onMouseLeave={() => {
@@ -797,15 +809,15 @@ const LocationServiceMap = () => {
                   </RegionButton>
                 ))}
               </RegionButtonGrid>
-            ) : !selectedSigungu ? (
+            ) : currentView === 'sigungu' ? (
               // 시/군/구 선택 화면
               <RegionButtonGrid>
                 <RegionButton
                   onClick={async () => {
-                    // 시도만 선택된 상태로 검색
+                    // 시도 선택 화면으로 돌아가기 (시군구와 동만 해제, 시도는 유지)
                     setSelectedSigungu('');
                     setSelectedEupmyeondong('');
-                    await handleRegionSearch(selectedSido, '', '');
+                    setCurrentView('sido');
                   }}
                 >
                   ← 뒤로
@@ -814,10 +826,8 @@ const LocationServiceMap = () => {
                   <RegionButton
                     key={sigungu}
                     onClick={async () => {
-                      setSelectedSigungu(sigungu);
-                      setSelectedEupmyeondong('');
                       // 시/군/구 검색
-                      await handleRegionSearch(selectedSido, sigungu);
+                      await handleRegionSearch(selectedSido, sigungu, null);
                     }}
                     active={selectedSigungu === sigungu}
                   >
@@ -826,13 +836,15 @@ const LocationServiceMap = () => {
                 ))}
               </RegionButtonGrid>
             ) : (
-              // 읍/면/동 선택 화면
+              // 읍/면/동 선택 화면 (시군구가 선택된 경우)
               <RegionButtonGrid>
                 <RegionButton
                   onClick={async () => {
-                    // 시군구만 선택된 상태로 검색
+                    // 시군구 선택 화면으로 돌아가기 (동 선택 해제)
+                    // handleRegionSearch를 호출하면 currentView가 다시 'eupmyeondong'로 설정되므로
+                    // 직접 상태만 업데이트
                     setSelectedEupmyeondong('');
-                    await handleRegionSearch(selectedSido, selectedSigungu, '');
+                    setCurrentView('sigungu');
                   }}
                 >
                   ← 뒤로
@@ -841,7 +853,6 @@ const LocationServiceMap = () => {
                   <RegionButton
                     key={eupmyeondong}
                     onClick={async () => {
-                      setSelectedEupmyeondong(eupmyeondong);
                       // 읍/면/동 검색
                       await handleRegionSearch(selectedSido, selectedSigungu, eupmyeondong);
                     }}

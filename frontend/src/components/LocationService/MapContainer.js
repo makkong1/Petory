@@ -259,7 +259,6 @@ const MapContainer = React.forwardRef(
       // 마커가 변경되지 않았으면 스킵
       const servicesKey = services.map(s => `${s.latitude},${s.longitude}`).join('|');
       if (servicesKey === lastServicesKeyRef.current && markersRef.current.length > 0) {
-        console.log('마커 변경 없음, 스킵');
         return;
       }
       lastServicesKeyRef.current = servicesKey;
