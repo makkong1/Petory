@@ -549,9 +549,9 @@ const MeetupPage = () => {
       '노원구', '도봉구', '동대문구', '동작구', '마포구', '서대문구', '서초구', '성동구',
       '성북구', '송파구', '양천구', '영등포구', '용산구', '은평구', '종로구', '중구', '중랑구',
     ],
-    '부산광역시': ['중구', '서구', '동구', '영도구', '부산진구', '동래구', '남구', '북구', '해운대구', '사하구'],
-    '대구광역시': ['중구', '동구', '서구', '남구', '북구', '수성구', '달서구'],
-    '인천광역시': ['중구', '동구', '미추홀구', '연수구', '남동구', '부평구', '계양구', '서구'],
+    '부산광역시': ['중구', '서구', '동구', '영도구', '부산진구', '동래구', '남구', '북구', '해운대구', '사하구', '금정구', '강서구', '연제구', '수영구', '사상구', '기장군'],
+    '대구광역시': ['중구', '동구', '서구', '남구', '북구', '수성구', '달서구', '달성군'],
+    '인천광역시': ['중구', '동구', '미추홀구', '연수구', '남동구', '부평구', '계양구', '서구', '강화군', '옹진군'],
     '광주광역시': ['동구', '서구', '남구', '북구', '광산구'],
     '대전광역시': ['동구', '중구', '서구', '유성구', '대덕구'],
     '울산광역시': ['중구', '남구', '동구', '북구', '울주군'],
@@ -559,14 +559,16 @@ const MeetupPage = () => {
     '경기도': [
       '수원시', '성남시', '고양시', '용인시', '부천시', '안산시', '안양시', '남양주시',
       '화성시', '평택시', '의정부시', '시흥시', '김포시', '광명시', '하남시', '이천시',
+      '오산시', '구리시', '안성시', '포천시', '의왕시', '양주시', '동두천시', '과천시',
+      '가평군', '양평군', '여주시', '연천군',
     ],
-    '강원특별자치도': ['춘천시', '원주시', '강릉시', '동해시', '속초시'],
-    '충청북도': ['청주시', '충주시', '제천시', '보은군', '옥천군'],
-    '충청남도': ['천안시', '공주시', '아산시', '서산시', '논산시'],
-    '전북특별자치도': ['전주시', '군산시', '익산시', '정읍시', '남원시'],
-    '전라남도': ['목포시', '여수시', '순천시', '나주시', '광양시'],
-    '경상북도': ['포항시', '경주시', '김천시', '안동시', '구미시'],
-    '경상남도': ['창원시', '진주시', '통영시', '사천시', '김해시'],
+    '강원특별자치도': ['춘천시', '원주시', '강릉시', '동해시', '속초시', '삼척시', '태백시', '정선군', '철원군', '화천군', '양구군', '인제군', '고성군', '양양군', '홍천군', '횡성군', '평창군', '영월군'],
+    '충청북도': ['청주시', '충주시', '제천시', '보은군', '옥천군', '영동군', '증평군', '진천군', '괴산군', '음성군', '단양군'],
+    '충청남도': ['천안시', '공주시', '아산시', '서산시', '논산시', '계룡시', '당진시', '금산군', '부여군', '서천군', '청양군', '홍성군', '예산군', '태안군'],
+    '전북특별자치도': ['전주시', '군산시', '익산시', '정읍시', '남원시', '김제시', '완주군', '진안군', '무주군', '장수군', '임실군', '순창군', '고창군', '부안군'],
+    '전라남도': ['목포시', '여수시', '순천시', '나주시', '광양시', '담양군', '곡성군', '구례군', '고흥군', '보성군', '화순군', '장흥군', '강진군', '해남군', '영암군', '무안군', '함평군', '영광군', '장성군', '완도군', '진도군', '신안군'],
+    '경상북도': ['포항시', '경주시', '김천시', '안동시', '구미시', '영주시', '영천시', '상주시', '문경시', '경산시', '군위군', '의성군', '청송군', '영양군', '영덕군', '청도군', '고령군', '성주군', '칠곡군', '예천군', '봉화군', '울진군', '울릉군'],
+    '경상남도': ['창원시', '진주시', '통영시', '사천시', '김해시', '밀양시', '거제시', '양산시', '의령군', '함안군', '창녕군', '고성군', '남해군', '하동군', '산청군', '함양군', '거창군', '합천군'],
     '제주특별자치도': ['제주시', '서귀포시'],
   };
 
@@ -620,46 +622,21 @@ const MeetupPage = () => {
     '제주특별자치도': ['제주시', '서귀포시'],
   };
 
-  // 지역 선택 핸들러 (LocationServiceMap 방식)
-  const handleRegionSelect = async (sidoOverride = null, sigunguOverride = null, eupmyeondongOverride = null) => {
-    // target 값 계산: null이면 빈 문자열, 아니면 해당 값 사용
-    const targetSido = sidoOverride !== null ? sidoOverride : '';
-    const targetSigungu = sigunguOverride !== null ? sigunguOverride : '';
-    const targetEupmyeondong = eupmyeondongOverride !== null ? eupmyeondongOverride : '';
-
-    // 상태는 무조건 세팅해야 UI가 정상적으로 넘어감
-    setSelectedSido(targetSido);
-    setSelectedSigungu(targetSigungu);
-    setSelectedEupmyeondong(targetEupmyeondong);
-
-    // 화면 상태 업데이트
-    if (!targetSido) {
-      setCurrentView('sido');
-    } else if (!targetSigungu) {
-      setCurrentView('sigungu');
-    } else if (!targetEupmyeondong) {
-      setCurrentView('eupmyeondong');
-    } else {
-      setCurrentView('eupmyeondong');
-    }
-
-    // 전국 선택 시 기본 위치로 - 상태는 이미 위에서 설정됨
+  // 지도 위치 업데이트 함수
+  const updateMapLocation = async (targetSido, targetSigungu, targetEupmyeondong) => {
+    // 전국 선택 시 기본 위치로
     if (!targetSido || targetSido === '' || targetSido === '전국') {
       setSelectedLocation(null);
       setMapCenter(DEFAULT_CENTER);
       setRadius(DEFAULT_RADIUS);
       setMapLevel(calculateMapLevelFromRadius(DEFAULT_RADIUS));
       isProgrammaticMoveRef.current = true;
-      setAvailableSigungus([]);
-      setAvailableEupmyeondongs([]);
-      setShowRegionControls(false); // 전국 선택 시 RegionControls 닫기
-      return;
+      return { center: DEFAULT_CENTER, radius: DEFAULT_RADIUS, mapLevel: calculateMapLevelFromRadius(DEFAULT_RADIUS) };
     }
 
     // 시도만 선택한 경우: 하드코딩된 중심 좌표 사용
     if (!targetSigungu && SIDO_CENTERS[targetSido]) {
       const center = SIDO_CENTERS[targetSido];
-
       const sidoZoomLevels = {
         '서울특별시': 11,
         '부산광역시': 10,
@@ -679,14 +656,8 @@ const MeetupPage = () => {
         '경상남도': 13,
         '제주특별자치도': 13,
       };
-
       const selectedRadius = 50;
       const selectedMapLevel = sidoZoomLevels[targetSido] || 4;
-
-      // 상태는 이미 함수 시작 부분에서 업데이트되었으므로 중복 업데이트 제거
-      // setSelectedSido(targetSido);
-      // setSelectedSigungu('');
-      // setSelectedEupmyeondong('');
       setMapCenter({ lat: center.lat, lng: center.lng });
       setRadius(selectedRadius);
       setMapLevel(selectedMapLevel);
@@ -695,16 +666,8 @@ const MeetupPage = () => {
         sigungu: '',
         eupmyeondong: '',
       });
-
-      // 시군구 목록 설정
-      setAvailableSigungus(SIGUNGUS[targetSido] || []);
-      setAvailableEupmyeondongs([]);
-
       isProgrammaticMoveRef.current = true;
-      // 시군구 선택 화면으로 넘어가므로 RegionControls는 계속 표시
-      // 지역 선택 시 모임 목록 새로 조회 (필터링할 지역을 명시적으로 전달)
-      fetchMeetups(targetSido, null, null);
-      return;
+      return { center: { lat: center.lat, lng: center.lng }, radius: selectedRadius, mapLevel: selectedMapLevel };
     }
 
     // 시군구 또는 동 선택한 경우: geocoding API 사용
@@ -718,11 +681,9 @@ const MeetupPage = () => {
 
     try {
       const coordData = await geocodingApi.addressToCoordinates(address);
-
       if (coordData && coordData.success !== false && coordData.latitude && coordData.longitude) {
         let selectedRadius = 20;
         let selectedMapLevel;
-
         if (targetEupmyeondong && targetEupmyeondong !== '전체' && targetEupmyeondong.trim() !== '') {
           selectedRadius = 3;
           selectedMapLevel = calculateMapLevelFromRadius(selectedRadius);
@@ -730,11 +691,6 @@ const MeetupPage = () => {
           selectedRadius = 20;
           selectedMapLevel = calculateMapLevelFromRadius(selectedRadius);
         }
-
-        // 상태는 이미 함수 시작 부분에서 업데이트되었으므로 중복 업데이트 제거
-        // setSelectedSido(targetSido);
-        // setSelectedSigungu(targetSigungu || '');
-        // setSelectedEupmyeondong(targetEupmyeondong || '');
         setMapCenter({ lat: coordData.latitude, lng: coordData.longitude });
         setRadius(selectedRadius);
         setMapLevel(selectedMapLevel);
@@ -743,37 +699,74 @@ const MeetupPage = () => {
           sigungu: targetSigungu || '',
           eupmyeondong: (targetEupmyeondong && targetEupmyeondong !== '전체' && targetEupmyeondong.trim() !== '') ? targetEupmyeondong : '',
         });
-
-        // 읍면동 목록 설정 (시군구가 선택된 경우)
-        if (targetSigungu) {
-          // fetchMeetups에서 자동으로 설정되지만, EUPMYEONDONGS 상수도 확인
-          if (EUPMYEONDONGS[targetSido] && EUPMYEONDONGS[targetSido][targetSigungu]) {
-            setAvailableEupmyeondongs(EUPMYEONDONGS[targetSido][targetSigungu]);
-          } else if (availableEupmyeondongs.length === 0) {
-            // EUPMYEONDONGS에 없고 기존 목록도 없으면 빈 배열로 설정 (fetchMeetups에서 추출될 수 있음)
-            setAvailableEupmyeondongs([]);
-          }
-          // 동이 선택된 경우에도 목록은 유지 (다른 동을 선택할 수 있도록)
-        } else if (!targetSigungu) {
-          // 시도만 선택된 경우 읍면동 목록 초기화
-          setAvailableEupmyeondongs([]);
-        }
-
         isProgrammaticMoveRef.current = true;
-        // 동까지 선택했을 때만 RegionControls 닫기 (시군구만 선택했을 때는 계속 열어둠)
-        if (targetEupmyeondong && targetEupmyeondong !== '전체' && targetEupmyeondong.trim() !== '') {
-          setShowRegionControls(false);
-        }
-
-        // 지역 선택 시 모임 목록 새로 조회 (mapCenter 업데이트 후, 필터링할 지역을 명시적으로 전달)
-        fetchMeetups(targetSido, targetSigungu || null, (targetEupmyeondong && targetEupmyeondong !== '전체' && targetEupmyeondong.trim() !== '') ? targetEupmyeondong : null);
+        return { center: { lat: coordData.latitude, lng: coordData.longitude }, radius: selectedRadius, mapLevel: selectedMapLevel };
       } else {
         alert('위치를 찾을 수 없습니다. 다시 시도해주세요.');
+        return null;
       }
     } catch (error) {
       console.error('위치 좌표 변환 실패:', error);
       alert('위치를 찾을 수 없습니다. 다시 시도해주세요.');
+      return null;
     }
+  };
+
+  // 지역 선택 핸들러 (LocationServiceMap 방식)
+  const handleRegionSelect = async (sidoOverride = null, sigunguOverride = null, eupmyeondongOverride = null, viewOverride = null) => {
+    // target 값 계산: null이면 빈 문자열, 아니면 해당 값 사용
+    const targetSido = sidoOverride !== null ? sidoOverride : '';
+    const targetSigungu = sigunguOverride !== null ? sigunguOverride : '';
+    const targetEupmyeondong = eupmyeondongOverride !== null ? eupmyeondongOverride : '';
+
+    // 상태는 무조건 세팅해야 UI가 정상적으로 넘어감
+    setSelectedSido(targetSido);
+    setSelectedSigungu(targetSigungu);
+    setSelectedEupmyeondong(targetEupmyeondong);
+
+    // 화면 상태 업데이트 (viewOverride가 있으면 그것을 사용, 없으면 자동 계산)
+    // 동 선택 화면 제거: 시도 또는 시군구 선택 화면만 사용
+    if (viewOverride) {
+      setCurrentView(viewOverride);
+    } else {
+      if (!targetSido) {
+        setCurrentView('sido');
+      } else {
+        setCurrentView('sigungu');
+      }
+    }
+
+    // 전국 선택 시 기본 위치로
+    if (!targetSido || targetSido === '' || targetSido === '전국') {
+      await updateMapLocation('', '', '');
+      setAvailableSigungus([]);
+      setAvailableEupmyeondongs([]);
+      setShowRegionControls(false); // 전국 선택 시 RegionControls 닫기
+      return;
+    }
+
+    // 지도 위치 업데이트
+    const mapResult = await updateMapLocation(targetSido, targetSigungu, targetEupmyeondong);
+    if (!mapResult) {
+      return; // 위치 업데이트 실패
+    }
+
+    // 시도만 선택한 경우
+    if (!targetSigungu) {
+      // 시군구 목록 설정
+      setAvailableSigungus(SIGUNGUS[targetSido] || []);
+      setAvailableEupmyeondongs([]);
+      // 지역 선택 시 모임 목록 새로 조회
+      fetchMeetups(targetSido, null, null);
+      return;
+    }
+
+    // 시군구 선택한 경우
+    // 시군구 선택 시 RegionControls 닫기
+    setShowRegionControls(false);
+
+    // 지역 선택 시 모임 목록 새로 조회 (mapCenter 업데이트 후, 필터링할 지역을 명시적으로 전달)
+    fetchMeetups(targetSido, targetSigungu || null, null);
   };
 
 
@@ -1069,7 +1062,7 @@ const MeetupPage = () => {
                 ? `${selectedLocation.sido} ${selectedLocation.sigungu} ${selectedLocation.eupmyeondong}`
                 : selectedLocation.sigungu
                   ? `${selectedLocation.sido} ${selectedLocation.sigungu}`
-                  : selectedLocation.sido || '전국'}
+                  : selectedLocation.sido || '내위치'}
             </SelectedLocationInfo>
           )}
           <RadiusControls>
@@ -1109,14 +1102,6 @@ const MeetupPage = () => {
             {currentView === 'sido' ? (
               // 시/도 선택 화면
               <RegionButtonGrid>
-                <RegionButton
-                  onClick={async () => {
-                    await handleRegionSelect(null, null, null);
-                  }}
-                  active={!selectedSido && !selectedSigungu && !selectedEupmyeondong}
-                >
-                  전국
-                </RegionButton>
                 {SIDOS.map((sido) => (
                   <RegionButton
                     key={sido}
@@ -1129,15 +1114,13 @@ const MeetupPage = () => {
                   </RegionButton>
                 ))}
               </RegionButtonGrid>
-            ) : currentView === 'sigungu' ? (
+            ) : (
               // 시/군/구 선택 화면
               <RegionButtonGrid>
                 <RegionButton
                   onClick={async () => {
-                    // 시도 선택 화면으로 돌아가기 (시군구와 동만 해제, 시도는 유지)
-                    setSelectedSigungu('');
-                    setSelectedEupmyeondong('');
-                    setCurrentView('sido');
+                    // 시도 선택 화면으로 돌아가기
+                    await handleRegionSelect(selectedSido, null, null, 'sido');
                   }}
                 >
                   ← 뒤로
@@ -1153,38 +1136,6 @@ const MeetupPage = () => {
                     {sigungu}
                   </RegionButton>
                 ))}
-              </RegionButtonGrid>
-            ) : (
-              // 읍/면/동 선택 화면 (시군구가 선택된 경우)
-              <RegionButtonGrid>
-                <RegionButton
-                  onClick={async () => {
-                    // 시군구 선택 화면으로 돌아가기 (동 선택 해제)
-                    // handleRegionSelect를 호출하면 currentView가 다시 'eupmyeondong'로 설정되므로
-                    // 직접 상태만 업데이트
-                    setSelectedEupmyeondong('');
-                    setCurrentView('sigungu');
-                  }}
-                >
-                  ← 뒤로
-                </RegionButton>
-                {availableEupmyeondongs.length > 0 ? (
-                  availableEupmyeondongs.map((eupmyeondong) => (
-                    <RegionButton
-                      key={eupmyeondong}
-                      onClick={async () => {
-                        await handleRegionSelect(selectedSido, selectedSigungu, eupmyeondong);
-                      }}
-                      active={selectedEupmyeondong === eupmyeondong}
-                    >
-                      {eupmyeondong}
-                    </RegionButton>
-                  ))
-                ) : (
-                  <div style={{ gridColumn: '1 / -1', padding: '1rem', textAlign: 'center', color: '#666' }}>
-                    선택 가능한 동이 없습니다.
-                  </div>
-                )}
               </RegionButtonGrid>
             )}
           </RegionControls>
