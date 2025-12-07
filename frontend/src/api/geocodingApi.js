@@ -38,6 +38,12 @@ export const geocodingApi = {
     return response.data; // response.data에 실제 데이터가 있음
   },
   
+  // 위도/경도를 주소로 변환 (역지오코딩)
+  coordinatesToAddress: async (lat, lng) => {
+    const response = await api.get('/geocoding/coordinates', { params: { lat, lng } });
+    return response.data;
+  },
+  
   // 네이버맵 길찾기 (Directions API)
   getDirections: async (startLat, startLng, endLat, endLng, option = 'traoptimal') => {
     const response = await api.get('/geocoding/directions', {

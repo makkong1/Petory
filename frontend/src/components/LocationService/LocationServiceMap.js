@@ -1,21 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import styled from 'styled-components';
-import MapContainer from './MapContainer';
 import { locationServiceApi } from '../../api/locationServiceApi';
 import { geocodingApi } from '../../api/geocodingApi';
-import {
-  loadSidoGeoJSON,
-  loadSigunguGeoJSON,
-  loadDongGeoJSON,
-  getSidoCode,
-  getSigunguCodeByName,
-  getBoundingBox,
-  calculateZoomFromBoundingBox
-} from '../../utils/geojsonUtils';
 
-const DEFAULT_CENTER = { lat: 36.5, lng: 127.5 }; // 대한민국 중심 좌표
-const DEFAULT_RADIUS = 3000;
-const MAP_DEFAULT_LEVEL = 14; // 전국 뷰: 레벨 14 (줌 8) - 전국이 완전히 보이는 레벨
+// 지도 관련 상수 제거됨 (지도 미사용)
 
 const CATEGORY_DEFAULT = 'all';
 const CATEGORY_CUSTOM = 'custom';
@@ -106,42 +94,7 @@ const SIGUNGUS = {
   '제주특별자치도': ['제주시', '서귀포시'],
 };
 
-const levelToRadius = (level) => {
-  const mapping = {
-    1: 200,
-    2: 400,
-    3: 800,
-    4: 1500,
-    5: 3000,
-    6: 6000,
-    7: 10000,
-  };
-  return mapping[level] || DEFAULT_RADIUS;
-};
-
-const levelToSize = (level) => {
-  // 지도 레벨에 따라 가져올 데이터 개수 결정
-  // 레벨이 낮을수록(축소, 넓은 화면) 더 많은 데이터
-  // 레벨이 높을수록(확대, 좁은 화면) 적은 데이터
-  const mapping = {
-    1: 30,   // 매우 확대: 30개
-    2: 40,   // 확대: 40개
-    3: 50,   // 기본 확대: 50개
-    4: 75,   // 기본: 75개
-    5: 100,  // 약간 축소: 100개
-    6: 125,  // 축소: 125개
-    7: 150,  // 많이 축소: 150개
-  };
-  return mapping[level] || 50; // 기본값 50개
-};
-
-// 지도 레벨에 따라 표시할 지역 단위 결정
-const getRegionLevel = (mapLevel) => {
-  if (mapLevel >= 7) return 'sido';        // 전국 범위: 시도
-  if (mapLevel >= 5) return 'sigungu';    // 시도 범위: 시군구
-  if (mapLevel >= 3) return 'eupmyeondong'; // 시군구 범위: 읍면동
-  return 'roadName';                      // 읍면동 범위: 도로명
-};
+// 지도 레벨 관련 함수들 제거됨 (지도 미사용)
 
 const calculateDistance = (lat1, lng1, lat2, lng2) => {
   if (
@@ -201,27 +154,10 @@ const LocationServiceMap = () => {
   const [availableEupmyeondongs, setAvailableEupmyeondongs] = useState([]); // 선택된 시군구의 읍면동 목록
   const [userLocation, setUserLocation] = useState(null);
   const [userLocationAddress, setUserLocationAddress] = useState(null);
-  const [mapCenter, setMapCenter] = useState(DEFAULT_CENTER);
-  const [mapLevel, setMapLevel] = useState(MAP_DEFAULT_LEVEL);
-  const [mapBounds, setMapBounds] = useState(null); // 지도 bounds (하이브리드용)
   const isSearchModeRef = useRef(false); // 검색 모드 여부 (카테고리/키워드 검색)
-  const programmaticCenterRef = useRef(null);
   const latestRequestRef = useRef(0);
-  const lastFetchedRef = useRef({ lat: null, lng: null, level: null });
-  const mapStateRef = useRef({
-    center: DEFAULT_CENTER,
-    level: MAP_DEFAULT_LEVEL,
-  });
   const fetchServicesRef = useRef(null);
-  const suppressNextFetchRef = useRef(false);
   const isInitialLoadRef = useRef(true); // 초기 로드 여부
-
-  useEffect(() => {
-    mapStateRef.current = {
-      center: mapCenter,
-      level: mapLevel,
-    };
-  }, [mapCenter, mapLevel]);
 
   // 클라이언트에서 지역별 필터링 (시도, 시군구, 읍면동) - 최적화: 한 번의 순회로 처리
   const filterServicesByRegion = useCallback((allServicesData, sido, sigungu, eupmyeondong, category) => {
@@ -282,69 +218,30 @@ const LocationServiceMap = () => {
     setStatusMessage(filtered.length === 0 ? '해당 지역에 표시할 장소가 없습니다.' : `총 ${filtered.length}개의 장소가 있습니다.`);
   }, []);
 
-  // 클라이언트에서 지도 bounds 기반 필터링 (하이브리드용)
-  const filterServicesByBounds = useCallback((bounds, allServicesData) => {
-    if (!bounds || !allServicesData || allServicesData.length === 0) {
-      return [];
-    }
-
-    const { sw, ne } = bounds; // southwest, northeast
-    return allServicesData.filter((service) => {
-      if (typeof service.latitude !== 'number' || typeof service.longitude !== 'number') {
-        return false;
-      }
-      return (
-        service.latitude >= sw.lat &&
-        service.latitude <= ne.lat &&
-        service.longitude >= sw.lng &&
-        service.longitude <= ne.lng
-      );
-    });
-  }, []);
+  // 지도 bounds 기반 필터링 제거됨 (지도 미사용)
 
   const fetchServices = useCallback(
     async ({
-      latitude,
-      longitude,
       region,
       keywordOverride,
-      level,
       categoryOverride,
-      append = false, // 기존 서비스에 추가할지 여부
-      isInitialLoad = false, // 초기 로드 여부 (하이브리드용)
+      isInitialLoad = false, // 초기 로드 여부
     }) => {
       const requestId = Date.now();
       latestRequestRef.current = requestId;
 
       setLoading(true);
-      setStatusMessage('지도 데이터 불러오는 중...');
+      setStatusMessage('데이터 불러오는 중...');
       setError(null);
 
-      const { center, level: currentLevel } = mapStateRef.current;
-      // 지역 검색 시에는 위도/경도를 전달하지 않음 (명시적으로 null 체크)
-      const isRegionOnlySearch = region && latitude === undefined && longitude === undefined;
-      const effectiveLatitude = isRegionOnlySearch ? undefined : (typeof latitude === 'number' ? latitude : center.lat);
-      const effectiveLongitude = isRegionOnlySearch ? undefined : (typeof longitude === 'number' ? longitude : center.lng);
-      const effectiveLevel = typeof level === 'number' ? level : currentLevel;
-      const effectiveRadius = levelToRadius(effectiveLevel);
-      const effectiveSize = levelToSize(effectiveLevel);
       const effectiveCategoryType = categoryOverride ?? categoryType;
-      const apiCategoryType =
-        effectiveCategoryType &&
-          effectiveCategoryType !== CATEGORY_DEFAULT &&
-          effectiveCategoryType !== CATEGORY_CUSTOM
-          ? effectiveCategoryType
-          : undefined;
+      const apiCategory = effectiveCategoryType &&
+        effectiveCategoryType !== CATEGORY_DEFAULT &&
+        effectiveCategoryType !== CATEGORY_CUSTOM
+        ? effectiveCategoryType
+        : undefined;
 
       try {
-        // 지도 레벨에 따라 지역 단위 결정
-        const regionLevel = getRegionLevel(effectiveLevel);
-        const effectiveCategoryType = categoryOverride ?? categoryType;
-        const apiCategory = effectiveCategoryType &&
-          effectiveCategoryType !== CATEGORY_DEFAULT &&
-          effectiveCategoryType !== CATEGORY_CUSTOM
-          ? effectiveCategoryType
-          : undefined;
 
         // 지역 계층별 검색만 수행 (내 위치는 거리 계산용으로만 사용)
         const regionParams = {};
@@ -394,7 +291,7 @@ const LocationServiceMap = () => {
             sigungu: apiSigungu,
             eupmyeondong: apiEupmyeondong,
             category: apiCategory,
-            size: effectiveSize,
+            size: 500, // 기본값
           });
 
           if (latestRequestRef.current !== requestId) {
@@ -440,14 +337,9 @@ const LocationServiceMap = () => {
         if (latestRequestRef.current === requestId) {
           setLoading(false);
         }
-        lastFetchedRef.current = {
-          lat: effectiveLatitude,
-          lng: effectiveLongitude,
-          level: effectiveLevel,
-        };
       }
     },
-    [keyword, categoryType, mapBounds, filterServicesByBounds, userLocation, selectedSido, selectedSigungu, selectedEupmyeondong, filterServicesByRegion, allServices]
+    [categoryType, selectedSido, selectedSigungu, selectedEupmyeondong, filterServicesByRegion, allServices]
   );
 
   useEffect(() => {
@@ -455,9 +347,7 @@ const LocationServiceMap = () => {
   }, [fetchServices]);
 
   useEffect(() => {
-    // 초기 로드: 전국 데이터 가져오기 (내 위치와 관계없이)
-    setMapCenter(DEFAULT_CENTER);
-    setMapLevel(MAP_DEFAULT_LEVEL); // 전국이 보이도록 레벨 1로 설정
+    // 초기 로드: 전국 데이터 가져오기
     fetchServicesRef.current?.({
       isInitialLoad: true, // 초기 로드 - 전국 데이터
     });
@@ -497,153 +387,24 @@ const LocationServiceMap = () => {
     tryGeolocation();
   }, []);
 
-  const handleMapDragStart = useCallback(() => {
-    setStatusMessage('지도 조정 중...');
-  }, []);
-
-  const handleMapIdle = useCallback(
-    ({ lat, lng, level, bounds, isManualOperation = false }) => {
-      const nextCenter = { lat, lng };
-      const prevLevel = mapLevel;
-      const levelChanged = prevLevel !== level;
-
-      // 초기 로드가 완료되기 전에는 mapCenter를 변경하지 않음 (DEFAULT_CENTER 유지)
-      // 프로그래밍 방식으로 이동 중일 때는 mapCenter를 업데이트하지 않음 (무한 루프 방지)
-      if (!isInitialLoadRef.current && !isManualOperation) {
-        // 프로그래밍 이동 중이 아니고, 실제로 중심이 변경되었을 때만 업데이트
-        const plannedCenter = programmaticCenterRef.current;
-        const COORD_EPSILON = 0.0001; // 좌표 비교 오차 범위
-
-        // 프로그래밍 이동이 진행 중이 아니거나, 목표 위치와 다를 때만 업데이트
-        if (!plannedCenter ||
-          Math.abs(plannedCenter.lat - lat) > COORD_EPSILON ||
-          Math.abs(plannedCenter.lng - lng) > COORD_EPSILON) {
-          // 실제로 중심이 변경되었을 때만 업데이트
-          if (
-            !mapCenter ||
-            Math.abs(mapCenter.lat - lat) > 0.00001 ||
-            Math.abs(mapCenter.lng - lng) > 0.00001
-          ) {
-            setMapCenter(nextCenter);
-          }
-        }
-      }
-
-      // 수동 조작이 아닐 때만 mapLevel 업데이트 (프로그래밍 방식으로 이동한 경우)
-      // 수동 조작 시에는 mapLevel을 업데이트하지 않아서 useEffect가 다시 실행되지 않음
-      if (levelChanged && !isManualOperation) {
-        setMapLevel(level);
-      }
-
-      // bounds 업데이트 (하이브리드용)
-      if (bounds) {
-        setMapBounds(bounds);
-      }
-
-      const plannedCenter = programmaticCenterRef.current;
-      const centersAreClose = (a, b) =>
-        a &&
-        b &&
-        Math.abs(a.lat - b.lat) < 0.00001 &&
-        Math.abs(a.lng - b.lng) < 0.00001;
-
-      // 프로그래밍 방식으로 이동한 경우, 지도가 목표 위치에 도달했으면 서버 요청 수행
-      if (centersAreClose(plannedCenter, nextCenter)) {
-        programmaticCenterRef.current = null;
-        // 지도 이동이 완료되었으므로 서버에서 데이터 가져오기
-        lastFetchedRef.current = { lat, lng, level };
-        fetchServices({
-          latitude: lat,
-          longitude: lng,
-          level,
-        });
-        return;
-      }
-
-      if (suppressNextFetchRef.current) {
-        suppressNextFetchRef.current = false;
-        programmaticCenterRef.current = null;
-        return;
-      }
-
-      // 하이브리드: allServices가 있고 키워드/지역 검색이 아닌 경우 클라이언트 필터링만 수행
-      // 단, 지도가 너무 멀리 이동했으면 추가 요청 필요
-      // 카테고리/키워드 검색 결과는 bounds 필터링을 하지 않음 (전체 표시)
-      if (allServices.length > 0 && bounds && !isSearchModeRef.current) {
-        const prevFetch = lastFetchedRef.current;
-        let shouldFetchFromServer = false;
-
-        // 이전 위치와의 거리 확인
-        if (prevFetch.lat != null && prevFetch.lng != null) {
-          const movedDistance = calculateDistance(prevFetch.lat, prevFetch.lng, lat, lng);
-          // 20km 이상 이동했으면 서버에서 추가 데이터 가져오기
-          if (movedDistance != null && movedDistance > 20000) {
-            shouldFetchFromServer = true;
-          }
-        }
-
-        if (!shouldFetchFromServer) {
-          // 클라이언트 필터링만 수행 (bounds에 맞는 서비스만 표시)
-          // 초기 로드 직후에는 allServices가 많을 수 있으므로 bounds로 필터링
-          const filtered = filterServicesByBounds(bounds, allServices);
-          setServices(filtered);
-          // 상태 메시지 업데이트
-          if (filtered.length === 0) {
-            setStatusMessage('현재 지도 영역에 표시할 장소가 없습니다.');
-          } else {
-            setStatusMessage('');
-          }
-          lastFetchedRef.current = { lat, lng, level };
-          programmaticCenterRef.current = null;
-          return;
-        }
-      }
-
-      // allServices가 없거나 범위를 벗어나면 서버 요청
-      const prevFetch = lastFetchedRef.current;
-      if (prevFetch.lat != null && prevFetch.lng != null) {
-        const movedDistance = calculateDistance(prevFetch.lat, prevFetch.lng, lat, lng);
-        // 레벨이 변경되지 않고 이동 거리가 작으면 스킵
-        if (movedDistance != null && movedDistance < 50 && !levelChanged) {
-          programmaticCenterRef.current = null;
-          return;
-        }
-      }
-
-      lastFetchedRef.current = { lat, lng, level };
-      programmaticCenterRef.current = null;
-
-      // 서버에서 데이터 가져오기
-      fetchServices({
-        latitude: lat,
-        longitude: lng,
-        level,
-      });
-    },
-    [fetchServices, mapCenter, mapLevel, allServices, filterServicesByBounds]
-  );
+  // 지도 이벤트 핸들러 제거됨 (지도 미사용)
 
   const handleKeywordSubmit = useCallback(
     (event) => {
       event.preventDefault();
-      if (mapCenter) {
-        programmaticCenterRef.current = { ...mapCenter };
-        lastFetchedRef.current = {
-          lat: mapCenter.lat,
-          lng: mapCenter.lng,
-          level: mapLevel,
-        };
-      }
       setCategoryType(CATEGORY_CUSTOM);
-      fetchServices({
-        latitude: mapCenter.lat,
-        longitude: mapCenter.lng,
-        keywordOverride: keyword,
-        level: mapLevel,
-        categoryOverride: CATEGORY_CUSTOM,
-      });
+      // 키워드 검색은 전체 데이터에서 필터링 (지도 없이)
+      if (allServices.length > 0) {
+        filterServicesByRegion(allServices, selectedSido, selectedSigungu, selectedEupmyeondong, keyword);
+      } else {
+        // allServices가 없으면 초기 로드
+        fetchServices({
+          isInitialLoad: true,
+          categoryOverride: CATEGORY_CUSTOM,
+        });
+      }
     },
-    [fetchServices, keyword, mapCenter, mapLevel]
+    [fetchServices, keyword, selectedSido, selectedSigungu, selectedEupmyeondong, allServices, filterServicesByRegion]
   );
 
   const handleRegionSearch = useCallback(async (sidoOverride = null, sigunguOverride = null, eupmyeondongOverride = null) => {
@@ -675,12 +436,8 @@ const LocationServiceMap = () => {
           ? `${targetSido} ${targetSigungu}`
           : targetSido;
 
-      // API 호출만 수행 (지도 관련 로직 제거)
+      // API 호출만 수행
       await fetchServices({
-        latitude: undefined,
-        longitude: undefined,
-        keywordOverride: keyword,
-        level: undefined,
         region: regionParam,
         categoryOverride: categoryType,
       });
@@ -721,10 +478,6 @@ const LocationServiceMap = () => {
       } else {
         // 시도가 없으면 일반 지역 검색으로 처리
         await fetchServices({
-          latitude: undefined,
-          longitude: undefined,
-          keywordOverride: keyword,
-          level: undefined,
           region: address,
           categoryOverride: categoryType,
         });
@@ -772,34 +525,16 @@ const LocationServiceMap = () => {
 
   const handleServiceSelect = useCallback((service) => {
     setSelectedService(service);
-
-    if (service?.latitude && service?.longitude) {
-      suppressNextFetchRef.current = true;
-      const center = { lat: service.latitude, lng: service.longitude };
-      programmaticCenterRef.current = center;
-      setMapCenter(center);
-    }
+    // 지도 관련 코드 제거됨
   }, []);
 
   const handleRecenterToUser = useCallback(() => {
     if (!userLocation) {
       return;
     }
-
-    const center = { ...userLocation };
-    programmaticCenterRef.current = center;
-    setMapCenter(center);
-    lastFetchedRef.current = {
-      lat: center.lat,
-      lng: center.lng,
-      level: mapLevel,
-    };
-    fetchServices({
-      latitude: center.lat,
-      longitude: center.lng,
-      level: mapLevel,
-    });
-  }, [fetchServices, mapLevel, userLocation]);
+    // 지도 관련 코드 제거됨 (내 위치는 거리 계산용으로만 사용)
+    setStatusMessage('내 위치는 거리 계산에만 사용됩니다.');
+  }, [userLocation]);
 
   return (
     <Container>
@@ -838,14 +573,8 @@ const LocationServiceMap = () => {
                   setSelectedSigungu('');
                   setSelectedEupmyeondong('');
                   setCurrentMapView('nation');
-                  setMapCenter(DEFAULT_CENTER);
-                  setMapLevel(MAP_DEFAULT_LEVEL);
                   await fetchServices({
-                    latitude: undefined,
-                    longitude: undefined,
-                    keywordOverride: keyword,
-                    level: MAP_DEFAULT_LEVEL,
-                    region: undefined,
+                    isInitialLoad: true,
                     categoryOverride: categoryType,
                   });
                 }}
@@ -868,21 +597,14 @@ const LocationServiceMap = () => {
                   setCategoryType(CATEGORY_CUSTOM);
                   if (categoryValue) {
                     // 카테고리 선택 시 자동 검색
-                    if (mapCenter) {
-                      programmaticCenterRef.current = { ...mapCenter };
-                      lastFetchedRef.current = {
-                        lat: mapCenter.lat,
-                        lng: mapCenter.lng,
-                        level: mapLevel,
-                      };
+                    if (allServices.length > 0) {
+                      filterServicesByRegion(allServices, selectedSido, selectedSigungu, selectedEupmyeondong, categoryValue);
+                    } else {
+                      fetchServices({
+                        isInitialLoad: true,
+                        categoryOverride: categoryValue,
+                      });
                     }
-                    fetchServices({
-                      latitude: mapCenter?.lat,
-                      longitude: mapCenter?.lng,
-                      keywordOverride: categoryValue,
-                      level: mapLevel,
-                      categoryOverride: CATEGORY_CUSTOM,
-                    });
                   }
                 }}
               >
@@ -924,15 +646,9 @@ const LocationServiceMap = () => {
                     setSelectedSido('');
                     setSelectedSigungu('');
                     setSelectedEupmyeondong('');
-                    setMapCenter(DEFAULT_CENTER);
-                    setMapLevel(MAP_DEFAULT_LEVEL);
                     // 전국 검색
                     await fetchServices({
-                      latitude: undefined,
-                      longitude: undefined,
-                      keywordOverride: keyword,
-                      level: MAP_DEFAULT_LEVEL,
-                      region: undefined,
+                      isInitialLoad: true,
                       categoryOverride: categoryType,
                     });
                   }}
@@ -974,8 +690,6 @@ const LocationServiceMap = () => {
                     setSelectedSido('');
                     setSelectedSigungu('');
                     setSelectedEupmyeondong('');
-                    setMapCenter(DEFAULT_CENTER);
-                    setMapLevel(MAP_DEFAULT_LEVEL);
                   }}
                 >
                   ← 뒤로
@@ -1318,7 +1032,7 @@ const LocationServiceMap = () => {
                                   if (!minutes || minutes < 0) return '정보 없음';
                                   const hours = Math.floor(minutes / 60);
                                   const mins = minutes % 60;
-                                  
+
                                   if (hours > 0 && mins > 0) {
                                     return `${hours}시간 ${mins}분`;
                                   } else if (hours > 0) {
@@ -1339,7 +1053,7 @@ const LocationServiceMap = () => {
                                     durationMinutes = convertDurationToMinutes(summary.duration);
                                   }
                                 }
-                                
+
                                 // 최단 경로(trafast) 확인 (traoptimal이 없을 경우)
                                 if (!durationMinutes && route && route.trafast && Array.isArray(route.trafast) && route.trafast.length > 0) {
                                   const summary = route.trafast[0].summary;
@@ -1743,24 +1457,7 @@ const MapArea = styled.div`
   min-height: 0;
 `;
 
-const MapWrapper = styled.div`
-  flex: 1;
-  position: relative;
-  min-width: 0;
-  min-height: 0;
-`;
-
-const LoadingOverlay = styled.div`
-  position: absolute;
-  inset: 0;
-  background: rgba(255, 255, 255, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 600;
-  color: ${props => props.theme.colors.primary};
-  z-index: 200;
-`;
+// MapWrapper, LoadingOverlay 제거됨 (지도 미사용)
 
 const ServiceListPanel = styled.div`
   width: 100%;

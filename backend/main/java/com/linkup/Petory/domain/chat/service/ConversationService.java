@@ -6,6 +6,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.linkup.Petory.domain.chat.converter.ConversationConverter;
@@ -112,8 +113,9 @@ public class ConversationService {
 
     /**
      * 채팅방 생성
+     * 별도 트랜잭션으로 실행하여 실패해도 호출한 트랜잭션에 영향을 주지 않음
      */
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public ConversationDTO createConversation(
             ConversationType conversationType,
             RelatedType relatedType,
@@ -132,8 +134,15 @@ public class ConversationService {
                 .filter(user -> !Boolean.TRUE.equals(user.getIsDeleted()))
                 .collect(Collectors.toList());
 
-        if (participants.size() < 2) {
-            throw new IllegalArgumentException("최소 2명의 참여자가 필요합니다.");
+        // 그룹 채팅(MEETUP)의 경우 최소 1명도 허용, 1:1 채팅은 최소 2명 필요
+        if (conversationType == ConversationType.MEETUP) {
+            if (participants.size() < 1) {
+                throw new IllegalArgumentException("최소 1명의 참여자가 필요합니다.");
+            }
+        } else {
+            if (participants.size() < 2) {
+                throw new IllegalArgumentException("최소 2명의 참여자가 필요합니다.");
+            }
         }
 
         // 1:1 채팅인 경우 기존 채팅방 확인
@@ -362,8 +371,9 @@ public class ConversationService {
 
     /**
      * 채팅방 참여자 역할 설정
+     * 별도 트랜잭션으로 실행하여 실패해도 호출한 트랜잭션에 영향을 주지 않음
      */
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void setParticipantRole(RelatedType relatedType, Long relatedIdx, Long userId, ParticipantRole role) {
         Optional<Conversation> conversation = conversationRepository
                 .findByRelatedTypeAndRelatedIdxAndIsDeletedFalse(relatedType, relatedIdx);
