@@ -101,7 +101,23 @@ domain/file/
       └── AttachmentFileRepository.java
 ```
 
-### 3.2 엔티티 관계도 (ERD)
+### 3.2 엔티티 구조
+
+#### AttachmentFile (첨부 파일)
+```java
+@Entity
+@Table(name = "file")
+public class AttachmentFile {
+    private Long idx;
+    private FileTargetType targetType;      // 대상 타입 (BOARD, COMMENT, CARE_REQUEST, MISSING_PET, USER, PET 등)
+    private Long targetIdx;                 // 대상 ID
+    private String filePath;                // 파일 경로
+    private String fileType;                // 파일 타입
+    private LocalDateTime createdAt;
+}
+```
+
+### 3.3 엔티티 관계도 (ERD)
 ```mermaid
 erDiagram
     AttachmentFile -.->|폴리모픽| Board

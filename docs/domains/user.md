@@ -250,7 +250,97 @@ domain/user/
       └── TokenResponse.java
 ```
 
-### 3.2 엔티티 관계도 (ERD)
+### 3.2 엔티티 구조
+
+#### Users (사용자)
+```java
+@Entity
+@Table(name = "users")
+public class Users {
+    private Long idx;
+    private String id;                     // 로그인용 아이디 (UNIQUE)
+    private String username;                // 닉네임 (UNIQUE)
+    private String email;                  // 이메일 (UNIQUE)
+    private String phone;                  // 전화번호
+    private String password;               // 비밀번호 (암호화)
+    private Role role;                     // 역할 (USER, ADMIN)
+    private String location;               // 위치
+    private String petInfo;                // 반려동물 정보
+    private String refreshToken;           // Refresh Token
+    private LocalDateTime refreshExpiration; // Refresh Token 만료일
+    private LocalDateTime lastLoginAt;     // 마지막 로그인 시간
+    private UserStatus status;             // 상태 (ACTIVE, SUSPENDED, BANNED)
+    private Integer warningCount;           // 경고 횟수
+    private LocalDateTime suspendedUntil;  // 이용제한 종료일
+    private Boolean isDeleted;             // 삭제 여부
+    private LocalDateTime deletedAt;       // 삭제 시간
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+    private List<SocialUser> socialUsers;   // 소셜 로그인 정보
+    private List<UserSanction> sanctions;  // 제재 이력
+    private List<Pet> pets;                // 등록한 반려동물 목록
+}
+```
+
+#### Pet (반려동물)
+```java
+@Entity
+@Table(name = "pets")
+public class Pet {
+    private Long idx;
+    private Users user;                    // 소유자
+    private String petName;                // 반려동물 이름
+    private PetType petType;               // 종류 (DOG, CAT, ETC)
+    private String breed;                  // 품종
+    private PetGender gender;              // 성별 (M, F, UNKNOWN)
+    private String age;                    // 나이
+    private String color;                  // 색상/털색
+    private BigDecimal weight;             // 몸무게 (kg)
+    private Boolean isNeutered;            // 중성화 여부
+    private LocalDate birthDate;           // 생년월일
+    private String healthInfo;             // 건강 정보
+    private String specialNotes;            // 특이사항
+    private String profileImageUrl;        // 프로필 사진 URL
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+    private Boolean isDeleted;
+    private List<PetVaccination> vaccinations; // 예방접종 기록
+}
+```
+
+#### UserSanction (사용자 제재)
+```java
+@Entity
+@Table(name = "user_sanctions")
+public class UserSanction {
+    private Long idx;
+    private Users user;                    // 제재 대상
+    private SanctionType sanctionType;     // 제재 타입 (WARNING, SUSPENSION, BAN)
+    private String reason;                 // 제재 사유
+    private Integer durationDays;           // 제재 기간 (일) - null이면 영구
+    private LocalDateTime startsAt;        // 제재 시작일
+    private LocalDateTime endsAt;          // 제재 종료일 - null이면 영구
+    private Users admin;                   // 처리한 관리자
+    private Long reportIdx;                // 관련 신고 ID
+    private LocalDateTime createdAt;
+}
+```
+
+#### SocialUser (소셜 로그인)
+```java
+@Entity
+@Table(name = "social_user")
+public class SocialUser {
+    private Long idx;
+    private Users user;                    // 사용자
+    private String provider;                // 제공자 (KAKAO, NAVER, GOOGLE)
+    private String providerId;             // 제공자 ID
+    private String email;                  // 이메일
+    private LocalDateTime createdAt;
+}
+```
+
+### 3.3 엔티티 관계도 (ERD)
 ```mermaid
 erDiagram
     Users ||--o{ Pet : "소유"
@@ -261,7 +351,7 @@ erDiagram
     Users ||--o{ CareRequest : "요청"
 ```
 
-### 3.3 API 설계
+### 3.4 API 설계
 | 엔드포인트 | Method | 설명 | 요청/응답 |
 |-----------|--------|------|----------|
 | `/api/auth/login` | POST | 로그인 | `LoginRequest` → `TokenResponse` |
@@ -277,14 +367,14 @@ erDiagram
 | `/api/admin/users/{id}/suspend` | POST | 이용제한 부여 | `days`, `reason` → `UserSanction` |
 | `/api/admin/users/{id}/ban` | POST | 영구 차단 | `reason` → `UserSanction` |
 
-### 3.4 다른 도메인과의 연관관계
+### 3.5 다른 도메인과의 연관관계
 - **Board 도메인**: Users가 게시글/댓글 작성
 - **Care 도메인**: Users가 펫케어 요청 생성/지원
 - **Report 도메인**: Users가 신고 접수, 제재 부여
 - **Notification 도메인**: Users에게 알림 전송
 - **File 도메인**: Users 프로필 이미지, Pet 프로필 이미지
 
-### 3.5 데이터 흐름
+### 3.6 데이터 흐름
 ```
 [사용자 요청] 
   → [AuthController/UsersController] 

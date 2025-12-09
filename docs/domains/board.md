@@ -299,7 +299,134 @@ domain/board/
       └── CommentConverter.java
 ```
 
-### 3.2 엔티티 관계도 (ERD)
+### 3.2 엔티티 구조
+
+#### Board (게시글)
+```java
+@Entity
+@Table(name = "board")
+public class Board {
+    private Long idx;
+    private Users user;                    // 작성자
+    private String title;                  // 제목
+    private String content;                // 내용
+    private String category;               // 카테고리
+    private ContentStatus status;          // 상태 (ACTIVE, HIDDEN, DELETED)
+    private Integer viewCount;             // 조회수
+    private Integer likeCount;             // 좋아요 수
+    private Integer commentCount;          // 댓글 수
+    private LocalDateTime lastReactionAt;  // 마지막 반응 시간
+    private LocalDateTime createdAt;
+    private Boolean isDeleted;
+    private List<Comment> comments;
+}
+```
+
+#### Comment (댓글)
+```java
+@Entity
+@Table(name = "comment")
+public class Comment {
+    private Long idx;
+    private Board board;                   // 게시글
+    private Users user;                    // 작성자
+    private String content;                // 내용
+    private ContentStatus status;          // 상태
+    private LocalDateTime createdAt;
+    private Boolean isDeleted;
+}
+```
+
+#### BoardReaction (게시글 반응)
+```java
+@Entity
+@Table(name = "board_reaction", 
+       uniqueConstraints = @UniqueConstraint(columnNames = {"board_idx", "user_idx"}))
+public class BoardReaction {
+    private Long idx;
+    private Board board;                   // 게시글
+    private Users user;                    // 사용자
+    private ReactionType reactionType;     // 반응 타입 (LIKE, DISLIKE)
+    private LocalDateTime createdAt;
+}
+```
+
+#### BoardViewLog (조회 로그)
+```java
+@Entity
+@Table(name = "board_view_log",
+       uniqueConstraints = @UniqueConstraint(columnNames = {"board_id", "user_id"}))
+public class BoardViewLog {
+    private Long id;
+    private Board board;                   // 게시글
+    private Users user;                    // 조회자
+    private LocalDateTime viewedAt;        // 조회 시간
+}
+```
+
+#### BoardPopularitySnapshot (인기글 스냅샷)
+```java
+@Entity
+@Table(name = "board_popularity_snapshot")
+public class BoardPopularitySnapshot {
+    private Long snapshotId;
+    private Board board;                    // 게시글
+    private PopularityPeriodType periodType; // 기간 타입 (WEEKLY, MONTHLY)
+    private LocalDate periodStartDate;      // 기간 시작일
+    private LocalDate periodEndDate;       // 기간 종료일
+    private Integer ranking;                // 순위
+    private Integer popularityScore;        // 인기도 점수
+    private Integer likeCount;              // 좋아요 수
+    private Integer commentCount;           // 댓글 수
+    private Integer viewCount;              // 조회수
+    private LocalDateTime createdAt;
+}
+```
+
+#### MissingPetBoard (실종 동물 게시글)
+```java
+@Entity
+@Table(name = "MissingPetBoard")
+public class MissingPetBoard {
+    private Long idx;
+    private Users user;                    // 작성자
+    private String title;                  // 제목
+    private String content;                // 내용
+    private String petName;                // 반려동물 이름
+    private String species;                // 종류
+    private String breed;                  // 품종
+    private MissingPetGender gender;       // 성별
+    private String age;                    // 나이
+    private String color;                   // 색상
+    private LocalDate lostDate;            // 실종일
+    private String lostLocation;            // 실종 위치
+    private BigDecimal latitude;            // 위도
+    private BigDecimal longitude;           // 경도
+    private MissingPetStatus status;        // 상태 (MISSING, FOUND)
+    private LocalDateTime createdAt;
+    private Boolean isDeleted;
+    private List<MissingPetComment> comments;
+}
+```
+
+#### MissingPetComment (실종 동물 댓글)
+```java
+@Entity
+@Table(name = "MissingPetComment")
+public class MissingPetComment {
+    private Long idx;
+    private MissingPetBoard board;         // 실종 동물 게시글
+    private Users user;                    // 작성자
+    private String content;                // 내용
+    private String address;                 // 목격 위치 주소
+    private Double latitude;                // 목격 위치 위도
+    private Double longitude;               // 목격 위치 경도
+    private LocalDateTime createdAt;
+    private Boolean isDeleted;
+}
+```
+
+### 3.3 엔티티 관계도 (ERD)
 ```mermaid
 erDiagram
     Users ||--o{ Board : "작성"
@@ -312,9 +439,12 @@ erDiagram
     Users ||--o{ BoardReaction : "반응"
     Users ||--o{ CommentReaction : "반응"
     Users ||--o{ BoardViewLog : "조회"
+    Users ||--o{ MissingPetBoard : "작성"
+    MissingPetBoard ||--o{ MissingPetComment : "댓글"
+    Users ||--o{ MissingPetComment : "작성"
 ```
 
-### 3.3 API 설계
+### 3.4 API 설계
 | 엔드포인트 | Method | 설명 | 요청/응답 |
 |-----------|--------|------|----------|
 | `/api/boards` | GET | 게시글 목록 (페이징) | `category`, `page`, `size` → `BoardPageResponseDTO` |
@@ -330,7 +460,7 @@ erDiagram
 | `/api/boards/{boardId}/reactions` | POST | 게시글 반응 | `ReactionRequest` → `ReactionSummaryDTO` |
 | `/api/boards/{boardId}/comments/{commentId}/reactions` | POST | 댓글 반응 | `ReactionRequest` → `ReactionSummaryDTO` |
 
-### 3.4 다른 도메인과의 연관관계
+### 3.5 다른 도메인과의 연관관계
 - **User 도메인**: 
   - Users가 게시글/댓글 작성
   - Users가 반응 추가
@@ -345,7 +475,7 @@ erDiagram
   - 게시글/댓글 신고
   - 신고 처리 결과로 상태 변경 (HIDDEN, DELETED)
 
-### 3.5 데이터 흐름
+### 3.6 데이터 흐름
 ```
 [사용자 요청] 
   → [BoardController] 
@@ -393,10 +523,6 @@ CREATE INDEX idx_snapshot_period ON board_popularity_snapshot(period_type, perio
 - JOIN에 사용되는 외래키 (user_idx, board_idx)
 - FULLTEXT 인덱스로 검색 성능 향상
 
-**효과**:
-- 카테고리별 조회: 인덱스 사용으로 쿼리 실행 시간 50% 감소
-- 검색: FULLTEXT 인덱스로 검색 성능 10배 향상
-
 #### 쿼리 최적화
 ```sql
 -- Before: 비효율적인 쿼리 (N+1)
@@ -416,10 +542,6 @@ GROUP BY board_idx, reaction_type;
 - 배치 조회로 N+1 문제 해결
 - IN 절 사용으로 여러 게시글의 반응 수를 한 번에 조회
 - GROUP BY로 집계 성능 향상
-
-**성능 측정**:
-- Before: 1000개 게시글 조회 시 2001개 쿼리, 응답 시간 5초
-- After: 1000개 게시글 조회 시 3개 쿼리, 응답 시간 0.5초
 
 #### N+1 문제 해결
 **문제**:
@@ -476,10 +598,6 @@ public BoardDTO updateBoard(long idx, BoardDTO dto) {
 - 게시글 수정/삭제 시 상세 캐시 무효화
 - 게시글 생성/수정/삭제 시 목록 캐시 무효화
 
-**효과**:
-- 응답 시간: Before 0.5초 → After 0.05초 (캐시 히트 시)
-- DB 부하 감소: 캐시 히트율 80% 달성
-
 #### 비동기 처리
 ```java
 // 인기글 스냅샷 생성 (스케줄러)
@@ -517,16 +635,6 @@ for (int i = 0; i < boardIds.size(); i += BATCH_SIZE) {
 #### Before/After 비교
 | 항목 | Before | After | 개선율 |
 |------|--------|-------|--------|
-| 게시글 목록 조회 (1000개) | 5초 | 0.5초 | 10배 |
-| 쿼리 수 (1000개 게시글) | 2001개 | 3개 | 667배 |
-| 인기글 조회 | 3초 | 0.1초 | 30배 |
-| 게시글 상세 조회 (캐시 히트) | 0.5초 | 0.05초 | 10배 |
-
-#### 모니터링 지표
-- **평균 응답 시간**: 0.3초
-- **P95 응답 시간**: 0.8초
-- **에러율**: 0.1%
-- **처리량 (TPS)**: 1000 req/s
 
 ---
 

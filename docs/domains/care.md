@@ -142,7 +142,74 @@ domain/care/
       └── CareReviewRepository.java
 ```
 
-### 3.2 엔티티 관계도 (ERD)
+### 3.2 엔티티 구조
+
+#### CareRequest (펫케어 요청)
+```java
+@Entity
+@Table(name = "carerequest")
+public class CareRequest {
+    private Long idx;
+    private Users user;                    // 요청자
+    private Pet pet;                        // 관련 펫 (선택사항)
+    private String title;                  // 제목
+    private String description;            // 설명
+    private LocalDateTime date;            // 날짜
+    private CareRequestStatus status;       // 상태 (OPEN, IN_PROGRESS, COMPLETED)
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+    private Boolean isDeleted;
+    private List<CareApplication> applications; // 지원 목록
+    private List<CareRequestComment> comments;   // 댓글 목록
+}
+```
+
+#### CareApplication (펫케어 지원)
+```java
+@Entity
+@Table(name = "careapplication")
+public class CareApplication {
+    private Long idx;
+    private CareRequest careRequest;        // 펫케어 요청
+    private Users provider;                // 케어 제공자
+    private CareApplicationStatus status;   // 상태 (PENDING, APPROVED, REJECTED)
+    private String message;                 // 지원 메시지
+    private LocalDateTime createdAt;
+    private List<CareReview> reviews;       // 리뷰 목록
+}
+```
+
+#### CareReview (펫케어 리뷰)
+```java
+@Entity
+@Table(name = "carereview")
+public class CareReview {
+    private Long idx;
+    private CareApplication careApplication; // 펫케어 지원
+    private Users reviewer;                // 리뷰 작성자 (요청자)
+    private Users reviewee;                 // 리뷰 대상 (제공자)
+    private int rating;                     // 평점 (1-5)
+    private String comment;                 // 리뷰 내용
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+}
+```
+
+#### CareRequestComment (펫케어 요청 댓글)
+```java
+@Entity
+@Table(name = "carerequest_comment")
+public class CareRequestComment {
+    private Long idx;
+    private CareRequest careRequest;        // 펫케어 요청
+    private Users user;                    // 작성자
+    private String content;                // 내용
+    private LocalDateTime createdAt;
+    private Boolean isDeleted;
+}
+```
+
+### 3.3 엔티티 관계도 (ERD)
 ```mermaid
 erDiagram
     Users ||--o{ CareRequest : "요청"
@@ -153,7 +220,7 @@ erDiagram
     Users ||--o{ CareReview : "작성"
 ```
 
-### 3.3 API 설계
+### 3.4 API 설계
 | 엔드포인트 | Method | 설명 |
 |-----------|--------|------|
 | `/api/care/requests` | GET | 요청 목록 |

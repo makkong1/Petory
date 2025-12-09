@@ -84,7 +84,45 @@ domain/meetup/
       └── MeetupParticipantsRepository.java
 ```
 
-### 3.2 엔티티 관계도 (ERD)
+### 3.2 엔티티 구조
+
+#### Meetup (산책모임)
+```java
+@Entity
+@Table(name = "meetup")
+public class Meetup {
+    private Long idx;
+    private String title;                  // 모임 제목
+    private String description;            // 모임 내용
+    private String location;                // 모임 장소 주소
+    private Double latitude;                // 위도
+    private Double longitude;               // 경도
+    private LocalDateTime date;            // 모임 일시
+    private Users organizer;               // 모임 주최자
+    private Integer maxParticipants;        // 최대 참여 인원
+    private Integer currentParticipants;    // 현재 참여자 수
+    private MeetupStatus status;            // 상태 (RECRUITING, CONFIRMED, COMPLETED)
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+    private List<MeetupParticipants> participants; // 참여자 목록
+}
+```
+
+#### MeetupParticipants (모임 참여자)
+```java
+@Entity
+@Table(name = "meetupparticipants")
+@IdClass(MeetupParticipantsId.class)
+public class MeetupParticipants {
+    @Id
+    private Meetup meetup;                  // 모임
+    @Id
+    private Users user;                    // 참여자
+    private LocalDateTime joinedAt;         // 참여 시간
+}
+```
+
+### 3.3 엔티티 관계도 (ERD)
 ```mermaid
 erDiagram
     Users ||--o{ Meetup : "주최"

@@ -87,6 +87,34 @@ domain/statistics/
       └── DailyStatisticsRepository.java
 ```
 
+### 3.2 엔티티 구조
+
+#### DailyStatistics (일일 통계)
+```java
+@Entity
+@Table(name = "dailystatistics")
+public class DailyStatistics {
+    private Long id;
+    private LocalDate statDate;            // 통계 날짜 (UNIQUE)
+    private Integer newUsers;              // 신규 사용자 수
+    private Integer newPosts;               // 신규 게시글 수
+    private Integer newCareRequests;        // 신규 펫케어 요청 수
+    private Integer completedCares;         // 완료된 펫케어 수
+    private BigDecimal totalRevenue;        // 총 수익
+    private Integer activeUsers;            // 활성 사용자 수
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+}
+```
+
+### 3.3 엔티티 관계도 (ERD)
+```mermaid
+erDiagram
+    DailyStatistics ||--o| Users : "집계"
+    DailyStatistics ||--o| Board : "집계"
+    DailyStatistics ||--o| CareRequest : "집계"
+```
+
 ---
 
 ## 4. 트러블슈팅

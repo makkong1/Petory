@@ -111,7 +111,26 @@ domain/notification/
       └── NotificationRepository.java
 ```
 
-### 3.2 엔티티 관계도 (ERD)
+### 3.2 엔티티 구조
+
+#### Notification (알림)
+```java
+@Entity
+@Table(name = "notifications")
+public class Notification {
+    private Long idx;
+    private Users user;                    // 알림을 받을 사용자
+    private NotificationType type;         // 알림 타입
+    private String title;                  // 알림 제목
+    private String content;                // 알림 내용
+    private Long relatedId;                // 관련 게시글/댓글 ID
+    private String relatedType;            // 관련 타입 (BOARD, CARE_REQUEST, MISSING_PET 등)
+    private Boolean isRead;                // 읽음 여부
+    private LocalDateTime createdAt;
+}
+```
+
+### 3.3 엔티티 관계도 (ERD)
 ```mermaid
 erDiagram
     Users ||--o{ Notification : "수신"

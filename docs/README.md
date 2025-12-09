@@ -52,8 +52,6 @@
 
 | 도메인 | 설명 | 문서 링크 |
 |--------|------|----------|
-| **Location** | 위치 기반 서비스, 리뷰 | [상세보기](./domains/location.md) |
-| **Meetup** | 오프라인 모임 | [상세보기](./domains/meetup.md) |
 | **Notification** | 알림 시스템 | [상세보기](./domains/notification.md) |
 | **Report** | 신고 및 제재 시스템 | [상세보기](./domains/report.md) |
 | **File** | 파일 업로드/다운로드 | [상세보기](./domains/file.md) |

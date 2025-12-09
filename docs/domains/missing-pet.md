@@ -91,7 +91,53 @@ domain/board/
       └── MissingPetCommentRepository.java
 ```
 
-### 3.2 엔티티 관계도 (ERD)
+### 3.2 엔티티 구조
+
+#### MissingPetBoard (실종 동물 게시글)
+```java
+@Entity
+@Table(name = "MissingPetBoard")
+public class MissingPetBoard {
+    private Long idx;
+    private Users user;                    // 작성자
+    private String title;                  // 제목
+    private String content;                // 내용
+    private String petName;                // 반려동물 이름
+    private String species;                // 종류
+    private String breed;                  // 품종
+    private MissingPetGender gender;       // 성별
+    private String age;                    // 나이
+    private String color;                  // 색상
+    private LocalDate lostDate;            // 실종일
+    private String lostLocation;           // 실종 위치
+    private BigDecimal latitude;           // 위도
+    private BigDecimal longitude;          // 경도
+    private MissingPetStatus status;        // 상태 (MISSING, FOUND)
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+    private Boolean isDeleted;
+    private List<MissingPetComment> comments; // 댓글 목록
+}
+```
+
+#### MissingPetComment (실종 동물 댓글)
+```java
+@Entity
+@Table(name = "MissingPetComment")
+public class MissingPetComment {
+    private Long idx;
+    private MissingPetBoard board;         // 실종 동물 게시글
+    private Users user;                    // 작성자
+    private String content;                // 내용
+    private String address;                // 목격 위치 주소
+    private Double latitude;               // 목격 위치 위도
+    private Double longitude;              // 목격 위치 경도
+    private LocalDateTime createdAt;
+    private Boolean isDeleted;
+}
+```
+
+### 3.3 엔티티 관계도 (ERD)
 ```mermaid
 erDiagram
     Users ||--o{ MissingPetBoard : "신고"

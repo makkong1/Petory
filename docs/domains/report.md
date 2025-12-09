@@ -89,7 +89,30 @@ domain/report/
       └── ReportRepository.java
 ```
 
-### 3.2 엔티티 관계도 (ERD)
+### 3.2 엔티티 구조
+
+#### Report (신고)
+```java
+@Entity
+@Table(name = "report",
+       uniqueConstraints = @UniqueConstraint(columnNames = {"target_type", "target_idx", "reporter_idx"}))
+public class Report {
+    private Long idx;
+    private ReportTargetType targetType;   // 신고 대상 타입 (BOARD, COMMENT, USER 등)
+    private Long targetIdx;                 // 신고 대상 ID
+    private Users reporter;                 // 신고자
+    private String reason;                  // 신고 사유
+    private ReportStatus status;            // 상태 (PENDING, PROCESSING, RESOLVED, REJECTED)
+    private Users handledBy;               // 처리자 (관리자)
+    private LocalDateTime handledAt;        // 처리 시간
+    private ReportActionType actionTaken;   // 조치 내용 (NONE, WARNING, SUSPENSION, BAN, DELETED)
+    private String adminNote;              // 관리자 메모
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+}
+```
+
+### 3.3 엔티티 관계도 (ERD)
 ```mermaid
 erDiagram
     Users ||--o{ Report : "신고자"

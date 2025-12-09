@@ -156,14 +156,70 @@ domain/location/
       └── LocationServiceReviewRepository.java
 ```
 
-### 3.2 엔티티 관계도 (ERD)
+### 3.2 엔티티 구조
+
+#### LocationService (위치 서비스)
+```java
+@Entity
+@Table(name = "locationservice")
+public class LocationService {
+    private Long idx;
+    private String name;                   // 서비스명
+    private String category1;              // 카테고리1 (대분류)
+    private String category2;              // 카테고리2 (중분류)
+    private String category3;              // 카테고리3 (소분류)
+    private String sido;                   // 시도
+    private String sigungu;                // 시군구
+    private String eupmyeondong;           // 읍면동
+    private String roadName;               // 도로명
+    private String address;                 // 주소
+    private String zipCode;                // 우편번호
+    private Double latitude;               // 위도
+    private Double longitude;               // 경도
+    private String phone;                   // 전화번호
+    private String website;                 // 웹사이트
+    private String closedDay;              // 휴무일
+    private String operatingHours;          // 운영시간
+    private Boolean parkingAvailable;       // 주차 가능여부
+    private String priceInfo;               // 가격 정보
+    private Boolean petFriendly;            // 반려동물 동반 가능
+    private Boolean isPetOnly;              // 반려동물 전용
+    private String petSize;                 // 입장 가능 동물 크기
+    private String petRestrictions;         // 반려동물 제한사항
+    private String petExtraFee;             // 애견 동반 추가 요금
+    private Boolean indoor;                 // 실내 여부
+    private Boolean outdoor;                // 실외 여부
+    private String description;             // 서비스 설명
+    private Double rating;                  // 평균 평점
+    private LocalDate lastUpdated;          // 최종작성일
+    private String dataSource;              // 데이터 출처 (PUBLIC, KAKAO)
+    private List<LocationServiceReview> reviews; // 리뷰 목록
+}
+```
+
+#### LocationServiceReview (위치 서비스 리뷰)
+```java
+@Entity
+@Table(name = "locationservicereview")
+public class LocationServiceReview {
+    private Long idx;
+    private LocationService service;       // 위치 서비스
+    private Users user;                    // 작성자
+    private Integer rating;                 // 평점 (1~5)
+    private String comment;                // 리뷰 내용
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+}
+```
+
+### 3.3 엔티티 관계도 (ERD)
 ```mermaid
 erDiagram
     LocationService ||--o{ LocationServiceReview : "리뷰"
     Users ||--o{ LocationServiceReview : "작성"
 ```
 
-### 3.3 API 설계
+### 3.4 API 설계
 | 엔드포인트 | Method | 설명 |
 |-----------|--------|------|
 | `/api/location-services/search` | GET | 지역 계층별 서비스 검색 |
