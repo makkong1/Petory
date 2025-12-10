@@ -23,7 +23,7 @@ public class SocialUser {
     private Users user;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, length = 25)
     private Provider provider;
 
     @Column(nullable = false)

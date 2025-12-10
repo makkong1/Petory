@@ -1,5 +1,9 @@
 package com.linkup.Petory.global.security;
 
+import com.linkup.Petory.domain.user.handler.OAuth2FailureHandler;
+import com.linkup.Petory.domain.user.handler.OAuth2SuccessHandler;
+import com.linkup.Petory.domain.user.service.ConditionalOAuth2TokenResponseClient;
+import com.linkup.Petory.domain.user.service.OAuth2UserProviderRouter;
 import com.linkup.Petory.filter.JwtAuthenticationFilter;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -12,8 +16,6 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
@@ -24,6 +26,10 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final OAuth2SuccessHandler oAuth2SuccessHandler;
+    private final OAuth2FailureHandler oAuth2FailureHandler;
+    private final OAuth2UserProviderRouter oAuth2UserProviderRouter;
+    private final ConditionalOAuth2TokenResponseClient conditionalOAuth2TokenResponseClient;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -40,10 +46,21 @@ public class SecurityConfig {
                 // JWT 필터 추가
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
 
+                // OAuth2 설정
+                // Naver는 커스텀 TokenResponseClient 사용, Google은 기본 클라이언트 사용
+                .oauth2Login(oauth2 -> oauth2
+                        .tokenEndpoint(token -> token
+                                .accessTokenResponseClient(conditionalOAuth2TokenResponseClient))
+                        .userInfoEndpoint(userInfo -> userInfo
+                                .userService(oAuth2UserProviderRouter))
+                        .successHandler(oAuth2SuccessHandler)
+                        .failureHandler(oAuth2FailureHandler))
+
                 // 인증 및 인가가 필요한 경로 설정
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**").permitAll() // 인증 관련 API 허용
                         .requestMatchers("/api/users/register").permitAll() // 회원가입 허용
+                        .requestMatchers("/oauth2/**").permitAll() // OAuth2 인증 엔드포인트 허용
                         .requestMatchers(HttpMethod.GET, "/api/uploads/**").permitAll() // 업로드 파일 공개 조회
                         .requestMatchers("/error").permitAll() // 에러 페이지
                         .requestMatchers("/ws/**", "/chat/**").permitAll() // WebSocket 엔드포인트 (인증은 인터셉터에서 처리)
@@ -71,11 +88,6 @@ public class SecurityConfig {
                         }));
 
         return http.build();
-    }
-
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
     }
 
     @Bean
