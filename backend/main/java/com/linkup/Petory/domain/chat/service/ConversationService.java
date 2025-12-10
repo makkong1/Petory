@@ -1,7 +1,9 @@
 package com.linkup.Petory.domain.chat.service;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -13,6 +15,7 @@ import com.linkup.Petory.domain.chat.converter.ConversationConverter;
 import com.linkup.Petory.domain.chat.converter.ConversationParticipantConverter;
 import com.linkup.Petory.domain.chat.converter.ChatMessageConverter;
 import com.linkup.Petory.domain.chat.dto.ConversationDTO;
+import com.linkup.Petory.domain.chat.entity.ChatMessage;
 import com.linkup.Petory.domain.chat.entity.Conversation;
 import com.linkup.Petory.domain.chat.entity.ConversationParticipant;
 import com.linkup.Petory.domain.chat.entity.ConversationStatus;
@@ -20,62 +23,94 @@ import com.linkup.Petory.domain.chat.entity.ConversationType;
 import com.linkup.Petory.domain.chat.entity.ParticipantRole;
 import com.linkup.Petory.domain.chat.entity.ParticipantStatus;
 import com.linkup.Petory.domain.chat.entity.RelatedType;
+import com.linkup.Petory.domain.chat.repository.ChatMessageRepository;
 import com.linkup.Petory.domain.chat.repository.ConversationParticipantRepository;
 import com.linkup.Petory.domain.chat.repository.ConversationRepository;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 @Transactional(readOnly = true)
 public class ConversationService {
 
     private final ConversationRepository conversationRepository;
     private final ConversationParticipantRepository participantRepository;
+    private final ChatMessageRepository chatMessageRepository;
     private final UsersRepository usersRepository;
     private final ConversationConverter conversationConverter;
     private final ConversationParticipantConverter participantConverter;
     private final ChatMessageConverter messageConverter;
 
     /**
-     * 사용자별 활성 채팅방 목록 조회
+     * 사용자별 활성 채팅방 목록 조회 (N+1 문제 최적화)
      */
     public List<ConversationDTO> getMyConversations(Long userId) {
         // 탈퇴하지 않은 사용자의 채팅방만 조회
         List<Conversation> conversations = conversationRepository
                 .findActiveConversationsByUser(userId, ConversationStatus.ACTIVE);
 
+        if (conversations.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        // 채팅방 ID 목록 추출
+        List<Long> conversationIdxs = conversations.stream()
+                .map(Conversation::getIdx)
+                .collect(Collectors.toList());
+
+        // 배치 조회: 현재 사용자의 참여자 정보 (읽지 않은 메시지 수 포함)
+        List<ConversationParticipant> myParticipants = participantRepository
+                .findParticipantsByConversationIdxsAndUserIdx(conversationIdxs, userId);
+        Map<Long, ConversationParticipant> myParticipantMap = myParticipants.stream()
+                .collect(Collectors.toMap(
+                        p -> p.getConversation().getIdx(),
+                        p -> p,
+                        (existing, replacement) -> existing));
+
+        // 배치 조회: 모든 활성 참여자 정보
+        List<ConversationParticipant> allParticipants = participantRepository
+                .findParticipantsByConversationIdxsAndStatus(conversationIdxs, ParticipantStatus.ACTIVE);
+        Map<Long, List<ConversationParticipant>> participantsMap = allParticipants.stream()
+                .collect(Collectors.groupingBy(p -> p.getConversation().getIdx()));
+
+        // 배치 조회: 각 채팅방의 최신 메시지
+        List<ChatMessage> latestMessages = chatMessageRepository
+                .findLatestMessagesByConversationIdxs(conversationIdxs);
+        Map<Long, ChatMessage> latestMessageMap = latestMessages.stream()
+                .collect(Collectors.toMap(
+                        m -> m.getConversation().getIdx(),
+                        m -> m,
+                        (existing, replacement) -> existing));
+
+        // DTO 변환
         return conversations.stream()
                 .map(conv -> {
                     ConversationDTO dto = conversationConverter.toDTO(conv);
-                    
+
                     // 현재 사용자의 참여자 정보 추가 (읽지 않은 메시지 수 포함)
-                    ConversationParticipant myParticipant = participantRepository
-                            .findByConversationIdxAndUserIdx(conv.getIdx(), userId)
-                            .orElse(null);
-                    
+                    ConversationParticipant myParticipant = myParticipantMap.get(conv.getIdx());
                     if (myParticipant != null) {
                         dto.setUnreadCount(myParticipant.getUnreadCount());
                     }
-                    
+
                     // 참여자 정보 추가
-                    List<ConversationParticipant> participants = participantRepository
-                            .findByConversationIdxAndStatus(conv.getIdx(), ParticipantStatus.ACTIVE);
-                    if (participants != null) {
+                    List<ConversationParticipant> participants = participantsMap.getOrDefault(conv.getIdx(),
+                            new ArrayList<>());
+                    if (!participants.isEmpty()) {
                         dto.setParticipants(participantConverter.toDTOList(participants));
                     }
-                    
+
                     // 마지막 메시지 추가
-                    if (conv.getMessages() != null && !conv.getMessages().isEmpty()) {
-                        conv.getMessages().stream()
-                                .max((m1, m2) -> m1.getCreatedAt().compareTo(m2.getCreatedAt()))
-                                .ifPresent(lastMessage -> {
-                                    dto.setLastMessage(messageConverter.toDTO(lastMessage));
-                                });
+                    ChatMessage lastMessage = latestMessageMap.get(conv.getIdx());
+                    if (lastMessage != null) {
+                        dto.setLastMessage(messageConverter.toDTO(lastMessage));
                     }
-                    
+
                     return dto;
                 })
                 .collect(Collectors.toList());
@@ -406,19 +441,19 @@ public class ConversationService {
         // 같은 제보(boardIdx)에 대한 모든 채팅방 조회
         List<Conversation> conversations = conversationRepository
                 .findByRelatedTypeAndRelatedIdxInAndIsDeletedFalse(
-                    RelatedType.MISSING_PET_BOARD, 
-                    List.of(boardIdx));
+                        RelatedType.MISSING_PET_BOARD,
+                        List.of(boardIdx));
 
         // 제보자와 목격자가 모두 참여한 채팅방 찾기
         Optional<Conversation> existing = conversations.stream()
                 .filter(conv -> {
                     List<ConversationParticipant> participants = participantRepository
                             .findByConversationIdxAndStatus(conv.getIdx(), ParticipantStatus.ACTIVE);
-                    
+
                     java.util.Set<Long> participantIds = participants.stream()
                             .map(p -> p.getUser().getIdx())
                             .collect(Collectors.toSet());
-                    
+
                     return participantIds.contains(reporterId) && participantIds.contains(witnessId);
                 })
                 .findFirst();
@@ -433,9 +468,7 @@ public class ConversationService {
                 ConversationType.MISSING_PET,
                 RelatedType.MISSING_PET_BOARD,
                 boardIdx,
-                null,  // 1:1이므로 제목 없음
-                List.of(reporterId, witnessId)
-        );
+                null, // 1:1이므로 제목 없음
+                List.of(reporterId, witnessId));
     }
 }
-

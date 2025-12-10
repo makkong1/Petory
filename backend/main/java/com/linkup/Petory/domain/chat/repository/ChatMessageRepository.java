@@ -96,17 +96,18 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
            "  )")
     Long countUnreadMessages(@Param("conversationIdx") Long conversationIdx, @Param("userId") Long userId);
 
-    // 여러 채팅방의 최신 메시지 조회 (배치)
-    @Query("SELECT m.conversation.idx, m " +
-           "FROM ChatMessage m " +
+    // 여러 채팅방의 최신 메시지 조회 (배치) - Sender 포함
+    @Query("SELECT m FROM ChatMessage m " +
+           "JOIN FETCH m.sender s " +
            "WHERE m.conversation.idx IN :conversationIdxs " +
            "  AND m.isDeleted = false " +
+           "  AND s.isDeleted = false " +
            "  AND m.idx IN (" +
            "    SELECT MAX(m2.idx) FROM ChatMessage m2 " +
            "    WHERE m2.conversation.idx = m.conversation.idx " +
            "      AND m2.isDeleted = false" +
            "  )")
-    List<Object[]> findLatestMessagesByConversationIdxs(@Param("conversationIdxs") List<Long> conversationIdxs);
+    List<ChatMessage> findLatestMessagesByConversationIdxs(@Param("conversationIdxs") List<Long> conversationIdxs);
 
     // 메시지 검색 (Full-Text Search)
     @Query("SELECT m FROM ChatMessage m " +

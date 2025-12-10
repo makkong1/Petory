@@ -97,5 +97,28 @@ public interface ConversationParticipantRepository extends JpaRepository<Convers
     Integer countByConversationIdxAndStatus(
         @Param("conversationIdx") Long conversationIdx,
         @Param("status") ParticipantStatus status);
+
+    // 여러 채팅방의 특정 사용자 참여자 정보 배치 조회
+    @Query("SELECT p FROM ConversationParticipant p " +
+           "JOIN FETCH p.conversation c " +
+           "JOIN FETCH p.user u " +
+           "WHERE p.conversation.idx IN :conversationIdxs " +
+           "  AND p.user.idx = :userId " +
+           "  AND p.isDeleted = false " +
+           "  AND u.isDeleted = false")
+    List<ConversationParticipant> findParticipantsByConversationIdxsAndUserIdx(
+        @Param("conversationIdxs") List<Long> conversationIdxs,
+        @Param("userId") Long userId);
+
+    // 여러 채팅방의 활성 참여자 정보 배치 조회
+    @Query("SELECT p FROM ConversationParticipant p " +
+           "JOIN FETCH p.user u " +
+           "WHERE p.conversation.idx IN :conversationIdxs " +
+           "  AND p.status = :status " +
+           "  AND p.isDeleted = false " +
+           "  AND u.isDeleted = false")
+    List<ConversationParticipant> findParticipantsByConversationIdxsAndStatus(
+        @Param("conversationIdxs") List<Long> conversationIdxs,
+        @Param("status") ParticipantStatus status);
 }
 
