@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -20,6 +21,8 @@ import com.linkup.Petory.domain.board.dto.MissingPetBoardDTO;
 import com.linkup.Petory.domain.board.dto.MissingPetCommentDTO;
 import com.linkup.Petory.domain.board.entity.MissingPetStatus;
 import com.linkup.Petory.domain.board.service.MissingPetBoardService;
+import com.linkup.Petory.domain.chat.dto.ConversationDTO;
+import com.linkup.Petory.domain.chat.service.ConversationService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,6 +34,7 @@ import lombok.extern.slf4j.Slf4j;
 public class MissingPetBoardController {
 
     private final MissingPetBoardService missingPetBoardService;
+    private final ConversationService conversationService;
 
     @GetMapping
     public ResponseEntity<List<MissingPetBoardDTO>> listBoards(
@@ -100,5 +104,23 @@ public class MissingPetBoardController {
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 실종제보 채팅 시작 ("목격했어요" 버튼 클릭)
+     */
+    @PostMapping("/{boardIdx}/start-chat")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ConversationDTO> startMissingPetChat(
+            @PathVariable Long boardIdx,
+            @RequestParam Long witnessId) {
+        // 실종제보 조회하여 제보자 ID 확인
+        MissingPetBoardDTO board = missingPetBoardService.getBoard(boardIdx);
+        Long reporterId = board.getUserId();
+        
+        ConversationDTO conversation = conversationService.createMissingPetChat(
+                boardIdx, reporterId, witnessId);
+        
+        return ResponseEntity.ok(conversation);
     }
 }

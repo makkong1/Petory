@@ -28,7 +28,7 @@ public class AuthService {
     @Transactional
     public TokenResponse login(String id, String password) {
         Users user = usersRepository.findByIdString(id)
-                .orElseThrow(() -> new RuntimeException("유저 없음"));
+                .orElseThrow(() -> new RuntimeException("유저 없음")); // 1번번
 
         // 제재 상태 확인
         if (user.getStatus() == UserStatus.BANNED) {
@@ -58,11 +58,11 @@ public class AuthService {
         user.setRefreshToken(refreshToken);
         user.setRefreshExpiration(LocalDateTime.now().plusDays(1));
         user.setLastLoginAt(LocalDateTime.now()); // 통계용: 마지막 로그인 시간 업데이트
-        usersRepository.save(user);
+        usersRepository.save(user); // 2번
 
         log.info("로그인 성공: {}, Refresh Token 저장 완료", id);
 
-        UsersDTO userDTO = usersService.getUserById(id);
+        UsersDTO userDTO = usersService.getUserById(id); // 3번
 
         return TokenResponse.builder()
                 .accessToken(accessToken)

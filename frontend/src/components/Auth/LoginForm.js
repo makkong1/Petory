@@ -41,6 +41,11 @@ const LoginForm = ({ onSwitchToRegister }) => {
     }
   };
 
+  const handleSocialLogin = (provider) => {
+    // OAuth2 로그인 시작 - Spring Boot 서버로 리다이렉트
+    window.location.href = `http://localhost:8080/oauth2/authorization/${provider}`;
+  };
+
   return (
     <LoginContainer>
       <Title>로그인</Title>
@@ -79,6 +84,32 @@ const LoginForm = ({ onSwitchToRegister }) => {
           {loading ? '로그인 중...' : '로그인'}
         </Button>
       </Form>
+
+      <Divider>
+        <DividerLine />
+        <DividerText>또는</DividerText>
+        <DividerLine />
+      </Divider>
+
+      <SocialLoginContainer>
+        <SocialButton 
+          type="button"
+          onClick={() => handleSocialLogin('google')}
+          google
+        >
+          <SocialIcon>G</SocialIcon>
+          Google로 로그인
+        </SocialButton>
+        
+        <SocialButton 
+          type="button"
+          onClick={() => handleSocialLogin('naver')}
+          naver
+        >
+          <SocialIcon>N</SocialIcon>
+          Naver로 로그인
+        </SocialButton>
+      </SocialLoginContainer>
 
       <LinkText>
         계정이 없으신가요?{' '}
@@ -187,6 +218,77 @@ const SuccessMessage = styled.div`
   color: #28a745;
   font-size: 0.875rem;
   margin-top: 0.5rem;
+`;
+
+const Divider = styled.div`
+  display: flex;
+  align-items: center;
+  margin: 1.5rem 0;
+  gap: 1rem;
+`;
+
+const DividerLine = styled.div`
+  flex: 1;
+  height: 1px;
+  background: #e1e5e9;
+`;
+
+const DividerText = styled.span`
+  color: #666;
+  font-size: 0.875rem;
+`;
+
+const SocialLoginContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1rem;
+`;
+
+const SocialButton = styled.button`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1.5rem;
+  border: 2px solid ${props => {
+    if (props.google) return '#4285F4';
+    if (props.naver) return '#03C75A';
+    return '#e1e5e9';
+  }};
+  background: ${props => {
+    if (props.google) return '#4285F4';
+    if (props.naver) return '#03C75A';
+    return 'white';
+  }};
+  color: white;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
+    opacity: 0.9;
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+`;
+
+const SocialIcon = styled.span`
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  font-weight: bold;
+  font-size: 0.875rem;
 `;
 
 const LinkText = styled.p`

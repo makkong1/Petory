@@ -5,13 +5,33 @@ import { locationServiceApi } from '../../api/locationServiceApi';
 const initial = {
   name: '',
   category: '',
+  category1: '',
+  category2: '',
+  category3: '',
   address: '',
+  detailAddress: '',
+  sido: '',
+  sigungu: '',
+  eupmyeondong: '',
+  ri: '',
+  bunji: '',
+  roadName: '',
+  buildingNumber: '',
+  zipCode: '',
   description: '',
-  opening_time: '',
-  closing_time: '',
+  operatingHours: '', // 운영시간 문자열 (예: "월~금 09:00~18:00")
+  closedDay: '',
   phone: '',
-  image_url: '',
   website: '',
+  parkingAvailable: false,
+  priceInfo: '',
+  petFriendly: false,
+  isPetOnly: false,
+  petSize: '',
+  petRestrictions: '',
+  petExtraFee: '',
+  indoor: false,
+  outdoor: false,
 };
 
 const categories = ['', '병원', '용품점', '유치원', '카페', '호텔', '미용실'];
@@ -59,16 +79,34 @@ export default function LocationServiceForm({ show, onClose, onSuccess }) {
     try {
       const payload = {
         name: fields.name,
-        category: fields.category,
+        category: fields.category3 || fields.category2 || fields.category1 || fields.category,
+        category1: fields.category1,
+        category2: fields.category2,
+        category3: fields.category3,
         address: fields.address,
         detailAddress: fields.detailAddress || '',
-        // 위도/경도는 서버에서 자동으로 변환됩니다.
+        sido: fields.sido,
+        sigungu: fields.sigungu,
+        eupmyeondong: fields.eupmyeondong,
+        ri: fields.ri,
+        bunji: fields.bunji,
+        roadName: fields.roadName,
+        buildingNumber: fields.buildingNumber,
+        zipCode: fields.zipCode,
         description: fields.description,
+        operatingHours: fields.operatingHours || '',
+        closedDay: fields.closedDay || '',
         phone: fields.phone,
-        openingTime: fields.opening_time || null,
-        closingTime: fields.closing_time || null,
-        imageUrl: fields.image_url || '',
         website: fields.website || '',
+        parkingAvailable: fields.parkingAvailable || false,
+        priceInfo: fields.priceInfo || '',
+        petFriendly: fields.petFriendly || false,
+        isPetOnly: fields.isPetOnly || false,
+        petSize: fields.petSize || '',
+        petRestrictions: fields.petRestrictions || '',
+        petExtraFee: fields.petExtraFee || '',
+        indoor: fields.indoor || false,
+        outdoor: fields.outdoor || false,
       };
       await locationServiceApi.createService(payload);
       if (onSuccess) onSuccess({ ...payload });
@@ -118,16 +156,27 @@ export default function LocationServiceForm({ show, onClose, onSuccess }) {
             <StyledInput id="description" name="description" placeholder="예: 애견 동반 가능, 넓은 주차장 등" value={fields.description} onChange={handleC} />
           </FieldGroup>
 
-          <FlexRow>
-            <FieldGroup>
-              <label htmlFor="opening_time">오픈 시간</label>
-              <StyledInput id="opening_time" name="opening_time" type="time" value={fields.opening_time} onChange={handleC} />
-            </FieldGroup>
-            <FieldGroup>
-              <label htmlFor="closing_time">마감 시간</label>
-              <StyledInput id="closing_time" name="closing_time" type="time" value={fields.closing_time} onChange={handleC} />
-            </FieldGroup>
-          </FlexRow>
+          <FieldGroup>
+            <label htmlFor="operating_hours">운영시간</label>
+            <StyledInput 
+              id="operating_hours" 
+              name="operatingHours" 
+              placeholder="예: 월~금 09:00~18:00" 
+              value={fields.operatingHours} 
+              onChange={handleC} 
+            />
+          </FieldGroup>
+
+          <FieldGroup>
+            <label htmlFor="closed_day">휴무일</label>
+            <StyledInput 
+              id="closed_day" 
+              name="closedDay" 
+              placeholder="예: 매주 월요일, 법정공휴일" 
+              value={fields.closedDay} 
+              onChange={handleC} 
+            />
+          </FieldGroup>
 
           <FieldGroup>
             <label htmlFor="phone">전화번호</label>
@@ -135,14 +184,90 @@ export default function LocationServiceForm({ show, onClose, onSuccess }) {
           </FieldGroup>
 
           <FieldGroup>
-            <label htmlFor="image_url">이미지 URL</label>
-            <StyledInput id="image_url" name="image_url" placeholder="이미지 주소 (선택)" value={fields.image_url} onChange={handleC} />
-          </FieldGroup>
-
-          <FieldGroup>
             <label htmlFor="website">웹사이트</label>
             <StyledInput id="website" name="website" placeholder="홈페이지 주소 (선택)" value={fields.website} onChange={handleC} />
           </FieldGroup>
+
+          <FieldGroup>
+            <label htmlFor="price_info">가격 정보</label>
+            <StyledInput id="price_info" name="priceInfo" placeholder="예: 입장료 5,000원" value={fields.priceInfo} onChange={handleC} />
+          </FieldGroup>
+
+          <FieldGroup>
+            <label>
+              <input 
+                type="checkbox" 
+                name="parkingAvailable" 
+                checked={fields.parkingAvailable || false} 
+                onChange={(e) => setFields({ ...fields, parkingAvailable: e.target.checked })} 
+              />
+              주차 가능
+            </label>
+          </FieldGroup>
+
+          <FieldGroup>
+            <label>
+              <input 
+                type="checkbox" 
+                name="petFriendly" 
+                checked={fields.petFriendly || false} 
+                onChange={(e) => setFields({ ...fields, petFriendly: e.target.checked })} 
+              />
+              반려동물 동반 가능
+            </label>
+          </FieldGroup>
+
+          <FieldGroup>
+            <label>
+              <input 
+                type="checkbox" 
+                name="isPetOnly" 
+                checked={fields.isPetOnly || false} 
+                onChange={(e) => setFields({ ...fields, isPetOnly: e.target.checked })} 
+              />
+              반려동물 전용
+            </label>
+          </FieldGroup>
+
+          <FieldGroup>
+            <label htmlFor="pet_size">입장 가능 동물 크기</label>
+            <StyledInput id="pet_size" name="petSize" placeholder="예: 소형견, 중형견, 대형견" value={fields.petSize} onChange={handleC} />
+          </FieldGroup>
+
+          <FieldGroup>
+            <label htmlFor="pet_restrictions">반려동물 제한사항</label>
+            <StyledInput id="pet_restrictions" name="petRestrictions" placeholder="예: 목줄 필수, 리드줄 필수" value={fields.petRestrictions} onChange={handleC} />
+          </FieldGroup>
+
+          <FieldGroup>
+            <label htmlFor="pet_extra_fee">애견 동반 추가 요금</label>
+            <StyledInput id="pet_extra_fee" name="petExtraFee" placeholder="예: 소형견 3,000원" value={fields.petExtraFee} onChange={handleC} />
+          </FieldGroup>
+
+          <FlexRow>
+            <FieldGroup>
+              <label>
+                <input 
+                  type="checkbox" 
+                  name="indoor" 
+                  checked={fields.indoor || false} 
+                  onChange={(e) => setFields({ ...fields, indoor: e.target.checked })} 
+                />
+                실내
+              </label>
+            </FieldGroup>
+            <FieldGroup>
+              <label>
+                <input 
+                  type="checkbox" 
+                  name="outdoor" 
+                  checked={fields.outdoor || false} 
+                  onChange={(e) => setFields({ ...fields, outdoor: e.target.checked })} 
+                />
+                실외
+              </label>
+            </FieldGroup>
+          </FlexRow>
 
           {/* 에러 및 버튼 */}
           {error && <ErrorText>{error}</ErrorText>}

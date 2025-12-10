@@ -132,6 +132,12 @@ export const userProfileApi = {
   // 닉네임 변경
   updateMyUsername: (username) =>
     profileApi.patch('/me/username', { username }),
+
+  // 다른 사용자의 프로필 조회 (리뷰 포함)
+  getUserProfile: (userId) => profileApi.get(`/${userId}/profile`),
+
+  // 특정 사용자의 리뷰 목록 조회
+  getUserReviews: (userId) => profileApi.get(`/${userId}/reviews`),
 };
 
 // 펫 관리 API

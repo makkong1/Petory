@@ -78,11 +78,12 @@ public class LocationServiceAdminService {
                     continue;
                 }
 
-                if (locationServiceRepository.existsByNameAndAddress(document.getPlaceName(),
-                        document.getAddressName())
-                        || (StringUtils.hasText(document.getRoadAddressName())
-                                && locationServiceRepository.existsByNameAndDetailAddress(document.getPlaceName(),
-                                        document.getRoadAddressName()))) {
+                // 주소: 도로명주소 우선, 없으면 지번주소
+                String address = StringUtils.hasText(document.getRoadAddressName())
+                        ? document.getRoadAddressName()
+                        : document.getAddressName();
+
+                if (locationServiceRepository.existsByNameAndAddress(document.getPlaceName(), address)) {
                     duplicateCount++;
                     continue;
                 }
@@ -157,17 +158,32 @@ public class LocationServiceAdminService {
     }
 
     private LocationService convertToEntity(KakaoPlaceDTO.Document document) {
+        // 카카오맵 데이터는 기본 필드만 채우고, 공공데이터 상세 필드는 null
+        // 카테고리 파싱
+        String categoryName = document.getCategoryName();
+        String[] categoryParts = categoryName != null ? categoryName.split(" > ") : new String[0];
+        String category3 = categoryParts.length > 2 ? categoryParts[2] : categoryName;
+
+        // 주소: 도로명주소 우선, 없으면 지번주소
+        String address = StringUtils.hasText(document.getRoadAddressName())
+                ? document.getRoadAddressName()
+                : document.getAddressName();
+
         return LocationService.builder()
                 .name(document.getPlaceName())
-                .category(document.getCategoryName())
-                .address(document.getAddressName())
-                .detailAddress(document.getRoadAddressName())
+                // category 필드 제거됨
+                .category1(categoryParts.length > 0 ? categoryParts[0] : null)
+                .category2(categoryParts.length > 1 ? categoryParts[1] : null)
+                .category3(category3) // 기본 카테고리
+                .address(address) // 도로명주소 우선, 없으면 지번주소
+                // detailAddress 필드 제거됨
                 .latitude(parseDouble(document.getY()))
                 .longitude(parseDouble(document.getX()))
                 .phone(document.getPhone())
                 .website(resolveWebsite(document))
                 .description(document.getCategoryGroupName())
                 .petFriendly(true)
+                .dataSource("KAKAO") // 카카오맵 데이터임을 명시
                 .build();
     }
 
@@ -195,4 +211,3 @@ public class LocationServiceAdminService {
         return null;
     }
 }
-
