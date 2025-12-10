@@ -10,6 +10,7 @@ import CommunityBoard from './components/Community/CommunityBoard';
 import LocationServiceMap from './components/LocationService/LocationServiceMap';
 import LoginForm from './components/Auth/LoginForm';
 import RegisterForm from './components/Auth/RegisterForm';
+import OAuth2Callback from './components/Auth/OAuth2Callback';
 import AdminPanel from './components/Admin/AdminPanel';
 import PermissionDeniedModal from './components/Common/PermissionDeniedModal';
 import ScrollToTopBottom from './components/Common/ScrollToTopBottom';
@@ -76,6 +77,15 @@ function AppContent() {
     }
   }, []);
 
+  // OAuth2 콜백 페이지 체크 (useState로 관리)
+  const [isOAuth2Callback, setIsOAuth2Callback] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    const urlParams = new URLSearchParams(window.location.search);
+    return window.location.pathname.includes('oauth2/callback') || 
+           urlParams.has('accessToken') ||
+           urlParams.has('error');
+  });
+
   // 로딩 중일 때
   if (loading) {
     return (
@@ -83,6 +93,11 @@ function AppContent() {
         로딩 중...
       </LoadingContainer>
     );
+  }
+
+  // OAuth2 콜백 처리
+  if (isOAuth2Callback) {
+    return <OAuth2Callback />;
   }
 
   // 인증되지 않은 경우
