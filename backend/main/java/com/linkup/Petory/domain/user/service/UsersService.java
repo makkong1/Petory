@@ -109,6 +109,16 @@ public class UsersService {
             user.setId(dto.getId());
         if (dto.getUsername() != null)
             user.setUsername(dto.getUsername());
+        if (dto.getNickname() != null && !dto.getNickname().isEmpty()) {
+            // 닉네임 중복 확인
+            usersRepository.findByNickname(dto.getNickname())
+                    .ifPresent(existingUser -> {
+                        if (!existingUser.getId().equals(userId)) {
+                            throw new RuntimeException("이미 사용 중인 닉네임입니다.");
+                        }
+                    });
+            user.setNickname(dto.getNickname());
+        }
         if (dto.getEmail() != null)
             user.setEmail(dto.getEmail());
         if (dto.getRole() != null) {
@@ -302,5 +312,44 @@ public class UsersService {
         user.setUsername(newUsername);
         Users updated = usersRepository.save(user);
         return usersConverter.toDTO(updated);
+    }
+
+    /**
+     * 닉네임 설정 (소셜 로그인 사용자용)
+     */
+    @Transactional
+    public UsersDTO setNickname(String userId, String nickname) {
+        if (nickname == null || nickname.trim().isEmpty()) {
+            throw new IllegalArgumentException("닉네임을 입력해주세요.");
+        }
+
+        if (nickname.length() > 50) {
+            throw new IllegalArgumentException("닉네임은 50자 이하여야 합니다.");
+        }
+
+        Users user = usersRepository.findByIdString(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // 닉네임 중복 확인
+        usersRepository.findByNickname(nickname)
+                .ifPresent(existingUser -> {
+                    if (!existingUser.getId().equals(userId)) {
+                        throw new RuntimeException("이미 사용 중인 닉네임입니다.");
+                    }
+                });
+
+        user.setNickname(nickname);
+        Users updated = usersRepository.save(user);
+        return usersConverter.toDTO(updated);
+    }
+
+    /**
+     * 닉네임 중복 검사
+     */
+    public boolean checkNicknameAvailability(String nickname) {
+        if (nickname == null || nickname.trim().isEmpty()) {
+            return false;
+        }
+        return usersRepository.findByNickname(nickname).isEmpty();
     }
 }

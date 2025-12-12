@@ -96,6 +96,34 @@ public class UserProfileController {
     }
 
     /**
+     * 닉네임 설정 (소셜 로그인 사용자용)
+     */
+    @PostMapping("/me/nickname")
+    public ResponseEntity<UsersDTO> setNickname(@RequestBody Map<String, String> request) {
+        String userId = getCurrentUserId();
+        String nickname = request.get("nickname");
+
+        if (nickname == null || nickname.trim().isEmpty()) {
+            throw new IllegalArgumentException("닉네임을 입력해주세요.");
+        }
+
+        UsersDTO updated = usersService.setNickname(userId, nickname);
+        return ResponseEntity.ok(updated);
+    }
+
+    /**
+     * 닉네임 중복 검사
+     */
+    @GetMapping("/nickname/check")
+    public ResponseEntity<Map<String, Object>> checkNicknameAvailability(@RequestParam String nickname) {
+        boolean available = usersService.checkNicknameAvailability(nickname);
+        return ResponseEntity.ok(Map.of(
+            "available", available,
+            "message", available ? "사용 가능한 닉네임입니다." : "이미 사용 중인 닉네임입니다."
+        ));
+    }
+
+    /**
      * 다른 사용자의 프로필 조회 (리뷰 포함)
      * - 인증된 사용자는 다른 사용자의 프로필을 조회할 수 있음
      */

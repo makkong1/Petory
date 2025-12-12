@@ -15,6 +15,8 @@ public interface UsersRepository extends JpaRepository<Users, Long> {
 
     Optional<Users> findByUsername(String username);
 
+    Optional<Users> findByNickname(String nickname);
+
     Optional<Users> findByEmail(String email);
 
     // 로그인용 아이디(String 타입 id 필드)로 조회

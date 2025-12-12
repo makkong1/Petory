@@ -23,6 +23,7 @@ public class UsersConverter {
                 .idx(user.getIdx())
                 .id(user.getId())
                 .username(user.getUsername())
+                .nickname(user.getNickname())
                 .email(user.getEmail())
                 .phone(user.getPhone())
                 // password는 응답에 포함하지 않음
@@ -47,6 +48,7 @@ public class UsersConverter {
                 .idx(dto.getIdx())
                 .id(dto.getId())
                 .username(dto.getUsername())
+                .nickname(dto.getNickname())
                 .email(dto.getEmail())
                 .phone(dto.getPhone())
                 // password는 Service에서 암호화 후 설정
