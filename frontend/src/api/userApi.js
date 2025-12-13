@@ -133,6 +133,14 @@ export const userProfileApi = {
   updateMyUsername: (username) =>
     profileApi.patch('/me/username', { username }),
 
+  // 닉네임 설정 (소셜 로그인 사용자용)
+  setNickname: (nickname) =>
+    profileApi.post('/me/nickname', { nickname }),
+
+  // 닉네임 중복 검사
+  checkNicknameAvailability: (nickname) =>
+    profileApi.get('/nickname/check', { params: { nickname } }),
+
   // 다른 사용자의 프로필 조회 (리뷰 포함)
   getUserProfile: (userId) => profileApi.get(`/${userId}/profile`),
 

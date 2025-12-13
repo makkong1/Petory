@@ -173,6 +173,9 @@ public class OAuth2Service {
 
             // 기존 사용자도 소셜 데이터로 업데이트 (없는 필드만)
             updateUserWithSocialData(user, attributes, provider);
+
+            // 기존 사용자의 nickname이 없으면 설정 필요 (null 유지, 프론트에서 설정하도록)
+            // nickname은 사용자가 직접 설정해야 함
         } else {
             // 신규 사용자 생성
             isNewUser = true;

@@ -87,13 +87,50 @@ public class UsersService {
     }
 
     // 생성
+    @Transactional
     public UsersDTO createUser(UsersDTO dto) {
+        // 닉네임 필수 검증
+        String nickname = dto.getNickname();
+        if (nickname == null || nickname.trim().isEmpty()) {
+            throw new RuntimeException("닉네임은 필수입니다.");
+        }
+
+        if (nickname.length() > 50) {
+            throw new RuntimeException("닉네임은 50자 이하여야 합니다.");
+        }
+
+        // 닉네임 중복 검사
+        usersRepository.findByNickname(nickname)
+                .ifPresent(existingUser -> {
+                    throw new RuntimeException("이미 사용 중인 닉네임입니다.");
+                });
+
+        // username 중복 검사
+        usersRepository.findByUsername(dto.getUsername())
+                .ifPresent(existingUser -> {
+                    throw new RuntimeException("이미 사용 중인 사용자명입니다.");
+                });
+
+        // email 중복 검사
+        usersRepository.findByEmail(dto.getEmail())
+                .ifPresent(existingUser -> {
+                    throw new RuntimeException("이미 사용 중인 이메일입니다.");
+                });
+
         Users user = usersConverter.toEntity(dto);
 
         // 비밀번호 암호화
         if (dto.getPassword() != null && !dto.getPassword().isEmpty()) {
             user.setPassword(passwordEncoder.encode(dto.getPassword()));
+        } else {
+            throw new RuntimeException("비밀번호는 필수입니다.");
         }
+
+        // 일반 회원가입은 소셜 로그인 필드들은 null로 유지
+        user.setProfileImage(null);
+        user.setBirthDate(null);
+        user.setGender(null);
+        user.setEmailVerified(false); // 일반 회원가입은 이메일 인증 안 됨
 
         Users saved = usersRepository.save(user);
         return usersConverter.toDTO(saved);

@@ -2,11 +2,13 @@ import React, { useEffect, useState } from 'react';
 import styled from 'styled-components';
 import { useAuth } from '../../contexts/AuthContext';
 import { authApi } from '../../api/authApi';
+import NicknameSetup from './NicknameSetup';
 
 const OAuth2Callback = () => {
   const { updateUserProfile } = useAuth();
-  const [status, setStatus] = useState('processing'); // 'processing', 'success', 'error'
+  const [status, setStatus] = useState('processing'); // 'processing', 'success', 'error', 'nickname-setup'
   const [message, setMessage] = useState('로그인 처리 중...');
+  const [needsNickname, setNeedsNickname] = useState(false);
 
   useEffect(() => {
     const handleCallback = async () => {
@@ -17,6 +19,7 @@ const OAuth2Callback = () => {
         const refreshToken = urlParams.get('refreshToken');
         const success = urlParams.get('success');
         const error = urlParams.get('error');
+        const needsNicknameParam = urlParams.get('needsNickname');
 
         if (error) {
           setStatus('error');
@@ -33,12 +36,25 @@ const OAuth2Callback = () => {
           authApi.setToken(accessToken);
           authApi.setRefreshToken(refreshToken);
 
+          // 닉네임 설정이 필요한지 확인
+          if (needsNicknameParam === 'true') {
+            setNeedsNickname(true);
+            setStatus('nickname-setup');
+            return;
+          }
+
           // 사용자 정보 가져오기
           try {
             const response = await authApi.validateToken();
             if (response.valid && response.user) {
+              // 닉네임이 없으면 닉네임 설정 페이지로
+              if (!response.user.nickname || response.user.nickname.trim().length === 0) {
+                setNeedsNickname(true);
+                setStatus('nickname-setup');
+                return;
+              }
+
               // AuthContext의 상태를 직접 업데이트하기 위해 페이지 리로드
-              // 또는 window.location.reload()를 사용하여 AuthContext가 자동으로 토큰을 확인하도록 함
               setStatus('success');
               setMessage('로그인 성공! 잠시 후 메인 페이지로 이동합니다...');
               
@@ -76,6 +92,21 @@ const OAuth2Callback = () => {
 
     handleCallback();
   }, [updateUserProfile]);
+
+  // 닉네임 설정 완료 시 처리
+  const handleNicknameComplete = () => {
+    setStatus('success');
+    setMessage('닉네임 설정 완료! 잠시 후 메인 페이지로 이동합니다...');
+    
+    setTimeout(() => {
+      window.location.href = window.location.origin;
+    }, 1500);
+  };
+
+  // 닉네임 설정 페이지 표시
+  if (status === 'nickname-setup') {
+    return <NicknameSetup onComplete={handleNicknameComplete} />;
+  }
 
   return (
     <CallbackContainer>
