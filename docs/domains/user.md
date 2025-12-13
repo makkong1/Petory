@@ -6,6 +6,7 @@
 - **역할**: 사용자 인증/인가, 프로필 관리, 반려동물 등록, 사용자 제재 시스템을 담당하는 핵심 도메인입니다.
 - **주요 기능**: 
   - 회원가입/로그인 (JWT 기반)
+  - 소셜 로그인 (Google, Naver) - OAuth2 기반, JWT 토큰 발급
   - 프로필 관리 (닉네임, 이메일, 전화번호, 위치)
   - 반려동물 등록/관리
   - 사용자 제재 시스템 (경고, 이용제한, 영구 차단)
@@ -21,6 +22,17 @@
   2. 로그인 시 Access Token (15분) + Refresh Token (1일) 발급
   3. Refresh Token으로 Access Token 갱신
   4. 제재 상태 확인 (정지/차단 시 로그인 불가)
+- **스크린샷/영상**:
+
+#### 주요 기능 1-1: 소셜 로그인 (Google, Naver)
+- **설명**: OAuth2 기반 소셜 로그인으로 Google/Naver 계정으로 간편 로그인 및 회원가입이 가능합니다. 소셜 로그인 성공 시 일반 로그인과 동일하게 JWT 토큰을 발급합니다.
+- **사용자 시나리오**:
+  1. 소셜 로그인 버튼 클릭 (Google 또는 Naver)
+  2. 소셜 제공자 인증 완료
+  3. 기존 사용자: 자동 로그인 및 JWT 토큰 발급
+  4. 신규 사용자: 자동 회원가입 후 로그인 및 JWT 토큰 발급
+  5. 이메일이 동일한 기존 사용자: 소셜 계정 자동 연결
+  6. 토큰은 쿼리 파라미터로 프론트엔드에 전달
 - **스크린샷/영상**: 
 
 #### 주요 기능 2: 반려동물 등록
@@ -96,6 +108,82 @@ public TokenResponse login(String id, String password) {
   - 제재 상태 확인 (BANNED, SUSPENDED)
   - 이용제한 만료 시 자동 해제
 - **보안**: Refresh Token은 DB에 저장하여 무효화 가능
+
+#### 로직 1-1: OAuth2 소셜 로그인 처리
+```java
+// OAuth2Service.java
+@Transactional
+public TokenResponse processOAuth2Login(OAuth2User oauth2User, Provider provider) {
+    // Provider별로 사용자 정보 추출 (표준화된 형태)
+    String providerId = extractProviderId(oauth2User, provider);
+    String email = extractEmail(oauth2User, provider);
+    String name = extractName(oauth2User, provider);
+    
+    // SocialUser 조회 (기존 소셜 로그인 사용자 확인)
+    Optional<SocialUser> socialUserOpt = 
+        socialUserRepository.findByProviderAndProviderId(provider, providerId);
+    
+    Users user;
+    if (socialUserOpt.isPresent()) {
+        // 기존 소셜 로그인 사용자
+        user = socialUserOpt.get().getUser();
+    } else {
+        // 신규 소셜 로그인 사용자 - 회원가입 처리
+        user = createOrLinkUser(oauth2User, provider, providerId, email, name);
+    }
+    
+    // 제재 상태 확인 (일반 로그인과 동일)
+    if (user.getStatus() == UserStatus.BANNED) {
+        throw new RuntimeException("영구 차단된 계정입니다.");
+    }
+    
+    // Access Token 생성 (15분) - 일반 로그인과 동일
+    String accessToken = jwtUtil.createAccessToken(user.getId());
+    
+    // Refresh Token 생성 (1일) - 일반 로그인과 동일
+    String refreshToken = jwtUtil.createRefreshToken();
+    
+    // DB에 refresh token 저장
+    user.setRefreshToken(refreshToken);
+    user.setRefreshExpiration(LocalDateTime.now().plusDays(1));
+    user.setLastLoginAt(LocalDateTime.now());
+    usersRepository.save(user);
+    
+    return TokenResponse.builder()
+        .accessToken(accessToken)
+        .refreshToken(refreshToken)
+        .user(userDTO)
+        .build();
+}
+
+// OAuth2SuccessHandler.java
+public void onAuthenticationSuccess(...) {
+    // OAuth2 로그인 처리
+    TokenResponse tokenResponse = oAuth2Service.processOAuth2Login(oAuth2User, provider);
+    
+    // 프론트엔드로 리다이렉트 (토큰 포함)
+    String targetUrl = UriComponentsBuilder.fromUriString(redirectUri)
+        .queryParam("accessToken", URLEncoder.encode(tokenResponse.getAccessToken(), ...))
+        .queryParam("refreshToken", URLEncoder.encode(tokenResponse.getRefreshToken(), ...))
+        .queryParam("success", "true")
+        .build()
+        .toUriString();
+    
+    getRedirectStrategy().sendRedirect(request, response, targetUrl);
+}
+```
+
+**설명**:
+- **처리 흐름**: OAuth2 인증 → 사용자 정보 추출 → 기존 사용자 확인/신규 생성 → 제재 상태 확인 → JWT 토큰 발급 → 프론트엔드 리다이렉트
+- **주요 판단 기준**: 
+  - SocialUser 조회로 기존 소셜 로그인 사용자 확인
+  - 이메일로 기존 사용자 확인 (소셜 계정 연결)
+  - 제재 상태 확인 (일반 로그인과 동일)
+- **특징**: 
+  - Provider별 사용자 정보 표준화 (Google: sub, Naver: id)
+  - Naver는 커스텀 TokenResponseClient 사용 (표준 OAuth2와 다른 응답 형식)
+  - Google은 기본 클라이언트 사용
+  - 일반 로그인과 동일한 JWT 토큰 발급 방식
 
 #### 로직 2: 경고 누적 시 자동 이용제한
 ```java
@@ -181,6 +269,15 @@ public UsersDTO updateMyProfile(String userId, UsersDTO dto) {
 | `logout()` | 로그아웃 | Refresh Token 제거 |
 | `validateRefreshToken()` | Refresh Token 검증 | JWT 검증 + DB 확인 |
 
+#### OAuth2Service
+| 메서드 | 설명 | 주요 로직 |
+|--------|------|-----------|
+| `processOAuth2Login()` | 소셜 로그인 처리 | 사용자 정보 추출, 기존 사용자 확인/신규 생성, 제재 상태 확인, JWT 토큰 발급 |
+| `extractProviderId()` | Provider별 ID 추출 | Google: sub, Naver: id |
+| `extractEmail()` | 이메일 추출 | 표준화된 attributes에서 추출 |
+| `extractName()` | 이름 추출 | 표준화된 attributes에서 추출 |
+| `createOrLinkUser()` | 사용자 생성/연결 | 이메일로 기존 사용자 확인, 신규 생성 또는 소셜 계정 연결 |
+
 #### UsersService
 | 메서드 | 설명 | 주요 로직 |
 |--------|------|-----------|
@@ -234,16 +331,28 @@ domain/user/
   │   ├── AuthService.java             # 인증 비즈니스 로직
   │   ├── UsersService.java            # 사용자 비즈니스 로직
   │   ├── PetService.java              # 반려동물 비즈니스 로직
-  │   └── UserSanctionService.java     # 제재 비즈니스 로직
+  │   ├── UserSanctionService.java     # 제재 비즈니스 로직
+  │   ├── OAuth2Service.java           # 소셜 로그인 비즈니스 로직
+  │   ├── GoogleOAuth2UserService.java # Google OAuth2 사용자 서비스
+  │   ├── NaverOAuth2UserService.java  # Naver OAuth2 사용자 서비스
+  │   ├── OAuth2UserProviderRouter.java # Provider별 라우터
+  │   ├── NaverOAuth2TokenResponseClient.java # Naver 토큰 응답 클라이언트
+  │   ├── ConditionalOAuth2TokenResponseClient.java # 조건부 토큰 응답 클라이언트
+  │   └── OAuth2DataCollector.java     # OAuth2 데이터 수집기
+  ├── handler/
+  │   ├── OAuth2SuccessHandler.java    # 소셜 로그인 성공 핸들러
+  │   └── OAuth2FailureHandler.java    # 소셜 로그인 실패 핸들러
   ├── repository/
   │   ├── UsersRepository.java
   │   ├── PetRepository.java
-  │   └── UserSanctionRepository.java
+  │   ├── UserSanctionRepository.java
+  │   └── SocialUserRepository.java
   ├── entity/
   │   ├── Users.java
   │   ├── Pet.java
   │   ├── UserSanction.java
-  │   └── SocialUser.java
+  │   ├── SocialUser.java
+  │   └── Provider.java               # 소셜 로그인 제공자 (GOOGLE, NAVER)
   └── dto/
       ├── UsersDTO.java
       ├── PetDTO.java
@@ -333,12 +442,19 @@ public class UserSanction {
 public class SocialUser {
     private Long idx;
     private Users user;                    // 사용자
-    private String provider;                // 제공자 (KAKAO, NAVER, GOOGLE)
-    private String providerId;             // 제공자 ID
-    private String email;                  // 이메일
+    private Provider provider;             // 제공자 (GOOGLE, NAVER)
+    private String providerId;             // 제공자 ID (Google: sub, Naver: id)
     private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 }
 ```
+
+**설명**:
+- **역할**: 소셜 로그인 사용자와 제공자 간의 연결 정보 저장
+- **관계**: Users와 Many-to-One 관계
+- **특징**: 
+  - 하나의 사용자가 여러 소셜 계정 연결 가능
+  - provider + providerId로 기존 소셜 로그인 사용자 식별
 
 ### 3.3 엔티티 관계도 (ERD)
 ```mermaid
@@ -358,6 +474,9 @@ erDiagram
 | `/api/auth/register` | POST | 회원가입 | `UsersDTO` → `UsersDTO` |
 | `/api/auth/refresh` | POST | 토큰 갱신 | `refreshToken` → `TokenResponse` |
 | `/api/auth/logout` | POST | 로그아웃 | - → `204 No Content` |
+| `/oauth2/authorization/google` | GET | Google 소셜 로그인 시작 | - → 리다이렉트 |
+| `/oauth2/authorization/naver` | GET | Naver 소셜 로그인 시작 | - → 리다이렉트 |
+| `/oauth2/callback` | GET | 소셜 로그인 콜백 | - → 리다이렉트 (토큰 포함) |
 | `/api/users/profile` | GET | 내 프로필 조회 | - → `UsersDTO` |
 | `/api/users/profile` | PUT | 프로필 수정 | `UsersDTO` → `UsersDTO` |
 | `/api/users/pets` | GET | 내 반려동물 목록 | - → `List<PetDTO>` |
@@ -366,6 +485,14 @@ erDiagram
 | `/api/admin/users/{id}/warn` | POST | 경고 부여 | `reason` → `UserSanction` |
 | `/api/admin/users/{id}/suspend` | POST | 이용제한 부여 | `days`, `reason` → `UserSanction` |
 | `/api/admin/users/{id}/ban` | POST | 영구 차단 | `reason` → `UserSanction` |
+
+**소셜 로그인 플로우**:
+1. 사용자가 `/oauth2/authorization/{provider}` 접근
+2. Spring Security가 소셜 제공자로 리다이렉트
+3. 사용자가 소셜 제공자에서 인증 완료
+4. 소셜 제공자가 `/oauth2/callback`으로 리다이렉트 (인증 코드 포함)
+5. `OAuth2SuccessHandler`에서 `OAuth2Service.processOAuth2Login()` 호출
+6. JWT 토큰 발급 후 프론트엔드로 리다이렉트 (쿼리 파라미터로 토큰 전달)
 
 ### 3.5 다른 도메인과의 연관관계
 - **Board 도메인**: Users가 게시글/댓글 작성
@@ -482,20 +609,25 @@ public void deleteUser(long idx) {
 
 ### 기술적 하이라이트
 1. **JWT 기반 인증**: Access Token + Refresh Token 패턴
-2. **제재 시스템**: 경고 누적 시 자동 이용제한
-3. **소프트 삭제**: 데이터 복구 가능
-4. **비밀번호 암호화**: BCryptPasswordEncoder 사용
-5. **동시성 제어**: 쿼리로 직접 증가하여 Lost Update 방지
+2. **OAuth2 소셜 로그인**: Google, Naver 지원, 일반 로그인과 동일한 JWT 토큰 발급
+3. **Provider별 표준화**: 각 소셜 제공자의 다른 응답 형식을 표준화하여 일관된 처리
+4. **제재 시스템**: 경고 누적 시 자동 이용제한
+5. **소프트 삭제**: 데이터 복구 가능
+6. **비밀번호 암호화**: BCryptPasswordEncoder 사용
 
 ### 학습한 점
 - JWT 토큰 관리 전략 (Access Token + Refresh Token)
+- OAuth2 소셜 로그인 구현 (Spring Security OAuth2 Client)
+- Provider별 커스텀 처리 (Naver는 커스텀 TokenResponseClient 사용)
+- 소셜 로그인 사용자 정보 표준화 (다양한 응답 형식을 일관된 형태로 변환)
 - 제재 시스템 자동화 (경고 누적 → 자동 이용제한)
 - 소프트 삭제 패턴 (데이터 보존)
 - 비밀번호 암호화 (BCrypt)
-- 동시성 제어 방법 (쿼리 직접 증가)
 
 ### 개선 가능한 부분
 - Redis 세션 관리: Refresh Token을 Redis에 저장
 - 2단계 인증 (2FA): 보안 강화
 - 로그인 이력 추적: 비정상 로그인 감지
 - 비밀번호 찾기: 이메일 인증
+- 추가 소셜 로그인 지원: Kakao 등
+- 소셜 계정 연결/해제 기능: 사용자가 직접 관리

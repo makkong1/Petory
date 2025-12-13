@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import styled from 'styled-components';
 import { useAuth } from '../../contexts/AuthContext';
+import { userProfileApi } from '../../api/userApi';
 
 const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
   const { register } = useAuth();
   const [formData, setFormData] = useState({
     id: '',
     username: '',
+    nickname: '',
     password: '',
     email: '',
     role: 'USER',
@@ -16,6 +18,7 @@ const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [nicknameCheck, setNicknameCheck] = useState({ checking: false, available: null, message: '' });
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -25,10 +28,63 @@ const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
     }));
     // 에러 메시지 초기화
     if (error) setError('');
+    // 닉네임 변경 시 중복 검사 상태 초기화
+    if (name === 'nickname') {
+      setNicknameCheck({ checking: false, available: null, message: '' });
+    }
+  };
+
+  // 닉네임 중복 검사
+  const handleNicknameCheck = async () => {
+    if (!formData.nickname || formData.nickname.trim().length === 0) {
+      setNicknameCheck({ checking: false, available: false, message: '닉네임을 입력해주세요.' });
+      return;
+    }
+
+    if (formData.nickname.length > 50) {
+      setNicknameCheck({ checking: false, available: false, message: '닉네임은 50자 이하여야 합니다.' });
+      return;
+    }
+
+    setNicknameCheck({ checking: true, available: null, message: '확인 중...' });
+
+    try {
+      const response = await userProfileApi.checkNicknameAvailability(formData.nickname);
+      setNicknameCheck({
+        checking: false,
+        available: response.data.available,
+        message: response.data.message
+      });
+    } catch (error) {
+      console.error('닉네임 중복 검사 실패:', error);
+      setNicknameCheck({
+        checking: false,
+        available: false,
+        message: '닉네임 중복 검사 중 오류가 발생했습니다.'
+      });
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // 닉네임 필수 검증
+    if (!formData.nickname || formData.nickname.trim().length === 0) {
+      setError('닉네임은 필수입니다.');
+      return;
+    }
+
+    // 닉네임 중복 검사 확인
+    if (nicknameCheck.available === null) {
+      setError('닉네임 중복 검사를 먼저 해주세요.');
+      return;
+    }
+
+    if (!nicknameCheck.available) {
+      setError('사용할 수 없는 닉네임입니다.');
+      return;
+    }
+
     setLoading(true);
     setError('');
     setSuccess('');
@@ -80,6 +136,35 @@ const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
             required
             disabled={loading}
           />
+        </InputGroup>
+
+        <InputGroup>
+          <Label htmlFor="nickname">닉네임 *</Label>
+          <NicknameInputGroup>
+            <Input
+              type="text"
+              id="nickname"
+              name="nickname"
+              value={formData.nickname}
+              onChange={handleChange}
+              required
+              disabled={loading}
+              placeholder="닉네임을 입력하세요"
+              maxLength={50}
+            />
+            <CheckButton 
+              type="button" 
+              onClick={handleNicknameCheck}
+              disabled={loading || nicknameCheck.checking || !formData.nickname}
+            >
+              {nicknameCheck.checking ? '확인 중...' : '중복 확인'}
+            </CheckButton>
+          </NicknameInputGroup>
+          {nicknameCheck.message && (
+            <NicknameMessage available={nicknameCheck.available}>
+              {nicknameCheck.message}
+            </NicknameMessage>
+          )}
         </InputGroup>
 
         <InputGroup>
@@ -299,4 +384,40 @@ const LinkText = styled.p`
       text-decoration: underline;
     }
   }
+`;
+
+const NicknameInputGroup = styled.div`
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+`;
+
+const CheckButton = styled.button`
+  padding: 0.75rem 1rem;
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+  
+  &:hover:not(:disabled) {
+    background: #0056b3;
+    transform: translateY(-1px);
+  }
+  
+  &:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+    transform: none;
+  }
+`;
+
+const NicknameMessage = styled.div`
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+  color: ${props => props.available ? '#28a745' : '#dc3545'};
 `;

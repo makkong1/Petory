@@ -25,6 +25,9 @@ public class Users {
     @Column(nullable = false, unique = true)
     private String username;
 
+    @Column(length = 50, unique = true)
+    private String nickname; // 닉네임 (소셜 로그인 사용자 필수 설정)
+
     @Column(nullable = false, unique = true)
     private String email;
 
@@ -33,6 +36,19 @@ public class Users {
 
     @Column(nullable = false)
     private String password;
+
+    // OAuth2 소셜 로그인 관련 필드
+    @Column(name = "profile_image", length = 500)
+    private String profileImage; // 프로필 이미지 URL (구글 picture, 네이버 profile_image)
+
+    @Column(name = "birth_date", length = 20)
+    private String birthDate; // 생년월일 (네이버: birthyear + birthday 조합, 형식: YYYY-MM-DD)
+
+    @Column(name = "gender", length = 10)
+    private String gender; // 성별 (네이버: M/F, 구글: 제공 안 함)
+
+    @Column(name = "email_verified")
+    private Boolean emailVerified; // 이메일 인증 여부 (구글: email_verified, 네이버: 기본 true)
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
