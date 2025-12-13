@@ -77,8 +77,8 @@ const UserProfileModal = ({ isOpen, userId, onClose, onUpdated }) => {
         });
       } else {
         // 다른 사용자 프로필인 경우 getUserProfile 사용
-        const response = await userProfileApi.getUserProfile(userId);
-        setProfile(response.data);
+      const response = await userProfileApi.getUserProfile(userId);
+      setProfile(response.data);
       }
     } catch (err) {
       const message = err.response?.data?.error || err.message || '프로필을 불러오는데 실패했습니다.';
@@ -320,16 +320,16 @@ const UserProfileModal = ({ isOpen, userId, onClose, onUpdated }) => {
                     {profile.user?.phone && (
                       <UserPhone>📞 {profile.user.phone}</UserPhone>
                     )}
-                    {profile.user?.location && (
-                      <UserLocation>
-                        <LocationIcon>📍</LocationIcon>
-                        {profile.user.location}
-                      </UserLocation>
-                    )}
-                    {profile.user?.role && (
-                      <UserRole>
-                        {profile.user.role === 'SERVICE_PROVIDER' ? '서비스 제공자' : '일반 사용자'}
-                      </UserRole>
+                {profile.user?.location && (
+                  <UserLocation>
+                    <LocationIcon>📍</LocationIcon>
+                    {profile.user.location}
+                  </UserLocation>
+                )}
+                {profile.user?.role && (
+                  <UserRole>
+                    {profile.user.role === 'SERVICE_PROVIDER' ? '서비스 제공자' : '일반 사용자'}
+                  </UserRole>
                     )}
                     {isMyProfile && (
                       <EditButton onClick={() => setIsEditMode(true)}>프로필 수정</EditButton>

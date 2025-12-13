@@ -3,7 +3,7 @@ import styled from 'styled-components';
 import { careRequestApi } from '../../api/careRequestApi';
 import { uploadApi } from '../../api/uploadApi';
 import { reportApi } from '../../api/reportApi';
-import { getOrCreateDirectConversation } from '../../api/chatApi';
+import { getOrCreateDirectConversation, createConversation } from '../../api/chatApi';
 import { usePermission } from '../../hooks/usePermission';
 import { useAuth } from '../../contexts/AuthContext';
 import UserProfileModal from '../User/UserProfileModal';
@@ -291,7 +291,7 @@ const CareRequestDetailPage = ({
   }, []);
 
   const handleStartChat = useCallback(async (otherUserId) => {
-    if (!currentUser || !otherUserId) {
+    if (!currentUser || !otherUserId || !careRequestId) {
       return;
     }
 
@@ -303,7 +303,14 @@ const CareRequestDetailPage = ({
 
     try {
       setIsStartingChat(true);
-      const conversation = await getOrCreateDirectConversation(currentUser.idx, otherUserId);
+      // 펫케어 요청과 연결된 채팅방 생성
+      const conversation = await createConversation({
+        conversationType: 'DIRECT',
+        relatedType: 'CARE_REQUEST',
+        relatedIdx: Number(careRequestId), // 숫자로 변환
+        title: null,
+        participantUserIds: [currentUser.idx, otherUserId]
+      });
       
       // 채팅 위젯 열기 (ChatWidget가 전역적으로 관리된다고 가정)
       if (window.openChatWidget) {
@@ -322,7 +329,7 @@ const CareRequestDetailPage = ({
     } finally {
       setIsStartingChat(false);
     }
-  }, [currentUser, requireLogin, redirectToLogin]);
+  }, [currentUser, careRequestId, requireLogin, redirectToLogin]);
 
   if (!isOpen) {
     return null;

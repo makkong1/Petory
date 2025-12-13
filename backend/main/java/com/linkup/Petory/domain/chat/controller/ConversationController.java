@@ -49,16 +49,17 @@ public class ConversationController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ConversationDTO> createConversation(@RequestBody CreateConversationRequest request) {
         ConversationType conversationType = ConversationType.valueOf(request.getConversationType());
-        RelatedType relatedType = request.getRelatedType() != null 
-            ? RelatedType.valueOf(request.getRelatedType()) : null;
-        
+        RelatedType relatedType = request.getRelatedType() != null
+                ? RelatedType.valueOf(request.getRelatedType())
+                : null;
+
         ConversationDTO dto = conversationService.createConversation(
                 conversationType,
                 relatedType,
                 request.getRelatedIdx(),
                 request.getTitle(),
                 request.getParticipantUserIds());
-        
+
         return ResponseEntity.ok(dto);
     }
 
@@ -141,5 +142,16 @@ public class ConversationController {
     public ResponseEntity<Integer> getMeetupChatParticipantCount(@PathVariable Long meetupIdx) {
         return ResponseEntity.ok(conversationService.getMeetupChatParticipantCount(meetupIdx));
     }
-}
 
+    /**
+     * 펫케어 거래 확정
+     */
+    @PostMapping("/{conversationIdx}/confirm-deal")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Void> confirmCareDeal(
+            @PathVariable Long conversationIdx,
+            @RequestParam Long userId) {
+        conversationService.confirmCareDeal(conversationIdx, userId);
+        return ResponseEntity.noContent().build();
+    }
+}
