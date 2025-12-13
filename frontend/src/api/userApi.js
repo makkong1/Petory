@@ -158,6 +158,14 @@ export const userProfileApi = {
   // 이메일 인증 처리
   verifyEmail: (token) =>
     profileApi.get(`/email/verify/${token}`),
+
+  // 회원가입 전 이메일 인증 메일 발송 (인증 불필요)
+  sendPreRegistrationVerificationEmail: (email) =>
+    profileApi.post('/email/verify/pre-registration', { email }),
+
+  // 회원가입 전 이메일 인증 완료 여부 확인 (인증 불필요)
+  checkPreRegistrationVerification: (email) =>
+    profileApi.get('/email/verify/pre-registration/check', { params: { email } }),
 };
 
 // 펫 관리 API

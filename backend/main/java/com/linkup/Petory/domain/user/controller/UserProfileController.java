@@ -12,6 +12,7 @@ import com.linkup.Petory.domain.user.dto.UserProfileWithReviewsDTO;
 import com.linkup.Petory.domain.user.entity.EmailVerificationPurpose;
 import com.linkup.Petory.domain.user.service.EmailVerificationService;
 import com.linkup.Petory.domain.user.service.UsersService;
+import com.linkup.Petory.util.JwtUtil;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,6 +33,7 @@ public class UserProfileController {
     private final UsersService usersService;
     private final CareReviewService careReviewService;
     private final EmailVerificationService emailVerificationService;
+    private final JwtUtil jwtUtil;
 
     /**
      * 현재 로그인한 사용자의 ID 추출
@@ -121,9 +123,8 @@ public class UserProfileController {
     public ResponseEntity<Map<String, Object>> checkNicknameAvailability(@RequestParam String nickname) {
         boolean available = usersService.checkNicknameAvailability(nickname);
         return ResponseEntity.ok(Map.of(
-            "available", available,
-            "message", available ? "사용 가능한 닉네임입니다." : "이미 사용 중인 닉네임입니다."
-        ));
+                "available", available,
+                "message", available ? "사용 가능한 닉네임입니다." : "이미 사용 중인 닉네임입니다."));
     }
 
     /**
@@ -133,9 +134,8 @@ public class UserProfileController {
     public ResponseEntity<Map<String, Object>> checkIdAvailability(@RequestParam String id) {
         boolean available = usersService.checkIdAvailability(id);
         return ResponseEntity.ok(Map.of(
-            "available", available,
-            "message", available ? "사용 가능한 아이디입니다." : "이미 사용 중인 아이디입니다."
-        ));
+                "available", available,
+                "message", available ? "사용 가능한 아이디입니다." : "이미 사용 중인 아이디입니다."));
     }
 
     /**
@@ -145,7 +145,7 @@ public class UserProfileController {
     public ResponseEntity<Map<String, Object>> sendVerificationEmail(@RequestBody Map<String, String> request) {
         String userId = getCurrentUserId();
         String purposeStr = request.get("purpose");
-        
+
         if (purposeStr == null || purposeStr.isEmpty()) {
             throw new IllegalArgumentException("인증 용도(purpose)를 지정해주세요.");
         }
@@ -153,14 +153,50 @@ public class UserProfileController {
         try {
             EmailVerificationPurpose purpose = EmailVerificationPurpose.valueOf(purposeStr.toUpperCase());
             emailVerificationService.sendVerificationEmail(userId, purpose);
-            
+
             return ResponseEntity.ok(Map.of(
-                "success", true,
-                "message", "이메일 인증 메일이 발송되었습니다."
-            ));
+                    "success", true,
+                    "message", "이메일 인증 메일이 발송되었습니다."));
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("유효하지 않은 인증 용도입니다: " + purposeStr);
         }
+    }
+
+    /**
+     * 회원가입 전 이메일 인증 메일 발송 (인증 불필요)
+     */
+    @PostMapping("/email/verify/pre-registration")
+    public ResponseEntity<Map<String, Object>> sendPreRegistrationVerificationEmail(
+            @RequestBody Map<String, String> request) {
+        String email = request.get("email");
+
+        if (email == null || email.isEmpty()) {
+            throw new IllegalArgumentException("이메일을 입력해주세요.");
+        }
+
+        try {
+            emailVerificationService.sendPreRegistrationVerificationEmail(email);
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "이메일 인증 메일이 발송되었습니다. 이메일을 확인해주세요."));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", e.getMessage()));
+        }
+    }
+
+    /**
+     * 회원가입 전 이메일 인증 완료 여부 확인 (인증 불필요)
+     */
+    @GetMapping("/email/verify/pre-registration/check")
+    public ResponseEntity<Map<String, Object>> checkPreRegistrationVerification(@RequestParam String email) {
+        boolean verified = emailVerificationService.isPreRegistrationEmailVerified(email);
+
+        return ResponseEntity.ok(Map.of(
+                "verified", verified,
+                "message", verified ? "이메일 인증이 완료되었습니다." : "이메일 인증이 완료되지 않았습니다."));
     }
 
     /**
@@ -170,21 +206,32 @@ public class UserProfileController {
     public ResponseEntity<Map<String, Object>> verifyEmail(@PathVariable String token) {
         try {
             EmailVerificationPurpose purpose = emailVerificationService.verifyEmail(token);
-            
+
+            // 회원가입 전 인증인 경우 이메일 추출
+            String email = jwtUtil.extractEmailFromEmailToken(token);
+            if (email != null && purpose == EmailVerificationPurpose.REGISTRATION) {
+                // 회원가입 페이지로 리다이렉트 (이메일 인증 완료 상태로)
+                String redirectUrl = "/register?emailVerified=true&email=" + email;
+                return ResponseEntity.ok(Map.of(
+                        "success", true,
+                        "message", "이메일 인증이 완료되었습니다. 회원가입을 진행해주세요.",
+                        "purpose", purpose.name(),
+                        "email", email,
+                        "redirectUrl", redirectUrl));
+            }
+
             // 용도에 따른 리다이렉트 URL 생성
             String redirectUrl = getRedirectUrl(purpose);
-            
+
             return ResponseEntity.ok(Map.of(
-                "success", true,
-                "message", "이메일 인증이 완료되었습니다.",
-                "purpose", purpose.name(),
-                "redirectUrl", redirectUrl
-            ));
+                    "success", true,
+                    "message", "이메일 인증이 완료되었습니다.",
+                    "purpose", purpose.name(),
+                    "redirectUrl", redirectUrl));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of(
-                "success", false,
-                "message", e.getMessage()
-            ));
+                    "success", false,
+                    "message", e.getMessage()));
         }
     }
 
@@ -193,6 +240,7 @@ public class UserProfileController {
      */
     private String getRedirectUrl(EmailVerificationPurpose purpose) {
         return switch (purpose) {
+            case REGISTRATION -> "/"; // 회원가입 완료 후 메인 페이지
             case PASSWORD_RESET -> "/password-reset";
             case PET_CARE -> "/care-requests";
             case MEETUP -> "/meetups";
@@ -212,14 +260,14 @@ public class UserProfileController {
         UsersDTO user = usersService.getUser(userId);
         List<CareReviewDTO> reviews = careReviewService.getReviewsByReviewee(userId);
         Double averageRating = careReviewService.getAverageRating(userId);
-        
+
         UserProfileWithReviewsDTO profile = UserProfileWithReviewsDTO.builder()
-            .user(user)
-            .reviews(reviews)
-            .averageRating(averageRating)
-            .reviewCount(reviews.size())
-            .build();
-        
+                .user(user)
+                .reviews(reviews)
+                .averageRating(averageRating)
+                .reviewCount(reviews.size())
+                .build();
+
         return ResponseEntity.ok(profile);
     }
 
@@ -232,4 +280,3 @@ public class UserProfileController {
         return ResponseEntity.ok(reviews);
     }
 }
-

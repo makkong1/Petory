@@ -3,6 +3,7 @@ import styled from 'styled-components';
 import { userProfileApi } from '../../api/userApi';
 
 const PURPOSE_LABELS = {
+  REGISTRATION: '회원가입 완료',
   PASSWORD_RESET: '비밀번호 변경',
   PET_CARE: '펫케어 서비스 이용',
   MEETUP: '모임 서비스 이용',

@@ -140,7 +140,8 @@ public class JwtUtil {
 
     /**
      * 이메일 인증 토큰 생성
-     * @param userId 사용자 ID
+     * 
+     * @param userId  사용자 ID (또는 이메일 - 회원가입 전용)
      * @param purpose 인증 용도
      * @return 이메일 인증 토큰
      */
@@ -158,7 +159,53 @@ public class JwtUtil {
     }
 
     /**
+     * 이메일 기반 임시 인증 토큰 생성 (회원가입 전용)
+     * 
+     * @param email   이메일 주소
+     * @param purpose 인증 용도
+     * @return 이메일 인증 토큰
+     */
+    public String createEmailVerificationTokenByEmail(String email, EmailVerificationPurpose purpose) {
+        Date now = new Date();
+        Date expiryDate = new Date(now.getTime() + EMAIL_VERIFICATION_TOKEN_EXPIRE_TIME);
+
+        return Jwts.builder()
+                .subject(email) // 이메일을 subject로 사용
+                .claim("purpose", purpose.name())
+                .claim("isPreRegistration", true) // 회원가입 전 인증임을 표시
+                .issuedAt(now)
+                .expiration(expiryDate)
+                .signWith(getSigningKey())
+                .compact();
+    }
+
+    /**
+     * 이메일 인증 토큰에서 이메일 추출 (회원가입 전용)
+     * 
+     * @param token 이메일 인증 토큰
+     * @return 이메일 주소
+     */
+    public String extractEmailFromEmailToken(String token) {
+        try {
+            Claims claims = Jwts.parser()
+                    .verifyWith(getSigningKey())
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
+            Boolean isPreRegistration = claims.get("isPreRegistration", Boolean.class);
+            if (Boolean.TRUE.equals(isPreRegistration)) {
+                return claims.getSubject(); // 회원가입 전 인증이면 subject가 이메일
+            }
+            return null;
+        } catch (JwtException e) {
+            log.error("이메일 인증 토큰에서 이메일 추출 실패: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    /**
      * 이메일 인증 토큰에서 사용자 ID 추출
+     * 
      * @param token 이메일 인증 토큰
      * @return 사용자 ID
      */
@@ -178,6 +225,7 @@ public class JwtUtil {
 
     /**
      * 이메일 인증 토큰에서 용도(Purpose) 추출
+     * 
      * @param token 이메일 인증 토큰
      * @return 인증 용도
      */
@@ -198,6 +246,7 @@ public class JwtUtil {
 
     /**
      * 이메일 인증 토큰 유효성 검증
+     * 
      * @param token 이메일 인증 토큰
      * @return 유효 여부
      */

@@ -28,15 +28,24 @@ const EmailVerificationPage = () => {
           setStatus('success');
           setMessage(response.data.message || '이메일 인증이 완료되었습니다.');
 
-          // 용도에 따른 리다이렉트 URL 설정
-          const purpose = response.data.purpose;
-          const purposeRedirectUrl = response.data.redirectUrl || '/';
-          setRedirectUrl(purposeRedirectUrl);
+          // 회원가입 전 인증인 경우
+          if (response.data.email && response.data.redirectUrl && response.data.redirectUrl.includes('/register')) {
+            // 회원가입 페이지로 리다이렉트 (이메일 인증 완료 상태로)
+            const redirectUrl = response.data.redirectUrl;
+            setRedirectUrl(redirectUrl);
+            setTimeout(() => {
+              window.location.href = redirectUrl;
+            }, 2000);
+          } else {
+            // 용도에 따른 리다이렉트 URL 설정
+            const purposeRedirectUrl = response.data.redirectUrl || '/';
+            setRedirectUrl(purposeRedirectUrl);
 
-          // 3초 후 리다이렉트
-          setTimeout(() => {
-            window.location.href = purposeRedirectUrl;
-          }, 3000);
+            // 3초 후 리다이렉트
+            setTimeout(() => {
+              window.location.href = purposeRedirectUrl;
+            }, 3000);
+          }
         } else {
           setStatus('error');
           setMessage(response.data.message || '이메일 인증에 실패했습니다.');

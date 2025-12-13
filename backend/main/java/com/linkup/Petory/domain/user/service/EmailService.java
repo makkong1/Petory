@@ -54,6 +54,7 @@ public class EmailService {
      */
     private String getEmailSubject(EmailVerificationPurpose purpose) {
         return switch (purpose) {
+            case REGISTRATION -> "[Petory] 회원가입 이메일 인증";
             case PASSWORD_RESET -> "[Petory] 비밀번호 변경을 위한 이메일 인증";
             case PET_CARE -> "[Petory] 펫케어 서비스 이용을 위한 이메일 인증";
             case MEETUP -> "[Petory] 모임 서비스 이용을 위한 이메일 인증";
@@ -72,7 +73,25 @@ public class EmailService {
         String verificationUrl = frontendUrl + "/email-verify?token=" + token;
         String purposeDescription = getPurposeDescription(purpose);
 
-        return String.format(
+        // 용도에 따라 다른 메시지 생성
+        String messageTemplate = switch (purpose) {
+            case REGISTRATION ->
+                "안녕하세요, Petory에 가입해주셔서 감사합니다!\n\n" +
+                        "회원가입을 완료하기 위해 이메일 인증이 필요합니다.\n\n" +
+                        "아래 링크를 클릭하여 이메일 인증을 완료해주세요:\n" +
+                        "%s\n\n" +
+                        "이메일 인증을 완료하시면 다음 기능들을 이용하실 수 있습니다:\n" +
+                        "- 게시글 수정/삭제\n" +
+                        "- 댓글 수정/삭제\n" +
+                        "- 펫케어 서비스 이용\n" +
+                        "- 모임 생성/참여\n" +
+                        "- 리뷰 작성\n" +
+                        "- 실종 제보 작성\n\n" +
+                        "이 링크는 24시간 동안 유효합니다.\n\n" +
+                        "본인이 요청한 것이 아니라면 이 메일을 무시해주세요.\n\n" +
+                        "감사합니다.\n" +
+                        "Petory 팀";
+            default ->
                 "안녕하세요, Petory입니다.\n\n" +
                         "%s를 위해 이메일 인증이 필요합니다.\n\n" +
                         "아래 링크를 클릭하여 이메일 인증을 완료해주세요:\n" +
@@ -80,9 +99,12 @@ public class EmailService {
                         "이 링크는 24시간 동안 유효합니다.\n\n" +
                         "본인이 요청한 것이 아니라면 이 메일을 무시해주세요.\n\n" +
                         "감사합니다.\n" +
-                        "Petory 팀",
-                purposeDescription,
-                verificationUrl);
+                        "Petory 팀";
+        };
+
+        return purpose == EmailVerificationPurpose.REGISTRATION
+                ? String.format(messageTemplate, verificationUrl)
+                : String.format(messageTemplate, purposeDescription, verificationUrl);
     }
 
     /**
@@ -90,6 +112,7 @@ public class EmailService {
      */
     private String getPurposeDescription(EmailVerificationPurpose purpose) {
         return switch (purpose) {
+            case REGISTRATION -> "회원가입 완료";
             case PASSWORD_RESET -> "비밀번호 변경";
             case PET_CARE -> "펫케어 서비스 이용";
             case MEETUP -> "모임 서비스 이용";

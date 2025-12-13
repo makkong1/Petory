@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { useAuth } from '../../contexts/AuthContext';
 import { userProfileApi } from '../../api/userApi';
@@ -24,6 +24,38 @@ const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
   const [success, setSuccess] = useState('');
   const [nicknameCheck, setNicknameCheck] = useState({ checking: false, available: null, message: '' });
   const [idCheck, setIdCheck] = useState({ checking: false, available: null, message: '' });
+  const [emailVerified, setEmailVerified] = useState(false); // 이메일 인증 완료 여부
+  const [emailVerificationSending, setEmailVerificationSending] = useState(false); // 이메일 발송 중 여부
+  const [emailVerificationSent, setEmailVerificationSent] = useState(false); // 이메일 발송 완료 여부
+
+  // URL 파라미터에서 이메일 인증 완료 상태 확인
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const emailVerifiedParam = urlParams.get('emailVerified');
+    const emailParam = urlParams.get('email');
+
+    if (emailVerifiedParam === 'true' && emailParam) {
+      // 이메일 인증 완료 상태로 설정
+      setEmailVerified(true);
+      setSuccess('이메일 인증이 완료되었습니다. 회원가입을 진행해주세요.');
+
+      // URL에서 파라미터 제거
+      window.history.replaceState({}, '', window.location.pathname);
+
+      // 이메일 자동 입력 (선택적)
+      if (emailParam && !formData.emailId) {
+        const emailParts = emailParam.split('@');
+        if (emailParts.length === 2) {
+          setFormData(prev => ({
+            ...prev,
+            emailId: emailParts[0],
+            emailDomain: emailParts[1],
+            email: emailParam
+          }));
+        }
+      }
+    }
+  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -33,10 +65,17 @@ const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
         [name]: value
       };
       // 이메일 ID나 도메인 변경 시 전체 이메일 자동 조합
-      if (name === 'emailId' || name === 'emailDomain') {
-        updated.email = updated.emailId && updated.emailDomain
-          ? `${updated.emailId}@${updated.emailDomain}`
-          : '';
+      if (name === 'emailId' || name === 'emailDomain' || name === 'customEmailDomain') {
+        const finalEmail = updated.emailDomain === 'custom'
+          ? (updated.emailId && updated.customEmailDomain ? `${updated.emailId}@${updated.customEmailDomain}` : '')
+          : (updated.emailId && updated.emailDomain ? `${updated.emailId}@${updated.emailDomain}` : '');
+        updated.email = finalEmail;
+
+        // 이메일 변경 시 인증 상태 초기화
+        if (emailVerified || emailVerificationSent) {
+          setEmailVerified(false);
+          setEmailVerificationSent(false);
+        }
       }
       return updated;
     });
@@ -139,6 +178,64 @@ const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
     setPets(updatedPets);
   };
 
+  // 이메일 인증 메일 발송 (회원가입 전)
+  const handleSendVerificationEmail = async () => {
+    // 이메일 필수 검증
+    if (!formData.emailId || formData.emailId.trim().length === 0) {
+      setError('이메일 아이디를 입력해주세요.');
+      return;
+    }
+    if (!formData.emailDomain || formData.emailDomain.trim().length === 0) {
+      setError('이메일 도메인을 선택해주세요.');
+      return;
+    }
+    if (formData.emailDomain === 'custom' && (!formData.customEmailDomain || formData.customEmailDomain.trim().length === 0)) {
+      setError('이메일 도메인을 입력해주세요.');
+      return;
+    }
+
+    // 최종 이메일 조합
+    const finalEmail = formData.emailDomain === 'custom'
+      ? `${formData.emailId}@${formData.customEmailDomain}`
+      : `${formData.emailId}@${formData.emailDomain}`;
+
+    setEmailVerificationSending(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      await userProfileApi.sendPreRegistrationVerificationEmail(finalEmail);
+      setEmailVerificationSent(true);
+      setSuccess('이메일 인증 메일이 발송되었습니다. 이메일을 확인해주세요.');
+    } catch (error) {
+      console.error('이메일 인증 메일 발송 실패:', error);
+      setError(error.response?.data?.message || '이메일 발송에 실패했습니다.');
+    } finally {
+      setEmailVerificationSending(false);
+    }
+  };
+
+  // 이메일 인증 완료 여부 확인 (주기적으로 체크)
+  useEffect(() => {
+    if (!emailVerified && emailVerificationSent && formData.email) {
+      const checkVerification = async () => {
+        try {
+          const response = await userProfileApi.checkPreRegistrationVerification(formData.email);
+          if (response.data.verified) {
+            setEmailVerified(true);
+            setSuccess('이메일 인증이 완료되었습니다. 회원가입을 진행해주세요.');
+          }
+        } catch (error) {
+          // 에러는 무시 (아직 인증 안 됨)
+        }
+      };
+
+      // 3초마다 확인 (이메일 발송 후에만)
+      const interval = setInterval(checkVerification, 3000);
+      return () => clearInterval(interval);
+    }
+  }, [formData.email, emailVerified, emailVerificationSent]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -195,6 +292,28 @@ const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
       return;
     }
 
+    // 이메일 인증 안했으면 경고
+    if (!emailVerified) {
+      const restrictedFeatures = [
+        '게시글 수정/삭제',
+        '댓글 수정/삭제',
+        '펫케어 서비스 이용',
+        '모임 생성/참여',
+        '리뷰 작성',
+        '실종 제보 작성'
+      ];
+
+      const confirmMessage = `이메일 인증을 하지 않으면 다음 기능들이 제한됩니다:\n\n${restrictedFeatures.join('\n')}\n\n그래도 회원가입을 진행하시겠습니까?`;
+
+      const proceed = window.confirm(confirmMessage);
+
+      if (!proceed) {
+        // 이메일 인증 안내
+        setError('이메일 인증을 완료한 후 회원가입을 진행해주세요. 이메일 인증 버튼을 클릭하여 인증 메일을 받아주세요.');
+        return;
+      }
+    }
+
     // 반려동물 필수 필드 검증
     for (let i = 0; i < pets.length; i++) {
       const pet = pets[i];
@@ -240,11 +359,16 @@ const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
     try {
       const response = await register(submitData);
 
-      setSuccess('회원가입 성공! 로그인해주세요.');
+      // 회원가입 성공 메시지
+      if (emailVerified) {
+        setSuccess('회원가입 성공! 이메일 인증이 완료되어 모든 기능을 이용하실 수 있습니다. 로그인해주세요.');
+      } else {
+        setSuccess('회원가입 성공! 입력하신 이메일로 인증 메일이 발송되었습니다. 이메일 인증을 완료하면 더 많은 기능을 이용할 수 있습니다.');
+      }
 
       // 회원가입 성공 시 콜백 호출
       if (onRegisterSuccess) {
-        onRegisterSuccess(response.user);
+        onRegisterSuccess(response.user || response);
       }
 
     } catch (error) {
@@ -394,6 +518,31 @@ const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
               />
             )}
           </EmailInputGroup>
+          {emailVerified ? (
+            <EmailVerificationStatus verified={true}>
+              ✓ 이메일 인증 완료
+            </EmailVerificationStatus>
+          ) : (
+            <>
+              <EmailVerificationStatus verified={false}>
+                ⚠ 이메일 인증을 완료하면 더 많은 기능을 이용할 수 있습니다
+              </EmailVerificationStatus>
+              <EmailVerificationButton
+                type="button"
+                onClick={handleSendVerificationEmail}
+                disabled={loading || emailVerificationSending || !formData.emailId || !formData.emailDomain}
+              >
+                {emailVerificationSending ? '발송 중...' : emailVerificationSent ? '인증 메일 재발송' : '이메일 인증 메일 발송'}
+              </EmailVerificationButton>
+              {emailVerificationSent && !emailVerified && (
+                <EmailVerificationInfo>
+                  이메일 인증 메일이 발송되었습니다. 이메일을 확인하여 인증을 완료해주세요.
+                  <br />
+                  인증 완료 후 자동으로 인증 상태가 업데이트됩니다.
+                </EmailVerificationInfo>
+              )}
+            </>
+          )}
         </InputGroup>
 
         <InputGroup>
@@ -1049,6 +1198,44 @@ const EmailDomainSelect = styled.select`
     background: #f5f5f5;
     cursor: not-allowed;
   }
+`;
+
+const EmailVerificationStatus = styled.div`
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  font-size: 0.875rem;
+  color: ${props => props.verified ? '#4caf50' : '#ff9800'};
+  font-weight: ${props => props.verified ? '600' : '500'};
+`;
+
+const EmailVerificationButton = styled.button`
+  margin-top: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: ${props => props.theme.colors.primary || '#007bff'};
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: ${props => props.disabled ? 'not-allowed' : 'pointer'};
+  opacity: ${props => props.disabled ? 0.6 : 1};
+  transition: all 0.2s ease;
+  
+  &:hover:not(:disabled) {
+    background: ${props => props.theme.colors.primaryDark || '#0056b3'};
+    transform: translateY(-1px);
+  }
+`;
+
+const EmailVerificationInfo = styled.div`
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  background: #e3f2fd;
+  border-left: 3px solid #2196f3;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  color: #1976d2;
+  line-height: 1.5;
 `;
 
 const EmailCustomInput = styled.input`

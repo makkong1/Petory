@@ -134,17 +134,26 @@ public class UsersService {
         user.setProfileImage(null);
         user.setBirthDate(null);
         user.setGender(null);
-        user.setEmailVerified(false); // 일반 회원가입은 이메일 인증 안 됨
+
+        // 회원가입 전 이메일 인증 완료 여부 확인
+        boolean preVerified = emailVerificationService.isPreRegistrationEmailVerified(dto.getEmail());
+        user.setEmailVerified(preVerified); // 회원가입 전 인증 완료했으면 true, 아니면 false
 
         Users saved = usersRepository.save(user);
 
-        // 회원가입 시 이메일 인증 메일 자동 발송
-        try {
-            emailVerificationService.sendVerificationEmail(saved.getId(), EmailVerificationPurpose.PASSWORD_RESET);
-            log.info("회원가입 이메일 인증 메일 발송: userId={}, email={}", saved.getId(), saved.getEmail());
-        } catch (Exception e) {
-            log.error("회원가입 이메일 인증 메일 발송 실패: userId={}, error={}", saved.getId(), e.getMessage(), e);
-            // 이메일 발송 실패해도 회원가입은 성공으로 처리
+        // 회원가입 전 이메일 인증을 완료한 경우 Redis에서 인증 상태 삭제
+        if (preVerified) {
+            emailVerificationService.removePreRegistrationVerification(dto.getEmail());
+            log.info("회원가입 완료 및 이메일 인증 상태 적용: userId={}, email={}", saved.getId(), saved.getEmail());
+        } else {
+            // 이메일 인증 안 했으면 회원가입 후 인증 메일 발송
+            try {
+                emailVerificationService.sendVerificationEmail(saved.getId(), EmailVerificationPurpose.REGISTRATION);
+                log.info("회원가입 후 이메일 인증 메일 발송: userId={}, email={}", saved.getId(), saved.getEmail());
+            } catch (Exception e) {
+                log.error("회원가입 이메일 인증 메일 발송 실패: userId={}, error={}", saved.getId(), e.getMessage(), e);
+                // 이메일 발송 실패해도 회원가입은 성공으로 처리
+            }
         }
 
         return usersConverter.toDTO(saved);
