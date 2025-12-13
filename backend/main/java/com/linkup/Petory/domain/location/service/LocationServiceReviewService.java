@@ -7,6 +7,7 @@ import com.linkup.Petory.domain.location.entity.LocationServiceReview;
 import com.linkup.Petory.domain.location.repository.LocationServiceRepository;
 import com.linkup.Petory.domain.location.repository.LocationServiceReviewRepository;
 import com.linkup.Petory.domain.user.entity.Users;
+import com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -42,6 +43,11 @@ public class LocationServiceReviewService {
         Users user = usersRepository.findById(reviewDTO.getUserIdx())
                 .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
 
+        // 이메일 인증 확인
+        if (user.getEmailVerified() == null || !user.getEmailVerified()) {
+            throw new EmailVerificationRequiredException("리뷰 작성을 위해 이메일 인증이 필요합니다.");
+        }
+
         LocationServiceReview review = LocationServiceReview.builder()
                 .service(service)
                 .user(user)
@@ -63,6 +69,12 @@ public class LocationServiceReviewService {
         LocationServiceReview review = reviewRepository.findById(reviewIdx)
                 .orElseThrow(() -> new RuntimeException("리뷰를 찾을 수 없습니다."));
 
+        // 이메일 인증 확인
+        Users user = review.getUser();
+        if (user.getEmailVerified() == null || !user.getEmailVerified()) {
+            throw new EmailVerificationRequiredException("리뷰 수정을 위해 이메일 인증이 필요합니다.");
+        }
+
         review.setRating(reviewDTO.getRating());
         review.setComment(reviewDTO.getComment());
 
@@ -79,6 +91,12 @@ public class LocationServiceReviewService {
     public void deleteReview(Long reviewIdx) {
         LocationServiceReview review = reviewRepository.findById(reviewIdx)
                 .orElseThrow(() -> new RuntimeException("리뷰를 찾을 수 없습니다."));
+
+        // 이메일 인증 확인
+        Users user = review.getUser();
+        if (user.getEmailVerified() == null || !user.getEmailVerified()) {
+            throw new EmailVerificationRequiredException("리뷰 삭제를 위해 이메일 인증이 필요합니다.");
+        }
 
         Long serviceIdx = review.getService().getIdx();
         reviewRepository.delete(review);

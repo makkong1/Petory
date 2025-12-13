@@ -328,7 +328,7 @@ const MyProfilePage = () => {
       <Header>
         <Title>내 프로필</Title>
         <UserInfo>
-          <UserName>{user.username || '사용자'}</UserName>
+          <UserName>{user.nickname || '사용자'}</UserName>
           <UserEmail>{user.email || ''}</UserEmail>
         </UserInfo>
       </Header>

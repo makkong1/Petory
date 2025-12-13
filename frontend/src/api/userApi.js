@@ -141,11 +141,23 @@ export const userProfileApi = {
   checkNicknameAvailability: (nickname) =>
     profileApi.get('/nickname/check', { params: { nickname } }),
 
+  // 아이디 중복 검사
+  checkIdAvailability: (id) =>
+    profileApi.get('/id/check', { params: { id } }),
+
   // 다른 사용자의 프로필 조회 (리뷰 포함)
   getUserProfile: (userId) => profileApi.get(`/${userId}/profile`),
 
   // 특정 사용자의 리뷰 목록 조회
   getUserReviews: (userId) => profileApi.get(`/${userId}/reviews`),
+
+  // 이메일 인증 메일 발송
+  sendVerificationEmail: (purpose) =>
+    profileApi.post('/email/verify', { purpose }),
+
+  // 이메일 인증 처리
+  verifyEmail: (token) =>
+    profileApi.get(`/email/verify/${token}`),
 };
 
 // 펫 관리 API

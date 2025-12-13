@@ -13,8 +13,10 @@ import com.linkup.Petory.domain.care.entity.CareRequestStatus;
 import com.linkup.Petory.domain.care.repository.CareRequestRepository;
 import com.linkup.Petory.domain.user.entity.Pet;
 import com.linkup.Petory.domain.user.entity.Users;
+import com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException;
 import com.linkup.Petory.domain.user.repository.PetRepository;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
+import com.linkup.Petory.domain.user.service.EmailVerificationService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -26,6 +28,7 @@ public class CareRequestService {
     private final UsersRepository usersRepository;
     private final PetRepository petRepository;
     private final CareRequestConverter careRequestConverter;
+    private final EmailVerificationService emailVerificationService;
 
     // 전체 케어 요청 조회 (필터링 포함) - 작성자도 활성 상태여야 함
     @Transactional(readOnly = true)
@@ -65,9 +68,13 @@ public class CareRequestService {
     // 케어 요청 생성
     @Transactional
     public CareRequestDTO createCareRequest(CareRequestDTO dto) {
-        // 요청자 조회
+        // 이메일 인증 확인
         Users user = usersRepository.findById(dto.getUserId())
                 .orElseThrow(() -> new RuntimeException("User not found"));
+        
+        if (user.getEmailVerified() == null || !user.getEmailVerified()) {
+            throw new EmailVerificationRequiredException("펫케어 서비스 이용을 위해 이메일 인증이 필요합니다.");
+        }
 
         CareRequest.CareRequestBuilder builder = CareRequest.builder()
                 .title(dto.getTitle())

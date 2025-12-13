@@ -63,6 +63,11 @@ public class MissingPetBoardService {
         Users user = usersRepository.findById(dto.getUserId())
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
+        // 이메일 인증 확인
+        if (user.getEmailVerified() == null || !user.getEmailVerified()) {
+            throw new com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException("실종 제보 작성을 위해 이메일 인증이 필요합니다.");
+        }
+
         MissingPetBoard board = MissingPetBoard.builder()
                 .user(user)
                 .title(dto.getTitle())
@@ -92,6 +97,12 @@ public class MissingPetBoardService {
     public MissingPetBoardDTO updateBoard(Long id, MissingPetBoardDTO dto) {
         MissingPetBoard board = boardRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Missing pet board not found"));
+
+        // 이메일 인증 확인
+        Users user = board.getUser();
+        if (user.getEmailVerified() == null || !user.getEmailVerified()) {
+            throw new com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException("실종 제보 수정을 위해 이메일 인증이 필요합니다.");
+        }
 
         if (StringUtils.hasText(dto.getTitle())) {
             board.setTitle(dto.getTitle());
@@ -152,6 +163,12 @@ public class MissingPetBoardService {
     public void deleteBoard(Long id) {
         MissingPetBoard board = boardRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Missing pet board not found"));
+
+        // 이메일 인증 확인
+        Users user = board.getUser();
+        if (user.getEmailVerified() == null || !user.getEmailVerified()) {
+            throw new com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException("실종 제보 삭제를 위해 이메일 인증이 필요합니다.");
+        }
         // soft delete board and related comments
         board.setIsDeleted(true);
         board.setDeletedAt(java.time.LocalDateTime.now());

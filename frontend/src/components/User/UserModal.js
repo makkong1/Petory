@@ -84,7 +84,7 @@ const UserModal = ({ user, onClose }) => {
         // 수정
         const originalRole = user.role;
         const newRole = formData.role;
-        
+
         // 역할이 ADMIN으로 변경되는 경우 (일반 사용자 -> ADMIN)
         if (originalRole !== 'ADMIN' && originalRole !== 'MASTER' && newRole === 'ADMIN') {
           // 일반 사용자를 ADMIN으로 승격
@@ -155,7 +155,7 @@ const UserModal = ({ user, onClose }) => {
           </FormGroup>
 
           <FormGroup>
-            <Label>사용자명 *</Label>
+            <Label>이름 *</Label>
             <Input
               type="text"
               name="username"

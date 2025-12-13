@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.linkup.Petory.domain.board.converter.CommentConverter;
 import com.linkup.Petory.domain.user.entity.Users;
+import com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 import com.linkup.Petory.domain.board.dto.CommentDTO;
 import com.linkup.Petory.domain.board.entity.Board;
@@ -105,6 +106,40 @@ public class CommentService {
 
     @CacheEvict(value = "boardDetail", key = "#boardId")
     @Transactional
+    public CommentDTO updateComment(Long boardId, Long commentId, CommentDTO dto) {
+        Board board = boardRepository.findById(boardId)
+                .orElseThrow(() -> new IllegalArgumentException("Board not found"));
+        Comment comment = commentRepository.findById(commentId)
+                .orElseThrow(() -> new IllegalArgumentException("Comment not found"));
+
+        if (!comment.getBoard().getIdx().equals(board.getIdx())) {
+            throw new IllegalArgumentException("Comment does not belong to the specified board");
+        }
+
+        // 이메일 인증 확인
+        Users user = comment.getUser();
+        if (user.getEmailVerified() == null || !user.getEmailVerified()) {
+            throw new EmailVerificationRequiredException("댓글 수정을 위해 이메일 인증이 필요합니다.");
+        }
+
+        // 댓글 내용 업데이트
+        if (dto.getContent() != null) {
+            comment.setContent(dto.getContent());
+        }
+
+        Comment saved = commentRepository.save(comment);
+
+        // 첨부파일 업데이트
+        if (dto.getCommentFilePath() != null) {
+            attachmentFileService.syncSingleAttachment(FileTargetType.COMMENT, saved.getIdx(), dto.getCommentFilePath(),
+                    null);
+        }
+
+        return mapWithReactionCounts(saved);
+    }
+
+    @CacheEvict(value = "boardDetail", key = "#boardId")
+    @Transactional
     public void deleteComment(Long boardId, Long commentId) {
         Board board = boardRepository.findById(boardId)
                 .orElseThrow(() -> new IllegalArgumentException("Board not found"));
@@ -113,6 +148,12 @@ public class CommentService {
 
         if (!comment.getBoard().getIdx().equals(board.getIdx())) {
             throw new IllegalArgumentException("Comment does not belong to the specified board");
+        }
+
+        // 이메일 인증 확인
+        Users user = comment.getUser();
+        if (user.getEmailVerified() == null || !user.getEmailVerified()) {
+            throw new EmailVerificationRequiredException("댓글 삭제를 위해 이메일 인증이 필요합니다.");
         }
 
         // Soft delete instead of physical delete

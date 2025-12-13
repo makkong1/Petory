@@ -9,6 +9,8 @@ import com.linkup.Petory.domain.care.dto.CareReviewDTO;
 import com.linkup.Petory.domain.care.service.CareReviewService;
 import com.linkup.Petory.domain.user.dto.UsersDTO;
 import com.linkup.Petory.domain.user.dto.UserProfileWithReviewsDTO;
+import com.linkup.Petory.domain.user.entity.EmailVerificationPurpose;
+import com.linkup.Petory.domain.user.service.EmailVerificationService;
 import com.linkup.Petory.domain.user.service.UsersService;
 
 import lombok.RequiredArgsConstructor;
@@ -29,6 +31,7 @@ public class UserProfileController {
 
     private final UsersService usersService;
     private final CareReviewService careReviewService;
+    private final EmailVerificationService emailVerificationService;
 
     /**
      * 현재 로그인한 사용자의 ID 추출
@@ -121,6 +124,83 @@ public class UserProfileController {
             "available", available,
             "message", available ? "사용 가능한 닉네임입니다." : "이미 사용 중인 닉네임입니다."
         ));
+    }
+
+    /**
+     * 아이디 중복 검사
+     */
+    @GetMapping("/id/check")
+    public ResponseEntity<Map<String, Object>> checkIdAvailability(@RequestParam String id) {
+        boolean available = usersService.checkIdAvailability(id);
+        return ResponseEntity.ok(Map.of(
+            "available", available,
+            "message", available ? "사용 가능한 아이디입니다." : "이미 사용 중인 아이디입니다."
+        ));
+    }
+
+    /**
+     * 이메일 인증 메일 발송
+     */
+    @PostMapping("/email/verify")
+    public ResponseEntity<Map<String, Object>> sendVerificationEmail(@RequestBody Map<String, String> request) {
+        String userId = getCurrentUserId();
+        String purposeStr = request.get("purpose");
+        
+        if (purposeStr == null || purposeStr.isEmpty()) {
+            throw new IllegalArgumentException("인증 용도(purpose)를 지정해주세요.");
+        }
+
+        try {
+            EmailVerificationPurpose purpose = EmailVerificationPurpose.valueOf(purposeStr.toUpperCase());
+            emailVerificationService.sendVerificationEmail(userId, purpose);
+            
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "이메일 인증 메일이 발송되었습니다."
+            ));
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("유효하지 않은 인증 용도입니다: " + purposeStr);
+        }
+    }
+
+    /**
+     * 이메일 인증 처리
+     */
+    @GetMapping("/email/verify/{token}")
+    public ResponseEntity<Map<String, Object>> verifyEmail(@PathVariable String token) {
+        try {
+            EmailVerificationPurpose purpose = emailVerificationService.verifyEmail(token);
+            
+            // 용도에 따른 리다이렉트 URL 생성
+            String redirectUrl = getRedirectUrl(purpose);
+            
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "이메일 인증이 완료되었습니다.",
+                "purpose", purpose.name(),
+                "redirectUrl", redirectUrl
+            ));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "message", e.getMessage()
+            ));
+        }
+    }
+
+    /**
+     * 용도에 따른 리다이렉트 URL 생성
+     */
+    private String getRedirectUrl(EmailVerificationPurpose purpose) {
+        return switch (purpose) {
+            case PASSWORD_RESET -> "/password-reset";
+            case PET_CARE -> "/care-requests";
+            case MEETUP -> "/meetups";
+            case LOCATION_REVIEW -> "/location-services";
+            case BOARD_EDIT -> "/boards";
+            case COMMENT_EDIT -> "/boards";
+            case MISSING_PET -> "/missing-pets";
+        };
     }
 
     /**

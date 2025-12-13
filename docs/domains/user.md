@@ -11,6 +11,7 @@
   - 반려동물 등록/관리
   - 사용자 제재 시스템 (경고, 이용제한, 영구 차단)
   - 소프트 삭제 (회원 탈퇴)
+  - **이메일 인증 시스템**: 비밀번호 변경, 펫케어/모임 서비스 이용을 위한 인증
 
 ### 1.2 기능 시연
 > **스크린샷/영상 링크**: [기능 작동 영상 또는 스크린샷 추가]
@@ -49,6 +50,19 @@
   1. 경고 3회 누적 시 자동 이용제한 3일 적용
   2. 이용제한 기간 만료 시 자동 해제 (스케줄러)
   3. 영구 차단 시 로그인 불가
+- **스크린샷/영상**: 
+
+#### 주요 기능 4: 이메일 인증 시스템
+- **설명**: 단일 이메일 인증 시스템으로 비밀번호 변경, 펫케어/모임 서비스 이용을 위한 인증을 제공합니다. 소셜 로그인 사용자는 자동으로 이메일 인증이 완료되며, 일반 회원가입 사용자는 이메일 인증 링크를 통해 인증을 완료합니다.
+- **사용자 시나리오**:
+  1. **소셜 로그인**: Google/Naver 로그인 시 자동으로 `emailVerified = true` 설정
+  2. **일반 회원가입**: 회원가입 시 이메일 인증 메일 발송 → 링크 클릭 시 인증 완료
+  3. **비밀번호 변경**: 비밀번호 재설정 전 이메일 인증 필수 확인
+  4. **펫케어 서비스**: 펫케어 요청/지원 시 이메일 인증 확인 → 미인증 시 모달 표시 및 인증 페이지로 리다이렉트
+  5. **모임 서비스**: 모임 생성/참여 시 이메일 인증 확인 → 미인증 시 모달 표시 및 인증 페이지로 리다이렉트
+- **권한 제어**:
+  - 인증 안 된 사용자: 주변 서비스, 커뮤니티는 조회 가능, 펫케어/모임은 이용 불가
+  - 인증 완료 후: 모든 서비스 이용 가능
 - **스크린샷/영상**: 
 
 ---
@@ -222,7 +236,79 @@ public UserSanction addWarning(Long userId, String reason, Long adminId, Long re
 - **주요 판단 기준**: 경고 횟수 >= 3회
 - **자동화**: 스케줄러로 만료된 이용제한 자동 해제
 
-#### 로직 3: 프로필 수정 시 중복 체크
+#### 로직 3: 이메일 인증 시스템
+```java
+// EmailVerificationService.java
+@Transactional
+public void sendVerificationEmail(String userId, EmailVerificationPurpose purpose) {
+    Users user = usersRepository.findByIdString(userId).orElseThrow();
+    
+    // 인증 토큰 생성 (JWT 기반, purpose 포함)
+    String token = jwtUtil.createEmailVerificationToken(userId, purpose);
+    
+    // 이메일 발송 (비동기)
+    emailService.sendVerificationEmail(user.getEmail(), token, purpose);
+}
+
+@Transactional
+public void verifyEmail(String token) {
+    // 토큰 검증 및 사용자 ID, purpose 추출
+    String userId = jwtUtil.extractUserIdFromEmailToken(token);
+    EmailVerificationPurpose purpose = jwtUtil.extractPurposeFromEmailToken(token);
+    
+    Users user = usersRepository.findByIdString(userId).orElseThrow();
+    
+    // 이메일 인증 완료 (용도 무관, 단일 인증 상태로 업데이트)
+    user.setEmailVerified(true);
+    usersRepository.save(user);
+    
+    // 용도별 후속 처리 (필요 시)
+    switch (purpose) {
+        case PASSWORD_RESET -> {
+            // 비밀번호 재설정 페이지로 리다이렉트
+        }
+        case PET_CARE -> {
+            // 펫케어 서비스 페이지로 리다이렉트
+        }
+        case MEETUP -> {
+            // 모임 서비스 페이지로 리다이렉트
+        }
+    }
+}
+
+// 서비스 레벨 권한 체크 예시 (CareRequestService.java)
+@PreAuthorize("isAuthenticated()")
+public CareRequestDTO createCareRequest(CareRequestDTO dto) {
+    String userId = getCurrentUserId();
+    Users user = usersRepository.findByIdString(userId).orElseThrow();
+    
+    // 이메일 인증 확인
+    if (user.getEmailVerified() == null || !user.getEmailVerified()) {
+        throw new EmailVerificationRequiredException("이메일 인증이 필요합니다.");
+    }
+    
+    // 펫케어 요청 생성 로직...
+}
+```
+
+**설명**:
+- **핵심 원칙**: 이메일 인증은 **하나의 통합 시스템**으로 구현, 용도(purpose)만 분리
+- **처리 흐름**: 
+  1. 인증 토큰 생성 (JWT 기반, purpose 포함)
+  2. 이메일 발송 (비동기)
+  3. 링크 클릭 시 토큰 검증
+  4. `emailVerified = true` 업데이트 (용도 무관)
+  5. 용도별 후속 처리 (리다이렉트 등)
+- **주요 판단 기준**: 
+  - 소셜 로그인: 자동 인증 (Google: `email_verified`, Naver: 기본 `true`)
+  - 일반 회원가입: 수동 인증 (이메일 링크 클릭)
+- **권한 제어**: 서비스 레벨에서 `emailVerified` 필드 확인
+- **특징**: 
+  - 단일 인증 상태 (`emailVerified` 필드 하나로 관리)
+  - 용도는 토큰에만 포함 (인증 완료 후 용도 무관)
+  - 서비스별 독립적인 권한 체크
+
+#### 로직 4: 프로필 수정 시 중복 체크
 ```java
 // UsersService.java
 public UsersDTO updateMyProfile(String userId, UsersDTO dto) {
@@ -281,10 +367,19 @@ public UsersDTO updateMyProfile(String userId, UsersDTO dto) {
 #### UsersService
 | 메서드 | 설명 | 주요 로직 |
 |--------|------|-----------|
-| `createUser()` | 회원가입 | 비밀번호 암호화, 사용자 저장 |
+| `createUser()` | 회원가입 | 비밀번호 암호화, 사용자 저장, 이메일 인증 메일 발송 |
 | `updateMyProfile()` | 프로필 수정 | 중복 체크, 필드 업데이트 |
-| `changePassword()` | 비밀번호 변경 | 현재 비밀번호 확인, 새 비밀번호 암호화 |
+| `changePassword()` | 비밀번호 변경 | 이메일 인증 확인, 현재 비밀번호 확인, 새 비밀번호 암호화 |
 | `deleteUser()` | 회원 탈퇴 | 소프트 삭제 (isDeleted = true) |
+| `checkIdAvailability()` | 아이디 중복 검사 | 아이디 사용 가능 여부 확인 |
+| `checkNicknameAvailability()` | 닉네임 중복 검사 | 닉네임 사용 가능 여부 확인 |
+
+#### EmailVerificationService
+| 메서드 | 설명 | 주요 로직 |
+|--------|------|-----------|
+| `sendVerificationEmail()` | 인증 메일 발송 | 인증 토큰 생성, 이메일 발송 (비동기) |
+| `verifyEmail()` | 이메일 인증 처리 | 토큰 검증, `emailVerified = true` 업데이트 |
+| `checkEmailVerification()` | 인증 상태 확인 | 사용자의 이메일 인증 여부 확인 |
 
 #### PetService
 | 메서드 | 설명 | 주요 로직 |
@@ -333,6 +428,7 @@ domain/user/
   │   ├── PetService.java              # 반려동물 비즈니스 로직
   │   ├── UserSanctionService.java     # 제재 비즈니스 로직
   │   ├── OAuth2Service.java           # 소셜 로그인 비즈니스 로직
+  │   ├── EmailVerificationService.java # 이메일 인증 비즈니스 로직
   │   ├── GoogleOAuth2UserService.java # Google OAuth2 사용자 서비스
   │   ├── NaverOAuth2UserService.java  # Naver OAuth2 사용자 서비스
   │   ├── OAuth2UserProviderRouter.java # Provider별 라우터
@@ -372,6 +468,11 @@ public class Users {
     private String email;                  // 이메일 (UNIQUE)
     private String phone;                  // 전화번호
     private String password;               // 비밀번호 (암호화)
+    private String profileImage;           // 프로필 이미지 URL (소셜 로그인)
+    private String birthDate;              // 생년월일 (소셜 로그인)
+    private String gender;                 // 성별 (소셜 로그인)
+    private Boolean emailVerified;         // 이메일 인증 여부
+    private String nickname;               // 닉네임 (소셜 로그인 사용자 필수)
     private Role role;                     // 역할 (USER, ADMIN)
     private String location;               // 위치
     private String petInfo;                // 반려동물 정보
@@ -481,6 +582,10 @@ erDiagram
 | `/api/users/profile` | PUT | 프로필 수정 | `UsersDTO` → `UsersDTO` |
 | `/api/users/pets` | GET | 내 반려동물 목록 | - → `List<PetDTO>` |
 | `/api/users/pets` | POST | 반려동물 등록 | `PetDTO` → `PetDTO` |
+| `/api/users/id/check` | GET | 아이디 중복 검사 | `id` → `{available: boolean}` |
+| `/api/users/nickname/check` | GET | 닉네임 중복 검사 | `nickname` → `{available: boolean}` |
+| `/api/users/email/verify` | POST | 이메일 인증 메일 발송 | `purpose` → `204 No Content` |
+| `/api/users/email/verify/{token}` | GET | 이메일 인증 처리 | - → 리다이렉트 |
 | `/api/admin/users` | GET | 사용자 목록 (관리자) | `page`, `size` → `UserPageResponseDTO` |
 | `/api/admin/users/{id}/warn` | POST | 경고 부여 | `reason` → `UserSanction` |
 | `/api/admin/users/{id}/suspend` | POST | 이용제한 부여 | `days`, `reason` → `UserSanction` |

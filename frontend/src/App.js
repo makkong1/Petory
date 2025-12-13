@@ -19,6 +19,7 @@ import ActivityPage from './components/Activity/ActivityPage';
 import MeetupPage from './components/Meetup/MeetupPage';
 import ChatWidget from './components/Chat/ChatWidget';
 import MyProfilePage from './components/User/MyProfilePage';
+import EmailVerificationPage from './components/Auth/EmailVerificationPage';
 import { setupApiInterceptors } from './api/authApi';
 
 
@@ -81,9 +82,17 @@ function AppContent() {
   const [isOAuth2Callback, setIsOAuth2Callback] = useState(() => {
     if (typeof window === 'undefined') return false;
     const urlParams = new URLSearchParams(window.location.search);
-    return window.location.pathname.includes('oauth2/callback') || 
-           urlParams.has('accessToken') ||
-           urlParams.has('error');
+    return window.location.pathname.includes('oauth2/callback') ||
+      urlParams.has('accessToken') ||
+      urlParams.has('error');
+  });
+
+  // 이메일 인증 페이지 체크
+  const [isEmailVerificationPage, setIsEmailVerificationPage] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    const urlParams = new URLSearchParams(window.location.search);
+    return window.location.pathname.includes('email-verify') ||
+      urlParams.has('token');
   });
 
   // 로딩 중일 때
@@ -93,6 +102,11 @@ function AppContent() {
         로딩 중...
       </LoadingContainer>
     );
+  }
+
+  // 이메일 인증 페이지 처리 (인증 여부와 관계없이 접근 가능)
+  if (isEmailVerificationPage) {
+    return <EmailVerificationPage />;
   }
 
   // OAuth2 콜백 처리
