@@ -1,9 +1,9 @@
 package com.linkup.Petory.domain.user.entity;
 
-import java.time.LocalDateTime;
-
 import jakarta.persistence.*;
 import lombok.*;
+
+import com.linkup.Petory.domain.common.BaseTimeEntity;
 
 @Entity
 @Table(name = "socialuser")
@@ -12,13 +12,13 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class SocialUser {
+public class SocialUser extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long idx;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "users_idx", nullable = false)
     private Users user;
 
@@ -46,17 +46,4 @@ public class SocialUser {
     @Column(name = "provider_age_range", length = 20)
     private String providerAgeRange; // Provider별 나이대 (네이버: 20-29 형식)
 
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
-
-    @PrePersist
-    protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
-        this.updatedAt = LocalDateTime.now();
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        this.updatedAt = LocalDateTime.now();
-    }
 }

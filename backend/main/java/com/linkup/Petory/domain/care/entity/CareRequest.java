@@ -7,6 +7,8 @@ import java.util.List;
 
 import com.linkup.Petory.domain.user.entity.Users;
 
+import com.linkup.Petory.domain.common.BaseTimeEntity;
+
 @Entity
 @Table(name = "carerequest")
 @Getter
@@ -14,13 +16,13 @@ import com.linkup.Petory.domain.user.entity.Users;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class CareRequest {
+public class CareRequest extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long idx;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_idx", nullable = false)
     private Users user; // 요청자
 
@@ -40,9 +42,6 @@ public class CareRequest {
     @Builder.Default
     private CareRequestStatus status = CareRequestStatus.OPEN;
 
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
-
     @Column(name = "is_deleted")
     @Builder.Default
     private Boolean isDeleted = false;
@@ -56,14 +55,4 @@ public class CareRequest {
     @OneToMany(mappedBy = "careRequest", cascade = CascadeType.ALL)
     private List<CareRequestComment> comments;
 
-    @PrePersist
-    protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
-        this.updatedAt = LocalDateTime.now();
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        this.updatedAt = LocalDateTime.now();
-    }
 }
