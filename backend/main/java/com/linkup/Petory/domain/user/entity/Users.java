@@ -6,6 +6,8 @@ import java.util.List;
 import jakarta.persistence.*;
 import lombok.*;
 
+import com.linkup.Petory.domain.common.BaseTimeEntity;
+
 @Entity
 @Table(name = "users")
 @Getter
@@ -13,7 +15,7 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Users {
+public class Users extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -25,6 +27,9 @@ public class Users {
     @Column(nullable = false, unique = true)
     private String username;
 
+    @Column(length = 50, unique = true)
+    private String nickname; // 닉네임 (소셜 로그인 사용자 필수 설정)
+
     @Column(nullable = false, unique = true)
     private String email;
 
@@ -34,6 +39,19 @@ public class Users {
     @Column(nullable = false)
     private String password;
 
+    // OAuth2 소셜 로그인 관련 필드
+    @Column(name = "profile_image", length = 500)
+    private String profileImage; // 프로필 이미지 URL (구글 picture, 네이버 profile_image)
+
+    @Column(name = "birth_date", length = 20)
+    private String birthDate; // 생년월일 (네이버: birthyear + birthday 조합, 형식: YYYY-MM-DD)
+
+    @Column(name = "gender", length = 10)
+    private String gender; // 성별 (네이버: M/F, 구글: 제공 안 함)
+
+    @Column(name = "email_verified")
+    private Boolean emailVerified; // 이메일 인증 여부 (구글: email_verified, 네이버: 기본 true)
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Role role;
@@ -42,9 +60,6 @@ public class Users {
 
     @Lob
     private String petInfo;
-
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
     private List<SocialUser> socialUsers;
@@ -82,26 +97,6 @@ public class Users {
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Pet> pets; // 등록한 애완동물 목록
-
-    @PrePersist
-    protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
-        this.updatedAt = LocalDateTime.now();
-        if (this.status == null) {
-            this.status = UserStatus.ACTIVE;
-        }
-        if (this.warningCount == null) {
-            this.warningCount = 0;
-        }
-        if (this.isDeleted == null) {
-            this.isDeleted = false;
-        }
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        this.updatedAt = LocalDateTime.now();
-    }
 
     /**
      * 현재 제재 상태인지 확인

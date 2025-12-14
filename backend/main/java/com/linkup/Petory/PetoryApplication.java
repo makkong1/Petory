@@ -18,6 +18,7 @@ import org.springframework.web.filter.HiddenHttpMethodFilter;
 @EnableScheduling // 주기적 작업을 활성화
 @EnableAsync
 @EnableCaching
+@org.springframework.data.jpa.repository.config.EnableJpaAuditing // JPA Auditing 활성화
 @EnableMethodSecurity(prePostEnabled = true) // @PreAuthorize 작동 활성화
 public class PetoryApplication {
 

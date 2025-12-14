@@ -1,5 +1,6 @@
 package com.linkup.Petory.domain.board.entity;
 
+import com.linkup.Petory.domain.common.BaseTimeEntity;
 import com.linkup.Petory.domain.common.ContentStatus;
 import com.linkup.Petory.domain.user.entity.Users;
 import jakarta.persistence.*;
@@ -13,19 +14,20 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Comment {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long idx;
+public class Comment extends BaseTimeEntity {
 
-    @ManyToOne
-    @JoinColumn(name = "board_idx", nullable = false)
-    private Board board;
+	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	private Long idx;
 
-    @ManyToOne
-    @JoinColumn(name = "user_idx", nullable = false)
-    private Users user;
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "board_idx", nullable = false)
+	private Board board;
+
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "user_idx", nullable = false)
+	private Users user;
 
 	@Lob
 	private String content;
@@ -37,8 +39,6 @@ public class Comment {
 
 	// soft delete support
 
-	private LocalDateTime createdAt;
-
 	@Column(name = "is_deleted")
 	@Builder.Default
 	private Boolean isDeleted = false;
@@ -46,9 +46,8 @@ public class Comment {
 	@Column(name = "deleted_at")
 	private LocalDateTime deletedAt;
 
-    @PrePersist
+	@PrePersist
 	protected void onCreate() {
-		this.createdAt = LocalDateTime.now();
 		if (this.status == null) {
 			this.status = ContentStatus.ACTIVE;
 		}

@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 public class CareRequestConverter {
 
     private final PetConverter petConverter;
+    private final CareApplicationConverter careApplicationConverter;
 
     // Entity → DTO
     public CareRequestDTO toDTO(CareRequest request) {
@@ -36,7 +37,14 @@ public class CareRequestConverter {
         // 펫 정보 추가
         if (request.getPet() != null) {
             builder.petIdx(request.getPet().getIdx())
-                   .pet(petConverter.toDTO(request.getPet()));
+                    .pet(petConverter.toDTO(request.getPet()));
+        }
+
+        // 지원 정보 추가
+        if (request.getApplications() != null && !request.getApplications().isEmpty()) {
+            builder.applications(request.getApplications().stream()
+                    .map(careApplicationConverter::toDTO)
+                    .collect(Collectors.toList()));
         }
 
         return builder.build();

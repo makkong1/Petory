@@ -133,11 +133,39 @@ export const userProfileApi = {
   updateMyUsername: (username) =>
     profileApi.patch('/me/username', { username }),
 
+  // 닉네임 설정 (소셜 로그인 사용자용)
+  setNickname: (nickname) =>
+    profileApi.post('/me/nickname', { nickname }),
+
+  // 닉네임 중복 검사
+  checkNicknameAvailability: (nickname) =>
+    profileApi.get('/nickname/check', { params: { nickname } }),
+
+  // 아이디 중복 검사
+  checkIdAvailability: (id) =>
+    profileApi.get('/id/check', { params: { id } }),
+
   // 다른 사용자의 프로필 조회 (리뷰 포함)
   getUserProfile: (userId) => profileApi.get(`/${userId}/profile`),
 
   // 특정 사용자의 리뷰 목록 조회
   getUserReviews: (userId) => profileApi.get(`/${userId}/reviews`),
+
+  // 이메일 인증 메일 발송
+  sendVerificationEmail: (purpose) =>
+    profileApi.post('/email/verify', { purpose }),
+
+  // 이메일 인증 처리
+  verifyEmail: (token) =>
+    profileApi.get(`/email/verify/${token}`),
+
+  // 회원가입 전 이메일 인증 메일 발송 (인증 불필요)
+  sendPreRegistrationVerificationEmail: (email) =>
+    profileApi.post('/email/verify/pre-registration', { email }),
+
+  // 회원가입 전 이메일 인증 완료 여부 확인 (인증 불필요)
+  checkPreRegistrationVerification: (email) =>
+    profileApi.get('/email/verify/pre-registration/check', { params: { email } }),
 };
 
 // 펫 관리 API

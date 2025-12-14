@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.linkup.Petory.domain.board.converter.BoardConverter;
 import com.linkup.Petory.domain.common.ContentStatus;
 import com.linkup.Petory.domain.user.entity.Users;
+import com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 import com.linkup.Petory.domain.board.dto.BoardDTO;
 import com.linkup.Petory.domain.board.dto.BoardPageResponseDTO;
@@ -251,6 +252,12 @@ public class BoardService {
         Board board = boardRepository.findById(idx)
                 .orElseThrow(() -> new RuntimeException("Board not found"));
 
+        // 이메일 인증 확인
+        Users user = board.getUser();
+        if (user.getEmailVerified() == null || !user.getEmailVerified()) {
+            throw new EmailVerificationRequiredException("게시글 수정을 위해 이메일 인증이 필요합니다.");
+        }
+
         if (dto.getTitle() != null)
             board.setTitle(dto.getTitle());
         if (dto.getContent() != null)
@@ -274,6 +281,12 @@ public class BoardService {
     public void deleteBoard(long idx) {
         Board board = boardRepository.findById(idx)
                 .orElseThrow(() -> new RuntimeException("Board not found"));
+
+        // 이메일 인증 확인
+        Users user = board.getUser();
+        if (user.getEmailVerified() == null || !user.getEmailVerified()) {
+            throw new EmailVerificationRequiredException("게시글 삭제를 위해 이메일 인증이 필요합니다.");
+        }
 
         // Soft delete: mark as DELETED and keep related data for audit/hard-delete
         // later

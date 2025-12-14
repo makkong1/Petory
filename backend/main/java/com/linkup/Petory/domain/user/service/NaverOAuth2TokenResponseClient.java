@@ -1,6 +1,5 @@
 package com.linkup.Petory.domain.user.service;
 
-import com.linkup.Petory.domain.user.service.OAuth2DataCollector;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.RequestEntity;
@@ -67,9 +66,6 @@ public class NaverOAuth2TokenResponseClient
             formParameters.add(OAuth2ParameterNames.CLIENT_SECRET,
                     authorizationCodeGrantRequest.getClientRegistration().getClientSecret());
 
-            log.info("Naver 토큰 요청 URI: {}", tokenUri);
-            log.info("Naver 토큰 요청 파라미터: {}", formParameters);
-
             RequestEntity<MultiValueMap<String, String>> requestEntity = RequestEntity
                     .post(tokenUri)
                     .header("Content-Type", "application/x-www-form-urlencoded")
@@ -80,28 +76,12 @@ public class NaverOAuth2TokenResponseClient
                     new ParameterizedTypeReference<Map<String, Object>>() {
                     });
 
-            log.info("========================================");
-            log.info("Naver 토큰 응답 상태 코드: {}", response.getStatusCode());
-            log.info("Naver 토큰 응답 헤더: {}", response.getHeaders());
-            log.info("Naver 토큰 응답 본문 (상세):");
-            log.info("========================================");
-
             // 응답 본문 확인
             Map<String, Object> responseBody = response.getBody();
             if (responseBody == null) {
                 log.error("❌ Naver 토큰 응답 본문이 null입니다.");
                 throw new RestClientException("Naver 토큰 응답 본문이 null입니다.");
             }
-
-            // 상세 로그 출력
-            responseBody.forEach((key, value) -> {
-                String valueStr = value != null ? value.toString() : "null";
-                if (valueStr.length() > 200) {
-                    valueStr = valueStr.substring(0, 200) + "... (길이: " + valueStr.length() + ")";
-                }
-                log.info("  [{}] = {}", key, valueStr);
-            });
-            log.info("========================================");
 
             // 전역 컬렉터에 저장 (토큰 응답 데이터)
             OAuth2DataCollector.saveProviderData("naver_token_response", responseBody);
@@ -163,7 +143,6 @@ public class NaverOAuth2TokenResponseClient
             builder.additionalParameters(additionalParameters);
 
             OAuth2AccessTokenResponse tokenResponse = builder.build();
-            log.info("========== Naver OAuth2 토큰 응답 처리 완료 ==========");
 
             return tokenResponse;
 

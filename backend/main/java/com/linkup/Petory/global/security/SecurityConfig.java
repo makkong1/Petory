@@ -60,6 +60,11 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**").permitAll() // 인증 관련 API 허용
                         .requestMatchers("/api/users/register").permitAll() // 회원가입 허용
+                        .requestMatchers(HttpMethod.GET, "/api/users/id/check").permitAll() // 아이디 중복 체크 (회원가입용)
+                        .requestMatchers(HttpMethod.GET, "/api/users/nickname/check").permitAll() // 닉네임 중복 체크 (회원가입용)
+                        .requestMatchers(HttpMethod.GET, "/api/users/email/verify/**").permitAll() // 이메일 인증 처리 (토큰 기반)
+                        .requestMatchers(HttpMethod.POST, "/api/users/email/verify/pre-registration").permitAll() // 회원가입
+                        .requestMatchers(HttpMethod.GET, "/api/users/email/verify/pre-registration/check").permitAll() // 회원가입
                         .requestMatchers("/oauth2/**").permitAll() // OAuth2 인증 엔드포인트 허용
                         .requestMatchers(HttpMethod.GET, "/api/uploads/**").permitAll() // 업로드 파일 공개 조회
                         .requestMatchers("/error").permitAll() // 에러 페이지

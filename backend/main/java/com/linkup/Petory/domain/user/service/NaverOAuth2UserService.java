@@ -1,6 +1,5 @@
 package com.linkup.Petory.domain.user.service;
 
-import com.linkup.Petory.domain.user.service.OAuth2DataCollector;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
@@ -38,14 +37,14 @@ public class NaverOAuth2UserService extends DefaultOAuth2UserService {
             log.info("  [{}] = {}", key, valueStr);
         });
         log.info("========================================");
-        
+
         // 전역 컬렉터에 저장 (원본 attributes)
         OAuth2DataCollector.saveProviderData("naver_original", attributes);
 
         // Naver는 response 객체 안에 사용자 정보가 있음
         @SuppressWarnings("unchecked")
         Map<String, Object> response = (Map<String, Object>) attributes.get("response");
-        
+
         if (response == null) {
             log.error("❌ Naver response 객체가 null입니다. 원본 attributes: {}", attributes);
             throw new OAuth2AuthenticationException("Naver 사용자 정보를 가져올 수 없습니다.");
@@ -64,7 +63,7 @@ public class NaverOAuth2UserService extends DefaultOAuth2UserService {
             log.info("  [{}] = {}", key, valueStr);
         });
         log.info("========================================");
-        
+
         // 전역 컬렉터에 저장 (response 객체)
         OAuth2DataCollector.saveProviderData("naver_response", response);
 
@@ -93,4 +92,3 @@ public class NaverOAuth2UserService extends DefaultOAuth2UserService {
         );
     }
 }
-

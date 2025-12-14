@@ -13,6 +13,7 @@ import com.linkup.Petory.domain.meetup.entity.MeetupParticipants;
 import com.linkup.Petory.domain.meetup.repository.MeetupRepository;
 import com.linkup.Petory.domain.meetup.repository.MeetupParticipantsRepository;
 import com.linkup.Petory.domain.user.entity.Users;
+import com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -43,6 +44,11 @@ public class MeetupService {
         // userId로 사용자 찾기 (id 필드 사용)
         Users organizer = usersRepository.findByIdString(userId)
                 .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
+
+        // 이메일 인증 확인
+        if (organizer.getEmailVerified() == null || !organizer.getEmailVerified()) {
+            throw new EmailVerificationRequiredException("모임 생성을 위해 이메일 인증이 필요합니다.");
+        }
 
         // 날짜 검증
         if (meetupDTO.getDate() != null && meetupDTO.getDate().isBefore(LocalDateTime.now())) {
@@ -252,6 +258,11 @@ public class MeetupService {
         // 사용자 확인 (userId는 Users의 id 필드, 문자열)
         Users user = usersRepository.findByIdString(userId)
                 .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
+
+        // 이메일 인증 확인
+        if (user.getEmailVerified() == null || !user.getEmailVerified()) {
+            throw new EmailVerificationRequiredException("모임 참여를 위해 이메일 인증이 필요합니다.");
+        }
 
         Long userIdx = user.getIdx(); // Users의 idx 필드 (Long)
 

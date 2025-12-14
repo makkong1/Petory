@@ -259,6 +259,7 @@ const LocationServiceMap = () => {
       keywordOverride,
       categoryOverride,
       isInitialLoad = false, // 초기 로드 여부
+      userLocation: userLocationOverride = null, // 사용자 위치 (초기 로드 시 내 주변 서비스 필터링용)
     }) => {
       const requestId = Date.now();
       latestRequestRef.current = requestId;
@@ -290,11 +291,33 @@ const LocationServiceMap = () => {
             return;
           }
 
-          // 거리 계산은 나중에 필요할 때만 수행 (초기 로드 시 성능 최적화)
-          const fetchedServices = (response.data?.services || []).map((service) => ({
+          // 사용자 위치가 있으면 거리 계산 및 정렬
+          const targetLocation = userLocationOverride || userLocation;
+          let fetchedServices = (response.data?.services || []).map((service) => {
+            let distance = null;
+            if (targetLocation && service.latitude && service.longitude) {
+              distance = calculateDistance(
+                targetLocation.lat,
+                targetLocation.lng,
+                service.latitude,
+                service.longitude
+              );
+            }
+            return {
             ...service,
-            // distance는 나중에 필요할 때 계산
-          }));
+              distance,
+            };
+          });
+
+          // 사용자 위치가 있으면 거리순으로 정렬하고, 10km 이내 서비스만 필터링
+          if (targetLocation) {
+            fetchedServices = fetchedServices
+              .filter(service => service.distance !== null && service.distance <= 10000) // 10km 이내
+              .sort((a, b) => (a.distance || Infinity) - (b.distance || Infinity))
+              .slice(0, 100); // 최대 100개만 표시
+
+            setStatusMessage(`내 주변 ${fetchedServices.length}개의 장소를 찾았습니다.`);
+          }
 
           // 전체 데이터를 allServices에 저장하고, 선택된 지역에 따라 필터링
           setAllServices(fetchedServices);
@@ -302,7 +325,6 @@ const LocationServiceMap = () => {
 
           isInitialLoadRef.current = false;
           isSearchModeRef.current = false;
-          setStatusMessage('');
           setSelectedService(null);
           setLoading(false);
           return;
@@ -372,7 +394,7 @@ const LocationServiceMap = () => {
         }
       }
     },
-    [categoryType, selectedSido, selectedSigungu, selectedEupmyeondong, filterServicesByRegion, allServices]
+    [categoryType, selectedSido, selectedSigungu, selectedEupmyeondong, filterServicesByRegion, allServices, userLocation]
   );
 
   useEffect(() => {
@@ -384,14 +406,13 @@ const LocationServiceMap = () => {
     setMapCenter(DEFAULT_CENTER);
     setMapLevel(10); // 전국 뷰
 
-    // 초기 로드: 전국 데이터 가져오기
-    fetchServicesRef.current?.({
-      isInitialLoad: true, // 초기 로드 - 전국 데이터
-    });
-
-    // 내 위치는 나중에 가져오기 (길찾기/거리 계산용으로만 사용)
+    // 내 위치를 먼저 가져온 후, 내 주변 서비스를 보여주기
     const tryGeolocation = () => {
       if (!navigator.geolocation) {
+        // 위치 정보를 가져올 수 없으면 전체 데이터 로드
+        fetchServicesRef.current?.({
+          isInitialLoad: true,
+        });
         return;
       }
 
@@ -407,15 +428,25 @@ const LocationServiceMap = () => {
             lat: position.coords.latitude,
             lng: position.coords.longitude,
           };
-          // 내 위치는 길찾기/거리 계산용으로만 저장 (지도 중심은 변경하지 않음)
           setUserLocation(location);
-
-          // 주소 변환은 백엔드 API를 통해 처리하거나, 간단하게 "현재 위치"로 표시
-          // 네이버맵 API는 CORS 문제로 직접 호출 불가
           setUserLocationAddress('현재 위치');
+
+          // 지도 중심을 사용자 위치로 설정
+          setMapCenter(location);
+          setMapLevel(calculateMapLevelFromRadius(5)); // 5km 반경에 맞는 줌 레벨
+
+          // 전체 데이터를 가져온 후 거리순으로 정렬하여 내 주변 서비스 표시
+          fetchServicesRef.current?.({
+            isInitialLoad: true,
+            userLocation: location, // 사용자 위치 전달
+          });
         },
         (error) => {
           console.warn('위치 정보를 가져올 수 없습니다:', error);
+          // 위치 정보를 가져올 수 없으면 전체 데이터 로드
+          fetchServicesRef.current?.({
+            isInitialLoad: true,
+          });
         },
         options
       );
@@ -880,7 +911,7 @@ const LocationServiceMap = () => {
         <ServiceListPanel>
           <ServiceListHeader>
             <ServiceListTitle>
-              내 주변 장소 ({servicesWithDisplay.length})
+              {userLocation ? '내 주변 장소' : '전체 장소'} ({servicesWithDisplay.length})
             </ServiceListTitle>
           </ServiceListHeader>
           <ServiceListContent>

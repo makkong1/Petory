@@ -8,6 +8,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import com.linkup.Petory.domain.common.BaseTimeEntity;
+
 /**
  * 애완동물 엔티티
  * - 사용자가 등록한 반려동물 정보
@@ -20,7 +22,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Pet {
+public class Pet extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -71,12 +73,6 @@ public class Pet {
     @Column(name = "profile_image_url", length = 500)
     private String profileImageUrl; // 프로필 사진 URL
 
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
-
-    @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
-
     // 소프트 삭제
     @Column(name = "is_deleted", nullable = false)
     @Builder.Default
@@ -85,21 +81,7 @@ public class Pet {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
-    @PrePersist
-    protected void onCreate() {
-        LocalDateTime now = LocalDateTime.now();
-        this.createdAt = now;
-        this.updatedAt = now;
-        if (this.isDeleted == null) {
-            this.isDeleted = false;
-        }
-    }
-
     @OneToMany(mappedBy = "pet", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<PetVaccination> vaccinations; // 예방접종 기록 목록
 
-    @PreUpdate
-    protected void onUpdate() {
-        this.updatedAt = LocalDateTime.now();
-    }
 }

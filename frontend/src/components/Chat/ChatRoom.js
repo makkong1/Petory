@@ -3,7 +3,9 @@ import styled from 'styled-components';
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { useAuth } from '../../contexts/AuthContext';
-import { getMessages, sendMessage, markAsRead, getConversation, leaveConversation, deleteConversation } from '../../api/chatApi';
+import { getMessages, sendMessage, markAsRead, getConversation, leaveConversation, deleteConversation, confirmCareDeal } from '../../api/chatApi';
+import { careRequestApi } from '../../api/careRequestApi';
+import { careReviewApi } from '../../api/careReviewApi';
 import { uploadApi } from '../../api/uploadApi';
 
 const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
@@ -17,6 +19,18 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
   const [showMenu, setShowMenu] = useState(false);
+  const [dealConfirmed, setDealConfirmed] = useState(false);
+  const [confirmingDeal, setConfirmingDeal] = useState(false);
+  const [careRequestStatus, setCareRequestStatus] = useState(null);
+  const [careRequestData, setCareRequestData] = useState(null);
+  const [isRequester, setIsRequester] = useState(false);
+  const [isProvider, setIsProvider] = useState(false);
+  const [completingCare, setCompletingCare] = useState(false);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [hasReview, setHasReview] = useState(false);
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
   const stompClientRef = useRef(null);
@@ -56,6 +70,43 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
     try {
       const data = await getConversation(conversationIdx, user.idx);
       setConversation(data);
+      // 내가 거래 확정했는지 확인
+      const myParticipant = data?.participants?.find(p => p.userIdx === user.idx);
+      setDealConfirmed(myParticipant?.dealConfirmed || false);
+
+      // 펫케어 요청 상태 조회
+      if (data?.relatedType === 'CARE_REQUEST' && data?.relatedIdx) {
+        try {
+          const careRequest = await careRequestApi.getCareRequest(data.relatedIdx);
+          const careRequestInfo = careRequest.data;
+          setCareRequestStatus(careRequestInfo?.status || null);
+          setCareRequestData(careRequestInfo);
+
+          // 요청자와 제공자 구분
+          const requesterId = careRequestInfo?.userId;
+
+          // 승인된 CareApplication에서 제공자 찾기
+          const acceptedApplication = careRequestInfo?.applications?.find(
+            app => app.status === 'ACCEPTED'
+          );
+          const providerId = acceptedApplication?.providerId || acceptedApplication?.provider?.idx;
+
+          setIsRequester(user?.idx === requesterId);
+          setIsProvider(user?.idx === providerId);
+
+          // 이미 리뷰를 작성했는지 확인
+          if (acceptedApplication && user?.idx === requesterId) {
+            const hasExistingReview = acceptedApplication.reviews?.some(
+              review => review.reviewerId === user.idx
+            );
+            setHasReview(hasExistingReview || false);
+          } else {
+            setHasReview(false);
+          }
+        } catch (error) {
+          console.error('펫케어 요청 상태 조회 실패:', error);
+        }
+      }
     } catch (error) {
       console.error('채팅방 정보 조회 실패:', error);
     }
@@ -333,6 +384,114 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
     }
   };
 
+  // 거래 확정
+  const handleConfirmDeal = async () => {
+    if (!conversationIdx || !user?.idx || dealConfirmed) return;
+
+    if (!window.confirm('거래를 확정하시겠습니까? 양쪽 모두 확정하면 펫케어 서비스가 시작됩니다.')) {
+      return;
+    }
+
+    setConfirmingDeal(true);
+    try {
+      await confirmCareDeal(conversationIdx, user.idx);
+      setDealConfirmed(true);
+      // 채팅방 정보 다시 조회
+      await fetchConversation();
+      alert('거래 확정이 완료되었습니다. 상대방도 확정하면 서비스가 시작됩니다.');
+    } catch (error) {
+      console.error('거래 확정 실패:', error);
+      alert(error.response?.data?.error || '거래 확정에 실패했습니다.');
+    } finally {
+      setConfirmingDeal(false);
+    }
+  };
+
+  // 펫케어 서비스 완료
+  const handleCompleteCare = async () => {
+    if (!conversation?.relatedIdx || !user?.idx || completingCare) return;
+
+    if (!window.confirm('펫케어 서비스를 완료 처리하시겠습니까?')) {
+      return;
+    }
+
+    setCompletingCare(true);
+    try {
+      await careRequestApi.updateStatus(conversation.relatedIdx, 'COMPLETED');
+      setCareRequestStatus('COMPLETED');
+      // 펫케어 요청 정보 다시 조회
+      await fetchConversation();
+      alert('펫케어 서비스가 완료되었습니다.');
+    } catch (error) {
+      console.error('서비스 완료 실패:', error);
+      alert(error.response?.data?.error || '서비스 완료 처리에 실패했습니다.');
+    } finally {
+      setCompletingCare(false);
+    }
+  };
+
+  // 리뷰 작성 모달 열기
+  const handleOpenReviewModal = () => {
+    setShowReviewModal(true);
+  };
+
+  // 리뷰 작성
+  const handleSubmitReview = async () => {
+    if (!careRequestData || !user?.idx) {
+      alert('리뷰 작성에 필요한 정보가 없습니다.');
+      return;
+    }
+
+    // CareApplication 찾기
+    const acceptedApplication = careRequestData.applications?.find(
+      app => app.status === 'ACCEPTED'
+    );
+
+    if (!acceptedApplication) {
+      alert('승인된 펫케어 서비스를 찾을 수 없습니다.');
+      return;
+    }
+
+    if (!reviewComment.trim()) {
+      alert('리뷰 내용을 입력해주세요.');
+      return;
+    }
+
+    setSubmittingReview(true);
+    try {
+      await careReviewApi.createReview({
+        careApplicationId: acceptedApplication.idx,
+        reviewerId: user.idx,
+        revieweeId: acceptedApplication.providerId,
+        rating: reviewRating,
+        comment: reviewComment.trim()
+      });
+
+      alert('리뷰가 작성되었습니다.');
+      setShowReviewModal(false);
+      setReviewRating(5);
+      setReviewComment('');
+      setHasReview(true);
+      // 리뷰 작성 후 리뷰 버튼 숨기기 위해 상태 업데이트
+      await fetchConversation();
+    } catch (error) {
+      console.error('리뷰 작성 실패:', error);
+      alert(error.response?.data?.error || '리뷰 작성에 실패했습니다.');
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
+  // 펫케어 관련 채팅방인지 확인
+  const isCareRequestChat = conversation?.relatedType === 'CARE_REQUEST' ||
+    conversation?.relatedType === 'CARE_APPLICATION' ||
+    conversation?.conversationType === 'CARE_REQUEST';
+
+  // 양쪽 모두 거래 확정했는지 확인
+  const allParticipantsConfirmed = conversation?.participants && conversation.participants.length > 0
+    ? conversation.participants.every(p => p.dealConfirmed === true)
+    : false;
+
   // 메뉴 외부 클릭 시 닫기
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -424,6 +583,58 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
         <div ref={messagesEndRef} />
       </MessagesContainer>
 
+      {/* 거래 확정 버튼 (펫케어 채팅방인 경우) */}
+      {isCareRequestChat && !allParticipantsConfirmed && (
+        <DealConfirmSection>
+          {dealConfirmed ? (
+            <DealConfirmStatus>
+              ✓ 거래 확정 완료 (상대방 확정 대기 중)
+            </DealConfirmStatus>
+          ) : (
+            <DealConfirmButton onClick={handleConfirmDeal} disabled={confirmingDeal}>
+              {confirmingDeal ? '확정 중...' : '🤝 거래 확정'}
+            </DealConfirmButton>
+          )}
+        </DealConfirmSection>
+      )}
+
+      {allParticipantsConfirmed && isCareRequestChat && (
+        <DealConfirmedBanner>
+          ✓ 양쪽 모두 거래 확정 완료! 펫케어 서비스가 시작되었습니다.
+        </DealConfirmedBanner>
+      )}
+
+      {/* 서비스 완료 버튼 (IN_PROGRESS 상태이고 제공자일 때만 표시) */}
+      {isCareRequestChat && careRequestStatus === 'IN_PROGRESS' && isProvider && (
+        <CompleteCareSection>
+          <CompleteCareButton onClick={handleCompleteCare} disabled={completingCare}>
+            {completingCare ? '완료 처리 중...' : '✅ 서비스 완료'}
+          </CompleteCareButton>
+        </CompleteCareSection>
+      )}
+
+      {isCareRequestChat && careRequestStatus === 'COMPLETED' && (
+        <CompletedBanner>
+          ✓ 펫케어 서비스가 완료되었습니다.
+        </CompletedBanner>
+      )}
+
+      {/* 리뷰 작성 버튼 (COMPLETED 상태이고 요청자이며 아직 리뷰를 작성하지 않았을 때만 표시) */}
+      {isCareRequestChat && careRequestStatus === 'COMPLETED' && isRequester && !hasReview && (
+        <ReviewSection>
+          <ReviewButton onClick={handleOpenReviewModal}>
+            ⭐ 리뷰 작성하기
+          </ReviewButton>
+        </ReviewSection>
+      )}
+
+      {/* 리뷰 작성 완료 메시지 */}
+      {isCareRequestChat && careRequestStatus === 'COMPLETED' && isRequester && hasReview && (
+        <ReviewCompletedBanner>
+          ✓ 리뷰를 작성하셨습니다.
+        </ReviewCompletedBanner>
+      )}
+
       <InputContainer>
         <MessageForm onSubmit={handleSendMessage}>
           <HiddenFileInput
@@ -465,6 +676,53 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
             <ImageModalImage src={selectedImage} alt="확대 이미지" />
           </ImageModalContent>
         </ImageModal>
+      )}
+
+      {/* 리뷰 작성 모달 */}
+      {showReviewModal && (
+        <ReviewModal onClick={() => setShowReviewModal(false)}>
+          <ReviewModalContent onClick={(e) => e.stopPropagation()}>
+            <ReviewModalHeader>
+              <ReviewModalTitle>리뷰 작성</ReviewModalTitle>
+              <ReviewModalClose onClick={() => setShowReviewModal(false)}>✕</ReviewModalClose>
+            </ReviewModalHeader>
+            <ReviewModalBody>
+              <ReviewRatingSection>
+                <ReviewLabel>평점</ReviewLabel>
+                <StarRating>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <StarButton
+                      key={star}
+                      type="button"
+                      onClick={() => setReviewRating(star)}
+                      active={star <= reviewRating}
+                    >
+                      ⭐
+                    </StarButton>
+                  ))}
+                  <RatingText>{reviewRating}점</RatingText>
+                </StarRating>
+              </ReviewRatingSection>
+              <ReviewCommentSection>
+                <ReviewLabel>리뷰 내용</ReviewLabel>
+                <ReviewTextarea
+                  value={reviewComment}
+                  onChange={(e) => setReviewComment(e.target.value)}
+                  placeholder="서비스에 대한 리뷰를 작성해주세요..."
+                  rows={5}
+                />
+              </ReviewCommentSection>
+            </ReviewModalBody>
+            <ReviewModalFooter>
+              <ReviewCancelButton onClick={() => setShowReviewModal(false)}>
+                취소
+              </ReviewCancelButton>
+              <ReviewSubmitButton onClick={handleSubmitReview} disabled={submittingReview || !reviewComment.trim()}>
+                {submittingReview ? '작성 중...' : '리뷰 작성'}
+              </ReviewSubmitButton>
+            </ReviewModalFooter>
+          </ReviewModalContent>
+        </ReviewModal>
       )}
     </Container>
   );
@@ -875,5 +1133,306 @@ const ImageModalImage = styled.img`
   max-height: 90vh;
   object-fit: contain;
   border-radius: 8px;
+`;
+
+const DealConfirmSection = styled.div`
+  padding: 12px 16px;
+  background: ${({ theme }) => theme.colors.surface};
+  border-top: 1px solid ${({ theme }) => theme.colors.border};
+  display: flex;
+  justify-content: center;
+  align-items: center;
+`;
+
+const DealConfirmButton = styled.button`
+  padding: 10px 20px;
+  background: ${({ theme }) => theme.colors.primary};
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover:not(:disabled) {
+    background: ${({ theme }) => theme.colors.primaryDark};
+    transform: translateY(-1px);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+`;
+
+const DealConfirmStatus = styled.div`
+  padding: 10px 20px;
+  background: ${({ theme }) => theme.colors.surfaceElevated};
+  color: ${({ theme }) => theme.colors.primary};
+  border: 1px solid ${({ theme }) => theme.colors.primary};
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+`;
+
+const DealConfirmedBanner = styled.div`
+  padding: 12px 16px;
+  background: ${({ theme }) => theme.colors.success || '#10b981'}20;
+  color: ${({ theme }) => theme.colors.success || '#10b981'};
+  border-top: 1px solid ${({ theme }) => theme.colors.border};
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+`;
+
+const CompleteCareSection = styled.div`
+  padding: 12px 16px;
+  background: ${({ theme }) => theme.colors.surface};
+  border-top: 1px solid ${({ theme }) => theme.colors.border};
+  display: flex;
+  justify-content: center;
+  align-items: center;
+`;
+
+const CompleteCareButton = styled.button`
+  padding: 10px 20px;
+  background: ${({ theme }) => theme.colors.success || '#10b981'};
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover:not(:disabled) {
+    background: ${({ theme }) => theme.colors.successDark || '#059669'};
+    transform: translateY(-1px);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+`;
+
+const CompletedBanner = styled.div`
+  padding: 12px 16px;
+  background: ${({ theme }) => theme.colors.success || '#10b981'}20;
+  color: ${({ theme }) => theme.colors.success || '#10b981'};
+  border-top: 1px solid ${({ theme }) => theme.colors.border};
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+`;
+
+const ReviewCompletedBanner = styled.div`
+  padding: 12px 16px;
+  background: ${({ theme }) => theme.colors.info || '#3b82f6'}20;
+  color: ${({ theme }) => theme.colors.info || '#3b82f6'};
+  border-top: 1px solid ${({ theme }) => theme.colors.border};
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+`;
+
+const ReviewSection = styled.div`
+  padding: 12px 16px;
+  background: ${({ theme }) => theme.colors.surface};
+  border-top: 1px solid ${({ theme }) => theme.colors.border};
+  display: flex;
+  justify-content: center;
+  align-items: center;
+`;
+
+const ReviewButton = styled.button`
+  padding: 10px 20px;
+  background: ${({ theme }) => theme.colors.warning || '#f59e0b'};
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover:not(:disabled) {
+    background: ${({ theme }) => theme.colors.warningDark || '#d97706'};
+    transform: translateY(-1px);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+`;
+
+const ReviewModal = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+`;
+
+const ReviewModalContent = styled.div`
+  background: ${({ theme }) => theme.colors.surface || '#ffffff'};
+  border-radius: 12px;
+  width: 100%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+`;
+
+const ReviewModalHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid ${({ theme }) => theme.colors.border};
+`;
+
+const ReviewModalTitle = styled.h2`
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: ${({ theme }) => theme.colors.text};
+`;
+
+const ReviewModalClose = styled.button`
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: ${({ theme }) => theme.colors.textSecondary};
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: ${({ theme }) => theme.colors.surfaceHover};
+  }
+`;
+
+const ReviewModalBody = styled.div`
+  padding: 20px;
+`;
+
+const ReviewRatingSection = styled.div`
+  margin-bottom: 20px;
+`;
+
+const ReviewCommentSection = styled.div`
+  margin-bottom: 20px;
+`;
+
+const ReviewLabel = styled.label`
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: ${({ theme }) => theme.colors.text};
+`;
+
+const StarRating = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+`;
+
+const StarButton = styled.button`
+  background: transparent;
+  border: none;
+  font-size: 28px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  filter: ${({ active }) => active ? 'none' : 'grayscale(100%) opacity(0.3)'};
+  transition: all 0.2s ease;
+
+  &:hover {
+    transform: scale(1.1);
+  }
+`;
+
+const RatingText = styled.span`
+  margin-left: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: ${({ theme }) => theme.colors.text};
+`;
+
+const ReviewTextarea = styled.textarea`
+  width: 100%;
+  padding: 12px;
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+  color: ${({ theme }) => theme.colors.text};
+  background: ${({ theme }) => theme.colors.background};
+
+  &:focus {
+    outline: none;
+    border-color: ${({ theme }) => theme.colors.primary};
+  }
+`;
+
+const ReviewModalFooter = styled.div`
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 20px;
+  border-top: 1px solid ${({ theme }) => theme.colors.border};
+`;
+
+const ReviewCancelButton = styled.button`
+  padding: 10px 20px;
+  background: ${({ theme }) => theme.colors.surface};
+  color: ${({ theme }) => theme.colors.text};
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: ${({ theme }) => theme.colors.surfaceHover};
+  }
+`;
+
+const ReviewSubmitButton = styled.button`
+  padding: 10px 20px;
+  background: ${({ theme }) => theme.colors.primary};
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover:not(:disabled) {
+    background: ${({ theme }) => theme.colors.primaryDark};
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
 `;
 

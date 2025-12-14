@@ -16,6 +16,7 @@ public class UsersDTO {
     private Long idx;
     private String id;
     private String username;
+    private String nickname; // 닉네임 (프론트엔드에서 표시)
     private String email;
     private String phone;
     private String password; // 요청 시에만 사용, 응답에서는 제외됨

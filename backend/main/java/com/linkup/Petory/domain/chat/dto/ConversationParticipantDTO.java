@@ -17,13 +17,15 @@ public class ConversationParticipantDTO {
     private Long userIdx;
     private String username;
     private String userProfileImageUrl;
-    private String role;  // MEMBER, ADMIN, MODERATOR
+    private String role; // MEMBER, ADMIN, MODERATOR
     private Integer unreadCount;
     private Long lastReadMessageIdx;
     private LocalDateTime lastReadAt;
-    private String status;  // ACTIVE, LEFT, KICKED, MUTED
+    private String status; // ACTIVE, LEFT, KICKED, MUTED
     private LocalDateTime joinedAt;
     private LocalDateTime leftAt;
+    private Boolean dealConfirmed;
+    private LocalDateTime dealConfirmedAt;
     private Boolean isDeleted;
     private LocalDateTime deletedAt;
     private LocalDateTime createdAt;
@@ -32,4 +34,3 @@ public class ConversationParticipantDTO {
     // 탈퇴한 사용자 표시용
     private Boolean isDeletedUser;
 }
-
