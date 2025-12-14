@@ -54,6 +54,13 @@ public class ConversationParticipant {
     @Column(name = "left_at")
     private LocalDateTime leftAt;
 
+    @Column(name = "deal_confirmed")
+    @Builder.Default
+    private Boolean dealConfirmed = false;
+
+    @Column(name = "deal_confirmed_at")
+    private LocalDateTime dealConfirmedAt;
+
     @Column(name = "is_deleted")
     @Builder.Default
     private Boolean isDeleted = false;

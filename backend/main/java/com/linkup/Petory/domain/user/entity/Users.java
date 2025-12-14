@@ -6,6 +6,8 @@ import java.util.List;
 import jakarta.persistence.*;
 import lombok.*;
 
+import com.linkup.Petory.domain.common.BaseTimeEntity;
+
 @Entity
 @Table(name = "users")
 @Getter
@@ -13,7 +15,7 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Users {
+public class Users extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -59,9 +61,6 @@ public class Users {
     @Lob
     private String petInfo;
 
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
-
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
     private List<SocialUser> socialUsers;
 
@@ -98,26 +97,6 @@ public class Users {
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Pet> pets; // 등록한 애완동물 목록
-
-    @PrePersist
-    protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
-        this.updatedAt = LocalDateTime.now();
-        if (this.status == null) {
-            this.status = UserStatus.ACTIVE;
-        }
-        if (this.warningCount == null) {
-            this.warningCount = 0;
-        }
-        if (this.isDeleted == null) {
-            this.isDeleted = false;
-        }
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        this.updatedAt = LocalDateTime.now();
-    }
 
     /**
      * 현재 제재 상태인지 확인

@@ -121,6 +121,15 @@ export const updateConversationStatus = async (conversationIdx, status) => {
   return response.data;
 };
 
+/**
+ * 펫케어 거래 확정
+ */
+export const confirmCareDeal = async (conversationIdx, userId) => {
+  await api.post(`/conversations/${conversationIdx}/confirm-deal`, null, {
+    params: { userId },
+  });
+};
+
 // ==================== Chat Message API ====================
 
 /**

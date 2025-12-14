@@ -129,7 +129,7 @@ public class OAuth2Service {
 
         return switch (provider) {
             case GOOGLE -> (String) attributes.get("sub");
-            case NAVER -> (String) attributes.get("id"); // NaverOAuth2UserService에서 이미 response를 attributes로 변환
+            case NAVER, KAKAO -> (String) attributes.get("id"); // Naver, Kakao는 id가 식별자
             default -> throw new IllegalArgumentException("지원하지 않는 Provider입니다: " + provider);
         };
     }
@@ -190,8 +190,7 @@ public class OAuth2Service {
                     .password(UUID.randomUUID().toString()) // 소셜 로그인은 비밀번호 불필요
                     .role(Role.USER)
                     .status(UserStatus.ACTIVE)
-                    .createdAt(LocalDateTime.now())
-                    .updatedAt(LocalDateTime.now())
+
                     .build();
 
             // 소셜 데이터로 사용자 정보 설정
@@ -216,8 +215,7 @@ public class OAuth2Service {
                     .user(user)
                     .provider(provider)
                     .providerId(providerId)
-                    .createdAt(LocalDateTime.now())
-                    .updatedAt(LocalDateTime.now())
+
                     .build();
         }
 
@@ -290,6 +288,21 @@ public class OAuth2Service {
                 // 성별
                 user.setGender((String) attributes.get("gender"));
             }
+            case KAKAO -> {
+                // Kakao 데이터 추출
+                user.setProfileImage((String) attributes.get("profile_image"));
+                user.setEmailVerified(true); // Kakao 이메일 있으면 인증된 것으로 간주 (설정에 따라 다름)
+
+                // 생년월일
+                String birthyear = (String) attributes.get("birthyear");
+                String birthday = (String) attributes.get("birthday"); // MMDD
+                if (birthyear != null && birthday != null) {
+                    user.setBirthDate(birthyear + "-" + birthday.substring(0, 2) + "-" + birthday.substring(2));
+                }
+
+                // 성별
+                user.setGender((String) attributes.get("gender"));
+            }
         }
     }
 
@@ -326,6 +339,17 @@ public class OAuth2Service {
                     }
                 }
                 // 성별이 없으면 설정
+                if (user.getGender() == null) {
+                    user.setGender((String) attributes.get("gender"));
+                }
+            }
+            case KAKAO -> {
+                if (user.getProfileImage() == null) {
+                    user.setProfileImage((String) attributes.get("profile_image"));
+                }
+                if (user.getEmailVerified() == null) {
+                    user.setEmailVerified(true);
+                }
                 if (user.getGender() == null) {
                     user.setGender((String) attributes.get("gender"));
                 }
@@ -374,6 +398,12 @@ public class OAuth2Service {
 
                 // 나이대
                 socialUser.setProviderAgeRange((String) attributes.get("age"));
+            }
+            case KAKAO -> {
+                socialUser.setProviderProfileImage((String) attributes.get("profile_image"));
+                socialUser.setProviderName((String) attributes.get("nickname"));
+                socialUser.setProviderPhone((String) attributes.get("phone_number"));
+                socialUser.setProviderAgeRange((String) attributes.get("age_range"));
             }
         }
     }

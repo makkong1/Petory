@@ -24,6 +24,21 @@
   4. 승인 시 상태 변경 (OPEN → IN_PROGRESS)
 - **스크린샷/영상**: 
 
+#### 주요 기능 1-1: 채팅 후 거래 확정 및 완료
+- **설명**: 펫케어 요청자가 서비스 제공자와 채팅을 시작한 후, 양쪽 모두 거래를 확정하면 펫케어 서비스가 시작되고, 서비스 완료 후 완료 처리할 수 있습니다.
+- **사용자 시나리오**:
+  1. 펫케어 요청 생성 (OPEN 상태)
+  2. 서비스 제공자가 "채팅하기" 버튼 클릭하여 채팅방 생성
+  3. 채팅방에서 가격, 시간, 서비스 내용 등 조건 협의
+  4. 양쪽 모두 "거래 확정" 버튼 클릭
+  5. 양쪽 모두 확정 시 자동으로:
+     - CareApplication 생성 및 ACCEPTED 상태로 설정
+     - CareRequest 상태 변경 (OPEN → IN_PROGRESS)
+  6. 서비스 진행 (IN_PROGRESS 상태)
+  7. 서비스 완료 후 채팅방에서 "서비스 완료" 버튼 클릭
+  8. CareRequest 상태 변경 (IN_PROGRESS → COMPLETED)
+- **스크린샷/영상**: 
+
 #### 주요 기능 2: 펫케어 리뷰 시스템
 - **설명**: 펫케어 완료 후 요청자가 돌봄 제공자에게 리뷰를 작성할 수 있습니다.
 - **사용자 시나리오**:
@@ -38,37 +53,74 @@
 
 ### 2.1 핵심 비즈니스 로직
 
-#### 로직 1: 지원 승인 (1명만 승인 가능)
+#### 로직 1: 채팅 후 거래 확정 (양쪽 모두 확인 시 자동 승인)
 ```java
-// CareRequestService.java
+// ConversationService.java
 @Transactional
-public void approveApplication(long requestId, long applicationId) {
-    CareRequest request = careRequestRepository.findById(requestId).orElseThrow();
+public void confirmCareDeal(Long conversationIdx, Long userId) {
+    Conversation conversation = conversationRepository.findById(conversationIdx).orElseThrow();
     
-    // 이미 승인된 지원이 있는지 확인
-    boolean hasApproved = applicationRepository
-        .existsByRequestAndStatus(request, CareApplicationStatus.APPROVED);
-    
-    if (hasApproved) {
-        throw new IllegalStateException("이미 승인된 지원이 있습니다.");
+    // 펫케어 관련 채팅방인지 확인
+    if (conversation.getRelatedType() != RelatedType.CARE_REQUEST 
+        && conversation.getRelatedType() != RelatedType.CARE_APPLICATION) {
+        throw new IllegalArgumentException("펫케어 관련 채팅방이 아닙니다.");
     }
     
-    // 승인 처리
-    CareApplication application = applicationRepository.findById(applicationId).orElseThrow();
-    application.setStatus(CareApplicationStatus.APPROVED);
+    // 사용자의 거래 확정 처리
+    ConversationParticipant participant = participantRepository
+        .findByConversationIdxAndUserIdx(conversationIdx, userId).orElseThrow();
     
-    // 요청 상태 변경
-    request.setStatus(CareRequestStatus.IN_PROGRESS);
+    participant.setDealConfirmed(true);
+    participant.setDealConfirmedAt(LocalDateTime.now());
+    participantRepository.save(participant);
     
-    careRequestRepository.save(request);
-    applicationRepository.save(application);
+    // 양쪽 모두 확정했는지 확인
+    List<ConversationParticipant> allParticipants = participantRepository
+        .findByConversationIdxAndStatus(conversationIdx, ParticipantStatus.ACTIVE);
+    
+    boolean allConfirmed = allParticipants.stream()
+        .allMatch(p -> Boolean.TRUE.equals(p.getDealConfirmed()));
+    
+    // 양쪽 모두 확정했으면 CareRequest 상태 변경 및 지원 승인
+    if (allConfirmed && allParticipants.size() == 2) {
+        CareRequest careRequest = careRequestRepository.findById(conversation.getRelatedIdx()).orElseThrow();
+        
+        if (careRequest.getStatus() == CareRequestStatus.OPEN) {
+            // 제공자 찾기
+            Long requesterId = careRequest.getUser().getIdx();
+            Long providerId = allParticipants.stream()
+                .map(p -> p.getUser().getIdx())
+                .filter(id -> !id.equals(requesterId))
+                .findFirst().orElseThrow();
+            
+            // CareApplication 생성 또는 승인
+            CareApplication application = careRequest.getApplications().stream()
+                .filter(app -> app.getProvider().getIdx().equals(providerId))
+                .findFirst().orElse(null);
+            
+            if (application == null) {
+                application = CareApplication.builder()
+                    .careRequest(careRequest)
+                    .provider(usersRepository.findById(providerId).orElseThrow())
+                    .status(CareApplicationStatus.ACCEPTED)
+                    .build();
+                careRequest.getApplications().add(application);
+            } else {
+                application.setStatus(CareApplicationStatus.ACCEPTED);
+            }
+    
+            // 상태 변경
+            careRequest.setStatus(CareRequestStatus.IN_PROGRESS);
+            careRequestRepository.save(careRequest);
+        }
+    }
 }
 ```
 
 **설명**:
-- **처리 흐름**: 요청 조회 → 승인된 지원 확인 → 승인 처리 → 상태 변경
-- **주요 판단 기준**: 이미 승인된 지원이 있으면 승인 불가
-- **동시성 제어**: 비관적 락 또는 Unique 제약조건 필요
+- **처리 흐름**: 채팅방 조회 → 사용자 거래 확정 처리 → 양쪽 모두 확정 확인 → 지원 승인 및 상태 변경
+- **주요 판단 기준**: 양쪽 모두 거래 확정해야만 서비스 시작
+- **동시성 제어**: 트랜잭션으로 처리하여 안전성 보장
 
 #### 로직 2: 날짜 지난 요청 자동 완료
 ```java
@@ -227,6 +279,8 @@ erDiagram
 | `/api/care/requests` | POST | 요청 생성 |
 | `/api/care/requests/{id}/applications` | POST | 지원하기 |
 | `/api/care/requests/{id}/applications/{appId}/approve` | PUT | 지원 승인 |
+| `/api/chat/conversations/{conversationIdx}/confirm-deal` | POST | 거래 확정 (채팅방에서) |
+| `/api/care-requests/{id}/status?status=COMPLETED` | PATCH | 서비스 완료 (채팅방에서) |
 | `/api/care/reviews` | POST | 리뷰 작성 |
 
 ---
@@ -290,4 +344,5 @@ List<CareRequest> findAllWithUserAndPet();
 ### 개선 가능한 부분
 - 분산 락 (Redis): 여러 인스턴스 환경에서 지원 승인 동시성 제어
 - 매칭 알고리즘: 위치 기반 추천, 평점 기반 추천
-- 채팅 시스템: 요청자 ↔ 지원자 실시간 채팅
+- 결제 시스템: 거래 확정 시 결제 처리 연동
+- 알림 시스템: 거래 확정 시 양쪽 모두에게 알림 발송

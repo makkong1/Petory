@@ -13,9 +13,12 @@ import com.linkup.Petory.domain.user.converter.UsersConverter;
 import com.linkup.Petory.domain.user.dto.PetDTO;
 import com.linkup.Petory.domain.user.dto.UsersDTO;
 import com.linkup.Petory.domain.user.dto.UserPageResponseDTO;
+import com.linkup.Petory.domain.user.entity.EmailVerificationPurpose;
 import com.linkup.Petory.domain.user.entity.UserStatus;
 import com.linkup.Petory.domain.user.entity.Users;
+import com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
+import com.linkup.Petory.domain.user.service.EmailVerificationService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,6 +33,7 @@ public class UsersService {
     private final UsersConverter usersConverter;
     private final PasswordEncoder passwordEncoder;
     private final PetService petService;
+    private final EmailVerificationService emailVerificationService;
 
     // 전체 조회
     public List<UsersDTO> getAllUsers() {
@@ -130,9 +134,28 @@ public class UsersService {
         user.setProfileImage(null);
         user.setBirthDate(null);
         user.setGender(null);
-        user.setEmailVerified(false); // 일반 회원가입은 이메일 인증 안 됨
+
+        // 회원가입 전 이메일 인증 완료 여부 확인
+        boolean preVerified = emailVerificationService.isPreRegistrationEmailVerified(dto.getEmail());
+        user.setEmailVerified(preVerified); // 회원가입 전 인증 완료했으면 true, 아니면 false
 
         Users saved = usersRepository.save(user);
+
+        // 회원가입 전 이메일 인증을 완료한 경우 Redis에서 인증 상태 삭제
+        if (preVerified) {
+            emailVerificationService.removePreRegistrationVerification(dto.getEmail());
+            log.info("회원가입 완료 및 이메일 인증 상태 적용: userId={}, email={}", saved.getId(), saved.getEmail());
+        } else {
+            // 이메일 인증 안 했으면 회원가입 후 인증 메일 발송
+            try {
+                emailVerificationService.sendVerificationEmail(saved.getId(), EmailVerificationPurpose.REGISTRATION);
+                log.info("회원가입 후 이메일 인증 메일 발송: userId={}, email={}", saved.getId(), saved.getEmail());
+            } catch (Exception e) {
+                log.error("회원가입 이메일 인증 메일 발송 실패: userId={}, error={}", saved.getId(), e.getMessage(), e);
+                // 이메일 발송 실패해도 회원가입은 성공으로 처리
+            }
+        }
+
         return usersConverter.toDTO(saved);
     }
 
@@ -150,7 +173,7 @@ public class UsersService {
             // 닉네임 중복 확인
             usersRepository.findByNickname(dto.getNickname())
                     .ifPresent(existingUser -> {
-                        if (!existingUser.getId().equals(userId)) {
+                        if (!existingUser.getId().equals(user.getId())) {
                             throw new RuntimeException("이미 사용 중인 닉네임입니다.");
                         }
                     });
@@ -318,6 +341,9 @@ public class UsersService {
      * 비밀번호 변경
      */
     public void changePassword(String userId, String currentPassword, String newPassword) {
+        // 이메일 인증 확인
+        emailVerificationService.checkEmailVerification(userId);
+
         Users user = usersRepository.findByIdString(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
@@ -388,5 +414,15 @@ public class UsersService {
             return false;
         }
         return usersRepository.findByNickname(nickname).isEmpty();
+    }
+
+    /**
+     * 아이디 중복 검사
+     */
+    public boolean checkIdAvailability(String id) {
+        if (id == null || id.trim().isEmpty()) {
+            return false;
+        }
+        return usersRepository.findByIdString(id).isEmpty();
     }
 }

@@ -7,6 +7,8 @@ import lombok.*;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import com.linkup.Petory.domain.common.BaseTimeEntity;
+
 @Entity
 @Table(name = "board")
 @Getter
@@ -14,13 +16,13 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Board {
+public class Board extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long idx;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_idx", nullable = false)
     private Users user;
 
@@ -35,8 +37,6 @@ public class Board {
     @Column(name = "status", nullable = false)
     @Builder.Default
     private ContentStatus status = ContentStatus.ACTIVE;
-
-    private LocalDateTime createdAt;
 
     @Builder.Default
     @Column(name = "view_count")
@@ -53,7 +53,7 @@ public class Board {
     @Column(name = "last_reaction_at")
     private LocalDateTime lastReactionAt;
 
-    @OneToMany(mappedBy = "board", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "board", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Comment> comments;
 
     @Column(name = "is_deleted")
@@ -65,7 +65,6 @@ public class Board {
 
     @PrePersist
     protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
         if (this.status == null) {
             this.status = ContentStatus.ACTIVE;
         }
