@@ -10,12 +10,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -33,7 +30,6 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 @SpringBootTest
 @ActiveProfiles("test")
-@Transactional
 class UserSanctionServiceConcurrencyTest {
 
     @Autowired
@@ -52,12 +48,16 @@ class UserSanctionServiceConcurrencyTest {
 
     @BeforeEach
     void setUp() {
+        // 각 테스트마다 고유한 데이터 사용
+        long timestamp = System.currentTimeMillis();
+
         // 테스트용 사용자 생성
         testUser = Users.builder()
-                .id("test_user")
-                .username("testuser")
-                .email("test@example.com")
+                .id("test_user_" + timestamp)
+                .username("testuser_" + timestamp)
+                .email("test_" + timestamp + "@example.com")
                 .password("password")
+                .role(com.linkup.Petory.domain.user.entity.Role.USER)
                 .status(UserStatus.ACTIVE)
                 .warningCount(0)
                 .build();
@@ -65,9 +65,9 @@ class UserSanctionServiceConcurrencyTest {
 
         // 테스트용 관리자 생성
         admin1 = Users.builder()
-                .id("admin1")
-                .username("admin1")
-                .email("admin1@example.com")
+                .id("admin1_" + timestamp)
+                .username("admin1_" + timestamp)
+                .email("admin1_" + timestamp + "@example.com")
                 .password("password")
                 .role(com.linkup.Petory.domain.user.entity.Role.ADMIN)
                 .status(UserStatus.ACTIVE)
@@ -76,9 +76,9 @@ class UserSanctionServiceConcurrencyTest {
         admin1 = usersRepository.save(admin1);
 
         admin2 = Users.builder()
-                .id("admin2")
-                .username("admin2")
-                .email("admin2@example.com")
+                .id("admin2_" + timestamp)
+                .username("admin2_" + timestamp)
+                .email("admin2_" + timestamp + "@example.com")
                 .password("password")
                 .role(com.linkup.Petory.domain.user.entity.Role.ADMIN)
                 .status(UserStatus.ACTIVE)
@@ -87,9 +87,9 @@ class UserSanctionServiceConcurrencyTest {
         admin2 = usersRepository.save(admin2);
 
         admin3 = Users.builder()
-                .id("admin3")
-                .username("admin3")
-                .email("admin3@example.com")
+                .id("admin3_" + timestamp)
+                .username("admin3_" + timestamp)
+                .email("admin3_" + timestamp + "@example.com")
                 .password("password")
                 .role(com.linkup.Petory.domain.user.entity.Role.ADMIN)
                 .status(UserStatus.ACTIVE)
@@ -154,7 +154,7 @@ class UserSanctionServiceConcurrencyTest {
         // 경고 횟수가 정확한지 확인
         // 이상적으로는 경고 횟수 = 경고 기록 개수여야 함
         long actualWarningCount = userSanctionRepository.countWarningsByUserId(testUser.getIdx());
-        assertEquals(actualWarningCount, finalUser.getWarningCount(),
+        assertEquals((long) actualWarningCount, (long) finalUser.getWarningCount(),
                 "경고 횟수와 실제 경고 기록 수가 일치해야 함");
     }
 
@@ -211,9 +211,8 @@ class UserSanctionServiceConcurrencyTest {
         System.out.println("실제 경고 기록 수: " + actualWarningCount);
         System.out.println("중간 경고 횟수들: " + warningCounts);
 
-        // 경고 횟수와 실제 기록 수가 일치하는지 확인
-        assertEquals(actualWarningCount, finalUser.getWarningCount(),
-                "경고 횟수와 실제 경고 기록 수가 일치해야 함");
+        assertEquals((long) actualWarningCount, (long) finalUser.getWarningCount(),
+                "동시 요청 시 경고 횟수가 누락될 수 있습니다.");
     }
 
     @Test

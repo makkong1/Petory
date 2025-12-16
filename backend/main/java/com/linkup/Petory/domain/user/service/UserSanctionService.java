@@ -53,9 +53,12 @@ public class UserSanctionService {
 
         sanctionRepository.save(warning);
 
-        // 경고 횟수 증가
-        user.setWarningCount(user.getWarningCount() + 1);
-        usersRepository.save(user);
+        // 경고 횟수 원자적 증가 (동시성 문제 해결)
+        usersRepository.incrementWarningCount(userId);
+
+        // 업데이트된 사용자 정보 다시 조회
+        user = usersRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("유저를 찾을 수 없습니다."));
 
         // 경고 3회 이상이면 자동 이용제한
         if (user.getWarningCount() >= WARNING_THRESHOLD) {

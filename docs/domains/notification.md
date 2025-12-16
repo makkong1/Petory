@@ -29,69 +29,29 @@
 ### 2.1 핵심 비즈니스 로직
 
 #### 로직 1: 알림 생성 및 발송
-```java
-// NotificationService.java
-@Async
-public void createNotification(
-    Long userId, NotificationType type, 
-    String title, String content, 
-    Long relatedId, String relatedType) {
-    
-    Notification notification = Notification.builder()
-        .user(usersRepository.findById(userId).orElseThrow())
-        .type(type)
-        .title(title)
-        .content(content)
-        .relatedId(relatedId)
-        .relatedType(relatedType)
-        .isRead(false)
-        .build();
-    
-    notificationRepository.save(notification);
-    
-    // SSE로 실시간 알림 발송
-    notificationSseService.sendNotification(userId, notification);
-}
-```
+**구현 위치**: `NotificationService.createNotification()` (Lines 44-70)
 
-**설명**:
-- **처리 흐름**: 알림 생성 → DB 저장 → SSE로 실시간 발송
-- **비동기 처리**: `@Async`로 핵심 로직에 영향 없음
+**핵심 로직**:
+- **알림 생성**: `Notification` 엔티티 생성 및 DB 저장
+- **Redis 저장**: `saveToRedis()`로 최신 알림 목록 관리 (최대 50개, 24시간 TTL)
+- **SSE 발송**: `sseService.sendNotification()`로 실시간 알림 전송 (연결된 경우)
+- **비동기 처리**: `@Transactional`로 트랜잭션 보장 (비동기는 아님)
 
-#### 로직 2: SSE 연결 관리
-```java
-// NotificationSseService.java
-public SseEmitter subscribe(Long userId) {
-    SseEmitter emitter = new SseEmitter(Long.MAX_VALUE);
-    
-    // 연결 저장
-    emitters.put(userId, emitter);
-    
-    // 연결 종료 시 정리
-    emitter.onCompletion(() -> emitters.remove(userId));
-    emitter.onTimeout(() -> emitters.remove(userId));
-    emitter.onError((ex) -> emitters.remove(userId));
-    
-    return emitter;
-}
+#### 로직 2: 알림 목록 조회
+**구현 위치**: `NotificationService.getUserNotifications()` (Lines 75-97)
 
-public void sendNotification(Long userId, Notification notification) {
-    SseEmitter emitter = emitters.get(userId);
-    if (emitter != null) {
-        try {
-            emitter.send(SseEmitter.event()
-                .name("notification")
-                .data(notification));
-        } catch (IOException e) {
-            emitters.remove(userId);
-        }
-    }
-}
-```
+**핵심 로직**:
+- **Redis 우선 조회**: Redis에서 최신 알림 목록 조회 시도
+- **DB 병합**: Redis에 데이터가 있으면 DB와 병합하여 반환 (중복 제거)
+- **최신순 정렬**: `createdAt` 기준 내림차순 정렬
 
-**설명**:
-- **처리 흐름**: SSE 연결 생성 → 연결 저장 → 이벤트 발송
-- **연결 관리**: 연결 종료/타임아웃/에러 시 자동 정리
+#### 로직 3: SSE 연결 관리
+**구현 위치**: `NotificationSseService` (별도 서비스)
+
+**핵심 로직**:
+- **SSE 연결 생성**: `SseEmitter` 생성 및 연결 저장
+- **연결 종료 처리**: `onCompletion`, `onTimeout`, `onError`로 자동 정리
+- **실시간 발송**: 연결된 사용자에게 알림 실시간 전송
 
 ---
 
@@ -120,13 +80,16 @@ domain/notification/
 public class Notification {
     private Long idx;
     private Users user;                    // 알림을 받을 사용자
+    @Enumerated(EnumType.STRING)
     private NotificationType type;         // 알림 타입
     private String title;                  // 알림 제목
+    @Column(length = 500)
     private String content;                // 알림 내용
     private Long relatedId;                // 관련 게시글/댓글 ID
     private String relatedType;            // 관련 타입 (BOARD, CARE_REQUEST, MISSING_PET 등)
-    private Boolean isRead;                // 읽음 여부
-    private LocalDateTime createdAt;
+    @Builder.Default
+    private Boolean isRead = false;        // 읽음 여부
+    private LocalDateTime createdAt;       // @PrePersist로 자동 설정
 }
 ```
 
@@ -180,16 +143,9 @@ public class AsyncConfig {
 ## 6. 핵심 포인트 요약
 
 ### 기술적 하이라이트
-1. **실시간 알림 (SSE)**: Server-Sent Events로 실시간 알림 발송
-2. **비동기 처리**: 알림 발송을 비동기로 처리하여 성능 향상
-3. **연결 관리**: 타임아웃 및 자동 정리로 연결 누수 방지
+1. **Redis 활용**: 최신 알림 목록을 Redis에 저장 (최대 50개, 24시간 TTL)
+2. **실시간 알림 (SSE)**: Server-Sent Events로 실시간 알림 발송
+3. **Redis-DB 병합**: 알림 목록 조회 시 Redis와 DB 데이터 병합 (중복 제거)
+4. **읽음 처리**: 읽음 처리 시 Redis에서도 제거
+5. **연결 관리**: 타임아웃 및 자동 정리로 연결 누수 방지
 
-### 학습한 점
-- SSE (Server-Sent Events) 활용
-- 비동기 처리 전략
-- 연결 관리 및 정리
-
-### 개선 가능한 부분
-- 푸시 알림: FCM (Firebase Cloud Messaging) 연동
-- 메시지 큐: RabbitMQ, Kafka 활용
-- Redis 활용: 읽지 않은 알림 수 캐싱

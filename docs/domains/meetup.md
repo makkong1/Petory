@@ -29,41 +29,24 @@
 
 ### 2.1 핵심 비즈니스 로직
 
-#### 로직 1: 모임 참여 (최대 인원 제한)
-```java
-// MeetupService.java
-@Transactional
-public void joinMeetup(long meetupId, long userId) {
-    Meetup meetup = meetupRepository.findById(meetupId).orElseThrow();
-    Users user = usersRepository.findById(userId).orElseThrow();
-    
-    // 인원 체크
-    if (meetup.getCurrentParticipants() >= meetup.getMaxParticipants()) {
-        throw new IllegalStateException("모임 인원이 가득 찼습니다.");
-    }
-    
-    // 중복 참여 체크
-    if (participantRepository.existsByMeetupAndUser(meetup, user)) {
-        throw new IllegalStateException("이미 참여한 모임입니다.");
-    }
-    
-    // 참여 추가
-    MeetupParticipants participant = MeetupParticipants.builder()
-        .meetup(meetup)
-        .user(user)
-        .build();
-    participantRepository.save(participant);
-    
-    // 인원 증가
-    meetup.setCurrentParticipants(meetup.getCurrentParticipants() + 1);
-    meetupRepository.save(meetup);
-}
-```
+#### 로직 1: 모임 생성
+**구현 위치**: `MeetupService.createMeetup()` (Lines 42-111)
 
-**설명**:
-- **처리 흐름**: 모임 조회 → 인원 체크 → 중복 체크 → 참여 추가 → 인원 증가
-- **주요 판단 기준**: 최대 인원 제한, 중복 참여 방지
-- **동시성 제어**: 비관적 락 또는 낙관적 락 필요
+**핵심 로직**:
+- **이메일 인증 확인**: 모임 생성 시 이메일 인증 필요 (`EmailVerificationRequiredException`)
+- **날짜 검증**: 모임 일시는 현재 시간 이후여야 함
+- **주최자 자동 참여**: 주최자를 자동으로 참가자에 추가, `currentParticipants`를 1로 설정
+- **그룹 채팅방 자동 생성**: 모임 생성 시 채팅방 자동 생성, 주최자를 ADMIN 역할로 설정
+
+#### 로직 2: 모임 참여 (최대 인원 제한)
+**구현 위치**: `MeetupService.joinMeetup()` (Lines 252-299)
+
+**핵심 로직**:
+- **이메일 인증 확인**: 모임 참여 시 이메일 인증 필요
+- **중복 참여 체크**: `existsByMeetupIdxAndUserIdx()`로 중복 참여 방지
+- **최대 인원 체크**: 주최자가 아닌 경우에만 인원 체크
+- **인원 증가**: 주최자가 아닌 경우에만 `currentParticipants` 증가
+- **동시성 제어**: `@Transactional`로 트랜잭션 보장
 
 ---
 
@@ -93,17 +76,22 @@ domain/meetup/
 public class Meetup {
     private Long idx;
     private String title;                  // 모임 제목
-    private String description;            // 모임 내용
+    @Lob
+    private String description;             // 모임 내용
     private String location;                // 모임 장소 주소
     private Double latitude;                // 위도
     private Double longitude;               // 경도
     private LocalDateTime date;            // 모임 일시
     private Users organizer;               // 모임 주최자
-    private Integer maxParticipants;        // 최대 참여 인원
-    private Integer currentParticipants;    // 현재 참여자 수
-    private MeetupStatus status;            // 상태 (RECRUITING, CONFIRMED, COMPLETED)
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
+    @Builder.Default
+    private Integer maxParticipants = 10;  // 최대 참여 인원 (기본값 10)
+    @Builder.Default
+    private Integer currentParticipants = 0;  // 현재 참여자 수
+    @Builder.Default
+    private MeetupStatus status = MeetupStatus.RECRUITING;  // 상태 (RECRUITING, CONFIRMED, COMPLETED)
+    private LocalDateTime createdAt;       // @PrePersist로 자동 설정
+    private LocalDateTime updatedAt;       // @PreUpdate로 자동 설정
+    @OneToMany(mappedBy = "meetup", cascade = CascadeType.ALL)
     private List<MeetupParticipants> participants; // 참여자 목록
 }
 ```
@@ -157,9 +145,11 @@ CREATE UNIQUE INDEX uk_meetup_participants ON meetup_participants(meetup_idx, us
 ## 6. 핵심 포인트 요약
 
 ### 기술적 하이라이트
-1. **최대 인원 동시성 제어**: 비관적 락 또는 UPDATE 쿼리 + 조건
-2. **중복 참여 방지**: Unique 제약조건
-3. **자동 완료**: 스케줄러로 만료된 모임 자동 완료
+1. **이메일 인증**: 모임 생성 및 참여 시 이메일 인증 필요
+2. **최대 인원 동시성 제어**: `@Transactional`로 트랜잭션 보장, 주최자는 인원 체크 제외
+3. **중복 참여 방지**: `existsByMeetupIdxAndUserIdx()`로 중복 참여 방지
+4. **그룹 채팅방 연동**: 모임 생성 시 채팅방 자동 생성, 모임 참여/취소 시 채팅방 자동 참여/나가기
+5. **주최자 보호**: 주최자는 참가 취소 불가
 
 ### 학습한 점
 - 동시성 제어 방법 (비관적 락, UPDATE 쿼리)

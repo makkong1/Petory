@@ -22,7 +22,7 @@ public class CareApplication extends BaseTimeEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "care_request_idx", nullable = false)
-    private CareApplication careRequest;
+    private CareRequest careRequest;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "provider_idx", nullable = false)

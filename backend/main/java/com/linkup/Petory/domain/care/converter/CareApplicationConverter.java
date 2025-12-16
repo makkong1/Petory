@@ -23,10 +23,7 @@ public class CareApplicationConverter {
                 .providerName(app.getProvider().getUsername())
                 .status(app.getStatus().name())
                 .message(app.getMessage())
-                .reviews(app.getReviews() != null ? app.getReviews().stream()
-                        .map(careReviewConverter::toDTO)
-                        .collect(Collectors.toList())
-                        : null)
+                .message(app.getMessage())
                 .build();
     }
 }

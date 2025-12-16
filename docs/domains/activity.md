@@ -28,44 +28,44 @@
 
 ### 2.1 핵심 비즈니스 로직
 
-#### 로직 1: 활동 로그 생성 (비동기)
-```java
-// ActivityService.java
-@Async
-public void logActivity(
-    Users user, String activityType, 
-    String targetType, Long targetIdx) {
-    
-    Activity activity = Activity.builder()
-        .user(user)
-        .activityType(activityType)
-        .targetType(targetType)
-        .targetIdx(targetIdx)
-        .build();
-    
-    activityRepository.save(activity);
-}
-```
+#### 로직 1: 사용자 활동 조회
+**구현 위치**: `ActivityService.getUserActivities()` (Lines 46-251)
 
-**설명**:
-- **처리 흐름**: 활동 로그 생성 → 비동기 저장
-- **비동기 처리**: 핵심 비즈니스 로직에 영향 없음
+**핵심 로직**:
+- **다양한 활동 타입 지원**:
+  - `CARE_REQUEST`: 펫케어 요청
+  - `BOARD`: 커뮤니티 게시글
+  - `MISSING_PET`: 실종 제보 게시글
+  - `CARE_COMMENT`: 펫케어 댓글
+  - `COMMENT`: 커뮤니티 댓글
+  - `MISSING_COMMENT`: 실종 제보 댓글
+- **최신순 정렬**: `createdAt` 기준 내림차순 정렬
+- **Soft Delete 필터링**: 삭제된 활동은 제외 (`isDeleted = false`)
+
+#### 로직 2: 활동 조회 (페이징)
+**구현 위치**: `ActivityService.getUserActivitiesWithPaging()` (Lines 254-297)
+
+**핵심 로직**:
+- **필터링**: `ALL`, `POSTS`, `COMMENTS`, `REVIEWS` 필터 지원
+- **필터별 개수**: 전체, 게시글, 댓글, 리뷰 개수 제공
+- **페이징**: Spring Data 페이징 지원
 
 ---
 
 ## 3. 아키텍처 설명
 
 ### 3.1 도메인 구조
+**참고**: Activity 도메인은 별도의 Activity 엔티티를 사용하지 않고, 각 도메인의 엔티티를 직접 조회합니다.
+
 ```
 domain/activity/
   ├── controller/
   │   └── ActivityController.java
   ├── service/
   │   └── ActivityService.java
-  ├── entity/
-  │   └── Activity.java
-  └── repository/
-      └── ActivityRepository.java
+  └── dto/
+      ├── ActivityDTO.java
+      └── ActivityPageResponseDTO.java
 ```
 
 ---
@@ -94,15 +94,8 @@ ON activity(activity_type, created_at DESC);
 ## 6. 핵심 포인트 요약
 
 ### 기술적 하이라이트
-1. **비동기 처리**: 활동 로그를 비동기로 저장
-2. **배치 삽입**: 대량 활동 로그 배치 처리
-3. **통계 집계**: 활동 로그 기반 통계 수집
-
-### 학습한 점
-- 비동기 처리 전략
-- 활동 로그 설계
-- 통계 집계 방법
-
-### 개선 가능한 부분
-- 시계열 DB: InfluxDB, TimescaleDB 활용
-- 이벤트 스트리밍: Kafka 활용
+1. **통합 활동 조회**: 여러 도메인의 활동을 통합하여 조회 (펫케어 요청, 게시글, 댓글 등)
+2. **필터링**: 활동 타입별 필터링 지원 (전체, 게시글, 댓글, 리뷰)
+3. **페이징**: Spring Data 페이징 지원
+4. **최신순 정렬**: `createdAt` 기준 내림차순 정렬
+5. **Soft Delete 필터링**: 삭제된 활동은 제외

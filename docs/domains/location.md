@@ -39,85 +39,21 @@
 ### 2.1 핵심 비즈니스 로직
 
 #### 로직 1: 지역 계층적 탐색
-```java
-// LocationServiceService.java
-public List<LocationServiceDTO> searchLocationServicesByRegion(
-    String sido, String sigungu, String eupmyeondong, 
-    String roadName, String category, Integer maxResults) {
-    
-    List<LocationService> services;
-    
-    // 지역 계층 우선순위에 따라 조회
-    if (StringUtils.hasText(roadName)) {
-        services = locationServiceRepository.findByRoadName(roadName);
-    } else if (StringUtils.hasText(eupmyeondong)) {
-        services = locationServiceRepository.findByEupmyeondong(eupmyeondong);
-    } else if (StringUtils.hasText(sigungu)) {
-        services = locationServiceRepository.findBySigungu(sigungu);
-    } else if (StringUtils.hasText(sido)) {
-        services = locationServiceRepository.findBySido(sido);
-    } else {
-        services = locationServiceRepository.findByOrderByRatingDesc();
-    }
-    
-    // 카테고리 필터링 (category3 → category2 → category1 순서)
-    if (StringUtils.hasText(category)) {
-        services = services.stream()
-            .filter(service -> {
-                if (service.getCategory3() != null && 
-                    service.getCategory3().equalsIgnoreCase(category)) {
-                    return true;
-                }
-                if (service.getCategory2() != null && 
-                    service.getCategory2().equalsIgnoreCase(category)) {
-                    return true;
-                }
-                if (service.getCategory1() != null && 
-                    service.getCategory1().equalsIgnoreCase(category)) {
-                    return true;
-                }
-                return false;
-            })
-            .collect(Collectors.toList());
-    }
-    
-    return services.stream()
-        .map(locationServiceConverter::toDTO)
-        .collect(Collectors.toList());
-}
-```
+**구현 위치**: `LocationServiceService.searchLocationServicesByRegion()` (Lines 48-123)
 
-**설명**:
-- **처리 흐름**: 지역 계층 우선순위 확인 → 해당 지역 서비스 조회 → 카테고리 필터링
-- **주요 판단 기준**: roadName > eupmyeondong > sigungu > sido > 전체
-- **카테고리 필터링**: category3 → category2 → category1 순서로 검색
+**핵심 로직**:
+- **지역 계층 우선순위**: roadName > eupmyeondong > sigungu > sido > 전체
+- **카테고리 필터링**: category3 → category2 → category1 순서로 검색 (대소문자 무시)
+- **최대 결과 수 제한**: `maxResults` 파라미터로 결과 수 제한 (null이거나 0이면 제한 없음)
+- **로깅**: 각 단계별 디버그 로그 출력
 
 #### 로직 2: 거리 계산 (Haversine 공식)
-```java
-// LocationServiceService.java
-public Double calculateDistance(Double lat1, Double lng1, Double lat2, Double lng2) {
-    if (lat1 == null || lng1 == null || lat2 == null || lng2 == null) {
-        return null;
-    }
-    
-    final int R = 6371000; // 지구 반경 (미터)
-    
-    double dLat = Math.toRadians(lat2 - lat1);
-    double dLng = Math.toRadians(lng2 - lng1);
-    
-    double a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-               Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
-               Math.sin(dLng / 2) * Math.sin(dLng / 2);
-    
-    double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    
-    return R * c; // 미터 단위
-}
-```
+**구현 위치**: `LocationServiceService.calculateDistance()` (Lines 129-146)
 
-**설명**:
-- **처리 흐름**: 위도/경도 차이 계산 → Haversine 공식 적용 → 거리 반환
-- **주요 판단 기준**: 지구 반경 6371000m 사용
+**핵심 로직**:
+- **입력 검증**: 위도/경도가 null이면 null 반환
+- **Haversine 공식**: 지구 반경 6371000m 사용
+- **반환 단위**: 미터 단위
 - **사용 목적**: 내 위치에서 각 서비스까지의 거리 표시
 
 ### 2.2 서비스 메서드 구조
@@ -125,9 +61,9 @@ public Double calculateDistance(Double lat1, Double lng1, Double lat2, Double ln
 #### LocationServiceService
 | 메서드 | 설명 | 주요 로직 |
 |--------|------|-----------|
-| `searchLocationServicesByRegion()` | 지역 계층별 서비스 검색 | 우선순위 기반 조회, 카테고리 필터링 |
-| `calculateDistance()` | 거리 계산 | Haversine 공식 |
-| `getPopularLocationServices()` | 인기 서비스 조회 | 캐싱 적용 |
+| `searchLocationServicesByRegion()` | 지역 계층별 서비스 검색 | 우선순위 기반 조회, 카테고리 필터링, 최대 결과 수 제한 |
+| `calculateDistance()` | 거리 계산 | Haversine 공식 (미터 단위) |
+| `getPopularLocationServices()` | 인기 서비스 조회 | 카테고리별 상위 10개, `@Cacheable` 적용 |
 
 ### 2.3 트랜잭션 처리
 - **트랜잭션 범위**: 
@@ -279,14 +215,3 @@ public List<LocationServiceDTO> getPopularLocationServices(String category) {
 2. **거리 계산**: Haversine 공식으로 정확한 거리 계산
 3. **인덱스 전략**: 지역 계층별 인덱스로 조회 성능 향상
 4. **하이브리드 데이터 로딩**: 초기 로드 + 클라이언트 필터링
-
-### 학습한 점
-- 지역 계층적 탐색 패턴
-- Haversine 공식 활용
-- 대량 데이터 조회 최적화
-- 프론트엔드 최적화 (하이브리드 로딩)
-
-### 개선 가능한 부분
-- 지도 통합: 네이버맵 또는 카카오맵 API 연동
-- 공간 인덱스: MySQL Spatial Index 활용
-- 반경 검색: 내 위치 기준 반경 내 서비스 검색

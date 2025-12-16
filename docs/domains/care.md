@@ -54,68 +54,19 @@
 ### 2.1 핵심 비즈니스 로직
 
 #### 로직 1: 채팅 후 거래 확정 (양쪽 모두 확인 시 자동 승인)
-```java
-// ConversationService.java
-@Transactional
-public void confirmCareDeal(Long conversationIdx, Long userId) {
-    Conversation conversation = conversationRepository.findById(conversationIdx).orElseThrow();
-    
-    // 펫케어 관련 채팅방인지 확인
-    if (conversation.getRelatedType() != RelatedType.CARE_REQUEST 
-        && conversation.getRelatedType() != RelatedType.CARE_APPLICATION) {
-        throw new IllegalArgumentException("펫케어 관련 채팅방이 아닙니다.");
-    }
-    
-    // 사용자의 거래 확정 처리
-    ConversationParticipant participant = participantRepository
-        .findByConversationIdxAndUserIdx(conversationIdx, userId).orElseThrow();
-    
-    participant.setDealConfirmed(true);
-    participant.setDealConfirmedAt(LocalDateTime.now());
-    participantRepository.save(participant);
-    
-    // 양쪽 모두 확정했는지 확인
-    List<ConversationParticipant> allParticipants = participantRepository
-        .findByConversationIdxAndStatus(conversationIdx, ParticipantStatus.ACTIVE);
-    
-    boolean allConfirmed = allParticipants.stream()
-        .allMatch(p -> Boolean.TRUE.equals(p.getDealConfirmed()));
-    
-    // 양쪽 모두 확정했으면 CareRequest 상태 변경 및 지원 승인
-    if (allConfirmed && allParticipants.size() == 2) {
-        CareRequest careRequest = careRequestRepository.findById(conversation.getRelatedIdx()).orElseThrow();
-        
-        if (careRequest.getStatus() == CareRequestStatus.OPEN) {
-            // 제공자 찾기
-            Long requesterId = careRequest.getUser().getIdx();
-            Long providerId = allParticipants.stream()
-                .map(p -> p.getUser().getIdx())
-                .filter(id -> !id.equals(requesterId))
-                .findFirst().orElseThrow();
-            
-            // CareApplication 생성 또는 승인
-            CareApplication application = careRequest.getApplications().stream()
-                .filter(app -> app.getProvider().getIdx().equals(providerId))
-                .findFirst().orElse(null);
-            
-            if (application == null) {
-                application = CareApplication.builder()
-                    .careRequest(careRequest)
-                    .provider(usersRepository.findById(providerId).orElseThrow())
-                    .status(CareApplicationStatus.ACCEPTED)
-                    .build();
-                careRequest.getApplications().add(application);
-            } else {
-                application.setStatus(CareApplicationStatus.ACCEPTED);
-            }
-    
-            // 상태 변경
-            careRequest.setStatus(CareRequestStatus.IN_PROGRESS);
-            careRequestRepository.save(careRequest);
-        }
-    }
-}
-```
+**구현 위치**: `ConversationService.confirmCareDeal()` (Lines 545-652)
+
+**핵심 로직**:
+- 펫케어 관련 채팅방인지 확인 (`RelatedType.CARE_REQUEST` 또는 `CARE_APPLICATION`)
+- 사용자의 거래 확정 처리 (`dealConfirmed`, `dealConfirmedAt` 설정)
+- 양쪽 모두 확정했는지 확인 (2명 참여자 모두 `dealConfirmed = true`)
+- 양쪽 모두 확정 시:
+  - `CareRequest` 상태가 `OPEN`인 경우에만 처리
+  - 제공자 찾기 (요청자가 아닌 참여자)
+  - `CareApplication` 생성 또는 승인 (`ACCEPTED` 상태)
+  - `CareRequest` 상태를 `IN_PROGRESS`로 변경
+
+**동시성 제어**: `@Transactional`로 트랜잭션 보장
 
 **설명**:
 - **처리 흐름**: 채팅방 조회 → 사용자 거래 확정 처리 → 양쪽 모두 확정 확인 → 지원 승인 및 상태 변경
@@ -123,25 +74,16 @@ public void confirmCareDeal(Long conversationIdx, Long userId) {
 - **동시성 제어**: 트랜잭션으로 처리하여 안전성 보장
 
 #### 로직 2: 날짜 지난 요청 자동 완료
-```java
-// CareRequestScheduler.java
-@Scheduled(cron = "0 0 * * * ?") // 매 시간 정각
-@Transactional
-public void updateExpiredCareRequests() {
-    LocalDateTime now = LocalDateTime.now();
-    List<CareRequest> expiredRequests = careRequestRepository
-        .findByDateBeforeAndStatusIn(
-            now,
-            List.of(CareRequestStatus.OPEN, CareRequestStatus.IN_PROGRESS)
-        );
-    
-    for (CareRequest request : expiredRequests) {
-        request.setStatus(CareRequestStatus.COMPLETED);
-    }
-    
-    careRequestRepository.saveAll(expiredRequests);
-}
-```
+**구현 위치**: `CareRequestScheduler.updateExpiredCareRequests()` (Lines 32-60)
+
+**스케줄러 설정**:
+- 매 시간 정각 실행: `@Scheduled(cron = "0 0 * * * ?")`
+- 매일 자정에도 실행: `@Scheduled(cron = "0 0 0 * * ?")` (더 정확한 처리를 위해)
+
+**핵심 로직**:
+- 날짜가 지났고 `OPEN` 또는 `IN_PROGRESS` 상태인 요청 조회
+- 상태를 `COMPLETED`로 변경
+- `saveAll()`로 일괄 저장
 
 **설명**:
 - **처리 흐름**: 만료된 요청 조회 → 상태 변경 → 저장
@@ -152,8 +94,12 @@ public void updateExpiredCareRequests() {
 #### CareRequestService
 | 메서드 | 설명 | 주요 로직 |
 |--------|------|-----------|
-| `createCareRequest()` | 펫케어 요청 생성 | 펫 소유자 확인, 상태 OPEN |
-| `getAllCareRequests()` | 요청 목록 조회 | 상태 필터링, 위치 필터링 |
+| `createCareRequest()` | 펫케어 요청 생성 | 이메일 인증 확인, 펫 소유자 확인, 상태 OPEN |
+| `getAllCareRequests()` | 요청 목록 조회 | 상태 필터링, 위치 필터링, 작성자 활성 상태 확인 |
+| `getCareRequest()` | 단일 요청 조회 | 펫 정보 포함 조회 |
+| `updateCareRequest()` | 요청 수정 | 펫 정보 업데이트 지원 |
+| `deleteCareRequest()` | 요청 삭제 | Soft Delete |
+| `getMyCareRequests()` | 내 요청 목록 | 사용자별 요청 조회 |
 | `updateStatus()` | 상태 변경 | OPEN → IN_PROGRESS → COMPLETED |
 | `searchCareRequests()` | 요청 검색 | 제목/내용 검색 |
 
@@ -166,9 +112,10 @@ public void updateExpiredCareRequests() {
 ### 2.3 트랜잭션 처리
 - **트랜잭션 범위**: 
   - 요청 생성/수정/삭제: `@Transactional`
-  - 지원 승인: `@Transactional` (동시성 제어 필요)
+  - 거래 확정: `@Transactional` (동시성 제어 필요)
   - 조회 메서드: `@Transactional(readOnly = true)`
-- **격리 수준**: 기본값 (READ_COMMITTED), 지원 승인은 REPEATABLE_READ 권장
+- **격리 수준**: 기본값 (READ_COMMITTED)
+- **이메일 인증**: 요청 생성 시 이메일 인증 확인 (`EmailVerificationRequiredException`)
 
 ---
 
@@ -200,18 +147,24 @@ domain/care/
 ```java
 @Entity
 @Table(name = "carerequest")
-public class CareRequest {
+public class CareRequest extends BaseTimeEntity {
     private Long idx;
     private Users user;                    // 요청자
-    private Pet pet;                        // 관련 펫 (선택사항)
-    private String title;                  // 제목
+    private Pet pet;                       // 관련 펫 (선택사항)
+    private String title;                   // 제목
+    @Lob
     private String description;            // 설명
     private LocalDateTime date;            // 날짜
-    private CareRequestStatus status;       // 상태 (OPEN, IN_PROGRESS, COMPLETED)
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
-    private Boolean isDeleted;
+    @Builder.Default
+    private CareRequestStatus status = CareRequestStatus.OPEN;  // 상태 (OPEN, IN_PROGRESS, COMPLETED)
+    @Builder.Default
+    private Boolean isDeleted = false;
+    private LocalDateTime deletedAt;
+    private LocalDateTime createdAt;       // BaseTimeEntity에서 상속
+    private LocalDateTime updatedAt;       // BaseTimeEntity에서 상속
+    @OneToMany(mappedBy = "careRequest", cascade = CascadeType.ALL)
     private List<CareApplication> applications; // 지원 목록
+    @OneToMany(mappedBy = "careRequest", cascade = CascadeType.ALL)
     private List<CareRequestComment> comments;   // 댓글 목록
 }
 ```
@@ -220,14 +173,16 @@ public class CareRequest {
 ```java
 @Entity
 @Table(name = "careapplication")
-public class CareApplication {
+public class CareApplication extends BaseTimeEntity {
     private Long idx;
     private CareRequest careRequest;        // 펫케어 요청
-    private Users provider;                // 케어 제공자
-    private CareApplicationStatus status;   // 상태 (PENDING, APPROVED, REJECTED)
+    private Users provider;                 // 케어 제공자
+    @Builder.Default
+    private CareApplicationStatus status = CareApplicationStatus.PENDING;  // 상태 (PENDING, ACCEPTED, REJECTED)
+    @Lob
     private String message;                 // 지원 메시지
-    private LocalDateTime createdAt;
-    private List<CareReview> reviews;       // 리뷰 목록
+    private LocalDateTime createdAt;       // BaseTimeEntity에서 상속
+    private LocalDateTime updatedAt;       // BaseTimeEntity에서 상속
 }
 ```
 
@@ -235,15 +190,16 @@ public class CareApplication {
 ```java
 @Entity
 @Table(name = "carereview")
-public class CareReview {
+public class CareReview extends BaseTimeEntity {
     private Long idx;
     private CareApplication careApplication; // 펫케어 지원
-    private Users reviewer;                // 리뷰 작성자 (요청자)
+    private Users reviewer;                 // 리뷰 작성자 (요청자)
     private Users reviewee;                 // 리뷰 대상 (제공자)
     private int rating;                     // 평점 (1-5)
+    @Lob
     private String comment;                 // 리뷰 내용
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
+    private LocalDateTime createdAt;        // BaseTimeEntity에서 상속
+    private LocalDateTime updatedAt;        // BaseTimeEntity에서 상속
 }
 ```
 
@@ -254,10 +210,13 @@ public class CareReview {
 public class CareRequestComment {
     private Long idx;
     private CareRequest careRequest;        // 펫케어 요청
-    private Users user;                    // 작성자
-    private String content;                // 내용
+    private Users user;                     // 작성자
+    @Lob
+    private String content;                 // 내용
     private LocalDateTime createdAt;
-    private Boolean isDeleted;
+    @Builder.Default
+    private Boolean isDeleted = false;
+    private LocalDateTime deletedAt;
 }
 ```
 
@@ -275,12 +234,15 @@ erDiagram
 ### 3.4 API 설계
 | 엔드포인트 | Method | 설명 |
 |-----------|--------|------|
-| `/api/care/requests` | GET | 요청 목록 |
-| `/api/care/requests` | POST | 요청 생성 |
-| `/api/care/requests/{id}/applications` | POST | 지원하기 |
-| `/api/care/requests/{id}/applications/{appId}/approve` | PUT | 지원 승인 |
+| `/api/care-requests` | GET | 요청 목록 (status, location 파라미터 지원) |
+| `/api/care-requests/{id}` | GET | 단일 요청 조회 |
+| `/api/care-requests` | POST | 요청 생성 (이메일 인증 필요) |
+| `/api/care-requests/{id}` | PUT | 요청 수정 |
+| `/api/care-requests/{id}` | DELETE | 요청 삭제 |
+| `/api/care-requests/my-requests` | GET | 내 요청 목록 (userId 파라미터) |
+| `/api/care-requests/{id}/status` | PATCH | 상태 변경 (status 파라미터) |
+| `/api/care-requests/search` | GET | 요청 검색 (keyword 파라미터) |
 | `/api/chat/conversations/{conversationIdx}/confirm-deal` | POST | 거래 확정 (채팅방에서) |
-| `/api/care-requests/{id}/status?status=COMPLETED` | PATCH | 서비스 완료 (채팅방에서) |
 | `/api/care/reviews` | POST | 리뷰 작성 |
 
 ---
@@ -331,18 +293,9 @@ List<CareRequest> findAllWithUserAndPet();
 ## 6. 핵심 포인트 요약
 
 ### 기술적 하이라이트
-1. **지원 승인 동시성 제어**: 비관적 락 또는 Unique 제약조건
-2. **자동 완료 스케줄러**: 날짜 지난 요청 자동 완료
-3. **리뷰 시스템**: 평균 평점 캐싱
-4. **N+1 문제 해결**: Fetch Join 사용
+1. **거래 확정 동시성 제어**: 트랜잭션으로 안전성 보장, 양쪽 모두 확인 시 자동 승인
+2. **자동 완료 스케줄러**: 날짜 지난 요청 자동 완료 (매 시간 정각 + 매일 자정)
+3. **이메일 인증**: 요청 생성 시 이메일 인증 확인
+4. **Soft Delete**: 요청 및 댓글 삭제 시 Soft Delete 적용
+5. **N+1 문제 해결**: Fetch Join 사용 (`findByIdWithPet`)
 
-### 학습한 점
-- 동시성 제어 방법 (비관적 락, Unique 제약조건)
-- 스케줄러 활용 (자동 완료 처리)
-- 리뷰 시스템 설계 (평균 평점 계산, 캐싱)
-
-### 개선 가능한 부분
-- 분산 락 (Redis): 여러 인스턴스 환경에서 지원 승인 동시성 제어
-- 매칭 알고리즘: 위치 기반 추천, 평점 기반 추천
-- 결제 시스템: 거래 확정 시 결제 처리 연동
-- 알림 시스템: 거래 확정 시 양쪽 모두에게 알림 발송

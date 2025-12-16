@@ -19,6 +19,7 @@
 - **Cache**: Redis
   - 알림 버퍼링: 최신 알림 50개를 24시간 TTL로 캐싱하여 실시간 조회 성능 향상
   - 게시글 캐싱: Spring Cache를 통한 게시글 상세 조회 캐싱 (`@Cacheable`)
+  - 이메일 인증: 회원가입 전 이메일 인증 상태 임시 저장 (24시간 TTL)
 - **Security**: Spring Security, JWT (Access Token + Refresh Token)
 - **Build**: Gradle
 - **Scheduling**: Spring Scheduler (@Scheduled)
@@ -76,6 +77,7 @@
     - 관리자 수동 제재 (경고, 이용제한, 영구 차단)
 - **제재 이력 관리**: 모든 제재 이력을 `UserSanction` 테이블에 기록
 - **자동 해제**: 스케줄러를 통한 만료된 이용제한 자동 해제
+- **동시성 제어**: DB 레벨 원자적 증가 쿼리로 여러 관리자가 동시에 경고 부여 시에도 경고 횟수 정확성 보장
 
 ---
 
@@ -95,6 +97,10 @@
 
 ### 🔐 인증 및 보안 아키텍처
 - **JWT 기반 인증**: Access Token (15분) + Refresh Token (1일) 이중 토큰 전략
+- **소셜 로그인**: OAuth2 기반 Google, Naver 로그인 지원
+  - 일반 로그인과 동일한 JWT 토큰 발급 방식
+  - 기존 계정과 소셜 계정 자동 연결 (이메일 기반)
+  - 소셜 로그인 사용자는 자동으로 이메일 인증 완료 처리
 - **Spring Security**: Method-level Security (`@PreAuthorize`)를 통한 세밀한 권한 제어
 - **Role 기반 접근 제어**: USER, SERVICE_PROVIDER, ADMIN, MASTER 역할 구분
 - **제재된 유저 로그인 차단**: 로그인 시 유저 상태(ACTIVE, SUSPENDED, BANNED) 확인
@@ -102,24 +108,22 @@
 ### ✉️ 이메일 인증 시스템 아키텍처
 > **핵심 원칙**: 이메일 인증은 **하나의 통합 시스템**으로 구현하며, 용도(purpose)만 분리합니다.
 >
-> **❌ 잘못된 접근**: 각 케이스별로 별도의 인증 시스템을 구현
-> - 비밀번호 변경용 이메일 인증
-> - 펫케어용 이메일 인증  
-> - 모임용 이메일 인증
-> 
-> **✅ 올바른 접근**: 단일 이메일 인증 시스템 + 용도 분리 + 서비스 레벨 권한 체크
->
 > **구현 전략**:
 > 1. **단일 인증 토큰 생성**: 이메일 인증 링크에 포함된 토큰은 하나의 표준 형식
 > 2. **용도(Purpose) 분리**: 토큰에 `purpose` 파라미터 포함 (PASSWORD_RESET, PET_CARE, MEETUP 등)
 > 3. **서비스 레벨 권한 체크**: 각 서비스(펫케어, 모임 등)에서 `emailVerified` 필드 확인
 > 4. **통합 인증 처리**: 인증 링크 클릭 시 `emailVerified = true`로 업데이트 (용도 무관)
+> 5. **회원가입 전 인증 지원**: Redis를 활용하여 회원가입 전 이메일 인증 상태 임시 저장 (24시간 TTL)
 >
 > **권한 정책**:
 > - **1단계 (로그인만)**: 모든 조회, 게시글/댓글 작성 (유입용, 참여 유도용)
 > - **2단계 (이메일 인증 필수)**: 게시글/댓글 수정/삭제, 실종 제보, 리뷰 작성, 모임/펫케어 서비스, 비밀번호 변경 (책임 있는 행동)
 >
-> **핵심 개념**: "이메일 인증은 '고급 기능 접근용'이 아니라 '책임 있는 행동을 할 수 있는 최소 조건'이다."
+> **특징**:
+> - 소셜 로그인 사용자는 자동으로 이메일 인증 완료 (Google: `email_verified`, Naver: 기본 `true`)
+> - 일반 회원가입 사용자는 이메일 인증 링크 클릭 필요
+> - 회원가입 전 이메일 인증 가능 (Redis에 임시 저장 후 회원가입 시 적용)
+>
 > ([상세 아키텍처 문서 보기](./docs/architecture/이메일%20인증%20시스템%20아키텍처.md))
 
 ### 📁 파일 관리 시스템
@@ -302,7 +306,8 @@ GET    /api/admin/boards        # 게시글 관리
 ### 캐싱 전략
 - **알림 버퍼링**: Redis에 최신 알림 50개를 24시간 TTL로 저장하여 실시간 조회 성능 향상
 - **게시글 캐싱**: `@Cacheable`을 통한 게시글 상세 조회 캐싱 (Redis 기반)
-- **캐시 키 전략**: `notification:{userId}`, `boardDetail:{boardId}` 등 도메인별 키 분리
+- **이메일 인증**: 회원가입 전 이메일 인증 상태를 Redis에 임시 저장 (24시간 TTL)
+- **캐시 키 전략**: `notification:{userId}`, `boardDetail:{boardId}`, `email_verification:pre_registration:{email}` 등 도메인별 키 분리
 
 ### 배치 작업
 - **일별 통계 집계**: 매일 자정 `DailyStatistics` 테이블 업데이트
@@ -331,7 +336,7 @@ GET    /api/admin/boards        # 게시글 관리
 2. **댓글 추가 시 게시글 카운트 동기화**: 댓글 저장과 카운트 업데이트를 원자적으로 처리
 3. **펫케어 요청 생성 시 펫 소유자 검증**: 펫 검증과 요청 저장을 같은 트랜잭션에서 처리
 
-**상세 사례**: [트랜잭션 관리 & 동시성 제어 사례](./docs/transaction-concurrency-cases.md#트랜잭션-관리-사례)
+**상세 사례**: [트랜잭션 관리 & 동시성 제어 사례](./docs/concurrency/transaction-concurrency-cases.md#트랜잭션-관리-사례)
 
 ---
 
@@ -341,13 +346,23 @@ GET    /api/admin/boards        # 게시글 관리
 - **조회수 중복 방지**: `BoardViewLog`를 통한 사용자별 1회 조회 제한
 - **반응 중복 방지**: Unique 제약조건으로 중복 좋아요/싫어요 방지
 - **스케줄러 중복 실행 방지**: ShedLock을 통한 분산 환경 대응
+- **제재 시스템 동시성 해결**: DB 레벨 원자적 증가 쿼리로 경고 횟수 정확성 보장
+- **소셜 로그인 동시성 해결**: DB UNIQUE 제약조건으로 중복 계정 생성 방지
 
 ### 주요 사례
 1. **게시글 조회수 중복 방지**: BoardViewLog 테이블로 사용자당 1회만 조회수 증가
 2. **좋아요/싫어요 중복 방지**: Unique 제약조건 + 예외 처리로 동시 클릭 시 하나만 저장
 3. **댓글 수 동기화**: UPDATE 쿼리로 원자적 증가 (개선 계획)
+4. **제재 시스템 경고 횟수 동시성 문제**
+   - **문제**: 여러 관리자가 동시에 경고 부여 시 Lost Update 발생 가능
+   - **해결**: `incrementWarningCount()` 메서드로 DB 레벨 원자적 증가 쿼리 사용
+   - **효과**: 동시 요청 시에도 경고 횟수 정확성 보장, 자동 이용제한 정확히 한 번만 적용
+5. **소셜 로그인 중복 계정 생성 방지**
+   - **문제**: 같은 소셜 계정으로 동시 로그인 시 Race Condition으로 중복 계정 생성 가능
+   - **해결**: DB UNIQUE 제약조건 (`Users.email`, `SocialUser.provider+providerId`) + 트랜잭션 활용
+   - **효과**: 동시 요청 시에도 하나의 계정만 생성되며, 기존 계정과의 연결도 정확하게 처리
 
-**상세 사례**: [트랜잭션 관리 & 동시성 제어 사례](./docs/transaction-concurrency-cases.md#동시성-제어-사례)
+**상세 사례**: [트랜잭션 관리 & 동시성 제어 사례](./docs/concurrency/transaction-concurrency-cases.md#동시성-제어-사례)
 
 ---
 
@@ -365,7 +380,7 @@ GET    /api/admin/boards        # 게시글 관리
 
 ### 백엔드 아키텍처
 - [백엔드 아키텍처 문서](./docs/README.md) - 도메인별 상세 설명, ERD, 성능 최적화
-- [트랜잭션 관리 & 동시성 제어 사례](./docs/transaction-concurrency-cases.md) - 실제 코드 기반 사례
+- [트랜잭션 관리 & 동시성 제어 사례](./docs/concurrency/transaction-concurrency-cases.md) - 실제 코드 기반 사례
 
 ### 전략 문서
 - [통계 시스템 전략](./md/ADMIN_STATISTICS_STRATEGY.md)
