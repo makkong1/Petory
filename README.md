@@ -39,10 +39,12 @@
 - **반경 검색**: MySQL `ST_Distance_Sphere` 함수를 활용한 반경 기반 위치 검색 (미터 단위)
 - **지역 계층 검색**: 시도 > 시군구 > 읍면동 > 도로명 우선순위로 지역별 서비스 검색
 - **거리 계산**: Haversine 공식을 통한 두 좌표 간 거리 계산 (미터 단위)
-- **카카오맵 API 연동**: 
-  - 키워드 기반 장소 검색 (반려동물 관련 시설)
-  - 주소-좌표 변환(Geocoding) 및 좌표-주소 변환(역지오코딩)
-- **네이버맵 API 연동**: 길찾기(Directions API) 및 역지오코딩
+- **네이버맵 API 연동**: 
+  - **백엔드**: 
+    - 주소-좌표 변환(Geocoding) - `NaverMapService` (`GeocodingController` `/api/geocoding/address`)
+    - 좌표-주소 변환(역지오코딩) - `NaverMapService` (`GeocodingController` `/api/geocoding/coordinates`)
+    - 길찾기(Directions API) - `NaverMapService` (`GeocodingController` `/api/geocoding/directions`)
+  - **프론트엔드**: 지도 표시 및 마커 표시 - `MapContainer` 컴포넌트
 - **공공데이터 연동**: CSV 배치 업로드를 통한 대량 위치 데이터 수집
 - **캐싱**: 인기 위치 서비스 조회 결과 캐싱 (카테고리별 상위 10개)
 

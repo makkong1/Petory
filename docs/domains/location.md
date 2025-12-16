@@ -10,6 +10,10 @@
   - 거리 계산 (Haversine 공식)
   - 위치 서비스 리뷰 시스템
   - 공공데이터 CSV 배치 임포트
+  - **네이버맵 API 연동**: 
+    - 주소-좌표 변환(Geocoding)
+    - 좌표-주소 변환(역지오코딩)
+    - 길찾기(Directions API)
 
 ### 1.2 기능 시연
 > **스크린샷/영상 링크**: [기능 작동 영상 또는 스크린샷 추가]
@@ -78,15 +82,19 @@
 ```
 domain/location/
   ├── controller/
-  │   └── LocationServiceController.java
+  │   ├── LocationServiceController.java
+  │   └── GeocodingController.java
   ├── service/
   │   ├── LocationServiceService.java
   │   ├── LocationServiceReviewService.java
   │   ├── PublicDataLocationService.java
-  │   └── LocationServiceAdminService.java
+  │   ├── LocationServiceAdminService.java
+  │   └── NaverMapService.java          # 네이버맵 API 연동
   ├── entity/
   │   ├── LocationService.java
   │   └── LocationServiceReview.java
+  ├── dto/
+  │   └── LocationServiceDTO.java
   └── repository/
       ├── LocationServiceRepository.java
       └── LocationServiceReviewRepository.java
@@ -128,7 +136,7 @@ public class LocationService {
     private String description;             // 서비스 설명
     private Double rating;                  // 평균 평점
     private LocalDate lastUpdated;          // 최종작성일
-    private String dataSource;              // 데이터 출처 (PUBLIC, KAKAO)
+    private String dataSource;              // 데이터 출처 (PUBLIC: 공공데이터)
     private List<LocationServiceReview> reviews; // 리뷰 목록
 }
 ```
@@ -161,6 +169,9 @@ erDiagram
 | `/api/location-services/search` | GET | 지역 계층별 서비스 검색 |
 | `/api/location-services/popular` | GET | 인기 서비스 조회 |
 | `/api/location-services/{id}/reviews` | POST | 리뷰 작성 |
+| `/api/geocoding/address` | GET | 주소→좌표 변환 (네이버맵 Geocoding API) |
+| `/api/geocoding/coordinates` | GET | 좌표→주소 변환 (네이버맵 역지오코딩 API) |
+| `/api/geocoding/directions` | GET | 길찾기 (네이버맵 Directions API) |
 
 ---
 
@@ -213,5 +224,12 @@ public List<LocationServiceDTO> getPopularLocationServices(String category) {
 ### 기술적 하이라이트
 1. **지역 계층적 탐색**: 시도 → 시군구 → 읍면동 → 도로명 계층 구조
 2. **거리 계산**: Haversine 공식으로 정확한 거리 계산
-3. **인덱스 전략**: 지역 계층별 인덱스로 조회 성능 향상
-4. **하이브리드 데이터 로딩**: 초기 로드 + 클라이언트 필터링
+3. **네이버맵 API 연동**: 
+   - 주소-좌표 변환(Geocoding) - 백엔드
+   - 좌표-주소 변환(역지오코딩) - 백엔드
+   - 길찾기(Directions API) - 백엔드
+   - 지도 표시 및 마커 표시 - 프론트엔드
+4. **인덱스 전략**: 지역 계층별 인덱스로 조회 성능 향상
+5. **하이브리드 데이터 로딩**: 초기 로드 + 클라이언트 필터링
+6. **데이터 출처 관리**: `dataSource` 필드로 데이터 출처 구분 (PUBLIC)
+7. **공공데이터 CSV 배치 업로드**: 대량 위치 데이터 수집 지원

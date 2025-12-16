@@ -110,7 +110,7 @@ public class LocationService {
 
     @Column(name = "data_source", length = 50)
     @Builder.Default
-    private String dataSource = "PUBLIC"; // 데이터 출처 (PUBLIC: 공공데이터, KAKAO: 카카오맵)
+    private String dataSource = "PUBLIC"; // 데이터 출처 (PUBLIC: 공공데이터)
 
     // created_at, updated_at는 DB에 없으므로 주석 처리
     // 필요시 DB에 컬럼 추가 후 활성화

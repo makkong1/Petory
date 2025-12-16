@@ -86,6 +86,56 @@ const SIDO_CENTERS = {
   '제주특별자치도': { lat: 33.4996, lng: 126.5312, level: 6 },
 };
 
+// 주요 시군구의 중심 좌표 (Geocoding API 실패 시 fallback)
+const SIGUNGU_CENTERS = {
+  '서울특별시': {
+    '강남구': { lat: 37.5172, lng: 127.0473 },
+    '강동구': { lat: 37.5301, lng: 127.1238 },
+    '강북구': { lat: 37.6398, lng: 127.0256 },
+    '강서구': { lat: 37.5509, lng: 126.8495 },
+    '관악구': { lat: 37.4784, lng: 126.9516 },
+    '광진구': { lat: 37.5384, lng: 127.0821 },
+    '구로구': { lat: 37.4954, lng: 126.8874 },
+    '금천구': { lat: 37.4519, lng: 126.9020 },
+    '노원구': { lat: 37.6542, lng: 127.0568 },
+    '도봉구': { lat: 37.6688, lng: 127.0471 },
+    '동대문구': { lat: 37.5744, lng: 127.0396 },
+    '동작구': { lat: 37.5124, lng: 126.9393 },
+    '마포구': { lat: 37.5663, lng: 126.9019 },
+    '서대문구': { lat: 37.5791, lng: 126.9368 },
+    '서초구': { lat: 37.4837, lng: 127.0324 },
+    '성동구': { lat: 37.5633, lng: 127.0366 },
+    '성북구': { lat: 37.5894, lng: 127.0167 },
+    '송파구': { lat: 37.5145, lng: 127.1058 },
+    '양천구': { lat: 37.5170, lng: 126.8664 },
+    '영등포구': { lat: 37.5264, lng: 126.8962 },
+    '용산구': { lat: 37.5326, lng: 126.9905 },
+    '은평구': { lat: 37.6028, lng: 126.9291 },
+    '종로구': { lat: 37.5735, lng: 126.9788 },
+    '중구': { lat: 37.5640, lng: 126.9970 },
+    '중랑구': { lat: 37.6064, lng: 127.0926 },
+  },
+  '부산광역시': {
+    '중구': { lat: 35.1028, lng: 129.0330 },
+    '서구': { lat: 35.0979, lng: 129.0244 },
+    '동구': { lat: 35.1294, lng: 129.0454 },
+    '영도구': { lat: 35.0919, lng: 129.0676 },
+    '부산진구': { lat: 35.1629, lng: 129.0535 },
+    '동래구': { lat: 35.2045, lng: 129.0780 },
+    '남구': { lat: 35.1366, lng: 129.0843 },
+    '북구': { lat: 35.1972, lng: 129.0134 },
+    '해운대구': { lat: 35.1631, lng: 129.1636 },
+    '사하구': { lat: 35.1048, lng: 128.9740 },
+    '금정구': { lat: 35.2427, lng: 129.0921 },
+    '강서구': { lat: 35.2123, lng: 128.9801 },
+    '연제구': { lat: 35.1763, lng: 129.0799 },
+    '수영구': { lat: 35.1455, lng: 129.1130 },
+    '사상구': { lat: 35.1527, lng: 128.9911 },
+    '기장군': { lat: 35.2444, lng: 129.2222 },
+  },
+  // 다른 시도도 필요시 추가 가능
+};
+
 const SIGUNGUS = {
   '서울특별시': [
     '강남구', '강동구', '강북구', '강서구', '관악구', '광진구', '구로구', '금천구',
@@ -304,7 +354,7 @@ const LocationServiceMap = () => {
               );
             }
             return {
-            ...service,
+              ...service,
               distance,
             };
           });
@@ -474,6 +524,26 @@ const LocationServiceMap = () => {
   );
 
   // 지도 위치 업데이트 함수
+  // 시도 중심 좌표 fallback 헬퍼 함수
+  const fallbackToSidoCenter = useCallback((targetSido, targetSigungu, resolve) => {
+    if (SIDO_CENTERS[targetSido]) {
+      const sidoCenter = SIDO_CENTERS[targetSido];
+      const selectedMapLevel = targetSigungu ? calculateMapLevelFromRadius(5) : 10;
+      console.log('시군구 선택 - 시도 중심 좌표 fallback:', {
+        sido: targetSido,
+        sigungu: targetSigungu,
+        center: { lat: sidoCenter.lat, lng: sidoCenter.lng },
+        mapLevel: selectedMapLevel
+      });
+      setMapCenter({ lat: sidoCenter.lat, lng: sidoCenter.lng });
+      setMapLevel(selectedMapLevel);
+      isProgrammaticMoveRef.current = true;
+      resolve({ center: { lat: sidoCenter.lat, lng: sidoCenter.lng }, mapLevel: selectedMapLevel });
+    } else {
+      resolve(null);
+    }
+  }, []);
+
   const updateMapLocation = useCallback(async (targetSido, targetSigungu, targetEupmyeondong) => {
     // 전국 선택 시 기본 위치로
     if (!targetSido) {
@@ -512,7 +582,7 @@ const LocationServiceMap = () => {
       return { center: { lat: center.lat, lng: center.lng }, mapLevel: selectedMapLevel };
     }
 
-    // 시군구 또는 동 선택한 경우: geocoding API 사용
+    // 시군구 또는 동 선택한 경우: geocoding API 사용 (실패 시 하드코딩된 좌표 사용)
     let address = targetSido;
     if (targetSigungu) {
       address = `${targetSido} ${targetSigungu}`;
@@ -521,25 +591,139 @@ const LocationServiceMap = () => {
       address = `${targetSido} ${targetSigungu} ${targetEupmyeondong}`;
     }
 
-    try {
-      const coordData = await geocodingApi.addressToCoordinates(address);
-      if (coordData && coordData.success !== false && coordData.latitude && coordData.longitude) {
-        let selectedMapLevel;
-        if (targetEupmyeondong) {
-          selectedMapLevel = calculateMapLevelFromRadius(3);
-        } else if (targetSigungu) {
-          selectedMapLevel = calculateMapLevelFromRadius(20);
-        } else {
-          selectedMapLevel = 10;
+    // 시군구 선택 시 하드코딩된 좌표 확인 (fallback)
+    if (targetSigungu && SIGUNGU_CENTERS[targetSido] && SIGUNGU_CENTERS[targetSido][targetSigungu]) {
+      const hardcodedCenter = SIGUNGU_CENTERS[targetSido][targetSigungu];
+      const selectedMapLevel = calculateMapLevelFromRadius(5); // 시군구 단위: 5km 반경 (레벨 7)
+      console.log('시군구 선택 - 하드코딩된 좌표 사용:', {
+        sido: targetSido,
+        sigungu: targetSigungu,
+        center: hardcodedCenter,
+        mapLevel: selectedMapLevel
+      });
+      setMapCenter({ lat: hardcodedCenter.lat, lng: hardcodedCenter.lng });
+      setMapLevel(selectedMapLevel);
+      isProgrammaticMoveRef.current = true;
+      return { center: { lat: hardcodedCenter.lat, lng: hardcodedCenter.lng }, mapLevel: selectedMapLevel };
+    }
+
+    // Geocoding 시도: 1) 프론트엔드 네이버맵 JavaScript API (geocoder 서브 모듈), 2) 백엔드 API, 3) 시도 중심 좌표 fallback
+    // 프론트엔드 네이버맵 JavaScript API 사용 (geocoder 서브 모듈 필요)
+    if (window.naver && window.naver.maps && window.naver.maps.Service && window.naver.maps.Service.geocode) {
+      return new Promise((resolve) => {
+        window.naver.maps.Service.geocode({
+          query: address
+        }, (status, response) => {
+          if (status === window.naver.maps.Service.Status.OK && response.v2 && response.v2.addresses && response.v2.addresses.length > 0) {
+            const firstAddress = response.v2.addresses[0];
+            const lat = parseFloat(firstAddress.y);
+            const lng = parseFloat(firstAddress.x);
+
+            if (!isNaN(lat) && !isNaN(lng)) {
+              let selectedMapLevel;
+              if (targetEupmyeondong) {
+                selectedMapLevel = calculateMapLevelFromRadius(3); // 동 단위: 3km 반경 (레벨 6)
+              } else if (targetSigungu) {
+                selectedMapLevel = calculateMapLevelFromRadius(5); // 시군구 단위: 5km 반경 (레벨 7) - 확대
+              } else {
+                selectedMapLevel = 10;
+              }
+              console.log('시군구 선택 - 네이버맵 JavaScript API Geocoding 성공:', {
+                address,
+                center: { lat, lng },
+                mapLevel: selectedMapLevel,
+                targetSigungu
+              });
+              setMapCenter({ lat, lng });
+              setMapLevel(selectedMapLevel);
+              isProgrammaticMoveRef.current = true;
+              resolve({ center: { lat, lng }, mapLevel: selectedMapLevel });
+              return;
+            }
+          }
+
+          console.warn('네이버맵 JavaScript API Geocoding 실패, 백엔드 API 시도:', { status, address });
+
+          // 네이버맵 JavaScript API 실패 시 백엔드 API 시도
+          geocodingApi.addressToCoordinates(address)
+            .then(coordData => {
+              if (coordData && coordData.success !== false && coordData.latitude && coordData.longitude) {
+                let selectedMapLevel;
+                if (targetEupmyeondong) {
+                  selectedMapLevel = calculateMapLevelFromRadius(3);
+                } else if (targetSigungu) {
+                  selectedMapLevel = calculateMapLevelFromRadius(5);
+                } else {
+                  selectedMapLevel = 10;
+                }
+                console.log('시군구 선택 - 백엔드 Geocoding API 성공:', {
+                  address,
+                  center: { lat: coordData.latitude, lng: coordData.longitude },
+                  mapLevel: selectedMapLevel,
+                  targetSigungu
+                });
+                setMapCenter({ lat: coordData.latitude, lng: coordData.longitude });
+                setMapLevel(selectedMapLevel);
+                isProgrammaticMoveRef.current = true;
+                resolve({ center: { lat: coordData.latitude, lng: coordData.longitude }, mapLevel: selectedMapLevel });
+              } else {
+                // 백엔드 API도 실패 시 시도 중심 좌표 사용
+                console.warn('백엔드 Geocoding API 실패, 시도 중심 좌표 사용');
+                fallbackToSidoCenter(targetSido, targetSigungu, resolve);
+              }
+            })
+            .catch(err => {
+              console.warn('백엔드 Geocoding API 실패, 시도 중심 좌표 사용:', err);
+              fallbackToSidoCenter(targetSido, targetSigungu, resolve);
+            });
+        });
+      });
+    } else {
+      // 네이버맵 JavaScript API geocoder 서브 모듈이 없으면 백엔드 API 시도
+      console.warn('네이버맵 JavaScript API geocoder 서브 모듈이 없습니다. 백엔드 API 시도');
+      try {
+        const coordData = await geocodingApi.addressToCoordinates(address);
+        if (coordData && coordData.success !== false && coordData.latitude && coordData.longitude) {
+          let selectedMapLevel;
+          if (targetEupmyeondong) {
+            selectedMapLevel = calculateMapLevelFromRadius(3);
+          } else if (targetSigungu) {
+            selectedMapLevel = calculateMapLevelFromRadius(5);
+          } else {
+            selectedMapLevel = 10;
+          }
+          console.log('시군구 선택 - 백엔드 Geocoding API 성공:', {
+            address,
+            center: { lat: coordData.latitude, lng: coordData.longitude },
+            mapLevel: selectedMapLevel,
+            targetSigungu
+          });
+          setMapCenter({ lat: coordData.latitude, lng: coordData.longitude });
+          setMapLevel(selectedMapLevel);
+          isProgrammaticMoveRef.current = true;
+          return { center: { lat: coordData.latitude, lng: coordData.longitude }, mapLevel: selectedMapLevel };
         }
-        setMapCenter({ lat: coordData.latitude, lng: coordData.longitude });
+      } catch (err) {
+        console.warn('백엔드 Geocoding API 실패, 시도 중심 좌표 사용:', err);
+      }
+
+      // 최종 fallback: 시도 중심 좌표 사용
+      if (SIDO_CENTERS[targetSido]) {
+        const sidoCenter = SIDO_CENTERS[targetSido];
+        const selectedMapLevel = targetSigungu ? calculateMapLevelFromRadius(5) : 10;
+        console.log('시군구 선택 - 시도 중심 좌표 fallback:', {
+          sido: targetSido,
+          sigungu: targetSigungu,
+          center: { lat: sidoCenter.lat, lng: sidoCenter.lng },
+          mapLevel: selectedMapLevel
+        });
+        setMapCenter({ lat: sidoCenter.lat, lng: sidoCenter.lng });
         setMapLevel(selectedMapLevel);
         isProgrammaticMoveRef.current = true;
-        return { center: { lat: coordData.latitude, lng: coordData.longitude }, mapLevel: selectedMapLevel };
+        return { center: { lat: sidoCenter.lat, lng: sidoCenter.lng }, mapLevel: selectedMapLevel };
       }
-    } catch (err) {
-      console.error('위치 좌표 변환 실패:', err);
     }
+
     return null;
   }, []);
 

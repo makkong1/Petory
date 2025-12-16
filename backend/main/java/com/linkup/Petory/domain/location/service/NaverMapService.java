@@ -32,14 +32,16 @@ public class NaverMapService {
 
     /**
      * 네이버맵 Directions API 호출
+     * 
      * @param startLng 출발지 경도
      * @param startLat 출발지 위도
-     * @param endLng 도착지 경도
-     * @param endLat 도착지 위도
-     * @param option 경로 옵션 (traoptimal=최적, trafast=최단, tracomfort=편한길)
+     * @param endLng   도착지 경도
+     * @param endLat   도착지 위도
+     * @param option   경로 옵션 (traoptimal=최적, trafast=최단, tracomfort=편한길)
      * @return 길찾기 결과
      */
-    public Map<String, Object> getDirections(double startLng, double startLat, double endLng, double endLat, String option) {
+    public Map<String, Object> getDirections(double startLng, double startLat, double endLng, double endLat,
+            String option) {
         try {
             // API 키가 없으면 에러 반환
             if (apiKeyId == null || apiKeyId.isEmpty() || apiKey == null || apiKey.isEmpty()) {
@@ -51,7 +53,8 @@ public class NaverMapService {
             }
 
             log.info("네이버맵 Directions API 호출 - 출발지: ({}, {}), 도착지: ({}, {})", startLng, startLat, endLng, endLat);
-            log.debug("API Key ID: {}, API Key: {}", apiKeyId, apiKey.substring(0, Math.min(5, apiKey.length())) + "***");
+            log.debug("API Key ID: {}, API Key: {}", apiKeyId,
+                    apiKey.substring(0, Math.min(5, apiKey.length())) + "***");
 
             // 네이버맵 Directions API URL (공식 예시에 따름)
             String url = UriComponentsBuilder.fromUriString("https://maps.apigw.ntruss.com/map-direction/v1/driving")
@@ -66,8 +69,9 @@ public class NaverMapService {
             HttpHeaders headers = new HttpHeaders();
             headers.set("x-ncp-apigw-api-key-id", apiKeyId);
             headers.set("x-ncp-apigw-api-key", apiKey);
-            
-            log.debug("요청 헤더 - x-ncp-apigw-api-key-id: {}, x-ncp-apigw-api-key: {}", apiKeyId, apiKey.substring(0, Math.min(5, apiKey.length())) + "***");
+
+            log.debug("요청 헤더 - x-ncp-apigw-api-key-id: {}, x-ncp-apigw-api-key: {}", apiKeyId,
+                    apiKey.substring(0, Math.min(5, apiKey.length())) + "***");
 
             HttpEntity<String> entity = new HttpEntity<>(headers);
 
@@ -76,8 +80,8 @@ public class NaverMapService {
                     url,
                     HttpMethod.GET,
                     entity,
-                    new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {}
-            );
+                    new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {
+                    });
 
             log.info("네이버맵 API 응답 상태: {}", response.getStatusCode());
 
@@ -114,14 +118,15 @@ public class NaverMapService {
             return result;
         } catch (org.springframework.web.client.HttpClientErrorException e) {
             String responseBody = e.getResponseBodyAsString();
-            log.warn("네이버맵 Directions API HTTP 에러: {} - 상태: {}, 응답: {}", e.getMessage(), e.getStatusCode(), responseBody);
-            
+            log.warn("네이버맵 Directions API HTTP 에러: {} - 상태: {}, 응답: {}", e.getMessage(), e.getStatusCode(),
+                    responseBody);
+
             // 401 에러이고 "subscription required" 메시지인 경우
-            if (e.getStatusCode() != null && e.getStatusCode().value() == 401 && 
-                responseBody != null && responseBody.contains("subscription")) {
+            if (e.getStatusCode() != null && e.getStatusCode().value() == 401 &&
+                    responseBody != null && responseBody.contains("subscription")) {
                 log.warn("네이버맵 Directions API 구독이 필요합니다. 웹 URL 방식은 정상 작동합니다.");
             }
-            
+
             Map<String, Object> errorResponse = new HashMap<>();
             errorResponse.put("success", false);
             errorResponse.put("error", e.getMessage());
@@ -139,7 +144,105 @@ public class NaverMapService {
     }
 
     /**
+     * 네이버맵 지오코딩 (주소를 좌표로 변환)
+     * 
+     * @param address 변환할 주소
+     * @return 위도, 경도 정보가 담긴 배열 [latitude, longitude], 변환 실패 시 null
+     */
+    public Double[] addressToCoordinates(String address) {
+        if (address == null || address.trim().isEmpty()) {
+            return null;
+        }
+
+        try {
+            // API 키가 없으면 에러 반환
+            if (apiKeyId == null || apiKeyId.isEmpty() || apiKey == null || apiKey.isEmpty()) {
+                log.warn("네이버맵 API 키가 설정되지 않았습니다.");
+                return null;
+            }
+
+            log.info("네이버맵 지오코딩 API 호출 - 주소: {}", address);
+
+            // 네이버맵 Geocoding API URL (지오코딩)
+            String url = UriComponentsBuilder
+                    .fromUriString("https://naveropenapi.apigw.ntruss.com/map-geocode/v2/geocode")
+                    .queryParam("query", address)
+                    .toUriString();
+
+            log.debug("요청 URL: {}", url);
+
+            // 헤더 설정
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("X-NCP-APIGW-API-KEY-ID", apiKeyId);
+            headers.set("X-NCP-APIGW-API-KEY", apiKey);
+
+            HttpEntity<String> entity = new HttpEntity<>(headers);
+
+            // API 호출
+            ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
+                    url,
+                    HttpMethod.GET,
+                    entity,
+                    new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {
+                    });
+
+            log.info("네이버맵 지오코딩 API 응답 상태: {}", response.getStatusCode());
+
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                Map<String, Object> responseBody = response.getBody();
+
+                // 네이버맵 지오코딩 응답 파싱
+                if (responseBody.containsKey("addresses") &&
+                        ((java.util.List<?>) responseBody.get("addresses")).size() > 0) {
+
+                    @SuppressWarnings("unchecked")
+                    java.util.List<Map<String, Object>> addresses = (java.util.List<Map<String, Object>>) responseBody
+                            .get("addresses");
+
+                    Map<String, Object> firstAddress = addresses.get(0);
+                    String latitudeStr = (String) firstAddress.get("y");
+                    String longitudeStr = (String) firstAddress.get("x");
+
+                    if (latitudeStr != null && longitudeStr != null) {
+                        try {
+                            Double latitude = Double.parseDouble(latitudeStr);
+                            Double longitude = Double.parseDouble(longitudeStr);
+                            log.info("네이버맵 지오코딩 성공 - 좌표: ({}, {})", latitude, longitude);
+                            return new Double[] { latitude, longitude };
+                        } catch (NumberFormatException e) {
+                            log.warn("좌표 파싱 실패: latitude={}, longitude={}", latitudeStr, longitudeStr);
+                            return null;
+                        }
+                    }
+                }
+            }
+
+            log.warn("네이버맵 지오코딩 실패 - 주소를 찾을 수 없습니다: {}", address);
+            return null;
+        } catch (org.springframework.web.client.HttpClientErrorException e) {
+            String responseBody = e.getResponseBodyAsString();
+            log.error("네이버맵 지오코딩 API HTTP 에러: {} - 상태: {}", e.getMessage(), e.getStatusCode());
+            if (responseBody != null) {
+                log.error("응답 본문: {}", responseBody);
+
+                // 401 에러이고 "subscription required" 메시지인 경우
+                if (e.getStatusCode() != null && e.getStatusCode().value() == 401 &&
+                        (responseBody.contains("subscription") || responseBody.contains("Permission Denied"))) {
+                    log.error("네이버맵 Geocoding API 구독이 필요합니다. 네이버 클라우드 플랫폼 콘솔에서 Geocoding API를 구독해주세요.");
+                    log.error("참고: https://www.ncloud.com/product/applicationService/mapsGeocoding");
+                }
+            }
+
+            return null;
+        } catch (Exception e) {
+            log.error("네이버맵 지오코딩 API 호출 실패: {}", e.getMessage(), e);
+            return null;
+        }
+    }
+
+    /**
      * 네이버맵 역지오코딩 (좌표를 주소로 변환)
+     * 
      * @param lat 위도
      * @param lng 경도
      * @return 주소 정보
@@ -158,7 +261,8 @@ public class NaverMapService {
             log.info("네이버맵 역지오코딩 API 호출 - 좌표: ({}, {})", lat, lng);
 
             // 네이버맵 Geocoding API URL (역지오코딩)
-            String url = UriComponentsBuilder.fromUriString("https://naveropenapi.apigw.ntruss.com/map-reversegeocode/v2/gc")
+            String url = UriComponentsBuilder
+                    .fromUriString("https://naveropenapi.apigw.ntruss.com/map-reversegeocode/v2/gc")
                     .queryParam("coords", lng + "," + lat) // 경도,위도 순서
                     .queryParam("output", "json")
                     .toUriString();
@@ -177,27 +281,27 @@ public class NaverMapService {
                     url,
                     HttpMethod.GET,
                     entity,
-                    new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {}
-            );
+                    new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {
+                    });
 
             log.info("네이버맵 역지오코딩 API 응답 상태: {}", response.getStatusCode());
 
             Map<String, Object> result = new HashMap<>();
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 Map<String, Object> responseBody = response.getBody();
-                
+
                 // 네이버맵 역지오코딩 응답 파싱
-                if (responseBody.containsKey("results") && 
-                    ((java.util.List<?>) responseBody.get("results")).size() > 0) {
-                    
+                if (responseBody.containsKey("results") &&
+                        ((java.util.List<?>) responseBody.get("results")).size() > 0) {
+
                     @SuppressWarnings("unchecked")
-                    java.util.List<Map<String, Object>> results = 
-                        (java.util.List<Map<String, Object>>) responseBody.get("results");
-                    
+                    java.util.List<Map<String, Object>> results = (java.util.List<Map<String, Object>>) responseBody
+                            .get("results");
+
                     Map<String, Object> firstResult = results.get(0);
                     @SuppressWarnings("unchecked")
                     Map<String, Object> region = (Map<String, Object>) firstResult.get("region");
-                    
+
                     // 주소 조합
                     StringBuilder addressBuilder = new StringBuilder();
                     if (region != null) {
@@ -209,7 +313,7 @@ public class NaverMapService {
                         Map<String, String> area3 = (Map<String, String>) region.get("area3"); // 읍면동
                         @SuppressWarnings("unchecked")
                         Map<String, String> area4 = (Map<String, String>) region.get("area4"); // 리
-                        
+
                         if (area1 != null && area1.get("name") != null) {
                             addressBuilder.append(area1.get("name"));
                         }
@@ -223,7 +327,7 @@ public class NaverMapService {
                             addressBuilder.append(" ").append(area4.get("name"));
                         }
                     }
-                    
+
                     // land 정보 (도로명 주소)
                     @SuppressWarnings("unchecked")
                     Map<String, Object> land = (Map<String, Object>) firstResult.get("land");
@@ -232,7 +336,7 @@ public class NaverMapService {
                         roadAddress = (String) land.get("name");
                         String number1 = (String) land.get("number1");
                         String number2 = (String) land.get("number2");
-                        
+
                         if (roadAddress != null) {
                             if (number1 != null) {
                                 roadAddress += " " + number1;
@@ -242,12 +346,12 @@ public class NaverMapService {
                             }
                         }
                     }
-                    
+
                     result.put("success", true);
                     result.put("address", roadAddress != null ? roadAddress : addressBuilder.toString());
                     result.put("roadAddress", roadAddress);
                     result.put("jibunAddress", addressBuilder.toString());
-                    
+
                     log.info("네이버맵 역지오코딩 성공 - 주소: {}", result.get("address"));
                 } else {
                     result.put("success", false);
@@ -269,4 +373,3 @@ public class NaverMapService {
         }
     }
 }
-
