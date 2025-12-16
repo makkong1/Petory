@@ -28,46 +28,22 @@
 
 ### 2.1 핵심 비즈니스 로직
 
-#### 로직 1: 신고 처리 및 자동 제재
-```java
-// ReportService.java
-@Transactional
-public void resolveReport(long reportId, long adminId, ReportActionType action, String note) {
-    Report report = reportRepository.findById(reportId).orElseThrow();
-    
-    // 신고 대상에 따라 조치 적용
-    if (report.getTargetType() == ReportTargetType.BOARD) {
-        Board board = boardRepository.findById(report.getTargetIdx()).orElseThrow();
-        switch (action) {
-            case CONTENT_HIDE:
-                board.setStatus(ContentStatus.HIDDEN);
-                break;
-            case CONTENT_DELETE:
-                board.setStatus(ContentStatus.DELETED);
-                break;
-        }
-        boardRepository.save(board);
-    } else if (report.getTargetType() == ReportTargetType.USER) {
-        // 자동 제재 적용
-        userSanctionService.applySanctionFromReport(
-            report.getTargetIdx(), action, note, adminId, reportId);
-    }
-    
-    // 신고 처리 완료
-    report.setStatus(ReportStatus.RESOLVED);
-    report.setHandledBy(admin);
-    report.setActionTaken(action);
-    report.setAdminNote(note);
-    reportRepository.save(report);
-    
-    // 신고자에게 알림 발송
-    notificationService.notifyReportHandled(report);
-}
-```
+#### 로직 1: 신고 접수
+**구현 위치**: `ReportService.createReport()` (Lines 46-81)
 
-**설명**:
-- **처리 흐름**: 신고 조회 → 대상 타입 확인 → 조치 적용 → 신고 처리 완료 → 알림 발송
-- **자동 제재**: 사용자 신고 시 자동으로 제재 적용
+**핵심 로직**:
+- **유효성 검증**: 대상 타입, 대상 ID, 신고자, 신고 사유 확인
+- **대상 유효성 검증**: `validateTarget()`로 신고 대상 존재 확인
+- **중복 신고 방지**: `existsByTargetTypeAndTargetIdxAndReporterIdx()`로 중복 신고 방지
+- **Unique 제약조건**: `(target_type, target_idx, reporter_idx)` Unique 제약조건으로 중복 방지
+
+#### 로직 2: 신고 처리 및 자동 제재
+**구현 위치**: `ReportService.handleReport()` (Lines 114-144)
+
+**핵심 로직**:
+- **신고 처리**: 상태, 처리자, 처리 시간, 관리자 메모, 조치 내용 설정
+- **자동 제재**: `WARN_USER` 또는 `SUSPEND_USER` 조치 시 `userSanctionService.applySanctionFromReport()` 호출
+- **제재 사유**: 신고 ID와 관리자 메모를 포함한 제재 사유 생성
 
 ---
 
@@ -144,16 +120,8 @@ ON report(target_type, target_idx);
 ## 6. 핵심 포인트 요약
 
 ### 기술적 하이라이트
-1. **폴리모픽 관계**: 다양한 대상 타입 신고 지원
-2. **자동 제재 시스템**: 경고 누적 시 자동 이용제한
-3. **중복 신고 방지**: Unique 제약조건
-
-### 학습한 점
-- 폴리모픽 관계 설계
-- 자동 제재 시스템 구현
-- 신고 처리 프로세스 설계
-
-### 개선 가능한 부분
-- 신고 우선순위: 긴급 신고 우선 처리
-- 자동 처리: 명백한 스팸 자동 처리
-- AI 기반 분류: 신고 내용 자동 분류
+1. **폴리모픽 관계**: 다양한 대상 타입 신고 지원 (BOARD, COMMENT, MISSING_PET, PET_CARE_PROVIDER)
+2. **자동 제재 시스템**: `WARN_USER` 또는 `SUSPEND_USER` 조치 시 자동으로 `UserSanctionService` 호출
+3. **중복 신고 방지**: Unique 제약조건 `(target_type, target_idx, reporter_idx)`
+4. **대상 미리보기**: `buildTargetPreview()`로 신고 대상 미리보기 제공
+5. **신고 사유 검증**: 신고 대상 타입별 유효성 검증 (`validateTarget()`)

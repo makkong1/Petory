@@ -29,46 +29,26 @@
 ### 2.1 핵심 비즈니스 로직
 
 #### 로직 1: 일별 통계 수집
-```java
-// StatisticsService.java
-@Scheduled(cron = "0 0 1 * * ?") // 매일 새벽 1시
-@Transactional
-public void collectDailyStatistics() {
-    LocalDate yesterday = LocalDate.now().minusDays(1);
-    
-    // 활성 사용자 수 (로그인 또는 활동한 사용자)
-    Long activeUsers = usersRepository.countActiveUsersByDate(yesterday);
-    
-    // 신규 가입자 수
-    Long newUsers = usersRepository.countNewUsersByDate(yesterday);
-    
-    // 게시글 수
-    Long boardPosts = boardRepository.countByCreatedAtBetween(
-        yesterday.atStartOfDay(),
-        yesterday.atTime(23, 59, 59)
-    );
-    
-    // 펫케어 요청 수
-    Long careRequests = careRequestRepository.countByCreatedAtBetween(
-        yesterday.atStartOfDay(),
-        yesterday.atTime(23, 59, 59)
-    );
-    
-    DailyStatistics stats = DailyStatistics.builder()
-        .date(yesterday)
-        .activeUsers(activeUsers.intValue())
-        .newUsers(newUsers.intValue())
-        .boardPosts(boardPosts.intValue())
-        .careRequests(careRequests.intValue())
-        .build();
-    
-    statisticsRepository.save(stats);
-}
-```
+**구현 위치**: `StatisticsScheduler.aggregateDailyStatistics()` (Lines 33-38)
 
-**설명**:
-- **처리 흐름**: 전날 날짜 계산 → 각 지표 집계 → DailyStatistics 저장
-- **스케줄러**: 매일 새벽 1시 자동 실행
+**스케줄러 설정**:
+- **실행 시간**: 매일 오후 6시 30분 (18:30:00) - `@Scheduled(cron = "0 30 18 * * ?")`
+- **집계 대상**: 어제 날짜의 통계
+
+**핵심 로직** (`aggregateStatisticsForDate()` Lines 44-88):
+- **중복 방지**: 이미 집계된 데이터가 있으면 건너뜀
+- **신규 가입자**: `countByCreatedAtBetween()`로 집계
+- **새 게시글**: `countByCreatedAtBetween()`로 집계
+- **케어 요청**: `countByCreatedAtBetween()`로 집계
+- **완료된 케어**: `countByDateBetweenAndStatus(COMPLETED)`로 집계
+- **활성 사용자**: `countByLastLoginAtBetween()`로 집계 (DAU)
+- **매출**: 현재 0으로 고정
+
+#### 로직 2: 실시간 통계 조회
+**구현 위치**: `StatisticsService.getDailyStatistics()` (Lines 42-56)
+
+**핵심 로직**:
+- **오늘 날짜 포함 시**: 조회 기간에 오늘이 포함되어 있고 DB에 오늘의 통계가 없으면 `calculateTodayStatistics()`로 실시간 집계 추가
 
 ---
 
@@ -95,15 +75,22 @@ domain/statistics/
 @Table(name = "dailystatistics")
 public class DailyStatistics {
     private Long id;
+    @Column(unique = true, nullable = false)
     private LocalDate statDate;            // 통계 날짜 (UNIQUE)
-    private Integer newUsers;              // 신규 사용자 수
-    private Integer newPosts;               // 신규 게시글 수
-    private Integer newCareRequests;        // 신규 펫케어 요청 수
-    private Integer completedCares;         // 완료된 펫케어 수
-    private BigDecimal totalRevenue;        // 총 수익
-    private Integer activeUsers;            // 활성 사용자 수
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
+    @Builder.Default
+    private Integer newUsers = 0;          // 신규 사용자 수
+    @Builder.Default
+    private Integer newPosts = 0;          // 신규 게시글 수
+    @Builder.Default
+    private Integer newCareRequests = 0;   // 신규 펫케어 요청 수
+    @Builder.Default
+    private Integer completedCares = 0;    // 완료된 펫케어 수
+    @Builder.Default
+    private BigDecimal totalRevenue = BigDecimal.ZERO;  // 총 수익
+    @Builder.Default
+    private Integer activeUsers = 0;       // 활성 사용자 수 (DAU)
+    private LocalDateTime createdAt;       // @PrePersist로 자동 설정
+    private LocalDateTime updatedAt;       // @PreUpdate로 자동 설정
 }
 ```
 
@@ -141,16 +128,8 @@ ON daily_statistics(date DESC);
 ## 6. 핵심 포인트 요약
 
 ### 기술적 하이라이트
-1. **스케줄러 활용**: 매일 자동 통계 수집
-2. **배치 처리**: 여러 날짜 통계 한 번에 수집
-3. **캐싱**: 최근 통계 캐싱
-
-### 학습한 점
-- 스케줄러 활용
-- 통계 집계 방법
-- 누락 데이터 복구
-
-### 개선 가능한 부분
-- 시계열 DB: InfluxDB, TimescaleDB 활용
-- 실시간 통계: WebSocket으로 실시간 업데이트
-- 고급 분석: 사용자 행동 분석, 트렌드 분석
+1. **스케줄러 활용**: 매일 오후 6시 30분에 어제 통계 자동 수집
+2. **중복 방지**: 이미 집계된 날짜는 건너뜀
+3. **실시간 집계**: 오늘 날짜 조회 시 실시간 집계 추가 (`calculateTodayStatistics()`)
+4. **과거 데이터 초기화**: `backfillStatistics()`로 과거 데이터 일괄 집계 지원
+5. **Unique 제약조건**: `statDate`에 Unique 제약조건으로 중복 방지

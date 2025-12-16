@@ -74,68 +74,15 @@ Chat 도메인은 실시간 채팅 기능을 제공하는 도메인입니다. We
 
 ### 3.1 채팅방 생성
 
-```java
-@Transactional(propagation = Propagation.REQUIRES_NEW)
-public ConversationDTO createConversation(
-        ConversationType conversationType,
-        RelatedType relatedType,
-        Long relatedIdx,
-        String title,
-        List<Long> participantUserIds) {
-    
-    // 참여자 유효성 검증
-    List<Users> participants = participantUserIds.stream()
-            .map(userId -> usersRepository.findById(userId)
-                    .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다: " + userId)))
-            .collect(Collectors.toList());
-    
-    // 탈퇴한 사용자 제외
-    participants = participants.stream()
-            .filter(user -> !Boolean.TRUE.equals(user.getIsDeleted()))
-            .collect(Collectors.toList());
-    
-    // 1:1 채팅인 경우 기존 채팅방 확인
-    if (conversationType == ConversationType.DIRECT && participants.size() == 2) {
-        Optional<Conversation> existing = conversationRepository.findDirectConversationBetweenUsers(
-                participants.get(0).getIdx(),
-                participants.get(1).getIdx());
-        
-        if (existing.isPresent()) {
-            return conversationConverter.toDTO(existing.get());
-        }
-    }
-    
-    // Conversation 생성
-    Conversation conversation = Conversation.builder()
-            .conversationType(conversationType)
-            .relatedType(relatedType)
-            .relatedIdx(relatedIdx)
-            .title(title)
-            .status(ConversationStatus.ACTIVE)
-            .build();
-    
-    conversation = conversationRepository.save(conversation);
-    
-    // 참여자 추가
-    for (Users user : participants) {
-        ConversationParticipant participant = ConversationParticipant.builder()
-                .conversation(conversation)
-                .user(user)
-                .role(ParticipantRole.MEMBER)
-                .status(ParticipantStatus.ACTIVE)
-                .unreadCount(0)
-                .build();
-        participantRepository.save(participant);
-    }
-    
-    return conversationConverter.toDTO(conversation);
-}
-```
+**구현 위치**: `ConversationService.createConversation()` (Lines 161-280)
 
 **핵심 로직**:
-- **1:1 채팅 중복 방지**: 기존 채팅방이 있으면 재사용
-- **탈퇴한 사용자 제외**: 탈퇴한 사용자는 참여 불가
+- **참여자 유효성 검증**: 사용자 존재 확인, 탈퇴한 사용자 제외
+- **그룹 채팅(MEETUP)**: 최소 1명 허용, 1:1 채팅은 최소 2명 필요
+- **relatedType/relatedIdx 기존 채팅방 확인**: 펫케어 요청 등 연관 엔티티가 있으면 기존 채팅방 확인
+- **1:1 채팅 중복 방지**: 기존 채팅방이 있으면 재사용, relatedType/relatedIdx 업데이트 지원
 - **별도 트랜잭션**: `REQUIRES_NEW`로 실패해도 호출한 트랜잭션에 영향 없음
+- **참여자 추가**: 각 참여자에 대해 `ConversationParticipant` 생성 (role 기본값: MEMBER)
 
 ### 3.2 메시지 전송
 
@@ -173,9 +120,10 @@ public ChatMessageDTO sendMessage(Long conversationIdx, Long senderIdx, String c
     
     message = chatMessageRepository.save(message);
     
-    // 5. 참여자들의 읽지 않은 메시지 수 증가 (본인 제외)
-    // DB 레벨 원자적 증가로 Lost Update 방지
-    participantRepository.incrementUnreadCount(conversationIdx, senderIdx);
+        // 5. 참여자들의 읽지 않은 메시지 수 증가 (본인 제외)
+        // DB 레벨 원자적 증가로 Lost Update 방지
+        // 구현 위치: ConversationParticipantRepository.incrementUnreadCount() (Lines 78-82)
+        participantRepository.incrementUnreadCount(conversationIdx, senderIdx);
     
     // 6. Conversation 메타데이터 업데이트
     conversation.setLastMessageAt(LocalDateTime.now());
@@ -196,67 +144,22 @@ public ChatMessageDTO sendMessage(Long conversationIdx, Long senderIdx, String c
 
 ### 3.3 메시지 읽음 처리
 
-```java
-@Transactional
-public void markAsRead(Long conversationIdx, Long userId, Long lastMessageIdx) {
-    // 참여자 확인
-    ConversationParticipant participant = participantRepository
-            .findByConversationIdxAndUserIdx(conversationIdx, userId)
-            .orElseThrow(() -> new IllegalArgumentException("채팅방 참여자가 아닙니다."));
-    
-    // 읽지 않은 메시지 수 초기화
-    participant.setUnreadCount(0);
-    if (lastMessageIdx != null) {
-        ChatMessage lastMessage = chatMessageRepository.findById(lastMessageIdx)
-                .orElse(null);
-        if (lastMessage != null) {
-            participant.setLastReadMessage(lastMessage);
-            participant.setLastReadAt(LocalDateTime.now());
-        }
-    }
-    participantRepository.save(participant);
-}
-```
+**구현 위치**: `ChatMessageService.markAsRead()` (Lines 149-190)
 
 **핵심 로직**:
-- **읽지 않은 메시지 수 초기화**: 읽음 처리 시 `unreadCount`를 0으로 설정
-- **마지막 읽은 메시지 저장**: `lastReadMessage`로 읽음 위치 추적
+- **참여자 확인**: 채팅방 참여자인지 확인
+- **읽지 않은 메시지 수 초기화**: `unreadCount`를 0으로 설정
+- **마지막 읽은 메시지 저장**: `lastReadMessage`, `lastReadAt` 설정
+- **MessageReadStatus 기록**: 선택사항 (필요한 경우 읽음 상태 기록)
 
 ### 3.4 재참여 시 메시지 조회
 
-```java
-public Page<ChatMessageDTO> getMessages(Long conversationIdx, Long userId, int page, int size) {
-    // 참여자 정보 확인 (재참여 여부 체크)
-    ConversationParticipant participant = participantRepository
-            .findByConversationIdxAndUserIdx(conversationIdx, userId)
-            .orElse(null);
-    
-    LocalDateTime readFrom = null;
-    if (participant != null && participant.getLastReadMessage() == null && participant.getJoinedAt() != null) {
-        // 재참여한 경우: lastReadMessage가 null이고 joinedAt이 있으면 재참여로 간주
-        readFrom = participant.getJoinedAt();
-    }
-    
-    Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
-    
-    Page<ChatMessage> messages;
-    if (readFrom != null) {
-        // 재참여한 경우: joinedAt 이후 메시지만 조회
-        messages = chatMessageRepository
-                .findByConversationIdxAndCreatedAtAfterOrderByCreatedAtDesc(conversationIdx, readFrom, pageable);
-    } else {
-        // 기존 참여자: 전체 메시지 조회
-        messages = chatMessageRepository
-                .findByConversationIdxOrderByCreatedAtDesc(conversationIdx, pageable);
-    }
-    
-    return messages.map(messageConverter::toDTO);
-}
-```
+**구현 위치**: `ChatMessageService.getMessages()` (Lines 104-130)
 
 **핵심 로직**:
 - **재참여 감지**: `lastReadMessage`가 null이고 `joinedAt`이 있으면 재참여로 간주
 - **메시지 필터링**: 재참여한 경우 `joinedAt` 이후 메시지만 조회
+- **페이징**: 기본값 page=0, size=50, 최신순 정렬 (DESC)
 
 ---
 
@@ -291,13 +194,24 @@ public class ConversationParticipant {
     private Long idx;
     private Conversation conversation;
     private Users user;
-    private ParticipantRole role;  // MEMBER, ADMIN
-    private Integer unreadCount;  // 읽지 않은 메시지 수
+    @Builder.Default
+    private ParticipantRole role = ParticipantRole.MEMBER;  // MEMBER, ADMIN
+    @Builder.Default
+    private Integer unreadCount = 0;  // 읽지 않은 메시지 수
     private ChatMessage lastReadMessage;  // 마지막 읽은 메시지
     private LocalDateTime lastReadAt;
-    private ParticipantStatus status;  // ACTIVE, LEFT
+    @Builder.Default
+    private ParticipantStatus status = ParticipantStatus.ACTIVE;  // ACTIVE, LEFT
     private LocalDateTime joinedAt;
     private LocalDateTime leftAt;
+    @Builder.Default
+    private Boolean dealConfirmed = false;  // 거래 확정 여부 (펫케어용)
+    private LocalDateTime dealConfirmedAt;  // 거래 확정 시간
+    @Builder.Default
+    private Boolean isDeleted = false;
+    private LocalDateTime deletedAt;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 }
 ```
 
@@ -309,10 +223,17 @@ public class ChatMessage {
     private Long idx;
     private Conversation conversation;
     private Users sender;
-    private MessageType messageType;  // TEXT, IMAGE, FILE, SYSTEM, NOTICE
+    @Builder.Default
+    private MessageType messageType = MessageType.TEXT;  // TEXT, IMAGE, FILE, SYSTEM, NOTICE
+    @Lob
     private String content;
     private ChatMessage replyToMessage;  // 답장 메시지
-    private Boolean isDeleted;
+    @Builder.Default
+    private Boolean isDeleted = false;
+    private LocalDateTime deletedAt;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+    @OneToMany(mappedBy = "message", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<MessageReadStatus> readStatuses;
 }
 ```
@@ -347,20 +268,36 @@ graph TD
 
 ### 4.3 API 설계
 
+#### REST API
 | 엔드포인트 | Method | 설명 |
 |-----------|--------|------|
-| `/api/chat/conversations` | GET | 내 채팅방 목록 |
-| `/api/chat/conversations` | POST | 채팅방 생성 |
-| `/api/chat/conversations/{id}` | GET | 채팅방 상세 |
-| `/api/chat/conversations/{id}/leave` | POST | 채팅방 나가기 |
-| `/api/chat/conversations/direct` | POST | 1:1 채팅방 생성/조회 |
-| `/api/chat/conversations/care-request` | POST | 펫케어 채팅방 생성 |
-| `/api/chat/messages` | POST | 메시지 전송 |
-| `/api/chat/messages/conversation/{id}` | GET | 메시지 목록 조회 |
-| `/api/chat/messages/conversation/{id}/read` | POST | 메시지 읽음 처리 |
+| `/api/chat/conversations` | GET | 내 채팅방 목록 (userId 파라미터) |
+| `/api/chat/conversations/{conversationIdx}` | GET | 채팅방 상세 (userId 파라미터) |
+| `/api/chat/conversations` | POST | 채팅방 생성 (범용) |
+| `/api/chat/conversations/care-request` | POST | 펫케어 채팅방 생성 (careApplicationIdx, requesterId, providerId 파라미터) |
+| `/api/chat/conversations/direct` | POST | 1:1 채팅방 생성/조회 (user1Id, user2Id 파라미터) |
+| `/api/chat/conversations/{conversationIdx}/leave` | POST | 채팅방 나가기 (userId 파라미터) |
+| `/api/chat/conversations/{conversationIdx}` | DELETE | 채팅방 삭제 (userId 파라미터) |
+| `/api/chat/conversations/{conversationIdx}/status` | PATCH | 채팅방 상태 변경 (status 파라미터) |
+| `/api/chat/conversations/meetup/{meetupIdx}/join` | POST | 산책모임 채팅방 참여 (userId 파라미터) |
+| `/api/chat/conversations/meetup/{meetupIdx}/participant-count` | GET | 산책모임 채팅방 참여 인원 수 조회 |
+| `/api/chat/conversations/{conversationIdx}/confirm-deal` | POST | 펫케어 거래 확정 (userId 파라미터) |
+| `/api/chat/messages` | POST | 메시지 전송 (senderIdx 파라미터) |
+| `/api/chat/messages/conversation/{conversationIdx}` | GET | 메시지 목록 조회 (페이징, userId 파라미터) |
+| `/api/chat/messages/conversation/{conversationIdx}/before` | GET | 메시지 목록 조회 (커서 기반, beforeDate 파라미터) |
+| `/api/chat/messages/conversation/{conversationIdx}/read` | POST | 메시지 읽음 처리 (userId, lastMessageIdx 파라미터) |
+| `/api/chat/messages/{messageIdx}` | DELETE | 메시지 삭제 (userId 파라미터) |
+| `/api/chat/messages/conversation/{conversationIdx}/search` | GET | 메시지 검색 (keyword 파라미터) |
+| `/api/chat/messages/conversation/{conversationIdx}/unread-count` | GET | 읽지 않은 메시지 수 조회 (userId 파라미터) |
+
+#### WebSocket API
+| 엔드포인트 | Method | 설명 |
+|-----------|--------|------|
 | `/app/chat.send` | WebSocket | 실시간 메시지 전송 |
 | `/app/chat.read` | WebSocket | 실시간 읽음 처리 |
 | `/app/chat.typing` | WebSocket | 타이핑 표시 |
+| `/topic/conversation/{conversationIdx}` | WebSocket | 채팅방 메시지 구독 |
+| `/user/{userId}/queue/errors` | WebSocket | 에러 메시지 수신 |
 
 ### 4.4 WebSocket 구조
 
@@ -450,18 +387,18 @@ public ConversationDTO createConversation(...) {
 - **타이핑 표시**: 사용자 경험 향상
 
 ### 7.2 읽지 않은 메시지 수 관리
-- **원자적 증가**: DB 레벨에서 증가하여 동시성 문제 해결
-- **읽음 처리**: 메시지 읽음 시 `unreadCount` 초기화
-- **재참여 처리**: 채팅방 나간 후 재참여 시 이전 메시지 미조회
+- **원자적 증가**: `@Modifying @Query`로 DB 레벨에서 증가하여 Lost Update 문제 해결 (`ConversationParticipantRepository.incrementUnreadCount()`)
+- **읽음 처리**: 메시지 읽음 시 `unreadCount` 초기화, `lastReadMessage` 저장
+- **재참여 처리**: 채팅방 나간 후 재참여 시 `joinedAt` 이후 메시지만 조회
 
 ### 7.3 채팅방 타입별 특화
-- **1:1 채팅**: 기존 채팅방 재사용
-- **펫케어 채팅**: `CareApplication` 승인 시 자동 생성
-- **실종제보 채팅**: 제보자-목격자 조합별 개별 채팅방
-- **산책모임 채팅**: 모임 참여 시 자동 참여
+- **1:1 채팅**: 기존 채팅방 재사용, relatedType/relatedIdx 업데이트 지원
+- **펫케어 채팅**: `CareApplication` 승인 시 자동 생성 (`createCareRequestConversation()`), 거래 확정 기능 (`confirmCareDeal()`)
+- **실종제보 채팅**: 제보자-목격자 조합별 개별 채팅방 (`createMissingPetChat()`)
+- **산책모임 채팅**: 모임 생성 시 자동 생성, 모임 참여 시 자동 참여 (`joinMeetupChat()`), 모임 나가기 시 채팅방에서도 나감 (`leaveMeetupChat()`)
 
 ### 7.4 성능 최적화
-- **N+1 문제 해결**: Fetch Join + 배치 조회
+- **N+1 문제 해결**: `getMyConversations()`에서 배치 조회 사용 (참여자 정보, 최신 메시지 등)
 - **인덱스 전략**: 자주 조회되는 컬럼 조합 인덱싱
-- **캐싱**: 채팅방 목록 캐싱으로 DB 부하 감소
+- **배치 조회**: `findParticipantsByConversationIdxsAndUserIdx()`, `findParticipantsByConversationIdxsAndStatus()` 등으로 N+1 문제 해결
 

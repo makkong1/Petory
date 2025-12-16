@@ -15,28 +15,28 @@ import com.linkup.Petory.domain.care.entity.CareRequest;
 @Repository
 public interface CareApplicationRepository extends JpaRepository<CareApplication, Long> {
 
-    /**
-     * 특정 CareRequest에 대한 지원 목록 조회
-     */
-    List<CareApplication> findByCareRequest(CareRequest careRequest);
+        /**
+         * 특정 CareRequest에 대한 지원 목록 조회
+         */
+        List<CareApplication> findByCareRequest(CareRequest careRequest);
 
-    /**
-     * 특정 CareRequest와 Provider로 지원 조회
-     */
-    @Query("SELECT ca FROM CareApplication ca " +
-            "WHERE ca.careRequest.idx = :careRequestIdx " +
-            "  AND ca.provider.idx = :providerIdx")
-    Optional<CareApplication> findByCareRequestIdxAndProviderIdx(
-            @Param("careRequestIdx") Long careRequestIdx,
-            @Param("providerIdx") Long providerIdx);
+        /**
+         * 특정 CareRequest와 Provider로 지원 조회
+         */
+        @Query("SELECT ca FROM CareApplication ca " +
+                        "WHERE ca.careRequest.idx = :careRequestIdx " +
+                        "  AND ca.provider.idx = :providerIdx")
+        Optional<CareApplication> findByCareRequestIdxAndProviderIdx(
+                        @Param("careRequestIdx") Long careRequestIdx,
+                        @Param("providerIdx") Long providerIdx);
 
-    /**
-     * 특정 CareRequest의 ACCEPTED 상태 지원 조회
-     */
-    @Query("SELECT ca FROM CareApplication ca " +
-            "WHERE ca.careRequest.idx = :careRequestIdx " +
-            "  AND ca.status = :status")
-    Optional<CareApplication> findByCareRequestIdxAndStatus(
-            @Param("careRequestIdx") Long careRequestIdx,
-            @Param("status") CareApplicationStatus status);
+        /**
+         * 특정 CareRequest의 ACCEPTED 상태 지원 조회
+         */
+        @Query("SELECT ca FROM CareApplication ca " +
+                        "WHERE ca.careRequest.idx = :careRequestIdx " +
+                        "  AND ca.status = :status")
+        Optional<CareApplication> findByCareRequestIdxAndStatus(
+                        @Param("careRequestIdx") Long careRequestIdx,
+                        @Param("status") CareApplicationStatus status);
 }

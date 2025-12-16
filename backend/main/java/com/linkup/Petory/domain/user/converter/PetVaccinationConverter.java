@@ -44,8 +44,7 @@ public class PetVaccinationConverter {
                 .nextDue(dto.getNextDue())
                 .notes(dto.getNotes())
                 .isDeleted(dto.getIsDeleted())
-                .createdAt(dto.getCreatedAt())
-                .updatedAt(dto.getUpdatedAt())
+
                 .build();
     }
 
@@ -64,4 +63,3 @@ public class PetVaccinationConverter {
                 .collect(Collectors.toList());
     }
 }
-

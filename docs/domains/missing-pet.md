@@ -36,47 +36,28 @@
 
 ### 2.1 핵심 비즈니스 로직
 
-#### 로직 1: 위치 기반 검색 (Haversine 공식)
-```java
-// MissingPetBoardService.java
-public List<MissingPetBoardDTO> searchByLocation(double lat, double lng, double radiusKm) {
-    List<MissingPetBoard> allMissingPets = missingPetBoardRepository
-        .findByStatusAndIsDeletedFalse(MissingPetStatus.MISSING);
-    
-    return allMissingPets.stream()
-        .filter(pet -> {
-            double distance = calculateDistance(
-                lat, lng, 
-                pet.getLatitude().doubleValue(), 
-                pet.getLongitude().doubleValue()
-            );
-            return distance <= radiusKm * 1000; // km를 미터로 변환
-        })
-        .map(converter::toDTO)
-        .collect(Collectors.toList());
-}
+#### 로직 1: 실종 제보 생성
+**구현 위치**: `MissingPetBoardService.createBoard()` (Lines 62-94)
 
-private double calculateDistance(double lat1, double lng1, double lat2, double lng2) {
-    final int R = 6371; // 지구 반경 (km)
-    double dLat = Math.toRadians(lat2 - lat1);
-    double dLng = Math.toRadians(lng2 - lng1);
-    double a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-               Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
-               Math.sin(dLng / 2) * Math.sin(dLng / 2);
-    double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
-}
-```
+**핵심 로직**:
+- **이메일 인증 확인**: 실종 제보 작성 시 이메일 인증 필요 (`EmailVerificationRequiredException`)
+- **파일 첨부**: `syncSingleAttachment()`로 이미지 첨부 지원
+- **알림 발송**: 댓글 작성 시 게시글 작성자에게 알림 발송 (댓글 작성자가 게시글 작성자가 아닌 경우)
 
-**설명**:
-- **처리 흐름**: 모든 실종 동물 조회 → 거리 계산 → 반경 내 필터링
-- **주요 판단 기준**: Haversine 공식으로 거리 계산, 반경 내 여부 확인
+#### 로직 2: 실종 제보 수정/삭제
+**구현 위치**: `MissingPetBoardService.updateBoard()`, `deleteBoard()` (Lines 97-182)
+
+**핵심 로직**:
+- **이메일 인증 확인**: 수정/삭제 시 이메일 인증 필요
+- **Soft Delete**: 삭제 시 관련 댓글도 함께 Soft Delete
 
 ---
 
 ## 3. 아키텍처 설명
 
 ### 3.1 도메인 구조
+**참고**: Missing Pet 도메인은 `domain/board/` 패키지 내에 위치합니다.
+
 ```
 domain/board/
   ├── controller/
@@ -86,6 +67,11 @@ domain/board/
   ├── entity/
   │   ├── MissingPetBoard.java
   │   └── MissingPetComment.java
+  ├── converter/
+  │   └── MissingPetConverter.java
+  ├── dto/
+  │   ├── MissingPetBoardDTO.java
+  │   └── MissingPetCommentDTO.java
   └── repository/
       ├── MissingPetBoardRepository.java
       └── MissingPetCommentRepository.java
@@ -101,6 +87,7 @@ public class MissingPetBoard {
     private Long idx;
     private Users user;                    // 작성자
     private String title;                  // 제목
+    @Lob
     private String content;                // 내용
     private String petName;                // 반려동물 이름
     private String species;                // 종류
@@ -112,10 +99,14 @@ public class MissingPetBoard {
     private String lostLocation;           // 실종 위치
     private BigDecimal latitude;           // 위도
     private BigDecimal longitude;          // 경도
-    private MissingPetStatus status;        // 상태 (MISSING, FOUND)
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
-    private Boolean isDeleted;
+    @Builder.Default
+    private MissingPetStatus status = MissingPetStatus.MISSING;  // 상태 (MISSING, FOUND, CLOSED)
+    private LocalDateTime createdAt;       // @PrePersist로 자동 설정
+    private LocalDateTime updatedAt;        // @PreUpdate로 자동 설정
+    @Builder.Default
+    private Boolean isDeleted = false;
+    private LocalDateTime deletedAt;
+    @OneToMany(mappedBy = "board", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<MissingPetComment> comments; // 댓글 목록
 }
 ```
@@ -133,7 +124,9 @@ public class MissingPetComment {
     private Double latitude;               // 목격 위치 위도
     private Double longitude;              // 목격 위치 경도
     private LocalDateTime createdAt;
-    private Boolean isDeleted;
+    @Builder.Default
+    private Boolean isDeleted = false;
+    private LocalDateTime deletedAt;
 }
 ```
 
@@ -169,16 +162,9 @@ CREATE SPATIAL INDEX idx_missing_pet_location ON MissingPetBoard(longitude, lati
 ## 6. 핵심 포인트 요약
 
 ### 기술적 하이라이트
-1. **위치 기반 검색**: Haversine 공식으로 거리 계산
-2. **MySQL Spatial Index**: 반경 검색 성능 향상
-3. **실종 동물 상태 관리**: MISSING → FOUND → CLOSED
+1. **이메일 인증**: 실종 제보 작성/수정/삭제 시 이메일 인증 필요
+2. **파일 첨부**: 이미지 첨부 지원 (`AttachmentFileService` 연동)
+3. **알림 발송**: 댓글 작성 시 게시글 작성자에게 알림 발송
+4. **Soft Delete**: 게시글 삭제 시 관련 댓글도 함께 Soft Delete
+5. **실종 동물 상태 관리**: MISSING → FOUND → CLOSED
 
-### 학습한 점
-- 위치 기반 검색 구현 (Haversine 공식)
-- MySQL Spatial Index 활용
-- 반경 검색 최적화
-
-### 개선 가능한 부분
-- 이미지 인식 AI: 사진 업로드 시 유사 동물 자동 검색
-- 푸시 알림: 내 위치 근처 실종 신고 시 알림
-- 지도 시각화: 실종 위치 지도 표시
