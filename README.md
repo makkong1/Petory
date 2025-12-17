@@ -54,6 +54,7 @@
 - **생애주기 관리**: 요청 -> 지원 -> 매칭 -> 케어 수행 -> 리뷰로 이어지는 전체 프로세스 구현
 - **신뢰 시스템**: 상호 리뷰 및 평점 시스템을 통한 펫시터 검증
 - **상태 관리**: OPEN, IN_PROGRESS, COMPLETED, CANCELLED 상태 전이 로직
+- **채팅 연동**: 케어 요청 생성 시 1:1 채팅방 자동 생성 및 매칭 기반 소통
 
 ### 산책 & 오프라인 모임 (Meetup)
 - **모임 생성 및 참여**: 산책 모임 생성, 참여/취소 기능
@@ -91,6 +92,13 @@
 - **자동 해제**: 스케줄러를 통한 만료된 이용제한 자동 해제
 - **동시성 제어**: DB 레벨 원자적 증가 쿼리로 여러 관리자가 동시에 경고 부여 시에도 경고 횟수 정확성 보장
 
+### 채팅 시스템 (Chat System)
+- **실시간 통신**: WebSocket (STOMP) 기반 실시간 메시지 전송
+- **다양한 채팅 유형**: 1:1 채팅, 그룹 채팅 지원
+- **자동 채팅방 생성**: 펫 케어 요청/모임 생성 시 채팅방 자동 생성 및 참여자 자동 추가
+- **읽음 상태 관리**: 메시지 읽음/안 읽음 상태 추적
+- **역할 관리**: 채팅방 내 역할 기반 권한 관리 (케어 요청자/지원자, 모임 호스트/참여자)
+
 ---
 
 ## 🏗️ System Architecture & Strategy
@@ -100,12 +108,10 @@
 >
 > **Solution**: **[Daily Summary Pattern]**
 > 매일 자정 배치 작업을 통해 전날의 데이터를 집계하여 `DailyStatistics` 테이블에 요약 저장합니다. 이를 통해 데이터 양이 늘어나도 대시보드 조회 성능을 일정하게 유지합니다.
-> ([상세 전략 문서 보기](./md/ADMIN_STATISTICS_STRATEGY.md))
 
 ### 🔔 알림 시스템 아키텍처
 > **Strategy**: 알림은 생성 직후 조회가 빈번하고, 일정 시간이 지나면 조회 빈도가 낮아지는 특성이 있습니다.
 > 따라서 Redis를 캐시로 사용하여 최신 알림 조회 성능을 높이고, DB 부하를 분산시키는 구조를 채택했습니다.
-> ([상세 전략 문서 보기](./md/NOTIFICATION_STRATEGY.md))
 
 ### 🔐 인증 및 보안 아키텍처
 - **JWT 기반 인증**: Access Token (15분) + Refresh Token (1일) 이중 토큰 전략
@@ -135,8 +141,7 @@
 > - 소셜 로그인 사용자는 자동으로 이메일 인증 완료 (Google: `email_verified`, Naver: 기본 `true`)
 > - 일반 회원가입 사용자는 이메일 인증 링크 클릭 필요
 > - 회원가입 전 이메일 인증 가능 (Redis에 임시 저장 후 회원가입 시 적용)
->
-> ([상세 아키텍처 문서 보기](./docs/architecture/이메일%20인증%20시스템%20아키텍처.md))
+
 
 ### 📁 파일 관리 시스템
 - **통합 파일 관리**: `AttachmentFile` 엔티티를 통한 모든 도메인의 파일 통합 관리
@@ -163,13 +168,29 @@ Petory/
 │       │   │   │   ├── controller/  # CareRequestController
 │       │   │   │   ├── service/     # CareRequestService
 │       │   │   │   └── entity/      # CareRequest, CareApplication, CareReview
+│       │   │   ├── chat/            # 채팅 시스템
+│       │   │   │   ├── controller/  # ChatController, ConversationController
+│       │   │   │   ├── service/     # ConversationService, ChatMessageService
+│       │   │   │   ├── entity/      # Conversation, ChatMessage, ConversationParticipant
+│       │   │   │   └── repository/  # JPA Repository
 │       │   │   ├── location/        # 위치 기반 서비스
 │       │   │   │   ├── controller/  # LocationServiceController, GeocodingController
 │       │   │   │   └── service/     # LocationServiceService
 │       │   │   ├── meetup/          # 모임 서비스
+│       │   │   │   ├── controller/  # MeetupController
+│       │   │   │   ├── service/     # MeetupService
+│       │   │   │   └── entity/      # Meetup, MeetupParticipants
 │       │   │   ├── notification/    # 알림 시스템
+│       │   │   │   ├── controller/  # NotificationController
+│       │   │   │   ├── service/     # NotificationService, NotificationSseService
+│       │   │   │   └── entity/      # Notification
 │       │   │   ├── report/          # 신고 관리
+│       │   │   │   ├── controller/  # ReportController
+│       │   │   │   ├── service/     # ReportService
+│       │   │   │   └── entity/      # Report
 │       │   │   ├── statistics/      # 통계/대시보드
+│       │   │   │   ├── service/     # StatisticsService, StatisticsScheduler
+│       │   │   │   └── entity/      # DailyStatistics
 │       │   │   ├── user/            # 유저 관리
 │       │   │   │   ├── controller/  # AuthController, UsersController
 │       │   │   │   ├── service/     # AuthService, UsersService, UserSanctionService
@@ -195,93 +216,31 @@ Petory/
 
 ---
 
-## 🔌 주요 API 엔드포인트
+## 🔌 API 엔드포인트
 
-### 인증 (Authentication)
-```
-POST   /api/auth/login          # 로그인 (Access Token + Refresh Token 발급)
-POST   /api/auth/register       # 회원가입
-POST   /api/auth/refresh        # Access Token 갱신
-POST   /api/auth/logout         # 로그아웃
-POST   /api/auth/validate       # 토큰 검증
-```
-
-### 커뮤니티 (Community)
-```
-GET    /api/boards              # 게시글 목록 조회
-GET    /api/boards/{id}         # 게시글 상세 조회
-POST   /api/boards              # 게시글 작성
-PUT    /api/boards/{id}         # 게시글 수정
-DELETE /api/boards/{id}         # 게시글 삭제
-POST   /api/boards/{id}/reactions  # 반응 추가 (좋아요 등)
-GET    /api/comments            # 댓글 목록 조회
-POST   /api/comments            # 댓글 작성
-```
-
-### 실종 제보 (Missing Pet)
-```
-GET    /api/missing-pets        # 실종 제보 목록
-GET    /api/missing-pets/{id}   # 실종 제보 상세
-POST   /api/missing-pets        # 실종 제보 작성
-PUT    /api/missing-pets/{id}   # 실종 제보 수정
-```
-
-### 펫 케어 요청 (Care Request)
-```
-GET    /api/care-requests       # 케어 요청 목록
-GET    /api/care-requests/{id}  # 케어 요청 상세
-POST   /api/care-requests       # 케어 요청 작성
-POST   /api/care-requests/{id}/applications  # 케어 지원 신청
-```
-
-### 위치 기반 서비스 (Location Service)
-```
-GET    /api/location-services  # 주변 서비스 조회 (반경 검색)
-GET    /api/location-services/{id}  # 서비스 상세
-POST   /api/location-services  # 서비스 등록
-GET    /api/geocoding/address  # 주소 -> 좌표 변환
-```
-
-### 모임 (Meetup)
-```
-GET    /api/meetups             # 모임 목록
-POST   /api/meetups             # 모임 생성
-GET    /api/meetups/nearby      # 주변 모임 조회
-POST   /api/meetups/{id}/participants  # 모임 참여
-```
-
-### 알림 (Notification)
-```
-GET    /api/notifications       # 알림 목록 조회
-PUT    /api/notifications/{id}/read  # 알림 읽음 처리
-GET    /api/notifications/stream  # SSE 실시간 알림 스트림
-```
-
-### 신고 (Report)
-```
-POST   /api/reports             # 신고 제출
-GET    /api/reports             # 신고 목록 조회 (관리자)
-GET    /api/reports/{id}        # 신고 상세 조회
-POST   /api/reports/{id}/handle # 신고 처리 (관리자)
-```
-
-### 관리자 (Admin)
-```
-GET    /api/admin/users         # 유저 목록 조회
-GET    /api/admin/statistics    # 통계 데이터 조회
-GET    /api/admin/boards        # 게시글 관리
-```
+> **상세 API 문서**: 각 도메인별 상세 API 엔드포인트는 [도메인 아키텍처 문서](./docs/architecture/)에서 확인할 수 있습니다.
+> 
+> - [커뮤니티 & 실종 제보](./docs/architecture/커뮤니티%20&%20실종%20제보%20아키텍처.md#api-엔드포인트)
+> - [펫 케어 & 매칭](./docs/architecture/펫%20케어%20&%20매칭%20아키텍처.md#api-엔드포인트)
+> - [위치 기반 서비스](./docs/architecture/위치%20기반%20서비스%20아키텍처.md#api-엔드포인트)
+> - [산책 & 오프라인 모임](./docs/architecture/산책%20&%20오프라인%20모임%20아키텍처.md#api-엔드포인트)
+> - [채팅 시스템](./docs/architecture/채팅%20시스템%20설계.md#api-엔드포인트)
+> - [알림 시스템](./docs/architecture/알림%20시스템%20아키텍처.md#api-엔드포인트)
+> - [신고 및 제재 시스템](./docs/architecture/신고%20및%20제재%20시스템%20아키텍처.md#api-엔드포인트)
+> - [관리자 대시보드 & 통계](./docs/architecture/관리자%20대시보드%20&%20통계%20시스템%20아키텍처.md#api-엔드포인트)
 
 ---
 
 ## 🗄️ 데이터베이스 설계 핵심
 
-### 주요 엔티티
+### 주요 메인 도메인 엔티티
 - **Users**: 유저 정보, 역할(ROLE), 제재 상태(ACTIVE/SUSPENDED/BANNED)
 - **Board**: 커뮤니티 게시글 (카테고리, 상태, 조회수, 반응 수)
 - **Comment**: 댓글 (게시글/실종제보 댓글 통합 관리)
 - **CareRequest**: 펫 케어 요청 (상태, 위치, 기간)
 - **LocationService**: 위치 기반 서비스 (POINT 타입으로 좌표 저장)
+- **Meetup**: 모임(산책/오프라인 등) 정보 및 참가자
+- **Chat/Conversation**: 채팅 대화방 및 메시지
 - **Notification**: 알림 (타입별 분류, 읽음 상태)
 - **Report**: 신고 (타입별 분류, 처리 상태)
 - **UserSanction**: 유저 제재 이력 (경고, 이용제한, 영구 차단)
@@ -335,7 +294,7 @@ GET    /api/admin/boards        # 게시글 관리
 
 ---
 
-## 🔄 트랜잭션 관리
+## 🔄 트랜잭션 관리 & 동시성 제어
 
 ### 트랜잭션 전략
 - **@Transactional**: Service 레이어에서 트랜잭션 경계 명확히 설정
@@ -343,38 +302,19 @@ GET    /api/admin/boards        # 게시글 관리
 - **격리 수준**: 기본값(REPEATABLE_READ) 사용, 필요 시 명시적 설정
 - **롤백 정책**: RuntimeException 발생 시 자동 롤백
 
-### 주요 사례
-1. **게시글 삭제 시 댓글 일괄 삭제**: 게시글과 댓글을 하나의 트랜잭션으로 처리하여 데이터 일관성 유지
-2. **댓글 추가 시 게시글 카운트 동기화**: 댓글 저장과 카운트 업데이트를 원자적으로 처리
-3. **펫케어 요청 생성 시 펫 소유자 검증**: 펫 검증과 요청 저장을 같은 트랜잭션에서 처리
-
-**상세 사례**: [트랜잭션 관리 & 동시성 제어 사례](./docs/concurrency/transaction-concurrency-cases.md#트랜잭션-관리-사례)
-
----
-
-## 🔒 동시성 제어
-
-### 구현 완료 ✅
+### 동시성 제어 전략
+- **DB 레벨 제약**: Unique Constraint로 중복 방지 (반응, 신고, 소셜 로그인 등)
+- **원자적 증가**: `@Modifying @Query`로 동시성 문제 해결 (경고 횟수 등)
 - **조회수 중복 방지**: `BoardViewLog`를 통한 사용자별 1회 조회 제한
-- **반응 중복 방지**: Unique 제약조건으로 중복 좋아요/싫어요 방지
 - **스케줄러 중복 실행 방지**: ShedLock을 통한 분산 환경 대응
-- **제재 시스템 동시성 해결**: DB 레벨 원자적 증가 쿼리로 경고 횟수 정확성 보장
-- **소셜 로그인 동시성 해결**: DB UNIQUE 제약조건으로 중복 계정 생성 방지
 
-### 주요 사례
-1. **게시글 조회수 중복 방지**: BoardViewLog 테이블로 사용자당 1회만 조회수 증가
-2. **좋아요/싫어요 중복 방지**: Unique 제약조건 + 예외 처리로 동시 클릭 시 하나만 저장
-3. **댓글 수 동기화**: UPDATE 쿼리로 원자적 증가 (개선 계획)
-4. **제재 시스템 경고 횟수 동시성 문제**
-   - **문제**: 여러 관리자가 동시에 경고 부여 시 Lost Update 발생 가능
-   - **해결**: `incrementWarningCount()` 메서드로 DB 레벨 원자적 증가 쿼리 사용
-   - **효과**: 동시 요청 시에도 경고 횟수 정확성 보장, 자동 이용제한 정확히 한 번만 적용
-5. **소셜 로그인 중복 계정 생성 방지**
-   - **문제**: 같은 소셜 계정으로 동시 로그인 시 Race Condition으로 중복 계정 생성 가능
-   - **해결**: DB UNIQUE 제약조건 (`Users.email`, `SocialUser.provider+providerId`) + 트랜잭션 활용
-   - **효과**: 동시 요청 시에도 하나의 계정만 생성되며, 기존 계정과의 연결도 정확하게 처리
+### 주요 해결 사례
+- **게시글 삭제 시 댓글 일괄 삭제**: 트랜잭션으로 원자성 보장
+- **댓글 추가 시 게시글 카운트 동기화**: 트랜잭션 내에서 원자적 처리
+- **제재 시스템 경고 횟수**: DB 레벨 원자적 증가 쿼리로 Lost Update 방지
+- **소셜 로그인 중복 계정**: DB UNIQUE 제약조건 + 트랜잭션으로 Race Condition 방지
 
-**상세 사례**: [트랜잭션 관리 & 동시성 제어 사례](./docs/concurrency/transaction-concurrency-cases.md#동시성-제어-사례)
+**상세 사례 및 코드**: [트랜잭션 관리 & 동시성 제어 사례](./docs/concurrency/transaction-concurrency-cases.md)
 
 ---
 
@@ -392,17 +332,22 @@ GET    /api/admin/boards        # 게시글 관리
 
 ### 백엔드 아키텍처
 - [전체 아키텍처 문서](./docs/architecture/전체%20아키텍처.md) - 시스템 전체 구조, 도메인 아키텍처, 공통 인프라
-- [백엔드 아키텍처 문서](./docs/README.md) - 도메인별 상세 설명, ERD, 성능 최적화
 - [트랜잭션 관리 & 동시성 제어 사례](./docs/concurrency/transaction-concurrency-cases.md) - 실제 코드 기반 사례
 
-### 전략 문서
-- [통계 시스템 전략](./md/ADMIN_STATISTICS_STRATEGY.md)
-- [알림 시스템 전략](./md/NOTIFICATION_STRATEGY.md)
+### 도메인별 아키텍처 문서
+- [커뮤니티 & 실종 제보 아키텍처](./docs/architecture/커뮤니티%20&%20실종%20제보%20아키텍처.md)
+- [펫 케어 & 매칭 아키텍처](./docs/architecture/펫%20케어%20&%20매칭%20아키텍처.md)
+- [위치 기반 서비스 아키텍처](./docs/architecture/위치%20기반%20서비스%20아키텍처.md)
+- [산책 & 오프라인 모임 아키텍처](./docs/architecture/산책%20&%20오프라인%20모임%20아키텍처.md)
+- [채팅 시스템 아키텍처](./docs/architecture/채팅%20시스템%20설계.md)
+- [알림 시스템 아키텍처](./docs/architecture/알림%20시스템%20아키텍처.md)
+- [관리자 대시보드 & 통계 시스템 아키텍처](./docs/architecture/관리자%20대시보드%20&%20통계%20시스템%20아키텍처.md)
+- [신고 및 제재 시스템 아키텍처](./docs/architecture/신고%20및%20제재%20시스템%20아키텍처.md)
 - [이메일 인증 시스템 아키텍처](./docs/architecture/이메일%20인증%20시스템%20아키텍처.md)
-- [실시간 알림 구현](./docs/md/#%20실시간%20알림%20시스템%20구현%20문서.md)
+
+### 공통 인프라 문서
 - [Redis 캐싱 전략](./docs/architecture/Redis_캐싱_전략.md)
-- [유저 제재 시스템](./docs/architecture/#%20유저%20제한%20및%20제재%20시스템.md)
-- [코드 플로우 가이드](./docs/md/코드흐름가이드.md)
+- [위치서비스 공공데이터 CSV 배치 임포트](./docs/architecture/위치서비스_공공데이터_CSV_배치_임포트_구현.md)
 
 ---
 
