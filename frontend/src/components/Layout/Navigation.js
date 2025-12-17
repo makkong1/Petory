@@ -318,7 +318,7 @@ const Navigation = ({ activeTab, setActiveTab, user, onNavigateToBoard }) => {
                   <span role="img" aria-label="user">
                     👤
                   </span>
-                  {user.username || '내 정보'}
+                  {user.nickname || '내 정보'}
                 </UserInfo>
               </>
             )}

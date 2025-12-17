@@ -40,11 +40,13 @@
 - **지역 계층 검색**: 시도 > 시군구 > 읍면동 > 도로명 우선순위로 지역별 서비스 검색
 - **거리 계산**: Haversine 공식을 통한 두 좌표 간 거리 계산 (미터 단위)
 - **네이버맵 API 연동**: 
+  - **프론트엔드**: 
+    - 지도 표시 및 마커 표시 - `MapContainer` 컴포넌트 (API 키는 Referer 제한으로 보호)
+    - 시군구 선택 시 자동 확대 (5km 반경, 레벨 7)
   - **백엔드**: 
-    - 주소-좌표 변환(Geocoding) - `NaverMapService` (`GeocodingController` `/api/geocoding/address`)
+    - 주소-좌표 변환(Geocoding) - `NaverMapService` (`GeocodingController` `/api/geocoding/address`) - API 키 보호, 구독 필요 시 fallback
     - 좌표-주소 변환(역지오코딩) - `NaverMapService` (`GeocodingController` `/api/geocoding/coordinates`)
     - 길찾기(Directions API) - `NaverMapService` (`GeocodingController` `/api/geocoding/directions`)
-  - **프론트엔드**: 지도 표시 및 마커 표시 - `MapContainer` 컴포넌트
 - **공공데이터 연동**: CSV 배치 업로드를 통한 대량 위치 데이터 수집
 - **캐싱**: 인기 위치 서비스 조회 결과 캐싱 (카테고리별 상위 10개)
 
@@ -52,6 +54,14 @@
 - **생애주기 관리**: 요청 -> 지원 -> 매칭 -> 케어 수행 -> 리뷰로 이어지는 전체 프로세스 구현
 - **신뢰 시스템**: 상호 리뷰 및 평점 시스템을 통한 펫시터 검증
 - **상태 관리**: OPEN, IN_PROGRESS, COMPLETED, CANCELLED 상태 전이 로직
+
+### 산책 & 오프라인 모임 (Meetup)
+- **모임 생성 및 참여**: 산책 모임 생성, 참여/취소 기능
+- **위치 기반 검색**: Haversine 공식을 활용한 반경 기반 모임 검색 (미터 단위)
+- **인원 관리**: 최대 인원 제한 및 동시성 제어로 정확한 인원 수 관리
+- **상태 관리**: RECRUITING → CLOSED → COMPLETED 상태 전이 로직
+- **채팅 연동**: 모임 생성 시 그룹 채팅방 자동 생성 및 참여자 자동 추가
+- **이메일 인증**: 모임 생성/참여 시 이메일 인증 필수
 
 ### 커뮤니티 & 실종 제보
 - **블라인드 처리**: 신고 누적 시 자동으로 콘텐츠를 가리는 유해 콘텐츠 필터링 로직
@@ -381,6 +391,7 @@ GET    /api/admin/boards        # 게시글 관리
 ## 📚 상세 문서
 
 ### 백엔드 아키텍처
+- [전체 아키텍처 문서](./docs/architecture/전체%20아키텍처.md) - 시스템 전체 구조, 도메인 아키텍처, 공통 인프라
 - [백엔드 아키텍처 문서](./docs/README.md) - 도메인별 상세 설명, ERD, 성능 최적화
 - [트랜잭션 관리 & 동시성 제어 사례](./docs/concurrency/transaction-concurrency-cases.md) - 실제 코드 기반 사례
 

@@ -211,8 +211,8 @@ const MapContainer = React.forwardRef(
       }
 
       const script = document.createElement('script');
-      // 네이버맵 API v3는 ncpClientId를 사용하며, geocoder 서브 모듈 포함
-      const scriptUrl = `https://openapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${NAVER_MAPS_KEY_ID}&submodules=geocoder`;
+      // 네이버맵 API v3는 ncpClientId를 사용 (지도 표시만, geocoding은 백엔드에서 처리)
+      const scriptUrl = `https://openapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${NAVER_MAPS_KEY_ID}`;
       script.src = scriptUrl;
       script.async = true;
       script.onload = () => {

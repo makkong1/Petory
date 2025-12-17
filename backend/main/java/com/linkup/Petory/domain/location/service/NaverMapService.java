@@ -229,7 +229,6 @@ public class NaverMapService {
                 if (e.getStatusCode() != null && e.getStatusCode().value() == 401 &&
                         (responseBody.contains("subscription") || responseBody.contains("Permission Denied"))) {
                     log.error("네이버맵 Geocoding API 구독이 필요합니다. 네이버 클라우드 플랫폼 콘솔에서 Geocoding API를 구독해주세요.");
-                    log.error("참고: https://www.ncloud.com/product/applicationService/mapsGeocoding");
                 }
             }
 
