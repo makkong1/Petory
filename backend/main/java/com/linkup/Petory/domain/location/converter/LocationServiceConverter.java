@@ -3,7 +3,6 @@ package com.linkup.Petory.domain.location.converter;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
-import com.linkup.Petory.domain.location.dto.KakaoPlaceDTO;
 import com.linkup.Petory.domain.location.dto.LocationServiceDTO;
 import com.linkup.Petory.domain.location.entity.LocationService;
 
@@ -103,57 +102,7 @@ public class LocationServiceConverter {
                 .indoor(dto.getIndoor())
                 .outdoor(dto.getOutdoor())
                 .lastUpdated(dto.getLastUpdated())
-                .dataSource(dto.getDataSource() != null ? dto.getDataSource() : "KAKAO")
-                .build();
-    }
-
-    /**
-     * KakaoPlaceDTO.Document를 LocationServiceDTO로 변환
-     */
-    public LocationServiceDTO fromKakaoDocument(KakaoPlaceDTO.Document document) {
-        Double latitude = parseDoubleOrNull(document.getY());
-        Double longitude = parseDoubleOrNull(document.getX());
-
-        // 주소: 도로명주소 우선, 없으면 지번주소
-        String address = StringUtils.hasText(document.getRoadAddressName())
-                ? document.getRoadAddressName()
-                : document.getAddressName();
-
-        // 카카오맵 카테고리 이름을 파싱하여 category1, category2, category3에 저장
-        String[] categoryParts = document.getCategoryName() != null ? document.getCategoryName().split(" > ")
-                : new String[0];
-        String category1 = categoryParts.length > 0 ? categoryParts[0].trim() : null;
-        String category2 = categoryParts.length > 1 ? categoryParts[1].trim() : null;
-        String category3 = categoryParts.length > 2 ? categoryParts[2].trim() : null;
-        String category = category3 != null ? category3 : (category2 != null ? category2 : category1);
-
-        return LocationServiceDTO.builder()
-                .idx(null)
-                .externalId(document.getId())
-                .name(document.getPlaceName())
-                .category(category) // DTO에서만 사용
-                .category1(category1)
-                .category2(category2)
-                .category3(category3)
-                .address(address) // 도로명주소 우선, 없으면 지번주소
-                .zipCode(null) // 카카오맵은 우편번호 제공 안 함
-                .latitude(latitude)
-                .longitude(longitude)
-                .rating(null)
-                .phone(document.getPhone())
-                .website(document.getPlace_url())
-                .placeUrl(document.getPlace_url())
-                .description(cleanDescription(document.getCategoryName(), category3)) // 카테고리명과 중복 제거
-                .petFriendly(true) // 카카오맵 검색 결과는 모두 반려동물 친화적이라고 가정
-                .dataSource("KAKAO")
-                .lastUpdated(java.time.LocalDate.now())
-                // 하위 호환성을 위한 deprecated 필드
-                .openingTime(null)
-                .closingTime(null)
-                .imageUrl(null)
-                .petPolicy(null)
-                .reviewCount(null)
-                .reviews(null)
+                .dataSource(dto.getDataSource() != null ? dto.getDataSource() : "PUBLIC")
                 .build();
     }
 

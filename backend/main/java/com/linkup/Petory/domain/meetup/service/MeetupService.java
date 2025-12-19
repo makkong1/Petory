@@ -85,21 +85,19 @@ public class MeetupService {
         // 그룹 채팅방 자동 생성 (주최자만 초기 참여)
         try {
             conversationService.createConversation(
-                ConversationType.MEETUP,
-                RelatedType.MEETUP,
-                savedMeetup.getIdx(),
-                savedMeetup.getTitle(),
-                List.of(organizer.getIdx())
-            );
-            
+                    ConversationType.MEETUP,
+                    RelatedType.MEETUP,
+                    savedMeetup.getIdx(),
+                    savedMeetup.getTitle(),
+                    List.of(organizer.getIdx()));
+
             // 주최자를 ADMIN 역할로 설정
             conversationService.setParticipantRole(
-                RelatedType.MEETUP,
-                savedMeetup.getIdx(),
-                organizer.getIdx(),
-                ParticipantRole.ADMIN
-            );
-            
+                    RelatedType.MEETUP,
+                    savedMeetup.getIdx(),
+                    organizer.getIdx(),
+                    ParticipantRole.ADMIN);
+
             log.info("모임 채팅방 생성 완료: meetupIdx={}, organizer={}", savedMeetup.getIdx(), userId);
         } catch (Exception e) {
             log.error("모임 채팅방 생성 실패: meetupIdx={}, error={}", savedMeetup.getIdx(), e.getMessage());
@@ -251,16 +249,32 @@ public class MeetupService {
     // 모임 참가
     @Transactional
     public MeetupParticipantsDTO joinMeetup(Long meetupIdx, String userId) {
-        // 모임 존재 확인
-        Meetup meetup = meetupRepository.findById(meetupIdx)
-                .orElseThrow(() -> new RuntimeException("모임을 찾을 수 없습니다."));
+        long startTime = System.currentTimeMillis();
+        String threadName = Thread.currentThread().getName();
+
+        log.info("[모임 참가 시작] thread={}, meetupIdx={}, userId={}", threadName, meetupIdx, userId);
+
+        // ✅ Pessimistic Lock으로 모임 조회 (Race Condition 방지)
+        // 다른 트랜잭션은 이 Lock이 해제될 때까지 대기
+        Meetup meetup = meetupRepository.findByIdWithLock(meetupIdx)
+                .orElseThrow(() -> {
+                    log.error("[모임 참가 실패] 모임을 찾을 수 없음: meetupIdx={}, userId={}", meetupIdx, userId);
+                    return new RuntimeException("모임을 찾을 수 없습니다.");
+                });
+
+        log.debug("[Lock 획득] thread={}, meetupIdx={}, 현재인원={}, 최대인원={}",
+                threadName, meetupIdx, meetup.getCurrentParticipants(), meetup.getMaxParticipants());
 
         // 사용자 확인 (userId는 Users의 id 필드, 문자열)
         Users user = usersRepository.findByIdString(userId)
-                .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
+                .orElseThrow(() -> {
+                    log.error("[모임 참가 실패] 사용자를 찾을 수 없음: meetupIdx={}, userId={}", meetupIdx, userId);
+                    return new RuntimeException("사용자를 찾을 수 없습니다.");
+                });
 
         // 이메일 인증 확인
         if (user.getEmailVerified() == null || !user.getEmailVerified()) {
+            log.warn("[모임 참가 실패] 이메일 인증 필요: meetupIdx={}, userId={}", meetupIdx, userId);
             throw new EmailVerificationRequiredException("모임 참여를 위해 이메일 인증이 필요합니다.");
         }
 
@@ -268,14 +282,31 @@ public class MeetupService {
 
         // 이미 참가했는지 확인
         if (meetupParticipantsRepository.existsByMeetupIdxAndUserIdx(meetupIdx, userIdx)) {
+            log.warn("[모임 참가 실패] 이미 참가한 모임: meetupIdx={}, userId={}, userIdx={}", meetupIdx, userId, userIdx);
             throw new RuntimeException("이미 참가한 모임입니다.");
         }
 
         // 주최자는 자동으로 참가자에 포함되므로, 주최자가 아닌 경우에만 인원 체크
         if (!meetup.getOrganizer().getIdx().equals(userIdx)) {
+            // ⚠️ Race Condition 발생 가능 지점 - 인원 체크 전 상태 로깅
+            int currentParticipants = meetup.getCurrentParticipants();
+            int maxParticipants = meetup.getMaxParticipants();
+            int availableSlots = maxParticipants - currentParticipants;
+
+            log.info("[인원 체크] thread={}, meetupIdx={}, userId={}, 현재인원={}, 최대인원={}, 남은자리={}",
+                    threadName, meetupIdx, userId, currentParticipants, maxParticipants, availableSlots);
+
             // 최대 인원 체크
-            if (meetup.getCurrentParticipants() >= meetup.getMaxParticipants()) {
+            if (currentParticipants >= maxParticipants) {
+                log.warn("[모임 참가 실패] 인원 초과: thread={}, meetupIdx={}, userId={}, 현재인원={}, 최대인원={}",
+                        threadName, meetupIdx, userId, currentParticipants, maxParticipants);
                 throw new RuntimeException("모임 인원이 가득 찼습니다.");
+            }
+
+            // ⚠️ Race Condition 위험 경고 로그
+            if (availableSlots <= 1) {
+                log.warn("[Race Condition 위험] 남은 자리가 1개 이하: thread={}, meetupIdx={}, 남은자리={}, " +
+                        "동시 참가 시도 시 인원 초과 가능성 있음", threadName, meetupIdx, availableSlots);
             }
         }
 
@@ -287,14 +318,58 @@ public class MeetupService {
                 .build();
 
         MeetupParticipants savedParticipant = meetupParticipantsRepository.save(participant);
+        log.debug("[참가자 추가 완료] thread={}, meetupIdx={}, userId={}, participantIdx={}",
+                threadName, meetupIdx, userId, savedParticipant.getUser().getIdx());
 
         // 주최자가 아닌 경우에만 currentParticipants 증가
         if (!meetup.getOrganizer().getIdx().equals(userIdx)) {
+            // ⚠️ Race Condition 발생 지점 - 증가 전 상태 로깅
+            int beforeCount = meetup.getCurrentParticipants();
             meetup.setCurrentParticipants(meetup.getCurrentParticipants() + 1);
+            int afterCount = meetup.getCurrentParticipants();
+
+            log.info("[인원 증가] thread={}, meetupIdx={}, userId={}, 증가전={}, 증가후={}, 최대인원={}",
+                    threadName, meetupIdx, userId, beforeCount, afterCount, meetup.getMaxParticipants());
+
+            // ⚠️ Race Condition 감지: 증가 후 인원이 최대 인원을 초과하는 경우
+            if (afterCount > meetup.getMaxParticipants()) {
+                log.error("[Race Condition 발생!] 인원 초과 감지: thread={}, meetupIdx={}, 증가전={}, 증가후={}, 최대인원={}, " +
+                        "동시 참가로 인한 인원 초과 발생 가능성",
+                        threadName, meetupIdx, beforeCount, afterCount, meetup.getMaxParticipants());
+            }
+
             meetupRepository.save(meetup);
+            log.debug("[인원 저장 완료] thread={}, meetupIdx={}, 현재인원={}",
+                    threadName, meetupIdx, afterCount);
         }
 
-        log.info("모임 참가 완료: meetupIdx={}, userId={}, userIdx={}", meetupIdx, userId, userIdx);
+        long endTime = System.currentTimeMillis();
+        long duration = endTime - startTime;
+
+        // 최종 상태 확인 및 로깅
+        Meetup finalMeetup = meetupRepository.findById(meetupIdx).orElse(null);
+        if (finalMeetup != null) {
+            long actualParticipantCount = meetupParticipantsRepository.countByMeetupIdx(meetupIdx);
+
+            log.info("[모임 참가 완료] thread={}, meetupIdx={}, userId={}, userIdx={}, 소요시간={}ms, " +
+                    "현재인원={}, 최대인원={}, 실제참가자수={}",
+                    threadName, meetupIdx, userId, userIdx, duration,
+                    finalMeetup.getCurrentParticipants(), finalMeetup.getMaxParticipants(), actualParticipantCount);
+
+            // 데이터 정합성 검증 로그
+            if (finalMeetup.getCurrentParticipants() != actualParticipantCount) {
+                log.error("[데이터 불일치 감지] currentParticipants({})와 실제 참가자 수({})가 일치하지 않음: meetupIdx={}",
+                        finalMeetup.getCurrentParticipants(), actualParticipantCount, meetupIdx);
+            }
+
+            // Race Condition 최종 검증
+            if (finalMeetup.getCurrentParticipants() > finalMeetup.getMaxParticipants()) {
+                log.error("[Race Condition 최종 확인] 인원 초과: meetupIdx={}, 현재인원={}, 최대인원={}, " +
+                        "Race Condition으로 인한 인원 초과 발생",
+                        meetupIdx, finalMeetup.getCurrentParticipants(), finalMeetup.getMaxParticipants());
+            }
+        }
+
         return participantsConverter.toDTO(savedParticipant);
     }
 

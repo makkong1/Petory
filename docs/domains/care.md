@@ -6,10 +6,11 @@
 - **역할**: 펫케어 요청/지원 시스템으로, 반려동물 돌봄이 필요한 사용자와 돌봄을 제공할 수 있는 사용자를 연결합니다.
 - **주요 기능**: 
   - 펫케어 요청 생성/조회/수정/삭제
-  - 펫케어 지원 (지원자 모집)
-  - 지원 승인/거절 (1명만 승인 가능)
+  - 펫케어 지원 (지원자 모집, 채팅을 통한 거래 확정)
+  - 지원 승인/거절 (1명만 승인 가능, 양쪽 모두 거래 확정 시 자동 승인)
   - 펫케어 상태 관리 (OPEN → IN_PROGRESS → COMPLETED)
-  - 펫케어 리뷰 시스템
+  - 펫케어 요청 댓글 (SERVICE_PROVIDER만 작성 가능, 파일 첨부 지원)
+  - 펫케어 리뷰 시스템 (요청자가 제공자에게 리뷰 작성)
   - 날짜 지난 요청 자동 완료 (스케줄러)
 
 ### 1.2 기능 시연
@@ -40,11 +41,21 @@
 - **스크린샷/영상**: 
 
 #### 주요 기능 2: 펫케어 리뷰 시스템
-- **설명**: 펫케어 완료 후 요청자가 돌봄 제공자에게 리뷰를 작성할 수 있습니다.
+- **설명**: 펫케어 지원이 승인된 후 요청자가 돌봄 제공자에게 리뷰를 작성할 수 있습니다.
 - **사용자 시나리오**:
-  1. 펫케어 완료 (COMPLETED 상태)
+  1. 펫케어 지원 승인 (`CareApplication` 상태가 `ACCEPTED`)
   2. 요청자가 리뷰 작성 (평점 1-5, 내용)
-  3. 평균 평점 계산 및 표시
+  3. 중복 리뷰 방지 (한 `CareApplication`당 1개의 리뷰만 작성 가능)
+  4. 평균 평점 계산 및 표시
+- **스크린샷/영상**:
+
+#### 주요 기능 3: 펫케어 요청 댓글
+- **설명**: `SERVICE_PROVIDER` 역할의 사용자만 펫케어 요청에 댓글을 작성할 수 있습니다.
+- **사용자 시나리오**:
+  1. `SERVICE_PROVIDER` 역할 사용자가 펫케어 요청 확인
+  2. 댓글 작성 (파일 첨부 가능)
+  3. 댓글 작성 시 요청자에게 알림 발송
+  4. 댓글 삭제 시 Soft Delete 적용
 - **스크린샷/영상**: 
 
 ---
@@ -54,28 +65,29 @@
 ### 2.1 핵심 비즈니스 로직
 
 #### 로직 1: 채팅 후 거래 확정 (양쪽 모두 확인 시 자동 승인)
-**구현 위치**: `ConversationService.confirmCareDeal()` (Lines 545-652)
+**구현 위치**: `ConversationService.confirmCareDeal()` 
 
 **핵심 로직**:
 - 펫케어 관련 채팅방인지 확인 (`RelatedType.CARE_REQUEST` 또는 `CARE_APPLICATION`)
 - 사용자의 거래 확정 처리 (`dealConfirmed`, `dealConfirmedAt` 설정)
+- 이미 거래 확정했는지 확인 (중복 방지)
 - 양쪽 모두 확정했는지 확인 (2명 참여자 모두 `dealConfirmed = true`)
 - 양쪽 모두 확정 시:
   - `CareRequest` 상태가 `OPEN`인 경우에만 처리
   - 제공자 찾기 (요청자가 아닌 참여자)
-  - `CareApplication` 생성 또는 승인 (`ACCEPTED` 상태)
+  - 기존 `CareApplication`이 있으면 승인, 없으면 생성 (`ACCEPTED` 상태)
   - `CareRequest` 상태를 `IN_PROGRESS`로 변경
 
 **동시성 제어**: `@Transactional`로 트랜잭션 보장
 
 **설명**:
-- **처리 흐름**: 채팅방 조회 → 사용자 거래 확정 처리 → 양쪽 모두 확정 확인 → 지원 승인 및 상태 변경
-- **주요 판단 기준**: 양쪽 모두 거래 확정해야만 서비스 시작
+- **처리 흐름**: 채팅방 조회 → 사용자 거래 확정 처리 → 중복 확인 → 양쪽 모두 확정 확인 → 지원 승인 및 상태 변경
+- **주요 판단 기준**: 양쪽 모두 거래 확정해야만 서비스 시작, `OPEN` 상태인 경우에만 처리
 - **동시성 제어**: 트랜잭션으로 처리하여 안전성 보장
+- **CareApplication 관리**: 채팅 도메인(`ConversationService`)에서 생성/관리
 
 #### 로직 2: 날짜 지난 요청 자동 완료
-**구현 위치**: `CareRequestScheduler.updateExpiredCareRequests()` (Lines 32-60)
-
+**구현 위치**: `CareRequestScheduler.updateExpiredCareRequests()` 
 **스케줄러 설정**:
 - 매 시간 정각 실행: `@Scheduled(cron = "0 0 * * * ?")`
 - 매일 자정에도 실행: `@Scheduled(cron = "0 0 0 * * ?")` (더 정확한 처리를 위해)
@@ -103,19 +115,33 @@
 | `updateStatus()` | 상태 변경 | OPEN → IN_PROGRESS → COMPLETED |
 | `searchCareRequests()` | 요청 검색 | 제목/내용 검색 |
 
+#### CareRequestCommentService
+| 메서드 | 설명 | 주요 로직 |
+|--------|------|-----------|
+| `getComments()` | 댓글 목록 조회 | 펫케어 요청별 댓글 조회, 파일 첨부 정보 포함 |
+| `addComment()` | 댓글 작성 | SERVICE_PROVIDER 역할 확인, 파일 첨부 지원, 알림 발송 |
+| `deleteComment()` | 댓글 삭제 | Soft Delete 적용 |
+
 #### CareReviewService
 | 메서드 | 설명 | 주요 로직 |
 |--------|------|-----------|
-| `createReview()` | 리뷰 작성 | COMPLETED 상태 확인, 평균 평점 계산 |
-| `getAverageRating()` | 평균 평점 조회 | 캐싱 적용 |
+| `createReview()` | 리뷰 작성 | CareApplication ACCEPTED 상태 확인, 중복 리뷰 방지, 요청자만 작성 가능 |
+| `getReviewsByReviewee()` | 리뷰 대상별 리뷰 목록 조회 | 특정 사용자(제공자)에 대한 리뷰 목록 |
+| `getReviewsByReviewer()` | 리뷰 작성자별 리뷰 목록 조회 | 특정 사용자가 작성한 리뷰 목록 |
+| `getAverageRating()` | 평균 평점 조회 | 리뷰 목록에서 평균 계산 (캐싱 없음) |
 
 ### 2.3 트랜잭션 처리
 - **트랜잭션 범위**: 
   - 요청 생성/수정/삭제: `@Transactional`
   - 거래 확정: `@Transactional` (동시성 제어 필요)
+  - 리뷰 작성: `@Transactional` (중복 리뷰 방지)
+  - 댓글 작성/삭제: `@Transactional`
   - 조회 메서드: `@Transactional(readOnly = true)`
 - **격리 수준**: 기본값 (READ_COMMITTED)
 - **이메일 인증**: 요청 생성 시 이메일 인증 확인 (`EmailVerificationRequiredException`)
+- **권한 체크**: 
+  - 댓글 작성: `SERVICE_PROVIDER` 역할만 가능 (`CareRequestCommentService.addComment()`)
+  - 리뷰 작성: 요청자만 가능 (`CareReviewService.createReview()`)
 
 ---
 
@@ -126,20 +152,38 @@
 domain/care/
   ├── controller/
   │   ├── CareRequestController.java
-  │   └── CareRequestCommentController.java
+  │   ├── CareRequestCommentController.java
+  │   └── CareReviewController.java
   ├── service/
   │   ├── CareRequestService.java
+  │   ├── CareRequestCommentService.java
   │   ├── CareReviewService.java
   │   └── CareRequestScheduler.java
   ├── entity/
   │   ├── CareRequest.java
   │   ├── CareApplication.java
+  │   ├── CareApplicationStatus.java (enum)
+  │   ├── CareRequestStatus.java (enum)
   │   ├── CareReview.java
   │   └── CareRequestComment.java
-  └── repository/
-      ├── CareRequestRepository.java
-      └── CareReviewRepository.java
+  ├── repository/
+  │   ├── CareRequestRepository.java
+  │   ├── CareApplicationRepository.java
+  │   ├── CareReviewRepository.java
+  │   └── CareRequestCommentRepository.java
+  ├── converter/
+  │   ├── CareRequestConverter.java
+  │   ├── CareApplicationConverter.java
+  │   ├── CareReviewConverter.java
+  │   └── CareRequestCommentConverter.java
+  └── dto/
+      ├── CareRequestDTO.java
+      ├── CareApplicationDTO.java
+      ├── CareReviewDTO.java
+      └── CareRequestCommentDTO.java
 ```
+
+**참고**: `CareApplication` 생성/관리는 채팅 도메인(`domain/chat/service/ConversationService`)에서 처리됩니다.
 
 ### 3.2 엔티티 구조
 
@@ -210,15 +254,20 @@ public class CareReview extends BaseTimeEntity {
 public class CareRequestComment {
     private Long idx;
     private CareRequest careRequest;        // 펫케어 요청
-    private Users user;                     // 작성자
+    private Users user;                     // 작성자 (SERVICE_PROVIDER만 작성 가능)
     @Lob
     private String content;                 // 내용
-    private LocalDateTime createdAt;
+    private LocalDateTime createdAt;        // @PrePersist로 자동 설정
     @Builder.Default
     private Boolean isDeleted = false;
     private LocalDateTime deletedAt;
 }
 ```
+**특징**:
+- `BaseTimeEntity`를 상속하지 않음 (직접 `createdAt` 관리)
+- `SERVICE_PROVIDER` 역할만 댓글 작성 가능
+- 파일 첨부 지원 (`FileTargetType.CARE_COMMENT`)
+- 댓글 작성 시 요청자에게 알림 발송 (`NotificationType.CARE_REQUEST_COMMENT`)
 
 ### 3.3 엔티티 관계도 (ERD)
 ```mermaid
@@ -242,8 +291,14 @@ erDiagram
 | `/api/care-requests/my-requests` | GET | 내 요청 목록 (userId 파라미터) |
 | `/api/care-requests/{id}/status` | PATCH | 상태 변경 (status 파라미터) |
 | `/api/care-requests/search` | GET | 요청 검색 (keyword 파라미터) |
-| `/api/chat/conversations/{conversationIdx}/confirm-deal` | POST | 거래 확정 (채팅방에서) |
-| `/api/care/reviews` | POST | 리뷰 작성 |
+| `/api/care-requests/{careRequestId}/comments` | GET | 댓글 목록 조회 |
+| `/api/care-requests/{careRequestId}/comments` | POST | 댓글 작성 (SERVICE_PROVIDER만 가능, 파일 첨부 지원) |
+| `/api/care-requests/{careRequestId}/comments/{commentId}` | DELETE | 댓글 삭제 (Soft Delete) |
+| `/api/chat/conversations/{conversationIdx}/confirm-deal` | POST | 거래 확정 (채팅방에서, 양쪽 모두 확정 시 자동 승인) |
+| `/api/care-reviews` | POST | 리뷰 작성 |
+| `/api/care-reviews/reviewee/{revieweeIdx}` | GET | 특정 사용자(제공자)에 대한 리뷰 목록 |
+| `/api/care-reviews/reviewer/{reviewerIdx}` | GET | 특정 사용자가 작성한 리뷰 목록 |
+| `/api/care-reviews/average-rating/{revieweeIdx}` | GET | 특정 사용자의 평균 평점 조회 |
 
 ---
 
@@ -270,13 +325,8 @@ CREATE INDEX idx_care_request_date_status ON carerequest(date, status);
 ### 5.2 애플리케이션 레벨 최적화
 
 #### 캐싱 전략
-```java
-// 평균 평점 캐싱
-@Cacheable(value = "userRating", key = "#userId")
-public double getAverageRating(long userId) {
-    return careReviewRepository.calculateAverageRating(userId);
-}
-```
+- 현재 평균 평점 조회에는 캐싱이 적용되지 않음
+- 필요 시 `@Cacheable` 어노테이션을 추가하여 성능 최적화 가능
 
 #### N+1 문제 해결
 ```java
@@ -293,9 +343,13 @@ List<CareRequest> findAllWithUserAndPet();
 ## 6. 핵심 포인트 요약
 
 ### 기술적 하이라이트
-1. **거래 확정 동시성 제어**: 트랜잭션으로 안전성 보장, 양쪽 모두 확인 시 자동 승인
+1. **거래 확정 동시성 제어**: 트랜잭션으로 안전성 보장, 양쪽 모두 확인 시 자동 승인 (`ConversationService`)
 2. **자동 완료 스케줄러**: 날짜 지난 요청 자동 완료 (매 시간 정각 + 매일 자정)
 3. **이메일 인증**: 요청 생성 시 이메일 인증 확인
 4. **Soft Delete**: 요청 및 댓글 삭제 시 Soft Delete 적용
-5. **N+1 문제 해결**: Fetch Join 사용 (`findByIdWithPet`)
+5. **N+1 문제 해결**: Fetch Join 사용 (`findByIdWithPet`, `findAllActiveRequests`)
+6. **리뷰 중복 방지**: `CareApplication`당 1개의 리뷰만 작성 가능
+7. **권한 기반 댓글**: `SERVICE_PROVIDER` 역할만 댓글 작성 가능
+8. **알림 연동**: 댓글 작성 시 요청자에게 알림 자동 발송
+9. **파일 첨부 지원**: 댓글에 파일 첨부 가능 (`FileTargetType.CARE_COMMENT`)
 

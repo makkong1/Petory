@@ -304,7 +304,7 @@ const LocationServiceMap = () => {
               );
             }
             return {
-            ...service,
+              ...service,
               distance,
             };
           });
@@ -474,6 +474,26 @@ const LocationServiceMap = () => {
   );
 
   // 지도 위치 업데이트 함수
+  // 시도 중심 좌표 fallback 헬퍼 함수
+  const fallbackToSidoCenter = useCallback((targetSido, targetSigungu, resolve) => {
+    if (SIDO_CENTERS[targetSido]) {
+      const sidoCenter = SIDO_CENTERS[targetSido];
+      const selectedMapLevel = targetSigungu ? calculateMapLevelFromRadius(5) : 10;
+      console.log('시군구 선택 - 시도 중심 좌표 fallback:', {
+        sido: targetSido,
+        sigungu: targetSigungu,
+        center: { lat: sidoCenter.lat, lng: sidoCenter.lng },
+        mapLevel: selectedMapLevel
+      });
+      setMapCenter({ lat: sidoCenter.lat, lng: sidoCenter.lng });
+      setMapLevel(selectedMapLevel);
+      isProgrammaticMoveRef.current = true;
+      resolve({ center: { lat: sidoCenter.lat, lng: sidoCenter.lng }, mapLevel: selectedMapLevel });
+    } else {
+      resolve(null);
+    }
+  }, []);
+
   const updateMapLocation = useCallback(async (targetSido, targetSigungu, targetEupmyeondong) => {
     // 전국 선택 시 기본 위치로
     if (!targetSido) {
@@ -512,7 +532,7 @@ const LocationServiceMap = () => {
       return { center: { lat: center.lat, lng: center.lng }, mapLevel: selectedMapLevel };
     }
 
-    // 시군구 또는 동 선택한 경우: geocoding API 사용
+    // 시군구 또는 동 선택한 경우: geocoding API 사용 (실패 시 하드코딩된 좌표 사용)
     let address = targetSido;
     if (targetSigungu) {
       address = `${targetSido} ${targetSigungu}`;
@@ -521,25 +541,41 @@ const LocationServiceMap = () => {
       address = `${targetSido} ${targetSigungu} ${targetEupmyeondong}`;
     }
 
-    try {
-      const coordData = await geocodingApi.addressToCoordinates(address);
-      if (coordData && coordData.success !== false && coordData.latitude && coordData.longitude) {
-        let selectedMapLevel;
-        if (targetEupmyeondong) {
-          selectedMapLevel = calculateMapLevelFromRadius(3);
-        } else if (targetSigungu) {
-          selectedMapLevel = calculateMapLevelFromRadius(20);
-        } else {
-          selectedMapLevel = 10;
-        }
-        setMapCenter({ lat: coordData.latitude, lng: coordData.longitude });
-        setMapLevel(selectedMapLevel);
-        isProgrammaticMoveRef.current = true;
-        return { center: { lat: coordData.latitude, lng: coordData.longitude }, mapLevel: selectedMapLevel };
-      }
-    } catch (err) {
-      console.error('위치 좌표 변환 실패:', err);
-    }
+    // Geocoding: 백엔드 API만 사용 (보안상 프론트엔드에서 직접 geocoding 하지 않음)
+    return new Promise((resolve) => {
+      geocodingApi.addressToCoordinates(address)
+        .then(coordData => {
+          if (coordData && coordData.success !== false && coordData.latitude && coordData.longitude) {
+            let selectedMapLevel;
+            if (targetEupmyeondong) {
+              selectedMapLevel = calculateMapLevelFromRadius(3);
+            } else if (targetSigungu) {
+              selectedMapLevel = calculateMapLevelFromRadius(5);
+            } else {
+              selectedMapLevel = 10;
+            }
+            console.log('시군구 선택 - 백엔드 Geocoding API 성공:', {
+              address,
+              center: { lat: coordData.latitude, lng: coordData.longitude },
+              mapLevel: selectedMapLevel,
+              targetSigungu
+            });
+            setMapCenter({ lat: coordData.latitude, lng: coordData.longitude });
+            setMapLevel(selectedMapLevel);
+            isProgrammaticMoveRef.current = true;
+            resolve({ center: { lat: coordData.latitude, lng: coordData.longitude }, mapLevel: selectedMapLevel });
+          } else {
+            // 백엔드 API 실패 시 시도 중심 좌표 사용
+            console.warn('백엔드 Geocoding API 실패, 시도 중심 좌표 사용');
+            fallbackToSidoCenter(targetSido, targetSigungu, resolve);
+          }
+        })
+        .catch(err => {
+          console.warn('백엔드 Geocoding API 실패, 시도 중심 좌표 사용:', err);
+          fallbackToSidoCenter(targetSido, targetSigungu, resolve);
+        });
+    });
+
     return null;
   }, []);
 

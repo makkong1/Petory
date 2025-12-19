@@ -5,7 +5,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import com.linkup.Petory.domain.location.service.KakaoMapService;
 import com.linkup.Petory.domain.location.service.NaverMapService;
 
 import java.util.HashMap;
@@ -20,17 +19,16 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class GeocodingController {
 
-    private final KakaoMapService kakaoMapService;
     private final NaverMapService naverMapService;
 
     /**
-     * 주소를 위도/경도로 변환
+     * 주소를 위도/경도로 변환 (네이버맵 Geocoding API)
      * GET /api/geocoding/address?address=서울시 강남구
      */
     @GetMapping("/address")
     public ResponseEntity<Map<String, Object>> addressToCoordinates(@RequestParam String address) {
         try {
-            Double[] coordinates = kakaoMapService.addressToCoordinates(address);
+            Double[] coordinates = naverMapService.addressToCoordinates(address);
 
             Map<String, Object> response = new HashMap<>();
             if (coordinates != null && coordinates.length == 2) {
@@ -39,33 +37,36 @@ public class GeocodingController {
                 response.put("success", true);
             } else {
                 response.put("success", false);
-                response.put("message", "주소를 좌표로 변환할 수 없습니다.");
+                response.put("message", "주소를 좌표로 변환할 수 없습니다. 네이버 클라우드 플랫폼에서 Geocoding API 구독이 필요할 수 있습니다.");
+                log.warn("주소 변환 실패 - 주소: {}, 좌표: {}", address, coordinates);
             }
 
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             log.error("주소 변환 실패: {}", e.getMessage(), e);
             Map<String, Object> response = new HashMap<>();
-            response.put("error", e.getMessage());
             response.put("success", false);
+            response.put("error", e.getMessage());
+            response.put("message", "주소 변환 중 오류가 발생했습니다. 네이버 클라우드 플랫폼에서 Geocoding API 구독을 확인해주세요.");
             return ResponseEntity.badRequest().body(response);
         }
     }
 
     /**
      * 네이버맵 길찾기 (Directions API)
-     * GET /api/geocoding/directions?start=127.1058342,37.359708&goal=129.075986,35.179470&option=traoptimal
+     * GET
+     * /api/geocoding/directions?start=127.1058342,37.359708&goal=129.075986,35.179470&option=traoptimal
      */
     @GetMapping("/directions")
     public ResponseEntity<Map<String, Object>> getDirections(
             @RequestParam String start, // 경도,위도 형식
-            @RequestParam String goal,  // 경도,위도 형식
+            @RequestParam String goal, // 경도,위도 형식
             @RequestParam(required = false, defaultValue = "traoptimal") String option) {
         try {
             // start와 goal 파싱 (경도,위도 형식)
             String[] startCoords = start.split(",");
             String[] goalCoords = goal.split(",");
-            
+
             if (startCoords.length != 2 || goalCoords.length != 2) {
                 Map<String, Object> errorResponse = new HashMap<>();
                 errorResponse.put("success", false);
