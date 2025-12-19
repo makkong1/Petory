@@ -1,6 +1,7 @@
 package com.linkup.Petory.domain.location.controller;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -19,6 +20,7 @@ import lombok.extern.slf4j.Slf4j;
 @RestController
 @RequestMapping("/api/admin/location-services")
 @RequiredArgsConstructor
+@PreAuthorize("hasRole('MASTER')")
 public class LocationServiceAdminController {
 
     private final LocationServiceAdminService locationServiceAdminService;
@@ -46,17 +48,17 @@ public class LocationServiceAdminController {
     @PostMapping(value = "/import-public-data", consumes = "multipart/form-data")
     public ResponseEntity<BatchImportResult> importPublicData(
             @RequestParam("file") MultipartFile file) {
-        
+
         if (file == null || file.isEmpty()) {
             return ResponseEntity.badRequest()
                     .body(BatchImportResult.builder()
                             .error(1)
                             .build());
         }
-        
-        log.info("공공데이터 CSV 파일 업로드 임포트 요청: {} ({} bytes)", 
+
+        log.info("공공데이터 CSV 파일 업로드 임포트 요청: {} ({} bytes)",
                 file.getOriginalFilename(), file.getSize());
-        
+
         try {
             BatchImportResult result = publicDataLocationService.importFromCsv(file);
             return ResponseEntity.ok(result);
@@ -68,7 +70,7 @@ public class LocationServiceAdminController {
                             .build());
         }
     }
-    
+
     /**
      * 공공데이터 CSV 파일 경로로 임포트 (기존 방식 - 하위 호환성)
      * 
@@ -78,9 +80,9 @@ public class LocationServiceAdminController {
     @PostMapping("/import-public-data-path")
     public ResponseEntity<BatchImportResult> importPublicDataByPath(
             @RequestParam String csvFilePath) {
-        
+
         log.info("공공데이터 CSV 경로 임포트 요청: {}", csvFilePath);
-        
+
         try {
             BatchImportResult result = publicDataLocationService.importFromCsv(csvFilePath);
             return ResponseEntity.ok(result);
@@ -93,4 +95,3 @@ public class LocationServiceAdminController {
         }
     }
 }
-

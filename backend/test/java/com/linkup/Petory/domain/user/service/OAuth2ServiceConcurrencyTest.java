@@ -12,10 +12,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -35,7 +33,6 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 @SpringBootTest
 @ActiveProfiles("test")
-@Transactional
 class OAuth2ServiceConcurrencyTest {
 
     @Autowired
@@ -53,9 +50,18 @@ class OAuth2ServiceConcurrencyTest {
 
     @BeforeEach
     void setUp() {
-        testProviderId = "test_oauth_provider_id_12345";
-        testEmail = "test_oauth@example.com";
+        // 각 테스트마다 고유한 데이터 사용
+        long timestamp = System.currentTimeMillis();
+        testProviderId = "test_oauth_provider_id_" + timestamp;
+        testEmail = "test_oauth_" + timestamp + "@example.com";
         testProvider = Provider.GOOGLE;
+
+        // 기존 데이터 정리
+        usersRepository.findByEmail(testEmail).ifPresent(usersRepository::delete);
+        socialUserRepository.findAll().stream()
+                .filter(su -> testProvider.equals(su.getProvider()) &&
+                        testProviderId.equals(su.getProviderId()))
+                .forEach(socialUserRepository::delete);
     }
 
     private OAuth2User createMockOAuth2User(String providerId, String email, String name) {
@@ -215,9 +221,10 @@ class OAuth2ServiceConcurrencyTest {
     @DisplayName("소셜 로그인 - 기존 계정과의 연결 확인")
     void testConcurrentOAuth2LoginExistingAccount() throws InterruptedException {
         // 기존 사용자 생성
+        long timestamp = System.currentTimeMillis();
         Users existingUser = Users.builder()
-                .id("existing_user")
-                .username("existinguser")
+                .id("existing_user_" + timestamp)
+                .username("existinguser_" + timestamp)
                 .email(testEmail)
                 .password("password")
                 .role(com.linkup.Petory.domain.user.entity.Role.USER)
@@ -271,10 +278,11 @@ class OAuth2ServiceConcurrencyTest {
                 "기존 사용자와 연결되어야 함");
 
         // SocialUser가 생성되었는지 확인
+        final Users finalUser = existingUser;
         long socialUserCount = socialUserRepository.findAll().stream()
                 .filter(su -> testProvider.equals(su.getProvider()) &&
                         testProviderId.equals(su.getProviderId()) &&
-                        existingUser.getIdx().equals(su.getUser().getIdx()))
+                        finalUser.getIdx().equals(su.getUser().getIdx()))
                 .count();
 
         assertEquals(1, socialUserCount,

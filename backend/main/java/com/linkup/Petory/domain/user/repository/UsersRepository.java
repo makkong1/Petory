@@ -4,6 +4,7 @@ import java.util.Optional;
 import java.time.LocalDateTime;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -30,4 +31,9 @@ public interface UsersRepository extends JpaRepository<Users, Long> {
     long countByCreatedAtBetween(LocalDateTime start, LocalDateTime end);
 
     long countByLastLoginAtBetween(LocalDateTime start, LocalDateTime end);
+
+    // 경고 횟수 원자적 증가 (동시성 문제 해결)
+    @Modifying
+    @Query("UPDATE Users u SET u.warningCount = u.warningCount + 1 WHERE u.idx = :userId")
+    int incrementWarningCount(@Param("userId") Long userId);
 }

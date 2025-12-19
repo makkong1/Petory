@@ -211,7 +211,7 @@ const MapContainer = React.forwardRef(
       }
 
       const script = document.createElement('script');
-      // 네이버맵 API v3는 ncpClientId를 사용합니다
+      // 네이버맵 API v3는 ncpClientId를 사용 (지도 표시만, geocoding은 백엔드에서 처리)
       const scriptUrl = `https://openapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${NAVER_MAPS_KEY_ID}`;
       script.src = scriptUrl;
       script.async = true;
@@ -353,43 +353,42 @@ const MapContainer = React.forwardRef(
         Math.abs(currentCenter.lat() - mapCenter.lat) < COORD_EPSILON &&
         Math.abs(currentCenter.lng() - mapCenter.lng) < COORD_EPSILON;
       const targetZoom = mapLevelToZoom(mapLevel);
-      const isSameZoom = currentZoom === targetZoom;
+      const isSameZoom = Math.abs(currentZoom - targetZoom) < 0.5; // 소수점 오차 허용
+
+      console.log('MapContainer 줌 업데이트:', {
+        currentZoom,
+        targetZoom,
+        mapLevel,
+        isSameZoom,
+        userZoomed: userZoomedRef.current
+      });
+
+      // mapLevel prop이 변경되었으면 무조건 userZoomedRef 리셋 (프로그래밍 방식 변경)
+      // 사용자가 마우스 휠로 조정했더라도, mapLevel prop이 명시적으로 변경되었으면 줌 변경 허용
+      userZoomedRef.current = false;
 
       // mapLevel이 변경되었고, 실제 줌이 다를 때만 강제로 줌 변경 (레벨 선택 드롭다운 변경 시)
       if (!isSameZoom) {
-        // 사용자가 마우스 휠로 조정했더라도, mapLevel prop이 명시적으로 변경되었으면 줌 변경 허용
-        userZoomedRef.current = false; // 레벨 선택 드롭다운 변경 시 강제로 리셋
         map.setZoom(targetZoom);
         lastProgrammaticCenterRef.current = { ...mapCenter };
         if (!isAlreadyAtCenter) {
           setTimeout(() => {
             map.setCenter(new window.naver.maps.LatLng(mapCenter.lat, mapCenter.lng));
             lastProgrammaticCenterRef.current = { ...mapCenter };
-            console.log('지도 줌 변경 완료:', mapCenter, '줌:', targetZoom);
+            console.log('지도 줌 변경 완료:', mapCenter, '줌:', targetZoom, '레벨:', mapLevel);
           }, 300);
         } else {
-          console.log('지도 줌 변경 완료:', mapCenter, '줌:', targetZoom);
+          console.log('지도 줌 변경 완료 (중심 동일):', mapCenter, '줌:', targetZoom, '레벨:', mapLevel);
         }
         return;
       }
 
-      // 사용자가 직접 마우스 휠로 줌을 조정한 경우, mapLevel prop 변경을 무시 (단, 줌이 같을 때만)
-      if (userZoomedRef.current && isSameZoom) {
-        // 중심만 이동하고 줌은 사용자가 조정한 대로 유지
-        if (!isAlreadyAtCenter) {
-          lastProgrammaticCenterRef.current = { ...mapCenter };
-          map.setCenter(new window.naver.maps.LatLng(mapCenter.lat, mapCenter.lng));
-        }
-        return; // 줌은 사용자가 조정한 대로 유지
-      }
-
-      // 중심만 이동 (줌은 이미 변경됨)
+      // 줌은 같지만 중심이 다르면 중심만 이동
       if (!isAlreadyAtCenter) {
         lastProgrammaticCenterRef.current = { ...mapCenter };
         map.setCenter(new window.naver.maps.LatLng(mapCenter.lat, mapCenter.lng));
       } else {
         lastProgrammaticCenterRef.current = { ...mapCenter };
-        userZoomedRef.current = false; // 리셋
       }
     }, [mapCenter, mapLevel, mapLevelToZoom]);
 
