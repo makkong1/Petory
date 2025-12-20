@@ -1,4 +1,4 @@
-package com.linkup.Petory.domain.statistics.controller;
+package com.linkup.Petory.domain.admin.controller;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -20,7 +20,7 @@ import lombok.RequiredArgsConstructor;
 @RestController
 @RequestMapping("/api/admin/statistics")
 @RequiredArgsConstructor
-public class StatisticsController {
+public class AdminStatisticsController {
 
     private final StatisticsService statisticsService;
 
@@ -54,3 +54,4 @@ public class StatisticsController {
         return ResponseEntity.ok("지난 " + days + "일간의 통계 집계가 완료되었습니다.");
     }
 }
+

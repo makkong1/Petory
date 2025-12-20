@@ -21,7 +21,6 @@ import com.linkup.Petory.domain.chat.entity.ParticipantStatus;
 import com.linkup.Petory.domain.chat.repository.ChatMessageRepository;
 import com.linkup.Petory.domain.chat.repository.ConversationParticipantRepository;
 import com.linkup.Petory.domain.chat.repository.ConversationRepository;
-import com.linkup.Petory.domain.chat.repository.MessageReadStatusRepository;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 
@@ -35,7 +34,6 @@ public class ChatMessageService {
     private final ChatMessageRepository chatMessageRepository;
     private final ConversationRepository conversationRepository;
     private final ConversationParticipantRepository participantRepository;
-    private final MessageReadStatusRepository readStatusRepository;
     private final UsersRepository usersRepository;
     private final ChatMessageConverter messageConverter;
 
@@ -164,29 +162,11 @@ public class ChatMessageService {
             }
         }
         participantRepository.save(participant);
-
-        // MessageReadStatus 기록 (선택사항 - 필요한 경우)
-        // 읽지 않은 메시지들에 대해 읽음 상태 기록
-        if (lastMessageIdx != null) {
-            List<ChatMessage> unreadMessages = chatMessageRepository
-                    .findByConversationIdxOrderByCreatedAtDesc(conversationIdx)
-                    .stream()
-                    .filter(m -> m.getCreatedAt().isBefore(
-                            chatMessageRepository.findById(lastMessageIdx)
-                                    .map(ChatMessage::getCreatedAt)
-                                    .orElse(LocalDateTime.now()))
-                            && !m.getSender().getIdx().equals(userId))
-                    .collect(Collectors.toList());
-
-            Users user = usersRepository.findById(userId).orElseThrow();
-            for (ChatMessage message : unreadMessages) {
-                // 이미 읽음 처리된 메시지는 스킵
-                if (!readStatusRepository.existsByMessageAndUser(message, user)) {
-                    // 필요시 MessageReadStatus 생성
-                    // readStatusRepository.save(...);
-                }
-            }
-        }
+        
+        // ⚠️ 제거됨: 불필요한 전체 메시지 조회 및 MessageReadStatus 기록 로직
+        // - 전체 메시지 조회는 성능 문제를 일으킴 (수천~수만 건 조회)
+        // - MessageReadStatus 기록 로직은 실제로 사용되지 않음
+        // - 참여자의 unreadCount와 lastReadMessage 업데이트만으로 충분함
     }
 
     /**

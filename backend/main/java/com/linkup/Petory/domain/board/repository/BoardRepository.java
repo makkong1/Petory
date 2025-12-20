@@ -6,6 +6,7 @@ import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -14,7 +15,7 @@ import com.linkup.Petory.domain.board.entity.Board;
 import com.linkup.Petory.domain.user.entity.Users;
 
 @Repository
-public interface BoardRepository extends JpaRepository<Board, Long> {
+public interface BoardRepository extends JpaRepository<Board, Long>, JpaSpecificationExecutor<Board> {
 
         // 전체 게시글 조회 (최신순)
         List<Board> findAllByOrderByCreatedAtDesc();
@@ -84,9 +85,17 @@ public interface BoardRepository extends JpaRepository<Board, Long> {
         // 통계용
         long countByCreatedAtBetween(LocalDateTime start, LocalDateTime end);
 
-        // 관리자용: 작성자 상태 체크 없이 조회 (삭제된 사용자 콘텐츠도 포함)
+        // 관리자용: 작성자 상태 체크 없이 조회 (삭제된 사용자 콘텐츠도 포함) - 페이징
         @Query("SELECT b FROM Board b JOIN FETCH b.user u WHERE b.isDeleted = false ORDER BY b.createdAt DESC")
         Page<Board> findAllByIsDeletedFalseForAdmin(Pageable pageable);
+
+        // 관리자용: 작성자 상태 체크 없이 조회 (삭제된 사용자 콘텐츠도 포함) - 전체 조회
+        @Query("SELECT b FROM Board b JOIN FETCH b.user u WHERE b.isDeleted = false ORDER BY b.createdAt DESC")
+        List<Board> findAllByIsDeletedFalseForAdmin();
+
+        // 관리자용: 전체 조회 (삭제 포함)
+        @Query("SELECT b FROM Board b JOIN FETCH b.user u ORDER BY b.createdAt DESC")
+        List<Board> findAllForAdmin();
 
         @Query("SELECT b FROM Board b JOIN FETCH b.user u WHERE b.category = :category AND b.isDeleted = false ORDER BY b.createdAt DESC")
         Page<Board> findByCategoryAndIsDeletedFalseForAdmin(@Param("category") String category, Pageable pageable);

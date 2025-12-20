@@ -1,4 +1,4 @@
-package com.linkup.Petory.domain.user.controller;
+package com.linkup.Petory.domain.admin.controller;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -22,7 +22,7 @@ import lombok.extern.slf4j.Slf4j;
  * - ADMIN 계정 생성/삭제/권한 변경
  * - 일반 사용자를 ADMIN으로 승격 가능
  * - MASTER 권한 변경 불가 (MASTER는 변경 불가)
- * - 일반 사용자 관리는 UsersController에서 처리 (ADMIN/MASTER 모두 가능)
+ * - 일반 사용자 관리는 AdminUserController에서 처리 (ADMIN/MASTER 모두 가능)
  */
 @RestController
 @RequestMapping("/api/master/admin-users")
@@ -214,3 +214,4 @@ public class AdminUserManagementController {
         }
     }
 }
+

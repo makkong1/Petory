@@ -24,6 +24,13 @@ const addAuthToken = (config) => {
 
 api.interceptors.request.use(addAuthToken, (error) => Promise.reject(error));
 
+const adminApi = axios.create({
+    baseURL: 'http://localhost:8080/api/admin/location-services',
+    headers: { 'Content-Type': 'application/json' },
+});
+
+adminApi.interceptors.request.use(addAuthToken, (error) => Promise.reject(error));
+
 export const locationServiceApi = {
   /**
    * DB에서 위치 서비스 검색
@@ -56,4 +63,14 @@ export const locationServiceApi = {
         ...(typeof size === 'number' && { size }),
       },
     }),
+
+  // 관리자용 API
+  listLocationServices: (params) => adminApi.get('', { params }),
+  importPublicData: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return adminApi.post('/import-public-data', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
 };

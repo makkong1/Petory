@@ -1,6 +1,115 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import styled from 'styled-components';
 import { locationServiceApi } from '../../../api/locationServiceApi';
+
+const LocationServiceList = () => {
+  const [sido, setSido] = useState('');
+  const [sigungu, setSigungu] = useState('');
+  const [category, setCategory] = useState('');
+  const [q, setQ] = useState('');
+  const [services, setServices] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const fetchServices = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const params = {};
+      if (sido) params.sido = sido;
+      if (sigungu) params.sigungu = sigungu;
+      if (category) params.category = category;
+      if (q) params.q = q;
+      
+      const res = await locationServiceApi.listLocationServices(params);
+      setServices(res.data?.services || []);
+    } catch (e) {
+      console.error('장소 목록 조회 실패:', e);
+      setError(e.response?.data?.message || '목록을 불러오지 못했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  }, [sido, sigungu, category, q]);
+
+  useEffect(() => {
+    fetchServices();
+  }, [fetchServices]);
+
+  return (
+    <>
+      <Filters>
+        <Group>
+          <Label>시도</Label>
+          <Input
+            placeholder="시도 (예: 서울특별시)"
+            value={sido}
+            onChange={e => setSido(e.target.value)}
+          />
+        </Group>
+        <Group>
+          <Label>시군구</Label>
+          <Input
+            placeholder="시군구 (예: 노원구)"
+            value={sigungu}
+            onChange={e => setSigungu(e.target.value)}
+          />
+        </Group>
+        <Group>
+          <Label>카테고리</Label>
+          <Input
+            placeholder="카테고리"
+            value={category}
+            onChange={e => setCategory(e.target.value)}
+          />
+        </Group>
+        <Group style={{ flex: 1 }}>
+          <Label>검색</Label>
+          <Input
+            placeholder="시설명/주소/카테고리"
+            value={q}
+            onChange={e => setQ(e.target.value)}
+          />
+        </Group>
+        <Group>
+          <Refresh onClick={fetchServices}>새로고침</Refresh>
+        </Group>
+      </Filters>
+
+      {loading && services.length === 0 ? (
+        <Info>로딩 중...</Info>
+      ) : error ? (
+        <Info>{error}</Info>
+      ) : services.length === 0 ? (
+        <Info>데이터가 없습니다.</Info>
+      ) : (
+        <Table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>시설명</th>
+              <th>카테고리</th>
+              <th>주소</th>
+              <th>전화번호</th>
+              <th>평점</th>
+            </tr>
+          </thead>
+          <tbody>
+            {services.map((service) => (
+              <tr key={service.idx}>
+                <td>{service.idx}</td>
+                <td className="ellipsis">{service.name || '-'}</td>
+                <td>{service.category3 || service.category2 || service.category1 || '-'}</td>
+                <td className="ellipsis">{service.address || '-'}</td>
+                <td>{service.phone || '-'}</td>
+                <td>{service.rating || '-'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+      )}
+    </>
+  );
+};
 
 const LocationServiceManagementSection = () => {
   const [selectedFile, setSelectedFile] = useState(null);
@@ -65,7 +174,7 @@ const LocationServiceManagementSection = () => {
         </CardDescription>
         
         <FormGroup>
-          <Label>CSV 파일 선택</Label>
+          <FormLabel>CSV 파일 선택</FormLabel>
           <FileInputWrapper>
             <FileInput
               type="file"
@@ -104,12 +213,10 @@ const LocationServiceManagementSection = () => {
         )}
       </Card>
 
-      <PlaceholderCard>
-        <PlaceholderTitle>장소 목록</PlaceholderTitle>
-        <PlaceholderText>
-          1단계에서는 장소 목록/검색용 기본 테이블만 구성합니다. 이후 사진/웹사이트/설명/좌표 수정, 리뷰 삭제, 캐시 모니터링 및 수동 삭제 기능을 추가합니다.
-        </PlaceholderText>
-      </PlaceholderCard>
+      <Card>
+        <CardTitle>장소 목록</CardTitle>
+        <LocationServiceList />
+      </Card>
     </Wrapper>
   );
 };
@@ -132,19 +239,59 @@ const Subtitle = styled.p`
   color: ${props => props.theme.colors.textSecondary};
 `;
 
-const PlaceholderCard = styled.div`
-  border-radius: ${props => props.theme.borderRadius.md};
-  border: 1px dashed ${props => props.theme.colors.border};
+const Filters = styled.div`
+  display: flex;
+  gap: ${props => props.theme.spacing.md};
+  align-items: center;
+  margin-bottom: ${props => props.theme.spacing.md};
+  flex-wrap: wrap;
+`;
+
+const Group = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${props => props.theme.spacing.xs};
+`;
+
+const Label = styled.span`
+  color: ${props => props.theme.colors.text};
+  font-size: ${props => props.theme.typography.caption.fontSize};
+`;
+
+const Input = styled.input`
+  width: 150px;
+  padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.sm};
+  border: 1px solid ${props => props.theme.colors.border};
+  border-radius: ${props => props.theme.borderRadius.sm};
+  background: ${props => props.theme.colors.surface};
+  color: ${props => props.theme.colors.text};
+`;
+
+const Refresh = styled.button`
+  padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.md};
+  border: 1px solid ${props => props.theme.colors.border};
+  background: ${props => props.theme.colors.background};
+  color: ${props => props.theme.colors.text};
+  border-radius: ${props => props.theme.borderRadius.sm};
+  cursor: pointer;
+  
+  &:hover {
+    background: ${props => props.theme.colors.surfaceHover};
+  }
+`;
+
+const Table = styled.table`
+  width: 100%;
+  border-collapse: collapse;
+  font-size: ${props => props.theme.typography.caption.fontSize};
+  th, td { padding: 8px 10px; border-bottom: 1px solid ${props => props.theme.colors.border}; }
+  th { color: ${props => props.theme.colors.text}; text-align: left; white-space: nowrap; }
+  td.ellipsis { max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+`;
+
+const Info = styled.div`
   padding: ${props => props.theme.spacing.lg};
-  background: ${props => props.theme.colors.surfaceSoft};
-`;
-
-const PlaceholderTitle = styled.h2`
-  font-size: ${props => props.theme.typography.h4.fontSize};
-  margin-bottom: ${props => props.theme.spacing.sm};
-`;
-
-const PlaceholderText = styled.p`
+  text-align: center;
   color: ${props => props.theme.colors.textSecondary};
 `;
 
@@ -174,7 +321,7 @@ const FormGroup = styled.div`
   margin-bottom: ${props => props.theme.spacing.md};
 `;
 
-const Label = styled.label`
+const FormLabel = styled.label`
   display: block;
   margin-bottom: ${props => props.theme.spacing.xs};
   font-weight: 600;

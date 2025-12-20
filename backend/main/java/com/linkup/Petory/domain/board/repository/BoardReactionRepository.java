@@ -29,4 +29,14 @@ public interface BoardReactionRepository extends JpaRepository<BoardReaction, Lo
            "WHERE br.board.idx IN :boardIds " +
            "GROUP BY br.board.idx, br.reactionType")
     List<Object[]> countByBoardsGroupByReactionType(@Param("boardIds") List<Long> boardIds);
+
+    /**
+     * 단일 게시글의 좋아요/싫어요 카운트를 한 번에 조회
+     * 반환값: [boardId, reactionType, count] 형태의 Object[] 리스트
+     */
+    @Query("SELECT br.board.idx as boardId, br.reactionType as reactionType, COUNT(br) as count " +
+           "FROM BoardReaction br " +
+           "WHERE br.board.idx = :boardId " +
+           "GROUP BY br.board.idx, br.reactionType")
+    List<Object[]> countByBoardGroupByReactionType(@Param("boardId") Long boardId);
 }
