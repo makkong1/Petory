@@ -36,12 +36,18 @@ public class UsersService {
     private final PetService petService;
     private final EmailVerificationService emailVerificationService;
 
-    // 전체 조회
+    /**
+     * 전체 사용자 조회 (관리자용)
+     * - AdminUserController에서 사용
+     */
     public List<UsersDTO> getAllUsers() {
         return usersConverter.toDTOList(usersRepository.findAll());
     }
 
-    // 전체 조회 (페이징 지원)
+    /**
+     * 전체 사용자 조회 (페이징 지원, 관리자용)
+     * - AdminUserController에서 사용
+     */
     @Transactional(readOnly = true)
     public UserPageResponseDTO getAllUsersWithPaging(int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
@@ -227,7 +233,10 @@ public class UsersService {
         usersRepository.save(user);
     }
 
-    // 계정 복구
+    /**
+     * 계정 복구 (관리자용)
+     * - AdminUserController에서 사용
+     */
     public UsersDTO restoreUser(long idx) {
         Users user = usersRepository.findById(idx)
                 .orElseThrow(() -> new RuntimeException("User not found"));
@@ -237,7 +246,11 @@ public class UsersService {
         return usersConverter.toDTO(restored);
     }
 
-    // 상태 관리 (상태, 경고 횟수, 정지 기간만 업데이트)
+    /**
+     * 사용자 상태 관리 (관리자용)
+     * - 상태, 경고 횟수, 정지 기간만 업데이트
+     * - AdminUserController에서 사용
+     */
     public UsersDTO updateUserStatus(long idx, UsersDTO dto) {
         Users user = usersRepository.findById(idx)
                 .orElseThrow(() -> new RuntimeException("User not found"));
@@ -294,7 +307,8 @@ public class UsersService {
     }
 
     /**
-     * 사용자 프로필 조회 (펫 정보 포함) - 관리자용
+     * 사용자 프로필 조회 (펫 정보 포함, 관리자용)
+     * - AdminUserController에서 사용
      */
     @Transactional(readOnly = true)
     public UsersDTO getUserWithPets(Long userIdx) {

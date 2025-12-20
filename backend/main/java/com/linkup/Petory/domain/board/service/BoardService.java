@@ -74,7 +74,11 @@ public class BoardService {
         return mapBoardsWithReactionsBatch(boards);
     }
 
-    // 관리자용 게시글 조회 (페이징 + 필터링 지원)
+    /**
+     * 관리자용 게시글 조회 (페이징 + 필터링 지원)
+     * - 작성자 상태 체크 없이 조회 (삭제된 사용자 콘텐츠도 포함)
+     * - AdminBoardController에서 사용
+     */
     public BoardPageResponseDTO getAdminBoardsWithPaging(
             String status, Boolean deleted, String category, String q, int page, int size) {
         // 기본 쿼리: 전체 게시글 조회 (삭제 포함 여부에 따라)
@@ -621,6 +625,10 @@ public class BoardService {
         return attachmentFileService.buildDownloadUrl(primary.getFilePath());
     }
 
+    /**
+     * 게시글 상태 변경 (관리자용)
+     * - AdminBoardController에서 사용
+     */
     @Caching(evict = {
             @CacheEvict(value = "boardDetail", key = "#id"),
             @CacheEvict(value = "boardList", allEntries = true)
@@ -634,6 +642,10 @@ public class BoardService {
         return mapBoardWithDetails(saved);
     }
 
+    /**
+     * 게시글 복구 (관리자용)
+     * - AdminBoardController에서 사용
+     */
     @Caching(evict = {
             @CacheEvict(value = "boardDetail", key = "#id"),
             @CacheEvict(value = "boardList", allEntries = true)

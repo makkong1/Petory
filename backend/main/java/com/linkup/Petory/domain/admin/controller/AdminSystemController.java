@@ -1,4 +1,4 @@
-package com.linkup.Petory.domain.system.controller;
+package com.linkup.Petory.domain.admin.controller;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -23,7 +23,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('MASTER')")
 @Slf4j
-public class SystemSettingsController {
+public class AdminSystemController {
 
     /**
      * 시스템 설정 조회

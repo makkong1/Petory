@@ -52,7 +52,11 @@ public class CommentService {
                 .collect(Collectors.toList());
     }
 
-    // 관리자용: 작성자 상태 체크 없이 조회 (삭제된 사용자 댓글도 포함)
+    /**
+     * 관리자용 댓글 조회
+     * - 작성자 상태 체크 없이 조회 (삭제된 사용자 댓글도 포함)
+     * - AdminBoardController에서 사용
+     */
     public List<CommentDTO> getCommentsForAdmin(Long boardId) {
         Board board = boardRepository.findById(boardId)
                 .orElseThrow(() -> new IllegalArgumentException("Board not found"));
@@ -194,6 +198,10 @@ public class CommentService {
         return attachmentFileService.buildDownloadUrl(primary.getFilePath());
     }
 
+    /**
+     * 댓글 상태 변경 (관리자용)
+     * - AdminBoardController에서 사용
+     */
     @CacheEvict(value = "boardDetail", key = "#boardId")
     @Transactional
     public CommentDTO updateCommentStatus(Long boardId, Long commentId,
@@ -212,6 +220,10 @@ public class CommentService {
         return mapWithReactionCounts(saved);
     }
 
+    /**
+     * 댓글 복구 (관리자용)
+     * - AdminBoardController에서 사용
+     */
     @CacheEvict(value = "boardDetail", key = "#boardId")
     @Transactional
     public CommentDTO restoreComment(Long boardId, Long commentId) {

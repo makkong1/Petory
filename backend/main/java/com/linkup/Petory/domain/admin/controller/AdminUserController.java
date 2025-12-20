@@ -1,4 +1,4 @@
-package com.linkup.Petory.domain.user.controller;
+package com.linkup.Petory.domain.admin.controller;
 
 import java.util.List;
 
@@ -13,7 +13,7 @@ import com.linkup.Petory.domain.user.service.UsersService;
 import lombok.RequiredArgsConstructor;
 
 /**
- * 사용자 관리 컨트롤러
+ * 사용자 관리 컨트롤러 (관리자용)
  * - ADMIN과 MASTER 모두 접근 가능
  * - 일반 사용자(USER, SERVICE_PROVIDER) 관리
  * - ADMIN 계정 관리는 AdminUserManagementController에서 처리 (MASTER만)
@@ -22,7 +22,7 @@ import lombok.RequiredArgsConstructor;
 @RequestMapping("/api/admin/users")
 @RequiredArgsConstructor
 @PreAuthorize("hasAnyRole('ADMIN', 'MASTER')")
-public class UsersController {
+public class AdminUserController {
 
     private final UsersService usersService;
 
@@ -116,3 +116,4 @@ public class UsersController {
         return ResponseEntity.ok(usersService.updateUserStatus(id, dto));
     }
 }
+

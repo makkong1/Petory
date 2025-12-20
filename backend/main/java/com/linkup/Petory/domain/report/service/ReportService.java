@@ -80,6 +80,10 @@ public class ReportService {
         return reportConverter.toDTO(saved);
     }
 
+    /**
+     * 신고 목록 조회 (관리자용)
+     * - AdminReportController에서 사용
+     */
     public List<ReportDTO> getReports(ReportTargetType targetType, ReportStatus status) {
         List<Report> reports;
 
@@ -98,6 +102,10 @@ public class ReportService {
                 .toList();
     }
 
+    /**
+     * 신고 상세 조회 (관리자용)
+     * - AdminReportController에서 사용
+     */
     public ReportDetailDTO getReportDetail(Long reportId) {
         Report report = reportRepository.findById(reportId)
                 .orElseThrow(() -> new IllegalArgumentException("신고 정보를 찾을 수 없습니다."));
@@ -110,6 +118,10 @@ public class ReportService {
                 .build();
     }
 
+    /**
+     * 신고 처리 (관리자용)
+     * - AdminReportController에서 사용
+     */
     @Transactional
     public ReportDTO handleReport(Long reportId, Long adminUserId, ReportHandleRequest req) {
         if (req.getStatus() == null) {
