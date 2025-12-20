@@ -4,10 +4,9 @@
 
 **문제**: 동시 참가 시 최대 인원 초과 (3명 제한인데 4명 참가)
 
-**해결**: 원자적 UPDATE 쿼리 방식 + DB 제약조건 적용 + 이벤트 기반 아키텍처
+**해결**: 원자적 UPDATE 쿼리 + DB 제약조건 + 이벤트 기반 아키텍처
 - ✅ Race Condition 완전 해결
 - ✅ 프로젝트 일관성 확보 (Chat, User 도메인과 동일한 패턴)
-- ✅ 데이터 정합성 100% 보장
 - ✅ DB 레벨 이중 안전장치 (CHECK 제약조건)
 - ✅ 핵심 도메인과 파생 도메인 분리 (이벤트 기반)
 
@@ -15,9 +14,9 @@
 
 ## 1. 문제 상황
 
-### 1.1 발생 배경
+### 1.1 발생 원인
 
-모임 참가 기능에서 동시에 여러 사용자가 참가 버튼을 클릭할 때, 최대 인원을 초과하여 참가가 허용되는 문제가 발생했습니다.
+동시에 여러 사용자가 참가할 때, `currentParticipants` 체크와 증가 사이에 다른 트랜잭션이 끼어들어 Lost Update 발생.
 
 **시나리오 예시**:
 - 모임 최대 인원: 3명
@@ -44,70 +43,25 @@
 ### 1.3 Before (문제 코드)
 
 ```java
-// MeetupService.joinMeetup() - 최적화 전
-@Transactional
-public MeetupParticipantsDTO joinMeetup(Long meetupIdx, String userId) {
-    Meetup meetup = meetupRepository.findById(meetupIdx)
-            .orElseThrow(() -> new RuntimeException("모임을 찾을 수 없습니다."));
-
-    // ... 사용자 확인 로직 ...
-
-    // ⚠️ Race Condition 발생 지점
-    if (!meetup.getOrganizer().getIdx().equals(userIdx)) {
-        // 1. 현재 인원 읽기
-        if (meetup.getCurrentParticipants() >= meetup.getMaxParticipants()) {
-            throw new RuntimeException("모임 인원이 가득 찼습니다.");
-        }
-        // 2. 여기서 다른 트랜잭션이 끼어들 수 있음!
-        // 3. 인원 증가
-        meetup.setCurrentParticipants(meetup.getCurrentParticipants() + 1);
-        meetupRepository.save(meetup);
-    }
-
-    // 참가자 추가
-    MeetupParticipants participant = MeetupParticipants.builder()
-            .meetup(meetup)
-            .user(user)
-            .joinedAt(LocalDateTime.now())
-            .build();
-
-    return participantsConverter.toDTO(meetupParticipantsRepository.save(participant));
+// ⚠️ Race Condition 발생 지점
+if (meetup.getCurrentParticipants() >= meetup.getMaxParticipants()) {
+    throw new RuntimeException("모임 인원이 가득 찼습니다.");
 }
+// 여기서 다른 트랜잭션이 끼어들 수 있음!
+meetup.setCurrentParticipants(meetup.getCurrentParticipants() + 1);
+meetupRepository.save(meetup);
 ```
 
-### 1.4 문제 발생 시나리오
-
-```
-시간 | 트랜잭션 A (사용자1)              | 트랜잭션 B (사용자2)              | 트랜잭션 C (사용자3)              | DB 상태
------|--------------------------------|--------------------------------|--------------------------------|----------
-T1   | currentParticipants 읽기 (1)   |                                 |                                 | 1
-T2   |                                 | currentParticipants 읽기 (1)   |                                 | 1
-T3   |                                 |                                 | currentParticipants 읽기 (1)   | 1
-T4   | 체크: 1 < 3 통과 ✅             |                                 |                                 | 1
-T5   |                                 | 체크: 1 < 3 통과 ✅             |                                 | 1
-T6   |                                 |                                 | 체크: 1 < 3 통과 ✅             | 1
-T7   | currentParticipants = 2 저장   |                                 |                                 | 2
-T8   | 참가자 추가                     |                                 |                                 | 2
-T9   | 커밋                            |                                 |                                 | 2
-T10  |                                 | currentParticipants = 2 저장   |                                 | 2 (Lost Update!)
-T11  |                                 | 참가자 추가                     |                                 | 2
-T12  |                                 | 커밋                            |                                 | 2
-T13  |                                 |                                 | currentParticipants = 2 저장   | 2 (Lost Update!)
-T14  |                                 |                                 | 참가자 추가                     | 2
-T15  |                                 |                                 | 커밋                            | 2
-결과: 3명 모두 참가 성공, currentParticipants = 2 (실제로는 4명 참가!)
-```
+**결과**: 3명이 동시 참가 시도 → 모두 체크 통과 → 4명 참가 (최대 3명 초과)
 
 ---
 
 ## 2. 해결 방법
 
-### 2.1 최종 적용: 원자적 UPDATE 쿼리 방식
+### 2.1 원자적 UPDATE 쿼리 방식
 
-#### Repository 메서드 추가
-
+**Repository 메서드**:
 ```java
-// MeetupRepository.java
 @Modifying
 @Query("UPDATE Meetup m SET m.currentParticipants = m.currentParticipants + 1 " +
        "WHERE m.idx = :meetupIdx " +
@@ -115,366 +69,115 @@ T15  |                                 |                                 | 커�
 int incrementParticipantsIfAvailable(@Param("meetupIdx") Long meetupIdx);
 ```
 
-#### Service 로직 수정
-
+**Service 로직**:
 ```java
-// MeetupService.joinMeetup() - 원자적 UPDATE 쿼리 적용
-@Transactional
-public MeetupParticipantsDTO joinMeetup(Long meetupIdx, String userId) {
-    // 모임 조회 (Lock 없이)
-    Meetup meetup = meetupRepository.findById(meetupIdx)
-            .orElseThrow(() -> new RuntimeException("모임을 찾을 수 없습니다."));
-
-    // ... 사용자 확인 로직 ...
-
-    // 주최자가 아닌 경우에만 인원 증가 (원자적 UPDATE 쿼리)
-    if (!meetup.getOrganizer().getIdx().equals(userIdx)) {
-        // 원자적 UPDATE 쿼리로 조건부 증가 (DB 레벨에서 체크 + 증가 동시 처리)
-        int updated = meetupRepository.incrementParticipantsIfAvailable(meetupIdx);
-        if (updated == 0) {
-            throw new RuntimeException("모임 인원이 가득 찼습니다.");
-        }
-        // 업데이트된 모임 정보 다시 조회
-        meetup = meetupRepository.findById(meetupIdx)
-                .orElseThrow(() -> new RuntimeException("모임을 찾을 수 없습니다."));
-    }
-
-    // 참가자 추가
-    MeetupParticipants participant = MeetupParticipants.builder()
-            .meetup(meetup)
-            .user(user)
-            .joinedAt(LocalDateTime.now())
-            .build();
-
-    return participantsConverter.toDTO(meetupParticipantsRepository.save(participant));
+// 원자적 UPDATE 쿼리로 조건부 증가 (DB 레벨에서 체크 + 증가 동시 처리)
+int updated = meetupRepository.incrementParticipantsIfAvailable(meetupIdx);
+if (updated == 0) {
+    throw new RuntimeException("모임 인원이 가득 찼습니다.");
 }
 ```
 
-#### 동작 방식
+**동작 방식**: DB 레벨에서 조건 체크와 증가를 원자적으로 처리하여 Race Condition 완전 방지
 
-- DB 레벨에서 조건부 UPDATE 쿼리 실행
-- `currentParticipants < maxParticipants` 조건을 만족하는 경우에만 증가
-- 조건 불만족 시 `updated = 0` 반환하여 인원 초과 처리
-- 원자적 연산으로 Race Condition 완전 방지
+### 2.2 DB 제약조건 추가 (이중 안전장치)
 
-#### DB 레벨 제약조건 추가 (이중 안전장치)
-
-원자적 UPDATE 쿼리로 Race Condition을 해결했지만, 방어적 프로그래밍 차원에서 DB 제약조건을 추가로 적용했습니다.
-
-**적용 SQL:**
 ```sql
 ALTER TABLE meetup 
 ADD CONSTRAINT chk_participants 
 CHECK (current_participants <= max_participants);
 ```
 
-**효과:**
-- 애플리케이션 로직을 우회하는 직접 SQL 실행 시에도 데이터 무결성 보장
-- 다른 서비스/배치 작업에서의 실수 방지
-- 데이터 마이그레이션 시 오류 방지
-- 예상치 못한 버그나 경로에서의 데이터 오염 방지
+**효과**: 애플리케이션 로직을 우회하는 직접 SQL 실행 시에도 데이터 무결성 보장
 
-**주의사항:**
-- MySQL 8.0.16 이상에서만 CHECK 제약조건이 적용됨
-- 8.0.16 미만 버전에서는 문법 오류 없이 무시됨
+**주의**: MySQL 8.0.16 이상에서만 적용됨
 
-### 2.2 선택 이유
+### 2.3 선택 이유
 
-#### 1. 프로젝트 일관성 확보 (가장 중요)
-- **Chat 도메인**: `incrementUnreadCount()` - 원자적 UPDATE 쿼리 사용
-- **User 도메인**: `incrementWarningCount()` - 원자적 UPDATE 쿼리 사용
-- **Meetup 도메인**: Pessimistic Lock 사용 → **일관성 부족**
-- **결정**: 프로젝트 전반의 동시성 제어 패턴 통일 필요
-
-#### 2. 확장성
-- **Pessimistic Lock**: 동시 접근 시 순차 처리 (병목 발생)
-- **원자적 UPDATE 쿼리**: 병렬 처리 가능 (성능 저하 최소화)
-
-#### 3. DB 레벨 보장
-- 조건부 업데이트로 안전성 확보
-- Lock 대기 시간 없음
-
-### 2.3 다른 해결 방법들 (참고)
-
-#### Pessimistic Lock
-- **장점**: 확실한 동시성 제어, 로컬 DB에서 빠름
-- **단점**: 프로젝트 일관성 부족, 순차 처리로 병목 가능
-- **적합**: 빠른 적용이 필요한 경우 (임시 해결책)
-
-#### Optimistic Lock
-- **장점**: 높은 동시성, Lock 대기 없음
-- **단점**: Entity 수정 필요, 재시도 로직 구현 필요
-- **적합**: 충돌 빈도가 낮을 때
-
-#### DB 제약조건
-- **장점**: 최종 안전장치 역할
-- **단점**: 단독 사용 시 Race Condition 발생 가능
-- **적합**: 다른 방법과 함께 이중 안전장치로 활용
-- **✅ 적용 완료**: 원자적 UPDATE 쿼리와 함께 CHECK 제약조건 적용
+1. **프로젝트 일관성**: Chat, User 도메인과 동일한 패턴 (가장 중요)
+2. **확장성**: 병렬 처리 가능 (Lock 대기 없음)
+3. **DB 레벨 보장**: 조건부 업데이트로 안전성 확보
 
 ---
 
-## 3. 결과
+## 3. 트랜잭션 개선: 핵심 도메인과 파생 도메인 분리
 
-### 3.1 After (해결 후) 시나리오
+### 3.1 문제 상황
 
-```
-시간 | 트랜잭션 A (사용자1)              | 트랜잭션 B (사용자2)              | 트랜잭션 C (사용자3)              | DB 상태
------|--------------------------------|--------------------------------|--------------------------------|----------
-T1   | UPDATE 실행 (조건 체크 + 증가)   | UPDATE 실행 (조건 체크 + 증가)   | UPDATE 실행 (조건 체크 + 증가)   | 1
-T2   | updated = 1 (성공) ✅           | 대기 (A 트랜잭션 완료 대기)      | 대기                              | 2
-T3   | 참가자 추가                     |                                 |                                 | 2
-T4   | 커밋                            |                                 |                                 | 2
-T5   |                                 | UPDATE 실행 (조건 체크 + 증가)   | 대기                              | 2
-T6   |                                 | updated = 1 (성공) ✅           |                                 | 3
-T7   |                                 | 참가자 추가                     |                                 | 3
-T8   |                                 | 커밋                            |                                 | 3
-T9   |                                 |                                 | UPDATE 실행 (조건 체크 + 증가)   | 3
-T10  |                                 |                                 | updated = 0 (실패) ❌            | 3
-T11  |                                 |                                 | 예외 발생                       | 3
-결과: 2명만 참가 성공, currentParticipants = 3 (정상!)
-```
+모임 생성 후 채팅방 생성 시도 시, 채팅방 생성 실패가 모임 생성까지 롤백하는 문제
 
-### 3.2 Before/After 비교
+**설계 원칙**: **파생 도메인은 실패해도 핵심 도메인을 롤백하면 안 된다.**
 
-| 항목 | Before (해결 전) | After (원자적 UPDATE 쿼리) |
-|------|------------------|---------------------------|
-| **Lost Update** | ✅ 발생 (4명 참가, 저장값 2) | ❌ 해결 (3명 참가, 저장값 3) |
-| **인원 초과** | ✅ 발생 (4명 > 최대 3명) | ❌ 해결 (3명 = 최대 3명) |
-| **데이터 일치** | ❌ 불일치 (실제 4명 ≠ 저장값 2) | ✅ 일치 (실제 3명 = 저장값 3) |
-| **성공/실패** | 3명 성공, 0명 실패 (잘못된 결과) | 2명 성공, 1명 실패 (정확한 결과) |
-| **처리 방식** | 동시 처리 (Race Condition) | 병렬 처리 (원자적 쿼리) |
-| **프로젝트 일관성** | - | ✅ 있음 (Chat/User와 동일) |
-| **확장성** | - | ✅ 병렬 처리 가능 |
+### 3.2 해결: 이벤트 기반 아키텍처
 
-### 3.3 실제 테스트 결과
-
-**테스트 환경:**
-- 동시 참가 시도: 10명
-- 테스트 횟수: 각 방식당 5회
-- 모임 최대 인원: 3명
-- DB 환경: 로컬 DB
-
-**Before (해결 전)**:
-```
-성공한 참가: 3명
-실패한 참가: 0명
-최종 currentParticipants: 2
-실제 참가자 수 (DB): 4
-최대 인원: 3
-
-⚠️ Race Condition 발생 확인!
-```
-
-**After (해결 후)**:
-```
-성공한 참가: 2명
-실패한 참가: 1명
-최종 currentParticipants: 3
-실제 참가자 수 (DB): 3
-최대 인원: 3
-
-✅ Race Condition 해결 확인!
-```
-
----
-
-## 4. 성능 비교
-
-### 4.1 실제 측정 결과 (로컬 DB 환경)
-
-**⚠️ 주의: 실제 테스트 결과는 환경에 따라 다를 수 있습니다.**
-
-| 항목 | Pessimistic Lock | 원자적 UPDATE 쿼리 | 비고 |
-|------|-----------------|-------------------|------|
-| **평균 처리 시간** (10명 동시) | **32.20ms** | 46.40ms | Pessimistic Lock이 더 빠름 |
-| **최소 처리 시간** | **3ms** | 15ms | Pessimistic Lock이 더 빠름 |
-| **최대 처리 시간** | 103ms | **92ms** | 원자적 UPDATE가 더 빠름 |
-| **쿼리 수** | 2개 (SELECT + UPDATE) | 3개 (SELECT + UPDATE + SELECT) | 원자적 UPDATE가 더 많음 |
-| **Lock 대기 시간** | 있음 (로컬에서는 거의 없음) | 없음 | - |
-| **동시성 안전성** | ✅ 보장 | ✅ 보장 | 동일 |
-| **프로젝트 일관성** | ❌ 없음 | ✅ 있음 | 개선 |
-
-### 4.2 성능 차이 원인 분석
-
-1. **쿼리 수 차이**:
-   - **Pessimistic Lock**: `findByIdWithLock` (1) + `save` (1) = **2개 쿼리**
-   - **원자적 UPDATE 쿼리**: `findById` (1) + `incrementParticipantsIfAvailable` (1) + `findById` (1, 재조회) = **3개 쿼리**
-   - 원자적 UPDATE 쿼리 방식이 주최자 확인과 업데이트 후 재조회로 인해 쿼리가 더 많음
-
-2. **로컬 DB 환경 특성**:
-   - 로컬 DB에서는 Lock 대기 시간이 거의 없어서 Pessimistic Lock의 단점이 드러나지 않음
-   - 실제 운영 환경(동시 접근이 많을 때)에서는 원자적 UPDATE 쿼리가 더 유리할 수 있음
-
-3. **병렬 처리 가능성**:
-   - **Pessimistic Lock**: 순차 처리 (Lock 대기)
-   - **원자적 UPDATE 쿼리**: 병렬 처리 가능 (Lock 대기 없음)
-   - 동시 접근이 많을수록 원자적 UPDATE 쿼리의 장점이 커짐
-
-### 4.3 결론
-
-**원자적 UPDATE 쿼리 방식 선택 이유:**
-
-1. ✅ **프로젝트 일관성**: Chat, User 도메인과 동일한 패턴 (**가장 중요**)
-2. ✅ **확장성**: 동시 접근이 많을 때 병렬 처리로 유리 (Lock 대기 없음)
-3. ✅ **코드 일관성**: 프로젝트 전반의 동시성 제어 패턴 통일
-
----
-
-## 5. 테스트
-
-### 5.1 테스트 파일 위치
-
-`backend/test/java/com/linkup/Petory/domain/meetup/service/MeetupServiceRaceConditionTest.java`
-
-### 5.2 테스트 실행 방법
-
-```bash
-# Before 테스트 (Race Condition 발생 확인)
-./gradlew test --tests MeetupServiceRaceConditionTest.testRaceConditionWithoutTransaction
-
-# After 테스트 (Race Condition 해결 확인)
-./gradlew test --tests MeetupServiceRaceConditionTest.testRaceConditionFixedWithPessimisticLock
-
-# 성능 비교 테스트
-./gradlew test --tests MeetupServiceRaceConditionTest.testPerformanceComparison
-
-# 모든 Race Condition 테스트 실행
-./gradlew test --tests MeetupServiceRaceConditionTest
-```
-
----
-
-## 6. 트랜잭션 개선: 핵심 도메인과 파생 도메인 분리
-
-### 6.1 문제 상황
-
-**위치**: `MeetupService.createMeetup()` (line 86-105)
-
-**초기 문제점**:
-- 모임 생성 후 채팅방 생성 시도
-- 채팅방 생성 실패 시 try-catch로 예외를 잡아서 트랜잭션이 롤백되지 않음
-- 결과: 채팅방 생성 실패해도 모임만 생성됨 → 데이터 일관성 문제
-
-**Before (문제 코드)**:
+**모임 생성 (핵심 도메인)**:
 ```java
 @Transactional
 public MeetupDTO createMeetup(...) {
     Meetup savedMeetup = meetupRepository.save(meetup);
     
-    // 채팅방 생성 시도
+    // 이벤트 발행 (트랜잭션 커밋 후 비동기 처리)
+    eventPublisher.publishEvent(new MeetupCreatedEvent(...));
+    
+    return converter.toDTO(savedMeetup);
+}
+```
+
+**채팅방 생성 (파생 도메인)**:
+```java
+@EventListener
+@Async
+@Transactional(propagation = Propagation.REQUIRES_NEW)
+public void handleMeetupCreated(MeetupCreatedEvent event) {
     try {
         conversationService.createConversation(...);
         conversationService.setParticipantRole(...);
     } catch (Exception e) {
-        log.error("모임 채팅방 생성 실패: ...");
-        // ⚠️ 채팅방 생성 실패해도 모임 생성은 성공으로 처리
-    }
-    
-    return converter.toDTO(savedMeetup);
-}
-```
-
-### 6.2 설계 원칙: 핵심 도메인과 파생 도메인 분리
-
-**핵심 개념**:
-- **모임 생성**: 핵심 도메인 (Core Domain) - 사용자의 핵심 요구사항
-- **채팅방 생성**: 파생 도메인 (Supporting Domain) - 모임의 부가 기능
-
-**설계 원칙**:
-> **파생 도메인은 실패해도 핵심 도메인을 롤백하면 안 된다.**
-
-**이유**:
-1. 사용자 경험: 채팅방 문제로 모임을 만들 수 없으면 사용자 불만 증가
-2. 확장성: 다른 부가 기능 추가 시 동일한 문제 발생 가능
-
-### 6.3 해결: 이벤트 기반 아키텍처 (Event-Driven Architecture)
-
-**적용**: 이벤트 발행 방식으로 핵심 도메인과 파생 도메인 분리
-
-**After (해결 코드)**:
-
-#### 1. 모임 생성 (핵심 도메인 - 단독 트랜잭션)
-```java
-@Transactional
-public MeetupDTO createMeetup(...) {
-    Meetup savedMeetup = meetupRepository.save(meetup);
-    
-    // 모임 생성 완료 이벤트 발행 (트랜잭션 커밋 후 비동기로 채팅방 생성 처리)
-    eventPublisher.publishEvent(new MeetupCreatedEvent(
-            this,
-            savedMeetup.getIdx(),
-            organizer.getIdx(),
-            savedMeetup.getTitle()
-    ));
-    
-    log.info("모임 생성 완료: meetupIdx={}, organizer={}", savedMeetup.getIdx(), userId);
-    return converter.toDTO(savedMeetup);
-}
-```
-
-#### 2. 이벤트 리스너 (파생 도메인 - 별도 트랜잭션)
-```java
-@Component
-@RequiredArgsConstructor
-public class MeetupChatRoomEventListener {
-    
-    private final ConversationService conversationService;
-    
-    @EventListener
-    @Async
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void handleMeetupCreated(MeetupCreatedEvent event) {
-        try {
-            // 채팅방 생성 (별도 트랜잭션)
-            conversationService.createConversation(...);
-            conversationService.setParticipantRole(...);
-        } catch (Exception e) {
-            // 채팅방 생성 실패해도 모임은 이미 생성됨 (롤백되지 않음)
-            log.error("모임 채팅방 생성 실패: meetupIdx={}", event.getMeetupIdx(), e);
-            // TODO: 재시도 메커니즘 추가
-        }
+        // 채팅방 생성 실패해도 모임은 이미 생성됨 (롤백되지 않음)
+        log.error("채팅방 생성 실패: meetupIdx={}", event.getMeetupIdx(), e);
     }
 }
 ```
 
 **효과**:
-- ✅ 핵심 도메인 보장: 모임 생성은 항상 성공 (채팅방 문제와 무관)
-- ✅ 사용자 경험 개선: 모임 생성은 즉시 성공, 채팅방은 비동기로 생성
-- ✅ 확장성: 다른 부가 기능도 이벤트 리스너로 쉽게 추가 가능
-- ✅ 독립적 처리: 채팅방 생성 실패가 모임 생성에 영향 없음
-- ✅ 재시도 가능: 채팅방 생성 실패 시 나중에 재시도 가능
+- ✅ 핵심 도메인 보장: 모임 생성은 항상 성공
+- ✅ 사용자 경험 개선: 모임 생성 즉시 응답, 채팅방은 비동기 생성
+- ✅ 확장성: 다른 부가 기능도 이벤트 리스너로 추가 가능
 
 **구현 파일**:
 - `MeetupCreatedEvent.java`: 이벤트 클래스
 - `MeetupChatRoomEventListener.java`: 이벤트 리스너
-- `MeetupService.java`: 이벤트 발행 로직
-
-**주의사항**:
-- `@EnableAsync` 설정 필요 (이미 적용됨)
-- 채팅방 생성 실패 시 재시도 메커니즘 고려 (스케줄러 등)
 
 ---
 
-## 7. 핵심 포인트
+## 4. 결과
 
-### 7.1 적용 가능한 패턴
+### 4.1 Before/After 비교
 
-- **원자적 UPDATE 쿼리 패턴**: 조건부 업데이트가 필요한 경우 (권장) ✅ 적용됨
-- **Pessimistic Lock 패턴**: 동시 접근이 빈번하고 데이터 정합성이 중요한 경우
-- **Optimistic Lock 패턴**: 충돌 빈도가 낮고 성능이 중요한 경우
-- **DB 제약조건 패턴**: 최종 안전망으로 항상 적용 ✅ 적용됨
+| 항목 | Before | After |
+|------|--------|-------|
+| **Lost Update** | ✅ 발생 (4명 참가) | ❌ 해결 (3명 참가) |
+| **인원 초과** | ✅ 발생 | ❌ 해결 |
+| **데이터 일치** | ❌ 불일치 | ✅ 일치 |
+| **프로젝트 일관성** | - | ✅ 있음 |
 
-### 7.2 로깅 전략
+### 4.2 테스트 결과
 
-**데이터 정합성 문제이므로 다음 로그를 남깁니다**:
+**Before**: 3명 성공, 0명 실패 → 실제 4명 참가 (최대 3명 초과)  
+**After**: 2명 성공, 1명 실패 → 실제 3명 참가 (정상)
 
-1. **동시성 감지 로그**: 참가 시도 시작 시점, 인원 체크 전 상태
-2. **Race Condition 위험 경고**: 남은 자리가 1개 이하일 때 경고
-3. **데이터 정합성 검증 로그**: `currentParticipants`와 실제 참가자 수 불일치 감지
-4. **성능 모니터링 로그**: 소요 시간 측정 및 로깅
+**테스트 파일**: `MeetupServiceRaceConditionTest.java`
 
-**로그 레벨**:
-- `INFO`: 정상 흐름 (참가 시작, 체크, 증가, 완료)
-- `WARN`: 예상 가능한 실패 (인원 초과, 이메일 인증 필요 등)
-- `ERROR`: 데이터 정합성 문제 (Race Condition 발생, 데이터 불일치)
+---
+
+## 5. 핵심 포인트
+
+### 적용된 패턴
+- ✅ **원자적 UPDATE 쿼리**: 조건부 업데이트가 필요한 경우
+- ✅ **DB 제약조건**: 최종 안전망
+- ✅ **이벤트 기반 아키텍처**: 핵심 도메인과 파생 도메인 분리
+
+### 로깅 전략
+- `INFO`: 정상 흐름
+- `WARN`: 예상 가능한 실패 (인원 초과 등)
+- `ERROR`: 데이터 정합성 문제

@@ -14,11 +14,15 @@ import com.linkup.Petory.domain.user.entity.Users;
 @Repository
 public interface UsersRepository extends JpaRepository<Users, Long> {
 
-    Optional<Users> findByUsername(String username);
+    // 탈퇴하지 않은 사용자만 조회 (Soft Delete 필터링)
+    @Query("SELECT u FROM Users u WHERE u.username = :username AND (u.isDeleted = false OR u.isDeleted IS NULL)")
+    Optional<Users> findByUsername(@Param("username") String username);
 
-    Optional<Users> findByNickname(String nickname);
+    @Query("SELECT u FROM Users u WHERE u.nickname = :nickname AND (u.isDeleted = false OR u.isDeleted IS NULL)")
+    Optional<Users> findByNickname(@Param("nickname") String nickname);
 
-    Optional<Users> findByEmail(String email);
+    @Query("SELECT u FROM Users u WHERE u.email = :email AND (u.isDeleted = false OR u.isDeleted IS NULL)")
+    Optional<Users> findByEmail(@Param("email") String email);
 
     // 로그인용 아이디(String 타입 id 필드)로 조회
     @Query("SELECT u FROM Users u WHERE u.id = :id")

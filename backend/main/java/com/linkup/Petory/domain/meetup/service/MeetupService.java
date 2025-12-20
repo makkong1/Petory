@@ -1,8 +1,5 @@
 package com.linkup.Petory.domain.meetup.service;
 
-import com.linkup.Petory.domain.chat.entity.ConversationType;
-import com.linkup.Petory.domain.chat.entity.ParticipantRole;
-import com.linkup.Petory.domain.chat.entity.RelatedType;
 import com.linkup.Petory.domain.chat.service.ConversationService;
 import com.linkup.Petory.domain.meetup.converter.MeetupConverter;
 import com.linkup.Petory.domain.meetup.converter.MeetupParticipantsConverter;

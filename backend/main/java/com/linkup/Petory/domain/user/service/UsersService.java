@@ -5,6 +5,7 @@ import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -139,7 +140,26 @@ public class UsersService {
         boolean preVerified = emailVerificationService.isPreRegistrationEmailVerified(dto.getEmail());
         user.setEmailVerified(preVerified); // 회원가입 전 인증 완료했으면 true, 아니면 false
 
-        Users saved = usersRepository.save(user);
+        Users saved;
+        try {
+            saved = usersRepository.save(user);
+        } catch (DataIntegrityViolationException e) {
+            // DB Unique 제약조건 위반 (Race Condition 발생 시)
+            String errorMessage = e.getMessage();
+            if (errorMessage != null) {
+                if (errorMessage.contains("nickname") || errorMessage.contains("nick_name")) {
+                    throw new RuntimeException("이미 사용 중인 닉네임입니다.");
+                } else if (errorMessage.contains("username") || errorMessage.contains("user_name")) {
+                    throw new RuntimeException("이미 사용 중인 사용자명입니다.");
+                } else if (errorMessage.contains("email")) {
+                    throw new RuntimeException("이미 사용 중인 이메일입니다.");
+                } else if (errorMessage.contains("id")) {
+                    throw new RuntimeException("이미 사용 중인 아이디입니다.");
+                }
+            }
+            // 알 수 없는 제약조건 위반
+            throw new RuntimeException("이미 사용 중인 정보가 있습니다. 다른 값을 사용해주세요.", e);
+        }
 
         // 회원가입 전 이메일 인증을 완료한 경우 Redis에서 인증 상태 삭제
         if (preVerified) {
