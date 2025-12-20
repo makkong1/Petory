@@ -59,8 +59,15 @@ public interface MeetupRepository extends JpaRepository<Meetup, Long> {
                         @Param("lng") Double lng,
                         @Param("radius") Double radius);
 
-        // ✅ Pessimistic Lock으로 동시 접근 방지 (Race Condition 해결)
+        // ✅ Pessimistic Lock으로 동시 접근 방지 (Race Condition 해결) - 레거시 방식
         @Lock(LockModeType.PESSIMISTIC_WRITE)
         @Query("SELECT m FROM Meetup m WHERE m.idx = :idx")
         Optional<Meetup> findByIdWithLock(@Param("idx") Long idx);
+
+        // ✅ 원자적 UPDATE 쿼리로 동시 접근 방지 (Race Condition 해결) - 권장 방식
+        @org.springframework.data.jpa.repository.Modifying
+        @Query("UPDATE Meetup m SET m.currentParticipants = m.currentParticipants + 1 " +
+                        "WHERE m.idx = :meetupIdx " +
+                        "  AND m.currentParticipants < m.maxParticipants")
+        int incrementParticipantsIfAvailable(@Param("meetupIdx") Long meetupIdx);
 }
