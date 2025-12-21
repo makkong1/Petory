@@ -27,6 +27,7 @@ public class ReportConverter {
                 .adminNote(report.getAdminNote())
                 .createdAt(report.getCreatedAt())
                 .updatedAt(report.getUpdatedAt())
+                .reportCount(null) // 신고 횟수는 서비스 레이어에서 계산
                 .build();
     }
 }

@@ -26,5 +26,6 @@ public class ReportDTO {
     String adminNote;
     LocalDateTime createdAt;
     LocalDateTime updatedAt;
+    Integer reportCount; // 같은 target에 대한 총 신고 횟수 (null 가능)
 }
 

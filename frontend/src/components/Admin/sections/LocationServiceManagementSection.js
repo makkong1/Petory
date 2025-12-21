@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import styled from 'styled-components';
 import { locationServiceApi } from '../../../api/locationServiceApi';
 
-const LocationServiceList = () => {
+const LocationServiceManagementSection = () => {
   const [sido, setSido] = useState('');
   const [sigungu, setSigungu] = useState('');
   const [category, setCategory] = useState('');
@@ -10,6 +10,11 @@ const LocationServiceList = () => {
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [importLoading, setImportLoading] = useState(false);
+  const [result, setResult] = useState(null);
+  const [importError, setImportError] = useState(null);
+  const fileInputRef = useRef(null);
 
   const fetchServices = useCallback(async () => {
     try {
@@ -20,7 +25,7 @@ const LocationServiceList = () => {
       if (sigungu) params.sigungu = sigungu;
       if (category) params.category = category;
       if (q) params.q = q;
-      
+
       const res = await locationServiceApi.listLocationServices(params);
       setServices(res.data?.services || []);
     } catch (e) {
@@ -35,8 +40,103 @@ const LocationServiceList = () => {
     fetchServices();
   }, [fetchServices]);
 
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (!file.name.endsWith('.csv')) {
+        alert('CSV 파일만 업로드 가능합니다.');
+        return;
+      }
+      setSelectedFile(file);
+      setImportError(null);
+      setResult(null);
+    }
+  };
+
+  const handleImport = async () => {
+    if (!selectedFile) {
+      alert('CSV 파일을 선택해주세요.');
+      return;
+    }
+
+    setImportLoading(true);
+    setImportError(null);
+    setResult(null);
+
+    try {
+      const response = await locationServiceApi.importPublicData(selectedFile);
+      setResult(response.data);
+      alert(`임포트 완료!\n총 읽음: ${response.data.totalRead}\n저장: ${response.data.saved}\n중복: ${response.data.duplicate}\n스킵: ${response.data.skipped}\n에러: ${response.data.error}`);
+      // 파일 선택 초기화
+      setSelectedFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      // 목록 새로고침
+      fetchServices();
+    } catch (err) {
+      setImportError(err?.response?.data?.message || err.message || '임포트 실패');
+      alert('임포트 실패: ' + (err?.response?.data?.message || err.message));
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
   return (
-    <>
+    <Wrapper>
+      <Header>
+        <Title>지역 서비스 관리</Title>
+        <Subtitle>등록된 장소, 리뷰, 외부 API 캐시를 관리합니다.</Subtitle>
+      </Header>
+
+      <Card>
+        <CardTitle>공공데이터 CSV 임포트</CardTitle>
+        <CardDescription>
+          공공데이터 포털에서 제공하는 반려동물 관련 시설 정보 CSV 파일을 임포트합니다.
+          <br />
+          CSV 파일 형식: 시설명,카테고리1,카테고리2,카테고리3,시도명칭,시군구명칭,법정읍면동명칭,리명칭,번지,도로명이름,건물번호,위도,경도,우편번호,도로명주소,지번주소,전화번호,홈페이지,휴무일,운영시간,주차가능여부,입장가격정보,반려동물동반가능정보,반려동물전용정보,입장가능동물크기,반려동물제한사항,장소실내여부,장소실외여부,기본정보장소설명,애견동반추가요금,최종작성일
+        </CardDescription>
+
+        <FormGroup>
+          <FormLabel>CSV 파일 선택</FormLabel>
+          <FileInputWrapper>
+            <FileInput
+              type="file"
+              accept=".csv"
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              disabled={importLoading}
+            />
+            {selectedFile && (
+              <FileInfo>
+                선택된 파일: <strong>{selectedFile.name}</strong> ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
+              </FileInfo>
+            )}
+          </FileInputWrapper>
+        </FormGroup>
+
+        <ButtonGroup>
+          <ImportButton onClick={handleImport} disabled={importLoading || !selectedFile}>
+            {importLoading ? '임포트 중...' : 'CSV 파일 임포트'}
+          </ImportButton>
+        </ButtonGroup>
+
+        {importError && <ErrorMessage>{importError}</ErrorMessage>}
+
+        {result && (
+          <ResultBox>
+            <ResultTitle>임포트 결과</ResultTitle>
+            <ResultList>
+              <ResultItem>총 읽은 라인: <strong>{result.totalRead}</strong></ResultItem>
+              <ResultItem>저장된 개수: <strong>{result.saved}</strong></ResultItem>
+              <ResultItem>중복 스킵: <strong>{result.duplicate}</strong></ResultItem>
+              <ResultItem>검증 실패 스킵: <strong>{result.skipped}</strong></ResultItem>
+              <ResultItem>에러 발생: <strong>{result.error}</strong></ResultItem>
+            </ResultList>
+          </ResultBox>
+        )}
+      </Card>
+
       <Filters>
         <Group>
           <Label>시도</Label>
@@ -75,147 +175,39 @@ const LocationServiceList = () => {
         </Group>
       </Filters>
 
-      {loading && services.length === 0 ? (
-        <Info>로딩 중...</Info>
-      ) : error ? (
-        <Info>{error}</Info>
-      ) : services.length === 0 ? (
-        <Info>데이터가 없습니다.</Info>
-      ) : (
-        <Table>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>시설명</th>
-              <th>카테고리</th>
-              <th>주소</th>
-              <th>전화번호</th>
-              <th>평점</th>
-            </tr>
-          </thead>
-          <tbody>
-            {services.map((service) => (
-              <tr key={service.idx}>
-                <td>{service.idx}</td>
-                <td className="ellipsis">{service.name || '-'}</td>
-                <td>{service.category3 || service.category2 || service.category1 || '-'}</td>
-                <td className="ellipsis">{service.address || '-'}</td>
-                <td>{service.phone || '-'}</td>
-                <td>{service.rating || '-'}</td>
+      <Card>
+        {loading && services.length === 0 ? (
+          <Info>로딩 중...</Info>
+        ) : error ? (
+          <Info>{error}</Info>
+        ) : services.length === 0 ? (
+          <Info>데이터가 없습니다.</Info>
+        ) : (
+          <Table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>시설명</th>
+                <th>카테고리</th>
+                <th>주소</th>
+                <th>전화번호</th>
+                <th>평점</th>
               </tr>
-            ))}
-          </tbody>
-        </Table>
-      )}
-    </>
-  );
-};
-
-const LocationServiceManagementSection = () => {
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState(null);
-  const [error, setError] = useState(null);
-  const fileInputRef = useRef(null);
-
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      if (!file.name.endsWith('.csv')) {
-        alert('CSV 파일만 업로드 가능합니다.');
-        return;
-      }
-      setSelectedFile(file);
-      setError(null);
-      setResult(null);
-    }
-  };
-
-  const handleImport = async () => {
-    if (!selectedFile) {
-      alert('CSV 파일을 선택해주세요.');
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    setResult(null);
-
-    try {
-      const response = await locationServiceApi.importPublicData(selectedFile);
-      setResult(response.data);
-      alert(`임포트 완료!\n총 읽음: ${response.data.totalRead}\n저장: ${response.data.saved}\n중복: ${response.data.duplicate}\n스킵: ${response.data.skipped}\n에러: ${response.data.error}`);
-      // 파일 선택 초기화
-      setSelectedFile(null);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    } catch (err) {
-      setError(err?.response?.data?.message || err.message || '임포트 실패');
-      alert('임포트 실패: ' + (err?.response?.data?.message || err.message));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <Wrapper>
-      <Header>
-        <Title>지역 서비스 관리</Title>
-        <Subtitle>등록된 장소, 리뷰, 외부 API 캐시를 관리합니다.</Subtitle>
-      </Header>
-
-      <Card>
-        <CardTitle>공공데이터 CSV 임포트</CardTitle>
-        <CardDescription>
-          공공데이터 포털에서 제공하는 반려동물 관련 시설 정보 CSV 파일을 임포트합니다.
-          <br />
-          CSV 파일 형식: 시설명,카테고리1,카테고리2,카테고리3,시도명칭,시군구명칭,법정읍면동명칭,리명칭,번지,도로명이름,건물번호,위도,경도,우편번호,도로명주소,지번주소,전화번호,홈페이지,휴무일,운영시간,주차가능여부,입장가격정보,반려동물동반가능정보,반려동물전용정보,입장가능동물크기,반려동물제한사항,장소실내여부,장소실외여부,기본정보장소설명,애견동반추가요금,최종작성일
-        </CardDescription>
-        
-        <FormGroup>
-          <FormLabel>CSV 파일 선택</FormLabel>
-          <FileInputWrapper>
-            <FileInput
-              type="file"
-              accept=".csv"
-              ref={fileInputRef}
-              onChange={handleFileChange}
-              disabled={loading}
-            />
-            {selectedFile && (
-              <FileInfo>
-                선택된 파일: <strong>{selectedFile.name}</strong> ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
-              </FileInfo>
-            )}
-          </FileInputWrapper>
-        </FormGroup>
-
-        <ButtonGroup>
-          <ImportButton onClick={handleImport} disabled={loading || !selectedFile}>
-            {loading ? '임포트 중...' : 'CSV 파일 임포트'}
-          </ImportButton>
-        </ButtonGroup>
-
-        {error && <ErrorMessage>{error}</ErrorMessage>}
-        
-        {result && (
-          <ResultBox>
-            <ResultTitle>임포트 결과</ResultTitle>
-            <ResultList>
-              <ResultItem>총 읽은 라인: <strong>{result.totalRead}</strong></ResultItem>
-              <ResultItem>저장된 개수: <strong>{result.saved}</strong></ResultItem>
-              <ResultItem>중복 스킵: <strong>{result.duplicate}</strong></ResultItem>
-              <ResultItem>검증 실패 스킵: <strong>{result.skipped}</strong></ResultItem>
-              <ResultItem>에러 발생: <strong>{result.error}</strong></ResultItem>
-            </ResultList>
-          </ResultBox>
+            </thead>
+            <tbody>
+              {services.map((service) => (
+                <tr key={service.idx}>
+                  <td>{service.idx}</td>
+                  <td className="ellipsis">{service.name || '-'}</td>
+                  <td>{service.category3 || service.category2 || service.category1 || '-'}</td>
+                  <td className="ellipsis">{service.address || '-'}</td>
+                  <td>{service.phone || '-'}</td>
+                  <td>{service.rating || '-'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
         )}
-      </Card>
-
-      <Card>
-        <CardTitle>장소 목록</CardTitle>
-        <LocationServiceList />
       </Card>
     </Wrapper>
   );
@@ -259,7 +251,7 @@ const Label = styled.span`
 `;
 
 const Input = styled.input`
-  width: 150px;
+  width: 240px;
   padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.sm};
   border: 1px solid ${props => props.theme.colors.border};
   border-radius: ${props => props.theme.borderRadius.sm};
@@ -286,7 +278,7 @@ const Table = styled.table`
   font-size: ${props => props.theme.typography.caption.fontSize};
   th, td { padding: 8px 10px; border-bottom: 1px solid ${props => props.theme.colors.border}; }
   th { color: ${props => props.theme.colors.text}; text-align: left; white-space: nowrap; }
-  td.ellipsis { max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  td.ellipsis { max-width: 420px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 `;
 
 const Info = styled.div`
@@ -296,11 +288,10 @@ const Info = styled.div`
 `;
 
 const Card = styled.div`
-  background: ${props => props.theme.colors.surface};
-  border: 1px solid ${props => props.theme.colors.border};
   border-radius: ${props => props.theme.borderRadius.md};
+  border: 1px solid ${props => props.theme.colors.border};
   padding: ${props => props.theme.spacing.lg};
-  margin-bottom: ${props => props.theme.spacing.lg};
+  background: ${props => props.theme.colors.surface};
 `;
 
 const CardTitle = styled.h3`
