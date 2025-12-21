@@ -53,9 +53,12 @@ public class LocationServiceService {
             String category,
             Integer maxResults) {
 
+        long methodStartTime = System.currentTimeMillis();
+
         List<com.linkup.Petory.domain.location.entity.LocationService> services;
 
         // 지역 계층 우선순위에 따라 조회
+        long queryStartTime = System.currentTimeMillis();
         if (StringUtils.hasText(roadName)) {
             services = locationServiceRepository.findByRoadName(roadName);
             log.debug("도로명 검색: roadName={}, 결과={}개", roadName, services.size());
@@ -73,8 +76,12 @@ public class LocationServiceService {
             services = locationServiceRepository.findByOrderByRatingDesc();
             log.debug("전체 조회: 결과={}개", services.size());
         }
+        long queryTime = System.currentTimeMillis() - queryStartTime;
+        log.info("⏱️  [성능 측정] DB 쿼리 실행 시간: {}ms, 조회된 레코드 수: {}개", queryTime, services.size());
 
         // 카테고리 필터링
+        long filterStartTime = System.currentTimeMillis();
+        long filterTime = 0;
         if (StringUtils.hasText(category) && !services.isEmpty()) {
             String categoryLower = category.toLowerCase(Locale.ROOT).trim();
             services = services.stream()
@@ -103,7 +110,8 @@ public class LocationServiceService {
                         return false;
                     })
                     .collect(Collectors.toList());
-            log.debug("카테고리 필터링 후: category={}, 결과={}개", category, services.size());
+            filterTime = System.currentTimeMillis() - filterStartTime;
+            log.info("⏱️  [성능 측정] 카테고리 필터링 시간: {}ms, 필터링 후 결과 수: {}개", filterTime, services.size());
         }
 
         // 최대 결과 수 제한 (null이거나 0이면 제한 없음)
@@ -117,9 +125,104 @@ public class LocationServiceService {
         }
 
         // DTO로 변환
-        return services.stream()
+        long dtoConvertStartTime = System.currentTimeMillis();
+        List<LocationServiceDTO> result = services.stream()
                 .map(locationServiceConverter::toDTO)
                 .collect(Collectors.toList());
+        long dtoConvertTime = System.currentTimeMillis() - dtoConvertStartTime;
+        log.info("⏱️  [성능 측정] DTO 변환 시간: {}ms, 변환된 레코드 수: {}개", dtoConvertTime, result.size());
+
+        long totalTime = System.currentTimeMillis() - methodStartTime;
+        log.info("✅ [성능 측정] searchLocationServicesByRegion 전체 시간: {}ms (쿼리: {}ms, 필터링: {}ms, DTO변환: {}ms)",
+                totalTime, queryTime, filterTime, dtoConvertTime);
+
+        return result;
+    }
+
+    /**
+     * 위치 기반 서비스 조회 (반경 검색)
+     * 
+     * @param latitude       위도
+     * @param longitude      경도
+     * @param radiusInMeters 반경 (미터 단위)
+     * @param category       카테고리 (선택)
+     * @param maxResults     최대 결과 수 (선택)
+     * @return 검색 결과
+     */
+    public List<LocationServiceDTO> searchLocationServicesByLocation(
+            Double latitude,
+            Double longitude,
+            Integer radiusInMeters,
+            String category,
+            Integer maxResults) {
+
+        long methodStartTime = System.currentTimeMillis();
+        log.info("📍 [위치 기반 검색] 시작 - latitude={}, longitude={}, radius={}m, category={}",
+                latitude, longitude, radiusInMeters, category);
+
+        // 반경 검색 수행
+        long queryStartTime = System.currentTimeMillis();
+        List<com.linkup.Petory.domain.location.entity.LocationService> services = locationServiceRepository
+                .findByRadius(latitude, longitude, (double) radiusInMeters);
+        long queryTime = System.currentTimeMillis() - queryStartTime;
+        log.info("⏱️  [성능 측정] 위치 기반 DB 쿼리 실행 시간: {}ms, 조회된 레코드 수: {}개", queryTime, services.size());
+
+        // 카테고리 필터링
+        long filterStartTime = System.currentTimeMillis();
+        long filterTime = 0;
+        if (StringUtils.hasText(category) && !services.isEmpty()) {
+            String categoryLower = category.toLowerCase(Locale.ROOT).trim();
+            services = services.stream()
+                    .filter(service -> {
+                        // category3 우선 확인
+                        if (service.getCategory3() != null) {
+                            String cat3 = service.getCategory3().toLowerCase(Locale.ROOT).trim();
+                            if (cat3.equals(categoryLower)) {
+                                return true;
+                            }
+                        }
+                        // category2 확인
+                        if (service.getCategory2() != null) {
+                            String cat2 = service.getCategory2().toLowerCase(Locale.ROOT).trim();
+                            if (cat2.equals(categoryLower)) {
+                                return true;
+                            }
+                        }
+                        // category1 확인
+                        if (service.getCategory1() != null) {
+                            String cat1 = service.getCategory1().toLowerCase(Locale.ROOT).trim();
+                            if (cat1.equals(categoryLower)) {
+                                return true;
+                            }
+                        }
+                        return false;
+                    })
+                    .collect(Collectors.toList());
+            filterTime = System.currentTimeMillis() - filterStartTime;
+            log.info("⏱️  [성능 측정] 카테고리 필터링 시간: {}ms, 필터링 후 결과 수: {}개", filterTime, services.size());
+        }
+
+        // 최대 결과 수 제한 (null이거나 0이면 제한 없음)
+        if (maxResults != null && maxResults > 0) {
+            services = services.stream()
+                    .limit(maxResults)
+                    .collect(Collectors.toList());
+            log.debug("결과 수 제한: maxResults={}, 제한 후={}개", maxResults, services.size());
+        }
+
+        // DTO로 변환
+        long dtoConvertStartTime = System.currentTimeMillis();
+        List<LocationServiceDTO> result = services.stream()
+                .map(locationServiceConverter::toDTO)
+                .collect(Collectors.toList());
+        long dtoConvertTime = System.currentTimeMillis() - dtoConvertStartTime;
+        log.info("⏱️  [성능 측정] DTO 변환 시간: {}ms, 변환된 레코드 수: {}개", dtoConvertTime, result.size());
+
+        long totalTime = System.currentTimeMillis() - methodStartTime;
+        log.info("✅ [성능 측정] searchLocationServicesByLocation 전체 시간: {}ms (쿼리: {}ms, 필터링: {}ms, DTO변환: {}ms)",
+                totalTime, queryTime, filterTime, dtoConvertTime);
+
+        return result;
     }
 
     /**

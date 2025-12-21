@@ -27,23 +27,40 @@ public class GeocodingController {
      */
     @GetMapping("/address")
     public ResponseEntity<Map<String, Object>> addressToCoordinates(@RequestParam String address) {
+        // URL 디코딩 및 + 문자를 공백으로 변환
+        if (address != null) {
+            // + 문자가 있으면 공백으로 변환 (URL 인코딩에서 +는 공백을 의미)
+            address = address.replace("+", " ");
+            // URL 디코딩 (이미 Spring이 자동으로 디코딩하지만 확실하게)
+            try {
+                address = java.net.URLDecoder.decode(address, "UTF-8");
+            } catch (java.io.UnsupportedEncodingException e) {
+                log.warn("주소 디코딩 실패: {}", e.getMessage());
+            }
+        }
+        log.info("🚀 [지오코딩] 요청 수신 - 원본 주소: {}", address);
+        log.info("🚀 [지오코딩] 주소 길이: {}, 공백 포함 여부: {}", address != null ? address.length() : 0,
+                address != null && address.contains(" "));
+        log.info("🚀 [지오코딩] NaverMapService 호출 시작");
         try {
             Double[] coordinates = naverMapService.addressToCoordinates(address);
+            log.info("🚀 [지오코딩] NaverMapService 호출 완료 - 결과: {}", coordinates != null ? "성공" : "null");
 
             Map<String, Object> response = new HashMap<>();
             if (coordinates != null && coordinates.length == 2) {
                 response.put("latitude", coordinates[0]);
                 response.put("longitude", coordinates[1]);
                 response.put("success", true);
+                log.info("✅ 지오코딩 성공 - 주소: {}, 좌표: ({}, {})", address, coordinates[0], coordinates[1]);
             } else {
                 response.put("success", false);
                 response.put("message", "주소를 좌표로 변환할 수 없습니다. 네이버 클라우드 플랫폼에서 Geocoding API 구독이 필요할 수 있습니다.");
-                log.warn("주소 변환 실패 - 주소: {}, 좌표: {}", address, coordinates);
+                log.warn("⚠️ 주소 변환 실패 - 주소: {}, 좌표: {}", address, coordinates);
             }
 
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            log.error("주소 변환 실패: {}", e.getMessage(), e);
+            log.error("❌ 주소 변환 실패 - 주소: {}, 에러: {}", address, e.getMessage(), e);
             Map<String, Object> response = new HashMap<>();
             response.put("success", false);
             response.put("error", e.getMessage());

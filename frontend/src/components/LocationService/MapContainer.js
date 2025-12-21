@@ -85,6 +85,9 @@ const MapContainer = React.forwardRef(
           minZoom: 1, // 최소 줌 레벨 (최대 축소)
           maxZoom: 21, // 최대 줌 레벨 (최대 확대)
           zoomControl: false, // 기본 컨트롤 비활성화 (커스텀 버튼 사용)
+          logoControl: false, // 네이버맵 로고 숨기기
+          mapDataControl: false, // 지도 데이터 컨트롤 숨기기
+          scaleControl: false, // 스케일 컨트롤 숨기기
           scrollWheel: false, // 마우스 휠 확대/축소 비활성화
           disableDoubleClickZoom: false, // 더블클릭 확대 활성화
           disableDoubleClick: false,
@@ -95,6 +98,18 @@ const MapContainer = React.forwardRef(
         lastProgrammaticCenterRef.current = initial;
         mapReadyRef.current = true;
         setMapReady(true);
+
+        // 네이버맵 로고 및 저작권 표시 숨기기 (지도 로드 후)
+        setTimeout(() => {
+          const copyrightElements = mapRef.current?.querySelectorAll('.nmap_copyright, .nmap_logo, [class*="nmap"][class*="copyright"], [class*="nmap"][class*="logo"]');
+          if (copyrightElements) {
+            copyrightElements.forEach((el) => {
+              if (el instanceof HTMLElement) {
+                el.style.display = 'none';
+              }
+            });
+          }
+        }, 500);
 
         // 지도 이벤트 리스너 등록
         window.naver.maps.Event.addListener(map, 'dragstart', () => {
@@ -515,6 +530,23 @@ const MapDiv = styled.div`
   min-height: 500px;
   position: relative;
   background: #ffffff;
+
+  /* 네이버맵 저작권 표시 숨기기 */
+  .nmap_copyright,
+  .nmap_logo,
+  .nmap_control {
+    display: none !important;
+  }
+
+  /* 네이버맵 로고 및 저작권 영역 숨기기 */
+  div[class*="nmap"],
+  div[class*="naver"] {
+    &[class*="copyright"],
+    &[class*="logo"],
+    &[class*="control"] {
+      display: none !important;
+    }
+  }
 `;
 
 const MapLoading = styled.div`

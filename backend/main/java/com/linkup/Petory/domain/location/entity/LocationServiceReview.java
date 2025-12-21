@@ -2,8 +2,7 @@ package com.linkup.Petory.domain.location.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-import java.time.LocalDateTime;
-
+import com.linkup.Petory.domain.common.BaseTimeEntity;
 import com.linkup.Petory.domain.user.entity.Users;
 
 @Entity
@@ -13,7 +12,7 @@ import com.linkup.Petory.domain.user.entity.Users;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class LocationServiceReview {
+public class LocationServiceReview extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -33,17 +32,6 @@ public class LocationServiceReview {
     @Lob
     private String comment; // 리뷰 내용
 
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
-
-    @PrePersist
-    protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
-        this.updatedAt = LocalDateTime.now();
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        this.updatedAt = LocalDateTime.now();
-    }
+    // createdAt, updatedAt은 BaseTimeEntity에서 상속받음
+    // @PrePersist, @PreUpdate는 BaseTimeEntity의 @EntityListeners가 자동 처리
 }

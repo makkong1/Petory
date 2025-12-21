@@ -25,8 +25,11 @@ public class LocationServiceController {
 
     /**
      * DB에서 위치 서비스 검색
-     * 지역 계층별 검색만 수행 (내 위치는 거리 계산/길찾기용으로만 사용)
+     * 위치 기반 검색 또는 지역 계층별 검색 수행
      * 
+     * @param latitude     위도 (선택, 위치 기반 검색 시 필수)
+     * @param longitude    경도 (선택, 위치 기반 검색 시 필수)
+     * @param radius       반경 (미터 단위, 선택, 기본값: 10000m = 10km)
      * @param sido         시도 (선택, 예: "서울특별시", "경기도")
      * @param sigungu      시군구 (선택, 예: "노원구", "고양시 덕양구")
      * @param eupmyeondong 읍면동 (선택, 예: "상계동", "동산동")
@@ -37,6 +40,9 @@ public class LocationServiceController {
      */
     @GetMapping("/search")
     public ResponseEntity<Map<String, Object>> searchLocationServices(
+            @RequestParam(required = false) Double latitude,
+            @RequestParam(required = false) Double longitude,
+            @RequestParam(required = false) Integer radius,
             @RequestParam(required = false) String sido,
             @RequestParam(required = false) String sigungu,
             @RequestParam(required = false) String eupmyeondong,
@@ -44,18 +50,39 @@ public class LocationServiceController {
             @RequestParam(required = false) String category,
             @RequestParam(required = false) Integer size) {
         try {
-            // 지역 계층별 검색만 수행
-            List<LocationServiceDTO> services = locationServiceService.searchLocationServicesByRegion(
-                    sido,
-                    sigungu,
-                    eupmyeondong,
-                    roadName,
-                    category,
-                    size);
+            // ========== 성능 측정 시작 ==========
+            long startTime = System.currentTimeMillis();
+            log.info("🚀 [성능 측정] 위치 서비스 검색 시작 - latitude={}, longitude={}, radius={}, sido={}, sigungu={}, eupmyeondong={}, category={}, size={}",
+                    latitude, longitude, radius, sido, sigungu, eupmyeondong, category, size);
+
+            // 위치 기반 검색 또는 지역 계층별 검색 수행
+            List<LocationServiceDTO> services;
+            if (latitude != null && longitude != null) {
+                // 위치 기반 검색 (반경 검색)
+                int radiusInMeters = (radius != null && radius > 0) ? radius : 10000; // 기본값 10km
+                services = locationServiceService.searchLocationServicesByLocation(
+                        latitude, longitude, radiusInMeters, category, size);
+            } else {
+                // 지역 계층별 검색 (기존 로직)
+                services = locationServiceService.searchLocationServicesByRegion(
+                        sido,
+                        sigungu,
+                        eupmyeondong,
+                        roadName,
+                        category,
+                        size);
+            }
+
+            long queryTime = System.currentTimeMillis() - startTime;
+            log.info("⏱️  [성능 측정] 위치 서비스 조회 완료 - 실행 시간: {}ms, 결과 수: {}개", queryTime, services.size());
 
             Map<String, Object> response = new HashMap<>();
             response.put("services", services);
             response.put("count", services.size());
+
+            long totalTime = System.currentTimeMillis() - startTime;
+            log.info("✅ [성능 측정] 전체 처리 시간: {}ms", totalTime);
+            // ========== 성능 측정 종료 ==========
 
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
