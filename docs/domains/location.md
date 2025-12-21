@@ -2,12 +2,14 @@
 
 ## 1. 개요
 
-Location 도메인은 위치 기반 서비스 (병원, 카페, 공원, 펫샵 등) 정보 제공 및 리뷰 관리 도메인입니다. 지역 계층적 탐색, 거리 계산, 네이버맵 API 연동을 통해 사용자에게 위치 기반 서비스를 제공합니다.
+Location 도메인은 위치 기반 서비스 (병원, 카페, 공원, 펫샵 등) 정보 제공 및 리뷰 관리 도메인입니다. 지역 계층적 탐색, 위치 기반 검색, 거리 계산, 네이버맵 API 연동을 통해 사용자에게 위치 기반 서비스를 제공합니다.
 
 **주요 기능**:
 - 지역 계층적 탐색 (시도 → 시군구 → 읍면동 → 도로명)
+- 위치 기반 반경 검색 (ST_Distance_Sphere 사용)
 - 카테고리별 서비스 검색
 - 거리 계산 (Haversine 공식)
+- 하이브리드 데이터 로딩 전략 (초기 로드 + 클라이언트 필터링)
 - 위치 서비스 리뷰 시스템
 - 공공데이터 CSV 배치 임포트
 - 네이버맵 API 연동:
@@ -24,20 +26,50 @@ Location 도메인은 위치 기반 서비스 (병원, 카페, 공원, 펫샵 �
 **탐색 프로세스**:
 1. 시도 선택 (전국 17개 시도)
 2. 시군구 선택 (선택된 시도의 시군구)
-3. 읍면동 선택 (선택된 시군구의 읍면동)
-4. 도로명 선택 (선택된 읍면동의 도로명)
-5. 해당 지역의 서비스 목록 표시
+3. 해당 지역의 서비스 목록 표시
 
 **우선순위**: roadName > eupmyeondong > sigungu > sido > 전체
 
-### 2.2 카테고리별 검색
+### 2.2 위치 기반 반경 검색
+
+**검색 프로세스**:
+1. 사용자 위치 확인 (GPS 또는 수동 입력)
+2. 반경 설정 (기본값: 10km)
+3. ST_Distance_Sphere를 사용한 반경 내 서비스 조회
+4. 거리순 정렬 (선택적)
+5. 카테고리 필터링 (선택적)
+
+**특징**:
+- MySQL의 `ST_Distance_Sphere` 함수 사용 (정확한 지구 곡률 반영)
+- POINT 형식: `POINT(경도, 위도)` 순서 사용
+- 반경 단위: 미터 (m)
+- 성능 최적화: 인덱스 활용 및 쿼리 최적화
+
+### 2.3 하이브리드 데이터 로딩 전략
+
+**초기 로드 전략**:
+1. 사용자 위치가 있으면: 위치 기반 검색 (10km 반경) + 백엔드 카테고리 필터링
+2. 사용자 위치가 없으면: 전체 조회 + 백엔드 카테고리 필터링
+3. 조회된 데이터를 `allServices`에 저장 (클라이언트 필터링용)
+
+**클라이언트 필터링**:
+- 지역 선택 시: 현재 데이터 범위 내면 프론트엔드 필터링, 범위 밖이면 백엔드 재요청
+- 카테고리 변경 시: 백엔드 재요청 (백엔드에서 카테고리 필터링)
+- 키워드 검색 시: 전체 데이터에서 필터링
+
+**성능 최적화**:
+- 초기 로드 시 한 번만 백엔드 요청
+- 지역 필터링은 클라이언트에서 처리 (데이터 범위 내)
+- 불필요한 API 호출 최소화
+
+### 2.4 카테고리별 검색
 
 **카테고리 필터링**:
 - category3 → category2 → category1 순서로 검색
 - 대소문자 무시
 - 최대 결과 수 제한 지원 (`maxResults` 파라미터)
 
-### 2.3 거리 계산 및 길찾기
+### 2.5 거리 계산 및 길찾기
 
 **거리 계산 프로세스**:
 1. 내 위치 확인 (GPS 또는 수동 입력)
@@ -45,7 +77,7 @@ Location 도메인은 위치 기반 서비스 (병원, 카페, 공원, 펫샵 �
 3. 거리 표시
 4. 길찾기 버튼 클릭 → 네이버맵 길찾기 연동
 
-### 2.4 위치 서비스 리뷰
+### 2.6 위치 서비스 리뷰
 
 **리뷰 작성 프로세스**:
 1. 위치 서비스 선택
@@ -123,8 +155,74 @@ public List<LocationServiceDTO> searchLocationServicesByRegion(
 - **최대 결과 수 제한**: `maxResults` 파라미터로 결과 수 제한 (null이거나 0이면 제한 없음)
 - **로깅**: 각 단계별 디버그 로그 출력
 
-#### 로직 2: 거리 계산 (Haversine 공식)
-**구현 위치**: `LocationServiceService.calculateDistance()` (Lines 129-146)
+#### 로직 2: 위치 기반 반경 검색
+**구현 위치**: `LocationServiceService.searchLocationServicesByLocation()` (Lines 152-226)
+
+```java
+public List<LocationServiceDTO> searchLocationServicesByLocation(
+        Double latitude,
+        Double longitude,
+        Integer radiusInMeters,
+        String category,
+        Integer maxResults) {
+    
+    // ST_Distance_Sphere를 사용한 반경 검색
+    List<LocationService> services = locationServiceRepository
+            .findByRadius(latitude, longitude, (double) radiusInMeters);
+    
+    // 카테고리 필터링 (category3 → category2 → category1)
+    if (StringUtils.hasText(category) && !services.isEmpty()) {
+        String categoryLower = category.toLowerCase(Locale.ROOT).trim();
+        services = services.stream()
+                .filter(service -> {
+                    if (service.getCategory3() != null && 
+                        service.getCategory3().toLowerCase(Locale.ROOT).trim().equals(categoryLower)) {
+                        return true;
+                    }
+                    if (service.getCategory2() != null && 
+                        service.getCategory2().toLowerCase(Locale.ROOT).trim().equals(categoryLower)) {
+                        return true;
+                    }
+                    if (service.getCategory1() != null && 
+                        service.getCategory1().toLowerCase(Locale.ROOT).trim().equals(categoryLower)) {
+                        return true;
+                    }
+                    return false;
+                })
+                .collect(Collectors.toList());
+    }
+    
+    // 최대 결과 수 제한
+    if (maxResults != null && maxResults > 0) {
+        services = services.stream()
+                .limit(maxResults)
+                .collect(Collectors.toList());
+    }
+    
+    return services.stream()
+            .map(locationServiceConverter::toDTO)
+            .collect(Collectors.toList());
+}
+```
+
+**핵심 로직**:
+- **반경 검색**: `ST_Distance_Sphere(POINT(longitude, latitude), POINT(?2, ?1)) <= ?3`
+- **POINT 형식**: `POINT(경도, 위도)` 순서 사용 (MySQL 표준)
+- **카테고리 필터링**: category3 → category2 → category1 순서로 검색
+- **성능 측정**: 각 단계별 실행 시간 로깅
+- **사용 목적**: 사용자 위치 기반 주변 서비스 검색
+
+**Repository 쿼리**:
+```java
+@Query(value = "SELECT * FROM locationservice WHERE " +
+        "latitude IS NOT NULL AND longitude IS NOT NULL AND " +
+        "ST_Distance_Sphere(POINT(longitude, latitude), POINT(?2, ?1)) <= ?3 " +
+        "ORDER BY rating DESC", nativeQuery = true)
+List<LocationService> findByRadius(Double latitude, Double longitude, Double radiusInMeters);
+```
+
+#### 로직 3: 거리 계산 (Haversine 공식)
+**구현 위치**: `LocationServiceService.calculateDistance()` (Lines 232-249)
 
 ```java
 public Double calculateDistance(Double lat1, Double lng1, Double lat2, Double lng2) {
@@ -153,7 +251,7 @@ public Double calculateDistance(Double lat1, Double lng1, Double lat2, Double ln
 - **반환 단위**: 미터 단위
 - **사용 목적**: 내 위치에서 각 서비스까지의 거리 표시
 
-#### 로직 3: 네이버맵 지오코딩 (주소 → 좌표)
+#### 로직 4: 네이버맵 지오코딩 (주소 → 좌표)
 **구현 위치**: `NaverMapService.addressToCoordinates()` (Lines 152-240)
 
 **핵심 로직**:
@@ -162,7 +260,7 @@ public Double calculateDistance(Double lat1, Double lng1, Double lat2, Double ln
 - **반환 형식**: `Double[]` 배열 `[latitude, longitude]`
 - **에러 처리**: API 키 미설정, 구독 필요 등 에러 처리
 
-#### 로직 4: 네이버맵 역지오코딩 (좌표 → 주소)
+#### 로직 5: 네이버맵 역지오코딩 (좌표 → 주소)
 **구현 위치**: `NaverMapService.coordinatesToAddress()` (Lines 249-373)
 
 **핵심 로직**:
@@ -171,7 +269,7 @@ public Double calculateDistance(Double lat1, Double lng1, Double lat2, Double ln
 - **주소 조합**: 시도, 시군구, 읍면동, 리를 조합하여 지번주소 생성
 - **반환 형식**: `Map<String, Object>` (`address`, `roadAddress`, `jibunAddress`)
 
-#### 로직 5: 네이버맵 길찾기
+#### 로직 6: 네이버맵 길찾기
 **구현 위치**: `NaverMapService.getDirections()` (Lines 43-144)
 
 **핵심 로직**:
@@ -180,7 +278,7 @@ public Double calculateDistance(Double lat1, Double lng1, Double lat2, Double ln
 - **응답 파싱**: `route.traoptimal` 경로 정보 추출
 - **에러 처리**: API 키 미설정, 구독 필요 등 에러 처리
 
-#### 로직 6: 리뷰 작성 및 평점 업데이트
+#### 로직 7: 리뷰 작성 및 평점 업데이트
 **구현 위치**: `LocationServiceReviewService.createReview()` (Lines 34-64)
 
 **핵심 로직**:
@@ -210,7 +308,8 @@ public void updateServiceRating(Long serviceIdx) {
 #### LocationServiceService
 | 메서드 | 설명 | 주요 로직 |
 |--------|------|-----------|
-| `searchLocationServicesByRegion()` | 지역 계층별 서비스 검색 | 우선순위 기반 조회, 카테고리 필터링, 최대 결과 수 제한 |
+| `searchLocationServicesByRegion()` | 지역 계층별 서비스 검색 | 우선순위 기반 조회, 카테고리 필터링, 최대 결과 수 제한, 성능 측정 로깅 |
+| `searchLocationServicesByLocation()` | 위치 기반 반경 검색 | ST_Distance_Sphere 사용, 카테고리 필터링, 최대 결과 수 제한, 성능 측정 로깅 |
 | `calculateDistance()` | 거리 계산 | Haversine 공식 (미터 단위) |
 | `getPopularLocationServices()` | 인기 서비스 조회 | 카테고리별 상위 10개, `@Cacheable` 적용 |
 
@@ -434,20 +533,25 @@ erDiagram
 #### REST API
 | 엔드포인트 | Method | 설명 |
 |-----------|--------|------|
-| `/api/location-services/search` | GET | 지역 계층별 서비스 검색 (sido, sigungu, eupmyeondong, roadName, category, size 파라미터) |
+| `/api/location-services/search` | GET | 위치 기반 검색 또는 지역 계층별 서비스 검색 (latitude, longitude, radius, sido, sigungu, eupmyeondong, roadName, category, size 파라미터) |
 | `/api/location-services/popular` | GET | 인기 서비스 조회 (category 파라미터) |
 | `/api/location-service-reviews` | POST | 리뷰 작성 (인증 필요) |
 | `/api/location-service-reviews/{reviewIdx}` | PUT | 리뷰 수정 (인증 필요) |
 | `/api/location-service-reviews/{reviewIdx}` | DELETE | 리뷰 삭제 (인증 필요) |
 | `/api/location-service-reviews/service/{serviceIdx}` | GET | 서비스별 리뷰 목록 조회 |
 | `/api/location-service-reviews/user/{userIdx}` | GET | 사용자별 리뷰 목록 조회 |
-| `/api/geocoding/address` | GET | 주소→좌표 변환 (address 파라미터) |
+| `/api/geocoding/address` | GET | 주소→좌표 변환 (address 파라미터, URL 디코딩 자동 처리) |
 | `/api/geocoding/coordinates` | GET | 좌표→주소 변환 (lat, lng 파라미터) |
-| `/api/geocoding/directions` | GET | 길찾기 (start, goal, option 파라미터) |
+| `/api/geocoding/directions` | GET | 길찾기 (start, goal, option 파라미터, 경도,위도 순서) |
 
 **지역 계층별 검색 요청 예시**:
 ```http
 GET /api/location-services/search?sido=서울특별시&sigungu=노원구&category=동물약국&size=100
+```
+
+**위치 기반 검색 요청 예시**:
+```http
+GET /api/location-services/search?latitude=37.5665&longitude=126.9780&radius=10000&category=동물약국&size=100
 ```
 
 **지역 계층별 검색 응답 예시**:
@@ -547,6 +651,11 @@ CREATE INDEX idx_category3_pet ON locationservice(category3, pet_friendly);
 
 -- 평점 정렬
 CREATE INDEX idx_rating ON locationservice(rating DESC);
+
+-- 위치 기반 검색 인덱스 (ST_Distance_Sphere 최적화)
+CREATE INDEX idx_latitude_longitude ON locationservice(latitude, longitude);
+-- 또는 공간 인덱스 (MySQL 5.7.6+)
+ALTER TABLE locationservice ADD SPATIAL INDEX idx_location (POINT(longitude, latitude));
 ```
 
 **선정 이유**:
@@ -554,6 +663,8 @@ CREATE INDEX idx_rating ON locationservice(rating DESC);
 - WHERE 절에서 자주 사용되는 조건
 - 평점 정렬을 위한 인덱스 (rating DESC)
 - 복합 인덱스로 조회 성능 향상
+- 위치 기반 검색을 위한 위도/경도 인덱스 (ST_Distance_Sphere 최적화)
+- 공간 인덱스 사용 시 반경 검색 성능 대폭 향상
 
 ### 7.2 애플리케이션 레벨 최적화
 
@@ -572,13 +683,35 @@ public List<LocationServiceDTO> getPopularLocationServices(String category) {
 
 **효과**: 인기 서비스 조회 시 캐싱으로 성능 향상
 
+#### 성능 측정 로깅
+**구현 위치**: `LocationServiceService.searchLocationServicesByRegion()`, `searchLocationServicesByLocation()`
+
+**측정 항목**:
+- DB 쿼리 실행 시간
+- 카테고리 필터링 시간
+- DTO 변환 시간
+- 전체 처리 시간
+
+**로깅 예시**:
+```
+⏱️  [성능 측정] DB 쿼리 실행 시간: 150ms, 조회된 레코드 수: 500개
+⏱️  [성능 측정] 카테고리 필터링 시간: 20ms, 필터링 후 결과 수: 50개
+⏱️  [성능 측정] DTO 변환 시간: 10ms, 변환된 레코드 수: 50개
+✅ [성능 측정] searchLocationServicesByRegion 전체 시간: 180ms (쿼리: 150ms, 필터링: 20ms, DTO변환: 10ms)
+```
+
 #### 프론트엔드 최적화
-- **하이브리드 데이터 로딩**: 초기 전국 데이터 로드 + 클라이언트 필터링
-- **메모이제이션**: 거리 계산, 서비스 필터링
+- **하이브리드 데이터 로딩**: 초기 위치 기반 검색(10km) 또는 전체 조회 + 클라이언트 필터링
+- **지역 필터링**: 현재 데이터 범위 내면 프론트엔드 필터링, 범위 밖이면 백엔드 재요청
+- **메모이제이션**: 거리 계산, 서비스 필터링 (`useMemo` 사용)
+- **배치 처리**: 마커 생성 시 배치 처리로 성능 개선 (50개씩)
+- **마커 개수 제한**: 최대 500개 마커만 표시
 
 #### 네이버맵 API 최적화
 - **에러 처리**: API 키 미설정, 구독 필요 등 에러 처리
 - **로깅**: API 호출 및 응답 로깅으로 디버깅 지원
+- **주소 정리**: `+` 문자를 공백으로 변환, 공백 정규화
+- **URL 인코딩**: `UriComponentsBuilder.encode()`로 자동 처리
 - **응답 캐싱**: 필요 시 클라이언트 측에서 응답 캐싱 가능
 
 ---
@@ -589,29 +722,73 @@ public List<LocationServiceDTO> getPopularLocationServices(String category) {
 - **계층 구조**: 시도 → 시군구 → 읍면동 → 도로명
 - **우선순위 기반 조회**: roadName > eupmyeondong > sigungu > sido > 전체
 - **카테고리 필터링**: category3 → category2 → category1 순서로 검색
+- **성능 측정**: 각 단계별 실행 시간 로깅
 
-### 8.2 거리 계산
+### 8.2 위치 기반 반경 검색
+- **ST_Distance_Sphere**: MySQL의 지구 곡률 반영 함수 사용
+- **POINT 형식**: `POINT(경도, 위도)` 순서 사용 (MySQL 표준)
+- **반경 단위**: 미터 (m), 기본값 10km
+- **카테고리 필터링**: category3 → category2 → category1 순서로 검색
+- **성능 측정**: 각 단계별 실행 시간 로깅
+
+### 8.3 하이브리드 데이터 로딩 전략
+- **초기 로드**: 사용자 위치 있으면 위치 기반 검색(10km), 없으면 전체 조회
+- **클라이언트 필터링**: 지역 선택 시 데이터 범위 내면 프론트엔드 필터링
+- **백엔드 재요청**: 데이터 범위 밖이거나 카테고리 변경 시 백엔드 재요청
+- **성능 최적화**: 불필요한 API 호출 최소화
+
+### 8.4 거리 계산
 - **Haversine 공식**: 지구 반경 6371000m 사용
 - **미터 단위 반환**: 내 위치에서 각 서비스까지의 거리 표시
 - **정확한 거리 계산**: 위도/경도 기반 정확한 거리 계산
+- **클라이언트 계산**: 프론트엔드에서 필요 시 거리 계산 (`useMemo` 사용)
 
-### 8.3 네이버맵 API 연동
-- **지오코딩**: 주소를 좌표로 변환 (`addressToCoordinates()`)
+### 8.5 네이버맵 API 연동
+- **지오코딩**: 주소를 좌표로 변환 (`addressToCoordinates()`, URL 디코딩 자동 처리)
 - **역지오코딩**: 좌표를 주소로 변환 (`coordinatesToAddress()`)
-- **길찾기**: 출발지-도착지 경로 정보 제공 (`getDirections()`)
+- **길찾기**: 출발지-도착지 경로 정보 제공 (`getDirections()`, 경도,위도 순서)
 - **에러 처리**: API 키 미설정, 구독 필요 등 에러 처리
+- **주소 정리**: `+` 문자를 공백으로 변환, 공백 정규화
 
-### 8.4 리뷰 시스템
+### 8.6 리뷰 시스템
 - **중복 리뷰 방지**: 한 서비스당 1개의 리뷰만 작성 가능
 - **이메일 인증**: 리뷰 작성/수정/삭제 시 이메일 인증 필요
 - **평점 자동 업데이트**: 리뷰 작성/수정/삭제 시 서비스 평균 평점 자동 계산 및 업데이트
 
-### 8.5 성능 최적화
+### 8.7 성능 최적화
 - **인덱스 전략**: 지역 계층별 인덱스로 조회 성능 향상
 - **캐싱**: 인기 서비스 조회 시 `@Cacheable` 적용
-- **하이브리드 데이터 로딩**: 초기 전국 데이터 로드 + 클라이언트 필터링
+- **하이브리드 데이터 로딩**: 초기 위치 기반 검색 또는 전체 조회 + 클라이언트 필터링
+- **성능 측정 로깅**: 각 단계별 실행 시간 측정 및 로깅
+- **프론트엔드 최적화**: 메모이제이션, 배치 처리, 마커 개수 제한
 
-### 8.6 엔티티 설계 특징
+### 8.8 프론트엔드 주요 로직
+
+#### 초기 로드 전략 (`LocationServiceMap.js`)
+1. **사용자 위치 확인**: `navigator.geolocation.getCurrentPosition()` 사용
+2. **전략 선택**:
+   - 위치 있으면: 위치 기반 검색 (10km 반경) + 백엔드 카테고리 필터링
+   - 위치 없으면: 전체 조회 + 백엔드 카테고리 필터링
+3. **데이터 저장**: 조회된 데이터를 `allServices`에 저장
+4. **필터링**: 선택된 지역에 따라 클라이언트 필터링
+
+#### 지역 선택 로직
+- **시도/시군구 선택**: 하드코딩된 중심 좌표 사용 (지오코딩 API 호출 없음)
+- **동 선택**: 지오코딩 API 호출 → 위치 기반 검색 (5km 반경)
+- **지오코딩 실패 시**: 시군구 중심 좌표로 fallback
+
+#### 하이브리드 필터링 전략
+- **데이터 범위 확인**: 현재 로드된 데이터의 시도/시군구 범위 확인
+- **범위 내**: 프론트엔드 필터링 (`filterServicesByRegion()`)
+- **범위 밖**: 백엔드 지역 기반 검색 재요청
+
+#### 지도 연동 (`MapContainer.js`)
+- **네이버맵 API**: `ncpKeyId` 사용 (지도 표시만)
+- **마커 표시**: 최대 500개, 배치 처리 (50개씩)
+- **줌 레벨**: 카카오맵 레벨(1-14)을 네이버맵 줌(1-21)으로 변환
+- **사용자 위치 마커**: 파란색 원형 마커
+
+### 8.9 엔티티 설계 특징
 - **BaseTimeEntity 미사용**: LocationService는 `createdAt`, `updatedAt` 없음
 - **직접 시간 관리**: LocationServiceReview는 `@PrePersist`, `@PreUpdate`로 직접 관리
 - **지역 계층 구조**: sido → sigungu → eupmyeondong → roadName

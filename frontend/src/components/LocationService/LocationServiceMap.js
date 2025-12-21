@@ -86,6 +86,38 @@ const SIDO_CENTERS = {
   '제주특별자치도': { lat: 33.4996, lng: 126.5312, level: 6 },
 };
 
+// 시군구 중심 좌표 (주요 시군구만)
+const SIGUNGU_CENTERS = {
+  '서울특별시': {
+    '강남구': { lat: 37.5172, lng: 127.0473 },
+    '강동구': { lat: 37.5301, lng: 127.1238 },
+    '강북구': { lat: 37.6398, lng: 127.0256 },
+    '강서구': { lat: 37.5509, lng: 126.8495 },
+    '관악구': { lat: 37.4785, lng: 126.9516 },
+    '광진구': { lat: 37.5384, lng: 127.0822 },
+    '구로구': { lat: 37.4954, lng: 126.8874 },
+    '금천구': { lat: 37.4519, lng: 126.9020 },
+    '노원구': { lat: 37.6542, lng: 127.0568 },
+    '도봉구': { lat: 37.6688, lng: 127.0471 },
+    '동대문구': { lat: 37.5744, lng: 127.0396 },
+    '동작구': { lat: 37.5124, lng: 126.9393 },
+    '마포구': { lat: 37.5663, lng: 126.9019 },
+    '서대문구': { lat: 37.5791, lng: 126.9368 },
+    '서초구': { lat: 37.4837, lng: 127.0324 },
+    '성동구': { lat: 37.5633, lng: 127.0368 },
+    '성북구': { lat: 37.5894, lng: 127.0167 },
+    '송파구': { lat: 37.5145, lng: 127.1058 },
+    '양천구': { lat: 37.5170, lng: 126.8663 },
+    '영등포구': { lat: 37.5264, lng: 126.8962 },
+    '용산구': { lat: 37.5326, lng: 126.9905 },
+    '은평구': { lat: 37.6027, lng: 126.9291 },
+    '종로구': { lat: 37.5735, lng: 126.9788 },
+    '중구': { lat: 37.5640, lng: 126.9970 },
+    '중랑구': { lat: 37.6063, lng: 127.0926 },
+  },
+  // 주요 시군구만 추가 (필요시 확장)
+};
+
 const SIGUNGUS = {
   '서울특별시': [
     '강남구', '강동구', '강북구', '강서구', '관악구', '광진구', '구로구', '금천구',
@@ -183,6 +215,7 @@ const LocationServiceMap = () => {
   const latestRequestRef = useRef(0);
   const fetchServicesRef = useRef(null);
   const isInitialLoadRef = useRef(true); // 초기 로드 여부
+  const initialLoadTypeRef = useRef(null); // 초기 로드 타입: 'location-based' (위치 기반) 또는 'all' (전체 조회)
 
   // 클라이언트에서 지역별 필터링 (시도, 시군구, 읍면동) - 최적화: 한 번의 순회로 처리
   const filterServicesByRegion = useCallback((allServicesData, sido, sigungu, eupmyeondong, category) => {
@@ -260,6 +293,9 @@ const LocationServiceMap = () => {
       categoryOverride,
       isInitialLoad = false, // 초기 로드 여부
       userLocation: userLocationOverride = null, // 사용자 위치 (초기 로드 시 내 주변 서비스 필터링용)
+      latitude, // 위치 기반 검색: 위도
+      longitude, // 위치 기반 검색: 경도
+      radius, // 위치 기반 검색: 반경 (미터)
     }) => {
       const requestId = Date.now();
       latestRequestRef.current = requestId;
@@ -280,20 +316,49 @@ const LocationServiceMap = () => {
         // 지역 계층별 검색만 수행 (내 위치는 거리 계산용으로만 사용)
         const regionParams = {};
 
-        // 초기 로드 시에만 전체 데이터 가져오기
+        // 초기 로드 시 전략 선택
         if (isInitialLoad) {
-          const response = await locationServiceApi.searchPlaces({
-            category: apiCategory,
-            size: 5000, // 초기 로드 시 적절한 크기로 제한 (성능 최적화)
-          });
+          const targetLocation = userLocationOverride || userLocation;
+
+          // ========== 성능 측정 시작 ==========
+          const totalStartTime = performance.now();
+          console.log('🚀 [성능 측정] 초기 로드 시작');
+
+          // 전략: 위치 기반 검색 (10km 반경) + 백엔드 카테고리 필터링
+          const apiStartTime = performance.now();
+          let response;
+
+          if (targetLocation) {
+            // 사용자 위치가 있으면 위치 기반 검색 (10km 반경)
+            console.log('📍 [위치 기반 검색] 사용자 위치 기반으로 10km 반경 검색');
+            initialLoadTypeRef.current = 'location-based';
+            response = await locationServiceApi.searchPlaces({
+              latitude: targetLocation.lat,
+              longitude: targetLocation.lng,
+              radius: 10000, // 10km
+              category: apiCategory, // 백엔드에서 카테고리 필터링
+            });
+          } else {
+            // 사용자 위치가 없으면 전체 조회
+            console.log('🌐 [전체 검색] 사용자 위치 없음 - 전체 조회');
+            initialLoadTypeRef.current = 'all';
+            response = await locationServiceApi.searchPlaces({
+              category: apiCategory,
+              size: null, // 전체 조회
+            });
+          }
+
+          const apiTime = performance.now() - apiStartTime;
+          console.log(`⏱️  [성능 측정] API 호출 시간: ${apiTime.toFixed(2)}ms`);
+          console.log(`📊 [성능 측정] 조회된 데이터 수: ${response.data?.services?.length || 0}개`);
 
           if (latestRequestRef.current !== requestId) {
             return;
           }
 
-          // 사용자 위치가 있으면 거리 계산 및 정렬
-          const targetLocation = userLocationOverride || userLocation;
-          let fetchedServices = (response.data?.services || []).map((service) => {
+          // 백엔드에서 이미 위치 기반 필터링이 완료되었으므로 거리 계산은 선택적
+          // (표시용 거리 정보는 필요 시 계산)
+          let allFetchedServices = (response.data?.services || []).map((service) => {
             let distance = null;
             if (targetLocation && service.latitude && service.longitude) {
               distance = calculateDistance(
@@ -309,22 +374,69 @@ const LocationServiceMap = () => {
             };
           });
 
-          // 사용자 위치가 있으면 거리순으로 정렬하고, 10km 이내 서비스만 필터링
-          if (targetLocation) {
-            fetchedServices = fetchedServices
-              .filter(service => service.distance !== null && service.distance <= 10000) // 10km 이내
-              .sort((a, b) => (a.distance || Infinity) - (b.distance || Infinity))
-              .slice(0, 100); // 최대 100개만 표시
+          // 전체 데이터를 allServices에 저장 (지역 필터링에 사용)
+          setAllServices(allFetchedServices);
 
-            setStatusMessage(`내 주변 ${fetchedServices.length}개의 장소를 찾았습니다.`);
+          // 사용자 위치가 있으면 메시지 표시
+          if (targetLocation) {
+            setStatusMessage(`내 주변 10km 이내 ${allFetchedServices.length}개의 장소를 찾았습니다.`);
+          } else {
+            setStatusMessage(`전체 ${allFetchedServices.length}개의 장소를 찾았습니다.`);
           }
 
-          // 전체 데이터를 allServices에 저장하고, 선택된 지역에 따라 필터링
-          setAllServices(fetchedServices);
-          filterServicesByRegion(fetchedServices, selectedSido, selectedSigungu, selectedEupmyeondong, apiCategory);
+          // 선택된 지역에 따라 필터링 (현재 로드된 데이터 기준)
+          const filterStartTime = performance.now();
+          filterServicesByRegion(allFetchedServices, selectedSido, selectedSigungu, selectedEupmyeondong, apiCategory);
+          const filterTime = performance.now() - filterStartTime;
+          console.log(`⏱️  [성능 측정] 필터링 시간: ${filterTime.toFixed(2)}ms`);
+
+          // 메모리 사용량 측정
+          if (performance.memory) {
+            const memoryUsed = (performance.memory.usedJSHeapSize / 1024 / 1024).toFixed(2);
+            const memoryTotal = (performance.memory.totalJSHeapSize / 1024 / 1024).toFixed(2);
+            console.log(`💾 [성능 측정] 메모리 사용량: ${memoryUsed} MB / ${memoryTotal} MB`);
+          }
+
+          const totalTime = performance.now() - totalStartTime;
+          console.log(`✅ [성능 측정] 전체 처리 시간: ${totalTime.toFixed(2)}ms`);
+          console.log(`📈 [성능 측정] 시간 분해: API(${apiTime.toFixed(2)}ms) + 필터링(${filterTime.toFixed(2)}ms) = ${totalTime.toFixed(2)}ms`);
+          // ========== 성능 측정 종료 ==========
 
           isInitialLoadRef.current = false;
           isSearchModeRef.current = false;
+          setSelectedService(null);
+          setLoading(false);
+          return;
+        }
+
+        // 위치 기반 검색이 명시적으로 요청된 경우
+        if (latitude != null && longitude != null && radius != null) {
+          console.log('📍 [위치 기반 검색] API 호출:', { latitude, longitude, radius, category: apiCategory });
+
+          const response = await locationServiceApi.searchPlaces({
+            latitude,
+            longitude,
+            radius,
+            category: apiCategory,
+          });
+
+          if (latestRequestRef.current !== requestId) {
+            return;
+          }
+
+          const fetchedServices = (response.data?.services || []).map((service) => ({
+            ...service,
+            distance: null, // 위치 기반 검색 시 거리는 백엔드에서 계산됨
+          }));
+
+          console.log(`위치 기반 검색 결과: ${fetchedServices.length}개 서비스`, { latitude, longitude, radius });
+
+          // 위치 기반 데이터를 allServices에 업데이트하고 필터링
+          setAllServices(fetchedServices);
+          filterServicesByRegion(fetchedServices, selectedSido, selectedSigungu, selectedEupmyeondong, apiCategory);
+
+          isSearchModeRef.current = false;
+          setStatusMessage(`반경 ${(radius / 1000).toFixed(1)}km 이내 ${fetchedServices.length}개의 장소를 찾았습니다.`);
           setSelectedService(null);
           setLoading(false);
           return;
@@ -339,14 +451,14 @@ const LocationServiceMap = () => {
           let apiSigungu = regionParts[1] || undefined;
           let apiEupmyeondong = regionParts[2] || undefined;
 
-          console.log('지역 검색 API 호출:', { apiSido, apiSigungu, apiEupmyeondong, region });
+          console.log('🌐 [지역 검색] API 호출:', { apiSido, apiSigungu, apiEupmyeondong, region });
 
           const response = await locationServiceApi.searchPlaces({
             sido: apiSido,
             sigungu: apiSigungu,
             eupmyeondong: apiEupmyeondong,
             category: apiCategory,
-            size: 500, // 기본값
+            size: null, // 제한 없음
           });
 
           if (latestRequestRef.current !== requestId) {
@@ -370,11 +482,49 @@ const LocationServiceMap = () => {
           return;
         }
 
-        // 초기 로드가 아니고 지역 검색도 아닌 경우 allServices에서 클라이언트 사이드 필터링만 수행
+        // 초기 로드가 아니고 지역 검색도 아닌 경우
+        // 하이브리드 전략: 현재 데이터 범위 내면 필터링, 범위 밖이면 백엔드 재요청
         if (allServices.length > 0) {
-          filterServicesByRegion(allServices, selectedSido, selectedSigungu, selectedEupmyeondong, apiCategory);
-          setLoading(false);
-          return;
+          // 현재 로드된 데이터의 지역 범위 확인
+          const loadedSidos = new Set(allServices.map(s => s.sido).filter(Boolean));
+          const loadedSigungus = new Set(allServices.map(s => s.sigungu).filter(Boolean));
+
+          // 선택한 지역이 현재 데이터 범위 내에 있는지 확인
+          const isRegionInLoadedData =
+            (!selectedSido || loadedSidos.has(selectedSido)) &&
+            (!selectedSigungu || loadedSigungus.has(selectedSigungu));
+
+          if (isRegionInLoadedData) {
+            // 현재 데이터 범위 내: 프론트엔드 필터링
+            console.log('📍 [하이브리드] 현재 데이터 범위 내 - 프론트엔드 필터링');
+            filterServicesByRegion(allServices, selectedSido, selectedSigungu, selectedEupmyeondong, apiCategory);
+            setLoading(false);
+            return;
+          } else {
+            // 현재 데이터 범위 밖: 백엔드 재요청
+            console.log('🌐 [하이브리드] 현재 데이터 범위 밖 - 백엔드 재요청');
+            const response = await locationServiceApi.searchPlaces({
+              sido: selectedSido || undefined,
+              sigungu: selectedSigungu || undefined,
+              eupmyeondong: selectedEupmyeondong || undefined,
+              category: apiCategory,
+            });
+
+            if (latestRequestRef.current !== requestId) {
+              return;
+            }
+
+            const fetchedServices = (response.data?.services || []).map((service) => ({
+              ...service,
+              distance: null, // 지역 검색 시 거리는 계산하지 않음
+            }));
+
+            setAllServices(fetchedServices);
+            filterServicesByRegion(fetchedServices, selectedSido, selectedSigungu, selectedEupmyeondong, apiCategory);
+            setStatusMessage(`총 ${fetchedServices.length}개의 장소를 찾았습니다.`);
+            setLoading(false);
+            return;
+          }
         }
 
         // allServices가 없으면 다시 로드
@@ -476,20 +626,39 @@ const LocationServiceMap = () => {
   // 지도 위치 업데이트 함수
   // 시도 중심 좌표 fallback 헬퍼 함수
   const fallbackToSidoCenter = useCallback((targetSido, targetSigungu, resolve) => {
-    if (SIDO_CENTERS[targetSido]) {
+    console.log('🔄 [Fallback] 네이버 지오코딩 API 실패 → 시군구 중심 좌표 사용');
+    // 시군구 중심 좌표가 있으면 우선 사용
+    if (targetSigungu && SIGUNGU_CENTERS[targetSido] && SIGUNGU_CENTERS[targetSido][targetSigungu]) {
+      const sigunguCenter = SIGUNGU_CENTERS[targetSido][targetSigungu];
+      const selectedMapLevel = calculateMapLevelFromRadius(5);
+      console.log('✅ [Fallback] 시군구 중심 좌표 사용:', {
+        sido: targetSido,
+        sigungu: targetSigungu,
+        center: { lat: sigunguCenter.lat, lng: sigunguCenter.lng },
+        mapLevel: selectedMapLevel,
+        source: 'SIGUNGU_CENTERS (하드코딩)'
+      });
+      setMapCenter({ lat: sigunguCenter.lat, lng: sigunguCenter.lng });
+      setMapLevel(selectedMapLevel);
+      isProgrammaticMoveRef.current = true;
+      resolve({ center: { lat: sigunguCenter.lat, lng: sigunguCenter.lng }, mapLevel: selectedMapLevel });
+    } else if (SIDO_CENTERS[targetSido]) {
+      // 시군구 좌표가 없으면 시도 중심 좌표 사용
       const sidoCenter = SIDO_CENTERS[targetSido];
       const selectedMapLevel = targetSigungu ? calculateMapLevelFromRadius(5) : 10;
-      console.log('시군구 선택 - 시도 중심 좌표 fallback:', {
+      console.log('⚠️ [Fallback] 시군구 중심 좌표 없음 → 시도 중심 좌표 사용:', {
         sido: targetSido,
         sigungu: targetSigungu,
         center: { lat: sidoCenter.lat, lng: sidoCenter.lng },
-        mapLevel: selectedMapLevel
+        mapLevel: selectedMapLevel,
+        source: 'SIDO_CENTERS (하드코딩)'
       });
       setMapCenter({ lat: sidoCenter.lat, lng: sidoCenter.lng });
       setMapLevel(selectedMapLevel);
       isProgrammaticMoveRef.current = true;
       resolve({ center: { lat: sidoCenter.lat, lng: sidoCenter.lng }, mapLevel: selectedMapLevel });
     } else {
+      console.error('❌ [Fallback] 시도 중심 좌표도 없음 - 지도 이동 실패');
       resolve(null);
     }
   }, []);
@@ -532,49 +701,78 @@ const LocationServiceMap = () => {
       return { center: { lat: center.lat, lng: center.lng }, mapLevel: selectedMapLevel };
     }
 
-    // 시군구 또는 동 선택한 경우: geocoding API 사용 (실패 시 하드코딩된 좌표 사용)
-    let address = targetSido;
-    if (targetSigungu) {
-      address = `${targetSido} ${targetSigungu}`;
-    }
-    if (targetEupmyeondong) {
-      address = `${targetSido} ${targetSigungu} ${targetEupmyeondong}`;
+    // 시군구 선택한 경우: 지오코딩 API 호출 없이 바로 시군구 중심 좌표 사용
+    // (네이버 지오코딩 API는 광역 지역명에 대해 결과를 반환하지 않으므로 불필요한 API 호출 제거)
+    if (targetSigungu && !targetEupmyeondong) {
+      if (SIGUNGU_CENTERS[targetSido] && SIGUNGU_CENTERS[targetSido][targetSigungu]) {
+        const sigunguCenter = SIGUNGU_CENTERS[targetSido][targetSigungu];
+        const selectedMapLevel = calculateMapLevelFromRadius(5);
+        console.log('✅ [지도 이동] 시군구 중심 좌표 사용:', {
+          sido: targetSido,
+          sigungu: targetSigungu,
+          center: { lat: sigunguCenter.lat, lng: sigunguCenter.lng },
+          mapLevel: selectedMapLevel,
+          source: 'SIGUNGU_CENTERS (하드코딩)'
+        });
+        setMapCenter({ lat: sigunguCenter.lat, lng: sigunguCenter.lng });
+        setMapLevel(selectedMapLevel);
+        isProgrammaticMoveRef.current = true;
+        return { center: { lat: sigunguCenter.lat, lng: sigunguCenter.lng }, mapLevel: selectedMapLevel };
+      } else {
+        // 시군구 중심 좌표가 없으면 시도 중심 좌표로 fallback
+        console.warn('⚠️ [지도 이동] 시군구 중심 좌표 없음 - 시도 중심 좌표 사용:', {
+          sido: targetSido,
+          sigungu: targetSigungu
+        });
+        if (SIDO_CENTERS[targetSido]) {
+          const sidoCenter = SIDO_CENTERS[targetSido];
+          const selectedMapLevel = calculateMapLevelFromRadius(5);
+          setMapCenter({ lat: sidoCenter.lat, lng: sidoCenter.lng });
+          setMapLevel(selectedMapLevel);
+          isProgrammaticMoveRef.current = true;
+          return { center: { lat: sidoCenter.lat, lng: sidoCenter.lng }, mapLevel: selectedMapLevel };
+        }
+      }
     }
 
-    // Geocoding: 백엔드 API만 사용 (보안상 프론트엔드에서 직접 geocoding 하지 않음)
-    return new Promise((resolve) => {
-      geocodingApi.addressToCoordinates(address)
-        .then(coordData => {
-          if (coordData && coordData.success !== false && coordData.latitude && coordData.longitude) {
-            let selectedMapLevel;
-            if (targetEupmyeondong) {
-              selectedMapLevel = calculateMapLevelFromRadius(3);
-            } else if (targetSigungu) {
-              selectedMapLevel = calculateMapLevelFromRadius(5);
+    // 동(읍면동) 선택한 경우: 지오코딩 API 호출 (구체적인 주소이므로 성공 가능성 높음)
+    if (targetEupmyeondong) {
+      const address = `${targetSido} ${targetSigungu} ${targetEupmyeondong}`;
+      console.log('📍 [지도 이동] 동 선택 - 지오코딩 API 호출:', { address });
+
+      return new Promise((resolve) => {
+        geocodingApi.addressToCoordinates(address)
+          .then(coordData => {
+            if (coordData && coordData.success !== false && coordData.latitude && coordData.longitude) {
+              const selectedMapLevel = calculateMapLevelFromRadius(3);
+              console.log('✅ [지도 이동] 지오코딩 API 성공:', {
+                address,
+                center: { lat: coordData.latitude, lng: coordData.longitude },
+                mapLevel: selectedMapLevel
+              });
+              setMapCenter({ lat: coordData.latitude, lng: coordData.longitude });
+              setMapLevel(selectedMapLevel);
+              isProgrammaticMoveRef.current = true;
+              resolve({ center: { lat: coordData.latitude, lng: coordData.longitude }, mapLevel: selectedMapLevel });
             } else {
-              selectedMapLevel = 10;
+              // 지오코딩 실패 시 시군구 중심 좌표로 fallback
+              console.warn('⚠️ [지도 이동] 지오코딩 API 실패 - 시군구 중심 좌표로 fallback:', {
+                address,
+                response: coordData
+              });
+              fallbackToSidoCenter(targetSido, targetSigungu, resolve);
             }
-            console.log('시군구 선택 - 백엔드 Geocoding API 성공:', {
+          })
+          .catch(err => {
+            console.error('❌ [지도 이동] 지오코딩 API 호출 실패 - 시군구 중심 좌표로 fallback:', {
               address,
-              center: { lat: coordData.latitude, lng: coordData.longitude },
-              mapLevel: selectedMapLevel,
-              targetSigungu
+              error: err.message,
+              response: err.response?.data
             });
-            setMapCenter({ lat: coordData.latitude, lng: coordData.longitude });
-            setMapLevel(selectedMapLevel);
-            isProgrammaticMoveRef.current = true;
-            resolve({ center: { lat: coordData.latitude, lng: coordData.longitude }, mapLevel: selectedMapLevel });
-          } else {
-            // 백엔드 API 실패 시 시도 중심 좌표 사용
-            console.warn('백엔드 Geocoding API 실패, 시도 중심 좌표 사용');
             fallbackToSidoCenter(targetSido, targetSigungu, resolve);
-          }
-        })
-        .catch(err => {
-          console.warn('백엔드 Geocoding API 실패, 시도 중심 좌표 사용:', err);
-          fallbackToSidoCenter(targetSido, targetSigungu, resolve);
-        });
-    });
+          });
+      });
+    }
 
     return null;
   }, []);
@@ -685,15 +883,92 @@ const LocationServiceMap = () => {
     }
   }, [addressQuery, categoryType, fetchServices, keyword, handleRegionSearch]);
 
-  // 시도/시군구/읍면동 선택 시 자동으로 서비스 필터링 (클라이언트 사이드)
+  // 시도/시군구/읍면동 선택 시 자동으로 서비스 필터링 및 지도 이동
+  // 카테고리 변경은 버튼 클릭에서 처리하므로 여기서는 지역 선택만 처리
   useEffect(() => {
-    if (!isInitialLoadRef.current && allServices.length > 0) {
-      const effectiveCategoryType = categoryType !== CATEGORY_DEFAULT && categoryType !== CATEGORY_CUSTOM
-        ? categoryType
-        : undefined;
+    if (isInitialLoadRef.current) {
+      return; // 초기 로드 중이면 무시
+    }
+
+    const effectiveCategoryType = categoryType !== CATEGORY_DEFAULT && categoryType !== CATEGORY_CUSTOM
+      ? categoryType
+      : undefined;
+
+    // 지역 선택 시: 지도 위치 업데이트 + 데이터 조회 전략
+    if (selectedSido || selectedSigungu || selectedEupmyeondong) {
+      // 동 선택 시: 지오코딩 후 위치 기반 검색 (반경)
+      if (selectedEupmyeondong) {
+        console.log('📍 [지역 선택] 동 선택 - 지오코딩 후 위치 기반 검색');
+        updateMapLocation(selectedSido, selectedSigungu, selectedEupmyeondong)
+          .then(locationResult => {
+            if (locationResult && locationResult.center) {
+              // 지오코딩 성공 시 위치 기반 검색
+              fetchServices({
+                latitude: locationResult.center.lat,
+                longitude: locationResult.center.lng,
+                radius: 5000, // 5km 반경
+                categoryOverride: effectiveCategoryType,
+              });
+            } else {
+              // 지오코딩 실패 시 지역 기반 검색으로 fallback
+              console.warn('⚠️ [지역 선택] 지오코딩 실패 - 지역 기반 검색으로 fallback');
+              fetchServices({
+                region: [selectedSido, selectedSigungu, selectedEupmyeondong].filter(Boolean).join(' '),
+                categoryOverride: effectiveCategoryType,
+              });
+            }
+          })
+          .catch(err => {
+            console.error('❌ [지역 선택] 지도 위치 업데이트 실패:', err);
+            // 에러 발생 시 지역 기반 검색으로 fallback
+            fetchServices({
+              region: [selectedSido, selectedSigungu, selectedEupmyeondong].filter(Boolean).join(' '),
+              categoryOverride: effectiveCategoryType,
+            });
+          });
+        return;
+      }
+
+      // 시도/시군구 선택 시: 지도 위치 업데이트 (지오코딩 API 호출 없음)
+      updateMapLocation(selectedSido, selectedSigungu, selectedEupmyeondong).catch(err => {
+        console.warn('지도 위치 업데이트 실패:', err);
+      });
+
+      // 시도/시군구 선택 시: 하이브리드 전략
+      if (allServices.length > 0 && initialLoadTypeRef.current === 'location-based') {
+        // 초기 로드가 위치 기반이면 범위 내 필터링, 범위 밖이면 백엔드 재요청
+        const loadedSidos = new Set(allServices.map(s => s.sido).filter(Boolean));
+        const loadedSigungus = new Set(allServices.map(s => s.sigungu).filter(Boolean));
+
+        const isRegionInLoadedData =
+          (!selectedSido || loadedSidos.has(selectedSido)) &&
+          (!selectedSigungu || loadedSigungus.has(selectedSigungu));
+
+        if (isRegionInLoadedData) {
+          // 현재 데이터 범위 내: 프론트엔드 필터링
+          console.log('📍 [지역 선택] 위치 기반 데이터 범위 내 - 프론트엔드 필터링');
+          filterServicesByRegion(allServices, selectedSido, selectedSigungu, selectedEupmyeondong, effectiveCategoryType);
+        } else {
+          // 현재 데이터 범위 밖: 백엔드 지역 기반 검색
+          console.log('🌐 [지역 선택] 위치 기반 데이터 범위 밖 - 백엔드 지역 기반 검색');
+          fetchServices({
+            region: [selectedSido, selectedSigungu, selectedEupmyeondong].filter(Boolean).join(' '),
+            categoryOverride: effectiveCategoryType,
+          });
+        }
+      } else {
+        // 초기 로드가 전체 조회이거나 데이터가 없으면 백엔드 지역 기반 검색
+        console.log('🌐 [지역 선택] 백엔드 지역 기반 검색');
+        fetchServices({
+          region: [selectedSido, selectedSigungu, selectedEupmyeondong].filter(Boolean).join(' '),
+          categoryOverride: effectiveCategoryType,
+        });
+      }
+    } else if (allServices.length > 0) {
+      // 지역 선택이 없으면 현재 카테고리로 필터링만
       filterServicesByRegion(allServices, selectedSido, selectedSigungu, selectedEupmyeondong, effectiveCategoryType);
     }
-  }, [selectedSido, selectedSigungu, selectedEupmyeondong, categoryType, allServices, filterServicesByRegion]);
+  }, [selectedSido, selectedSigungu, selectedEupmyeondong, allServices, filterServicesByRegion, fetchServices, categoryType, updateMapLocation]);
 
 
   // 거리 계산을 지연 로딩 (필요할 때만 계산)
@@ -828,24 +1103,47 @@ const LocationServiceMap = () => {
                     setSelectedKeywordCategory(categoryValue);
                     setKeyword(categoryValue);
                     if (categoryValue) {
-                      // 카테고리 선택 시 자동 필터링
+                      // 카테고리 선택 시: 백엔드 재요청 (백엔드에서 카테고리 필터링)
                       setCategoryType(CATEGORY_CUSTOM);
-                      if (allServices.length > 0) {
-                        filterServicesByRegion(allServices, selectedSido, selectedSigungu, selectedEupmyeondong, categoryValue);
-                      } else {
+                      const targetLocation = userLocation;
+                      if (targetLocation) {
+                        // 위치 기반 재요청
                         fetchServices({
-                          isInitialLoad: true,
+                          categoryOverride: categoryValue,
+                          userLocation: targetLocation,
+                        });
+                      } else if (selectedSido || selectedSigungu || selectedEupmyeondong) {
+                        // 지역 기반 재요청
+                        fetchServices({
+                          region: [selectedSido, selectedSigungu, selectedEupmyeondong].filter(Boolean).join(' '),
+                          categoryOverride: categoryValue,
+                        });
+                      } else {
+                        // 전체 조회 재요청
+                        fetchServices({
                           categoryOverride: categoryValue,
                         });
                       }
                     } else {
-                      // 전체 선택 시 필터링 해제
+                      // 전체 선택 시: 백엔드 재요청
                       setCategoryType(CATEGORY_DEFAULT);
-                      if (allServices.length > 0) {
-                        filterServicesByRegion(allServices, selectedSido, selectedSigungu, selectedEupmyeondong, undefined);
-                      } else {
+                      const targetLocation = userLocation;
+                      if (targetLocation) {
+                        // 위치 기반 재요청
                         fetchServices({
-                          isInitialLoad: true,
+                          categoryOverride: undefined,
+                          userLocation: targetLocation,
+                        });
+                      } else if (selectedSido || selectedSigungu || selectedEupmyeondong) {
+                        // 지역 기반 재요청
+                        fetchServices({
+                          region: [selectedSido, selectedSigungu, selectedEupmyeondong].filter(Boolean).join(' '),
+                          categoryOverride: undefined,
+                        });
+                      } else {
+                        // 전체 조회 재요청
+                        fetchServices({
+                          categoryOverride: undefined,
                         });
                       }
                     }

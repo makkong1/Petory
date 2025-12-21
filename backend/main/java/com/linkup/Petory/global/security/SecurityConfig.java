@@ -67,6 +67,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/users/email/verify/pre-registration/check").permitAll() // 회원가입
                         .requestMatchers("/oauth2/**").permitAll() // OAuth2 인증 엔드포인트 허용
                         .requestMatchers(HttpMethod.GET, "/api/uploads/**").permitAll() // 업로드 파일 공개 조회
+                        .requestMatchers("/api/geocoding/**").permitAll() // 지오코딩 API 공개 접근 허용
                         .requestMatchers("/error").permitAll() // 에러 페이지
                         .requestMatchers("/ws/**", "/chat/**").permitAll() // WebSocket 엔드포인트 (인증은 인터셉터에서 처리)
                         // MASTER 전용 API - 최상위 권한만 접근 가능

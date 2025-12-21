@@ -150,35 +150,68 @@ public class NaverMapService {
      * @return 위도, 경도 정보가 담긴 배열 [latitude, longitude], 변환 실패 시 null
      */
     public Double[] addressToCoordinates(String address) {
+        log.info("📍 [NaverMapService] addressToCoordinates 호출됨 - 주소: {}", address);
+
         if (address == null || address.trim().isEmpty()) {
+            log.warn("⚠️ [NaverMapService] 주소가 null이거나 비어있음");
             return null;
         }
 
         try {
+            log.info("🔑 [NaverMapService] API 키 확인 중...");
+            log.info("🔑 [NaverMapService] apiKeyId: {}",
+                    apiKeyId != null && !apiKeyId.isEmpty() ? apiKeyId : "null 또는 비어있음");
+            log.info("🔑 [NaverMapService] apiKey: {}",
+                    apiKey != null && !apiKey.isEmpty() ? (apiKey.substring(0, Math.min(5, apiKey.length())) + "***")
+                            : "null 또는 비어있음");
+
             // API 키가 없으면 에러 반환
             if (apiKeyId == null || apiKeyId.isEmpty() || apiKey == null || apiKey.isEmpty()) {
-                log.warn("네이버맵 API 키가 설정되지 않았습니다.");
+                log.error(
+                        "❌ [NaverMapService] 네이버맵 API 키가 설정되지 않았습니다. application.properties에서 naver.map.api.client-id와 naver.map.api.client-secret을 확인하세요.");
+                log.error("❌ [NaverMapService] 현재 apiKeyId: {}, apiKey: {}",
+                        apiKeyId != null ? apiKeyId : "null",
+                        apiKey != null
+                                ? (apiKey.length() > 0 ? apiKey.substring(0, Math.min(5, apiKey.length())) + "***"
+                                        : "비어있음")
+                                : "null");
                 return null;
             }
 
-            log.info("네이버맵 지오코딩 API 호출 - 주소: {}", address);
+            log.info("✅ [NaverMapService] API 키 확인 완료 - 네이버맵 지오코딩 API 호출 시작 - 주소: {}", address);
+            log.info("📍 [NaverMapService] 주소 상세 - 길이: {}, 공백 포함: {}, + 포함: {}",
+                    address.length(), address.contains(" "), address.contains("+"));
 
-            // 네이버맵 Geocoding API URL (지오코딩)
+            // 주소 정리: + 문자를 공백으로 변환하고 공백을 하나로 통일
+            String cleanedAddress = address.replace("+", " ").replaceAll("\\s+", " ").trim();
+            log.info("🧹 [NaverMapService] 정리된 주소: {}", cleanedAddress);
+
+            // 네이버맵 Geocoding API URL (지오코딩) - 공식 문서에 따름
+            // 공식 엔드포인트: https://maps.apigw.ntruss.com/map-geocode/v2/geocode
             String url = UriComponentsBuilder
-                    .fromUriString("https://naveropenapi.apigw.ntruss.com/map-geocode/v2/geocode")
-                    .queryParam("query", address)
+                    .fromUriString("https://maps.apigw.ntruss.com/map-geocode/v2/geocode")
+                    .queryParam("query", cleanedAddress)
+                    .encode() // URL 인코딩 자동 처리
                     .toUriString();
 
-            log.debug("요청 URL: {}", url);
+            log.info("🌐 [NaverMapService] 요청 URL: {}", url);
 
-            // 헤더 설정
+            // 헤더 설정 (공식 문서에 따름 - 소문자)
             HttpHeaders headers = new HttpHeaders();
-            headers.set("X-NCP-APIGW-API-KEY-ID", apiKeyId);
-            headers.set("X-NCP-APIGW-API-KEY", apiKey);
+            headers.set("x-ncp-apigw-api-key-id", apiKeyId);
+            headers.set("x-ncp-apigw-api-key", apiKey);
+            headers.set("Accept", "application/json");
+
+            log.info("🔑 [NaverMapService] 요청 헤더 설정 완료 - apiKeyId: {}, apiKey: {}", apiKeyId,
+                    apiKey.substring(0, Math.min(5, apiKey.length())) + "***");
+            log.info("🔑 [NaverMapService] 헤더 상세 - x-ncp-apigw-api-key-id 존재: {}, x-ncp-apigw-api-key 존재: {}",
+                    headers.containsKey("x-ncp-apigw-api-key-id"), headers.containsKey("x-ncp-apigw-api-key"));
+            log.info("🔑 [NaverMapService] 모든 헤더: {}", headers);
 
             HttpEntity<String> entity = new HttpEntity<>(headers);
 
             // API 호출
+            log.info("📡 [NaverMapService] API 호출 시작...");
             ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
                     url,
                     HttpMethod.GET,
@@ -186,39 +219,65 @@ public class NaverMapService {
                     new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {
                     });
 
-            log.info("네이버맵 지오코딩 API 응답 상태: {}", response.getStatusCode());
+            log.info("📥 [NaverMapService] 네이버맵 지오코딩 API 응답 상태: {}", response.getStatusCode());
 
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 Map<String, Object> responseBody = response.getBody();
+                log.info("📦 [NaverMapService] 응답 본문 전체: {}", responseBody);
+                if (responseBody != null) {
+                    log.info("📦 [NaverMapService] 응답 키 목록: {}", responseBody.keySet());
+                }
 
                 // 네이버맵 지오코딩 응답 파싱
-                if (responseBody.containsKey("addresses") &&
-                        ((java.util.List<?>) responseBody.get("addresses")).size() > 0) {
-
+                if (responseBody != null && responseBody.containsKey("addresses")) {
                     @SuppressWarnings("unchecked")
-                    java.util.List<Map<String, Object>> addresses = (java.util.List<Map<String, Object>>) responseBody
-                            .get("addresses");
+                    java.util.List<?> addressesList = (java.util.List<?>) responseBody.get("addresses");
 
-                    Map<String, Object> firstAddress = addresses.get(0);
-                    String latitudeStr = (String) firstAddress.get("y");
-                    String longitudeStr = (String) firstAddress.get("x");
+                    if (addressesList != null && addressesList.size() > 0) {
+                        log.info("✅ [NaverMapService] addresses 배열 발견, 크기: {}", addressesList.size());
 
-                    if (latitudeStr != null && longitudeStr != null) {
-                        try {
-                            Double latitude = Double.parseDouble(latitudeStr);
-                            Double longitude = Double.parseDouble(longitudeStr);
-                            log.info("네이버맵 지오코딩 성공 - 좌표: ({}, {})", latitude, longitude);
-                            return new Double[] { latitude, longitude };
-                        } catch (NumberFormatException e) {
-                            log.warn("좌표 파싱 실패: latitude={}, longitude={}", latitudeStr, longitudeStr);
+                        @SuppressWarnings("unchecked")
+                        java.util.List<Map<String, Object>> addresses = (java.util.List<Map<String, Object>>) addressesList;
+
+                        Map<String, Object> firstAddress = addresses.get(0);
+                        String latitudeStr = (String) firstAddress.get("y");
+                        String longitudeStr = (String) firstAddress.get("x");
+
+                        if (latitudeStr != null && longitudeStr != null) {
+                            try {
+                                Double latitude = Double.parseDouble(latitudeStr);
+                                Double longitude = Double.parseDouble(longitudeStr);
+                                log.info("네이버맵 지오코딩 성공 - 좌표: ({}, {})", latitude, longitude);
+                                return new Double[] { latitude, longitude };
+                            } catch (NumberFormatException e) {
+                                log.warn("좌표 파싱 실패: latitude={}, longitude={}", latitudeStr, longitudeStr);
+                                return null;
+                            }
+                        } else {
+                            log.warn("⚠️ [NaverMapService] 좌표 정보가 없습니다 - latitudeStr: {}, longitudeStr: {}",
+                                    latitudeStr, longitudeStr);
                             return null;
                         }
+                    } else {
+                        // addresses가 비어있는 경우
+                        log.warn("⚠️ [NaverMapService] 네이버맵 지오코딩 결과 없음 - 주소: {}, status: {}, totalCount: {}",
+                                address,
+                                responseBody != null ? responseBody.get("status") : "N/A",
+                                responseBody != null && responseBody.containsKey("meta")
+                                        ? ((Map<?, ?>) responseBody.get("meta")).get("totalCount")
+                                        : "N/A");
+                        return null;
                     }
+                } else {
+                    // addresses 키가 없거나 responseBody가 null인 경우
+                    log.warn("⚠️ [NaverMapService] 네이버맵 지오코딩 응답에 addresses 키가 없습니다 - 주소: {}", address);
+                    return null;
                 }
+            } else {
+                // 응답이 실패하거나 null인 경우
+                log.warn("⚠️ [NaverMapService] 네이버맵 지오코딩 실패 - 주소를 찾을 수 없습니다: {}", address);
+                return null;
             }
-
-            log.warn("네이버맵 지오코딩 실패 - 주소를 찾을 수 없습니다: {}", address);
-            return null;
         } catch (org.springframework.web.client.HttpClientErrorException e) {
             String responseBody = e.getResponseBodyAsString();
             log.error("네이버맵 지오코딩 API HTTP 에러: {} - 상태: {}", e.getMessage(), e.getStatusCode());
@@ -268,10 +327,13 @@ public class NaverMapService {
 
             log.debug("요청 URL: {}", url);
 
-            // 헤더 설정
+            // 헤더 설정 (공식 예시에 따름 - 소문자)
             HttpHeaders headers = new HttpHeaders();
-            headers.set("X-NCP-APIGW-API-KEY-ID", apiKeyId);
-            headers.set("X-NCP-APIGW-API-KEY", apiKey);
+            headers.set("x-ncp-apigw-api-key-id", apiKeyId);
+            headers.set("x-ncp-apigw-api-key", apiKey);
+
+            log.debug("요청 헤더 - x-ncp-apigw-api-key-id: {}, x-ncp-apigw-api-key: {}", apiKeyId,
+                    apiKey.substring(0, Math.min(5, apiKey.length())) + "***");
 
             HttpEntity<String> entity = new HttpEntity<>(headers);
 
@@ -290,71 +352,76 @@ public class NaverMapService {
                 Map<String, Object> responseBody = response.getBody();
 
                 // 네이버맵 역지오코딩 응답 파싱
-                if (responseBody.containsKey("results") &&
-                        ((java.util.List<?>) responseBody.get("results")).size() > 0) {
-
+                if (responseBody != null && responseBody.containsKey("results")) {
                     @SuppressWarnings("unchecked")
-                    java.util.List<Map<String, Object>> results = (java.util.List<Map<String, Object>>) responseBody
-                            .get("results");
+                    java.util.List<?> resultsList = (java.util.List<?>) responseBody.get("results");
 
-                    Map<String, Object> firstResult = results.get(0);
-                    @SuppressWarnings("unchecked")
-                    Map<String, Object> region = (Map<String, Object>) firstResult.get("region");
-
-                    // 주소 조합
-                    StringBuilder addressBuilder = new StringBuilder();
-                    if (region != null) {
+                    if (resultsList != null && resultsList.size() > 0) {
                         @SuppressWarnings("unchecked")
-                        Map<String, String> area1 = (Map<String, String>) region.get("area1"); // 시도
-                        @SuppressWarnings("unchecked")
-                        Map<String, String> area2 = (Map<String, String>) region.get("area2"); // 시군구
-                        @SuppressWarnings("unchecked")
-                        Map<String, String> area3 = (Map<String, String>) region.get("area3"); // 읍면동
-                        @SuppressWarnings("unchecked")
-                        Map<String, String> area4 = (Map<String, String>) region.get("area4"); // 리
+                        java.util.List<Map<String, Object>> results = (java.util.List<Map<String, Object>>) resultsList;
 
-                        if (area1 != null && area1.get("name") != null) {
-                            addressBuilder.append(area1.get("name"));
-                        }
-                        if (area2 != null && area2.get("name") != null) {
-                            addressBuilder.append(" ").append(area2.get("name"));
-                        }
-                        if (area3 != null && area3.get("name") != null) {
-                            addressBuilder.append(" ").append(area3.get("name"));
-                        }
-                        if (area4 != null && area4.get("name") != null) {
-                            addressBuilder.append(" ").append(area4.get("name"));
-                        }
-                    }
+                        Map<String, Object> firstResult = results.get(0);
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> region = (Map<String, Object>) firstResult.get("region");
 
-                    // land 정보 (도로명 주소)
-                    @SuppressWarnings("unchecked")
-                    Map<String, Object> land = (Map<String, Object>) firstResult.get("land");
-                    String roadAddress = null;
-                    if (land != null) {
-                        roadAddress = (String) land.get("name");
-                        String number1 = (String) land.get("number1");
-                        String number2 = (String) land.get("number2");
+                        // 주소 조합
+                        StringBuilder addressBuilder = new StringBuilder();
+                        if (region != null) {
+                            @SuppressWarnings("unchecked")
+                            Map<String, String> area1 = (Map<String, String>) region.get("area1"); // 시도
+                            @SuppressWarnings("unchecked")
+                            Map<String, String> area2 = (Map<String, String>) region.get("area2"); // 시군구
+                            @SuppressWarnings("unchecked")
+                            Map<String, String> area3 = (Map<String, String>) region.get("area3"); // 읍면동
+                            @SuppressWarnings("unchecked")
+                            Map<String, String> area4 = (Map<String, String>) region.get("area4"); // 리
 
-                        if (roadAddress != null) {
-                            if (number1 != null) {
-                                roadAddress += " " + number1;
+                            if (area1 != null && area1.get("name") != null) {
+                                addressBuilder.append(area1.get("name"));
                             }
-                            if (number2 != null) {
-                                roadAddress += "-" + number2;
+                            if (area2 != null && area2.get("name") != null) {
+                                addressBuilder.append(" ").append(area2.get("name"));
+                            }
+                            if (area3 != null && area3.get("name") != null) {
+                                addressBuilder.append(" ").append(area3.get("name"));
+                            }
+                            if (area4 != null && area4.get("name") != null) {
+                                addressBuilder.append(" ").append(area4.get("name"));
                             }
                         }
+
+                        // land 정보 (도로명 주소)
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> land = (Map<String, Object>) firstResult.get("land");
+                        String roadAddress = null;
+                        if (land != null) {
+                            roadAddress = (String) land.get("name");
+                            String number1 = (String) land.get("number1");
+                            String number2 = (String) land.get("number2");
+
+                            if (roadAddress != null) {
+                                if (number1 != null) {
+                                    roadAddress += " " + number1;
+                                }
+                                if (number2 != null) {
+                                    roadAddress += "-" + number2;
+                                }
+                            }
+                        }
+
+                        result.put("success", true);
+                        result.put("address", roadAddress != null ? roadAddress : addressBuilder.toString());
+                        result.put("roadAddress", roadAddress);
+                        result.put("jibunAddress", addressBuilder.toString());
+
+                        log.info("네이버맵 역지오코딩 성공 - 주소: {}", result.get("address"));
+                    } else {
+                        result.put("success", false);
+                        result.put("message", "주소를 찾을 수 없습니다.");
                     }
-
-                    result.put("success", true);
-                    result.put("address", roadAddress != null ? roadAddress : addressBuilder.toString());
-                    result.put("roadAddress", roadAddress);
-                    result.put("jibunAddress", addressBuilder.toString());
-
-                    log.info("네이버맵 역지오코딩 성공 - 주소: {}", result.get("address"));
                 } else {
                     result.put("success", false);
-                    result.put("message", "주소를 찾을 수 없습니다.");
+                    result.put("message", "응답에 results 키가 없습니다.");
                 }
             } else {
                 result.put("success", false);

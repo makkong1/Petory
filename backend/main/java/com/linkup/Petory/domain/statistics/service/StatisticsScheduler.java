@@ -8,6 +8,7 @@ import com.linkup.Petory.domain.statistics.repository.DailyStatisticsRepository;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,12 +28,29 @@ public class StatisticsScheduler {
     private final BoardRepository boardRepository;
     private final CareRequestRepository careRequestRepository;
 
+    // application.properties에서 스케줄러 시간 읽기 (기본값: 18:30)
+    @Value("${statistics.scheduler.hour:18}")
+    private int schedulerHour;
+
+    @Value("${statistics.scheduler.minute:30}")
+    private int schedulerMinute;
+
     /**
-     * 매일 오후 6시 30분(18:30:00)에 실행되어 '어제'의 통계를 집계
+     * 매일 지정된 시간에 실행되어 '어제'의 통계를 집계
+     * 
+     * 기본값: 매일 오후 6시 30분(18:30:00)
+     * 설정 변경: application.properties에 다음 추가
+     *   statistics.scheduler.hour=18
+     *   statistics.scheduler.minute=30
+     * 
+     * 주의: @Scheduled는 컴파일 타임에 결정되므로, 동적 변경을 위해서는
+     *       TaskScheduler를 사용한 동적 스케줄러 구현이 필요합니다.
+     *       현재는 application.properties 수정 후 서버 재시작이 필요합니다.
      */
-    @Scheduled(cron = "0 30 18 * * ?")
+    @Scheduled(cron = "${statistics.scheduler.cron:0 30 18 * * ?}")
     @Transactional
     public void aggregateDailyStatistics() {
+        log.info("통계 집계 스케줄러 실행 (설정된 시간: {}:{}), 어제 통계 집계 시작", schedulerHour, schedulerMinute);
         LocalDate yesterday = LocalDate.now().minusDays(1);
         aggregateStatisticsForDate(yesterday);
     }

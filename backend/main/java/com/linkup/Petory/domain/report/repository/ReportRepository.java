@@ -1,8 +1,11 @@
 package com.linkup.Petory.domain.report.repository;
 
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import com.linkup.Petory.domain.report.entity.Report;
 import com.linkup.Petory.domain.report.entity.ReportStatus;
@@ -19,5 +22,16 @@ public interface ReportRepository extends JpaRepository<Report, Long> {
     List<Report> findByTargetTypeOrderByCreatedAtDesc(ReportTargetType targetType);
 
     List<Report> findByTargetTypeAndStatusOrderByCreatedAtDesc(ReportTargetType targetType, ReportStatus status);
+
+    /**
+     * 필터 조건에 맞는 신고 목록 조회
+     */
+    @Query("SELECT r FROM Report r " +
+           "WHERE (:targetType IS NULL OR r.targetType = :targetType) " +
+           "AND (:status IS NULL OR r.status = :status) " +
+           "ORDER BY r.createdAt DESC")
+    List<Report> findReportsWithFilters(
+            @Param("targetType") ReportTargetType targetType,
+            @Param("status") ReportStatus status);
 }
 

@@ -2,6 +2,7 @@ package com.linkup.Petory.domain.report.service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -83,22 +84,62 @@ public class ReportService {
     /**
      * 신고 목록 조회 (관리자용)
      * - AdminReportController에서 사용
+     * - 신고 횟수가 많은 순서대로 정렬 (신고 횟수 DESC, 생성일시 DESC)
      */
     public List<ReportDTO> getReports(ReportTargetType targetType, ReportStatus status) {
-        List<Report> reports;
+        // 필터 조건에 맞는 신고 목록 조회
+        List<Report> reports = reportRepository.findReportsWithFilters(targetType, status);
 
-        if (targetType != null && status != null) {
-            reports = reportRepository.findByTargetTypeAndStatusOrderByCreatedAtDesc(targetType, status);
-        } else if (targetType != null) {
-            reports = reportRepository.findByTargetTypeOrderByCreatedAtDesc(targetType);
-        } else if (status != null) {
-            reports = reportRepository.findByStatusOrderByCreatedAtDesc(status);
-        } else {
-            reports = reportRepository.findAllByOrderByCreatedAtDesc();
-        }
+        // 각 target에 대한 총 신고 횟수 계산 (Map으로 캐싱)
+        Map<String, Long> reportCountMap = reports.stream()
+                .collect(java.util.stream.Collectors.groupingBy(
+                        r -> r.getTargetType().name() + "_" + r.getTargetIdx(),
+                        java.util.stream.Collectors.counting()));
 
-        return reports.stream()
-                .map(reportConverter::toDTO)
+        // ReportDTO 변환 및 신고 횟수 포함
+        List<ReportDTO> dtos = reports.stream()
+                .map(report -> {
+                    String targetKey = report.getTargetType().name() + "_" + report.getTargetIdx();
+                    Integer reportCount = reportCountMap.get(targetKey).intValue();
+                    
+                    ReportDTO dto = reportConverter.toDTO(report);
+                    // ReportDTO는 @Value이므로 새로 빌드해야 함
+                    return ReportDTO.builder()
+                            .idx(dto.getIdx())
+                            .targetType(dto.getTargetType())
+                            .targetIdx(dto.getTargetIdx())
+                            .reporterId(dto.getReporterId())
+                            .reporterName(dto.getReporterName())
+                            .reason(dto.getReason())
+                            .status(dto.getStatus())
+                            .actionTaken(dto.getActionTaken())
+                            .handledBy(dto.getHandledBy())
+                            .handledByName(dto.getHandledByName())
+                            .handledAt(dto.getHandledAt())
+                            .adminNote(dto.getAdminNote())
+                            .createdAt(dto.getCreatedAt())
+                            .updatedAt(dto.getUpdatedAt())
+                            .reportCount(reportCount)
+                            .build();
+                })
+                .toList();
+
+        // 신고 횟수 기준으로 정렬 (신고 횟수 DESC, 생성일시 DESC)
+        return dtos.stream()
+                .sorted((dto1, dto2) -> {
+                    // 신고 횟수 비교 (내림차순)
+                    int countCompare = Integer.compare(
+                            dto2.getReportCount() != null ? dto2.getReportCount() : 0,
+                            dto1.getReportCount() != null ? dto1.getReportCount() : 0);
+                    if (countCompare != 0) {
+                        return countCompare;
+                    }
+                    // 신고 횟수가 같으면 생성일시 비교 (내림차순)
+                    if (dto1.getCreatedAt() != null && dto2.getCreatedAt() != null) {
+                        return dto2.getCreatedAt().compareTo(dto1.getCreatedAt());
+                    }
+                    return 0;
+                })
                 .toList();
     }
 
