@@ -52,8 +52,18 @@ public class LocationServiceController {
         try {
             // ========== 성능 측정 시작 ==========
             long startTime = System.currentTimeMillis();
-            log.info("🚀 [성능 측정] 위치 서비스 검색 시작 - latitude={}, longitude={}, radius={}, sido={}, sigungu={}, eupmyeondong={}, category={}, size={}",
-                    latitude, longitude, radius, sido, sigungu, eupmyeondong, category, size);
+            
+            // 기본 결과 수 제한 (size 파라미터 없으면 100개로 제한)
+            // 단, size가 명시적으로 0이거나 음수면 전체 조회 (null 전달)
+            Integer effectiveSize = size;
+            if (effectiveSize == null) {
+                effectiveSize = 100; // 기본값: 100개
+            } else if (effectiveSize <= 0) {
+                effectiveSize = null; // 0 이하면 전체 조회
+            }
+            
+            log.info("🚀 [성능 측정] 위치 서비스 검색 시작 - latitude={}, longitude={}, radius={}, sido={}, sigungu={}, eupmyeondong={}, category={}, size={} (effectiveSize={})",
+                    latitude, longitude, radius, sido, sigungu, eupmyeondong, category, size, effectiveSize);
 
             // 위치 기반 검색 또는 지역 계층별 검색 수행
             List<LocationServiceDTO> services;
@@ -61,7 +71,7 @@ public class LocationServiceController {
                 // 위치 기반 검색 (반경 검색)
                 int radiusInMeters = (radius != null && radius > 0) ? radius : 10000; // 기본값 10km
                 services = locationServiceService.searchLocationServicesByLocation(
-                        latitude, longitude, radiusInMeters, category, size);
+                        latitude, longitude, radiusInMeters, category, effectiveSize);
             } else {
                 // 지역 계층별 검색 (기존 로직)
                 services = locationServiceService.searchLocationServicesByRegion(
@@ -70,7 +80,7 @@ public class LocationServiceController {
                         eupmyeondong,
                         roadName,
                         category,
-                        size);
+                        effectiveSize);
             }
 
             long queryTime = System.currentTimeMillis() - startTime;

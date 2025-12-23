@@ -109,6 +109,20 @@ const MapContainer = React.forwardRef(
               }
             });
           }
+
+          // 네이버맵 인증 관련 요소 숨기기
+          const authElements = document.querySelectorAll('iframe[src*="oapi.map.naver.com"], iframe[src*="auth"], a[href*="oapi.map.naver.com"], a[href*="auth"]');
+          authElements.forEach((el) => {
+            if (el instanceof HTMLElement) {
+              el.style.display = 'none';
+              el.style.visibility = 'hidden';
+              el.style.opacity = '0';
+              el.style.width = '0';
+              el.style.height = '0';
+              el.style.position = 'absolute';
+              el.style.left = '-9999px';
+            }
+          });
         }, 500);
 
         // 지도 이벤트 리스너 등록
@@ -267,7 +281,6 @@ const MapContainer = React.forwardRef(
 
     // 서비스 마커 표시 - 성능 최적화: 마커 개수 제한 및 배치 처리
     const lastServicesKeyRef = useRef('');
-
     useEffect(() => {
       if (!mapReadyRef.current || !mapInstanceRef.current || !window.naver?.maps) return;
 
@@ -280,8 +293,8 @@ const MapContainer = React.forwardRef(
 
       clearMarkers();
 
-      // 마커 개수 제한 (성능 최적화)
-      const maxMarkers = 500;
+      // 마커 개수 제한 (성능 최적화) - UX 개선: 20개로 제한
+      const maxMarkers = 20;
       const servicesToShow = services.slice(0, maxMarkers);
 
       // 배치 처리로 성능 개선
@@ -453,6 +466,36 @@ const MapContainer = React.forwardRef(
 
     // GeoJSON 폴리곤 표시 기능 제거됨 (geojsonUtils 파일 없음)
 
+    // 네이버맵 인증 관련 요소 주기적으로 숨기기 (동적으로 생성될 수 있음)
+    useEffect(() => {
+      if (!mapReadyRef.current) return;
+
+      const hideAuthElements = () => {
+        const authElements = document.querySelectorAll('iframe[src*="oapi.map.naver.com"], iframe[src*="auth"], a[href*="oapi.map.naver.com"], a[href*="auth"]');
+        authElements.forEach((el) => {
+          if (el instanceof HTMLElement) {
+            el.style.display = 'none';
+            el.style.visibility = 'hidden';
+            el.style.opacity = '0';
+            el.style.width = '0';
+            el.style.height = '0';
+            el.style.position = 'absolute';
+            el.style.left = '-9999px';
+          }
+        });
+      };
+
+      // 주기적으로 인증 관련 요소 숨기기
+      const hideAuthInterval = setInterval(hideAuthElements, 1000);
+
+      // 초기 실행
+      hideAuthElements();
+
+      return () => {
+        clearInterval(hideAuthInterval);
+      };
+    }, [mapReady]);
+
     // 정리
     useEffect(() => {
       return () => {
@@ -487,17 +530,6 @@ const MapContainer = React.forwardRef(
       }
     }, []);
 
-    if (!NAVER_MAPS_KEY_ID) {
-      return (
-        <MapDiv ref={mapRef}>
-          <MapError>
-            네이버맵 Key ID가 설정되지 않았습니다.<br />
-            .env 파일에 REACT_APP_NAVER_MAPS_KEY_ID를 확인하세요.
-          </MapError>
-        </MapDiv>
-      );
-    }
-
     if (!mapReady) {
       return (
         <MapDiv ref={mapRef}>
@@ -530,6 +562,7 @@ const MapDiv = styled.div`
   min-height: 500px;
   position: relative;
   background: #ffffff;
+  overflow: hidden; /* 인증 URL 등이 밖으로 나오지 않도록 */
 
   /* 네이버맵 저작권 표시 숨기기 */
   .nmap_copyright,
@@ -546,6 +579,21 @@ const MapDiv = styled.div`
     &[class*="control"] {
       display: none !important;
     }
+  }
+
+  /* 네이버맵 인증 관련 요소 숨기기 */
+  iframe[src*="oapi.map.naver.com"],
+  iframe[src*="auth"],
+  script[src*="oapi.map.naver.com"],
+  a[href*="oapi.map.naver.com"],
+  a[href*="auth"] {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    width: 0 !important;
+    height: 0 !important;
+    position: absolute !important;
+    left: -9999px !important;
   }
 `;
 
