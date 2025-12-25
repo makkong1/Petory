@@ -22,6 +22,7 @@ public class MissingPetBoardDTO {
     private Long idx;
     private Long userId;
     private String username;
+    private String nickname;
     private String title;
     private String content;
     private String phoneNumber;

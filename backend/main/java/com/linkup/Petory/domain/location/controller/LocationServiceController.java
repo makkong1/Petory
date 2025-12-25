@@ -65,15 +65,15 @@ public class LocationServiceController {
             log.info("🚀 [성능 측정] 위치 서비스 검색 시작 - latitude={}, longitude={}, radius={}, sido={}, sigungu={}, eupmyeondong={}, category={}, size={} (effectiveSize={})",
                     latitude, longitude, radius, sido, sigungu, eupmyeondong, category, size, effectiveSize);
 
-            // 위치 기반 검색 또는 지역 계층별 검색 수행
+            // 하이브리드 전략: 초기 로드는 위치 기반, 이후 검색은 시도/시군구 기반
             List<LocationServiceDTO> services;
-            if (latitude != null && longitude != null) {
-                // 위치 기반 검색 (반경 검색)
-                int radiusInMeters = (radius != null && radius > 0) ? radius : 10000; // 기본값 10km
+            if (latitude != null && longitude != null && radius != null) {
+                // 초기 로드: 위치 기반 반경 검색 (빠르고 적은 데이터)
+                int radiusInMeters = radius > 0 ? radius : 10000; // 기본값 10km
                 services = locationServiceService.searchLocationServicesByLocation(
                         latitude, longitude, radiusInMeters, category, effectiveSize);
             } else {
-                // 지역 계층별 검색 (기존 로직)
+                // 이후 검색: 시도/시군구 기반 검색 (일관성 유지)
                 services = locationServiceService.searchLocationServicesByRegion(
                         sido,
                         sigungu,
