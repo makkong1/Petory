@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { careRequestApi } from '../../api/careRequestApi';
+import { geocodingApi } from '../../api/geocodingApi';
 import CareRequestForm from './CareRequestForm';
 import CareRequestDetailPage from './CareRequestDetailPage';
 import { useAuth } from '../../contexts/AuthContext';
@@ -16,13 +17,26 @@ const CareRequestList = () => {
   const [selectedCareRequestId, setSelectedCareRequestId] = useState(null);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [isSearching, setIsSearching] = useState(false);
+  
+  // 위치 필터링 관련 State
+  const [filterLocation, setFilterLocation] = useState(null); // 예: '강남구'
+  const [locationLoading, setLocationLoading] = useState(false);
 
   // API에서 케어 요청 데이터 가져오기
   const fetchCareRequests = async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await careRequestApi.getAllCareRequests();
+      
+      const params = {};
+      if (activeFilter !== 'ALL') {
+        params.status = activeFilter;
+      }
+      if (filterLocation) {
+        params.location = filterLocation;
+      }
+      
+      const response = await careRequestApi.getAllCareRequests(params);
       setCareRequests(response.data || []);
     } catch (error) {
       console.error('케어 요청 데이터 로딩 실패:', error);
@@ -35,7 +49,7 @@ const CareRequestList = () => {
 
   useEffect(() => {
     fetchCareRequests();
-  }, []);
+  }, [filterLocation]); // filterLocation 변경 시 재요청 (activeFilter는 handleFilterChange에서 처리)
 
   // 전역 이벤트 리스너: 알림에서 펫케어 요청글로 이동할 때 사용
   useEffect(() => {
@@ -109,10 +123,19 @@ const CareRequestList = () => {
     setActiveFilter(filterKey);
     setSearchKeyword(''); // 검색어 초기화
     setIsSearching(false);
+    
+    // fetchCareRequests 함수 사용 (중복 로직 제거 효과)
+    // 단, state update가 비동기라 여기서 호출하면 이전 state를 쓸 수 있음.
+    // 하지만 setActiveFilter 직후라 useEffect 의존성을 쓰는게 나을수도 있으나
+    // 기존 로직 유지를 위해 직접 호출하되 params 구성
+    
     try {
       setLoading(true);
       setError(null);
       const params = filterKey === 'ALL' ? {} : { status: filterKey };
+      if (filterLocation) {
+        params.location = filterLocation;
+      }
       const response = await careRequestApi.getAllCareRequests(params);
       setCareRequests(response.data || []);
     } catch (error) {
@@ -121,6 +144,86 @@ const CareRequestList = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // 내 동네 필터 토글
+  const handleLocationFilterToggle = () => {
+    if (filterLocation) {
+      // 이미 켜져있으면 끄기
+      setFilterLocation(null);
+      return;
+    }
+
+    if (!navigator.geolocation) {
+      alert('브라우저가 위치 정보를 지원하지 않습니다.');
+      return;
+    }
+
+    setLocationLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+          // 역지오코딩 API 호출
+          const addressData = await geocodingApi.coordinatesToAddress(latitude, longitude);
+          
+          if (addressData && addressData.address) {
+            const fullAddress = addressData.address;
+            console.log('내 위치 주소:', fullAddress);
+            
+            // 주소에서 '구' 또는 '군' 단위 추출 (간단한 로직)
+            // 예: "서울특별시 강남구 역삼동" -> "강남구"
+            // 예: "경기도 성남시 분당구 정자동" -> "분당구"
+            const parts = fullAddress.split(' ');
+            let targetRegion = '';
+            
+            // 시/도 다음 단어가 시/군/구일 확률이 높음
+            if (parts.length >= 2) {
+              // '구'나 '군'이나 '시'로 끝나는 단어 찾기
+              // 1. '구' 포함 체크
+              const guPart = parts.find(p => p.endsWith('구'));
+              if (guPart) {
+                targetRegion = guPart;
+              } else {
+                // 2. '군' 포함 체크
+                const gunPart = parts.find(p => p.endsWith('군'));
+                if (gunPart) {
+                  targetRegion = gunPart;
+                } else {
+                   // 3. '시' 포함 체크 (시 단위일 경우)
+                   const siPart = parts.find(p => p.endsWith('시') && p !== parts[0]); // 첫단어(서울시 등) 제외
+                   if (siPart) {
+                     targetRegion = siPart;
+                   } else {
+                     // 찾지 못하면 두번째 단어 사용
+                     targetRegion = parts[1];
+                   }
+                }
+              }
+            }
+            
+            if (targetRegion) {
+              setFilterLocation(targetRegion);
+              console.log('설정된 지역 필터:', targetRegion);
+            } else {
+              alert('주소에서 지역 정보를 찾을 수 없습니다.');
+            }
+          } else {
+            alert('주소 정보를 가져오는데 실패했습니다.');
+          }
+        } catch (err) {
+          console.error('역지오코딩 에러:', err);
+          alert('위치 정보를 변환하는데 실패했습니다.');
+        } finally {
+          setLocationLoading(false);
+        }
+      },
+      (error) => {
+        console.error('위치 권한 에러:', error);
+        alert('위치 정보를 가져올 수 없습니다. 권한을 확인해주세요.');
+        setLocationLoading(false);
+      }
+    );
   };
 
   // 검색 기능
@@ -252,6 +355,13 @@ const CareRequestList = () => {
             {filter.label} ({filter.count})
           </FilterButton>
         ))}
+        <LocationFilterButton
+          active={!!filterLocation}
+          onClick={handleLocationFilterToggle}
+          disabled={locationLoading}
+        >
+          {locationLoading ? '위치 확인 중...' : filterLocation ? `📍 ${filterLocation}만 보기` : '📍 내 동네만 보기'}
+        </LocationFilterButton>
       </FilterSection>
 
       <CareGrid>
@@ -429,6 +539,25 @@ const FilterButton = styled.button`
   &:hover {
     background: ${props => props.active ? props.theme.colors.primaryDark : props.theme.colors.surfaceHover};
     transform: translateY(-1px);
+  }
+`;
+
+const LocationFilterButton = styled(FilterButton)`
+  margin-left: auto; /* 우측 정렬 */
+  background: ${props => props.active ? '#fff0f5' : props.theme.colors.surface}; /* 핑크빛 배경 */
+  color: ${props => props.active ? props.theme.colors.primary : props.theme.colors.text};
+  border-color: ${props => props.active ? props.theme.colors.primary : props.theme.colors.border};
+  font-weight: 600;
+  
+  &:hover {
+    background: ${props => props.active ? '#ffe4e6' : props.theme.colors.surfaceHover};
+  }
+
+  @media (max-width: 768px) {
+    margin-left: 0;
+    width: 100%;
+    justify-content: center;
+    border-radius: 8px; /* 모바일에서는 둥글기 좀 줄임 */
   }
 `;
 

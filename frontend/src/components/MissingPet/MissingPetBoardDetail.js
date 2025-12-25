@@ -232,7 +232,7 @@ const MissingPetBoardDetail = ({
                 <InfoGrid>
                   <InfoItem>
                     <InfoLabel>제보자</InfoLabel>
-                    <InfoValue>{board.username || '알 수 없음'}</InfoValue>
+                    <InfoValue>{board.nickname || '알 수 없음'}</InfoValue>
                   </InfoItem>
                   <InfoItem>
                     <InfoLabel>실종일</InfoLabel>
@@ -384,7 +384,7 @@ const MissingPetBoardDetail = ({
                   {board.comments.map((item) => (
                     <CommentItem key={item.idx}>
                       <CommentHeader>
-                        <CommentAuthor>{item.username || '익명'}</CommentAuthor>
+                        <CommentAuthor>{item.nickname || '익명'}</CommentAuthor>
                         <CommentDate>
                           {item.createdAt?.replace('T', ' ').substring(0, 16)}
                         </CommentDate>

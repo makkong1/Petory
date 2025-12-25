@@ -65,13 +65,10 @@ public class NaverMapService {
 
             log.debug("요청 URL: {}", url);
 
-            // 헤더 설정 (공식 예시에 따름 - 소문자)
+            // 헤더 설정 (네이버 클라우드 플랫폼 공식 문서: 대문자 사용)
             HttpHeaders headers = new HttpHeaders();
-            headers.set("x-ncp-apigw-api-key-id", apiKeyId);
-            headers.set("x-ncp-apigw-api-key", apiKey);
-
-            log.debug("요청 헤더 - x-ncp-apigw-api-key-id: {}, x-ncp-apigw-api-key: {}", apiKeyId,
-                    apiKey.substring(0, Math.min(5, apiKey.length())) + "***");
+            headers.set("X-NCP-APIGW-API-KEY-ID", apiKeyId);
+            headers.set("X-NCP-APIGW-API-KEY", apiKey);
 
             HttpEntity<String> entity = new HttpEntity<>(headers);
 
@@ -83,13 +80,10 @@ public class NaverMapService {
                     new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {
                     });
 
-            log.info("네이버맵 API 응답 상태: {}", response.getStatusCode());
-
             Map<String, Object> result = new HashMap<>();
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 result.put("success", true);
                 result.put("data", response.getBody());
-                log.info("네이버맵 Directions API 호출 성공");
                 // 응답 데이터 구조 로깅
                 Map<String, Object> responseBody = response.getBody();
                 if (responseBody != null) {
@@ -159,11 +153,6 @@ public class NaverMapService {
 
         try {
             log.info("🔑 [NaverMapService] API 키 확인 중...");
-            log.info("🔑 [NaverMapService] apiKeyId: {}",
-                    apiKeyId != null && !apiKeyId.isEmpty() ? apiKeyId : "null 또는 비어있음");
-            log.info("🔑 [NaverMapService] apiKey: {}",
-                    apiKey != null && !apiKey.isEmpty() ? (apiKey.substring(0, Math.min(5, apiKey.length())) + "***")
-                            : "null 또는 비어있음");
 
             // API 키가 없으면 에러 반환
             if (apiKeyId == null || apiKeyId.isEmpty() || apiKey == null || apiKey.isEmpty()) {
@@ -178,13 +167,8 @@ public class NaverMapService {
                 return null;
             }
 
-            log.info("✅ [NaverMapService] API 키 확인 완료 - 네이버맵 지오코딩 API 호출 시작 - 주소: {}", address);
-            log.info("📍 [NaverMapService] 주소 상세 - 길이: {}, 공백 포함: {}, + 포함: {}",
-                    address.length(), address.contains(" "), address.contains("+"));
-
             // 주소 정리: + 문자를 공백으로 변환하고 공백을 하나로 통일
             String cleanedAddress = address.replace("+", " ").replaceAll("\\s+", " ").trim();
-            log.info("🧹 [NaverMapService] 정리된 주소: {}", cleanedAddress);
 
             // 네이버맵 Geocoding API URL (지오코딩) - 공식 문서에 따름
             // 공식 엔드포인트: https://maps.apigw.ntruss.com/map-geocode/v2/geocode
@@ -194,19 +178,11 @@ public class NaverMapService {
                     .encode() // URL 인코딩 자동 처리
                     .toUriString();
 
-            log.info("🌐 [NaverMapService] 요청 URL: {}", url);
-
-            // 헤더 설정 (공식 문서에 따름 - 소문자)
+            // 헤더 설정 (네이버 클라우드 플랫폼 공식 문서: 대문자 사용)
             HttpHeaders headers = new HttpHeaders();
-            headers.set("x-ncp-apigw-api-key-id", apiKeyId);
-            headers.set("x-ncp-apigw-api-key", apiKey);
+            headers.set("X-NCP-APIGW-API-KEY-ID", apiKeyId);
+            headers.set("X-NCP-APIGW-API-KEY", apiKey);
             headers.set("Accept", "application/json");
-
-            log.info("🔑 [NaverMapService] 요청 헤더 설정 완료 - apiKeyId: {}, apiKey: {}", apiKeyId,
-                    apiKey.substring(0, Math.min(5, apiKey.length())) + "***");
-            log.info("🔑 [NaverMapService] 헤더 상세 - x-ncp-apigw-api-key-id 존재: {}, x-ncp-apigw-api-key 존재: {}",
-                    headers.containsKey("x-ncp-apigw-api-key-id"), headers.containsKey("x-ncp-apigw-api-key"));
-            log.info("🔑 [NaverMapService] 모든 헤더: {}", headers);
 
             HttpEntity<String> entity = new HttpEntity<>(headers);
 
@@ -219,14 +195,8 @@ public class NaverMapService {
                     new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {
                     });
 
-            log.info("📥 [NaverMapService] 네이버맵 지오코딩 API 응답 상태: {}", response.getStatusCode());
-
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 Map<String, Object> responseBody = response.getBody();
-                log.info("📦 [NaverMapService] 응답 본문 전체: {}", responseBody);
-                if (responseBody != null) {
-                    log.info("📦 [NaverMapService] 응답 키 목록: {}", responseBody.keySet());
-                }
 
                 // 네이버맵 지오코딩 응답 파싱
                 if (responseBody != null && responseBody.containsKey("addresses")) {
@@ -234,7 +204,6 @@ public class NaverMapService {
                     java.util.List<?> addressesList = (java.util.List<?>) responseBody.get("addresses");
 
                     if (addressesList != null && addressesList.size() > 0) {
-                        log.info("✅ [NaverMapService] addresses 배열 발견, 크기: {}", addressesList.size());
 
                         @SuppressWarnings("unchecked")
                         java.util.List<Map<String, Object>> addresses = (java.util.List<Map<String, Object>>) addressesList;
@@ -316,24 +285,20 @@ public class NaverMapService {
                 return errorResponse;
             }
 
-            log.info("네이버맵 역지오코딩 API 호출 - 좌표: ({}, {})", lat, lng);
-
-            // 네이버맵 Geocoding API URL (역지오코딩)
+            // 네이버맵 Reverse Geocoding API URL (공식 문서 기준)
             String url = UriComponentsBuilder
-                    .fromUriString("https://naveropenapi.apigw.ntruss.com/map-reversegeocode/v2/gc")
+                    .fromUriString("https://maps.apigw.ntruss.com/map-reversegeocode/v2/gc")
                     .queryParam("coords", lng + "," + lat) // 경도,위도 순서
                     .queryParam("output", "json")
+                    .queryParam("orders", "legalcode,admcode,addr,roadaddr") // 공식 문서 예시에 따라 추가
                     .toUriString();
 
-            log.debug("요청 URL: {}", url);
+            log.info("🌐 [역지오코딩] 요청 URL: {}", url);
 
-            // 헤더 설정 (공식 예시에 따름 - 소문자)
+            // 헤더 설정 (네이버 클라우드 플랫폼 공식 문서: 대문자 사용)
             HttpHeaders headers = new HttpHeaders();
-            headers.set("x-ncp-apigw-api-key-id", apiKeyId);
-            headers.set("x-ncp-apigw-api-key", apiKey);
-
-            log.debug("요청 헤더 - x-ncp-apigw-api-key-id: {}, x-ncp-apigw-api-key: {}", apiKeyId,
-                    apiKey.substring(0, Math.min(5, apiKey.length())) + "***");
+            headers.set("X-NCP-APIGW-API-KEY-ID", apiKeyId);
+            headers.set("X-NCP-APIGW-API-KEY", apiKey);
 
             HttpEntity<String> entity = new HttpEntity<>(headers);
 
@@ -430,6 +395,24 @@ public class NaverMapService {
             }
 
             return result;
+        } catch (org.springframework.web.client.HttpClientErrorException e) {
+            String responseBody = e.getResponseBodyAsString();
+            log.error("네이버맵 역지오코딩 API HTTP 에러: {} - 상태: {}, 응답: {}", e.getMessage(), e.getStatusCode(), responseBody);
+
+            // 401 에러이고 "subscription required" 메시지인 경우
+            if (e.getStatusCode() != null && e.getStatusCode().value() == 401 &&
+                    (responseBody != null
+                            && (responseBody.contains("subscription") || responseBody.contains("Permission Denied")))) {
+                log.error("네이버맵 역지오코딩 API 구독이 필요합니다. 네이버 클라우드 플랫폼 콘솔에서 Reverse Geocoding API를 구독해주세요.");
+            }
+
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("error", e.getMessage());
+            errorResponse.put("statusCode", e.getStatusCode() != null ? e.getStatusCode().value() : null);
+            errorResponse.put("message", "네이버맵 역지오코딩 API 구독이 필요합니다. 네이버 클라우드 플랫폼 콘솔에서 Reverse Geocoding API를 구독해주세요.");
+            errorResponse.put("responseBody", responseBody);
+            return errorResponse;
         } catch (Exception e) {
             log.error("네이버맵 역지오코딩 API 호출 실패: {}", e.getMessage(), e);
             Map<String, Object> errorResponse = new HashMap<>();
