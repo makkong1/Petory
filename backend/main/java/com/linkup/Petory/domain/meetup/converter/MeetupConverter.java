@@ -48,6 +48,8 @@ public class MeetupConverter {
                 .status(meetup.getStatus() != null ? meetup.getStatus().name() : MeetupStatus.RECRUITING.name())
                 .createdAt(meetup.getCreatedAt())
                 .updatedAt(meetup.getUpdatedAt())
+                .isDeleted(meetup.getIsDeleted())
+                .deletedAt(meetup.getDeletedAt())
                 .participants(participantsDTO)
                 .build();
     }
@@ -77,8 +79,9 @@ public class MeetupConverter {
                 .maxParticipants(dto.getMaxParticipants())
                 .currentParticipants(dto.getCurrentParticipants() != null ? dto.getCurrentParticipants() : 0)
                 .status(status)
-                .createdAt(dto.getCreatedAt())
-                .updatedAt(dto.getUpdatedAt())
+                .isDeleted(dto.getIsDeleted())
+                .deletedAt(dto.getDeletedAt())
+                // createdAt, updatedAt은 BaseTimeEntity에서 자동 관리되므로 제거
                 .build();
     }
 }
