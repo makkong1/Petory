@@ -19,6 +19,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -84,11 +86,17 @@ public class MeetupService {
 
         // 모임 생성 완료 이벤트 발행 (트랜잭션 커밋 후 비동기로 채팅방 생성 처리)
         // 핵심 도메인(모임)과 파생 도메인(채팅방) 분리: 채팅방 생성 실패가 모임 생성까지 롤백하지 않음
-        eventPublisher.publishEvent(new MeetupCreatedEvent(
-                this,
-                savedMeetup.getIdx(),
-                organizer.getIdx(),
-                savedMeetup.getTitle()));
+        // TransactionSynchronization을 사용하여 트랜잭션 커밋 후 이벤트 발행 보장
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                eventPublisher.publishEvent(new MeetupCreatedEvent(
+                        MeetupService.this,
+                        savedMeetup.getIdx(),
+                        organizer.getIdx(),
+                        savedMeetup.getTitle()));
+            }
+        });
 
         log.info("모임 생성 완료: meetupIdx={}, organizer={}", savedMeetup.getIdx(), userId);
         return converter.toDTO(savedMeetup);

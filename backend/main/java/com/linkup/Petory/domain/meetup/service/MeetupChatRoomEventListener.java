@@ -32,7 +32,8 @@ public class MeetupChatRoomEventListener {
         private final ConversationService conversationService;
 
         /**
-         * 모임 생성 완료 이벤트를 수신하여 채팅방을 생성
+         * 이 이벤트 리스너는 모임 생성 완료 이벤트를 수신하여 채팅방을 생성
+         * 별도 트랜잭션으로 처리하여 모임 생성 트랜잭션과 분리
          * 
          * @Async: 비동기 처리로 모임 생성 응답 속도 향상
          *         @Transactional(REQUIRES_NEW): 별도 트랜잭션으로 처리하여 모임 생성 트랜잭션과 분리

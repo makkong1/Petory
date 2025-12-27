@@ -92,11 +92,166 @@ CHECK (current_participants <= max_participants);
 
 **주의**: MySQL 8.0.16 이상에서만 적용됨
 
-### 2.3 선택 이유
+### 2.3 다른 해결 방법들
+
+#### 1️⃣ **세마포어 (Semaphore)** - 애플리케이션 레벨 동시성 제어
+
+```java
+// 각 모임별로 세마포어 생성 (메모리 기반)
+private final Map<Long, Semaphore> meetupSemaphores = new ConcurrentHashMap<>();
+
+public MeetupParticipantsDTO joinMeetup(Long meetupIdx, String userId) {
+    // 모임별 세마포어 가져오기 (최대 인원수만큼 허용)
+    Semaphore semaphore = meetupSemaphores.computeIfAbsent(meetupIdx, 
+        idx -> new Semaphore(getMeetupMaxParticipants(idx) - getCurrentParticipants(idx)));
+    
+    try {
+        // 세마포어 획득 시도 (인원이 가득 차면 대기)
+        if (!semaphore.tryAcquire(1, TimeUnit.SECONDS)) {
+            throw new RuntimeException("모임 인원이 가득 찼습니다.");
+        }
+        
+        // 참가 처리
+        // ...
+    } catch (InterruptedException e) {
+        throw new RuntimeException("참가 처리 중 오류가 발생했습니다.");
+    } finally {
+        // 실패 시 세마포어 반환
+        // 성공 시에는 반환하지 않음 (인원 유지)
+    }
+}
+```
+
+**장점**:
+- ✅ 빠른 응답 시간 (메모리 기반)
+- ✅ 애플리케이션 레벨에서 즉시 차단 가능
+
+**단점**:
+- ❌ **분산 환경 미지원**: 서버가 여러 대면 각 서버별로 세마포어가 독립적으로 동작
+- ❌ **서버 재시작 시 초기화**: 메모리 기반이라 재시작 시 상태 손실
+- ❌ **DB와 동기화 필요**: 실제 DB 상태와 메모리 상태 불일치 가능
+- ❌ **복잡도 증가**: 세마포어 관리, 정리 로직 필요
+
+#### 2️⃣ **Pessimistic Lock (비관적 락)** - DB 레벨 락
+
+```java
+@Lock(LockModeType.PESSIMISTIC_WRITE)
+@Query("SELECT m FROM Meetup m WHERE m.idx = :meetupIdx")
+Optional<Meetup> findByIdWithLock(@Param("meetupIdx") Long meetupIdx);
+
+// 사용
+Meetup meetup = meetupRepository.findByIdWithLock(meetupIdx)
+    .orElseThrow(() -> new RuntimeException("모임을 찾을 수 없습니다."));
+
+if (meetup.getCurrentParticipants() >= meetup.getMaxParticipants()) {
+    throw new RuntimeException("모임 인원이 가득 찼습니다.");
+}
+meetup.setCurrentParticipants(meetup.getCurrentParticipants() + 1);
+meetupRepository.save(meetup);
+```
+
+**장점**:
+- ✅ 분산 환경 지원 (DB 레벨)
+- ✅ 데이터 일관성 보장
+
+**단점**:
+- ❌ **성능 저하**: Lock 대기로 인한 블로킹
+- ❌ **Deadlock 위험**: 여러 트랜잭션 간 Lock 순서 불일치 시
+- ❌ **확장성 제한**: 동시 요청이 많을수록 대기 시간 증가
+
+#### 3️⃣ **Optimistic Lock (낙관적 락)** - 버전 기반
+
+```java
+@Entity
+public class Meetup {
+    @Version
+    private Long version; // 버전 필드 추가
+    
+    // ...
+}
+
+// 사용
+try {
+    Meetup meetup = meetupRepository.findById(meetupIdx).orElseThrow();
+    if (meetup.getCurrentParticipants() >= meetup.getMaxParticipants()) {
+        throw new RuntimeException("모임 인원이 가득 찼습니다.");
+    }
+    meetup.setCurrentParticipants(meetup.getCurrentParticipants() + 1);
+    meetupRepository.save(meetup); // version 체크
+} catch (OptimisticLockingFailureException e) {
+    // 재시도 또는 실패 처리
+}
+```
+
+**장점**:
+- ✅ 높은 동시성 (Lock 대기 없음)
+- ✅ 분산 환경 지원
+
+**단점**:
+- ❌ **재시도 로직 필요**: 충돌 시 재시도 필요
+- ❌ **Race Condition 여전히 발생 가능**: 체크-업데이트 사이 다른 트랜잭션 끼어들 수 있음
+- ❌ **복잡도 증가**: 재시도 메커니즘 구현 필요
+
+#### 4️⃣ **Redis 분산 락** - 분산 환경용
+
+```java
+// Redisson 또는 Lettuce 사용
+RLock lock = redissonClient.getLock("meetup:" + meetupIdx);
+try {
+    if (lock.tryLock(5, 10, TimeUnit.SECONDS)) {
+        // 참가 처리
+    }
+} finally {
+    if (lock.isHeldByCurrentThread()) {
+        lock.unlock();
+    }
+}
+```
+
+**장점**:
+- ✅ **분산 환경 완벽 지원**
+- ✅ 빠른 성능 (Redis 메모리 기반)
+
+**단점**:
+- ❌ **인프라 의존성**: Redis 추가 필요
+- ❌ **복잡도 증가**: Redis 설정, 관리 필요
+- ❌ **비용**: Redis 인스턴스 운영 비용
+
+#### 5️⃣ **원자적 UPDATE 쿼리** (현재 사용 중) ⭐
+
+```java
+@Modifying
+@Query("UPDATE Meetup m SET m.currentParticipants = m.currentParticipants + 1 " +
+       "WHERE m.idx = :meetupIdx " +
+       "  AND m.currentParticipants < m.maxParticipants")
+int incrementParticipantsIfAvailable(@Param("meetupIdx") Long meetupIdx);
+
+// 사용
+int updated = meetupRepository.incrementParticipantsIfAvailable(meetupIdx);
+if (updated == 0) {
+    throw new RuntimeException("모임 인원이 가득 찼습니다.");
+}
+```
+
+**장점**:
+- ✅ **분산 환경 지원** (DB 레벨)
+- ✅ **높은 동시성** (Lock 대기 없음)
+- ✅ **단순하고 명확**: 체크와 업데이트가 원자적으로 처리
+- ✅ **프로젝트 일관성**: Chat, User 도메인과 동일한 패턴
+
+**단점**:
+- ❌ 거의 없음 (가장 균형 잡힌 방법)
+
+### 2.4 선택 이유
 
 1. **프로젝트 일관성**: Chat, User 도메인과 동일한 패턴 (가장 중요)
 2. **확장성**: 병렬 처리 가능 (Lock 대기 없음)
 3. **DB 레벨 보장**: 조건부 업데이트로 안전성 확보
+4. **분산 환경 지원**: 여러 서버 환경에서도 안전
+5. **단순함**: 복잡한 재시도 로직이나 인프라 추가 불필요
+
+
+**결론**: 원자적 UPDATE 쿼리가 **분산 환경, 성능, 단순성, 데이터 일관성** 모든 면에서 균형 잡힌 최선의 선택
 
 ---
 
