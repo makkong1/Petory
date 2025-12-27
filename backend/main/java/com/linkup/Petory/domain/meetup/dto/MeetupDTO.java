@@ -25,5 +25,7 @@ public class MeetupDTO {
     private String status; // 모임 상태: RECRUITING, CLOSED, COMPLETED
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private Boolean isDeleted;
+    private LocalDateTime deletedAt;
     private List<MeetupParticipantsDTO> participants;
 }

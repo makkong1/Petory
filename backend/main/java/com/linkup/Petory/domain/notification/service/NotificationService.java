@@ -5,6 +5,7 @@ import java.util.stream.Collectors;
 
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.linkup.Petory.domain.notification.converter.NotificationConverter;
@@ -111,9 +112,9 @@ public class NotificationService {
 
     /**
      * 읽지 않은 알림 개수 조회
-     * SSE 연결 등 장시간 연결에서 호출될 수 있으므로 타임아웃 설정
+     * SSE 연결 등 장시간 연결에서 호출될 수 있으므로 트랜잭션 없이 실행
      */
-    @Transactional(readOnly = true, timeout = 5)
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public Long getUnreadCount(Long userId) {
         Users user = usersRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));

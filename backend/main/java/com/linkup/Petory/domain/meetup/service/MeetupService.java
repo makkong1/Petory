@@ -112,15 +112,22 @@ public class MeetupService {
         return converter.toDTO(savedMeetup);
     }
 
-    // 모임 삭제
+    // 모임 삭제 (소프트 삭제)
     @Transactional
     public void deleteMeetup(Long meetupIdx) {
-        meetupRepository.deleteById(meetupIdx);
+        Meetup meetup = meetupRepository.findById(meetupIdx)
+                .orElseThrow(() -> new RuntimeException("모임을 찾을 수 없습니다."));
+
+        meetup.setIsDeleted(true);
+        meetup.setDeletedAt(LocalDateTime.now());
+        meetupRepository.save(meetup);
+
+        log.info("모임 소프트 삭제 완료: meetupIdx={}", meetupIdx);
     }
 
-    // 모든 모임 조회
+    // 모든 모임 조회 (소프트 삭제 제외)
     public List<MeetupDTO> getAllMeetups() {
-        return meetupRepository.findAll()
+        return meetupRepository.findAllNotDeleted()
                 .stream()
                 .map(converter::toDTO)
                 .collect(Collectors.toList());
@@ -138,8 +145,8 @@ public class MeetupService {
         LocalDateTime now = LocalDateTime.now();
         log.info("반경 기반 모임 조회 요청: lat={}, lng={}, radius={}km, currentDate={}", lat, lng, radiusKm, now);
 
-        // 모든 모임을 가져와서 Java에서 필터링 (Native query 문제 회피)
-        List<Meetup> allMeetups = meetupRepository.findAll();
+        // 모든 모임을 가져와서 Java에서 필터링 (Native query 문제 회피, 소프트 삭제 제외)
+        List<Meetup> allMeetups = meetupRepository.findAllNotDeleted();
         log.info("전체 모임 수: {}", allMeetups.size());
 
         // 거리 계산 함수 (Haversine 공식)
