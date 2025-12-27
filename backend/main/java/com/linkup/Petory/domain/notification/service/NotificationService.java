@@ -111,7 +111,9 @@ public class NotificationService {
 
     /**
      * 읽지 않은 알림 개수 조회
+     * SSE 연결 등 장시간 연결에서 호출될 수 있으므로 타임아웃 설정
      */
+    @Transactional(readOnly = true, timeout = 5)
     public Long getUnreadCount(Long userId) {
         Users user = usersRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
