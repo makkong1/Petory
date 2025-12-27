@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import styled from 'styled-components';
-import { careRequestAdminApi } from '../../../api/careRequestAdminApi';
+import { careRequestAdminApi } from '../../../api/careRequestAdminApi.js';
 
 const CareServiceManagementSection = () => {
   const [status, setStatus] = useState('');
@@ -20,7 +20,7 @@ const CareServiceManagementSection = () => {
       if (location) params.location = location;
       if (deleted !== '') params.deleted = deleted === 'true';
       if (q) params.q = q;
-      
+
       const res = await careRequestAdminApi.listCareRequests(params);
       setCareRequests(res.data || []);
     } catch (e) {

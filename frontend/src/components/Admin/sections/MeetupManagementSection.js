@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import styled from 'styled-components';
-import { meetupAdminApi } from '../../../api/meetupAdminApi';
+import { meetupAdminApi } from '../../../api/meetupAdminApi.js';
 
 const MeetupManagementSection = () => {
   const [status, setStatus] = useState('');
@@ -19,7 +19,7 @@ const MeetupManagementSection = () => {
       const params = {};
       if (status && status !== 'ALL') params.status = status;
       if (q) params.q = q;
-      
+
       const res = await meetupAdminApi.listMeetups(params);
       setMeetups(res.data || []);
     } catch (e) {

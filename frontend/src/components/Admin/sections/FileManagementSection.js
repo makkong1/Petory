@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import styled from 'styled-components';
-import { fileAdminApi } from '../../../api/fileAdminApi';
+import { fileAdminApi } from '../../../api/fileAdminApi.js';
 
 const FileManagementSection = () => {
   const [targetType, setTargetType] = useState('');
