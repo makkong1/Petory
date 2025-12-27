@@ -20,7 +20,7 @@ public class ChatMessageDTO {
     private Long senderIdx;
     private String senderUsername;
     private String senderProfileImageUrl;
-    private String messageType;  // TEXT, IMAGE, FILE, SYSTEM, NOTICE
+    private String messageType; // TEXT, IMAGE, FILE, SYSTEM, NOTICE
     private String content;
     private Long replyToMessageIdx;
     private ChatMessageDTO replyToMessage;
@@ -32,7 +32,6 @@ public class ChatMessageDTO {
     // 읽음 상태
     private Boolean isRead;
     private LocalDateTime readAt;
-    private List<MessageReadStatusDTO> readStatuses;
 
     // 파일 첨부 (이미지, 파일)
     private List<FileDTO> attachments;
@@ -40,4 +39,3 @@ public class ChatMessageDTO {
     // 탈퇴한 사용자 표시용
     private Boolean isDeletedSender;
 }
-

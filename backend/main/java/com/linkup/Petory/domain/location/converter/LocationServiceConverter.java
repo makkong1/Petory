@@ -106,17 +106,6 @@ public class LocationServiceConverter {
                 .build();
     }
 
-    private Double parseDoubleOrNull(String value) {
-        if (!StringUtils.hasText(value)) {
-            return null;
-        }
-        try {
-            return Double.parseDouble(value);
-        } catch (NumberFormatException ex) {
-            return null;
-        }
-    }
-
     /**
      * 우편번호 정리 (소수점 제거)
      */

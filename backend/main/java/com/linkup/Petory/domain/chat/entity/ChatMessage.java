@@ -2,9 +2,7 @@ package com.linkup.Petory.domain.chat.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-import java.time.LocalDateTime;
-import java.util.List;
-
+import com.linkup.Petory.domain.common.BaseTimeEntity;
 import com.linkup.Petory.domain.user.entity.Users;
 
 @Entity
@@ -14,7 +12,7 @@ import com.linkup.Petory.domain.user.entity.Users;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class ChatMessage {
+public class ChatMessage extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -46,31 +44,16 @@ public class ChatMessage {
     private Boolean isDeleted = false;
 
     @Column(name = "deleted_at")
-    private LocalDateTime deletedAt;
-
-    @Column(name = "created_at")
-    private LocalDateTime createdAt;
-
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
-
-    @OneToMany(mappedBy = "message", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<MessageReadStatus> readStatuses;
+    private java.time.LocalDateTime deletedAt;
 
     @PrePersist
     protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
-        this.updatedAt = LocalDateTime.now();
+        // BaseTimeEntity가 createdAt, updatedAt을 자동 관리하므로 여기서는 기본값만 설정
         if (this.messageType == null) {
             this.messageType = MessageType.TEXT;
         }
         if (this.isDeleted == null) {
             this.isDeleted = false;
         }
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        this.updatedAt = LocalDateTime.now();
     }
 }
