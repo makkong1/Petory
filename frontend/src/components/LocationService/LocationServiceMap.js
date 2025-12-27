@@ -517,8 +517,6 @@ const LocationServiceMap = () => {
           let apiSigungu = regionParts[1] || undefined;
           let apiEupmyeondong = regionParts[2] || undefined;
 
-          console.log('🌐 [지역 검색] API 호출:', { apiSido, apiSigungu, apiEupmyeondong, region });
-
           const response = await locationServiceApi.searchPlaces({
             sido: apiSido,
             sigungu: apiSigungu,
@@ -536,8 +534,6 @@ const LocationServiceMap = () => {
             latitude: parseFloat(service.latitude),
             longitude: parseFloat(service.longitude),
           }));
-
-          console.log(`지역 검색 결과: ${fetchedServices.length}개 서비스`, { region, apiSido, apiSigungu, apiEupmyeondong });
 
           // 지역별 데이터를 allServices에 업데이트하고 필터링
           setAllServices(fetchedServices);
@@ -677,12 +673,10 @@ const LocationServiceMap = () => {
 
         // ✅ 현재 위치 좌표를 주소로 변환
         try {
-          console.log('📍 현재 위치 좌표를 주소로 변환 중...', { lat: location.lat, lng: location.lng });
           const addressData = await geocodingApi.coordinatesToAddress(
             location.lat,
             location.lng
           );
-          console.log('📍 주소 변환 API 응답:', addressData);
 
           // 응답 형식 확인: address 필드 또는 success 필드 확인
           if (addressData) {
@@ -690,7 +684,6 @@ const LocationServiceMap = () => {
               console.warn('⚠️ 주소 변환 실패:', addressData.message || addressData.error);
             } else if (addressData.address) {
               setUserLocationAddress(addressData.address);
-              console.log('✅ 현재 위치 주소 변환 성공:', addressData.address);
             } else {
               console.warn('⚠️ 주소 변환 결과에 address 필드가 없음:', addressData);
             }
@@ -710,7 +703,6 @@ const LocationServiceMap = () => {
         setStatusMessage('주변 서비스를 불러오는 중...');
 
         // 2단계: 초기 로드는 내 위치 기반 반경 검색 (빠르고 적은 데이터)
-        console.log('📍 [초기 로드] 내 위치 기반 반경 검색 (5km)');
         const response = await locationServiceApi.searchPlaces({
           latitude: location.lat,
           longitude: location.lng,
@@ -763,7 +755,6 @@ const LocationServiceMap = () => {
         // 초기 로드 완료 후 사용자 드래그를 허용하기 위해 플래그 리셋
         setTimeout(() => {
           isProgrammaticMoveRef.current = false;
-          console.log('📍 [초기 로드 완료] isProgrammaticMoveRef.current = false로 리셋');
         }, 2000); // 2초 후 리셋 (지도 로드 완료 대기)
       } catch (error) {
         console.warn('위치 정보를 가져올 수 없습니다:', error);
@@ -1321,7 +1312,6 @@ const LocationServiceMap = () => {
       if (addressData && addressData.success !== false && addressData.address) {
         sido = extractSidoFromAddress(addressData.address);
         sigungu = extractSigunguFromAddress(addressData.address, sido);
-        console.log('✅ [이 지역 검색] 역지오코딩 성공:', { address: addressData.address, sido, sigungu });
       } else {
         // 역지오코딩 실패 시 위치 기반 반경 검색으로 fallback
         console.warn('⚠️ [이 지역 검색] 역지오코딩 실패 - 위치 기반 반경 검색으로 fallback');
@@ -1339,8 +1329,6 @@ const LocationServiceMap = () => {
       // ✅ 지도 레벨을 5km 반경에 맞게 조정
       const appropriateLevel = calculateMapLevelFromRadius(5); // 5km
       setMapLevel(appropriateLevel);
-
-      console.log('📍 [이 지역 검색] 시도/시군구 기반 검색 실행:', { sido, sigungu });
 
       // 시도/시군구 기반 검색
       await fetchServices({

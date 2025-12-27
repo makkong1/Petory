@@ -4,7 +4,6 @@ import com.linkup.Petory.domain.chat.entity.*;
 import com.linkup.Petory.domain.chat.repository.ChatMessageRepository;
 import com.linkup.Petory.domain.chat.repository.ConversationParticipantRepository;
 import com.linkup.Petory.domain.chat.repository.ConversationRepository;
-import com.linkup.Petory.domain.chat.repository.MessageReadStatusRepository;
 import com.linkup.Petory.domain.user.entity.Role;
 import com.linkup.Petory.domain.user.entity.UserStatus;
 import com.linkup.Petory.domain.user.entity.Users;
@@ -58,9 +57,6 @@ class ChatMessageServiceReadStatusPerformanceTest {
 
         @Autowired
         private UsersRepository usersRepository;
-
-        @Autowired
-        private MessageReadStatusRepository readStatusRepository;
 
         @PersistenceContext
         private EntityManager entityManager;
@@ -155,8 +151,9 @@ class ChatMessageServiceReadStatusPerformanceTest {
                                         .content("테스트 메시지 " + i)
                                         .messageType(MessageType.TEXT)
                                         .isDeleted(false)
-                                        .createdAt(LocalDateTime.now().minusMinutes(MESSAGE_COUNT - i)) // 시간 순서대로
                                         .build();
+                        // BaseTimeEntity가 createdAt을 자동 관리하므로 수동 설정 불가
+                        // 시간 순서는 실제 저장 시 자동으로 설정됨
 
                         testMessages.add(message);
 
@@ -292,13 +289,14 @@ class ChatMessageServiceReadStatusPerformanceTest {
                                                 && !m.getSender().getIdx().equals(userId))
                                 .collect(Collectors.toList());
 
+                // ⚠️ MessageReadStatus가 제거되어 이 로직도 제거됨
                 // 실제로는 MessageReadStatus 저장은 안 하지만, 로직은 실행됨
-                Users user = usersRepository.findById(userId).orElseThrow();
-                for (ChatMessage message : unreadMessages) {
-                        if (!readStatusRepository.existsByMessageAndUser(message, user)) {
-                                // readStatusRepository.save(...); // 주석 처리되어 실제 저장은 안 함
-                        }
-                }
+                // Users user = usersRepository.findById(userId).orElseThrow();
+                // for (ChatMessage message : unreadMessages) {
+                //         if (!readStatusRepository.existsByMessageAndUser(message, user)) {
+                //                 // readStatusRepository.save(...); // 주석 처리되어 실제 저장은 안 함
+                //         }
+                // }
 
                 long endTimeProblem = System.nanoTime();
                 System.gc();

@@ -514,14 +514,6 @@ const MapContainer = React.forwardRef(
       const targetZoom = mapLevelToZoom(mapLevel);
       const isSameZoom = Math.abs(currentZoom - targetZoom) < 0.5; // 소수점 오차 허용
 
-      console.log('MapContainer 줌 업데이트:', {
-        currentZoom,
-        targetZoom,
-        mapLevel,
-        isSameZoom,
-        userZoomed: userZoomedRef.current
-      });
-
       // mapLevel prop이 변경되었으면 무조건 userZoomedRef 리셋 (프로그래밍 방식 변경)
       // 사용자가 마우스 휠로 조정했더라도, mapLevel prop이 명시적으로 변경되었으면 줌 변경 허용
       userZoomedRef.current = false;

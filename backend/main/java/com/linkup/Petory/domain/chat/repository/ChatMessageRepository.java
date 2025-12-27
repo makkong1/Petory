@@ -86,14 +86,12 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
         MessageType messageType);
 
     // 채팅방별 읽지 않은 메시지 수 조회
+    // 참고: 실제로는 ConversationParticipant의 unreadCount를 사용하므로 이 메서드는 사용되지 않음
+    // MessageReadStatus가 제거되어 쿼리도 단순화됨
     @Query("SELECT COUNT(m) FROM ChatMessage m " +
            "WHERE m.conversation.idx = :conversationIdx " +
            "  AND m.sender.idx != :userId " +
-           "  AND m.isDeleted = false " +
-           "  AND NOT EXISTS (" +
-           "    SELECT r FROM MessageReadStatus r " +
-           "    WHERE r.message.idx = m.idx AND r.user.idx = :userId" +
-           "  )")
+           "  AND m.isDeleted = false")
     Long countUnreadMessages(@Param("conversationIdx") Long conversationIdx, @Param("userId") Long userId);
 
     // 여러 채팅방의 최신 메시지 조회 (배치) - Sender 포함

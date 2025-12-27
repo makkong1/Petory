@@ -22,7 +22,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -137,9 +136,9 @@ class ConversationServicePerformanceTest {
                                                 .content("메시지 " + j)
                                                 .messageType(MessageType.TEXT)
                                                 .isDeleted(false)
-                                                .createdAt(LocalDateTime.now()
-                                                                .minusMinutes(MESSAGES_PER_CONVERSATION - j))
                                                 .build();
+                                                // BaseTimeEntity가 createdAt을 자동 관리하므로 수동 설정 불가
+                                                // 시간 순서는 실제 저장 시 자동으로 설정됨
                                 messages.add(chatMessageRepository.save(message));
                         }
 
