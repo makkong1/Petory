@@ -907,4 +907,175 @@ class MeetupServiceRaceConditionTest {
         assertTrue(finalMeetup.getCurrentParticipants() <= finalMeetup.getMaxParticipants(),
                 "Race Condition 발생: 최대 인원 초과");
     }
+
+    @Test
+    @DisplayName("성능 비교: Pessimistic Lock vs 원자적 UPDATE 쿼리")
+    void testPerformanceComparison() throws InterruptedException {
+        System.out.println("\n=== 성능 비교 테스트 시작 ===");
+        System.out.println("비교 방식: Pessimistic Lock vs 원자적 UPDATE 쿼리");
+        System.out.println("동시 참가 시도: 10명");
+        System.out.println("테스트 횟수: 각 방식당 5회");
+        System.out.println("================================\n");
+
+        int attemptCount = 10;
+        int testRuns = 5;
+
+        // Pessimistic Lock 방식 성능 측정 (레거시 방식 - 직접 구현)
+        List<Long> pessimisticLockTimes = new ArrayList<>();
+        List<Long> atomicUpdateTimes = new ArrayList<>();
+
+        for (int run = 0; run < testRuns; run++) {
+            // 테스트 데이터 재설정
+            setUp();
+            Long meetupIdx = testMeetup.getIdx();
+
+            // 추가 사용자 생성 (10명)
+            long timestamp = System.currentTimeMillis();
+            List<Users> testUsers = new ArrayList<>();
+            for (int i = 0; i < attemptCount; i++) {
+                Users user = Users.builder()
+                        .id("test_user_" + timestamp + "_" + i)
+                        .username("test_user_" + timestamp + "_" + i)
+                        .email("test_user_" + timestamp + "_" + i + "@example.com")
+                        .password("password")
+                        .role(Role.USER)
+                        .status(UserStatus.ACTIVE)
+                        .emailVerified(true)
+                        .build();
+                user = usersRepository.save(user);
+                testUsers.add(user);
+            }
+
+            // Pessimistic Lock 방식 테스트
+            long pessimisticStart = System.currentTimeMillis();
+            testPessimisticLockApproach(meetupIdx, testUsers);
+            long pessimisticEnd = System.currentTimeMillis();
+            pessimisticLockTimes.add(pessimisticEnd - pessimisticStart);
+
+            // 테스트 데이터 재설정
+            setUp();
+            meetupIdx = testMeetup.getIdx();
+
+            // 원자적 UPDATE 쿼리 방식 테스트 (현재 구현)
+            long atomicStart = System.currentTimeMillis();
+            testAtomicUpdateApproach(meetupIdx, testUsers);
+            long atomicEnd = System.currentTimeMillis();
+            atomicUpdateTimes.add(atomicEnd - atomicStart);
+
+            System.out.println(String.format("테스트 %d회 완료 - Pessimistic Lock: %dms, 원자적 UPDATE: %dms",
+                    run + 1, pessimisticEnd - pessimisticStart, atomicEnd - atomicStart));
+        }
+
+        // 통계 계산
+        double pessimisticAvg = pessimisticLockTimes.stream().mapToLong(Long::longValue).average().orElse(0);
+        double atomicAvg = atomicUpdateTimes.stream().mapToLong(Long::longValue).average().orElse(0);
+        long pessimisticMin = pessimisticLockTimes.stream().mapToLong(Long::longValue).min().orElse(0);
+        long atomicMin = atomicUpdateTimes.stream().mapToLong(Long::longValue).min().orElse(0);
+        long pessimisticMax = pessimisticLockTimes.stream().mapToLong(Long::longValue).max().orElse(0);
+        long atomicMax = atomicUpdateTimes.stream().mapToLong(Long::longValue).max().orElse(0);
+
+        System.out.println("\n=== 성능 비교 결과 ===");
+        System.out.println("Pessimistic Lock 방식:");
+        System.out.println("  평균: " + String.format("%.2f", pessimisticAvg) + "ms");
+        System.out.println("  최소: " + pessimisticMin + "ms");
+        System.out.println("  최대: " + pessimisticMax + "ms");
+        System.out.println("\n원자적 UPDATE 쿼리 방식:");
+        System.out.println("  평균: " + String.format("%.2f", atomicAvg) + "ms");
+        System.out.println("  최소: " + atomicMin + "ms");
+        System.out.println("  최대: " + atomicMax + "ms");
+
+        double improvement = ((pessimisticAvg - atomicAvg) / pessimisticAvg) * 100;
+        System.out.println("\n성능 개선율: " + String.format("%.2f", improvement) + "%");
+        System.out.println("========================\n");
+
+        // 검증: 원자적 UPDATE 쿼리 방식이 더 빠르거나 비슷해야 함
+        assertTrue(atomicAvg <= pessimisticAvg * 1.1,
+                "원자적 UPDATE 쿼리 방식이 Pessimistic Lock보다 느리면 안 됨");
+    }
+
+    private void testPessimisticLockApproach(Long meetupIdx, List<Users> testUsers) throws InterruptedException {
+        ExecutorService executor = Executors.newFixedThreadPool(testUsers.size());
+        CountDownLatch readyLatch = new CountDownLatch(testUsers.size());
+        AtomicInteger successCount = new AtomicInteger(0);
+
+        for (Users user : testUsers) {
+            final String userId = user.getId();
+            executor.submit(() -> {
+                try {
+                    readyLatch.await();
+                    // Pessimistic Lock 방식 (레거시)
+                    Meetup meetup = meetupRepository.findByIdWithLock(meetupIdx)
+                            .orElseThrow(() -> new RuntimeException("모임을 찾을 수 없습니다."));
+
+                    Long userIdx = user.getIdx();
+                    if (!meetup.getOrganizer().getIdx().equals(userIdx)) {
+                        if (meetup.getCurrentParticipants() >= meetup.getMaxParticipants()) {
+                            return;
+                        }
+                        meetup.setCurrentParticipants(meetup.getCurrentParticipants() + 1);
+                        meetupRepository.save(meetup);
+                    }
+
+                    MeetupParticipants participant = MeetupParticipants.builder()
+                            .meetup(meetup)
+                            .user(user)
+                            .joinedAt(LocalDateTime.now())
+                            .build();
+                    meetupParticipantsRepository.save(participant);
+                    successCount.incrementAndGet();
+                } catch (Exception e) {
+                    // 실패 무시
+                }
+            });
+            readyLatch.countDown();
+        }
+
+        executor.shutdown();
+        executor.awaitTermination(10, TimeUnit.SECONDS);
+    }
+
+    private void testAtomicUpdateApproach(Long meetupIdx, List<Users> testUsers) throws InterruptedException {
+        ExecutorService executor = Executors.newFixedThreadPool(testUsers.size());
+        CountDownLatch readyLatch = new CountDownLatch(testUsers.size());
+        AtomicInteger successCount = new AtomicInteger(0);
+
+        for (Users user : testUsers) {
+            final String userId = user.getId();
+            executor.submit(() -> {
+                try {
+                    readyLatch.await();
+                    // 원자적 UPDATE 쿼리 방식 (현재 구현)
+                    // 주최자 확인을 위해 한 번만 조회
+                    Meetup meetup = meetupRepository.findById(meetupIdx)
+                            .orElseThrow(() -> new RuntimeException("모임을 찾을 수 없습니다."));
+
+                    Long userIdx = user.getIdx();
+                    if (!meetup.getOrganizer().getIdx().equals(userIdx)) {
+                        // 원자적 UPDATE 쿼리 실행
+                        int updated = meetupRepository.incrementParticipantsIfAvailable(meetupIdx);
+                        if (updated == 0) {
+                            return;
+                        }
+                        // 참가자 추가를 위해 업데이트된 모임 정보 다시 조회 (실제 서비스 로직과 동일)
+                        meetup = meetupRepository.findById(meetupIdx)
+                                .orElseThrow(() -> new RuntimeException("모임을 찾을 수 없습니다."));
+                    }
+
+                    MeetupParticipants participant = MeetupParticipants.builder()
+                            .meetup(meetup)
+                            .user(user)
+                            .joinedAt(LocalDateTime.now())
+                            .build();
+                    meetupParticipantsRepository.save(participant);
+                    successCount.incrementAndGet();
+                } catch (Exception e) {
+                    // 실패 무시
+                }
+            });
+            readyLatch.countDown();
+        }
+
+        executor.shutdown();
+        executor.awaitTermination(10, TimeUnit.SECONDS);
+    }
 }

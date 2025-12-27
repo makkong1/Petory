@@ -24,12 +24,22 @@ const addAuthToken = (config) => {
 
 api.interceptors.request.use(addAuthToken, (error) => Promise.reject(error));
 
+const adminApi = axios.create({
+    baseURL: 'http://localhost:8080/api/admin/location-services',
+    headers: { 'Content-Type': 'application/json' },
+});
+
+adminApi.interceptors.request.use(addAuthToken, (error) => Promise.reject(error));
+
 export const locationServiceApi = {
   /**
    * DB에서 위치 서비스 검색
-   * 지역 계층별 검색만 수행 (내 위치는 거리 계산/길찾기용으로만 사용)
+   * 위치 기반 검색 또는 지역 계층별 검색 수행
    * 
    * @param {Object} params 검색 파라미터
+   * @param {number} params.latitude 위도 (선택, 위치 기반 검색 시 필수)
+   * @param {number} params.longitude 경도 (선택, 위치 기반 검색 시 필수)
+   * @param {number} params.radius 반경 (미터 단위, 선택, 기본값: 10000m = 10km)
    * @param {string} params.sido 시도 (선택, 예: "서울특별시", "경기도")
    * @param {string} params.sigungu 시군구 (선택, 예: "노원구", "고양시 덕양구")
    * @param {string} params.eupmyeondong 읍면동 (선택, 예: "상계동", "동산동")
@@ -39,6 +49,9 @@ export const locationServiceApi = {
    * @returns {Promise} 검색 결과
    */
   searchPlaces: ({ 
+    latitude,
+    longitude,
+    radius,
     sido, 
     sigungu, 
     eupmyeondong, 
@@ -48,6 +61,9 @@ export const locationServiceApi = {
   } = {}) =>
     api.get('/search', {
       params: {
+        ...(typeof latitude === 'number' && { latitude }),
+        ...(typeof longitude === 'number' && { longitude }),
+        ...(typeof radius === 'number' && { radius }),
         ...(sido && { sido }),
         ...(sigungu && { sigungu }),
         ...(eupmyeondong && { eupmyeondong }),
@@ -56,4 +72,14 @@ export const locationServiceApi = {
         ...(typeof size === 'number' && { size }),
       },
     }),
+
+  // 관리자용 API
+  listLocationServices: (params) => adminApi.get('', { params }),
+  importPublicData: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return adminApi.post('/import-public-data', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
 };

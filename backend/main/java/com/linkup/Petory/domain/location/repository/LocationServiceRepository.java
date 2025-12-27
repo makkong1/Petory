@@ -73,13 +73,12 @@ public interface LocationServiceRepository extends JpaRepository<LocationService
 
         // 반경 검색 (ST_Distance_Sphere 사용) - latitude, longitude 직접 사용
         // POINT 형식: POINT(경도 위도) = POINT(longitude latitude) 순서 사용 (MySQL 표준)
+        // Native Query 파라미터 순서: ?1=latitude, ?2=longitude, ?3=radiusInMeters
         @Query(value = "SELECT * FROM locationservice WHERE " +
                         "latitude IS NOT NULL AND longitude IS NOT NULL AND " +
                         "ST_Distance_Sphere(POINT(longitude, latitude), POINT(?2, ?1)) <= ?3 " +
                         "ORDER BY rating DESC", nativeQuery = true)
-        List<LocationService> findByRadius(@Param("latitude") Double latitude,
-                        @Param("longitude") Double longitude,
-                        @Param("radiusInMeters") Double radiusInMeters);
+        List<LocationService> findByRadius(Double latitude, Double longitude, Double radiusInMeters);
 
         // 서울 구/동 검색
         @Query("SELECT ls FROM LocationService ls WHERE " +

@@ -15,6 +15,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -73,26 +74,27 @@ public class BoardService {
         return mapBoardsWithReactionsBatch(boards);
     }
 
-    // 관리자용 게시글 조회 (페이징 + 필터링 지원)
+    /**
+     * 관리자용 게시글 조회 (페이징 + 필터링 지원)
+     * - 작성자 상태 체크 없이 조회 (삭제된 사용자 콘텐츠도 포함)
+     * - AdminBoardController에서 사용
+     */
     public BoardPageResponseDTO getAdminBoardsWithPaging(
             String status, Boolean deleted, String category, String q, int page, int size) {
-        // 필터링을 위해 더 많은 데이터를 가져옴 (최대 1000개 또는 필요한 만큼)
-        // 실제로는 DB 쿼리 레벨에서 필터링하는 것이 더 효율적이지만, 복잡한 필터링이므로 일단 이 방식 사용
-        Pageable largePageable = PageRequest.of(0, 1000); // 충분히 큰 페이지 크기
-
-        // 기본 쿼리: 전체 게시글 (삭제 포함 여부에 따라)
-        Page<Board> boardPage;
+        // 기본 쿼리: 전체 게시글 조회 (삭제 포함 여부에 따라)
+        // 관리자 페이지에서는 전체 게시글을 조회해야 하므로 List로 조회
+        List<Board> allBoards;
 
         if (Boolean.TRUE.equals(deleted)) {
             // 삭제된 게시글 포함 (관리자용 - 작성자 상태 체크 없음)
-            boardPage = boardRepository.findAll(largePageable);
+            allBoards = boardRepository.findAllForAdmin();
         } else {
             // 삭제되지 않은 게시글만 (관리자용 - 작성자 상태 체크 없음)
-            boardPage = boardRepository.findAllByIsDeletedFalseForAdmin(largePageable);
+            allBoards = boardRepository.findAllByIsDeletedFalseForAdmin();
         }
 
         // 메모리에서 필터링
-        List<Board> filteredBoards = boardPage.getContent().stream()
+        List<Board> filteredBoards = allBoards.stream()
                 .filter(board -> {
                     // 카테고리 필터
                     if (category != null && !category.equals("ALL")
@@ -214,7 +216,7 @@ public class BoardService {
             incrementViewCount(board);
         }
 
-        return mapWithReactions(board);
+        return mapBoardWithDetails(board);
     }
 
     // 게시글 생성
@@ -239,7 +241,7 @@ public class BoardService {
             attachmentFileService.syncSingleAttachment(FileTargetType.BOARD, saved.getIdx(), dto.getBoardFilePath(),
                     null);
         }
-        return mapWithReactions(saved);
+        return mapBoardWithDetails(saved);
     }
 
     // 게시글 수정
@@ -269,7 +271,7 @@ public class BoardService {
             attachmentFileService.syncSingleAttachment(FileTargetType.BOARD, updated.getIdx(), dto.getBoardFilePath(),
                     null);
         }
-        return mapWithReactions(updated);
+        return mapBoardWithDetails(updated);
     }
 
     // 게시글 삭제
@@ -415,19 +417,100 @@ public class BoardService {
     }
 
     /**
-     * 단일 게시글에 반응 정보 매핑 (단일 조회용)
+     * 단일 게시글에 상세 정보 매핑 (반응 정보, 첨부파일 포함)
+     * 배치 조회를 활용하여 최적화
      */
-    private BoardDTO mapWithReactions(Board board) {
-        BoardDTO dto = boardConverter.toDTO(board);
-        long likeCount = boardReactionRepository.countByBoardAndReactionType(board, ReactionType.LIKE);
-        long dislikeCount = boardReactionRepository.countByBoardAndReactionType(board, ReactionType.DISLIKE);
-        dto.setLikes(Math.toIntExact(likeCount));
-        dto.setDislikes(Math.toIntExact(dislikeCount));
-        List<FileDTO> attachments = attachmentFileService.getAttachments(FileTargetType.BOARD, board.getIdx());
+    private BoardDTO mapBoardWithDetails(Board board) {
+        List<BoardDTO> results = mapBoardsWithReactionsBatch(List.of(board));
+        return results.isEmpty() ? boardConverter.toDTO(board) : results.get(0);
+    }
+
+    /**
+     * 반응 카운트 조회 결과(Object[])를 Map으로 변환 (단일 조회용)
+     * 
+     * @param results Repository에서 반환된 Object[] 리스트 [boardId, reactionType, count]
+     * @return Map<ReactionType, Count>
+     */
+    private Map<ReactionType, Long> parseReactionCountResults(List<Object[]> results) {
+        Map<ReactionType, Long> counts = new HashMap<>();
+        for (Object[] result : results) {
+            ReactionType reactionType = (ReactionType) result[1];
+            Long count = ((Number) result[2]).longValue();
+            counts.put(reactionType, count);
+        }
+        return counts;
+    }
+
+    /**
+     * 배치 조회 결과(Object[])를 Map으로 변환
+     * 
+     * @param results Repository에서 반환된 Object[] 리스트 [boardId, reactionType, count]
+     * @return Map<BoardId, Map<ReactionType, Count>>
+     */
+    private Map<Long, Map<ReactionType, Long>> parseBatchReactionCountResults(List<Object[]> results) {
+        Map<Long, Map<ReactionType, Long>> countsMap = new HashMap<>();
+        for (Object[] result : results) {
+            Long boardId = ((Number) result[0]).longValue();
+            ReactionType reactionType = (ReactionType) result[1];
+            Long count = ((Number) result[2]).longValue();
+
+            countsMap.computeIfAbsent(boardId, k -> new HashMap<>())
+                    .put(reactionType, count);
+        }
+        return countsMap;
+    }
+
+    /**
+     * BoardDTO에 반응 카운트 적용
+     * 
+     * @param dto    대상 BoardDTO
+     * @param counts Map<ReactionType, Count>
+     */
+    private void applyReactionCounts(BoardDTO dto, Map<ReactionType, Long> counts) {
+        dto.setLikes(Math.toIntExact(counts.getOrDefault(ReactionType.LIKE, 0L)));
+        dto.setDislikes(Math.toIntExact(counts.getOrDefault(ReactionType.DISLIKE, 0L)));
+    }
+
+    /**
+     * BoardDTO에 첨부파일 정보 적용 (배치 조회용)
+     * 
+     * @param dto            대상 BoardDTO
+     * @param boardId        게시글 ID
+     * @param attachmentsMap Map<BoardId, List<FileDTO>>
+     */
+    private void applyAttachmentInfo(BoardDTO dto, Long boardId, Map<Long, List<FileDTO>> attachmentsMap) {
+        List<FileDTO> attachments = attachmentsMap.getOrDefault(boardId, new ArrayList<>());
         dto.setAttachments(attachments);
         dto.setBoardFilePath(extractPrimaryFileUrl(attachments));
-        return dto;
     }
+
+    // /**
+    // * 게시글에 반응 정보(좋아요/싫어요 카운트) 매핑
+    // *
+    // * @deprecated 단일 조회 시 mapBoardsWithReactionsBatch를 활용하도록 변경됨.
+    // * 호환성을 위해 유지되지만, mapBoardWithDetails에서 더 이상 사용되지 않음.
+    // */
+    // @Deprecated
+    // private void mapReactionCounts(BoardDTO dto, Long boardId) {
+    // List<Object[]> results =
+    // boardReactionRepository.countByBoardGroupByReactionType(boardId);
+    // Map<ReactionType, Long> counts = parseReactionCountResults(results);
+    // applyReactionCounts(dto, counts);
+    // }
+
+    // /**
+    // * 게시글에 첨부파일 정보 매핑
+    // *
+    // * @deprecated 단일 조회 시 mapBoardsWithReactionsBatch를 활용하도록 변경됨.
+    // * 호환성을 위해 유지되지만, mapBoardWithDetails에서 더 이상 사용되지 않음.
+    // */
+    // @Deprecated
+    // private void mapAttachmentInfo(BoardDTO dto, Long boardId) {
+    // List<FileDTO> attachments =
+    // attachmentFileService.getAttachments(FileTargetType.BOARD, boardId);
+    // dto.setAttachments(attachments);
+    // dto.setBoardFilePath(extractPrimaryFileUrl(attachments));
+    // }
 
     /**
      * 여러 게시글에 반응 정보를 배치로 매핑 (목록 조회용 - N+1 문제 해결)
@@ -454,17 +537,13 @@ public class BoardService {
                 .map(board -> {
                     BoardDTO dto = boardConverter.toDTO(board);
 
-                    // 좋아요/싫어요 카운트 설정
+                    // 좋아요/싫어요 카운트 설정 (공통 메서드 사용)
                     Map<ReactionType, Long> counts = reactionCountsMap.getOrDefault(
                             board.getIdx(), new HashMap<>());
-                    dto.setLikes(Math.toIntExact(counts.getOrDefault(ReactionType.LIKE, 0L)));
-                    dto.setDislikes(Math.toIntExact(counts.getOrDefault(ReactionType.DISLIKE, 0L)));
+                    applyReactionCounts(dto, counts);
 
-                    // 첨부파일 설정
-                    List<FileDTO> attachments = attachmentsMap.getOrDefault(
-                            board.getIdx(), new ArrayList<>());
-                    dto.setAttachments(attachments);
-                    dto.setBoardFilePath(extractPrimaryFileUrl(attachments));
+                    // 첨부파일 설정 (공통 메서드 사용)
+                    applyAttachmentInfo(dto, board.getIdx(), attachmentsMap);
 
                     return dto;
                 })
@@ -492,15 +571,9 @@ public class BoardService {
 
             List<Object[]> results = boardReactionRepository.countByBoardsGroupByReactionType(batch);
 
-            // 결과를 Map으로 변환: Map<BoardId, Map<ReactionType, Count>>
-            for (Object[] result : results) {
-                Long boardId = ((Number) result[0]).longValue();
-                ReactionType reactionType = (ReactionType) result[1];
-                Long count = ((Number) result[2]).longValue();
-
-                countsMap.computeIfAbsent(boardId, k -> new HashMap<>())
-                        .put(reactionType, count);
-            }
+            // 결과를 Map으로 변환: Map<BoardId, Map<ReactionType, Count>> (공통 메서드 사용)
+            Map<Long, Map<ReactionType, Long>> batchCounts = parseBatchReactionCountResults(results);
+            countsMap.putAll(batchCounts);
         }
 
         return countsMap;
@@ -552,6 +625,10 @@ public class BoardService {
         return attachmentFileService.buildDownloadUrl(primary.getFilePath());
     }
 
+    /**
+     * 게시글 상태 변경 (관리자용)
+     * - AdminBoardController에서 사용
+     */
     @Caching(evict = {
             @CacheEvict(value = "boardDetail", key = "#id"),
             @CacheEvict(value = "boardList", allEntries = true)
@@ -562,9 +639,13 @@ public class BoardService {
         // do not change isDeleted here
         board.setStatus(status);
         Board saved = boardRepository.save(board);
-        return mapWithReactions(saved);
+        return mapBoardWithDetails(saved);
     }
 
+    /**
+     * 게시글 복구 (관리자용)
+     * - AdminBoardController에서 사용
+     */
     @Caching(evict = {
             @CacheEvict(value = "boardDetail", key = "#id"),
             @CacheEvict(value = "boardList", allEntries = true)
@@ -578,6 +659,94 @@ public class BoardService {
             board.setStatus(com.linkup.Petory.domain.common.ContentStatus.ACTIVE);
         }
         Board saved = boardRepository.save(board);
-        return mapWithReactions(saved);
+        return mapBoardWithDetails(saved);
+    }
+
+    /**
+     * 관리자용 게시글 조회 (페이징 + 필터링 지원) - DB 레벨 필터링 버전
+     * 
+     * 개선사항:
+     * - 메모리 필터링 → DB 레벨 필터링 (Specification 패턴 사용)
+     * - 불필요한 데이터 조회 제거
+     * - 인덱스 활용 가능
+     * - 성능 대폭 개선
+     */
+    public BoardPageResponseDTO getAdminBoardsWithPagingOptimized(
+            String status, Boolean deleted, String category, String q, int page, int size) {
+
+        // Specification으로 동적 쿼리 구성
+        Specification<Board> spec = null;
+
+        // 삭제 여부 필터
+        if (deleted != null) {
+            Specification<Board> deletedSpec = (root, query, cb) -> cb.equal(root.get("isDeleted"), deleted);
+            spec = spec == null ? deletedSpec : spec.and(deletedSpec);
+        }
+
+        // 카테고리 필터
+        if (category != null && !category.equals("ALL")) {
+            Specification<Board> categorySpec = (root, query, cb) -> cb.equal(root.get("category"), category);
+            spec = spec == null ? categorySpec : spec.and(categorySpec);
+        }
+
+        // 상태 필터
+        if (status != null && !status.equals("ALL")) {
+            try {
+                ContentStatus contentStatus = ContentStatus.valueOf(status.toUpperCase());
+                Specification<Board> statusSpec = (root, query, cb) -> cb.equal(root.get("status"), contentStatus);
+                spec = spec == null ? statusSpec : spec.and(statusSpec);
+            } catch (IllegalArgumentException e) {
+                // 잘못된 status 값은 무시
+                log.warn("Invalid status value: {}", status);
+            }
+        }
+
+        // 검색어 필터 (제목, 내용, 작성자명)
+        if (q != null && !q.isBlank()) {
+            String keyword = "%" + q.toLowerCase() + "%";
+            Specification<Board> searchSpec = (root, query, cb) -> {
+                // JOIN FETCH를 사용하기 위해 join 사용
+                jakarta.persistence.criteria.Join<Board, Users> userJoin = root.join("user");
+
+                return cb.or(
+                        cb.like(cb.lower(root.get("title")), keyword),
+                        cb.like(cb.lower(root.get("content")), keyword),
+                        cb.like(cb.lower(userJoin.get("username")), keyword));
+            };
+            spec = spec == null ? searchSpec : spec.and(searchSpec);
+        }
+
+        // 최신순 정렬 추가
+        Pageable pageable = PageRequest.of(page, size,
+                org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC,
+                        "createdAt"));
+
+        // DB 레벨에서 필터링 및 페이징 처리
+        Page<Board> boardPage = boardRepository.findAll(spec, pageable);
+
+        if (boardPage.isEmpty()) {
+            return BoardPageResponseDTO.builder()
+                    .boards(new ArrayList<>())
+                    .totalCount(0)
+                    .totalPages(0)
+                    .currentPage(page)
+                    .pageSize(size)
+                    .hasNext(false)
+                    .hasPrevious(false)
+                    .build();
+        }
+
+        // 배치 조회로 N+1 문제 해결
+        List<BoardDTO> boardDTOs = mapBoardsWithReactionsBatch(boardPage.getContent());
+
+        return BoardPageResponseDTO.builder()
+                .boards(boardDTOs)
+                .totalCount(boardPage.getTotalElements())
+                .totalPages(boardPage.getTotalPages())
+                .currentPage(page)
+                .pageSize(size)
+                .hasNext(boardPage.hasNext())
+                .hasPrevious(boardPage.hasPrevious())
+                .build();
     }
 }

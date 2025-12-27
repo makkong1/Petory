@@ -31,16 +31,18 @@ const NAVER_MAPS_KEY_ID = process.env.REACT_APP_NAVER_MAPS_KEY_ID || process.env
  * @param {Function} onRegionClick - 지역 클릭 핸들러
  */
 const MapContainer = React.forwardRef(
-  ({ services = [], onServiceClick, userLocation, mapCenter, mapLevel, onMapDragStart, onMapIdle, hoverMarker = null, currentMapView = 'nation', selectedSido = null, selectedSigungu = null, selectedEupmyeondong = null, onRegionClick = null, onMapClick = null }, ref) => {
+  ({ services = [], onServiceClick, userLocation, mapCenter, mapLevel, onMapDragStart, onMapIdle, hoverMarker = null, currentMapView = 'nation', selectedSido = null, selectedSigungu = null, selectedEupmyeondong = null, onRegionClick = null, onMapClick = null, selectedService = null, hoveredService = null }, ref) => {
     const mapRef = useRef(null);
     const mapInstanceRef = useRef(null);
     const markersRef = useRef([]);
+    const markerClusterRef = useRef(null); // MarkerClusterer 인스턴스
     const userMarkerRef = useRef(null);
     const hoverMarkerRef = useRef(null);
     const lastProgrammaticCenterRef = useRef(null);
     const mapReadyRef = useRef(false);
     const [mapReady, setMapReady] = useState(false);
     const userZoomedRef = useRef(false); // 사용자가 직접 줌 조정했는지 여부
+    const clustererReadyRef = useRef(false); // MarkerClusterer 로드 여부
     // GeoJSON 관련 ref 제거됨
 
     // 카카오맵 레벨을 네이버맵 줌으로 변환
@@ -85,6 +87,9 @@ const MapContainer = React.forwardRef(
           minZoom: 1, // 최소 줌 레벨 (최대 축소)
           maxZoom: 21, // 최대 줌 레벨 (최대 확대)
           zoomControl: false, // 기본 컨트롤 비활성화 (커스텀 버튼 사용)
+          logoControl: false, // 네이버맵 로고 숨기기
+          mapDataControl: false, // 지도 데이터 컨트롤 숨기기
+          scaleControl: false, // 스케일 컨트롤 숨기기
           scrollWheel: false, // 마우스 휠 확대/축소 비활성화
           disableDoubleClickZoom: false, // 더블클릭 확대 활성화
           disableDoubleClick: false,
@@ -95,6 +100,32 @@ const MapContainer = React.forwardRef(
         lastProgrammaticCenterRef.current = initial;
         mapReadyRef.current = true;
         setMapReady(true);
+
+        // 네이버맵 로고 및 저작권 표시 숨기기 (지도 로드 후)
+        setTimeout(() => {
+          const copyrightElements = mapRef.current?.querySelectorAll('.nmap_copyright, .nmap_logo, [class*="nmap"][class*="copyright"], [class*="nmap"][class*="logo"]');
+          if (copyrightElements) {
+            copyrightElements.forEach((el) => {
+              if (el instanceof HTMLElement) {
+                el.style.display = 'none';
+              }
+            });
+          }
+
+          // 네이버맵 인증 관련 요소 숨기기
+          const authElements = document.querySelectorAll('iframe[src*="oapi.map.naver.com"], iframe[src*="auth"], a[href*="oapi.map.naver.com"], a[href*="auth"]');
+          authElements.forEach((el) => {
+            if (el instanceof HTMLElement) {
+              el.style.display = 'none';
+              el.style.visibility = 'hidden';
+              el.style.opacity = '0';
+              el.style.width = '0';
+              el.style.height = '0';
+              el.style.position = 'absolute';
+              el.style.left = '-9999px';
+            }
+          });
+        }, 500);
 
         // 지도 이벤트 리스너 등록
         window.naver.maps.Event.addListener(map, 'dragstart', () => {
@@ -242,6 +273,20 @@ const MapContainer = React.forwardRef(
 
     // 마커 정리
     const clearMarkers = useCallback(() => {
+      // 클러스터 마커 제거
+      if (markerClusterRef.current) {
+        if (markerClusterRef.current.markers) {
+          // 직접 구현한 클러스터 마커
+          markerClusterRef.current.markers.forEach((marker) => {
+            if (marker.setMap) marker.setMap(null);
+          });
+        } else if (markerClusterRef.current.clear) {
+          // MarkerClusterer 라이브러리 사용 시
+          markerClusterRef.current.clear();
+        }
+        markerClusterRef.current = null;
+      }
+      // 개별 마커도 정리
       markersRef.current.forEach((marker) => {
         if (marker.setMap) marker.setMap(null);
       });
@@ -250,96 +295,210 @@ const MapContainer = React.forwardRef(
 
     // 지역 폴리곤 정리 함수 제거됨 (GeoJSON 미사용)
 
-    // 서비스 마커 표시 - 성능 최적화: 마커 개수 제한 및 배치 처리
-    const lastServicesKeyRef = useRef('');
 
+
+    // 서비스 마커 표시 - 클러스터링 사용
+    const lastServicesKeyRef = useRef('');
+    const lastZoomRef = useRef(null);
+    const lastBoundsRef = useRef(null);
+    const servicesRef = useRef(services);
+    const selectedServiceRef = useRef(selectedService);
+
+    // services와 selectedService를 ref에 동기화
     useEffect(() => {
+      servicesRef.current = services;
+      selectedServiceRef.current = selectedService;
+    }, [services, selectedService]);
+
+    // 마커 업데이트 함수
+    // 마커 업데이트 함수
+    const updateMarkers = useCallback(() => {
       if (!mapReadyRef.current || !mapInstanceRef.current || !window.naver?.maps) return;
 
-      // 마커가 변경되지 않았으면 스킵
-      const servicesKey = services.map(s => `${s.latitude},${s.longitude}`).join('|');
-      if (servicesKey === lastServicesKeyRef.current && markersRef.current.length > 0) {
-        return;
-      }
-      lastServicesKeyRef.current = servicesKey;
+      try {
+        const currentServices = servicesRef.current;
+        const currentSelectedService = selectedServiceRef.current;
+        const currentHoveredService = hoverMarkerRef.current?.service || hoveredService; // props.hoveredService -> hoveredService 수정
+        const currentZoom = mapInstanceRef.current.getZoom();
+        const currentBounds = mapInstanceRef.current.getBounds();
 
-      clearMarkers();
+        // 서비스가 변경되지 않고, 줌과 bounds도 변경되지 않았으면 스킵 (단, 호버 상태 변경 시에는 업데이트 필요)
+        // 호버 상태 변경 감지를 위해 의존성 배열에 hoveredService 추가 필요하지만,
+        // 여기서는 useEffect에서 호출되므로 괜찮음.
+        const servicesKey = currentServices.map(s => `${s.latitude},${s.longitude}`).join('|');
+        // const zoomChanged = lastZoomRef.current !== currentZoom;
+        // const boundsChanged = ...
 
-      // 마커 개수 제한 (성능 최적화)
-      const maxMarkers = 500;
-      const servicesToShow = services.slice(0, maxMarkers);
+        // 강제 업데이트가 필요할 수 있으므로 최적화 로직 잠시 완화 또는 호버 ID 포함
+        // (실제로는 useEffect에서 호출되므로 로직 단순화)
+        
+        lastServicesKeyRef.current = servicesKey;
+        lastZoomRef.current = currentZoom;
+        lastBoundsRef.current = currentBounds;
 
-      // 배치 처리로 성능 개선
-      const batchSize = 50;
-      let batchIndex = 0;
+        clearMarkers();
 
-      const createMarkerBatch = () => {
-        const start = batchIndex * batchSize;
-        const end = Math.min(start + batchSize, servicesToShow.length);
+        // 유효한 좌표를 가진 서비스만 필터링
+        const validServices = currentServices.filter(
+          service => typeof service.latitude === 'number' && typeof service.longitude === 'number'
+        );
 
-        for (let i = start; i < end; i++) {
-          const service = servicesToShow[i];
-          if (typeof service.latitude !== 'number' || typeof service.longitude !== 'number') {
-            continue;
+        if (validServices.length === 0) return;
+
+        // 통합 핀 아이콘 생성 함수 (SVG)
+        // type: 'normal' | 'selected' | 'hovered' | 'missing'
+        const createPinIcon = (type) => {
+          let color = '#03C75A'; // 기본 녹색
+          let scale = 1;
+          let zIndex = 100;
+          let label = '';
+          let labelSize = 13;
+          let labelColor = 'white';
+
+          if (type === 'missing') {
+            color = '#FF6B6B'; // 실종: 빨강
+            zIndex = 150;
+          }
+          
+          if (type === 'selected') {
+            color = '#028A48'; // 선택: 진한 녹색
+            scale = 1.25;
+            zIndex = 1000;
+          } else if (type === 'hovered') {
+            scale = 1.25; // 호버 시 확대
+            zIndex = 900;
           }
 
+          // SVG 핀 아이콘 (더 날렵한 비율: 26x36)
+          const width = 26 * scale;
+          const height = 36 * scale;
+          
+          // 내부 컨텐츠: 흰 점 (개별 마커)
+          const innerContent = `<circle cx="12" cy="12" r="5" fill="white"/>`;
+
+          // SVG Path: 날렵한 핀 모양
+           const svgContent = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 24 34" fill="none">
+              <path fill="${color}" d="M12 0C5.37258 0 0 5.37258 0 12C0 19 12 34 12 34C12 34 24 19 24 12C24 5.37258 18.6274 0 12 0Z"/>
+              ${innerContent}
+            </svg>
+          `;
+
+          return {
+            content: `<div style="cursor:pointer; filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.25));">${svgContent}</div>`,
+            anchor: new window.naver.maps.Point(width / 2, height),
+            zIndex: zIndex
+          };
+        };
+
+        // 모든 서비스에 대해 개별 마커 생성 (클러스터링 비활성화 - 사용자 요청)
+        const individualMarkersList = validServices.map((service) => {
           const position = new window.naver.maps.LatLng(service.latitude, service.longitude);
 
-          // 실종신고는 다른 색상 마커 사용
-          const isMissingPet = service.type === 'missingPet';
-          const markerIcon = isMissingPet
-            ? {
-              content: '<div style="width:20px;height:20px;background:#FF6B6B;border-radius:50%;border:2px solid #fff;box-shadow:0 2px 4px rgba(0,0,0,0.3);"></div>',
-              anchor: new window.naver.maps.Point(10, 10),
-            }
-            : undefined; // 기본 마커 사용
+          const isSelected = currentSelectedService && (
+            (currentSelectedService.idx && service.idx === currentSelectedService.idx) ||
+            (currentSelectedService.externalId && service.idx === currentSelectedService.externalId) ||
+            (currentSelectedService.latitude && currentSelectedService.latitude === service.latitude &&
+              currentSelectedService.longitude && currentSelectedService.longitude === service.longitude)
+          );
+
+          const isHovered = hoveredService && (
+             (hoveredService.idx && service.idx === hoveredService.idx) ||
+             (hoveredService.externalId && service.idx === hoveredService.externalId) ||
+             (hoveredService.key && service.key === hoveredService.key)
+          );
+
+          let type = 'normal';
+          if (service.type === 'missingPet') type = 'missing';
+          if (isSelected) type = 'selected';
+          else if (isHovered) type = 'hovered';
+
+          // 개별 마커용 핀 아이콘
+          const markerIcon = createPinIcon(type);
 
           const marker = new window.naver.maps.Marker({
             position,
             map: mapInstanceRef.current,
             title: service.name || '서비스',
             icon: markerIcon,
+            zIndex: markerIcon.zIndex,
           });
 
           window.naver.maps.Event.addListener(marker, 'click', () => {
             if (mapInstanceRef.current) {
-              mapInstanceRef.current.panTo(position);
+               // 클릭 시 부드럽게 이동
+              mapInstanceRef.current.panTo(position, { duration: 300 });
             }
             onServiceClick?.(service);
           });
 
-          markersRef.current.push(marker);
-        }
+          // 마커 호버 이벤트 (필요 시)
+          // window.naver.maps.Event.addListener(marker, 'mouseover', () => { ... });
 
-        batchIndex++;
-        if (end < servicesToShow.length) {
-          // 다음 배치를 비동기로 처리
-          requestAnimationFrame(createMarkerBatch);
-        } else {
+          return marker;
+        });
 
-          // 마커가 하나만 있고 mapCenter가 설정되어 있으면, 마커 위치로 지도 중심 조정
-          if (markersRef.current.length === 1 && mapCenter && mapInstanceRef.current) {
-            const marker = markersRef.current[0];
-            const markerPosition = marker.getPosition();
-            const currentCenter = mapInstanceRef.current.getCenter();
+        markersRef.current = individualMarkersList;
+        markerClusterRef.current = null; // 클러스터 없음
 
-            // 마커 위치와 현재 중심이 다르면 마커 위치로 이동
-            if (currentCenter && (
-              Math.abs(currentCenter.lat() - markerPosition.lat()) > COORD_EPSILON ||
-              Math.abs(currentCenter.lng() - markerPosition.lng()) > COORD_EPSILON
-            )) {
-              setTimeout(() => {
-                if (mapInstanceRef.current && marker) {
-                  mapInstanceRef.current.setCenter(markerPosition);
-                }
-              }, 100);
-            }
+        // 1개 마커 중심 이동 로직 (기존 유지)
+        if (validServices.length === 1 && mapCenter && mapInstanceRef.current && markersRef.current.length > 0) {
+          const marker = markersRef.current[0];
+          const markerPosition = marker.getPosition();
+          const currentCenter = mapInstanceRef.current.getCenter();
+
+          if (currentCenter && (
+            Math.abs(currentCenter.lat() - markerPosition.lat()) > COORD_EPSILON ||
+            Math.abs(currentCenter.lng() - markerPosition.lng()) > COORD_EPSILON
+          )) {
+            setTimeout(() => {
+              if (mapInstanceRef.current && marker) {
+                mapInstanceRef.current.setCenter(markerPosition);
+              }
+            }, 100);
           }
         }
+      } catch (error) {
+        console.error('마커 업데이트 중 오류:', error);
+      }
+    }, [onServiceClick, clearMarkers, mapCenter, hoveredService]); // props.hoveredService -> hoveredService 수정
+
+    // 마커 업데이트 실행 (서비스 변경 시)
+    useEffect(() => {
+      if (mapReadyRef.current && mapInstanceRef.current) {
+        updateMarkers();
+      }
+    }, [services, selectedService, updateMarkers]);
+
+    // 지도 줌/이동 시 마커 재계산 (한 번만 등록)
+    useEffect(() => {
+      if (!mapReadyRef.current || !mapInstanceRef.current || !window.naver?.maps) return;
+
+      const map = mapInstanceRef.current;
+      let timeoutId = null;
+
+      const handleMapChange = () => {
+        if (timeoutId) clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => {
+          if (mapReadyRef.current && mapInstanceRef.current) {
+            updateMarkers();
+          }
+        }, 300); // 디바운스
       };
 
-      createMarkerBatch();
-    }, [services, onServiceClick, clearMarkers, mapCenter]);
+      window.naver.maps.Event.addListener(map, 'zoom_changed', handleMapChange);
+      window.naver.maps.Event.addListener(map, 'bounds_changed', handleMapChange);
+
+      return () => {
+        if (timeoutId) clearTimeout(timeoutId);
+        try {
+          window.naver.maps.Event.removeListener(map, 'zoom_changed', handleMapChange);
+          window.naver.maps.Event.removeListener(map, 'bounds_changed', handleMapChange);
+        } catch (error) {
+          // 무시 (이미 제거되었을 수 있음)
+        }
+      };
+    }, [mapReady, updateMarkers]);
 
     // 지도 중심 및 줌 변경 (프로그래밍 방식으로만 실행)
     useEffect(() => {
@@ -354,14 +513,6 @@ const MapContainer = React.forwardRef(
         Math.abs(currentCenter.lng() - mapCenter.lng) < COORD_EPSILON;
       const targetZoom = mapLevelToZoom(mapLevel);
       const isSameZoom = Math.abs(currentZoom - targetZoom) < 0.5; // 소수점 오차 허용
-
-      console.log('MapContainer 줌 업데이트:', {
-        currentZoom,
-        targetZoom,
-        mapLevel,
-        isSameZoom,
-        userZoomed: userZoomedRef.current
-      });
 
       // mapLevel prop이 변경되었으면 무조건 userZoomedRef 리셋 (프로그래밍 방식 변경)
       // 사용자가 마우스 휠로 조정했더라도, mapLevel prop이 명시적으로 변경되었으면 줌 변경 허용
@@ -438,6 +589,36 @@ const MapContainer = React.forwardRef(
 
     // GeoJSON 폴리곤 표시 기능 제거됨 (geojsonUtils 파일 없음)
 
+    // 네이버맵 인증 관련 요소 주기적으로 숨기기 (동적으로 생성될 수 있음)
+    useEffect(() => {
+      if (!mapReadyRef.current) return;
+
+      const hideAuthElements = () => {
+        const authElements = document.querySelectorAll('iframe[src*="oapi.map.naver.com"], iframe[src*="auth"], a[href*="oapi.map.naver.com"], a[href*="auth"]');
+        authElements.forEach((el) => {
+          if (el instanceof HTMLElement) {
+            el.style.display = 'none';
+            el.style.visibility = 'hidden';
+            el.style.opacity = '0';
+            el.style.width = '0';
+            el.style.height = '0';
+            el.style.position = 'absolute';
+            el.style.left = '-9999px';
+          }
+        });
+      };
+
+      // 주기적으로 인증 관련 요소 숨기기
+      const hideAuthInterval = setInterval(hideAuthElements, 1000);
+
+      // 초기 실행
+      hideAuthElements();
+
+      return () => {
+        clearInterval(hideAuthInterval);
+      };
+    }, [mapReady]);
+
     // 정리
     useEffect(() => {
       return () => {
@@ -472,17 +653,6 @@ const MapContainer = React.forwardRef(
       }
     }, []);
 
-    if (!NAVER_MAPS_KEY_ID) {
-      return (
-        <MapDiv ref={mapRef}>
-          <MapError>
-            네이버맵 Key ID가 설정되지 않았습니다.<br />
-            .env 파일에 REACT_APP_NAVER_MAPS_KEY_ID를 확인하세요.
-          </MapError>
-        </MapDiv>
-      );
-    }
-
     if (!mapReady) {
       return (
         <MapDiv ref={mapRef}>
@@ -515,6 +685,39 @@ const MapDiv = styled.div`
   min-height: 500px;
   position: relative;
   background: #ffffff;
+  overflow: hidden; /* 인증 URL 등이 밖으로 나오지 않도록 */
+
+  /* 네이버맵 저작권 표시 숨기기 */
+  .nmap_copyright,
+  .nmap_logo,
+  .nmap_control {
+    display: none !important;
+  }
+
+  /* 네이버맵 로고 및 저작권 영역 숨기기 */
+  div[class*="nmap"],
+  div[class*="naver"] {
+    &[class*="copyright"],
+    &[class*="logo"],
+    &[class*="control"] {
+      display: none !important;
+    }
+  }
+
+  /* 네이버맵 인증 관련 요소 숨기기 */
+  iframe[src*="oapi.map.naver.com"],
+  iframe[src*="auth"],
+  script[src*="oapi.map.naver.com"],
+  a[href*="oapi.map.naver.com"],
+  a[href*="auth"] {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    width: 0 !important;
+    height: 0 !important;
+    position: absolute !important;
+    left: -9999px !important;
+  }
 `;
 
 const MapLoading = styled.div`

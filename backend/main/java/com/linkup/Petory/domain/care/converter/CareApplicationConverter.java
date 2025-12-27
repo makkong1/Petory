@@ -1,7 +1,5 @@
 package com.linkup.Petory.domain.care.converter;
 
-import java.util.stream.Collectors;
-
 import org.springframework.stereotype.Component;
 
 import com.linkup.Petory.domain.care.dto.CareApplicationDTO;
@@ -13,7 +11,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class CareApplicationConverter {
 
-    private final CareReviewConverter careReviewConverter;
+    // private final CareReviewConverter careReviewConverter;
 
     public CareApplicationDTO toDTO(CareApplication app) {
         return CareApplicationDTO.builder()

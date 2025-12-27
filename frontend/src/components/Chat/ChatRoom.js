@@ -7,6 +7,7 @@ import { getMessages, sendMessage, markAsRead, getConversation, leaveConversatio
 import { careRequestApi } from '../../api/careRequestApi';
 import { careReviewApi } from '../../api/careReviewApi';
 import { uploadApi } from '../../api/uploadApi';
+import { geocodingApi } from '../../api/geocodingApi';
 
 const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
   const { user } = useAuth();
@@ -31,6 +32,7 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
   const [reviewComment, setReviewComment] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
   const [hasReview, setHasReview] = useState(false);
+  const [gettingLocation, setGettingLocation] = useState(false);
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
   const stompClientRef = useRef(null);
@@ -482,6 +484,45 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
     }
   };
 
+  // 내 위치 전송 (주소 텍스트 입력)
+  const handleSendLocation = async () => {
+    if (!navigator.geolocation) {
+      alert('브라우저가 위치 정보를 지원하지 않습니다.');
+      return;
+    }
+
+    setGettingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+          // 역지오코딩 API 호출
+          const addressData = await geocodingApi.coordinatesToAddress(latitude, longitude);
+          
+          if (addressData && addressData.address) {
+            const locationText = `📍 내 위치: ${addressData.address}`;
+            // 기존 입력값이 있으면 줄바꿈 후 추가
+            setMessageInput(prev => prev ? `${prev}\n${locationText}` : locationText);
+            // 입력창으로 포커스
+            messageInputRef.current?.focus();
+          } else {
+            alert('주소 정보를 가져오는데 실패했습니다.');
+          }
+        } catch (err) {
+          console.error('위치 변환 실패:', err);
+          alert('위치 정보를 변환하는데 실패했습니다.');
+        } finally {
+          setGettingLocation(false);
+        }
+      },
+      (error) => {
+        console.error('위치 권한 에러:', error);
+        alert('위치 정보를 가져올 수 없습니다. 권한을 확인해주세요.');
+        setGettingLocation(false);
+      }
+    );
+  };
+
   // 펫케어 관련 채팅방인지 확인
   const isCareRequestChat = conversation?.relatedType === 'CARE_REQUEST' ||
     conversation?.relatedType === 'CARE_APPLICATION' ||
@@ -652,6 +693,14 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
               title="이미지 업로드"
             >
               {uploadingImage ? '📤' : '📷'}
+            </ImageButton>
+            <ImageButton
+              type="button"
+              onClick={handleSendLocation}
+              disabled={gettingLocation || sending}
+              title="내 위치 전송"
+            >
+              {gettingLocation ? '📡' : '📍'}
             </ImageButton>
             <MessageInput
               ref={messageInputRef}

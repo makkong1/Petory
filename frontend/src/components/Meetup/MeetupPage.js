@@ -1048,98 +1048,77 @@ const MeetupPage = () => {
   return (
     <Container>
       <Header>
-        <Title>🐾 산책 모임</Title>
-        <Controls>
-          <LocationButton onClick={fetchUserLocation} title="내 위치로 이동">
-            📍 내 위치
-          </LocationButton>
-          <LocationSelectButton onClick={() => setShowRegionControls(!showRegionControls)} title="위치 선택">
-            📌 위치 선택
-          </LocationSelectButton>
-          {selectedLocation && (
-            <SelectedLocationInfo>
-              {selectedLocation.eupmyeondong && selectedLocation.eupmyeondong !== '전체'
-                ? `${selectedLocation.sido} ${selectedLocation.sigungu} ${selectedLocation.eupmyeondong}`
-                : selectedLocation.sigungu
-                  ? `${selectedLocation.sido} ${selectedLocation.sigungu}`
-                  : selectedLocation.sido || '내위치'}
-            </SelectedLocationInfo>
-          )}
-          <RadiusControls>
-            <RadiusSelect
-              value={radius}
-              onChange={(e) => {
-                const newRadius = Number(e.target.value);
-                const newMapLevel = calculateMapLevelFromRadius(newRadius);
-
-                setRadius(newRadius);
-                setMapLevel(newMapLevel);
-
-                // 프로그래매틱 이동 플래그 설정 (리스트는 자동으로 조회됨)
-                isProgrammaticMoveRef.current = true;
-              }}
-            >
-              <option value={1}>레벨 1</option>
-              <option value={3}>레벨 2</option>
-              <option value={5}>레벨 3</option>
-              <option value={10}>레벨 4</option>
-              <option value={20}>레벨 5</option>
-            </RadiusSelect>
-          </RadiusControls>
-          <CreateButton onClick={() => setShowCreateForm(true)}>
-            ➕ 모임 등록
-          </CreateButton>
-          <ToggleButton onClick={() => {
-            const newValue = !showList;
-            setShowList(newValue);
-            showListRef.current = newValue;
-          }}>
-            {showList ? '📋 리스트 숨기기' : '📋 리스트 보기'}
-          </ToggleButton>
-        </Controls>
-        {showRegionControls && (
-          <RegionControls>
-            {currentView === 'sido' ? (
-              // 시/도 선택 화면
-              <RegionButtonGrid>
-                {SIDOS.map((sido) => (
-                  <RegionButton
-                    key={sido}
-                    onClick={async () => {
-                      await handleRegionSelect(sido, null, null);
-                    }}
-                    active={selectedSido === sido}
-                  >
-                    {sido}
-                  </RegionButton>
-                ))}
-              </RegionButtonGrid>
-            ) : (
-              // 시/군/구 선택 화면
-              <RegionButtonGrid>
-                <RegionButton
-                  onClick={async () => {
-                    // 시도 선택 화면으로 돌아가기
-                    await handleRegionSelect(selectedSido, null, null, 'sido');
-                  }}
-                >
-                  ← 뒤로
-                </RegionButton>
-                {(availableSigungus.length > 0 ? availableSigungus : (SIGUNGUS[selectedSido] || [])).map((sigungu) => (
-                  <RegionButton
-                    key={sigungu}
-                    onClick={async () => {
-                      await handleRegionSelect(selectedSido, sigungu, null);
-                    }}
-                    active={selectedSigungu === sigungu}
-                  >
-                    {sigungu}
-                  </RegionButton>
-                ))}
-              </RegionButtonGrid>
+        <HeaderTop>
+          <Title>🐾 산책 모임</Title>
+          <HeaderActions>
+            <LocationButton onClick={fetchUserLocation} title="내 위치로 이동">
+              📍 내 위치
+            </LocationButton>
+            <LocationSelectButton onClick={() => setShowRegionControls(!showRegionControls)} title="위치 선택">
+              📌 위치 선택
+            </LocationSelectButton>
+            {selectedLocation && (
+              <SelectedLocationInfo>
+                {selectedLocation.eupmyeondong && selectedLocation.eupmyeondong !== '전체'
+                  ? `${selectedLocation.sido} ${selectedLocation.sigungu} ${selectedLocation.eupmyeondong}`
+                  : selectedLocation.sigungu
+                    ? `${selectedLocation.sido} ${selectedLocation.sigungu}`
+                    : selectedLocation.sido || '내위치'}
+              </SelectedLocationInfo>
             )}
-          </RegionControls>
-        )}
+            <CreateButton onClick={() => setShowCreateForm(true)}>
+              ➕ 모임 등록
+            </CreateButton>
+            <ToggleButton onClick={() => {
+              const newValue = !showList;
+              setShowList(newValue);
+              showListRef.current = newValue;
+            }}>
+              {showList ? '📋 리스트 숨기기' : '📋 리스트 보기'}
+            </ToggleButton>
+          </HeaderActions>
+        </HeaderTop>
+        <RegionControls $isOpen={showRegionControls}>
+          {currentView === 'sido' ? (
+            // 시/도 선택 화면
+            <RegionButtonGrid>
+              {SIDOS.map((sido) => (
+                <RegionButton
+                  key={sido}
+                  onClick={async () => {
+                    await handleRegionSelect(sido, null, null);
+                  }}
+                  active={selectedSido === sido}
+                >
+                  {sido}
+                </RegionButton>
+              ))}
+            </RegionButtonGrid>
+          ) : (
+            // 시/군/구 선택 화면
+            <RegionButtonGrid>
+              <RegionButton
+                onClick={async () => {
+                  // 시도 선택 화면으로 돌아가기
+                  await handleRegionSelect(selectedSido, null, null, 'sido');
+                }}
+              >
+                ← 뒤로
+              </RegionButton>
+              {(availableSigungus.length > 0 ? availableSigungus : (SIGUNGUS[selectedSido] || [])).map((sigungu) => (
+                <RegionButton
+                  key={sigungu}
+                  onClick={async () => {
+                    await handleRegionSelect(selectedSido, sigungu, null);
+                  }}
+                  active={selectedSigungu === sigungu}
+                >
+                  {sigungu}
+                </RegionButton>
+              ))}
+            </RegionButtonGrid>
+          )}
+        </RegionControls>
       </Header>
 
       <ContentWrapper>
@@ -1171,7 +1150,6 @@ const MeetupPage = () => {
             {selectedLocation
               ? `${selectedLocation.bname || selectedLocation.sigungu || '선택한 위치'} 주변 모임 (${meetups.length}개)`
               : `주변 모임 목록 (${meetups.length}개)`}
-            {radius > 0 && <RadiusInfo>레벨 {radiusToLevel(radius)}</RadiusInfo>}
           </ListHeader>
           {loading ? (
             <LoadingText>로딩 중...</LoadingText>
@@ -1537,53 +1515,35 @@ const Container = styled.div`
 `;
 
 const Header = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
   padding: 1rem 2rem;
   background: ${props => props.theme.colors.surface};
   border-bottom: 1px solid ${props => props.theme.colors.border};
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+`;
 
-  @media (max-width: 768px) {
-    flex-direction: column;
-    gap: 1rem;
-    align-items: stretch;
-    padding: 1rem;
-  }
+const HeaderTop = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
 `;
 
 const Title = styled.h1`
+  margin: 0;
+  color: ${props => props.theme.colors.text};
   font-size: 1.5rem;
   font-weight: 700;
-  color: ${props => props.theme.colors.text};
-  margin: 0;
-
-  @media (max-width: 768px) {
-    font-size: 1.25rem;
-  }
 `;
 
-const Controls = styled.div`
+const HeaderActions = styled.div`
   display: flex;
-  gap: 1rem;
   align-items: center;
+  gap: 0.75rem;
   flex-wrap: wrap;
-
-  @media (max-width: 768px) {
-    width: 100%;
-    justify-content: space-between;
-    gap: 0.5rem;
-  }
-`;
-
-const RadiusSelect = styled.select`
-  padding: 0.5rem 1rem;
-  border: 1px solid ${props => props.theme.colors.border};
-  border-radius: 8px;
-  background: ${props => props.theme.colors.surface};
-  color: ${props => props.theme.colors.text};
-  font-size: 0.9rem;
-  cursor: pointer;
+  justify-content: flex-end;
 `;
 
 const CreateButton = styled.button`
@@ -1607,16 +1567,29 @@ const LocationButton = styled.button`
   padding: 0.5rem 1rem;
   border: 1px solid ${props => props.theme.colors.border};
   border-radius: 8px;
-  background: ${props => props.theme.colors.surface};
-  color: ${props => props.theme.colors.text};
   font-size: 0.9rem;
+  font-weight: 600;
   cursor: pointer;
+  background: ${props => props.disabled ? props.theme.colors.border : props.theme.colors.surface};
+  color: ${props => props.disabled ? props.theme.colors.textSecondary : props.theme.colors.text};
   transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
   white-space: nowrap;
 
-  &:hover {
+  &:hover:enabled {
     background: ${props => props.theme.colors.primary};
     color: white;
+  }
+
+  &:active:enabled {
+    transform: translateY(-1px);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
   }
 `;
 
@@ -1624,16 +1597,24 @@ const LocationSelectButton = styled.button`
   padding: 0.5rem 1rem;
   border: 1px solid ${props => props.theme.colors.border};
   border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
   background: ${props => props.theme.colors.surface};
   color: ${props => props.theme.colors.text};
-  font-size: 0.9rem;
-  cursor: pointer;
   transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
   white-space: nowrap;
 
   &:hover {
     background: ${props => props.theme.colors.primary};
     color: white;
+  }
+
+  &:active {
+    transform: translateY(-1px);
   }
 `;
 
@@ -1647,47 +1628,64 @@ const SelectedLocationInfo = styled.div`
   white-space: nowrap;
 `;
 
-const RadiusControls = styled.div`
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-  flex-wrap: wrap;
-`;
-
-const RegionControls = styled.div`
+const RegionControls = styled.div.withConfig({
+  shouldForwardProp: (prop) => prop !== '$isOpen',
+})`
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.75rem;
   width: 100%;
-  padding: 0.5rem 0;
+  padding: ${props => props.$isOpen ? '0.75rem 0' : '0'};
+  max-height: ${props => props.$isOpen ? '300px' : '0'};
+  overflow: hidden;
+  opacity: ${props => props.$isOpen ? '1' : '0'};
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 `;
 
 const RegionButtonGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 0.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
   width: 100%;
-  max-height: 200px;
+  max-height: 220px;
   overflow-y: auto;
-  padding: 0.5rem;
+  padding: 0.75rem;
   position: relative;
   z-index: 1000;
   pointer-events: auto;
+  
+  /* 스크롤바 스타일링 */
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+  &::-webkit-scrollbar-track {
+    background: ${props => props.theme.colors.background};
+    border-radius: 3px;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: ${props => props.theme.colors.border};
+    border-radius: 3px;
+    &:hover {
+      background: ${props => props.theme.colors.primary}80;
+    }
+  }
 `;
 
 const RegionButton = styled.button.withConfig({
   shouldForwardProp: (prop) => prop !== 'active',
 })`
-  padding: 0.6rem 1rem;
-  border: 1px solid ${props => props.active ? props.theme.colors.primary : props.theme.colors.border};
-  border-radius: 8px;
+  padding: 0.65rem 1.25rem;
+  border: 2px solid ${props => props.active ? props.theme.colors.primary : props.theme.colors.border};
+  border-radius: 24px;
   font-size: 0.9rem;
-  font-weight: 500;
+  font-weight: ${props => props.active ? 600 : 500};
   cursor: pointer;
-  background: ${props => props.active ? props.theme.colors.primary : props.theme.colors.surface};
+  background: ${props => props.active 
+    ? `linear-gradient(135deg, ${props.theme.colors.primary} 0%, ${props.theme.colors.primary}dd 100%)`
+    : props.theme.colors.surface};
   color: ${props => props.active ? 'white' : props.theme.colors.text};
-  transition: all 0.2s;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   text-align: center;
   white-space: nowrap;
   overflow: hidden;
@@ -1695,15 +1693,43 @@ const RegionButton = styled.button.withConfig({
   position: relative;
   z-index: 1000;
   pointer-events: auto;
-
+  box-shadow: ${props => props.active 
+    ? `0 4px 12px ${props.theme.colors.primary}40, 0 2px 4px ${props.theme.colors.primary}20`
+    : '0 2px 4px rgba(0, 0, 0, 0.05)'};
+  
+  /* 호버 효과 */
   &:hover {
-    background: ${props => props.active ? props.theme.colors.primary + 'dd' : props.theme.colors.primary + '20'};
+    background: ${props => props.active 
+      ? `linear-gradient(135deg, ${props.theme.colors.primary}dd 0%, ${props.theme.colors.primary} 100%)`
+      : `linear-gradient(135deg, ${props.theme.colors.primary}15 0%, ${props.theme.colors.primary}25 100%)`};
     border-color: ${props => props.theme.colors.primary};
     color: ${props => props.active ? 'white' : props.theme.colors.primary};
+    transform: translateY(-2px);
+    box-shadow: ${props => props.active 
+      ? `0 6px 16px ${props.theme.colors.primary}50, 0 4px 8px ${props.theme.colors.primary}30`
+      : `0 4px 12px ${props.theme.colors.primary}25, 0 2px 4px ${props.theme.colors.primary}15`};
   }
 
+  /* 활성 상태 강조 */
+  ${props => props.active && `
+    &::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      border-radius: 24px;
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0) 100%);
+      pointer-events: none;
+    }
+  `}
+
   &:active {
-    transform: translateY(1px);
+    transform: translateY(0px);
+    box-shadow: ${props => props.active 
+      ? `0 2px 6px ${props.theme.colors.primary}40`
+      : '0 1px 2px rgba(0, 0, 0, 0.1)'};
   }
 `;
 
@@ -1713,15 +1739,24 @@ const ToggleButton = styled.button`
   padding: 0.5rem 1rem;
   border: 1px solid ${props => props.theme.colors.border};
   border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
   background: ${props => props.theme.colors.surface};
   color: ${props => props.theme.colors.text};
-  font-size: 0.9rem;
-  cursor: pointer;
   transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
 
   &:hover {
     background: ${props => props.theme.colors.primary};
     color: white;
+  }
+
+  &:active {
+    transform: translateY(-1px);
   }
 `;
 
@@ -1776,12 +1811,6 @@ const ListHeader = styled.div`
   font-weight: 600;
   border-bottom: 1px solid ${props => props.theme.colors.border};
   color: ${props => props.theme.colors.text};
-`;
-
-const RadiusInfo = styled.span`
-  font-size: 0.85rem;
-  font-weight: 400;
-  color: ${props => props.theme.colors.textSecondary || props.theme.colors.text}99;
 `;
 
 const MeetupList = styled.div`

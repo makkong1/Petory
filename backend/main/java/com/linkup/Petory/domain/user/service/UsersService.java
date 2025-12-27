@@ -5,6 +5,7 @@ import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,12 +36,18 @@ public class UsersService {
     private final PetService petService;
     private final EmailVerificationService emailVerificationService;
 
-    // 전체 조회
+    /**
+     * 전체 사용자 조회 (관리자용)
+     * - AdminUserController에서 사용
+     */
     public List<UsersDTO> getAllUsers() {
         return usersConverter.toDTOList(usersRepository.findAll());
     }
 
-    // 전체 조회 (페이징 지원)
+    /**
+     * 전체 사용자 조회 (페이징 지원, 관리자용)
+     * - AdminUserController에서 사용
+     */
     @Transactional(readOnly = true)
     public UserPageResponseDTO getAllUsersWithPaging(int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
@@ -139,7 +146,26 @@ public class UsersService {
         boolean preVerified = emailVerificationService.isPreRegistrationEmailVerified(dto.getEmail());
         user.setEmailVerified(preVerified); // 회원가입 전 인증 완료했으면 true, 아니면 false
 
-        Users saved = usersRepository.save(user);
+        Users saved;
+        try {
+            saved = usersRepository.save(user);
+        } catch (DataIntegrityViolationException e) {
+            // DB Unique 제약조건 위반 (Race Condition 발생 시)
+            String errorMessage = e.getMessage();
+            if (errorMessage != null) {
+                if (errorMessage.contains("nickname") || errorMessage.contains("nick_name")) {
+                    throw new RuntimeException("이미 사용 중인 닉네임입니다.");
+                } else if (errorMessage.contains("username") || errorMessage.contains("user_name")) {
+                    throw new RuntimeException("이미 사용 중인 사용자명입니다.");
+                } else if (errorMessage.contains("email")) {
+                    throw new RuntimeException("이미 사용 중인 이메일입니다.");
+                } else if (errorMessage.contains("id")) {
+                    throw new RuntimeException("이미 사용 중인 아이디입니다.");
+                }
+            }
+            // 알 수 없는 제약조건 위반
+            throw new RuntimeException("이미 사용 중인 정보가 있습니다. 다른 값을 사용해주세요.", e);
+        }
 
         // 회원가입 전 이메일 인증을 완료한 경우 Redis에서 인증 상태 삭제
         if (preVerified) {
@@ -207,7 +233,10 @@ public class UsersService {
         usersRepository.save(user);
     }
 
-    // 계정 복구
+    /**
+     * 계정 복구 (관리자용)
+     * - AdminUserController에서 사용
+     */
     public UsersDTO restoreUser(long idx) {
         Users user = usersRepository.findById(idx)
                 .orElseThrow(() -> new RuntimeException("User not found"));
@@ -217,7 +246,11 @@ public class UsersService {
         return usersConverter.toDTO(restored);
     }
 
-    // 상태 관리 (상태, 경고 횟수, 정지 기간만 업데이트)
+    /**
+     * 사용자 상태 관리 (관리자용)
+     * - 상태, 경고 횟수, 정지 기간만 업데이트
+     * - AdminUserController에서 사용
+     */
     public UsersDTO updateUserStatus(long idx, UsersDTO dto) {
         Users user = usersRepository.findById(idx)
                 .orElseThrow(() -> new RuntimeException("User not found"));
@@ -274,7 +307,8 @@ public class UsersService {
     }
 
     /**
-     * 사용자 프로필 조회 (펫 정보 포함) - 관리자용
+     * 사용자 프로필 조회 (펫 정보 포함, 관리자용)
+     * - AdminUserController에서 사용
      */
     @Transactional(readOnly = true)
     public UsersDTO getUserWithPets(Long userIdx) {
