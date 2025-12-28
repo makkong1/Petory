@@ -112,7 +112,6 @@ const MissingPetBoardPage = () => {
 
     // 이메일 인증 체크
     if (!checkAndRedirect()) {
-      console.log('이메일 인증 필요 - 확인 다이얼로그 표시');
       return; // 이메일 인증이 필요하면 확인 다이얼로그 표시되고 함수 종료
     }
 

@@ -66,19 +66,14 @@ function AppContent() {
   // 전역 이메일 인증 필요 이벤트 리스너 (서버 예외 발생 시 백업용)
   useEffect(() => {
     const handleEmailVerificationRequired = (event) => {
-      console.log('🎯 전역 이벤트 리스너: emailVerificationRequired 수신', event.detail);
       const { purpose, currentUrl } = event.detail;
-      console.log('🎯 프롬프트 표시 설정:', { purpose, currentUrl });
       setEmailVerificationPurpose(purpose);
       setShowGlobalEmailVerificationPrompt(true);
-      console.log('🎯 showGlobalEmailVerificationPrompt를 true로 설정');
     };
 
-    console.log('🎯 전역 이벤트 리스너 등록: emailVerificationRequired');
     window.addEventListener('emailVerificationRequired', handleEmailVerificationRequired);
 
     return () => {
-      console.log('🎯 전역 이벤트 리스너 제거: emailVerificationRequired');
       window.removeEventListener('emailVerificationRequired', handleEmailVerificationRequired);
     };
   }, []);
@@ -206,10 +201,6 @@ function AppContent() {
         onCancel={handleEmailVerificationCancel}
         purpose={emailVerificationPurpose}
       />
-      {console.log('🔍 App.js 렌더링:', { 
-        showGlobalEmailVerificationPrompt, 
-        emailVerificationPurpose 
-      })}
       <Navigation
         activeTab={activeTab}
         setActiveTab={setActiveTab}

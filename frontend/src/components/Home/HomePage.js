@@ -67,7 +67,7 @@ const HomePage = ({ setActiveTab }) => {
         ))}
       </FeatureGrid>
 
-      <StatsSection>
+      {/* <StatsSection>
         <h2 style={{ marginBottom: '16px', color: 'inherit' }}>Petory와 함께하는 펫케어</h2>
         <p style={{ color: 'var(--text-secondary)', marginBottom: '0' }}>
           많은 반려동물과 보호자들이 Petory를 통해 안전한 펫케어 서비스를 이용하고 있습니다.
@@ -90,7 +90,7 @@ const HomePage = ({ setActiveTab }) => {
             <StatLabel>재이용율</StatLabel>
           </StatItem>
         </StatsGrid>
-      </StatsSection>
+      </StatsSection> */}
 
       {isAdmin && (
         <AdminSection>

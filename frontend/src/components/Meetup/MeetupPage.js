@@ -1079,18 +1079,12 @@ const MeetupPage = () => {
   const handleCreateMeetup = async (e) => {
     e.preventDefault();
 
-    console.log('🚀 handleCreateMeetup 호출됨');
-
     // 이메일 인증 체크
     const canProceed = checkAndRedirect();
-    console.log('📋 checkAndRedirect 결과:', canProceed);
 
     if (!canProceed) {
-      console.log('⛔ 이메일 인증 필요 - 확인 다이얼로그 표시, 함수 종료');
       return; // 이메일 인증이 필요하면 확인 다이얼로그 표시되고 함수 종료
     }
-
-    console.log('✅ 이메일 인증 완료 - 모임 등록 진행');
 
     if (!validateForm()) {
       return;
@@ -1211,19 +1205,12 @@ const MeetupPage = () => {
                   <CreateButton onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    console.log('➕ 모임 등록 버튼 클릭 - 이벤트:', e);
-
                     // 이메일 인증 체크 (모임 등록 시작 시점에 체크)
-                    console.log('🔍 checkAndRedirect 함수 존재:', typeof checkAndRedirect);
                     const result = checkAndRedirect();
-                    console.log('🔍 checkAndRedirect 결과:', result);
 
                     if (!result) {
-                      console.log('⛔ 이메일 인증 필요 - 모임 등록 시작 불가');
                       return; // 이메일 인증이 필요하면 확인 다이얼로그 표시되고 함수 종료
                     }
-
-                    console.log('✅ 이메일 인증 완료 - 모임 등록 시작');
                     setCreateStep('location');
                     setShowCreateForm(true);
                     setShowList(false); // 위치 잡을 때는 리스트 숨김

@@ -407,7 +407,6 @@ export const setupApiInterceptors = () => {
           if (typeof window !== 'undefined') {
             const currentUrl = window.location.pathname + window.location.search;
             const purpose = error.response?.data?.purpose || '';
-            console.log('📡 emailVerificationRequired 이벤트 발생:', { purpose, currentUrl });
             const event = new CustomEvent('emailVerificationRequired', {
               detail: {
                 purpose,
@@ -416,7 +415,6 @@ export const setupApiInterceptors = () => {
               }
             });
             window.dispatchEvent(event);
-            console.log('📡 이벤트 디스패치 완료');
           }
           return Promise.reject(error);
         }
