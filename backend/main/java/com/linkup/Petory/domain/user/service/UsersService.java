@@ -17,9 +17,7 @@ import com.linkup.Petory.domain.user.dto.UserPageResponseDTO;
 import com.linkup.Petory.domain.user.entity.EmailVerificationPurpose;
 import com.linkup.Petory.domain.user.entity.UserStatus;
 import com.linkup.Petory.domain.user.entity.Users;
-import com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
-import com.linkup.Petory.domain.user.service.EmailVerificationService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

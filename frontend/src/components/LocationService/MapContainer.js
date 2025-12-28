@@ -153,7 +153,17 @@ const MapContainer = React.forwardRef(
         // 지도 클릭 이벤트 (GeoJSON 폴리곤 기능 제거됨)
         if (onMapClick) {
           window.naver.maps.Event.addListener(map, 'click', (e) => {
-            onMapClick(e);
+            // 네이버맵 API에서 e.coord 또는 e.latlng로 좌표 전달
+            // 호환성을 위해 coord와 latlng 둘 다 제공
+            const coord = e.coord || e.latlng;
+            if (coord) {
+              onMapClick({
+                coord: coord,
+                latlng: coord, // 호환성을 위해 둘 다 제공
+              });
+            } else {
+              onMapClick(e);
+            }
           });
         }
 

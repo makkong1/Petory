@@ -73,7 +73,9 @@ public class CareRequestService {
                 .orElseThrow(() -> new RuntimeException("User not found"));
         
         if (user.getEmailVerified() == null || !user.getEmailVerified()) {
-            throw new EmailVerificationRequiredException("펫케어 서비스 이용을 위해 이메일 인증이 필요합니다.");
+            throw new EmailVerificationRequiredException(
+                    "펫케어 서비스 이용을 위해 이메일 인증이 필요합니다.",
+                    com.linkup.Petory.domain.user.entity.EmailVerificationPurpose.PET_CARE);
         }
 
         CareRequest.CareRequestBuilder builder = CareRequest.builder()

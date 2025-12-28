@@ -65,7 +65,9 @@ public class MissingPetBoardService {
 
         // 이메일 인증 확인
         if (user.getEmailVerified() == null || !user.getEmailVerified()) {
-            throw new com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException("실종 제보 작성을 위해 이메일 인증이 필요합니다.");
+            throw new com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException(
+                    "실종 제보 작성을 위해 이메일 인증이 필요합니다.",
+                    com.linkup.Petory.domain.user.entity.EmailVerificationPurpose.MISSING_PET);
         }
 
         MissingPetBoard board = MissingPetBoard.builder()
@@ -101,7 +103,9 @@ public class MissingPetBoardService {
         // 이메일 인증 확인
         Users user = board.getUser();
         if (user.getEmailVerified() == null || !user.getEmailVerified()) {
-            throw new com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException("실종 제보 수정을 위해 이메일 인증이 필요합니다.");
+            throw new com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException(
+                    "실종 제보 수정을 위해 이메일 인증이 필요합니다.",
+                    com.linkup.Petory.domain.user.entity.EmailVerificationPurpose.MISSING_PET);
         }
 
         if (StringUtils.hasText(dto.getTitle())) {
@@ -167,7 +171,9 @@ public class MissingPetBoardService {
         // 이메일 인증 확인
         Users user = board.getUser();
         if (user.getEmailVerified() == null || !user.getEmailVerified()) {
-            throw new com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException("실종 제보 삭제를 위해 이메일 인증이 필요합니다.");
+            throw new com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException(
+                    "실종 제보 삭제를 위해 이메일 인증이 필요합니다.",
+                    com.linkup.Petory.domain.user.entity.EmailVerificationPurpose.MISSING_PET);
         }
         // soft delete board and related comments
         board.setIsDeleted(true);

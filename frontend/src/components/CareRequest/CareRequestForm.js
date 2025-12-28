@@ -3,9 +3,11 @@ import styled from 'styled-components';
 import { careRequestApi } from '../../api/careRequestApi';
 import { petApiClient } from '../../api/userApi';
 import { useAuth } from '../../contexts/AuthContext';
+import { useEmailVerification } from '../../hooks/useEmailVerification';
 
 const CareRequestForm = ({ onCancel, onCreated }) => {
   const { user } = useAuth();
+  const { checkAndRedirect, EmailVerificationPromptComponent } = useEmailVerification('PET_CARE');
   const [form, setForm] = useState({
     title: '',
     date: '',
@@ -266,6 +268,11 @@ const CareRequestForm = ({ onCancel, onCreated }) => {
       return;
     }
 
+    // 이메일 인증 체크
+    if (!checkAndRedirect()) {
+      return; // 이메일 인증이 필요하면 이메일 인증 페이지로 이동됨
+    }
+
     if (!form.title.trim()) {
       setError('제목을 입력해주세요.');
       return;
@@ -320,7 +327,9 @@ const CareRequestForm = ({ onCancel, onCreated }) => {
   const selectedPet = pets.find(p => p.idx === selectedPetIdx);
 
   return (
-    <FormContainer ref={formContainerRef}>
+    <>
+      <EmailVerificationPromptComponent />
+      <FormContainer ref={formContainerRef}>
       <FormWrapper>
         <LeftCard>
           <Form onSubmit={handleSubmit}>
@@ -571,6 +580,7 @@ const CareRequestForm = ({ onCancel, onCreated }) => {
         </RightCard>
       </FormWrapper>
     </FormContainer>
+    </>
   );
 };
 

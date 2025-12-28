@@ -123,7 +123,9 @@ public class CommentService {
         // 이메일 인증 확인
         Users user = comment.getUser();
         if (user.getEmailVerified() == null || !user.getEmailVerified()) {
-            throw new EmailVerificationRequiredException("댓글 수정을 위해 이메일 인증이 필요합니다.");
+            throw new EmailVerificationRequiredException(
+                    "댓글 수정을 위해 이메일 인증이 필요합니다.",
+                    com.linkup.Petory.domain.user.entity.EmailVerificationPurpose.COMMENT_EDIT);
         }
 
         // 댓글 내용 업데이트
@@ -157,7 +159,9 @@ public class CommentService {
         // 이메일 인증 확인
         Users user = comment.getUser();
         if (user.getEmailVerified() == null || !user.getEmailVerified()) {
-            throw new EmailVerificationRequiredException("댓글 삭제를 위해 이메일 인증이 필요합니다.");
+            throw new EmailVerificationRequiredException(
+                    "댓글 삭제를 위해 이메일 인증이 필요합니다.",
+                    com.linkup.Petory.domain.user.entity.EmailVerificationPurpose.COMMENT_EDIT);
         }
 
         // Soft delete instead of physical delete

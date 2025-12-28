@@ -80,7 +80,15 @@ public interface MeetupRepository extends JpaRepository<Meetup, Long> {
                         "  AND m.currentParticipants < m.maxParticipants")
         int incrementParticipantsIfAvailable(@Param("meetupIdx") Long meetupIdx);
 
-        // 모든 모임 조회 (소프트 삭제 제외)
-        @Query("SELECT m FROM Meetup m WHERE m.isDeleted = false OR m.isDeleted IS NULL")
+        // 모든 모임 조회 (소프트 삭제 제외) - JOIN FETCH로 N+1 문제 해결
+        @Query("SELECT m FROM Meetup m JOIN FETCH m.organizer WHERE m.isDeleted = false OR m.isDeleted IS NULL")
         List<Meetup> findAllNotDeleted();
+
+        // 특정 모임 조회 (organizer와 participants 포함) - JOIN FETCH로 N+1 문제 해결
+        @Query("SELECT DISTINCT m FROM Meetup m " +
+                "LEFT JOIN FETCH m.organizer " +
+                "LEFT JOIN FETCH m.participants p " +
+                "LEFT JOIN FETCH p.user " +
+                "WHERE m.idx = :idx")
+        Optional<Meetup> findByIdWithDetails(@Param("idx") Long idx);
 }
