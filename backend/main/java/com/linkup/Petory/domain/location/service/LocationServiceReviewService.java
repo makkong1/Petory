@@ -45,7 +45,9 @@ public class LocationServiceReviewService {
 
         // 이메일 인증 확인
         if (user.getEmailVerified() == null || !user.getEmailVerified()) {
-            throw new EmailVerificationRequiredException("리뷰 작성을 위해 이메일 인증이 필요합니다.");
+            throw new EmailVerificationRequiredException(
+                    "리뷰 작성을 위해 이메일 인증이 필요합니다.",
+                    com.linkup.Petory.domain.user.entity.EmailVerificationPurpose.LOCATION_REVIEW);
         }
 
         LocationServiceReview review = LocationServiceReview.builder()
@@ -72,7 +74,9 @@ public class LocationServiceReviewService {
         // 이메일 인증 확인
         Users user = review.getUser();
         if (user.getEmailVerified() == null || !user.getEmailVerified()) {
-            throw new EmailVerificationRequiredException("리뷰 수정을 위해 이메일 인증이 필요합니다.");
+            throw new EmailVerificationRequiredException(
+                    "리뷰 수정을 위해 이메일 인증이 필요합니다.",
+                    com.linkup.Petory.domain.user.entity.EmailVerificationPurpose.LOCATION_REVIEW);
         }
 
         review.setRating(reviewDTO.getRating());
@@ -95,7 +99,9 @@ public class LocationServiceReviewService {
         // 이메일 인증 확인
         Users user = review.getUser();
         if (user.getEmailVerified() == null || !user.getEmailVerified()) {
-            throw new EmailVerificationRequiredException("리뷰 삭제를 위해 이메일 인증이 필요합니다.");
+            throw new EmailVerificationRequiredException(
+                    "리뷰 삭제를 위해 이메일 인증이 필요합니다.",
+                    com.linkup.Petory.domain.user.entity.EmailVerificationPurpose.LOCATION_REVIEW);
         }
 
         Long serviceIdx = review.getService().getIdx();

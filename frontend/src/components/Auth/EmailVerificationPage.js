@@ -4,20 +4,42 @@ import { userProfileApi } from '../../api/userApi';
 
 const EmailVerificationPage = () => {
   const [token, setToken] = useState(null);
+  const [purpose, setPurpose] = useState(null);
+  const [sendingEmail, setSendingEmail] = useState(false);
 
-  const [status, setStatus] = useState('verifying'); // 'verifying', 'success', 'error'
+  const [status, setStatus] = useState('verifying'); // 'verifying', 'success', 'error', 'no-token'
   const [message, setMessage] = useState('');
   const [redirectUrl, setRedirectUrl] = useState('/');
 
   useEffect(() => {
-    // URL에서 토큰 추출
+    // URL에서 토큰 및 purpose 추출
     const urlParams = new URLSearchParams(window.location.search);
     const tokenFromUrl = urlParams.get('token');
+    const purposeFromUrl = urlParams.get('purpose');
+    const redirectFromUrl = urlParams.get('redirect');
+    
     setToken(tokenFromUrl);
+    setPurpose(purposeFromUrl);
+    
+    // URL 파라미터의 redirect를 우선 사용, 없으면 sessionStorage에서 확인, 둘 다 없으면 기본값 '/'
+    let initialRedirectUrl = '/';
+    if (redirectFromUrl) {
+      initialRedirectUrl = decodeURIComponent(redirectFromUrl);
+      // sessionStorage에도 저장 (이메일 링크 클릭 시 redirect 정보 유지)
+      sessionStorage.setItem('emailVerificationRedirect', initialRedirectUrl);
+    } else {
+      // sessionStorage에서 redirect URL 확인
+      const storedRedirect = sessionStorage.getItem('emailVerificationRedirect');
+      if (storedRedirect) {
+        initialRedirectUrl = storedRedirect;
+      }
+    }
+    setRedirectUrl(initialRedirectUrl);
 
+    // 토큰이 없으면 이메일 인증 메일 발송 안내 화면 표시
     if (!tokenFromUrl) {
-      setStatus('error');
-      setMessage('인증 토큰이 없습니다.');
+      setStatus('no-token');
+      setMessage('이메일 인증이 필요합니다. 아래 버튼을 클릭하여 인증 메일을 발송해주세요.');
       return;
     }
 
@@ -37,13 +59,26 @@ const EmailVerificationPage = () => {
               window.location.href = redirectUrl;
             }, 2000);
           } else {
-            // 용도에 따른 리다이렉트 URL 설정
-            const purposeRedirectUrl = response.data.redirectUrl || '/';
-            setRedirectUrl(purposeRedirectUrl);
+            // URL 파라미터의 redirect가 있으면 우선 사용, 없으면 sessionStorage, 둘 다 없으면 API 응답의 redirectUrl 사용
+            let finalRedirectUrl = '/';
+            if (redirectFromUrl) {
+              finalRedirectUrl = decodeURIComponent(redirectFromUrl);
+            } else {
+              const storedRedirect = sessionStorage.getItem('emailVerificationRedirect');
+              if (storedRedirect) {
+                finalRedirectUrl = storedRedirect;
+              } else {
+                finalRedirectUrl = response.data.redirectUrl || '/';
+              }
+            }
+            setRedirectUrl(finalRedirectUrl);
+            
+            // sessionStorage에서 redirect 정보 제거
+            sessionStorage.removeItem('emailVerificationRedirect');
 
             // 3초 후 리다이렉트
             setTimeout(() => {
-              window.location.href = purposeRedirectUrl;
+              window.location.href = finalRedirectUrl;
             }, 3000);
           }
         } else {
@@ -84,13 +119,50 @@ const EmailVerificationPage = () => {
           </>
         )}
 
+        {status === 'no-token' && (
+          <>
+            <Icon>✉️</Icon>
+            <Title>이메일 인증이 필요합니다</Title>
+            <Message>{message}</Message>
+            <Button 
+              onClick={async () => {
+                setSendingEmail(true);
+                try {
+                  // 현재 redirect URL을 sessionStorage에 저장 (이메일 링크 클릭 시 유지)
+                  if (redirectUrl && redirectUrl !== '/') {
+                    sessionStorage.setItem('emailVerificationRedirect', redirectUrl);
+                  }
+                  
+                  await userProfileApi.sendVerificationEmail(purpose || 'MEETUP');
+                  setStatus('success');
+                  setMessage('이메일 인증 메일이 발송되었습니다. 이메일을 확인해주세요.');
+                } catch (error) {
+                  setStatus('error');
+                  setMessage(error.response?.data?.message || '이메일 발송에 실패했습니다. 다시 시도해주세요.');
+                } finally {
+                  setSendingEmail(false);
+                }
+              }}
+              disabled={sendingEmail}
+            >
+              {sendingEmail ? '발송 중...' : '인증 메일 발송'}
+            </Button>
+            <Button 
+              onClick={() => window.location.href = redirectUrl || '/'}
+              style={{ marginTop: '10px', background: '#ccc' }}
+            >
+              나중에 하기
+            </Button>
+          </>
+        )}
+
         {status === 'error' && (
           <>
             <ErrorIcon>❌</ErrorIcon>
             <Title>인증 실패</Title>
             <Message>{message}</Message>
-            <Button onClick={() => window.location.href = '/'}>
-              홈으로 이동
+            <Button onClick={() => window.location.href = redirectUrl || '/'}>
+              {redirectUrl ? '이전 페이지로' : '홈으로 이동'}
             </Button>
           </>
         )}

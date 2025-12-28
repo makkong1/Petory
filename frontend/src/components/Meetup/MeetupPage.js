@@ -4,6 +4,7 @@ import { meetupApi } from '../../api/meetupApi';
 import MapContainer from '../LocationService/MapContainer';
 import { useAuth } from '../../contexts/AuthContext';
 import { geocodingApi } from '../../api/geocodingApi';
+import { useEmailVerification } from '../../hooks/useEmailVerification';
 
 const DEFAULT_CENTER = { lat: 37.5665, lng: 126.9780 };
 const DEFAULT_RADIUS = 5; // km
@@ -57,6 +58,7 @@ const calculateMapLevelFromRadius = (radiusKm) => {
 
 const MeetupPage = () => {
   const { user } = useAuth();
+  const { checkAndRedirect, EmailVerificationPromptComponent } = useEmailVerification('MEETUP');
   const [meetups, setMeetups] = useState([]);
   const [selectedMeetup, setSelectedMeetup] = useState(null);
   const [participants, setParticipants] = useState([]);
@@ -80,7 +82,7 @@ const MeetupPage = () => {
   const showListRef = useRef(true); // ref로도 관리하여 안정성 확보
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [createStep, setCreateStep] = useState('none'); // 'none', 'location', 'form'
-  const [showRegionControls, setShowRegionControls] = useState(false); 
+  const [showRegionControls, setShowRegionControls] = useState(false);
   const [availableSigungus, setAvailableSigungus] = useState([]); // 선택된 시도의 시군구 목록
   const [availableEupmyeondongs, setAvailableEupmyeondongs] = useState([]); // 선택된 시군구의 읍면동 목록
   const [formData, setFormData] = useState({
@@ -128,7 +130,7 @@ const MeetupPage = () => {
           hour: String(defaultDate.getHours()).padStart(2, '0'),
           minute: '00',
         });
-        
+
         const localDateString = `${defaultDate.getFullYear()}-${String(defaultDate.getMonth() + 1).padStart(2, '0')}-${String(defaultDate.getDate()).padStart(2, '0')}T${String(defaultDate.getHours()).padStart(2, '0')}:00`;
         setFormData(prev => ({ ...prev, date: localDateString }));
       }
@@ -1077,6 +1079,19 @@ const MeetupPage = () => {
   const handleCreateMeetup = async (e) => {
     e.preventDefault();
 
+    console.log('🚀 handleCreateMeetup 호출됨');
+
+    // 이메일 인증 체크
+    const canProceed = checkAndRedirect();
+    console.log('📋 checkAndRedirect 결과:', canProceed);
+
+    if (!canProceed) {
+      console.log('⛔ 이메일 인증 필요 - 확인 다이얼로그 표시, 함수 종료');
+      return; // 이메일 인증이 필요하면 확인 다이얼로그 표시되고 함수 종료
+    }
+
+    console.log('✅ 이메일 인증 완료 - 모임 등록 진행');
+
     if (!validateForm()) {
       return;
     }
@@ -1148,10 +1163,10 @@ const MeetupPage = () => {
       if (createStep === 'location' && mapCenter) {
         try {
           const response = await geocodingApi.coordinatesToAddress(mapCenter.lat, mapCenter.lng);
-          const address = (response && response.success !== false) 
-            ? response.address 
+          const address = (response && response.success !== false)
+            ? response.address
             : `${mapCenter.lat.toFixed(6)}, ${mapCenter.lng.toFixed(6)}`;
-          
+
           setFormData(prev => ({
             ...prev,
             location: address,
@@ -1169,461 +1184,479 @@ const MeetupPage = () => {
   }, [mapCenter, createStep]);
 
   return (
-    <Container>
-      <Header>
-        <HeaderTop>
-          <Title>🐾 산책 모임</Title>
-          <HeaderActions>
-            {createStep === 'none' ? (
-              <>
-                <LocationButton onClick={fetchUserLocation} title="내 위치로 이동">
-                  📍 내 위치
-                </LocationButton>
-                <LocationSelectButton onClick={() => setShowRegionControls(!showRegionControls)} title="위치 선택">
-                  📌 지역 필터
-                </LocationSelectButton>
-                {selectedLocation && (
-                  <SelectedLocationInfo>
-                    {selectedLocation.eupmyeondong && selectedLocation.eupmyeondong !== '전체'
-                      ? `${selectedLocation.sido} ${selectedLocation.sigungu} ${selectedLocation.eupmyeondong}`
-                      : selectedLocation.sigungu
-                        ? `${selectedLocation.sido} ${selectedLocation.sigungu}`
-                        : selectedLocation.sido || '내위치'}
-                  </SelectedLocationInfo>
-                )}
-                <CreateButton onClick={() => {
-                  setCreateStep('location');
-                  setShowCreateForm(true);
-                  setShowList(false); // 위치 잡을 때는 리스트 숨김
-                }}>
-                  ➕ 모임 등록
-                </CreateButton>
-                <ToggleButton onClick={() => {
-                  const newValue = !showList;
-                  setShowList(newValue);
-                  showListRef.current = newValue;
-                }}>
-                  {showList ? '📋 리스트 숨기기' : '📋 리스트 보기'}
-                </ToggleButton>
-              </>
-            ) : createStep === 'location' ? (
-              <BackButton onClick={() => {
-                setCreateStep('none');
-                setShowCreateForm(false);
-                setShowList(true);
-              }}>
-                ⬅️ 취소하고 돌아가기
-              </BackButton>
-            ) : (
-              <BackButton onClick={() => setCreateStep('location')}>
-                ⬅️ 다시 위치 선택
-              </BackButton>
-            )}
-          </HeaderActions>
-        </HeaderTop>
-        <RegionControls $isOpen={showRegionControls}>
-          {currentView === 'sido' ? (
-            // 시/도 선택 화면
-            <RegionButtonGrid>
-              {SIDOS.map((sido) => (
-                <RegionButton
-                  key={sido}
-                  onClick={async () => {
-                    await handleRegionSelect(sido, null, null);
-                  }}
-                  active={selectedSido === sido}
-                >
-                  {sido}
-                </RegionButton>
-              ))}
-            </RegionButtonGrid>
-          ) : (
-            // 시/군/구 선택 화면
-            <RegionButtonGrid>
-              <RegionButton
-                onClick={async () => {
-                  // 시도 선택 화면으로 돌아가기
-                  await handleRegionSelect(selectedSido, null, null, 'sido');
-                }}
-              >
-                ← 뒤로
-              </RegionButton>
-              {(availableSigungus.length > 0 ? availableSigungus : (SIGUNGUS[selectedSido] || [])).map((sigungu) => (
-                <RegionButton
-                  key={sigungu}
-                  onClick={async () => {
-                    await handleRegionSelect(selectedSido, sigungu, null);
-                  }}
-                  active={selectedSigungu === sigungu}
-                >
-                  {sigungu}
-                </RegionButton>
-              ))}
-            </RegionButtonGrid>
-          )}
-        </RegionControls>
-      </Header>
+    <>
+      <EmailVerificationPromptComponent />
+      <Container>
+        <Header>
+          <HeaderTop>
+            <Title>🐾 산책 모임</Title>
+            <HeaderActions>
+              {createStep === 'none' ? (
+                <>
+                  <LocationButton onClick={fetchUserLocation} title="내 위치로 이동">
+                    📍 내 위치
+                  </LocationButton>
+                  <LocationSelectButton onClick={() => setShowRegionControls(!showRegionControls)} title="위치 선택">
+                    📌 지역 필터
+                  </LocationSelectButton>
+                  {selectedLocation && (
+                    <SelectedLocationInfo>
+                      {selectedLocation.eupmyeondong && selectedLocation.eupmyeondong !== '전체'
+                        ? `${selectedLocation.sido} ${selectedLocation.sigungu} ${selectedLocation.eupmyeondong}`
+                        : selectedLocation.sigungu
+                          ? `${selectedLocation.sido} ${selectedLocation.sigungu}`
+                          : selectedLocation.sido || '내위치'}
+                    </SelectedLocationInfo>
+                  )}
+                  <CreateButton onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('➕ 모임 등록 버튼 클릭 - 이벤트:', e);
 
-      <ContentWrapper>
-        <MapSection style={{ width: createStep === 'location' ? '100%' : '60%' }}>
-          {mapCenter && (
-            <MapContainer
-              services={[
-                ...meetups.map(m => ({
-                  idx: m.idx,
-                  name: m.title,
-                  latitude: m.latitude,
-                  longitude: m.longitude,
-                  address: m.location,
-                  type: 'meetup',
-                })),
-              ]}
-              onServiceClick={createStep === 'none' ? handleMarkerClick : undefined}
-              onMapClick={handleMapClick}
-              userLocation={userLocation}
-              mapCenter={mapCenter}
-              mapLevel={mapLevel}
-              onMapIdle={handleMapIdle}
-            />
-          )}
-          
-          {createStep === 'location' && (
-            <>
-              <MapCenterPin>
-                <PinIcon>📍</PinIcon>
-              </MapCenterPin>
-              
-              <LocationFloatingBar>
-                <FloatingAddressCard>
-                  <CardLabel>여기로 선택하시겠어요?</CardLabel>
-                  <CardAddress>{formData.location || '위치를 찾는 중...'}</CardAddress>
-                  <ConfirmLocationButton onClick={() => setCreateStep('form')}>
-                    이 위치에서 모이기 활성화 ✨
-                  </ConfirmLocationButton>
-                </FloatingAddressCard>
+                    // 이메일 인증 체크 (모임 등록 시작 시점에 체크)
+                    console.log('🔍 checkAndRedirect 함수 존재:', typeof checkAndRedirect);
+                    const result = checkAndRedirect();
+                    console.log('🔍 checkAndRedirect 결과:', result);
 
-                <FloatingSearchBox ref={locationSearchInputRef}>
-                  <LocationSearchInput
-                    type="text"
-                    value={locationSearchQuery}
-                    onChange={(e) => {
-                      setLocationSearchQuery(e.target.value);
-                      searchLocation(e.target.value);
+                    if (!result) {
+                      console.log('⛔ 이메일 인증 필요 - 모임 등록 시작 불가');
+                      return; // 이메일 인증이 필요하면 확인 다이얼로그 표시되고 함수 종료
+                    }
+
+                    console.log('✅ 이메일 인증 완료 - 모임 등록 시작');
+                    setCreateStep('location');
+                    setShowCreateForm(true);
+                    setShowList(false); // 위치 잡을 때는 리스트 숨김
+                  }}>
+                    ➕ 모임 등록
+                  </CreateButton>
+                  <ToggleButton onClick={() => {
+                    const newValue = !showList;
+                    setShowList(newValue);
+                    showListRef.current = newValue;
+                  }}>
+                    {showList ? '📋 리스트 숨기기' : '📋 리스트 보기'}
+                  </ToggleButton>
+                </>
+              ) : createStep === 'location' ? (
+                <BackButton onClick={() => {
+                  setCreateStep('none');
+                  setShowCreateForm(false);
+                  setShowList(true);
+                }}>
+                  ⬅️ 취소하고 돌아가기
+                </BackButton>
+              ) : (
+                <BackButton onClick={() => setCreateStep('location')}>
+                  ⬅️ 다시 위치 선택
+                </BackButton>
+              )}
+            </HeaderActions>
+          </HeaderTop>
+          <RegionControls $isOpen={showRegionControls}>
+            {currentView === 'sido' ? (
+              // 시/도 선택 화면
+              <RegionButtonGrid>
+                {SIDOS.map((sido) => (
+                  <RegionButton
+                    key={sido}
+                    onClick={async () => {
+                      await handleRegionSelect(sido, null, null);
                     }}
-                    placeholder="다른 장소 검색하기"
-                  />
-                  {showLocationSearchResults && locationSearchResults.length > 0 && (
-                    <FloatingResults>
-                      {locationSearchResults.map((result, index) => (
-                        <LocationSearchResultItem
-                          key={index}
-                          onClick={() => {
-                            handleLocationSelect(result);
-                            setMapCenter({ lat: result.latitude, lng: result.longitude });
-                          }}
-                        >
-                          <LocationIcon>📍</LocationIcon>
-                          <LocationAddress>{result.address}</LocationAddress>
-                        </LocationSearchResultItem>
-                      ))}
-                    </FloatingResults>
-                  )}
-                </FloatingSearchBox>
-              </LocationFloatingBar>
-            </>
-          )}
-        </MapSection>
-
-        <ListSection style={{ display: showList ? 'flex' : 'none' }}>
-          <>
-            <ListHeader>
-              {selectedLocation
-                ? `${selectedLocation.bname || selectedLocation.sigungu || '선택한 위치'} 주변 모임 (${meetups.length}개)`
-                : `주변 모임 목록 (${meetups.length}개)`}
-            </ListHeader>
-            {loading ? (
-              <LoadingText>로딩 중...</LoadingText>
-            ) : meetups.length === 0 ? (
-              <EmptyText>주변에 모임이 없습니다.</EmptyText>
-            ) : (
-              <MeetupList>
-                {meetups.map((meetup) => (
-                  <MeetupItem
-                    key={meetup.idx}
-                    onClick={() => handleMeetupClick(meetup)}
-                    $isSelected={selectedMeetup?.idx === meetup.idx}
+                    active={selectedSido === sido}
                   >
-                    <MeetupTitle>{meetup.title}</MeetupTitle>
-                    <MeetupInfo>
-                      <InfoItem>📍 {meetup.location}</InfoItem>
-                      <InfoItem>🕐 {formatDate(meetup.date)}</InfoItem>
-                      <InfoItem>
-                        👥 {meetup.currentParticipants || 0}/{meetup.maxParticipants}명
-                      </InfoItem>
-                    </MeetupInfo>
-                  </MeetupItem>
+                    {sido}
+                  </RegionButton>
                 ))}
-              </MeetupList>
+              </RegionButtonGrid>
+            ) : (
+              // 시/군/구 선택 화면
+              <RegionButtonGrid>
+                <RegionButton
+                  onClick={async () => {
+                    // 시도 선택 화면으로 돌아가기
+                    await handleRegionSelect(selectedSido, null, null, 'sido');
+                  }}
+                >
+                  ← 뒤로
+                </RegionButton>
+                {(availableSigungus.length > 0 ? availableSigungus : (SIGUNGUS[selectedSido] || [])).map((sigungu) => (
+                  <RegionButton
+                    key={sigungu}
+                    onClick={async () => {
+                      await handleRegionSelect(selectedSido, sigungu, null);
+                    }}
+                    active={selectedSigungu === sigungu}
+                  >
+                    {sigungu}
+                  </RegionButton>
+                ))}
+              </RegionButtonGrid>
             )}
-          </>
-        </ListSection>
-      </ContentWrapper>
+          </RegionControls>
+        </Header>
 
-      {/* 모임 등록 모달 */}
-      {createStep === 'form' && (
-        <ModalOverlay onClick={() => setCreateStep('location')}>
-          <ModalContent 
-            ref={createFormModalRef}
-            onClick={(e) => e.stopPropagation()}
-            style={{ maxWidth: '500px' }}
-          >
-            <ModalHeader>
-              <ModalTitle>상세 정보 입력</ModalTitle>
-              <CloseButton onClick={() => setCreateStep('location')}>×</CloseButton>
-            </ModalHeader>
-            <ModalBody>
-              <SelectedLocationSummary style={{ margin: '0 0 1.5rem 0' }}>
-                <span className="icon">📍</span>
-                <span className="text">{formData.location}</span>
-              </SelectedLocationSummary>
-              
-              <Form onSubmit={handleCreateMeetup} style={{ padding: 0 }}>
-                <FormGroup>
-                  <FormLabel>모임 제목 *</FormLabel>
-                  <Input
-                    type="text"
-                    name="title"
-                    value={formData.title}
-                    onChange={handleFormChange}
-                    placeholder="예: 공원 산책 같이해요"
-                    required
-                  />
-                  {formErrors.title && <ErrorText>{formErrors.title}</ErrorText>}
-                </FormGroup>
+        <ContentWrapper>
+          <MapSection style={{ width: createStep === 'location' ? '100%' : '60%' }}>
+            {mapCenter && (
+              <MapContainer
+                services={[
+                  ...meetups.map(m => ({
+                    idx: m.idx,
+                    name: m.title,
+                    latitude: m.latitude,
+                    longitude: m.longitude,
+                    address: m.location,
+                    type: 'meetup',
+                  })),
+                ]}
+                onServiceClick={createStep === 'none' ? handleMarkerClick : undefined}
+                onMapClick={handleMapClick}
+                userLocation={userLocation}
+                mapCenter={mapCenter}
+                mapLevel={mapLevel}
+                onMapIdle={handleMapIdle}
+              />
+            )}
 
-                <FormGroup>
-                  <FormLabel>모임 설명</FormLabel>
-                  <TextArea
-                    name="description"
-                    value={formData.description}
-                    onChange={handleFormChange}
-                    placeholder="간단한 소개나 준비물을 적어주세요"
-                    rows={3}
-                  />
-                </FormGroup>
+            {createStep === 'location' && (
+              <>
+                <MapCenterPin>
+                  <PinIcon>📍</PinIcon>
+                </MapCenterPin>
 
-                <FormGroup>
-                  <FormLabel>모임 일시 *</FormLabel>
-                  <DatePickerWrapper className="date-picker-wrapper">
-                    <DateInputButton
-                      ref={datePickerButtonRef}
-                      type="button"
-                      onClick={() => setShowDatePicker(!showDatePicker)}
-                      hasValue={!!formData.date}
-                    >
-                      {formData.date ? formatDate(formData.date) : '날짜와 시간 선택'}
-                      <CalendarIcon>📅</CalendarIcon>
-                    </DateInputButton>
-                    
-                    {showDatePicker && selectedDate && (
-                      <DatePickerDropdown className="date-picker-dropdown">
-                        <CalendarContainer>
-                          <CalendarHeader>
-                            <NavButton type="button" onClick={() => {
-                              const newDate = new Date(selectedDate);
-                              newDate.setMonth(newDate.getMonth() - 1);
-                              setSelectedDate(newDate);
-                            }}>‹</NavButton>
-                            <MonthYear>{selectedDate.getFullYear()}년 {selectedDate.getMonth() + 1}월</MonthYear>
-                            <NavButton type="button" onClick={() => {
-                              const newDate = new Date(selectedDate);
-                              newDate.setMonth(newDate.getMonth() + 1);
-                              setSelectedDate(newDate);
-                            }}>›</NavButton>
-                          </CalendarHeader>
+                <LocationFloatingBar>
+                  <FloatingAddressCard>
+                    <CardLabel>여기로 선택하시겠어요?</CardLabel>
+                    <CardAddress>{formData.location || '위치를 찾는 중...'}</CardAddress>
+                    <ConfirmLocationButton onClick={() => setCreateStep('form')}>
+                      이 위치에서 모이기 활성화 ✨
+                    </ConfirmLocationButton>
+                  </FloatingAddressCard>
 
-                          <CalendarGrid>
-                            {['일', '월', '화', '수', '목', '금', '토'].map(d => (
-                              <CalendarDayHeader key={d}>{d}</CalendarDayHeader>
-                            ))}
-                            {getCalendarDays(selectedDate).map((day, i) => {
-                              const isSelected = formData.date && new Date(formData.date).toDateString() === day.toDateString();
-                              const isToday = new Date().toDateString() === day.toDateString();
-                              const isCurrentMonth = day.getMonth() === selectedDate.getMonth();
-                              const isPast = day < new Date(new Date().setHours(0,0,0,0));
-
-                              return (
-                                <CalendarDay
-                                  key={i}
-                                  type="button"
-                                  onClick={() => handleDateSelect(day)}
-                                  isSelected={isSelected}
-                                  isToday={isToday}
-                                  isCurrentMonth={isCurrentMonth}
-                                  disabled={isPast || !isCurrentMonth}
-                                >
-                                  {day.getDate()}
-                                </CalendarDay>
-                              );
-                            })}
-                          </CalendarGrid>
-
-                          <TimeSelector>
-                            <TimeLabel>⏰ 시간</TimeLabel>
-                            <TimeInputs>
-                              <TimeInput
-                                type="number"
-                                value={selectedTime.hour}
-                                onChange={(e) => handleTimeChange('hour', e.target.value)}
-                              />
-                              <TimeSeparator>:</TimeSeparator>
-                              <TimeInput
-                                type="number"
-                                value={selectedTime.minute}
-                                onChange={(e) => handleTimeChange('minute', e.target.value)}
-                              />
-                            </TimeInputs>
-                          </TimeSelector>
-
-                          <DatePickerActions>
-                            <DatePickerButton type="button" onClick={() => setShowDatePicker(false)}>확인</DatePickerButton>
-                          </DatePickerActions>
-                        </CalendarContainer>
-                      </DatePickerDropdown>
+                  <FloatingSearchBox ref={locationSearchInputRef}>
+                    <LocationSearchInput
+                      type="text"
+                      value={locationSearchQuery}
+                      onChange={(e) => {
+                        setLocationSearchQuery(e.target.value);
+                        searchLocation(e.target.value);
+                      }}
+                      placeholder="다른 장소 검색하기"
+                    />
+                    {showLocationSearchResults && locationSearchResults.length > 0 && (
+                      <FloatingResults>
+                        {locationSearchResults.map((result, index) => (
+                          <LocationSearchResultItem
+                            key={index}
+                            onClick={() => {
+                              handleLocationSelect(result);
+                              setMapCenter({ lat: result.latitude, lng: result.longitude });
+                            }}
+                          >
+                            <LocationIcon>📍</LocationIcon>
+                            <LocationAddress>{result.address}</LocationAddress>
+                          </LocationSearchResultItem>
+                        ))}
+                      </FloatingResults>
                     )}
-                  </DatePickerWrapper>
-                  {formErrors.date && <ErrorText>{formErrors.date}</ErrorText>}
-                </FormGroup>
+                  </FloatingSearchBox>
+                </LocationFloatingBar>
+              </>
+            )}
+          </MapSection>
 
-                <FormGroup>
-                  <FormLabel>최대 인원 *</FormLabel>
-                  <Input
-                    type="number"
-                    name="maxParticipants"
-                    value={formData.maxParticipants}
-                    onChange={handleFormChange}
-                    min="1"
-                    required
-                  />
-                  {formErrors.maxParticipants && <ErrorText>{formErrors.maxParticipants}</ErrorText>}
-                </FormGroup>
+          <ListSection style={{ display: showList ? 'flex' : 'none' }}>
+            <>
+              <ListHeader>
+                {selectedLocation
+                  ? `${selectedLocation.bname || selectedLocation.sigungu || '선택한 위치'} 주변 모임 (${meetups.length}개)`
+                  : `주변 모임 목록 (${meetups.length}개)`}
+              </ListHeader>
+              {loading ? (
+                <LoadingText>로딩 중...</LoadingText>
+              ) : meetups.length === 0 ? (
+                <EmptyText>주변에 모임이 없습니다.</EmptyText>
+              ) : (
+                <MeetupList>
+                  {meetups.map((meetup) => (
+                    <MeetupItem
+                      key={meetup.idx}
+                      onClick={() => handleMeetupClick(meetup)}
+                      $isSelected={selectedMeetup?.idx === meetup.idx}
+                    >
+                      <MeetupTitle>{meetup.title}</MeetupTitle>
+                      <MeetupInfo>
+                        <InfoItem>📍 {meetup.location}</InfoItem>
+                        <InfoItem>🕐 {formatDate(meetup.date)}</InfoItem>
+                        <InfoItem>
+                          👥 {meetup.currentParticipants || 0}/{meetup.maxParticipants}명
+                        </InfoItem>
+                      </MeetupInfo>
+                    </MeetupItem>
+                  ))}
+                </MeetupList>
+              )}
+            </>
+          </ListSection>
+        </ContentWrapper>
 
-                <FormSubmitButton type="submit" disabled={formLoading}>
-                  {formLoading ? '등록 중...' : '모임 등록하기 ✨'}
-                </FormSubmitButton>
-              </Form>
-            </ModalBody>
-          </ModalContent>
-        </ModalOverlay>
-      )}
+        {/* 모임 등록 모달 */}
+        {createStep === 'form' && (
+          <ModalOverlay onClick={() => setCreateStep('location')}>
+            <ModalContent
+              ref={createFormModalRef}
+              onClick={(e) => e.stopPropagation()}
+              style={{ maxWidth: '500px' }}
+            >
+              <ModalHeader>
+                <ModalTitle>상세 정보 입력</ModalTitle>
+                <CloseButton onClick={() => setCreateStep('location')}>×</CloseButton>
+              </ModalHeader>
+              <ModalBody>
+                <SelectedLocationSummary style={{ margin: '0 0 1.5rem 0' }}>
+                  <span className="icon">📍</span>
+                  <span className="text">{formData.location}</span>
+                </SelectedLocationSummary>
 
-      {/* 기존 전역 DatePickerDropdown 제거 (모달 내부로 이동됨) */}
+                <Form onSubmit={handleCreateMeetup} style={{ padding: 0 }}>
+                  <FormGroup>
+                    <FormLabel>모임 제목 *</FormLabel>
+                    <Input
+                      type="text"
+                      name="title"
+                      value={formData.title}
+                      onChange={handleFormChange}
+                      placeholder="예: 공원 산책 같이해요"
+                      required
+                    />
+                    {formErrors.title && <ErrorText>{formErrors.title}</ErrorText>}
+                  </FormGroup>
 
-      {/* 모달 제거됨 - RegionControls로 대체 */}
+                  <FormGroup>
+                    <FormLabel>모임 설명</FormLabel>
+                    <TextArea
+                      name="description"
+                      value={formData.description}
+                      onChange={handleFormChange}
+                      placeholder="간단한 소개나 준비물을 적어주세요"
+                      rows={3}
+                    />
+                  </FormGroup>
 
-      {selectedMeetup && (
-        <ModalOverlay onClick={() => setSelectedMeetup(null)}>
-          <ModalContent onClick={(e) => e.stopPropagation()}>
-            <ModalHeader>
-              <ModalTitle>{selectedMeetup.title}</ModalTitle>
-              <CloseButton onClick={() => setSelectedMeetup(null)}>×</CloseButton>
-            </ModalHeader>
+                  <FormGroup>
+                    <FormLabel>모임 일시 *</FormLabel>
+                    <DatePickerWrapper className="date-picker-wrapper">
+                      <DateInputButton
+                        ref={datePickerButtonRef}
+                        type="button"
+                        onClick={() => setShowDatePicker(!showDatePicker)}
+                        hasValue={!!formData.date}
+                      >
+                        {formData.date ? formatDate(formData.date) : '날짜와 시간 선택'}
+                        <CalendarIcon>📅</CalendarIcon>
+                      </DateInputButton>
 
-            <ModalBody>
-              <Section>
-                <SectionTitle>📅 모임 일시</SectionTitle>
-                <SectionContent>{formatDate(selectedMeetup.date)}</SectionContent>
-              </Section>
+                      {showDatePicker && selectedDate && (
+                        <DatePickerDropdown className="date-picker-dropdown">
+                          <CalendarContainer>
+                            <CalendarHeader>
+                              <NavButton type="button" onClick={() => {
+                                const newDate = new Date(selectedDate);
+                                newDate.setMonth(newDate.getMonth() - 1);
+                                setSelectedDate(newDate);
+                              }}>‹</NavButton>
+                              <MonthYear>{selectedDate.getFullYear()}년 {selectedDate.getMonth() + 1}월</MonthYear>
+                              <NavButton type="button" onClick={() => {
+                                const newDate = new Date(selectedDate);
+                                newDate.setMonth(newDate.getMonth() + 1);
+                                setSelectedDate(newDate);
+                              }}>›</NavButton>
+                            </CalendarHeader>
 
-              <Section>
-                <SectionTitle>📍 모임 장소</SectionTitle>
-                <SectionContent>{selectedMeetup.location}</SectionContent>
-              </Section>
+                            <CalendarGrid>
+                              {['일', '월', '화', '수', '목', '금', '토'].map(d => (
+                                <CalendarDayHeader key={d}>{d}</CalendarDayHeader>
+                              ))}
+                              {getCalendarDays(selectedDate).map((day, i) => {
+                                const isSelected = formData.date && new Date(formData.date).toDateString() === day.toDateString();
+                                const isToday = new Date().toDateString() === day.toDateString();
+                                const isCurrentMonth = day.getMonth() === selectedDate.getMonth();
+                                const isPast = day < new Date(new Date().setHours(0, 0, 0, 0));
 
-              {selectedMeetup.description && (
+                                return (
+                                  <CalendarDay
+                                    key={i}
+                                    type="button"
+                                    onClick={() => handleDateSelect(day)}
+                                    isSelected={isSelected}
+                                    isToday={isToday}
+                                    isCurrentMonth={isCurrentMonth}
+                                    disabled={isPast || !isCurrentMonth}
+                                  >
+                                    {day.getDate()}
+                                  </CalendarDay>
+                                );
+                              })}
+                            </CalendarGrid>
+
+                            <TimeSelector>
+                              <TimeLabel>⏰ 시간</TimeLabel>
+                              <TimeInputs>
+                                <TimeInput
+                                  type="number"
+                                  value={selectedTime.hour}
+                                  onChange={(e) => handleTimeChange('hour', e.target.value)}
+                                />
+                                <TimeSeparator>:</TimeSeparator>
+                                <TimeInput
+                                  type="number"
+                                  value={selectedTime.minute}
+                                  onChange={(e) => handleTimeChange('minute', e.target.value)}
+                                />
+                              </TimeInputs>
+                            </TimeSelector>
+
+                            <DatePickerActions>
+                              <DatePickerButton type="button" onClick={() => setShowDatePicker(false)}>확인</DatePickerButton>
+                            </DatePickerActions>
+                          </CalendarContainer>
+                        </DatePickerDropdown>
+                      )}
+                    </DatePickerWrapper>
+                    {formErrors.date && <ErrorText>{formErrors.date}</ErrorText>}
+                  </FormGroup>
+
+                  <FormGroup>
+                    <FormLabel>최대 인원 *</FormLabel>
+                    <Input
+                      type="number"
+                      name="maxParticipants"
+                      value={formData.maxParticipants}
+                      onChange={handleFormChange}
+                      min="1"
+                      required
+                    />
+                    {formErrors.maxParticipants && <ErrorText>{formErrors.maxParticipants}</ErrorText>}
+                  </FormGroup>
+
+                  <FormSubmitButton type="submit" disabled={formLoading}>
+                    {formLoading ? '등록 중...' : '모임 등록하기 ✨'}
+                  </FormSubmitButton>
+                </Form>
+              </ModalBody>
+            </ModalContent>
+          </ModalOverlay>
+        )}
+
+        {/* 기존 전역 DatePickerDropdown 제거 (모달 내부로 이동됨) */}
+
+        {/* 모달 제거됨 - RegionControls로 대체 */}
+
+        {selectedMeetup && (
+          <ModalOverlay onClick={() => setSelectedMeetup(null)}>
+            <ModalContent onClick={(e) => e.stopPropagation()}>
+              <ModalHeader>
+                <ModalTitle>{selectedMeetup.title}</ModalTitle>
+                <CloseButton onClick={() => setSelectedMeetup(null)}>×</CloseButton>
+              </ModalHeader>
+
+              <ModalBody>
                 <Section>
-                  <SectionTitle>📝 모임 설명</SectionTitle>
-                  <SectionContent>{selectedMeetup.description}</SectionContent>
+                  <SectionTitle>📅 모임 일시</SectionTitle>
+                  <SectionContent>{formatDate(selectedMeetup.date)}</SectionContent>
                 </Section>
-              )}
 
-              <Section>
-                <SectionTitle>👥 참가자 ({participants.length}명)</SectionTitle>
-                {participants.length === 0 ? (
-                  <EmptyText>아직 참가자가 없습니다.</EmptyText>
-                ) : (
-                  <ParticipantsList>
-                    {participants.map((p, index) => (
-                      <ParticipantItem key={index}>
-                        <ParticipantName>{p.username}</ParticipantName>
-                        <ParticipantDate>
-                          {new Date(p.joinedAt).toLocaleDateString('ko-KR')}
-                        </ParticipantDate>
-                      </ParticipantItem>
-                    ))}
-                  </ParticipantsList>
+                <Section>
+                  <SectionTitle>📍 모임 장소</SectionTitle>
+                  <SectionContent>{selectedMeetup.location}</SectionContent>
+                </Section>
+
+                {selectedMeetup.description && (
+                  <Section>
+                    <SectionTitle>📝 모임 설명</SectionTitle>
+                    <SectionContent>{selectedMeetup.description}</SectionContent>
+                  </Section>
                 )}
-              </Section>
 
-              <Section>
-                <SectionTitle>📊 모임 정보</SectionTitle>
-                <InfoGrid>
-                  <InfoItem>
-                    <Label>주최자:</Label>
-                    <Value>{selectedMeetup.organizerName || '알 수 없음'}</Value>
-                  </InfoItem>
-                  <InfoItem>
-                    <Label>참가 인원:</Label>
-                    <Value>
-                      {selectedMeetup.currentParticipants || 0}/{selectedMeetup.maxParticipants}명
-                    </Value>
-                  </InfoItem>
-                  <InfoItem>
-                    <Label>상태:</Label>
-                    <Value>
-                      {selectedMeetup.status === 'RECRUITING' ? '모집중' :
-                        selectedMeetup.status === 'CLOSED' ? '마감' : '종료'}
-                    </Value>
-                  </InfoItem>
-                </InfoGrid>
-              </Section>
-
-              {/* 참가하기 버튼 */}
-              {selectedMeetup.organizerIdx?.toString() !== user?.idx?.toString() && (
-                <ActionSection>
-                  {isParticipating ? (
-                    <CancelButton
-                      onClick={handleCancelParticipation}
-                      disabled={participationLoading}
-                    >
-                      {participationLoading ? '처리 중...' : '참가 취소'}
-                    </CancelButton>
+                <Section>
+                  <SectionTitle>👥 참가자 ({participants.length}명)</SectionTitle>
+                  {participants.length === 0 ? (
+                    <EmptyText>아직 참가자가 없습니다.</EmptyText>
                   ) : (
-                    <JoinButton
-                      onClick={handleJoinMeetup}
-                      disabled={
-                        participationLoading ||
-                        (selectedMeetup.currentParticipants || 0) >= (selectedMeetup.maxParticipants || 0) ||
-                        selectedMeetup.status === 'CLOSED' ||
-                        selectedMeetup.status === 'COMPLETED'
-                      }
-                    >
-                      {participationLoading
-                        ? '처리 중...'
-                        : (selectedMeetup.currentParticipants || 0) >= (selectedMeetup.maxParticipants || 0)
-                          ? '인원 마감'
-                          : selectedMeetup.status === 'CLOSED' || selectedMeetup.status === 'COMPLETED'
-                            ? '참가 불가'
-                            : '참가하기'}
-                    </JoinButton>
+                    <ParticipantsList>
+                      {participants.map((p, index) => (
+                        <ParticipantItem key={index}>
+                          <ParticipantName>{p.username}</ParticipantName>
+                          <ParticipantDate>
+                            {new Date(p.joinedAt).toLocaleDateString('ko-KR')}
+                          </ParticipantDate>
+                        </ParticipantItem>
+                      ))}
+                    </ParticipantsList>
                   )}
-                </ActionSection>
-              )}
-            </ModalBody>
-          </ModalContent>
-        </ModalOverlay>
-      )}
-    </Container>
+                </Section>
+
+                <Section>
+                  <SectionTitle>📊 모임 정보</SectionTitle>
+                  <InfoGrid>
+                    <InfoItem>
+                      <Label>주최자:</Label>
+                      <Value>{selectedMeetup.organizerName || '알 수 없음'}</Value>
+                    </InfoItem>
+                    <InfoItem>
+                      <Label>참가 인원:</Label>
+                      <Value>
+                        {selectedMeetup.currentParticipants || 0}/{selectedMeetup.maxParticipants}명
+                      </Value>
+                    </InfoItem>
+                    <InfoItem>
+                      <Label>상태:</Label>
+                      <Value>
+                        {selectedMeetup.status === 'RECRUITING' ? '모집중' :
+                          selectedMeetup.status === 'CLOSED' ? '마감' : '종료'}
+                      </Value>
+                    </InfoItem>
+                  </InfoGrid>
+                </Section>
+
+                {/* 참가하기 버튼 */}
+                {selectedMeetup.organizerIdx?.toString() !== user?.idx?.toString() && (
+                  <ActionSection>
+                    {isParticipating ? (
+                      <CancelButton
+                        onClick={handleCancelParticipation}
+                        disabled={participationLoading}
+                      >
+                        {participationLoading ? '처리 중...' : '참가 취소'}
+                      </CancelButton>
+                    ) : (
+                      <JoinButton
+                        onClick={handleJoinMeetup}
+                        disabled={
+                          participationLoading ||
+                          (selectedMeetup.currentParticipants || 0) >= (selectedMeetup.maxParticipants || 0) ||
+                          selectedMeetup.status === 'CLOSED' ||
+                          selectedMeetup.status === 'COMPLETED'
+                        }
+                      >
+                        {participationLoading
+                          ? '처리 중...'
+                          : (selectedMeetup.currentParticipants || 0) >= (selectedMeetup.maxParticipants || 0)
+                            ? '인원 마감'
+                            : selectedMeetup.status === 'CLOSED' || selectedMeetup.status === 'COMPLETED'
+                              ? '참가 불가'
+                              : '참가하기'}
+                      </JoinButton>
+                    )}
+                  </ActionSection>
+                )}
+              </ModalBody>
+            </ModalContent>
+          </ModalOverlay>
+        )}
+      </Container>
+    </>
   );
 };
 

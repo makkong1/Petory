@@ -387,7 +387,41 @@ export const setupApiInterceptors = () => {
           return Promise.reject(refreshError);
         }
       } else if (error.response?.status === 403) {
-        // 403 에러 시 권한 모달 표시 이벤트 발생
+        console.log('🔍 403 에러 발생 - 응답 데이터 확인:', {
+          errorCode: error.response?.data?.errorCode,
+          message: error.response?.data?.message,
+          purpose: error.response?.data?.purpose,
+          fullResponse: error.response?.data
+        });
+        
+        // 이메일 인증 필요 예외 체크
+        if (error.response?.data?.errorCode === 'EMAIL_VERIFICATION_REQUIRED') {
+          console.warn('📧 이메일 인증 필요:', {
+            message: error.response?.data?.message,
+            purpose: error.response?.data?.purpose,
+            redirectUrl: error.response?.data?.redirectUrl,
+            timestamp: new Date().toISOString()
+          });
+          
+          // 전역 이벤트 발생 (각 페이지에서 처리하도록)
+          if (typeof window !== 'undefined') {
+            const currentUrl = window.location.pathname + window.location.search;
+            const purpose = error.response?.data?.purpose || '';
+            console.log('📡 emailVerificationRequired 이벤트 발생:', { purpose, currentUrl });
+            const event = new CustomEvent('emailVerificationRequired', {
+              detail: {
+                purpose,
+                currentUrl,
+                message: error.response?.data?.message
+              }
+            });
+            window.dispatchEvent(event);
+            console.log('📡 이벤트 디스패치 완료');
+          }
+          return Promise.reject(error);
+        }
+        
+        // 일반 403 에러 시 권한 모달 표시 이벤트 발생
         console.warn('🚫 403 Forbidden 에러 발생:', {
           url: originalRequest?.url,
           method: originalRequest?.method,

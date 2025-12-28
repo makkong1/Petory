@@ -7,6 +7,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.async.AsyncRequestTimeoutException;
 
+import com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException;
+
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.HashMap;
@@ -73,6 +75,27 @@ public class GlobalExceptionHandler {
         response.put("status", HttpStatus.CONFLICT.value());
         
         return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+    }
+
+    /**
+     * 이메일 인증 필요 예외 처리
+     * 프론트엔드에서 이 예외를 감지하여 이메일 인증 페이지로 리다이렉트
+     */
+    @ExceptionHandler(EmailVerificationRequiredException.class)
+    public ResponseEntity<Map<String, Object>> handleEmailVerificationRequiredException(EmailVerificationRequiredException e) {
+        log.info("이메일 인증 필요: {}, purpose: {}", e.getMessage(), e.getPurpose());
+        
+        Map<String, Object> response = new HashMap<>();
+        response.put("error", "이메일 인증이 필요합니다.");
+        response.put("message", e.getMessage());
+        response.put("status", HttpStatus.FORBIDDEN.value());
+        response.put("errorCode", "EMAIL_VERIFICATION_REQUIRED");
+        response.put("redirectUrl", "/email-verification");
+        if (e.getPurpose() != null) {
+            response.put("purpose", e.getPurpose().name());
+        }
+        
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
     }
 
     /**
