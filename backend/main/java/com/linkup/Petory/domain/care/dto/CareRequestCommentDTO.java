@@ -18,7 +18,7 @@ public class CareRequestCommentDTO {
     private Long idx;
     private String content;
     private LocalDateTime createdAt;
-    private String status;          // ACTIVE / BLINDED / DELETED
+    private String status; // ACTIVE / BLINDED / DELETED
     private Boolean deleted;
     private LocalDateTime deletedAt;
 
@@ -28,6 +28,7 @@ public class CareRequestCommentDTO {
     // 작성자 정보
     private Long userId;
     private String username;
+    private String nickname;
     private String userLocation;
     private String userRole; // SERVICE_PROVIDER 체크용
 

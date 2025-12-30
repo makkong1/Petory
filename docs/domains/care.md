@@ -188,6 +188,8 @@ domain/care/
 ### 3.2 엔티티 구조
 
 #### CareRequest (펫케어 요청)
+**역할**: 펫케어 요청을 나타내는 핵심 엔티티입니다. 반려동물 돌봄이 필요한 사용자가 서비스 제공자를 모집하기 위해 생성하는 게시물입니다. 요청자는 제목, 설명, 날짜, 관련 펫 정보를 포함하여 요청을 생성하며, 상태는 OPEN → IN_PROGRESS → COMPLETED로 전이됩니다. 하나의 요청에는 여러 지원(CareApplication)과 댓글(CareRequestComment)이 연결될 수 있습니다.
+
 ```java
 @Entity
 @Table(name = "carerequest")
@@ -214,6 +216,8 @@ public class CareRequest extends BaseTimeEntity {
 ```
 
 #### CareApplication (펫케어 지원)
+**역할**: 펫케어 지원을 나타내는 엔티티입니다. 서비스 제공자(SERVICE_PROVIDER)가 특정 펫케어 요청에 지원할 때 생성됩니다. 상태는 PENDING → ACCEPTED 또는 REJECTED로 변경되며, ACCEPTED 상태가 되면 실제 서비스가 시작됩니다. 채팅을 통한 거래 확정 시 양쪽 모두 확정하면 자동으로 ACCEPTED 상태가 되고, 요청 상태가 IN_PROGRESS로 변경됩니다. 하나의 요청에는 여러 지원이 가능하지만, 일반적으로 1명만 ACCEPTED 상태가 됩니다.
+
 ```java
 @Entity
 @Table(name = "careapplication")
@@ -231,6 +235,8 @@ public class CareApplication extends BaseTimeEntity {
 ```
 
 #### CareReview (펫케어 리뷰)
+**역할**: 펫케어 리뷰를 나타내는 엔티티입니다. 펫케어 서비스가 완료된 후, 요청자(reviewer)가 서비스 제공자(reviewee)에게 작성하는 리뷰입니다. 하나의 CareApplication당 1개의 리뷰만 작성 가능하며, ACCEPTED 상태의 CareApplication에 대해서만 리뷰를 작성할 수 있습니다. 평점(1-5)과 리뷰 내용을 포함하며, 제공자의 평균 평점 계산에 사용됩니다.
+
 ```java
 @Entity
 @Table(name = "carereview")
@@ -248,6 +254,8 @@ public class CareReview extends BaseTimeEntity {
 ```
 
 #### CareRequestComment (펫케어 요청 댓글)
+**역할**: 펫케어 요청 댓글을 나타내는 엔티티입니다. SERVICE_PROVIDER 역할의 사용자가 특정 펫케어 요청에 대해 질문이나 답변을 작성할 때 사용됩니다. 요청자와 서비스 제공자 간의 소통을 위한 기능으로, 댓글 작성 시 요청자에게 알림이 자동으로 발송됩니다. 파일 첨부가 가능하며, Soft Delete 방식으로 삭제됩니다.
+
 ```java
 @Entity
 @Table(name = "carerequest_comment")

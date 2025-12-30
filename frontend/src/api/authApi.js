@@ -241,6 +241,16 @@ export const authApi = {
     }
   },
 
+  // 비밀번호 찾기 - 비밀번호 재설정 이메일 발송 (인증 불필요)
+  forgotPassword: async (email) => {
+    try {
+      const response = await axios.post(`${BASE_URL}/forgot-password`, { email });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
   // 토큰 가져오기
   getToken: getToken,
   getRefreshToken: getRefreshToken,

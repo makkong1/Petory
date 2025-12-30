@@ -6,6 +6,7 @@ import { reportApi } from '../../api/reportApi';
 import { uploadApi } from '../../api/uploadApi';
 import { usePermission } from '../../hooks/usePermission';
 import { useAuth } from '../../contexts/AuthContext';
+import UserProfileModal from '../User/UserProfileModal';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
@@ -35,6 +36,8 @@ const CommunityDetailPage = ({
   const [commentFilePath, setCommentFilePath] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
+  const [selectedUserId, setSelectedUserId] = useState(null);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
   const categoryInfo = useMemo(() => {
     if (!board?.category) {
@@ -413,6 +416,11 @@ const CommunityDetailPage = ({
     [boardId, currentUser, onCommentAdded]
   );
 
+  const handleViewProfile = useCallback((userId) => {
+    setSelectedUserId(userId);
+    setIsProfileModalOpen(true);
+  }, []);
+
   if (!isOpen) {
     return null;
   }
@@ -527,7 +535,12 @@ const CommunityDetailPage = ({
                         {comment.username ? comment.username.charAt(0).toUpperCase() : 'U'}
                       </CommentAvatar>
                       <CommentAuthorInfo>
-                        <CommentAuthorName>{comment.username || '알 수 없음'}</CommentAuthorName>
+                        <CommentAuthorName
+                          onClick={() => handleViewProfile(comment.userId)}
+                          style={{ cursor: 'pointer' }}
+                        >
+                          {comment.username || '알 수 없음'}
+                        </CommentAuthorName>
                         <CommentTimestamp>
                           {comment.createdAt
                             ? new Date(comment.createdAt).toLocaleString('ko-KR')
@@ -625,6 +638,15 @@ const CommunityDetailPage = ({
           </CommentSection>
         </DetailCard>
       </PageContainer>
+
+      <UserProfileModal
+        isOpen={isProfileModalOpen}
+        userId={selectedUserId}
+        onClose={() => {
+          setIsProfileModalOpen(false);
+          setSelectedUserId(null);
+        }}
+      />
     </>
   );
 };
@@ -928,6 +950,11 @@ const CommentAuthorInfo = styled.div`
 const CommentAuthorName = styled.span`
   font-weight: 600;
   color: ${(props) => props.theme.colors.text};
+  transition: color 0.2s ease;
+
+  &:hover {
+    color: ${(props) => props.theme.colors.primary};
+  }
 `;
 
 const CommentTimestamp = styled.span`

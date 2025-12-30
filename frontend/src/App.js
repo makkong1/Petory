@@ -111,9 +111,9 @@ function AppContent() {
   const [isOAuth2Callback, setIsOAuth2Callback] = useState(() => {
     if (typeof window === 'undefined') return false;
     const urlParams = new URLSearchParams(window.location.search);
-    return window.location.pathname.includes('oauth2/callback') || 
-           urlParams.has('accessToken') ||
-           urlParams.has('error');
+    return window.location.pathname.includes('oauth2/callback') ||
+      urlParams.has('accessToken') ||
+      urlParams.has('error');
   });
 
   // 이메일 인증 페이지 체크
@@ -185,7 +185,7 @@ function AppContent() {
         return <ActivityPage />;
       case 'home':
       default:
-        return <HomePage setActiveTab={setActiveTab} />;
+        return <HomePage setActiveTab={setActiveTab} user={user} />;
     }
   };
 
