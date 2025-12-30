@@ -5,6 +5,7 @@ import { reportApi } from '../../api/reportApi';
 import { startMissingPetChat } from '../../api/chatApi';
 import AddressMapSelector from './AddressMapSelector';
 import MapContainer from '../LocationService/MapContainer';
+import UserProfileModal from '../User/UserProfileModal';
 
 const statusLabel = {
   MISSING: '실종',
@@ -27,6 +28,13 @@ const MissingPetBoardDetail = ({
   const [showAddressMap, setShowAddressMap] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [statusUpdating, setStatusUpdating] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState(null);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+
+  const handleViewProfile = (userId) => {
+    setSelectedUserId(userId);
+    setIsProfileModalOpen(true);
+  };
 
   if (!board) {
     return null;
@@ -384,7 +392,12 @@ const MissingPetBoardDetail = ({
                   {board.comments.map((item) => (
                     <CommentItem key={item.idx}>
                       <CommentHeader>
-                        <CommentAuthor>{item.nickname || '익명'}</CommentAuthor>
+                        <CommentAuthor
+                          onClick={() => item.userId && handleViewProfile(item.userId)}
+                          style={{ cursor: item.userId ? 'pointer' : 'default' }}
+                        >
+                          {item.nickname || '익명'}
+                        </CommentAuthor>
                         <CommentDate>
                           {item.createdAt?.replace('T', ' ').substring(0, 16)}
                         </CommentDate>
@@ -460,6 +473,15 @@ const MissingPetBoardDetail = ({
           </DetailBody>
         </DetailCard>
       </PageContainer>
+
+      <UserProfileModal
+        isOpen={isProfileModalOpen}
+        userId={selectedUserId}
+        onClose={() => {
+          setIsProfileModalOpen(false);
+          setSelectedUserId(null);
+        }}
+      />
     </>
   );
 };
@@ -843,6 +865,11 @@ const CommentHeader = styled.div`
 const CommentAuthor = styled.span`
   font-weight: 600;
   color: ${(props) => props.theme.colors.text};
+  transition: color 0.2s ease;
+
+  &:hover {
+    color: ${(props) => props.theme.colors.primary};
+  }
 `;
 
 const CommentDate = styled.span`

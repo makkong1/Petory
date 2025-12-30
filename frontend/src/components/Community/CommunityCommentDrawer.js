@@ -3,6 +3,7 @@ import styled from 'styled-components';
 import { commentApi } from '../../api/commentApi';
 import { uploadApi } from '../../api/uploadApi';
 import { reportApi } from '../../api/reportApi';
+import UserProfileModal from '../User/UserProfileModal';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
@@ -15,6 +16,8 @@ const CommunityCommentDrawer = ({ isOpen, board, onClose, currentUser, onComment
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [commentFilePath, setCommentFilePath] = useState('');
+  const [selectedUserId, setSelectedUserId] = useState(null);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
   const boardTitle = useMemo(() => board?.title || '게시글', [board]);
 
@@ -168,6 +171,11 @@ const CommunityCommentDrawer = ({ isOpen, board, onClose, currentUser, onComment
     }
   };
 
+  const handleViewProfile = (userId) => {
+    setSelectedUserId(userId);
+    setIsProfileModalOpen(true);
+  };
+
   if (!isOpen) {
     return null;
   }
@@ -204,7 +212,12 @@ const CommunityCommentDrawer = ({ isOpen, board, onClose, currentUser, onComment
                         {comment.username ? comment.username.charAt(0).toUpperCase() : 'U'}
                       </CommentAvatar>
                       <CommentAuthorInfo>
-                        <CommentAuthorName>{comment.username}</CommentAuthorName>
+                        <CommentAuthorName
+                          onClick={() => handleViewProfile(comment.userId)}
+                          style={{ cursor: 'pointer' }}
+                        >
+                          {comment.username}
+                        </CommentAuthorName>
                         <CommentTimestamp>
                           {comment.createdAt
                             ? new Date(comment.createdAt).toLocaleString('ko-KR')
@@ -285,6 +298,15 @@ const CommunityCommentDrawer = ({ isOpen, board, onClose, currentUser, onComment
           )}
         </ModalFooter>
       </Modal>
+
+      <UserProfileModal
+        isOpen={isProfileModalOpen}
+        userId={selectedUserId}
+        onClose={() => {
+          setIsProfileModalOpen(false);
+          setSelectedUserId(null);
+        }}
+      />
     </>
   );
 };
@@ -458,6 +480,11 @@ const CommentAuthorInfo = styled.div`
 const CommentAuthorName = styled.span`
   font-weight: 600;
   color: ${(props) => props.theme.colors.text};
+  transition: color 0.2s ease;
+
+  &:hover {
+    color: ${(props) => props.theme.colors.primary};
+  }
 `;
 
 const CommentTimestamp = styled.span`
