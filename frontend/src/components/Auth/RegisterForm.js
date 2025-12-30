@@ -27,6 +27,7 @@ const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
   const [emailVerified, setEmailVerified] = useState(false); // 이메일 인증 완료 여부
   const [emailVerificationSending, setEmailVerificationSending] = useState(false); // 이메일 발송 중 여부
   const [emailVerificationSent, setEmailVerificationSent] = useState(false); // 이메일 발송 완료 여부
+  const [emailVerificationError, setEmailVerificationError] = useState(''); // 이메일 인증 관련 에러 메시지
 
   // URL 파라미터에서 이메일 인증 완료 상태 확인
   useEffect(() => {
@@ -75,6 +76,10 @@ const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
         if (emailVerified || emailVerificationSent) {
           setEmailVerified(false);
           setEmailVerificationSent(false);
+        }
+        // 이메일 변경 시 인증 에러 메시지 초기화
+        if (emailVerificationError) {
+          setEmailVerificationError('');
         }
       }
       return updated;
@@ -182,15 +187,15 @@ const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
   const handleSendVerificationEmail = async () => {
     // 이메일 필수 검증
     if (!formData.emailId || formData.emailId.trim().length === 0) {
-      setError('이메일 아이디를 입력해주세요.');
+      setEmailVerificationError('이메일 아이디를 입력해주세요.');
       return;
     }
     if (!formData.emailDomain || formData.emailDomain.trim().length === 0) {
-      setError('이메일 도메인을 선택해주세요.');
+      setEmailVerificationError('이메일 도메인을 선택해주세요.');
       return;
     }
     if (formData.emailDomain === 'custom' && (!formData.customEmailDomain || formData.customEmailDomain.trim().length === 0)) {
-      setError('이메일 도메인을 입력해주세요.');
+      setEmailVerificationError('이메일 도메인을 입력해주세요.');
       return;
     }
 
@@ -200,16 +205,25 @@ const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
       : `${formData.emailId}@${formData.emailDomain}`;
 
     setEmailVerificationSending(true);
-    setError('');
+    setEmailVerificationError('');
     setSuccess('');
 
     try {
-      await userProfileApi.sendPreRegistrationVerificationEmail(finalEmail);
-      setEmailVerificationSent(true);
-      setSuccess('이메일 인증 메일이 발송되었습니다. 이메일을 확인해주세요.');
+      const response = await userProfileApi.sendPreRegistrationVerificationEmail(finalEmail);
+      
+      // 응답의 success 필드를 확인
+      if (response.data && response.data.success === false) {
+        setEmailVerificationError(response.data.message || '이메일 발송에 실패했습니다.');
+        setEmailVerificationSent(false);
+      } else {
+        setEmailVerificationSent(true);
+        setEmailVerificationError('');
+        setSuccess('이메일 인증 메일이 발송되었습니다. 이메일을 확인해주세요.');
+      }
     } catch (error) {
       console.error('이메일 인증 메일 발송 실패:', error);
-      setError(error.response?.data?.message || '이메일 발송에 실패했습니다.');
+      setEmailVerificationError(error.response?.data?.message || '이메일 발송에 실패했습니다.');
+      setEmailVerificationSent(false);
     } finally {
       setEmailVerificationSending(false);
     }
@@ -518,6 +532,11 @@ const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
               />
             )}
           </EmailInputGroup>
+          {emailVerificationError && (
+            <EmailVerificationErrorMessage>
+              {emailVerificationError}
+            </EmailVerificationErrorMessage>
+          )}
           {emailVerified ? (
             <EmailVerificationStatus verified={true}>
               ✓ 이메일 인증 완료
@@ -1198,6 +1217,17 @@ const EmailDomainSelect = styled.select`
     background: #f5f5f5;
     cursor: not-allowed;
   }
+`;
+
+const EmailVerificationErrorMessage = styled.div`
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  font-size: 0.875rem;
+  color: #dc3545;
+  font-weight: 500;
+  background: #fff5f5;
+  border-left: 3px solid #dc3545;
+  border-radius: 4px;
 `;
 
 const EmailVerificationStatus = styled.div`

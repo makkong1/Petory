@@ -48,6 +48,10 @@ public interface CareRequestRepository extends JpaRepository<CareRequest, Long> 
         @Query("SELECT cr FROM CareRequest cr LEFT JOIN FETCH cr.pet LEFT JOIN FETCH cr.user WHERE cr.idx = :idx")
         java.util.Optional<CareRequest> findByIdWithPet(@Param("idx") Long idx);
 
+        // 단일 케어 요청 조회 (펫 정보 및 지원 정보 포함)
+        @Query("SELECT cr FROM CareRequest cr LEFT JOIN FETCH cr.pet LEFT JOIN FETCH cr.user LEFT JOIN FETCH cr.applications WHERE cr.idx = :idx")
+        java.util.Optional<CareRequest> findByIdWithApplications(@Param("idx") Long idx);
+
         // 통계용
         long countByCreatedAtBetween(LocalDateTime start, LocalDateTime end);
 

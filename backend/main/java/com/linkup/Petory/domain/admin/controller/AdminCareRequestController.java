@@ -5,6 +5,8 @@ import java.util.stream.Collectors;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import com.linkup.Petory.domain.care.dto.CareRequestDTO;
@@ -24,6 +26,22 @@ import lombok.RequiredArgsConstructor;
 public class AdminCareRequestController {
 
     private final CareRequestService careRequestService;
+
+    /**
+     * 현재 로그인한 사용자의 ID 추출
+     */
+    private Long getCurrentUserId() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || authentication.getPrincipal() == null) {
+            throw new RuntimeException("인증되지 않은 사용자입니다.");
+        }
+        String userIdString = authentication.getName();
+        try {
+            return Long.parseLong(userIdString);
+        } catch (NumberFormatException e) {
+            throw new RuntimeException("유효하지 않은 사용자 ID입니다.");
+        }
+    }
 
     /**
      * 케어 요청 목록 조회 (필터링 지원)
@@ -66,21 +84,23 @@ public class AdminCareRequestController {
     }
 
     /**
-     * 케어 요청 상태 변경
+     * 케어 요청 상태 변경 (관리자는 권한 검증 우회)
      */
     @PatchMapping("/{id}/status")
     public ResponseEntity<CareRequestDTO> updateStatus(
             @PathVariable Long id,
             @RequestParam String status) {
-        return ResponseEntity.ok(careRequestService.updateStatus(id, status));
+        Long currentUserId = getCurrentUserId();
+        return ResponseEntity.ok(careRequestService.updateStatus(id, status, currentUserId));
     }
 
     /**
-     * 케어 요청 삭제 (소프트 삭제)
+     * 케어 요청 삭제 (소프트 삭제, 관리자는 권한 검증 우회)
      */
     @PostMapping("/{id}/delete")
     public ResponseEntity<Void> deleteCareRequest(@PathVariable Long id) {
-        careRequestService.deleteCareRequest(id);
+        Long currentUserId = getCurrentUserId();
+        careRequestService.deleteCareRequest(id, currentUserId);
         return ResponseEntity.noContent().build();
     }
 

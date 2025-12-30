@@ -36,7 +36,7 @@ public class UserProfileController {
     private final JwtUtil jwtUtil;
 
     /**
-     * 현재 로그인한 사용자의 ID 추출
+     * 현재 로그인한 사용자의 ID 추출 (String - 로그인용 id 필드)
      */
     private String getCurrentUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -48,21 +48,45 @@ public class UserProfileController {
     }
 
     /**
-     * 자신의 프로필 조회
+     * 자신의 프로필 조회 (리뷰 포함)
      */
     @GetMapping("/me")
-    public ResponseEntity<UsersDTO> getMyProfile() {
+    public ResponseEntity<UserProfileWithReviewsDTO> getMyProfile() {
         String userId = getCurrentUserId();
-        UsersDTO profile = usersService.getMyProfile(userId);
+        UsersDTO user = usersService.getMyProfile(userId);
+        
+        // UsersDTO의 idx를 사용하여 리뷰 조회
+        Long userIdx = user.getIdx();
+        List<CareReviewDTO> reviews = careReviewService.getReviewsByReviewee(userIdx);
+        Double averageRating = careReviewService.getAverageRating(userIdx);
+
+        UserProfileWithReviewsDTO profile = UserProfileWithReviewsDTO.builder()
+                .user(user)
+                .reviews(reviews)
+                .averageRating(averageRating)
+                .reviewCount(reviews.size())
+                .build();
+
         return ResponseEntity.ok(profile);
     }
 
     /**
      * 자신의 프로필 수정 (닉네임, 이메일, 전화번호, 위치, 펫 정보 등)
+     * - 당사자만 수정 가능 (권한 검증 포함)
+     * - 관리자(MASTER 포함)도 다른 사람의 프로필을 수정할 수 없음
      */
     @PutMapping("/me")
     public ResponseEntity<UsersDTO> updateMyProfile(@RequestBody UsersDTO dto) {
         String userId = getCurrentUserId();
+        
+        // 현재 사용자의 UsersDTO를 가져와서 idx 확인
+        UsersDTO currentUser = usersService.getMyProfile(userId);
+        
+        // 본인의 프로필만 수정 가능 (dto에 idx가 있으면 확인)
+        if (dto.getIdx() != null && !dto.getIdx().equals(currentUser.getIdx())) {
+            throw new RuntimeException("본인의 프로필만 수정할 수 있습니다.");
+        }
+        
         UsersDTO updated = usersService.updateMyProfile(userId, dto);
         return ResponseEntity.ok(updated);
     }
