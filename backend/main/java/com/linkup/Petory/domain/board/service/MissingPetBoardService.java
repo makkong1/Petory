@@ -1,6 +1,7 @@
 package com.linkup.Petory.domain.board.service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
@@ -24,7 +25,9 @@ import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -38,16 +41,29 @@ public class MissingPetBoardService {
     private final NotificationService notificationService;
 
     public List<MissingPetBoardDTO> getBoards(MissingPetStatus status) {
+        // JOIN FETCH를 사용하여 댓글까지 함께 조회 (N+1 문제 해결)
         List<MissingPetBoard> boards = status == null
-                ? boardRepository.findAllByOrderByCreatedAtDesc()
-                : boardRepository.findByStatusOrderByCreatedAtDesc(status);
+                ? boardRepository.findAllWithCommentsByOrderByCreatedAtDesc()
+                : boardRepository.findByStatusWithCommentsOrderByCreatedAtDesc(status);
+
+        // 게시글 ID 목록 추출
+        List<Long> boardIds = boards.stream()
+                .map(MissingPetBoard::getIdx)
+                .collect(Collectors.toList());
+
+        // 파일 배치 조회 (N+1 문제 해결)
+        Map<Long, List<FileDTO>> filesByBoardId = attachmentFileService.getAttachmentsBatch(
+                FileTargetType.MISSING_PET, boardIds);
+
+        // DTO 변환 (파일 정보 포함)
         return boards.stream()
-                .map(this::mapBoardWithAttachments)
+                .map(board -> mapBoardWithAttachmentsFromBatch(board, filesByBoardId))
                 .collect(Collectors.toList());
     }
 
     public MissingPetBoardDTO getBoard(Long id) {
-        MissingPetBoard board = boardRepository.findByIdWithUser(id)
+        // JOIN FETCH를 사용하여 댓글까지 함께 조회 (N+1 문제 해결)
+        MissingPetBoard board = boardRepository.findByIdWithComments(id)
                 .orElseThrow(() -> new IllegalArgumentException("Missing pet board not found"));
 
         // 삭제된 게시글인지 확인
@@ -191,6 +207,7 @@ public class MissingPetBoardService {
         MissingPetBoard board = boardRepository.findById(boardId)
                 .orElseThrow(() -> new IllegalArgumentException("Missing pet board not found"));
         List<MissingPetComment> comments = commentRepository.findByBoardAndIsDeletedFalseOrderByCreatedAtAsc(board);
+
         return comments.stream()
                 .map(this::mapCommentWithAttachments)
                 .collect(Collectors.toList());
@@ -258,6 +275,18 @@ public class MissingPetBoardService {
     private MissingPetBoardDTO mapBoardWithAttachments(MissingPetBoard board) {
         MissingPetBoardDTO dto = missingPetConverter.toBoardDTO(board);
         List<FileDTO> attachments = attachmentFileService.getAttachments(FileTargetType.MISSING_PET, board.getIdx());
+        dto.setAttachments(attachments);
+        dto.setImageUrl(extractPrimaryFileUrl(attachments));
+        return dto;
+    }
+
+    /**
+     * 배치 조회된 파일 정보를 사용하여 게시글 DTO 매핑 (N+1 문제 해결)
+     */
+    private MissingPetBoardDTO mapBoardWithAttachmentsFromBatch(MissingPetBoard board,
+            Map<Long, List<FileDTO>> filesByBoardId) {
+        MissingPetBoardDTO dto = missingPetConverter.toBoardDTO(board);
+        List<FileDTO> attachments = filesByBoardId.getOrDefault(board.getIdx(), List.of());
         dto.setAttachments(attachments);
         dto.setImageUrl(extractPrimaryFileUrl(attachments));
         return dto;
