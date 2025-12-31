@@ -51,14 +51,7 @@ public class CareRequestService {
     // 전체 케어 요청 조회 (필터링 포함) - 작성자도 활성 상태여야 함
     @Transactional(readOnly = true)
     public List<CareRequestDTO> getAllCareRequests(String status, String location) {
-        long startTime = System.currentTimeMillis();
-        Runtime runtime = Runtime.getRuntime();
-        long memoryBefore = runtime.totalMemory() - runtime.freeMemory();
-
-        log.debug("[Service] 전체 케어 요청 조회 시작 - status: {}, location: {}", status, location);
-
         // 작성자 상태 체크가 포함된 쿼리 사용
-        long queryStartTime = System.currentTimeMillis();
         List<CareRequest> requests;
         if (status != null && !status.equals("ALL")) {
             CareRequestStatus statusEnum = CareRequestStatus.valueOf(status);
@@ -66,36 +59,16 @@ public class CareRequestService {
         } else {
             requests = careRequestRepository.findAllActiveRequests();
         }
-        long queryEndTime = System.currentTimeMillis();
-        log.debug("[Service] DB 쿼리 실행 시간: {}ms, 조회된 엔티티 수: {}",
-                queryEndTime - queryStartTime, requests.size());
 
         // 위치 필터링 (추후 구현)
         if (location != null && !location.isEmpty()) {
-            long filterStartTime = System.currentTimeMillis();
             requests = requests.stream()
                     .filter(r -> r.getUser().getLocation() != null &&
                             r.getUser().getLocation().contains(location))
                     .collect(Collectors.toList());
-            long filterEndTime = System.currentTimeMillis();
-            log.debug("[Service] 위치 필터링 시간: {}ms, 필터링 후 수: {}",
-                    filterEndTime - filterStartTime, requests.size());
         }
 
-        long converterStartTime = System.currentTimeMillis();
-        List<CareRequestDTO> result = careRequestConverter.toDTOList(requests);
-        long converterEndTime = System.currentTimeMillis();
-        log.debug("[Service] DTO 변환 시간: {}ms", converterEndTime - converterStartTime);
-
-        long endTime = System.currentTimeMillis();
-        long memoryAfter = runtime.totalMemory() - runtime.freeMemory();
-        long executionTime = endTime - startTime;
-        long memoryUsed = memoryAfter - memoryBefore;
-
-        log.info("[Service] 전체 케어 요청 조회 완료 - 총 실행 시간: {}ms, 메모리 사용: {}MB, 결과 수: {}개",
-                executionTime, memoryUsed / (1024 * 1024), result.size());
-
-        return result;
+        return careRequestConverter.toDTOList(requests);
     }
 
     // 단일 케어 요청 조회
@@ -235,38 +208,14 @@ public class CareRequestService {
     // 검색 기능
     @Transactional(readOnly = true)
     public List<CareRequestDTO> searchCareRequests(String keyword) {
-        long startTime = System.currentTimeMillis();
-        Runtime runtime = Runtime.getRuntime();
-        long memoryBefore = runtime.totalMemory() - runtime.freeMemory();
-
-        log.debug("[Service] 케어 요청 검색 시작 - keyword: {}", keyword);
-
         if (keyword == null || keyword.trim().isEmpty()) {
-            log.debug("[Service] 키워드가 비어있어 전체 조회로 전환");
             return getAllCareRequests(null, null);
         }
 
-        long queryStartTime = System.currentTimeMillis();
         List<CareRequest> requests = careRequestRepository
                 .findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCaseAndIsDeletedFalse(
                         keyword.trim(), keyword.trim());
-        long queryEndTime = System.currentTimeMillis();
-        log.debug("[Service] 검색 쿼리 실행 시간: {}ms, 조회된 엔티티 수: {}",
-                queryEndTime - queryStartTime, requests.size());
 
-        long converterStartTime = System.currentTimeMillis();
-        List<CareRequestDTO> result = careRequestConverter.toDTOList(requests);
-        long converterEndTime = System.currentTimeMillis();
-        log.debug("[Service] DTO 변환 시간: {}ms", converterEndTime - converterStartTime);
-
-        long endTime = System.currentTimeMillis();
-        long memoryAfter = runtime.totalMemory() - runtime.freeMemory();
-        long executionTime = endTime - startTime;
-        long memoryUsed = memoryAfter - memoryBefore;
-
-        log.info("[Service] 케어 요청 검색 완료 - 총 실행 시간: {}ms, 메모리 사용: {}MB, 결과 수: {}개",
-                executionTime, memoryUsed / (1024 * 1024), result.size());
-
-        return result;
+        return careRequestConverter.toDTOList(requests);
     }
 }

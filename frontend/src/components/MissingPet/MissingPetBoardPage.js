@@ -57,6 +57,7 @@ const MissingPetBoardPage = () => {
   const loadBoardDetail = useCallback(
     async (id) => {
       if (!id) return;
+      
       try {
         setDetailLoading(true);
         const response = await missingPetApi.get(id);

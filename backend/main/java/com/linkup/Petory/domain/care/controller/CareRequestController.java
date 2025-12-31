@@ -43,29 +43,7 @@ public class CareRequestController {
     public ResponseEntity<List<CareRequestDTO>> getAllCareRequests(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String location) {
-        long startTime = System.currentTimeMillis();
-        Runtime runtime = Runtime.getRuntime();
-        long memoryBefore = runtime.totalMemory() - runtime.freeMemory();
-        
-        log.info("=== [펫케어 전체조회] API 호출 시작 - status: {}, location: {} ===", status, location);
-        
-        List<CareRequestDTO> result = careRequestService.getAllCareRequests(status, location);
-        
-        long endTime = System.currentTimeMillis();
-        long memoryAfter = runtime.totalMemory() - runtime.freeMemory();
-        long executionTime = endTime - startTime;
-        long memoryUsed = memoryAfter - memoryBefore;
-        
-        log.info("=== [펫케어 전체조회] 완료 ===");
-        log.info("  - 실행 시간: {}ms ({}초)", executionTime, executionTime / 1000.0);
-        log.info("  - 메모리 사용량: {}MB ({}KB)", memoryUsed / (1024 * 1024), memoryUsed / 1024);
-        log.info("  - 조회된 데이터 수: {}개", result.size());
-        log.info("  - 현재 메모리 상태 - Total: {}MB, Free: {}MB, Used: {}MB",
-                runtime.totalMemory() / (1024 * 1024),
-                runtime.freeMemory() / (1024 * 1024),
-                (runtime.totalMemory() - runtime.freeMemory()) / (1024 * 1024));
-        
-        return ResponseEntity.ok(result);
+        return ResponseEntity.ok(careRequestService.getAllCareRequests(status, location));
     }
 
     // 단일 케어 요청 조회
@@ -113,28 +91,6 @@ public class CareRequestController {
     // 케어 요청 검색
     @GetMapping("/search")
     public ResponseEntity<List<CareRequestDTO>> searchCareRequests(@RequestParam String keyword) {
-        long startTime = System.currentTimeMillis();
-        Runtime runtime = Runtime.getRuntime();
-        long memoryBefore = runtime.totalMemory() - runtime.freeMemory();
-        
-        log.info("=== [펫케어 검색조회] API 호출 시작 - keyword: {} ===", keyword);
-        
-        List<CareRequestDTO> result = careRequestService.searchCareRequests(keyword);
-        
-        long endTime = System.currentTimeMillis();
-        long memoryAfter = runtime.totalMemory() - runtime.freeMemory();
-        long executionTime = endTime - startTime;
-        long memoryUsed = memoryAfter - memoryBefore;
-        
-        log.info("=== [펫케어 검색조회] 완료 ===");
-        log.info("  - 실행 시간: {}ms ({}초)", executionTime, executionTime / 1000.0);
-        log.info("  - 메모리 사용량: {}MB ({}KB)", memoryUsed / (1024 * 1024), memoryUsed / 1024);
-        log.info("  - 조회된 데이터 수: {}개", result.size());
-        log.info("  - 현재 메모리 상태 - Total: {}MB, Free: {}MB, Used: {}MB",
-                runtime.totalMemory() / (1024 * 1024),
-                runtime.freeMemory() / (1024 * 1024),
-                (runtime.totalMemory() - runtime.freeMemory()) / (1024 * 1024));
-        
-        return ResponseEntity.ok(result);
+        return ResponseEntity.ok(careRequestService.searchCareRequests(keyword));
     }
 }

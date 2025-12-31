@@ -19,6 +19,13 @@ public class MissingPetConverter {
                 ? Collections.emptyList()
                 : board.getComments().stream()
                         .filter(comment -> !comment.getIsDeleted()) // 삭제된 댓글 제외
+                        .sorted((c1, c2) -> {
+                            // createdAt 기준 오름차순 정렬 (최신순)
+                            if (c1.getCreatedAt() == null && c2.getCreatedAt() == null) return 0;
+                            if (c1.getCreatedAt() == null) return 1;
+                            if (c2.getCreatedAt() == null) return -1;
+                            return c1.getCreatedAt().compareTo(c2.getCreatedAt());
+                        })
                         .map(this::toCommentDTO)
                         .collect(Collectors.toList());
 
