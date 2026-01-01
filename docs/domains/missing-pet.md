@@ -598,6 +598,35 @@ List<MissingPetBoard> findAllByOrderByCreatedAtDesc();
 - **파일 매핑**: `mapBoardWithAttachments()`, `mapCommentWithAttachments()`로 첨부 파일 정보 포함
 - **주요 이미지 URL**: 첫 번째 파일의 다운로드 URL을 `imageUrl`로 설정하여 빠른 접근
 
+### 7.4 최적화 핵심 포인트
+
+#### 1단계: 댓글 N+1 해결
+- **문제**: 각 게시글마다 `board.getComments()` 호출 시 LAZY 로딩으로 개별 쿼리 발생
+- **해결**: Repository 쿼리에 `LEFT JOIN FETCH b.comments c` 및 `LEFT JOIN FETCH c.user cu` 추가
+- **효과**: 103개 쿼리 → 0개 (메인 쿼리에 포함)
+
+#### 2단계: 파일 N+1 해결
+- **문제**: 각 게시글마다 `getAttachments()` 호출로 개별 쿼리 발생
+- **해결**: `getAttachmentsBatch()` 메서드로 게시글 ID 목록을 한 번에 조회
+- **효과**: 103개 쿼리 → 1개 (배치 조회, IN 절 사용)
+
+### 7.5 성능 개선 결과
+
+| 항목 | 최적화 전 | 최적화 후 | 개선율 |
+|------|----------|----------|--------|
+| **쿼리 수** | 207개 | 3개 | **98.5% 감소** |
+| **실행 시간** | 571ms | 79ms | **86% 감소** |
+| **메모리 사용** | 11MB | 4MB | **64% 감소** |
+
+### 7.6 기술 스택
+
+- **Backend**: Spring Boot 3.5.7, JPA/Hibernate
+- **Database**: MySQL
+- **최적화 기법**: 
+  - Fetch Join (LEFT JOIN FETCH)
+  - 배치 조회 (Batch Fetching with IN 절)
+  - DISTINCT를 활용한 중복 제거
+
 ---
 
 ## 8. 핵심 포인트 요약
