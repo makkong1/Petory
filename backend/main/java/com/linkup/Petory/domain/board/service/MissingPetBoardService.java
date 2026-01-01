@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -238,19 +239,14 @@ public class MissingPetBoardService {
                     dto.getImageUrl(), null);
         }
 
-        // 알림 발송: 댓글 작성자가 게시글 작성자가 아닌 경우에만 알림 발송
+        // 알림 발송: 댓글 작성자가 게시글 작성자가 아닌 경우에만 알림 발송 (비동기 처리)
         Long boardOwnerId = board.getUser().getIdx();
         if (!boardOwnerId.equals(user.getIdx())) {
-            notificationService.createNotification(
+            sendMissingPetCommentNotificationAsync(
                     boardOwnerId,
-                    NotificationType.MISSING_PET_COMMENT,
-                    "실종 제보 게시글에 새로운 댓글이 달렸습니다",
-                    String.format("%s님이 댓글을 남겼습니다: %s", user.getUsername(),
-                            dto.getContent() != null && dto.getContent().length() > 50
-                                    ? dto.getContent().substring(0, 50) + "..."
-                                    : dto.getContent()),
-                    board.getIdx(),
-                    "MISSING_PET");
+                    user.getUsername(),
+                    dto.getContent(),
+                    board.getIdx());
         }
 
         return mapCommentWithAttachments(saved);
@@ -313,6 +309,32 @@ public class MissingPetBoardService {
             return primary.getDownloadUrl();
         }
         return attachmentFileService.buildDownloadUrl(primary.getFilePath());
+    }
+
+    /**
+     * 실종제보 댓글 알림 발송 (비동기 처리)
+     * 알림 발송 실패 시에도 댓글 작성은 성공하도록 분리
+     */
+    @Async
+    public void sendMissingPetCommentNotificationAsync(Long boardOwnerId, String username, String content,
+            Long boardIdx) {
+        try {
+            String notificationContent = content != null && content.length() > 50
+                    ? content.substring(0, 50) + "..."
+                    : content;
+
+            notificationService.createNotification(
+                    boardOwnerId,
+                    NotificationType.MISSING_PET_COMMENT,
+                    "실종 제보 게시글에 새로운 댓글이 달렸습니다",
+                    String.format("%s님이 댓글을 남겼습니다: %s", username, notificationContent),
+                    boardIdx,
+                    "MISSING_PET");
+        } catch (Exception e) {
+            log.error("실종제보 댓글 알림 발송 실패: boardOwnerId={}, boardIdx={}, error={}",
+                    boardOwnerId, boardIdx, e.getMessage(), e);
+            // 알림 발송 실패는 로깅만 하고 예외를 던지지 않음 (댓글 작성과 분리)
+        }
     }
 
 }
