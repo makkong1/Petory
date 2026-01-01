@@ -859,33 +859,45 @@ const calculateMapLevelFromRadius = (radiusKm) => {
 ### 7.1 DB 최적화
 
 #### 인덱스 전략
-```sql
--- 지역 계층별 검색 인덱스
-CREATE INDEX idx_sido ON locationservice(sido);
-CREATE INDEX idx_sigungu ON locationservice(sigungu);
-CREATE INDEX idx_eupmyeondong ON locationservice(eupmyeondong);
-CREATE INDEX idx_road_name ON locationservice(road_name);
 
--- 복합 인덱스
-CREATE INDEX idx_region_hierarchy ON locationservice(sido, sigungu, eupmyeondong);
-CREATE INDEX idx_category3_pet ON locationservice(category3, pet_friendly);
+**locationservice 테이블**:
+```sql
+-- Full-Text 검색 (이름, 설명)
+CREATE FULLTEXT INDEX ft_name_desc ON locationservice(name, description);
+
+-- 주소별 조회
+CREATE INDEX idx_address ON locationservice(address);
+CREATE INDEX idx_address_detail ON locationservice(address);
+
+-- 카테고리 및 평점 조회
+CREATE INDEX idx_category_rating ON locationservice(rating);
+
+-- 위치 기반 검색 (위도, 경도)
+CREATE INDEX idx_lat_lng ON locationservice(latitude, longitude);
+
+-- 이름 및 주소 조회
+CREATE INDEX idx_name_address ON locationservice(name, address);
 
 -- 평점 정렬
-CREATE INDEX idx_rating ON locationservice(rating DESC);
+CREATE INDEX idx_rating_desc ON locationservice(rating);
+```
 
--- 위치 기반 검색 인덱스 (ST_Distance_Sphere 최적화)
-CREATE INDEX idx_latitude_longitude ON locationservice(latitude, longitude);
--- 또는 공간 인덱스 (MySQL 5.7.6+)
-ALTER TABLE locationservice ADD SPATIAL INDEX idx_location (POINT(longitude, latitude));
+**locationservicereview 테이블**:
+```sql
+-- 서비스별 리뷰 조회
+CREATE INDEX service_idx ON locationservicereview(service_idx);
+
+-- 사용자별 리뷰 조회
+CREATE INDEX user_idx ON locationservicereview(user_idx);
 ```
 
 **선정 이유**:
-- 자주 조회되는 지역 계층 컬럼 (sido, sigungu, eupmyeondong, roadName)
+- 자주 조회되는 지역 계층 컬럼 (address)
 - WHERE 절에서 자주 사용되는 조건
-- 평점 정렬을 위한 인덱스 (rating DESC)
-- 복합 인덱스로 조회 성능 향상
+- 평점 정렬을 위한 인덱스 (rating)
 - 위치 기반 검색을 위한 위도/경도 인덱스 (ST_Distance_Sphere 최적화)
-- 공간 인덱스 사용 시 반경 검색 성능 대폭 향상
+- Full-Text 검색으로 이름 및 설명 검색 성능 향상
+- JOIN에 사용되는 외래키 (service_idx, user_idx)
 
 ### 7.2 애플리케이션 레벨 최적화
 

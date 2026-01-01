@@ -319,16 +319,50 @@ erDiagram
 ### 5.1 DB 최적화
 
 #### 인덱스 전략
+
+**carerequest 테이블**:
 ```sql
--- 상태별 조회
-CREATE INDEX idx_care_request_status ON carerequest(status, is_deleted, date DESC);
+-- 외래키 (pet_idx)
+CREATE INDEX fk_carerequest_pet ON carerequest(pet_idx);
 
 -- 사용자별 조회
-CREATE INDEX idx_care_request_user ON carerequest(user_idx, is_deleted, created_at DESC);
-
--- 스케줄러 쿼리 최적화
-CREATE INDEX idx_care_request_date_status ON carerequest(date, status);
+CREATE INDEX user_idx ON carerequest(user_idx);
 ```
+
+**careapplication 테이블**:
+```sql
+-- 펫케어 요청별 지원 조회
+CREATE INDEX care_request_idx ON careapplication(care_request_idx);
+
+-- 제공자별 지원 조회
+CREATE INDEX provider_idx ON careapplication(provider_idx);
+```
+
+**carerequest_comment 테이블**:
+```sql
+-- 펫케어 요청별 댓글 조회
+CREATE INDEX fk_care_request_comment_request ON carerequest_comment(care_request_idx);
+
+-- 사용자별 댓글 조회
+CREATE INDEX fk_care_request_comment_user ON carerequest_comment(user_idx);
+```
+
+**carereview 테이블**:
+```sql
+-- 펫케어 지원별 리뷰 조회
+CREATE INDEX care_application_idx ON carereview(care_application_idx);
+
+-- 리뷰 대상별 리뷰 조회
+CREATE INDEX reviewee_idx ON carereview(reviewee_idx);
+
+-- 리뷰 작성자별 리뷰 조회
+CREATE INDEX reviewer_idx ON carereview(reviewer_idx);
+```
+
+**선정 이유**:
+- WHERE 절에서 자주 사용되는 조건
+- JOIN에 사용되는 외래키 (user_idx, care_request_idx, provider_idx 등)
+- 사용자별, 요청별 조회 최적화
 
 ### 5.2 애플리케이션 레벨 최적화
 

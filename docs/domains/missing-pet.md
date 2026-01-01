@@ -561,21 +561,35 @@ POST /api/missing-pets/1/start-chat?witnessId=2
 ### 7.1 DB 최적화
 
 #### 인덱스 전략
+
+**missing_pet_board 테이블**:
 ```sql
--- 상태별 조회
-CREATE INDEX idx_missing_pet_status ON MissingPetBoard(status, is_deleted, created_at DESC);
+-- 사용자별 게시글 조회
+CREATE INDEX idx_missing_pet_user ON missing_pet_board(user_idx, is_deleted, created_at);
 
 -- 위치 기반 검색
-CREATE INDEX idx_missing_pet_location ON MissingPetBoard(latitude, longitude);
+CREATE INDEX idx_missing_pet_location ON missing_pet_board(latitude, longitude);
 
--- 사용자별 게시글 조회
-CREATE INDEX idx_missing_pet_user ON MissingPetBoard(user_idx, is_deleted, created_at DESC);
+-- 상태별 조회
+CREATE INDEX idx_missing_pet_status ON missing_pet_board(status, is_deleted, created_at);
+
+-- 외래키 (user_idx)
+CREATE INDEX FKrid0u1qvm8e07etghggxnu1b1 ON missing_pet_board(user_idx);
+```
+
+**missing_pet_comment 테이블**:
+```sql
+-- 사용자별 댓글 조회
+CREATE INDEX FKe3sca61815j9cxi608oxmrfjt ON missing_pet_comment(user_idx);
+
+-- 게시글별 댓글 조회
+CREATE INDEX FKpodx5stuchr73mrjgffir72ii ON missing_pet_comment(board_idx);
 ```
 
 **선정 이유**:
 - 자주 조회되는 컬럼 조합 (status, is_deleted, created_at)
 - WHERE 절에서 자주 사용되는 조건
-- JOIN에 사용되는 외래키 (user_idx)
+- JOIN에 사용되는 외래키 (user_idx, board_idx)
 - 위치 기반 검색을 위한 인덱스 (latitude, longitude)
 
 ### 7.2 애플리케이션 레벨 최적화

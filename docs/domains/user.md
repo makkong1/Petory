@@ -737,30 +737,70 @@ void incrementWarningCount(@Param("userId") Long userId);
 ### 5.1 DB 최적화
 
 #### 인덱스 전략
+
+**users 테이블**:
 ```sql
--- 로그인용 ID 조회
-CREATE UNIQUE INDEX idx_users_id ON users(id);
+-- 이메일 조회 (Unique)
+CREATE UNIQUE INDEX email ON users(email);
 
--- 닉네임 조회
-CREATE UNIQUE INDEX idx_users_username ON users(username);
+-- 로그인용 ID 조회 (Unique)
+CREATE UNIQUE INDEX id ON users(id);
 
--- 닉네임 조회 (별도 필드)
-CREATE UNIQUE INDEX idx_users_nickname ON users(nickname);
+-- 닉네임 조회 (Unique)
+CREATE UNIQUE INDEX uk_users_nickname ON users(nickname);
 
--- 이메일 조회
-CREATE UNIQUE INDEX idx_users_email ON users(email);
+-- 사용자명 조회 (Unique)
+CREATE UNIQUE INDEX username ON users(username);
+```
 
--- 제재 상태 조회
-CREATE INDEX idx_users_status ON users(status, is_deleted);
+**socialuser 테이블**:
+```sql
+-- 사용자별 소셜 계정 조회
+CREATE INDEX users_idx ON socialuser(users_idx);
+```
 
--- Refresh Token 조회
-CREATE INDEX idx_users_refresh_token ON users(refresh_token);
+**user_sanctions 테이블**:
+```sql
+-- 관리자별 제재 조회
+CREATE INDEX admin_idx ON user_sanctions(admin_idx);
+
+-- 제재 종료일 조회 (만료된 제재 조회)
+CREATE INDEX idx_ends_at ON user_sanctions(ends_at);
+
+-- 사용자별 제재 조회
+CREATE INDEX idx_user_idx ON user_sanctions(user_idx);
+```
+
+**pets 테이블**:
+```sql
+-- 품종별 조회
+CREATE INDEX idx_pets_breed ON pets(breed);
+
+-- 삭제 여부 조회
+CREATE INDEX idx_pets_deleted ON pets(is_deleted);
+
+-- 반려동물 종류별 조회
+CREATE INDEX idx_pets_type ON pets(pet_type);
+
+-- 사용자별 반려동물 조회
+CREATE INDEX idx_pets_user ON pets(user_idx);
+```
+
+**pet_vaccinations 테이블**:
+```sql
+-- 삭제 여부 조회
+CREATE INDEX idx_pet_vaccine_deleted ON pet_vaccinations(is_deleted);
+
+-- 반려동물별 예방접종 조회
+CREATE INDEX idx_pet_vaccine_pet_idx ON pet_vaccinations(pet_idx);
 ```
 
 **선정 이유**:
-- 자주 조회되는 컬럼 (id, username, nickname, email)
+- 자주 조회되는 컬럼 (id, email, nickname, username)
 - UNIQUE 제약조건으로 중복 방지
-- 제재 상태 필터링 최적화
+- JOIN에 사용되는 외래키 (user_idx, users_idx)
+- 제재 만료일 조회 최적화 (idx_ends_at)
+- 반려동물 관련 조회 최적화
 
 #### 쿼리 최적화
 ```sql

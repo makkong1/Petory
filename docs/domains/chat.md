@@ -467,34 +467,65 @@ graph TD
 ### 6.1 DB 최적화
 
 #### 인덱스 전략
+
+**conversation 테이블**:
 ```sql
--- 채팅방 목록 조회 (사용자별)
-CREATE INDEX idx_participant_user_status ON conversationparticipant(user_idx, status, conversation_idx);
-
--- 메시지 조회 (채팅방별, 시간순)
-CREATE INDEX idx_message_conversation_created ON chatmessage(conversation_idx, created_at DESC, is_deleted);
-
--- 읽지 않은 메시지 수 조회
-CREATE INDEX idx_participant_conversation_user ON conversationparticipant(conversation_idx, user_idx, status);
-
--- 1:1 채팅방 조회
-CREATE INDEX idx_conversation_type_status ON conversation(conversation_type, status, is_deleted);
+-- 삭제 여부 조회
+CREATE INDEX idx_conversation_deleted ON conversation(is_deleted, deleted_at);
 
 -- 관련 엔티티 조회
-CREATE INDEX idx_conversation_related ON conversation(related_type, related_idx, is_deleted);
+CREATE INDEX idx_conversation_related ON conversation(related_type, related_idx);
+
+-- 타입 및 상태별 조회
+CREATE INDEX idx_conversation_type_status ON conversation(conversation_type, status, last_message_at);
+```
+
+**conversationparticipant 테이블**:
+```sql
+-- 채팅방별 참여자 조회
+CREATE INDEX idx_participant_conversation ON conversationparticipant(conversation_idx, status);
+
+-- 읽지 않은 메시지 수 조회
+CREATE INDEX idx_participant_unread ON conversationparticipant(user_idx, unread_count);
+
+-- 사용자별 참여 상태 조회
+CREATE INDEX idx_participant_user_status ON conversationparticipant(user_idx, status, unread_count);
+
+-- 마지막 읽은 메시지 조회
+CREATE INDEX last_read_message_idx ON conversationparticipant(last_read_message_idx);
+
+-- 채팅방-사용자 조합 (Unique 제약조건)
+CREATE UNIQUE INDEX uk_participant_conversation_user ON conversationparticipant(conversation_idx, user_idx);
+```
+
+**chatmessage 테이블**:
+```sql
+-- 내용 검색
+CREATE INDEX idx_chat_message_content ON chatmessage(content);
+
+-- 채팅방별 메시지 조회 (시간순)
+CREATE INDEX idx_chat_message_conversation_created ON chatmessage(conversation_idx, created_at);
+
+-- 삭제 여부 조회
+CREATE INDEX idx_chat_message_deleted ON chatmessage(is_deleted, deleted_at);
+
+-- 발신자별 메시지 조회
+CREATE INDEX idx_chat_message_sender ON chatmessage(sender_idx, created_at);
+
+-- 메시지 타입별 조회
+CREATE INDEX idx_chat_message_type ON chatmessage(message_type, created_at);
+
+-- 답장 메시지 조회
+CREATE INDEX reply_to_message_idx ON chatmessage(reply_to_message_idx);
 ```
 
 **선정 이유**:
 - 자주 조회되는 컬럼 조합 (user_idx, status, conversation_idx)
 - WHERE 절에서 자주 사용되는 조건
 - JOIN에 사용되는 외래키 (conversation_idx, user_idx)
-- 시간순 정렬을 위한 인덱스 (created_at DESC)
-
-**선정 이유**:
-- 자주 조회되는 컬럼 조합 (user_idx, status, conversation_idx)
-- WHERE 절에서 자주 사용되는 조건
-- JOIN에 사용되는 외래키 (conversation_idx, user_idx)
-- 시간순 정렬을 위한 인덱스 (created_at DESC)
+- 시간순 정렬을 위한 인덱스 (created_at)
+- 중복 방지를 위한 Unique 제약조건 (conversationparticipant)
+- 메시지 검색을 위한 인덱스 (content)
 
 ### 6.2 캐싱 전략
 

@@ -2,10 +2,10 @@
 
 ## 1. N+1 문제
 
-### 1.1 게시글 목록 조회 시 심각한 N+1 문제 (실제 발생 확인됨)
+### 1.1 게시글 목록 조회 시 심각한 N+1 문제 (실제 발생 확인됨) ✅ **해결됨**
 **위치**: `MissingPetBoardService.getBoards()`
 
-**문제점**: ✅ **실제 SQL 로그에서 확인됨**
+**문제점**: ✅ **실제 SQL 로그에서 확인됨** → ✅ **해결 완료**
 - 게시글 목록 조회 후 각 게시글마다 댓글과 파일을 개별 조회
 - `MissingPetConverter.toBoardDTO()`에서 `board.getComments()` 호출 시 지연 로딩 발생
 
@@ -55,36 +55,16 @@ public MissingPetBoardDTO toBoardDTO(MissingPetBoard board) {
 }
 ```
 
-**해결 방안**:
-1. **즉시 해결**: Repository에 댓글과 파일을 함께 조회하는 메서드 추가
-   ```java
-   @Query("SELECT DISTINCT b FROM MissingPetBoard b " +
-          "JOIN FETCH b.user u " +
-          "LEFT JOIN FETCH b.comments c " +
-          "WHERE b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' " +
-          "ORDER BY b.createdAt DESC")
-   List<MissingPetBoard> findAllWithCommentsByOrderByCreatedAtDesc();
-   ```
-   - 주의: `LEFT JOIN FETCH` 사용 시 페이징 불가능 (페이징 필요 시 별도 처리)
+**해결 완료**: ✅
+- **1단계: 댓글 N+1 해결** - Repository 쿼리에 `LEFT JOIN FETCH b.comments c` 및 `LEFT JOIN FETCH c.user cu` 추가
+- **2단계: 파일 N+1 해결** - `getAttachmentsBatch()` 메서드로 게시글 ID 목록을 한 번에 조회
+- **성능 개선 결과**: 207개 쿼리 → 3개 쿼리 (98.5% 감소), 571ms → 79ms (86% 감소)
+- 자세한 내용은 `docs/domains/missing-pet.md` 7.4, 7.5 섹션 참고
 
-2. **파일 조회 최적화**: 배치 조회로 변경
-   ```java
-   // 게시글 ID 목록으로 한 번에 파일 조회
-   List<Long> boardIds = boards.stream().map(MissingPetBoard::getIdx).collect(Collectors.toList());
-   Map<Long, List<FileDTO>> filesByBoardId = attachmentFileService.getAttachmentsBatch(
-       FileTargetType.MISSING_PET, boardIds);
-   ```
-
-3. **댓글 조회 최적화**: 배치 조회로 변경
-   ```java
-   Map<Long, List<MissingPetComment>> commentsByBoardId = commentRepository
-       .findByBoardInAndIsDeletedFalse(boards);
-   ```
-
-### 1.2 게시글 단건 조회 시 댓글 및 파일 N+1 문제 (실제 발생 확인됨)
+### 1.2 게시글 단건 조회 시 댓글 및 파일 N+1 문제 (실제 발생 확인됨) ✅ **해결됨**
 **위치**: `MissingPetBoardService.getBoard()`
 
-**문제점**: ✅ **실제 SQL 로그에서 확인됨**
+**문제점**: ✅ **실제 SQL 로그에서 확인됨** → ✅ **해결 완료**
 - `getBoard()`에서 `mapBoardWithAttachments()`를 호출하지만, 댓글과 파일은 별도 조회
 - `MissingPetConverter.toBoardDTO()`에서 `board.getComments()` 호출 시 지연 로딩 발생
 - `mapBoardWithAttachments()`에서 `attachmentFileService.getAttachments()` 개별 호출
@@ -128,19 +108,9 @@ public MissingPetBoardDTO getBoard(Long id) {
 }
 ```
 
-**해결 방안**:
-- Repository에 댓글과 파일을 함께 조회하는 메서드 추가
-  ```java
-  @Query("SELECT DISTINCT b FROM MissingPetBoard b " +
-         "JOIN FETCH b.user u " +
-         "LEFT JOIN FETCH b.comments c " +
-         "LEFT JOIN FETCH c.user cu " +
-         "WHERE b.idx = :id AND b.isDeleted = false " +
-         "AND u.isDeleted = false AND u.status = 'ACTIVE'")
-  Optional<MissingPetBoard> findByIdWithComments(@Param("id") Long id);
-  ```
-- 파일은 폴리모픽 관계이므로 JOIN FETCH 불가능 → 배치 조회는 단건이므로 불필요
-- 단건 조회이므로 성능 영향은 적지만, 일관성을 위해 개선 권장
+**해결 완료**: ✅
+- 게시글 목록 조회와 동일하게 JOIN FETCH 및 배치 조회 적용
+- 자세한 내용은 `docs/domains/missing-pet.md` 7.4, 7.5 섹션 참고
 
 ### 1.3 댓글 조회 시 게시글 정보 N+1 문제
 **위치**: `MissingPetCommentRepository.findByBoardAndIsDeletedFalseOrderByCreatedAtAsc()`
@@ -336,10 +306,10 @@ if (dto.getImageUrl() != null) {
 
 ## 6. 성능 문제
 
-### 6.1 게시글 목록 조회 시 파일 조회 N+1 (실제 발생 확인됨)
+### 6.1 게시글 목록 조회 시 파일 조회 N+1 (실제 발생 확인됨) ✅ **해결됨**
 **위치**: `MissingPetBoardService.getBoards()`
 
-**문제점**: ✅ **실제 SQL 로그에서 확인됨**
+**문제점**: ✅ **실제 SQL 로그에서 확인됨** → ✅ **해결 완료**
 ```java
 return boards.stream()
         .map(this::mapBoardWithAttachments)  // 각 게시글마다 파일 조회
@@ -349,31 +319,21 @@ return boards.stream()
 - 게시글 수만큼 추가 쿼리 발생
 - **실제 로그**: Line 859, 861, 863에서 각 게시글마다 파일 조회 쿼리 발생
 
-**해결 방안**:
-- 배치 조회로 최적화 (게시글 ID 목록으로 한 번에 파일 조회)
-  ```java
-  List<Long> boardIds = boards.stream()
-      .map(MissingPetBoard::getIdx)
-      .collect(Collectors.toList());
-  Map<Long, List<FileDTO>> filesByBoardId = attachmentFileService
-      .getAttachmentsBatch(FileTargetType.MISSING_PET, boardIds);
-  ```
-- 또는 `AttachmentFileService`에 배치 조회 메서드 추가 필요
+**해결 완료**: ✅
+- `getAttachmentsBatch()` 메서드로 게시글 ID 목록을 한 번에 조회하여 N+1 문제 해결
+- **효과**: 103개 쿼리 → 1개 쿼리 (배치 조회, IN 절 사용)
+- 자세한 내용은 `docs/domains/missing-pet.md` 7.4, 7.5 섹션 참고
 
-### 6.2 댓글 목록 조회 시 파일 조회 N+1
+### 6.2 댓글 목록 조회 시 파일 조회 N+1 ✅ **해결됨**
 **위치**: `MissingPetBoardService.getComments()`
 
-**문제점**:
-```java
-return comments.stream()
-        .map(this::mapCommentWithAttachments)  // 각 댓글마다 파일 조회
-        .collect(Collectors.toList());
-```
+**문제점**: ✅ **해결 완료**
 - 각 댓글마다 `attachmentFileService.getAttachments()` 호출
 - 댓글 수만큼 추가 쿼리 발생
 
-**해결 방안**:
-- 배치 조회로 최적화
+**해결 완료**: ✅
+- `mapCommentWithAttachments()`에서 배치 조회 방식으로 최적화
+- 자세한 내용은 `docs/domains/missing-pet.md` 7.4, 7.5 섹션 참고
 
 ### 6.3 위치 기반 검색 미구현
 **위치**: 문서에는 언급되어 있으나 구현 없음
@@ -731,13 +691,13 @@ public MissingPetBoardDTO getBoard(Long id) {
 3. **삭제된 게시글의 댓글 조회** (3.3) - 비즈니스 로직 오류
 
 ### 🟡 중간 우선순위 (개선 권장)
-4. **N+1 문제** (1.1, 1.2, 6.1, 6.2, 11) - 성능 이슈 ⚠️ **실제 발생 확인됨**
-   - 게시글 목록 조회 시 댓글 N+1 (1.1)
-   - 게시글 단건 조회 시 댓글/파일 N+1 (1.2)
-   - 게시글 목록 조회 시 파일 N+1 (6.1)
-   - 게시글 100개 조회 시 201번 쿼리 발생
-   - 게시글 단건 조회 시 3번 쿼리 발생
-   - **실제 SQL 로그 분석** (11) 참고
+4. **N+1 문제** (1.1, 1.2, 6.1, 6.2, 11) - 성능 이슈 ✅ **해결됨**
+   - 게시글 목록 조회 시 댓글 N+1 (1.1) ✅ **해결됨**
+   - 게시글 단건 조회 시 댓글/파일 N+1 (1.2) ✅ **해결됨**
+   - 게시글 목록 조회 시 파일 N+1 (6.1) ✅ **해결됨**
+   - 댓글 목록 조회 시 파일 N+1 (6.2) ✅ **해결됨**
+   - **성능 개선 결과**: 207개 쿼리 → 3개 쿼리 (98.5% 감소), 571ms → 79ms (86% 감소)
+   - 자세한 내용은 `docs/domains/missing-pet.md` 7.4, 7.5 섹션 참고
 5. **위치 정보 타입 불일치** (3.1) - 데이터 정합성
 6. **트랜잭션 및 동시성 문제** (2.1, 2.2, 2.3) - 데이터 일관성
 7. **예외 처리 개선** (5.1, 5.2) - 사용자 경험
