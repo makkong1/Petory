@@ -485,18 +485,32 @@ GET /api/meetups/nearby?lat=37.5665&lng=126.9780&radius=5.0
 ### 7.1 DB 최적화
 
 #### 인덱스 전략
+
+**meetup 테이블**:
 ```sql
--- 모임 상태별 조회
-CREATE INDEX idx_meetup_status_date ON meetup(status, date DESC);
+-- 날짜별 모임 조회
+CREATE INDEX idx_meetup_date ON meetup(date);
 
--- 주최자별 모임
-CREATE INDEX idx_meetup_organizer ON meetup(organizer_idx, created_at DESC);
-
--- 중복 참여 방지 (복합 키로 자동 생성되지만 명시적으로 추가 가능)
-CREATE UNIQUE INDEX uk_meetup_participants ON meetupparticipants(meetup_idx, user_idx);
+-- 날짜 및 상태별 모임 조회
+CREATE INDEX idx_meetup_date_status ON meetup(date, status);
 
 -- 위치 기반 검색
 CREATE INDEX idx_meetup_location ON meetup(latitude, longitude);
+
+-- 상태별 모임 조회
+CREATE INDEX idx_meetup_status ON meetup(status);
+
+-- 주최자별 모임 조회
+CREATE INDEX organizer_idx ON meetup(organizer_idx);
+```
+
+**meetupparticipants 테이블**:
+```sql
+-- 사용자별 참여 모임 조회
+CREATE INDEX user_idx ON meetupparticipants(user_idx);
+
+-- 복합 키 (Primary Key, 중복 참여 방지)
+-- PRIMARY KEY (meetup_idx, user_idx)
 ```
 
 **선정 이유**:
@@ -504,6 +518,7 @@ CREATE INDEX idx_meetup_location ON meetup(latitude, longitude);
 - WHERE 절에서 자주 사용되는 조건
 - JOIN에 사용되는 외래키 (organizer_idx)
 - 위치 기반 검색을 위한 인덱스 (latitude, longitude)
+- 복합 키로 중복 참여 방지
 
 ### 7.2 애플리케이션 레벨 최적화
 

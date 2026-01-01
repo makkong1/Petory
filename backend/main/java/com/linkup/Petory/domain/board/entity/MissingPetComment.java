@@ -1,5 +1,6 @@
 package com.linkup.Petory.domain.board.entity;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 import com.linkup.Petory.domain.user.entity.Users;
@@ -46,9 +47,11 @@ public class MissingPetComment {
 
     private String address; // 목격 위치 주소
 
-    private Double latitude; // 목격 위치 위도
+    @Column(precision = 15, scale = 12)
+    private BigDecimal latitude; // 목격 위치 위도
 
-    private Double longitude; // 목격 위치 경도
+    @Column(precision = 15, scale = 12)
+    private BigDecimal longitude; // 목격 위치 경도
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;

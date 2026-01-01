@@ -735,31 +735,85 @@ erDiagram
 ### 5.1 DB 최적화
 
 #### 인덱스 전략
+
+**board 테이블**:
 ```sql
 -- 카테고리별 조회
-CREATE INDEX idx_board_category_deleted ON board(category, is_deleted, created_at DESC);
+CREATE INDEX idx_board_category_deleted_created ON board(category, is_deleted, created_at);
 
--- 사용자별 게시글
-CREATE INDEX idx_board_user_deleted ON board(user_idx, is_deleted, created_at DESC);
+-- 전체 게시글 조회 (최신순)
+CREATE INDEX idx_board_created_at_desc ON board(created_at);
 
--- 검색 (Full-Text Search)
-CREATE FULLTEXT INDEX idx_board_search ON board(title, content);
+-- 삭제 여부 및 생성일 조회
+CREATE INDEX idx_board_deleted_created ON board(is_deleted, created_at);
 
--- 반응 조회
-CREATE INDEX idx_reaction_board_type ON board_reaction(board_idx, reaction_type);
+-- 상태별 조회
+CREATE INDEX idx_board_status ON board(status);
 
--- 조회 로그 (중복 방지)
-CREATE UNIQUE INDEX idx_view_log_board_user ON board_view_log(board_idx, user_idx);
+-- 검색 (제목, 내용)
+CREATE INDEX idx_board_title_content ON board(title, content);
 
--- 인기글 스냅샷 조회
-CREATE INDEX idx_snapshot_period ON board_popularity_snapshot(period_type, period_start_date, period_end_date, ranking);
+-- 사용자별 게시글 조회
+CREATE INDEX idx_board_user_deleted_created ON board(user_idx, is_deleted, created_at);
+```
+
+**board_popularity_snapshot 테이블**:
+```sql
+-- 게시글별 스냅샷 조회
+CREATE INDEX idx_snapshot_board_id ON board_popularity_snapshot(board_id);
+
+-- 기간별 스냅샷 조회
+CREATE INDEX idx_snapshot_range ON board_popularity_snapshot(period_type, period_start_date, period_end_date);
+
+-- 최근 스냅샷 조회
+CREATE INDEX idx_snapshot_recent ON board_popularity_snapshot(period_type, period_end_date, ranking);
+```
+
+**board_reaction 테이블**:
+```sql
+-- 사용자별 반응 조회
+CREATE INDEX FKag3ixpa53bjp1p5s79myoscpr ON board_reaction(user_idx);
+
+-- 게시글-사용자 조합 (Unique 제약조건)
+CREATE UNIQUE INDEX UKaymqx4hghgrqitkbplgp553u0 ON board_reaction(board_idx, user_idx);
+```
+
+**board_view_log 테이블**:
+```sql
+-- 사용자별 조회 로그
+CREATE INDEX FKemjj96yrflacv5mtek2nipy22 ON board_view_log(user_id);
+
+-- 게시글-사용자 조합 (Unique 제약조건, 중복 방지)
+CREATE UNIQUE INDEX uk_board_view_log_board_user ON board_view_log(board_id, user_id);
+```
+
+**comment 테이블**:
+```sql
+-- 게시글별 댓글 조회
+CREATE INDEX board_idx ON comment(board_idx);
+
+-- 상태별 댓글 조회
+CREATE INDEX idx_comment_status ON comment(status);
+
+-- 사용자별 댓글 조회
+CREATE INDEX user_idx ON comment(user_idx);
+```
+
+**comment_reaction 테이블**:
+```sql
+-- 사용자별 반응 조회
+CREATE INDEX FK24cjwe1ksjmeujkgoa6f2pya ON comment_reaction(user_idx);
+
+-- 댓글-사용자 조합 (Unique 제약조건)
+CREATE UNIQUE INDEX UKbes4ghhrkss5cdpx28ugh86gh ON comment_reaction(comment_idx, user_idx);
 ```
 
 **선정 이유**:
 - 자주 조회되는 컬럼 조합 (category, is_deleted, created_at)
 - WHERE 절에서 자주 사용되는 조건
 - JOIN에 사용되는 외래키 (user_idx, board_idx)
-- FULLTEXT 인덱스로 검색 성능 향상
+- 검색 성능 향상 (title, content)
+- 중복 방지를 위한 Unique 제약조건 (board_reaction, board_view_log, comment_reaction)
 
 #### 쿼리 최적화
 ```sql

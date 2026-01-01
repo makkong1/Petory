@@ -427,20 +427,17 @@ data: {"idx":1,"userId":1,"type":"BOARD_COMMENT","title":"게시글에 새로운
 ### 7.1 DB 최적화
 
 #### 인덱스 전략
+
+**notifications 테이블**:
 ```sql
 -- 사용자별 알림 조회
-CREATE INDEX idx_notification_user_created 
-ON notifications(user_idx, created_at DESC);
-
--- 읽지 않은 알림 조회
-CREATE INDEX idx_notification_user_unread 
-ON notifications(user_idx, is_read, created_at DESC);
+CREATE INDEX fk_notifications_user ON notifications(user_idx);
 ```
 
 **선정 이유**:
-- 자주 조회되는 컬럼 조합 (`user_idx`, `created_at`)
-- WHERE 절에서 자주 사용되는 조건 (`user_idx`, `is_read`)
-- 최신순 정렬을 위한 인덱스 (`created_at DESC`)
+- 자주 조회되는 컬럼 (user_idx)
+- WHERE 절에서 자주 사용되는 조건
+- JOIN에 사용되는 외래키 (user_idx)
 
 ### 7.2 애플리케이션 레벨 최적화
 

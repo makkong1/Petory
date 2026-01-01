@@ -112,8 +112,8 @@ class MissingPetBoardConcurrencyTest {
                     .user(testUser2)
                     .content("초기 댓글 " + i)
                     .address("테스트 주소 " + i)
-                    .latitude(37.5665 + i * 0.001)
-                    .longitude(126.9780 + i * 0.001)
+                    .latitude(new BigDecimal("37.5665").add(new BigDecimal(i).multiply(new BigDecimal("0.001"))))
+                    .longitude(new BigDecimal("126.9780").add(new BigDecimal(i).multiply(new BigDecimal("0.001"))))
                     .isDeleted(false)
                     .build();
             commentRepository.save(comment);
@@ -155,8 +155,8 @@ class MissingPetBoardConcurrencyTest {
                 .user(testUser2)
                 .content("동시에 추가된 댓글")
                 .address("동시 추가 주소")
-                .latitude(37.5670)
-                .longitude(126.9790)
+                .latitude(new BigDecimal("37.5670"))
+                .longitude(new BigDecimal("126.9790"))
                 .isDeleted(false)
                 .build();
         commentRepository.saveAndFlush(newComment);

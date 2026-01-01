@@ -482,25 +482,24 @@ Content-Type: application/json
 ### 7.1 DB 최적화
 
 #### 인덱스 전략
+
+**report 테이블**:
 ```sql
--- 신고 상태별 조회
-CREATE INDEX idx_report_status_created 
-ON report(status, created_at DESC);
+-- 처리자별 신고 조회
+CREATE INDEX handled_by ON report(handled_by);
 
--- 신고 대상별 조회
-CREATE INDEX idx_report_target 
-ON report(target_type, target_idx);
+-- 신고자별 신고 조회
+CREATE INDEX reporter_idx ON report(reporter_idx);
 
--- Unique 제약조건 (중복 신고 방지)
--- 이미 @Table의 uniqueConstraints로 정의됨
--- (target_type, target_idx, reporter_idx)
+-- 신고 대상별 조회 (Unique 제약조건, 중복 신고 방지)
+CREATE UNIQUE INDEX target_type ON report(target_type, target_idx, reporter_idx);
 ```
 
 **선정 이유**:
-- 자주 조회되는 컬럼 조합 (`status`, `created_at`)
-- WHERE 절에서 자주 사용되는 조건 (`target_type`, `target_idx`)
-- 최신순 정렬을 위한 인덱스 (`created_at DESC`)
-- 중복 신고 방지를 위한 Unique 제약조건
+- 자주 조회되는 컬럼 (reporter_idx, handled_by)
+- WHERE 절에서 자주 사용되는 조건 (target_type, target_idx)
+- JOIN에 사용되는 외래키 (reporter_idx, handled_by)
+- 중복 신고 방지를 위한 Unique 제약조건 (target_type, target_idx, reporter_idx)
 
 ### 7.2 애플리케이션 레벨 최적화
 
