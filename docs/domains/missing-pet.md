@@ -6,11 +6,11 @@ Missing Pet 도메인은 실종 동물 신고 및 관리 시스템으로, 반려
 
 **주요 기능**:
 - 실종 동물 신고 생성/조회/수정/삭제
-- 위치 기반 검색 (반경 내)
+- 위치 정보 저장 (위도, 경도, 주소) - 현재 검색 기능 미구현
 - 실종 동물 상태 관리 (MISSING → FOUND → RESOLVED)
 - 목격 정보 댓글 (위치 정보 포함)
-- 파일 첨부 (이미지)
-- 알림 발송 (댓글 작성 시)
+- 파일 첨부 (이미지 - 첫 번째 파일만 저장)
+- 알림 발송 (댓글 작성 시, 비동기 처리)
 - 실종제보 채팅 연동
 
 ---
@@ -47,12 +47,13 @@ Missing Pet 도메인은 실종 동물 신고 및 관리 시스템으로, 반려
 - **FOUND**: 발견됨
 - **RESOLVED**: 해결됨
 
-### 2.4 위치 기반 검색
+### 2.4 위치 정보 저장
+**참고**: 현재 위치 기반 검색 기능은 구현되어 있지 않습니다. 위도/경도 정보는 저장만 되며, 향후 반경 기반 검색 기능 구현 예정입니다.
 
-**반경 기반 검색**:
-- 내 위치 기준 반경 내 실종 동물 검색
-- 위도/경도 기반 거리 계산
-- 상태별 필터링 지원
+**현재 구현**:
+- 실종 위치 정보 저장 (위도, 경도, 주소)
+- 목격 위치 정보 저장 (위도, 경도, 주소)
+- 위치 정보는 데이터 저장 용도로만 사용
 
 ---
 
@@ -121,6 +122,25 @@ public MissingPetBoardDTO createBoard(MissingPetBoardDTO dto) {
 - **이메일 인증 확인**: 수정 시 이메일 인증 필요
 - **선택적 업데이트**: DTO에 값이 있는 필드만 업데이트
 - **파일 첨부**: `imageUrl`이 있으면 파일 동기화
+- **위치 정보 업데이트**: 위도, 경도, 주소 정보 업데이트 지원
+
+#### 로직 2-1: 상태 변경
+**구현 위치**: `MissingPetBoardService.updateStatus()`
+
+```java
+@Transactional
+public MissingPetBoardDTO updateStatus(Long id, MissingPetStatus status) {
+    MissingPetBoard board = boardRepository.findById(id)
+            .orElseThrow(() -> new IllegalArgumentException("Missing pet board not found"));
+    board.setStatus(status);
+    return mapBoardWithAttachments(board);
+}
+```
+
+**핵심 로직**:
+- **상태 변경**: MISSING → FOUND → RESOLVED 상태 전환
+- **API 형식**: RequestBody로 `{"status": "MISSING"}` 형태로 받음
+- **권한 체크**: 현재 권한 체크 없음 (모든 인증된 사용자 가능)
 
 #### 로직 3: 실종 제보 삭제 (Soft Delete)
 **구현 위치**: `MissingPetBoardService.deleteBoard()`
@@ -214,9 +234,43 @@ public MissingPetCommentDTO addComment(Long boardId, MissingPetCommentDTO dto) {
 
 **핵심 로직**:
 - **댓글 생성**: 목격 정보 포함 (내용, 주소, 위도, 경도)
-- **파일 첨부**: `syncSingleAttachment()`로 이미지 첨부 지원 (`FileTargetType.MISSING_PET_COMMENT`)
+- **파일 첨부**: `syncSingleAttachment()`로 이미지 첨부 지원 (`FileTargetType.MISSING_PET_COMMENT`) - 첫 번째 파일만 저장
 - **알림 발송**: 댓글 작성자가 게시글 작성자가 아닌 경우에만 알림 발송 (`NotificationType.MISSING_PET_COMMENT`)
+- **알림 처리**: 비동기 처리 (`@Async`) - 알림 발송 실패해도 댓글 작성은 성공
 - **알림 내용**: 댓글 내용 미리보기 (50자 제한)
+- **댓글 추가**: 댓글 저장 후 `board.getComments().add(saved)` 호출
+
+```java
+// MissingPetBoardService.java
+@Async
+public void sendMissingPetCommentNotificationAsync(Long boardOwnerId, String username, String content, Long boardIdx) {
+    try {
+        String notificationContent = content != null && content.length() > 50
+                ? content.substring(0, 50) + "..."
+                : content;
+        
+        notificationService.createNotification(
+                boardOwnerId,
+                NotificationType.MISSING_PET_COMMENT,
+                "실종 제보 게시글에 새로운 댓글이 달렸습니다",
+                String.format("%s님이 댓글을 남겼습니다: %s", username, notificationContent),
+                boardIdx,
+                "MISSING_PET");
+    } catch (Exception e) {
+        log.error("실종제보 댓글 알림 발송 실패: boardOwnerId={}, boardIdx={}, error={}",
+                boardOwnerId, boardIdx, e.getMessage(), e);
+        // 알림 발송 실패는 로깅만 하고 예외를 던지지 않음 (댓글 작성과 분리)
+    }
+}
+```
+
+**설명**:
+- **처리 흐름**: 댓글 저장 → 작성자 확인 → 비동기 알림 발송 → 댓글 반환
+- **주요 판단 기준**: 댓글 작성자가 요청자가 아닌 경우에만 알림 발송
+- **특징**: 
+  - 비동기 처리로 댓글 작성 응답 시간 단축
+  - 알림 발송 실패해도 댓글 작성은 성공 (예외 처리)
+  - 파일 첨부는 첫 번째 파일만 저장
 
 #### 로직 5: 파일 첨부 매핑
 **구현 위치**: `MissingPetBoardService.mapBoardWithAttachments()`, `mapCommentWithAttachments()`
@@ -234,12 +288,13 @@ public MissingPetCommentDTO addComment(Long boardId, MissingPetCommentDTO dto) {
 | `getBoards()` | 실종 제보 목록 조회 | 상태별 필터링, 첨부 파일 포함 |
 | `getBoard()` | 특정 실종 제보 조회 | 사용자 정보 포함, 삭제 확인, 첨부 파일 포함 |
 | `createBoard()` | 실종 제보 생성 | 이메일 인증 확인, 파일 첨부 처리 |
-| `updateBoard()` | 실종 제보 수정 | 이메일 인증 확인, 선택적 업데이트, 파일 첨부 처리 |
-| `updateStatus()` | 상태 변경 | MISSING → FOUND → RESOLVED |
+| `updateBoard()` | 실종 제보 수정 | 이메일 인증 확인, 선택적 업데이트, 파일 첨부 처리, 위치 정보 업데이트 |
+| `updateStatus()` | 상태 변경 | MISSING → FOUND → RESOLVED (RequestBody로 status 받음) |
 | `deleteBoard()` | 실종 제보 삭제 | 이메일 인증 확인, Soft Delete, 관련 댓글 삭제 |
 | `getComments()` | 댓글 목록 조회 | 삭제되지 않은 댓글만, 작성자 활성 상태 확인, 첨부 파일 포함 |
-| `addComment()` | 댓글 작성 | 파일 첨부 처리, 알림 발송 |
+| `addComment()` | 댓글 작성 | 파일 첨부 처리 (첫 번째 파일만), 알림 발송 (비동기), 댓글 목록에 추가 |
 | `deleteComment()` | 댓글 삭제 | Soft Delete |
+| `sendMissingPetCommentNotificationAsync()` | 알림 발송 (비동기) | `@Async` 사용, 알림 발송 실패해도 댓글 작성은 성공 |
 
 ### 3.3 트랜잭션 처리
 - **트랜잭션 범위**: 
@@ -314,7 +369,7 @@ public class MissingPetBoard {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
     
-    @OneToMany(mappedBy = "board", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "board", cascade = CascadeType.ALL)
     @Builder.Default
     private List<MissingPetComment> comments = new ArrayList<>(); // 댓글 목록
     
@@ -346,6 +401,7 @@ public class MissingPetBoard {
 - `BaseTimeEntity`를 상속하지 않음 (`@PrePersist`, `@PreUpdate`로 직접 관리)
 - 위치 정보: `BigDecimal` 타입으로 정밀도 보장 (precision = 15, scale = 12)
 - Soft Delete: `isDeleted`, `deletedAt` 필드로 Soft Delete 지원
+- `orphanRemoval` 속성 없음 (cascade만 사용)
 
 #### MissingPetComment (실종 동물 댓글)
 ```java
@@ -392,7 +448,7 @@ public class MissingPetComment {
 
 **특징**:
 - `BaseTimeEntity`를 상속하지 않음 (`@PrePersist`로 직접 `createdAt` 관리)
-- 목격 위치 정보: 주소, 위도, 경도 포함
+- 목격 위치 정보: 주소, 위도, 경도 포함 (`BigDecimal` 타입, precision = 15, scale = 12)
 - Soft Delete: `isDeleted`, `deletedAt` 필드로 Soft Delete 지원
 
 #### MissingPetStatus (실종 동물 상태)
@@ -455,11 +511,11 @@ erDiagram
 | `/api/missing-pets/{id}` | GET | 특정 실종 제보 조회 |
 | `/api/missing-pets` | POST | 실종 제보 생성 (인증 필요) |
 | `/api/missing-pets/{id}` | PUT | 실종 제보 수정 (인증 필요) |
-| `/api/missing-pets/{id}/status` | PATCH | 상태 변경 (status 파라미터) |
-| `/api/missing-pets/{id}` | DELETE | 실종 제보 삭제 (인증 필요) |
+| `/api/missing-pets/{id}/status` | PATCH | 상태 변경 (RequestBody: `{"status": "MISSING"}`) |
+| `/api/missing-pets/{id}` | DELETE | 실종 제보 삭제 (인증 필요, 응답: `{"success": true}`) |
 | `/api/missing-pets/{id}/comments` | GET | 댓글 목록 조회 |
-| `/api/missing-pets/{id}/comments` | POST | 댓글 작성 (인증 필요) |
-| `/api/missing-pets/{boardId}/comments/{commentId}` | DELETE | 댓글 삭제 (인증 필요) |
+| `/api/missing-pets/{id}/comments` | POST | 댓글 작성 (인증 필요, 파일 첨부 지원 - 첫 번째 파일만 저장) |
+| `/api/missing-pets/{boardId}/comments/{commentId}` | DELETE | 댓글 삭제 (인증 필요, 응답: `{"success": true}`) |
 | `/api/missing-pets/{boardIdx}/start-chat` | POST | 실종제보 채팅 시작 (인증 필요, witnessId 파라미터) |
 
 **실종 제보 생성 요청 예시**:
@@ -530,9 +586,26 @@ Content-Type: application/json
 }
 ```
 
+**상태 변경 요청 예시**:
+```http
+PATCH /api/missing-pets/1/status
+Content-Type: application/json
+
+{
+  "status": "FOUND"
+}
+```
+
 **실종제보 채팅 시작 요청 예시**:
 ```http
 POST /api/missing-pets/1/start-chat?witnessId=2
+```
+
+**삭제 응답 예시**:
+```json
+{
+  "success": true
+}
 ```
 
 ---
@@ -553,6 +626,11 @@ POST /api/missing-pets/1/start-chat?witnessId=2
 ---
 
 ## 6. 트러블슈팅
+
+### 6.1 위치 기반 검색 미구현
+**현재 상태**: 위치 기반 검색 기능은 현재 구현되어 있지 않습니다.
+**저장된 데이터**: 위도/경도 정보는 저장만 되며, 반경 기반 검색 쿼리는 존재하지 않습니다.
+**향후 구현 예정**: 하버사인 공식 또는 MySQL의 공간 인덱스(GIS)를 활용한 반경 기반 검색 기능 구현 예정
 
 ---
 
@@ -652,10 +730,11 @@ List<MissingPetBoard> findAllByOrderByCreatedAtDesc();
 - **상태 관리**: MISSING → FOUND → RESOLVED 상태 전환
 
 ### 8.2 목격 정보 댓글
-- **위치 정보 포함**: 목격 위치 주소, 위도, 경도 포함
-- **파일 첨부**: 이미지 첨부 지원 (`FileTargetType.MISSING_PET_COMMENT`)
-- **알림 발송**: 댓글 작성 시 게시글 작성자에게 알림 발송 (댓글 작성자가 게시글 작성자가 아닌 경우)
+- **위치 정보 포함**: 목격 위치 주소, 위도, 경도 포함 (`BigDecimal` 타입)
+- **파일 첨부**: 이미지 첨부 지원 (`FileTargetType.MISSING_PET_COMMENT`) - 첫 번째 파일만 저장
+- **알림 발송**: 댓글 작성 시 게시글 작성자에게 알림 발송 (댓글 작성자가 게시글 작성자가 아닌 경우, 비동기 처리)
 - **Soft Delete**: 댓글 삭제 시 Soft Delete 적용
+- **댓글 추가**: 댓글 저장 후 `board.getComments().add(saved)` 호출
 
 ### 8.3 실종제보 채팅 연동
 - **채팅 시작**: "목격했어요" 버튼 클릭 시 실종제보 채팅방 생성
@@ -664,7 +743,9 @@ List<MissingPetBoard> findAllByOrderByCreatedAtDesc();
 ### 8.4 성능 최적화
 - **N+1 문제 해결**: `JOIN FETCH`로 사용자 정보를 함께 조회
 - **활성 사용자 필터링**: 삭제되지 않고 활성 상태인 사용자만 조회
+- **파일 배치 조회**: `getAttachmentsBatch()`로 게시글 목록의 파일을 한 번에 조회 (N+1 문제 해결)
 - **인덱스 전략**: 상태별, 위치별, 사용자별 인덱스로 조회 성능 향상
+- **비동기 알림**: `@Async`로 알림 발송을 비동기 처리하여 댓글 작성 응답 시간 단축
 
 ### 8.5 엔티티 설계 특징
 - **BaseTimeEntity 미사용**: `@PrePersist`, `@PreUpdate`로 직접 시간 관리

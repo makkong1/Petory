@@ -69,6 +69,45 @@
   - 인증 완료 후: 모든 서비스 이용 가능
 - **스크린샷/영상**: 
 
+#### 주요 기능 5: 비밀번호 찾기 및 변경
+- **설명**: 사용자가 비밀번호를 잊어버린 경우 이메일을 통해 비밀번호 재설정 링크를 받아 새 비밀번호를 설정할 수 있습니다. 또한 로그인한 사용자는 현재 비밀번호를 확인하여 새 비밀번호로 변경할 수 있습니다.
+- **사용자 시나리오**:
+  1. **비밀번호 찾기**:
+     - 비밀번호 찾기 페이지에서 이메일 입력
+     - 이메일로 비밀번호 재설정 링크 발송
+     - 링크 클릭 시 새 비밀번호 설정 페이지로 이동
+     - 새 비밀번호 입력 및 저장
+  2. **비밀번호 변경** (로그인 상태):
+     - 현재 비밀번호 확인
+     - 이메일 인증 완료 여부 확인 (필수)
+     - 새 비밀번호 입력 및 저장
+- **스크린샷/영상**: 
+
+#### 주요 기능 6: 사용자 프로필 조회 및 리뷰
+- **설명**: 사용자는 자신의 프로필을 조회할 수 있으며, 다른 사용자의 프로필도 조회할 수 있습니다. 프로필에는 펫케어 서비스에서 받은 리뷰와 평점이 포함됩니다.
+- **사용자 시나리오**:
+  1. **내 프로필 조회**: 
+     - 자신의 프로필 정보 (닉네임, 이메일, 전화번호, 위치 등)
+     - 등록한 반려동물 목록
+     - 받은 리뷰 목록 및 평균 평점
+  2. **다른 사용자 프로필 조회**:
+     - 특정 사용자의 프로필 정보 조회
+     - 해당 사용자가 받은 리뷰 목록 및 평균 평점
+     - 펫케어 서비스 이용 시 상대방 신뢰도 확인 용도
+  3. **리뷰 목록 조회**:
+     - 특정 사용자의 리뷰만 별도로 조회 가능
+- **스크린샷/영상**: 
+
+#### 주요 기능 7: 회원가입 전 이메일 인증 확인
+- **설명**: 회원가입 전에 이메일 인증을 완료한 경우, 회원가입 시 인증 상태를 확인하여 자동으로 인증 완료 상태로 설정합니다.
+- **사용자 시나리오**:
+  1. 회원가입 전 이메일 인증 메일 발송
+  2. 이메일 링크 클릭하여 인증 완료 (Redis에 24시간 저장)
+  3. 회원가입 시 인증 완료 여부 확인 API 호출
+  4. 인증 완료된 경우 회원가입 후 자동으로 `emailVerified = true` 설정
+  5. 인증 안 된 경우 회원가입 후 별도 인증 메일 발송
+- **스크린샷/영상**: 
+
 ---
 
 ## 2. 서비스 로직 설명
@@ -646,18 +685,24 @@ erDiagram
 | `/oauth2/authorization/google` | GET | Google 소셜 로그인 시작 | - → 리다이렉트 |
 | `/oauth2/authorization/naver` | GET | Naver 소셜 로그인 시작 | - → 리다이렉트 |
 | `/oauth2/callback` | GET | 소셜 로그인 콜백 | - → 리다이렉트 (토큰 포함) |
-| `/api/users/profile` | GET | 내 프로필 조회 | - → `UsersDTO` |
-| `/api/users/profile` | PUT | 프로필 수정 | `UsersDTO` → `UsersDTO` |
-| `/api/users/nickname` | POST | 닉네임 설정 | `nickname` → `UsersDTO` |
+| `/api/users/me` | GET | 내 프로필 조회 (리뷰 포함) | - → `UserProfileWithReviewsDTO` |
+| `/api/users/me` | PUT | 프로필 수정 | `UsersDTO` → `UsersDTO` |
+| `/api/users/me/password` | PATCH | 비밀번호 변경 | `{currentPassword, newPassword}` → `{message: string}` |
+| `/api/users/me/username` | PATCH | 닉네임 변경 | `{username}` → `UsersDTO` |
+| `/api/users/me/nickname` | POST | 닉네임 설정 (소셜 로그인 사용자용) | `{nickname}` → `UsersDTO` |
+| `/api/users/{userId}/profile` | GET | 다른 사용자 프로필 조회 (리뷰 포함) | - → `UserProfileWithReviewsDTO` |
+| `/api/users/{userId}/reviews` | GET | 특정 사용자의 리뷰 목록 조회 | - → `List<CareReviewDTO>` |
 | `/api/users/pets` | GET | 내 반려동물 목록 | - → `List<PetDTO>` |
 | `/api/users/pets` | POST | 반려동물 등록 | `PetDTO` → `PetDTO` |
 | `/api/users/pets/{petIdx}` | PUT | 반려동물 수정 | `PetDTO` → `PetDTO` |
 | `/api/users/pets/{petIdx}` | DELETE | 반려동물 삭제 | - → `204 No Content` |
 | `/api/users/id/check` | GET | 아이디 중복 검사 | `id` → `{available: boolean}` |
 | `/api/users/nickname/check` | GET | 닉네임 중복 검사 | `nickname` → `{available: boolean}` |
-| `/api/users/email/verify` | POST | 이메일 인증 메일 발송 | `purpose` → `204 No Content` |
-| `/api/users/email/verify/pre-registration` | POST | 회원가입 전 이메일 인증 메일 발송 | `email` → `204 No Content` |
-| `/api/users/email/verify/{token}` | GET | 이메일 인증 처리 | - → 리다이렉트 |
+| `/api/users/email/verify` | POST | 이메일 인증 메일 발송 | `{purpose}` → `{success: boolean, message: string}` |
+| `/api/users/email/verify/pre-registration` | POST | 회원가입 전 이메일 인증 메일 발송 | `{email}` → `{success: boolean, message: string}` |
+| `/api/users/email/verify/pre-registration/check` | GET | 회원가입 전 이메일 인증 완료 여부 확인 | `email` → `{verified: boolean, message: string}` |
+| `/api/users/email/verify/{token}` | GET | 이메일 인증 처리 | - → `{success: boolean, purpose: string, redirectUrl: string}` |
+| `/api/auth/forgot-password` | POST | 비밀번호 찾기 (비밀번호 재설정 이메일 발송) | `{email}` → `{success: boolean, message: string}` |
 | `/api/admin/users` | GET | 사용자 목록 (관리자) | `page`, `size` → `UserPageResponseDTO` |
 | `/api/admin/users/{id}/warn` | POST | 경고 부여 | `reason` → `UserSanction` |
 | `/api/admin/users/{id}/suspend` | POST | 이용제한 부여 | `days`, `reason` → `UserSanction` |

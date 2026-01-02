@@ -17,12 +17,17 @@
 > **스크린샷/영상 링크**: [기능 작동 영상 또는 스크린샷 추가]
 
 #### 주요 기능 1: 펫케어 요청 및 지원
-- **설명**: 사용자가 펫케어 요청을 생성하고, 다른 사용자들이 지원할 수 있습니다.
+- **설명**: 사용자가 펫케어 요청을 생성하고, 다른 사용자들이 지원할 수 있습니다. 요청 수정/삭제는 작성자만 가능하며, 관리자는 모든 요청을 수정/삭제할 수 있습니다.
 - **사용자 시나리오**: 
-  1. 펫케어 요청 생성 (제목, 설명, 날짜, 펫 정보)
+  1. 펫케어 요청 생성 (제목, 설명, 날짜, 펫 정보) - 이메일 인증 필요
   2. 여러 사용자가 지원
   3. 요청자가 1명만 승인
   4. 승인 시 상태 변경 (OPEN → IN_PROGRESS)
+  5. 요청 수정 시 펫 정보 연결/해제 가능 (petIdx를 null로 전달하면 펫 연결 해제)
+  6. 상태 변경은 작성자 또는 승인된 제공자만 가능 (서비스 완료 처리 등)
+- **권한 제어**:
+  - 요청 수정/삭제: 작성자만 가능 (관리자 우회)
+  - 상태 변경: 작성자 또는 승인된 제공자만 가능 (관리자 우회)
 - **스크린샷/영상**: 
 
 #### 주요 기능 1-1: 채팅 후 거래 확정 및 완료
@@ -50,12 +55,27 @@
 - **스크린샷/영상**:
 
 #### 주요 기능 3: 펫케어 요청 댓글
-- **설명**: `SERVICE_PROVIDER` 역할의 사용자만 펫케어 요청에 댓글을 작성할 수 있습니다.
+- **설명**: `SERVICE_PROVIDER` 역할의 사용자만 펫케어 요청에 댓글을 작성할 수 있습니다. 댓글 작성 시 요청자에게 알림이 발송되며, 파일 첨부가 가능합니다.
 - **사용자 시나리오**:
   1. `SERVICE_PROVIDER` 역할 사용자가 펫케어 요청 확인
-  2. 댓글 작성 (파일 첨부 가능)
-  3. 댓글 작성 시 요청자에게 알림 발송
+  2. 댓글 작성 (파일 첨부 가능 - 첫 번째 파일만 저장됨)
+  3. 댓글 작성 시 요청자에게 알림 발송 (단, 작성자가 요청자가 아닌 경우에만)
   4. 댓글 삭제 시 Soft Delete 적용
+- **제한사항**:
+  - 파일 첨부는 첫 번째 파일만 저장됨 (`syncSingleAttachment`는 단일 파일만 지원)
+  - 자신의 요청에 자신이 댓글을 달면 알림 발송 안 함
+- **스크린샷/영상**: 
+
+#### 주요 기능 4: 펫케어 요청 검색
+- **설명**: 제목과 내용 모두에서 키워드를 검색할 수 있습니다. 대소문자 구분 없이 검색되며, 삭제되지 않은 요청만 검색 결과에 포함됩니다.
+- **사용자 시나리오**:
+  1. 검색어 입력
+  2. 제목 또는 내용에 키워드가 포함된 요청 검색
+  3. 검색 결과는 삭제되지 않은 요청만 표시
+- **검색 특징**:
+  - 제목과 내용 모두에서 검색 (`findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCaseAndIsDeletedFalse`)
+  - 대소문자 구분 없음 (`IgnoreCase`)
+  - 삭제되지 않은 요청만 검색
 - **스크린샷/영상**: 
 
 ---
@@ -101,6 +121,133 @@
 - **처리 흐름**: 만료된 요청 조회 → 상태 변경 → 저장
 - **주요 판단 기준**: 날짜가 지났고 OPEN 또는 IN_PROGRESS 상태
 
+#### 로직 3: 요청 수정/삭제 권한 체크
+```java
+// CareRequestService.java
+@Transactional
+public CareRequestDTO updateCareRequest(Long idx, CareRequestDTO dto, Long currentUserId) {
+    CareRequest request = careRequestRepository.findById(idx).orElseThrow();
+    
+    // 작성자 확인 (관리자는 우회)
+    if (!isAdmin() && !request.getUser().getIdx().equals(currentUserId)) {
+        throw new RuntimeException("본인의 케어 요청만 수정할 수 있습니다.");
+    }
+    
+    // 펫 정보 업데이트 (연결 해제도 가능)
+    if (dto.getPetIdx() != null) {
+        Pet pet = petRepository.findById(dto.getPetIdx()).orElseThrow();
+        // 펫 소유자 확인
+        if (!pet.getUser().getIdx().equals(request.getUser().getIdx())) {
+            throw new RuntimeException("펫 소유자만 펫 정보를 연결할 수 있습니다.");
+        }
+        request.setPet(pet);
+    } else if (dto.getPetIdx() == null && request.getPet() != null) {
+        // petIdx가 null로 전달되면 펫 연결 해제
+        request.setPet(null);
+    }
+}
+```
+
+**설명**:
+- **처리 흐름**: 요청 조회 → 작성자 확인 (관리자 우회) → 필드 업데이트 → 펫 정보 처리
+- **주요 판단 기준**: 
+  - 작성자만 수정 가능 (관리자는 우회)
+  - 펫 소유자 확인 (펫 연결 시)
+  - 펫 연결 해제 지원 (petIdx가 null인 경우)
+- **특징**: 
+  - 관리자는 모든 요청 수정 가능
+  - 펫 연결 해제 기능 제공
+
+#### 로직 4: 상태 변경 권한 체크
+```java
+// CareRequestService.java
+@Transactional
+public CareRequestDTO updateStatus(Long idx, String status, Long currentUserId) {
+    CareRequest request = careRequestRepository.findByIdWithApplications(idx).orElseThrow();
+    
+    // 관리자는 권한 검증 우회
+    if (!isAdmin()) {
+        // 작성자 또는 승인된 제공자만 상태 변경 가능
+        boolean isRequester = request.getUser().getIdx().equals(currentUserId);
+        boolean isAcceptedProvider = request.getApplications() != null &&
+                request.getApplications().stream()
+                        .anyMatch(app -> app.getStatus() == CareApplicationStatus.ACCEPTED
+                                && app.getProvider().getIdx().equals(currentUserId));
+        
+        if (!isRequester && !isAcceptedProvider) {
+            throw new RuntimeException("작성자 또는 승인된 제공자만 상태를 변경할 수 있습니다.");
+        }
+    }
+    
+    request.setStatus(CareRequestStatus.valueOf(status));
+    return careRequestConverter.toDTO(careRequestRepository.save(request));
+}
+```
+
+**설명**:
+- **처리 흐름**: 요청 조회 (지원 목록 포함) → 권한 확인 (관리자 우회) → 상태 변경
+- **주요 판단 기준**: 
+  - 작성자 또는 승인된 제공자만 상태 변경 가능
+  - 관리자는 모든 요청의 상태 변경 가능
+- **특징**: 
+  - 승인된 제공자도 상태 변경 가능 (서비스 완료 처리 등)
+  - 관리자 권한 우회
+
+#### 로직 5: 요청 검색 (제목과 내용 모두 검색)
+```java
+// CareRequestService.java
+@Transactional(readOnly = true)
+public List<CareRequestDTO> searchCareRequests(String keyword) {
+    if (keyword == null || keyword.trim().isEmpty()) {
+        return getAllCareRequests(null, null);
+    }
+    
+    List<CareRequest> requests = careRequestRepository
+            .findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCaseAndIsDeletedFalse(
+                    keyword.trim(), keyword.trim());
+    
+    return careRequestConverter.toDTOList(requests);
+}
+```
+
+**설명**:
+- **처리 흐름**: 키워드 검증 → 제목과 내용 모두 검색 → 결과 반환
+- **주요 판단 기준**: 
+  - 제목 또는 내용에 키워드 포함 시 검색
+  - 대소문자 구분 없음 (`IgnoreCase`)
+  - 삭제되지 않은 요청만 검색
+- **특징**: 
+  - 제목과 내용 모두에서 검색
+  - 대소문자 구분 없음
+
+#### 로직 6: 댓글 작성 시 알림 발송 조건
+```java
+// CareRequestCommentService.java
+@Transactional
+public CareRequestCommentDTO addComment(Long careRequestId, CareRequestCommentDTO dto) {
+    // ... 댓글 저장 로직 ...
+    
+    // 알림 발송: 댓글 작성자가 게시글 작성자가 아닌 경우에만 알림 발송
+    Long requestOwnerId = careRequest.getUser().getIdx();
+    if (!requestOwnerId.equals(user.getIdx())) {
+        notificationService.createNotification(
+                requestOwnerId,
+                NotificationType.CARE_REQUEST_COMMENT,
+                "펫케어 요청글에 새로운 댓글이 달렸습니다",
+                String.format("%s님이 댓글을 남겼습니다: %s", user.getUsername(), ...),
+                careRequest.getIdx(),
+                "CARE_REQUEST");
+    }
+}
+```
+
+**설명**:
+- **처리 흐름**: 댓글 저장 → 작성자 확인 → 알림 발송 (조건부)
+- **주요 판단 기준**: 댓글 작성자가 요청자가 아닌 경우에만 알림 발송
+- **특징**: 
+  - 자신의 요청에 자신이 댓글을 달면 알림 발송 안 함
+  - 파일 첨부는 첫 번째 파일만 저장 (`syncSingleAttachment`는 단일 파일만 지원)
+
 ### 2.2 서비스 메서드 구조
 
 #### CareRequestService
@@ -109,17 +256,17 @@
 | `createCareRequest()` | 펫케어 요청 생성 | 이메일 인증 확인, 펫 소유자 확인, 상태 OPEN |
 | `getAllCareRequests()` | 요청 목록 조회 | 상태 필터링, 위치 필터링, 작성자 활성 상태 확인 |
 | `getCareRequest()` | 단일 요청 조회 | 펫 정보 포함 조회 |
-| `updateCareRequest()` | 요청 수정 | 펫 정보 업데이트 지원 |
-| `deleteCareRequest()` | 요청 삭제 | Soft Delete |
+| `updateCareRequest()` | 요청 수정 | 작성자 확인 (관리자 우회), 펫 정보 업데이트/연결 해제 지원, 펫 소유자 확인 |
+| `deleteCareRequest()` | 요청 삭제 | 작성자 확인 (관리자 우회), Soft Delete |
 | `getMyCareRequests()` | 내 요청 목록 | 사용자별 요청 조회 |
-| `updateStatus()` | 상태 변경 | OPEN → IN_PROGRESS → COMPLETED |
-| `searchCareRequests()` | 요청 검색 | 제목/내용 검색 |
+| `updateStatus()` | 상태 변경 | 작성자 또는 승인된 제공자 확인 (관리자 우회), OPEN → IN_PROGRESS → COMPLETED |
+| `searchCareRequests()` | 요청 검색 | 제목과 내용 모두 검색 (대소문자 구분 없음, `findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCaseAndIsDeletedFalse`) |
 
 #### CareRequestCommentService
 | 메서드 | 설명 | 주요 로직 |
 |--------|------|-----------|
 | `getComments()` | 댓글 목록 조회 | 펫케어 요청별 댓글 조회, 파일 첨부 정보 포함 |
-| `addComment()` | 댓글 작성 | SERVICE_PROVIDER 역할 확인, 파일 첨부 지원, 알림 발송 |
+| `addComment()` | 댓글 작성 | SERVICE_PROVIDER 역할 확인, 파일 첨부 지원 (첫 번째 파일만 저장), 알림 발송 (작성자가 요청자가 아닌 경우에만) |
 | `deleteComment()` | 댓글 삭제 | Soft Delete 적용 |
 
 #### CareReviewService
@@ -140,6 +287,8 @@
 - **격리 수준**: 기본값 (READ_COMMITTED)
 - **이메일 인증**: 요청 생성 시 이메일 인증 확인 (`EmailVerificationRequiredException`)
 - **권한 체크**: 
+  - 요청 수정/삭제: 작성자만 가능 (관리자는 우회) (`CareRequestService.updateCareRequest()`, `deleteCareRequest()`)
+  - 상태 변경: 작성자 또는 승인된 제공자만 가능 (관리자는 우회) (`CareRequestService.updateStatus()`)
   - 댓글 작성: `SERVICE_PROVIDER` 역할만 가능 (`CareRequestCommentService.addComment()`)
   - 리뷰 작성: 요청자만 가능 (`CareReviewService.createReview()`)
 
@@ -294,13 +443,13 @@ erDiagram
 | `/api/care-requests` | GET | 요청 목록 (status, location 파라미터 지원) |
 | `/api/care-requests/{id}` | GET | 단일 요청 조회 |
 | `/api/care-requests` | POST | 요청 생성 (이메일 인증 필요) |
-| `/api/care-requests/{id}` | PUT | 요청 수정 |
-| `/api/care-requests/{id}` | DELETE | 요청 삭제 |
+| `/api/care-requests/{id}` | PUT | 요청 수정 (작성자만 가능, 관리자 우회, currentUserId 자동 추출) |
+| `/api/care-requests/{id}` | DELETE | 요청 삭제 (작성자만 가능, 관리자 우회, currentUserId 자동 추출) |
 | `/api/care-requests/my-requests` | GET | 내 요청 목록 (userId 파라미터) |
-| `/api/care-requests/{id}/status` | PATCH | 상태 변경 (status 파라미터) |
-| `/api/care-requests/search` | GET | 요청 검색 (keyword 파라미터) |
+| `/api/care-requests/{id}/status` | PATCH | 상태 변경 (작성자 또는 승인된 제공자만 가능, 관리자 우회, status 파라미터, currentUserId 자동 추출) |
+| `/api/care-requests/search` | GET | 요청 검색 (keyword 파라미터, 제목과 내용 모두 검색, 대소문자 구분 없음) |
 | `/api/care-requests/{careRequestId}/comments` | GET | 댓글 목록 조회 |
-| `/api/care-requests/{careRequestId}/comments` | POST | 댓글 작성 (SERVICE_PROVIDER만 가능, 파일 첨부 지원) |
+| `/api/care-requests/{careRequestId}/comments` | POST | 댓글 작성 (SERVICE_PROVIDER만 가능, 파일 첨부 지원 - 첫 번째 파일만 저장, 작성자가 요청자가 아닌 경우에만 알림 발송) |
 | `/api/care-requests/{careRequestId}/comments/{commentId}` | DELETE | 댓글 삭제 (Soft Delete) |
 | `/api/chat/conversations/{conversationIdx}/confirm-deal` | POST | 거래 확정 (채팅방에서, 양쪽 모두 확정 시 자동 승인) |
 | `/api/care-reviews` | POST | 리뷰 작성 |

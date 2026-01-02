@@ -46,6 +46,20 @@
   5. 스냅샷 조회 시 다단계 전략 사용 (정확한 날짜 매칭 → 겹치는 기간 → 최근 스냅샷 → 생성)
 - **스크린샷/영상**: 
 
+#### 주요 기능 4: 게시글 검색
+- **설명**: 제목, 내용, 작성자 ID로 게시글을 검색할 수 있습니다. 검색 타입을 지정하여 원하는 범위로 검색 가능합니다.
+- **사용자 시나리오**:
+  1. 검색어 입력
+  2. 검색 타입 선택 (제목만, 내용만, 제목+내용, 작성자 ID)
+  3. 페이징 지원 (기본 20개씩)
+  4. 검색 결과는 최신순으로 정렬
+- **검색 타입**:
+  - `TITLE`: 제목만 검색
+  - `CONTENT`: 내용만 검색
+  - `TITLE_CONTENT`: 제목과 내용 모두 검색 (기본값)
+  - `ID`: 작성자 ID로 검색 (활성 상태 사용자만)
+- **스크린샷/영상**: 
+
 ---
 
 ## 2. 서비스 로직 설명
@@ -379,6 +393,48 @@ public CommentDTO restoreComment(Long boardId, Long commentId) {
   - 댓글 복구 기능 제공 (관리자용)
   - 삭제/복구 시 commentCount 실시간 업데이트
 
+#### 로직 7: 게시글 검색 (검색 타입별 분기 처리)
+```java
+// BoardService.java
+public BoardPageResponseDTO searchBoardsWithPaging(String keyword, String searchType, int page, int size) {
+    // 검색 타입에 따라 다른 쿼리 실행
+    switch (searchType != null ? searchType.toUpperCase() : "TITLE_CONTENT") {
+        case "ID":
+            // 작성자 ID로 검색 (활성 상태 사용자만)
+            Optional<Users> userOpt = usersRepository.findByIdString(trimmedKeyword);
+            if (userOpt.isPresent()) {
+                Users user = userOpt.get();
+                if (!Boolean.TRUE.equals(user.getIsDeleted())
+                        && user.getStatus() == UserStatus.ACTIVE) {
+                    List<Board> userBoards = boardRepository.findByUserAndIsDeletedFalseOrderByCreatedAtDesc(user);
+                    // 페이징 처리
+                }
+            }
+            break;
+        case "TITLE":
+            boardPage = boardRepository.findByTitleContainingAndIsDeletedFalseOrderByCreatedAtDesc(trimmedKeyword, pageable);
+            break;
+        case "CONTENT":
+            boardPage = boardRepository.findByContentContainingAndIsDeletedFalseOrderByCreatedAtDesc(trimmedKeyword, pageable);
+            break;
+        case "TITLE_CONTENT":
+        default:
+            boardPage = boardRepository.searchByKeywordWithPaging(trimmedKeyword, pageable);
+            break;
+    }
+}
+```
+
+**설명**:
+- **처리 흐름**: 검색 타입 확인 → 타입별 쿼리 실행 → 페이징 처리 → 배치 조회로 N+1 문제 해결
+- **주요 판단 기준**: 
+  - 검색 타입 (TITLE, CONTENT, TITLE_CONTENT, ID)
+  - ID 검색 시 사용자 활성 상태 확인
+- **특징**: 
+  - 검색 타입별로 최적화된 쿼리 사용
+  - ID 검색은 활성 상태 사용자만 대상
+  - 기본값: TITLE_CONTENT (제목과 내용 모두 검색)
+
 ### 2.2 서비스 메서드 구조
 
 #### BoardService
@@ -394,7 +450,7 @@ public CommentDTO restoreComment(Long boardId, Long commentId) {
 | `deleteBoard()` | 게시글 삭제 (소프트 삭제) | 이메일 인증 확인, 연관 댓글도 소프트 삭제 |
 | `restoreBoard()` | 게시글 복구 | 소프트 삭제 해제, 상태 복구 |
 | `updateBoardStatus()` | 게시글 상태 변경 | 관리자용 상태 변경 (BLINDED, ACTIVE 등) |
-| `searchBoardsWithPaging()` | 게시글 검색 | 제목/내용/작성자 ID 검색, 페이징 지원 |
+| `searchBoardsWithPaging()` | 게시글 검색 | 제목/내용/작성자 ID 검색, 검색 타입별 분기 처리 (TITLE/CONTENT/TITLE_CONTENT/ID), 페이징 지원 |
 
 #### ReactionService
 | 메서드 | 설명 | 주요 로직 |
@@ -409,7 +465,7 @@ public CommentDTO restoreComment(Long boardId, Long commentId) {
 | `getComments()` | 댓글 목록 조회 | 반응 수 포함 |
 | `getCommentsForAdmin()` | 댓글 목록 조회 (관리자용) | 작성자 상태 체크 없이 조회 |
 | `addComment()` | 댓글 작성 | commentCount 증가, 파일 첨부, 알림 발송 |
-| `updateComment()` | 댓글 수정 | 이메일 인증 확인, 내용/파일 업데이트 |
+| `updateComment()` | 댓글 수정 | 이메일 인증 확인, 내용/파일 업데이트 (참고: 현재 컨트롤러 엔드포인트 미제공) |
 | `deleteComment()` | 댓글 삭제 | 이메일 인증 확인, 소프트 삭제, commentCount 감소 |
 | `restoreComment()` | 댓글 복구 | 소프트 삭제 해제, commentCount 증가 |
 | `updateCommentStatus()` | 댓글 상태 변경 | 관리자용 상태 변경 |
@@ -638,13 +694,13 @@ erDiagram
 | `/api/boards` | POST | 게시글 작성 | `BoardDTO` → `BoardDTO` |
 | `/api/boards/{id}` | PUT | 게시글 수정 | `BoardDTO` → `BoardDTO` |
 | `/api/boards/{id}` | DELETE | 게시글 삭제 | - → `204 No Content` |
-| `/api/boards/search` | GET | 게시글 검색 | `keyword`, `searchType`, `page`, `size` → `BoardPageResponseDTO` |
-| `/api/boards/popular` | GET | 인기글 조회 | `period` (WEEKLY/MONTHLY) → `List<BoardPopularitySnapshotDTO>` |
-| `/api/boards/my-posts` | GET | 내 게시글 조회 | `userId` → `List<BoardDTO>` |
+| `/api/boards/search` | GET | 게시글 검색 | `keyword`, `searchType` (TITLE/CONTENT/TITLE_CONTENT/ID, 기본값: TITLE_CONTENT), `page`, `size` → `BoardPageResponseDTO` |
+| `/api/boards/popular` | GET | 인기글 조회 | `period` (WEEKLY/MONTHLY, 기본값: WEEKLY) → `List<BoardPopularitySnapshotDTO>` |
+| `/api/boards/my-posts` | GET | 내 게시글 조회 | `userId` (필수) → `List<BoardDTO>` |
 | `/api/boards/{boardId}/comments` | GET | 댓글 목록 | - → `List<CommentDTO>` |
 | `/api/boards/{boardId}/comments` | POST | 댓글 작성 | `CommentDTO` → `CommentDTO` |
-| `/api/boards/{boardId}/comments/{commentId}` | PUT | 댓글 수정 | `CommentDTO` → `CommentDTO` |
 | `/api/boards/{boardId}/comments/{commentId}` | DELETE | 댓글 삭제 | - → `204 No Content` |
+| **참고**: 댓글 수정 기능은 서비스 레벨(`CommentService.updateComment()`)에서 구현되어 있으나, 현재 컨트롤러 엔드포인트는 제공되지 않습니다. |
 | `/api/boards/{boardId}/reactions` | POST | 게시글 반응 | `ReactionRequest` → `ReactionSummaryDTO` |
 | `/api/boards/{boardId}/comments/{commentId}/reactions` | POST | 댓글 반응 | `ReactionRequest` → `ReactionSummaryDTO` |
 

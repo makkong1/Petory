@@ -126,6 +126,8 @@ public ChatMessageDTO sendMessage(Long conversationIdx, Long senderIdx, String c
         // 5. 참여자들의 읽지 않은 메시지 수 증가 (본인 제외)
         // DB 레벨 원자적 증가로 Lost Update 방지
         // 구현 위치: ConversationParticipantRepository.incrementUnreadCount()
+        // UPDATE ConversationParticipant p SET p.unreadCount = p.unreadCount + 1 
+        // WHERE p.conversation.idx = :conversationIdx AND p.user.idx != :senderUserId AND p.status = 'ACTIVE'
         participantRepository.incrementUnreadCount(conversationIdx, senderIdx);
     
     // 6. Conversation 메타데이터 업데이트
@@ -149,11 +151,38 @@ public ChatMessageDTO sendMessage(Long conversationIdx, Long senderIdx, String c
 
 **구현 위치**: `ChatMessageService.markAsRead()` 
 
+```java
+@Transactional
+public void markAsRead(Long conversationIdx, Long userId, Long lastMessageIdx) {
+    // 참여자 확인
+    ConversationParticipant participant = participantRepository
+            .findByConversationIdxAndUserIdx(conversationIdx, userId)
+            .orElseThrow(() -> new IllegalArgumentException("채팅방 참여자가 아닙니다."));
+    
+    // 읽지 않은 메시지 수 초기화
+    participant.setUnreadCount(0);
+    if (lastMessageIdx != null) {
+        ChatMessage lastMessage = chatMessageRepository.findById(lastMessageIdx)
+                .orElse(null);
+        if (lastMessage != null) {
+            participant.setLastReadMessage(lastMessage);
+            participant.setLastReadAt(LocalDateTime.now());
+        }
+    }
+    participantRepository.save(participant);
+    
+    // ⚠️ 제거됨: MessageReadStatus 기록 로직
+    // - 전체 메시지 조회는 성능 문제를 일으킴 (수천~수만 건 조회)
+    // - MessageReadStatus 기록 로직은 실제로 사용되지 않음
+    // - 참여자의 unreadCount와 lastReadMessage 업데이트만으로 충분함
+}
+```
+
 **핵심 로직**:
 - **참여자 확인**: 채팅방 참여자인지 확인
 - **읽지 않은 메시지 수 초기화**: `unreadCount`를 0으로 설정
 - **마지막 읽은 메시지 저장**: `lastMessageIdx`가 있으면 `lastReadMessage`, `lastReadAt` 설정
-- **MessageReadStatus 기록**: 선택사항 (현재는 주석 처리되어 있음, 필요시 활성화 가능)
+- **MessageReadStatus 기록**: 제거됨 (성능 문제 및 불필요한 로직)
 
 ### 3.4 재참여 시 메시지 조회
 
@@ -259,7 +288,7 @@ public class ConversationParticipant {
 ```java
 @Entity
 @Table(name = "chatmessage")
-public class ChatMessage {
+public class ChatMessage extends BaseTimeEntity {
     private Long idx;
     private Conversation conversation;
     private Users sender;
@@ -272,14 +301,11 @@ public class ChatMessage {
     @Builder.Default
     private Boolean isDeleted = false;
     private LocalDateTime deletedAt;
-    private LocalDateTime createdAt;  // @PrePersist로 자동 설정
-    private LocalDateTime updatedAt;  // @PrePersist/@PreUpdate로 자동 설정
-    @OneToMany(mappedBy = "message", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<MessageReadStatus> readStatuses;
+    // createdAt, updatedAt은 BaseTimeEntity에서 상속받음
 }
 ```
 **특징**:
-- `BaseTimeEntity`를 상속하지 않음 (`@PrePersist`, `@PreUpdate`로 직접 관리)
+- `BaseTimeEntity`를 상속받음 (`createdAt`, `updatedAt` 자동 관리)
 
 #### MessageReadStatus (메시지 읽음 상태)
 ```java
@@ -382,7 +408,7 @@ graph TD
 | `markAsRead()` | 메시지 읽음 처리 | unreadCount 초기화, lastReadMessage 저장 |
 | `deleteMessage()` | 메시지 삭제 | 본인 메시지만 삭제 가능, Soft Delete |
 | `searchMessages()` | 메시지 검색 | 키워드로 메시지 검색 |
-| `getUnreadCount()` | 읽지 않은 메시지 수 조회 | 참여자의 unreadCount 반환 |
+| `getUnreadCount()` | 읽지 않은 메시지 수 조회 | 참여자의 unreadCount 반환 (Long 타입) |
 
 ### 4.5 API 설계
 
@@ -394,19 +420,19 @@ graph TD
 | `/api/chat/conversations` | POST | 채팅방 생성 (범용) |
 | `/api/chat/conversations/care-request` | POST | 펫케어 채팅방 생성 (careApplicationIdx, requesterId, providerId 파라미터) |
 | `/api/chat/conversations/direct` | POST | 1:1 채팅방 생성/조회 (user1Id, user2Id 파라미터) |
-| `/api/chat/conversations/{conversationIdx}/leave` | POST | 채팅방 나가기 (userId 파라미터) |
-| `/api/chat/conversations/{conversationIdx}` | DELETE | 채팅방 삭제 (userId 파라미터) |
+| `/api/chat/conversations/{conversationIdx}/leave` | POST | 채팅방 나가기 (userId 파라미터, 응답: 204 No Content) |
+| `/api/chat/conversations/{conversationIdx}` | DELETE | 채팅방 삭제 (userId 파라미터, 응답: 204 No Content) |
 | `/api/chat/conversations/{conversationIdx}/status` | PATCH | 채팅방 상태 변경 (status 파라미터) |
 | `/api/chat/conversations/meetup/{meetupIdx}/join` | POST | 산책모임 채팅방 참여 (userId 파라미터) |
-| `/api/chat/conversations/meetup/{meetupIdx}/participant-count` | GET | 산책모임 채팅방 참여 인원 수 조회 |
-| `/api/chat/conversations/{conversationIdx}/confirm-deal` | POST | 펫케어 거래 확정 (userId 파라미터, 양쪽 모두 확정 시 자동 승인) |
-| `/api/chat/messages` | POST | 메시지 전송 (senderIdx 파라미터) |
-| `/api/chat/messages/conversation/{conversationIdx}` | GET | 메시지 목록 조회 (페이징, userId 파라미터) |
-| `/api/chat/messages/conversation/{conversationIdx}/before` | GET | 메시지 목록 조회 (커서 기반, beforeDate 파라미터) |
-| `/api/chat/messages/conversation/{conversationIdx}/read` | POST | 메시지 읽음 처리 (userId, lastMessageIdx 파라미터) |
-| `/api/chat/messages/{messageIdx}` | DELETE | 메시지 삭제 (userId 파라미터) |
+| `/api/chat/conversations/meetup/{meetupIdx}/participant-count` | GET | 산책모임 채팅방 참여 인원 수 조회 (응답: Integer) |
+| `/api/chat/conversations/{conversationIdx}/confirm-deal` | POST | 펫케어 거래 확정 (userId 파라미터, 양쪽 모두 확정 시 자동 승인, 응답: 204 No Content) |
+| `/api/chat/messages` | POST | 메시지 전송 (senderIdx 파라미터, RequestBody: SendMessageRequest) |
+| `/api/chat/messages/conversation/{conversationIdx}` | GET | 메시지 목록 조회 (페이징, userId 파라미터, page 기본값 0, size 기본값 50) |
+| `/api/chat/messages/conversation/{conversationIdx}/before` | GET | 메시지 목록 조회 (커서 기반, beforeDate 파라미터 ISO 형식, size 기본값 50) |
+| `/api/chat/messages/conversation/{conversationIdx}/read` | POST | 메시지 읽음 처리 (userId, lastMessageIdx 파라미터, 응답: 204 No Content) |
+| `/api/chat/messages/{messageIdx}` | DELETE | 메시지 삭제 (userId 파라미터, 응답: 204 No Content) |
 | `/api/chat/messages/conversation/{conversationIdx}/search` | GET | 메시지 검색 (keyword 파라미터) |
-| `/api/chat/messages/conversation/{conversationIdx}/unread-count` | GET | 읽지 않은 메시지 수 조회 (userId 파라미터) |
+| `/api/chat/messages/conversation/{conversationIdx}/unread-count` | GET | 읽지 않은 메시지 수 조회 (userId 파라미터, 응답: Long) |
 
 #### WebSocket API
 | 엔드포인트 | Method | 설명 |
@@ -446,10 +472,10 @@ graph TD
 
 ### 5.1 트랜잭션 전략
 - **채팅방 생성**: `@Transactional(propagation = Propagation.REQUIRES_NEW)` - 실패해도 호출한 트랜잭션에 영향 없음
-- **메시지 전송**: `@Transactional` - 메시지 저장, unreadCount 증가, 메타데이터 업데이트를 원자적으로 처리
-- **읽음 처리**: `@Transactional` - unreadCount 초기화, lastReadMessage 저장을 원자적으로 처리
+- **메시지 전송**: `@Transactional` - 메시지 저장, 원자적 unreadCount 증가, 메타데이터 업데이트를 원자적으로 처리
+- **읽음 처리**: `@Transactional` - unreadCount 초기화, lastReadMessage 저장을 원자적으로 처리 (Repository의 markAsRead() 미사용, Service에서 직접 업데이트)
 - **거래 확정**: `@Transactional` - 양쪽 모두 확정 확인, CareApplication 생성/승인, CareRequest 상태 변경을 원자적으로 처리
-- **조회 메서드**: `@Transactional(readOnly = true)` - 읽기 전용 최적화
+- **조회 메서드**: `@Transactional(readOnly = true)` - 읽기 전용 최적화 (클래스 레벨)
 
 ### 5.2 동시성 제어
 - **읽지 않은 메시지 수 증가**: `@Modifying @Query`로 DB 레벨 원자적 증가 (`incrementUnreadCount()`)
@@ -554,8 +580,10 @@ CREATE INDEX reply_to_message_idx ON chatmessage(reply_to_message_idx);
 
 ### 8.2 읽지 않은 메시지 수 관리
 - **원자적 증가**: `@Modifying @Query`로 DB 레벨에서 증가하여 Lost Update 문제 해결 (`ConversationParticipantRepository.incrementUnreadCount()`)
-- **읽음 처리**: 메시지 읽음 시 `unreadCount` 초기화, `lastReadMessage` 저장
+  - `UPDATE ConversationParticipant p SET p.unreadCount = p.unreadCount + 1 WHERE p.conversation.idx = :conversationIdx AND p.user.idx != :senderUserId AND p.status = 'ACTIVE'`
+- **읽음 처리**: 메시지 읽음 시 `unreadCount` 초기화, `lastReadMessage` 저장 (Service에서 직접 업데이트, Repository의 markAsRead() 미사용)
 - **재참여 처리**: 채팅방 나간 후 재참여 시 `joinedAt` 이후 메시지만 조회
+- **읽지 않은 메시지 수 조회**: `Long` 타입 반환
 
 ### 8.3 채팅방 타입별 특화
 - **1:1 채팅**: 기존 채팅방 재사용, relatedType/relatedIdx 업데이트 지원 (기존 일반 채팅방을 펫케어 채팅방으로 변환 가능)
@@ -579,8 +607,10 @@ CREATE INDEX reply_to_message_idx ON chatmessage(reply_to_message_idx);
 - **트랜잭션 분리**: 채팅방 생성 시 `REQUIRES_NEW`로 실패해도 호출한 트랜잭션에 영향 없음
 
 ### 8.5 엔티티 설계 특징
-- **BaseTimeEntity 미사용**: 모든 엔티티가 `@PrePersist`, `@PreUpdate`로 직접 시간 관리
+- **BaseTimeEntity 사용**: `ChatMessage`는 `BaseTimeEntity`를 상속받음 (`createdAt`, `updatedAt` 자동 관리)
+- **BaseTimeEntity 미사용**: `Conversation`, `ConversationParticipant`는 `@PrePersist`, `@PreUpdate`로 직접 시간 관리
 - **Soft Delete**: Conversation, ConversationParticipant, ChatMessage 모두 Soft Delete 지원
 - **재참여 지원**: `joinedAt`, `leftAt`, `lastReadMessage`를 통한 재참여 처리
 - **거래 확정**: 펫케어 채팅방에서 `dealConfirmed`, `dealConfirmedAt` 필드로 거래 확정 상태 관리
+- **MessageReadStatus**: 제거됨 (성능 문제 및 불필요한 로직, 참여자의 unreadCount와 lastReadMessage만으로 충분)
 
