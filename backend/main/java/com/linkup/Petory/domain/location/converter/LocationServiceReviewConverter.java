@@ -23,6 +23,8 @@ public class LocationServiceReviewConverter {
                 .comment(review.getComment())
                 .createdAt(review.getCreatedAt())
                 .updatedAt(review.getUpdatedAt())
+                .isDeleted(review.getIsDeleted())
+                .deletedAt(review.getDeletedAt())
                 .build();
     }
 
@@ -44,6 +46,8 @@ public class LocationServiceReviewConverter {
                 .user(user)
                 .rating(dto.getRating())
                 .comment(dto.getComment())
+                .isDeleted(dto.getIsDeleted() != null ? dto.getIsDeleted() : false)
+                .deletedAt(dto.getDeletedAt())
                 .build();
     }
 
@@ -64,6 +68,8 @@ public class LocationServiceReviewConverter {
                 .idx(dto.getIdx())
                 .rating(dto.getRating())
                 .comment(dto.getComment())
+                .isDeleted(dto.getIsDeleted() != null ? dto.getIsDeleted() : false)
+                .deletedAt(dto.getDeletedAt())
                 .build();
     }
 }

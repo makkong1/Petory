@@ -6,7 +6,9 @@ import com.linkup.Petory.domain.location.service.LocationServiceService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -105,6 +107,29 @@ public class LocationServiceController {
             Map<String, Object> response = new HashMap<>();
             response.put("error", "위치 서비스 검색 중 오류가 발생했습니다.");
             return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    /**
+     * 위치 서비스 삭제 (Soft Delete)
+     * 
+     * @param serviceIdx 서비스 ID
+     * @return 삭제 결과
+     */
+    @DeleteMapping("/{serviceIdx}")
+    public ResponseEntity<Map<String, Object>> deleteService(@PathVariable Long serviceIdx) {
+        try {
+            locationServiceService.deleteService(serviceIdx);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "서비스가 성공적으로 삭제되었습니다.");
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("서비스 삭제 실패: {}", e.getMessage());
+            Map<String, Object> response = new HashMap<>();
+            response.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
         }
     }
 }

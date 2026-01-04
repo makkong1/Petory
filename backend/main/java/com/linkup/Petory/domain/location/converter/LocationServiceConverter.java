@@ -47,6 +47,8 @@ public class LocationServiceConverter {
                 .outdoor(service.getOutdoor())
                 .lastUpdated(service.getLastUpdated())
                 .dataSource(service.getDataSource())
+                .isDeleted(service.getIsDeleted())
+                .deletedAt(service.getDeletedAt())
                 // 하위 호환성을 위한 deprecated 필드
                 .openingTime(null) // operatingHours 문자열로 저장되므로 null
                 .closingTime(null) // 필요 시 operatingHours 파싱 필요
@@ -103,6 +105,8 @@ public class LocationServiceConverter {
                 .outdoor(dto.getOutdoor())
                 .lastUpdated(dto.getLastUpdated())
                 .dataSource(dto.getDataSource() != null ? dto.getDataSource() : "PUBLIC")
+                .isDeleted(dto.getIsDeleted() != null ? dto.getIsDeleted() : false)
+                .deletedAt(dto.getDeletedAt())
                 .build();
     }
 

@@ -18,4 +18,6 @@ public class LocationServiceReviewDTO {
     private String comment;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private Boolean isDeleted;
+    private LocalDateTime deletedAt;
 }

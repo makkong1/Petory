@@ -4,10 +4,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import com.linkup.Petory.domain.location.converter.LocationServiceConverter;
 import com.linkup.Petory.domain.location.dto.LocationServiceDTO;
+import com.linkup.Petory.domain.location.entity.LocationService;
 import com.linkup.Petory.domain.location.repository.LocationServiceRepository;
 
 import java.util.List;
@@ -246,5 +248,28 @@ public class LocationServiceService {
         double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
         return R * c; // 미터 단위
+    }
+
+    /**
+     * 위치 서비스 삭제 (Soft Delete)
+     * 
+     * @param serviceIdx 서비스 ID
+     */
+    @Transactional
+    public void deleteService(Long serviceIdx) {
+        LocationService service = locationServiceRepository.findById(serviceIdx)
+                .orElseThrow(() -> new RuntimeException("서비스를 찾을 수 없습니다."));
+
+        // 이미 삭제된 서비스인지 확인
+        if (service.getIsDeleted() != null && service.getIsDeleted()) {
+            throw new RuntimeException("이미 삭제된 서비스입니다.");
+        }
+
+        // Soft Delete 처리
+        service.setIsDeleted(true);
+        service.setDeletedAt(java.time.LocalDateTime.now());
+        locationServiceRepository.save(service);
+        
+        log.info("위치 서비스가 삭제되었습니다. serviceIdx: {}", serviceIdx);
     }
 }

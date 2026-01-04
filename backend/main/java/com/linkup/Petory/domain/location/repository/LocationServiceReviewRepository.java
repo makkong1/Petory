@@ -14,18 +14,35 @@ import java.util.Optional;
 public interface LocationServiceReviewRepository extends JpaRepository<LocationServiceReview, Long> {
 
     // 특정 서비스의 모든 리뷰 조회
-    List<LocationServiceReview> findByServiceIdxOrderByCreatedAtDesc(Long serviceIdx);
+    @Query("SELECT r FROM LocationServiceReview r WHERE " +
+            "r.service.idx = :serviceIdx AND " +
+            "(r.isDeleted IS NULL OR r.isDeleted = false) " +
+            "ORDER BY r.createdAt DESC")
+    List<LocationServiceReview> findByServiceIdxOrderByCreatedAtDesc(@Param("serviceIdx") Long serviceIdx);
 
     // 특정 사용자의 리뷰 조회
-    List<LocationServiceReview> findByUserIdxOrderByCreatedAtDesc(Long userIdx);
+    @Query("SELECT r FROM LocationServiceReview r WHERE " +
+            "r.user.idx = :userIdx AND " +
+            "(r.isDeleted IS NULL OR r.isDeleted = false) " +
+            "ORDER BY r.createdAt DESC")
+    List<LocationServiceReview> findByUserIdxOrderByCreatedAtDesc(@Param("userIdx") Long userIdx);
 
     // 특정 서비스의 평균 평점 계산
-    @Query("SELECT AVG(r.rating) FROM LocationServiceReview r WHERE r.service.idx = :serviceIdx")
+    @Query("SELECT AVG(r.rating) FROM LocationServiceReview r WHERE " +
+            "r.service.idx = :serviceIdx AND " +
+            "(r.isDeleted IS NULL OR r.isDeleted = false)")
     Optional<Double> findAverageRatingByServiceIdx(@Param("serviceIdx") Long serviceIdx);
 
     // 특정 서비스의 리뷰 개수
-    Long countByServiceIdx(Long serviceIdx);
+    @Query("SELECT COUNT(r) FROM LocationServiceReview r WHERE " +
+            "r.service.idx = :serviceIdx AND " +
+            "(r.isDeleted IS NULL OR r.isDeleted = false)")
+    Long countByServiceIdx(@Param("serviceIdx") Long serviceIdx);
 
     // 특정 사용자가 특정 서비스에 리뷰를 작성했는지 확인
-    boolean existsByServiceIdxAndUserIdx(Long serviceIdx, Long userIdx);
+    @Query("SELECT COUNT(r) > 0 FROM LocationServiceReview r WHERE " +
+            "r.service.idx = :serviceIdx AND " +
+            "r.user.idx = :userIdx AND " +
+            "(r.isDeleted IS NULL OR r.isDeleted = false)")
+    boolean existsByServiceIdxAndUserIdx(@Param("serviceIdx") Long serviceIdx, @Param("userIdx") Long userIdx);
 }

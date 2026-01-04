@@ -163,6 +163,7 @@ public List<LocationServiceDTO> searchLocationServicesByRegion(
 - **지역 계층 우선순위**: roadName > eupmyeondong > sigungu > sido > 전체
 - **카테고리 필터링**: category3 → category2 → category1 순서로 검색 (대소문자 무시)
 - **최대 결과 수 제한**: `maxResults` 파라미터로 결과 수 제한 (null이거나 0이면 제한 없음)
+- **Soft Delete 제외**: 모든 조회 쿼리에서 삭제된 서비스 자동 제외
 - **성능 측정**: 각 단계별 실행 시간 로깅
 
 #### 로직 2: 위치 기반 반경 검색
@@ -228,6 +229,7 @@ public List<LocationServiceDTO> searchLocationServicesByLocation(
 - **반경 검색**: `ST_Distance_Sphere(POINT(longitude, latitude), POINT(?2, ?1)) <= ?3`
 - **POINT 형식**: `POINT(경도, 위도)` 순서 사용 (MySQL 표준)
 - **카테고리 필터링**: category3 → category2 → category1 순서로 검색 (대소문자 무시)
+- **Soft Delete 제외**: 모든 조회 쿼리에서 삭제된 서비스 자동 제외
 - **성능 측정**: 각 단계별 실행 시간 로깅 (DB 쿼리 시간, 필터링 시간, DTO 변환 시간)
 - **사용 목적**: 사용자 위치 기반 주변 서비스 검색
 - **기본값**: 컨트롤러에서 `radius` 기본값 10000m (10km), `size` 기본값 100
@@ -236,10 +238,16 @@ public List<LocationServiceDTO> searchLocationServicesByLocation(
 ```java
 @Query(value = "SELECT * FROM locationservice WHERE " +
         "latitude IS NOT NULL AND longitude IS NOT NULL AND " +
-        "ST_Distance_Sphere(POINT(longitude, latitude), POINT(?2, ?1)) <= ?3 " +
+        "ST_Distance_Sphere(POINT(longitude, latitude), POINT(?2, ?1)) <= ?3 AND " +
+        "(is_deleted IS NULL OR is_deleted = 0) " +
         "ORDER BY rating DESC", nativeQuery = true)
 List<LocationService> findByRadius(Double latitude, Double longitude, Double radiusInMeters);
 ```
+
+**Soft Delete 조건**:
+- 모든 조회 쿼리에 `(isDeleted IS NULL OR isDeleted = false)` 조건 자동 적용
+- Native Query의 경우 `(is_deleted IS NULL OR is_deleted = 0)` 조건 사용
+- 삭제된 데이터는 조회되지 않으며, 평점 계산에서도 제외됨
 
 #### 로직 3: 거리 계산 (Haversine 공식)
 **구현 위치**: `LocationServiceService.calculateDistance()`
@@ -314,7 +322,7 @@ public Double calculateDistance(Double lat1, Double lng1, Double lat2, Double ln
 - **리뷰 저장**: `LocationServiceReview` 엔티티 생성 및 저장
 - **평점 업데이트**: `updateServiceRating()`로 서비스 평균 평점 자동 계산 및 업데이트
 
-#### 로직 8: 리뷰 삭제
+#### 로직 8: 리뷰 삭제 (Soft Delete)
 **구현 위치**: `LocationServiceReviewService.deleteReview()`
 
 ```java
@@ -322,6 +330,11 @@ public Double calculateDistance(Double lat1, Double lng1, Double lat2, Double ln
 public void deleteReview(Long reviewIdx) {
     LocationServiceReview review = reviewRepository.findById(reviewIdx)
             .orElseThrow(() -> new RuntimeException("리뷰를 찾을 수 없습니다."));
+    
+    // 이미 삭제된 리뷰인지 확인
+    if (review.getIsDeleted() != null && review.getIsDeleted()) {
+        throw new RuntimeException("이미 삭제된 리뷰입니다.");
+    }
     
     // 이메일 인증 확인
     Users user = review.getUser();
@@ -331,21 +344,21 @@ public void deleteReview(Long reviewIdx) {
                 EmailVerificationPurpose.LOCATION_REVIEW);
     }
     
-    Long serviceIdx = review.getService().getIdx();
-    
-    // Soft Delete
+    // Soft Delete 처리
     review.setIsDeleted(true);
     review.setDeletedAt(LocalDateTime.now());
     reviewRepository.save(review);
     
     // 서비스 평점 업데이트
+    Long serviceIdx = review.getService().getIdx();
     updateServiceRating(serviceIdx);
 }
 ```
 
 **핵심 로직**:
+- **중복 삭제 방지**: 이미 삭제된 리뷰 재삭제 방지
 - **이메일 인증 확인**: 리뷰 삭제 시 이메일 인증 필요
-- **Soft Delete**: `isDeleted = true`, `deletedAt` 설정
+- **Soft Delete**: `isDeleted = true`, `deletedAt` 설정 (물리적 삭제 없음)
 - **평점 업데이트**: 삭제 후 서비스 평균 평점 자동 계산 및 업데이트
 
 **평점 업데이트 로직** (`updateServiceRating()`):
@@ -364,15 +377,50 @@ public void updateServiceRating(Long serviceIdx) {
 }
 ```
 
+**Repository 쿼리 조건**:
+- 모든 조회 쿼리에 `(isDeleted IS NULL OR isDeleted = false)` 조건 자동 적용
+- 삭제된 리뷰는 조회되지 않으며, 평점 계산에서도 제외됨
+
+#### 로직 9: 위치 서비스 삭제 (Soft Delete)
+**구현 위치**: `LocationServiceService.deleteService()`
+
+```java
+@Transactional
+public void deleteService(Long serviceIdx) {
+    LocationService service = locationServiceRepository.findById(serviceIdx)
+            .orElseThrow(() -> new RuntimeException("서비스를 찾을 수 없습니다."));
+    
+    // 이미 삭제된 서비스인지 확인
+    if (service.getIsDeleted() != null && service.getIsDeleted()) {
+        throw new RuntimeException("이미 삭제된 서비스입니다.");
+    }
+    
+    // Soft Delete 처리
+    service.setIsDeleted(true);
+    service.setDeletedAt(LocalDateTime.now());
+    locationServiceRepository.save(service);
+}
+```
+
+**핵심 로직**:
+- **중복 삭제 방지**: 이미 삭제된 서비스 재삭제 방지
+- **Soft Delete**: `isDeleted = true`, `deletedAt` 설정 (물리적 삭제 없음)
+- **조회 제외**: 삭제된 서비스는 모든 조회 쿼리에서 자동 제외됨
+
+**Repository 쿼리 조건**:
+- 모든 조회 쿼리에 `(isDeleted IS NULL OR isDeleted = false)` 조건 자동 적용
+- Native Query의 경우 `(is_deleted IS NULL OR is_deleted = 0)` 조건 사용
+
 ### 3.2 서비스 메서드 구조
 
 #### LocationServiceService
 | 메서드 | 설명 | 주요 로직 |
 |--------|------|-----------|
-| `searchLocationServicesByRegion()` | 지역 계층별 서비스 검색 | 우선순위 기반 조회, 카테고리 필터링, 최대 결과 수 제한, 성능 측정 로깅 |
-| `searchLocationServicesByLocation()` | 위치 기반 반경 검색 | ST_Distance_Sphere 사용, 카테고리 필터링, 최대 결과 수 제한, 성능 측정 로깅 |
+| `searchLocationServicesByRegion()` | 지역 계층별 서비스 검색 | 우선순위 기반 조회, 카테고리 필터링, 최대 결과 수 제한, 성능 측정 로깅, Soft Delete 제외 |
+| `searchLocationServicesByLocation()` | 위치 기반 반경 검색 | ST_Distance_Sphere 사용, 카테고리 필터링, 최대 결과 수 제한, 성능 측정 로깅, Soft Delete 제외 |
 | `calculateDistance()` | 거리 계산 | Haversine 공식 (미터 단위) |
-| `getPopularLocationServices()` | 인기 서비스 조회 | 카테고리별 상위 10개, `@Cacheable` 적용 (컨트롤러 엔드포인트 없음) |
+| `getPopularLocationServices()` | 인기 서비스 조회 | 카테고리별 상위 10개, `@Cacheable` 적용, Soft Delete 제외 (컨트롤러 엔드포인트 없음) |
+| `deleteService()` | 서비스 삭제 | Soft Delete 처리 (`isDeleted = true`, `deletedAt` 설정) |
 
 #### NaverMapService
 | 메서드 | 설명 | 주요 로직 |
@@ -386,19 +434,24 @@ public void updateServiceRating(Long serviceIdx) {
 |--------|------|-----------|
 | `createReview()` | 리뷰 작성 | 중복 체크, 이메일 인증 확인 (`EmailVerificationPurpose.LOCATION_REVIEW`), 평점 업데이트 |
 | `updateReview()` | 리뷰 수정 | 이메일 인증 확인 (`EmailVerificationPurpose.LOCATION_REVIEW`), 평점 업데이트 |
-| `deleteReview()` | 리뷰 삭제 | 이메일 인증 확인 (`EmailVerificationPurpose.LOCATION_REVIEW`), Soft Delete, 평점 업데이트 |
-| `getReviewsByService()` | 서비스별 리뷰 목록 조회 | `findByServiceIdxOrderByCreatedAtDesc()` |
-| `getReviewsByUser()` | 사용자별 리뷰 목록 조회 | `findByUserIdxOrderByCreatedAtDesc()` |
-| `updateServiceRating()` | 서비스 평점 업데이트 | 평균 평점 계산 및 업데이트 |
+| `deleteReview()` | 리뷰 삭제 | 중복 삭제 방지, 이메일 인증 확인 (`EmailVerificationPurpose.LOCATION_REVIEW`), Soft Delete, 평점 업데이트 |
+| `getReviewsByService()` | 서비스별 리뷰 목록 조회 | `findByServiceIdxOrderByCreatedAtDesc()`, Soft Delete 제외 |
+| `getReviewsByUser()` | 사용자별 리뷰 목록 조회 | `findByUserIdxOrderByCreatedAtDesc()`, Soft Delete 제외 |
+| `updateServiceRating()` | 서비스 평점 업데이트 | 평균 평점 계산 및 업데이트 (삭제된 리뷰 제외) |
 
 ### 3.3 트랜잭션 처리
 - **트랜잭션 범위**: 
   - 조회 메서드: 트랜잭션 없음 (읽기 전용)
+  - 서비스 삭제: `@Transactional` (Soft Delete)
   - 리뷰 작성/수정/삭제: `@Transactional`
   - 평점 업데이트: `@Transactional`
 - **격리 수준**: 기본값 (READ_COMMITTED)
 - **이메일 인증**: 리뷰 작성/수정/삭제 시 이메일 인증 확인 (`EmailVerificationRequiredException`, `EmailVerificationPurpose.LOCATION_REVIEW`)
-- **리뷰 삭제**: Soft Delete 사용 (`isDeleted = true`, `deletedAt` 설정)
+- **Soft Delete**: 
+  - **서비스 삭제**: `isDeleted = true`, `deletedAt` 설정
+  - **리뷰 삭제**: `isDeleted = true`, `deletedAt` 설정
+  - **조회 제외**: 모든 조회 쿼리에서 `(isDeleted IS NULL OR isDeleted = false)` 조건 자동 적용
+  - **평점 계산**: 삭제된 리뷰는 평점 계산에서 제외
 
 ---
 
@@ -499,6 +552,14 @@ public class LocationService {
     @Builder.Default
     private String dataSource = "PUBLIC"; // 데이터 출처
     
+    // Soft Delete 필드
+    @Column(name = "is_deleted")
+    @Builder.Default
+    private Boolean isDeleted = false;
+    
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+    
     @OneToMany(mappedBy = "service", cascade = CascadeType.ALL)
     private List<LocationServiceReview> reviews;
 }
@@ -510,6 +571,7 @@ public class LocationService {
 - 카테고리 계층 구조: category1 → category2 → category3
 - 반려동물 관련 필드: `petFriendly`, `isPetOnly`, `petSize`, `petRestrictions`, `petExtraFee`
 - 추가 필드: `phone`, `website`
+- Soft Delete: `isDeleted`, `deletedAt` 필드로 Soft Delete 지원
 
 #### LocationServiceReview (위치 서비스 리뷰)
 ```java
@@ -596,12 +658,13 @@ erDiagram
 
 | 엔드포인트 | Method | 설명 |
 |-----------|--------|------|
-| `/api/location-services/search` | GET | 위치 기반 검색 또는 지역 계층별 서비스 검색 (하이브리드 전략: latitude/longitude/radius 있으면 위치 기반, 없으면 지역 계층별, radius 기본값 10000m, size 기본값 100, 응답: `{"services": [...], "count": N}`) |
+| `/api/location-services/search` | GET | 위치 기반 검색 또는 지역 계층별 서비스 검색 (하이브리드 전략: latitude/longitude/radius 있으면 위치 기반, 없으면 지역 계층별, radius 기본값 10000m, size 기본값 100, Soft Delete 제외, 응답: `{"services": [...], "count": N}`) |
+| `/api/location-services/{serviceIdx}` | DELETE | 위치 서비스 삭제 (Soft Delete, 응답: `{"message": "..."}`) |
 | `/api/location-service-reviews` | POST | 리뷰 작성 (인증 필요, 클래스 레벨 `@PreAuthorize`, 응답: `{"review": {...}, "message": "..."}`) |
 | `/api/location-service-reviews/{reviewIdx}` | PUT | 리뷰 수정 (인증 필요, 클래스 레벨 `@PreAuthorize`, 응답: `{"review": {...}, "message": "..."}`) |
 | `/api/location-service-reviews/{reviewIdx}` | DELETE | 리뷰 삭제 (인증 필요, 클래스 레벨 `@PreAuthorize`, Soft Delete, 응답: `{"message": "..."}`) |
-| `/api/location-service-reviews/service/{serviceIdx}` | GET | 서비스별 리뷰 목록 조회 (응답: `{"reviews": [...], "count": N}`) |
-| `/api/location-service-reviews/user/{userIdx}` | GET | 사용자별 리뷰 목록 조회 (응답: `{"reviews": [...], "count": N}`) |
+| `/api/location-service-reviews/service/{serviceIdx}` | GET | 서비스별 리뷰 목록 조회 (Soft Delete 제외, 응답: `{"reviews": [...], "count": N}`) |
+| `/api/location-service-reviews/user/{userIdx}` | GET | 사용자별 리뷰 목록 조회 (Soft Delete 제외, 응답: `{"reviews": [...], "count": N}`) |
 | `/api/geocoding/address` | GET | 주소→좌표 변환 (address 파라미터, 컨트롤러에서 명시적 URL 디코딩 처리, 응답: `{"latitude": ..., "longitude": ..., "success": true}`) |
 | `/api/geocoding/coordinates` | GET | 좌표→주소 변환 (lat, lng 파라미터) |
 | `/api/geocoding/directions` | GET | 길찾기 (start, goal, option 파라미터 기본값 "traoptimal", 경도,위도 순서) |
@@ -676,6 +739,13 @@ GET /api/location-services/search?latitude=37.5665&longitude=126.9780
 ```json
 {
   "message": "리뷰가 성공적으로 삭제되었습니다."
+}
+```
+
+**서비스 삭제 응답 예시**:
+```json
+{
+  "message": "서비스가 성공적으로 삭제되었습니다."
 }
 ```
 
@@ -1118,16 +1188,25 @@ public List<LocationServiceDTO> getPopularLocationServices(String category) {
   - 컨트롤러에서 `start`, `goal` 파라미터를 `,`로 분리하여 파싱
 - **에러 처리**: API 키 미설정, 구독 필요 등 에러 처리
 
-### 8.6 리뷰 시스템
-- **중복 리뷰 방지**: 한 서비스당 1개의 리뷰만 작성 가능 (`existsByServiceIdxAndUserIdx()`)
+### 8.6 Soft Delete 시스템
+- **서비스 삭제**: `LocationService` 엔티티에 `isDeleted`, `deletedAt` 필드로 Soft Delete 지원
+- **리뷰 삭제**: `LocationServiceReview` 엔티티에 `isDeleted`, `deletedAt` 필드로 Soft Delete 지원
+- **조회 제외**: 모든 조회 쿼리에 `(isDeleted IS NULL OR isDeleted = false)` 조건 자동 적용
+  - JPQL: `(ls.isDeleted IS NULL OR ls.isDeleted = false)`
+  - Native Query: `(is_deleted IS NULL OR is_deleted = 0)`
+- **중복 삭제 방지**: 이미 삭제된 항목 재삭제 시 예외 발생
+- **평점 계산**: 삭제된 리뷰는 평균 평점 계산에서 자동 제외
+
+### 8.7 리뷰 시스템
+- **중복 리뷰 방지**: 한 서비스당 1개의 리뷰만 작성 가능 (`existsByServiceIdxAndUserIdx()`, 삭제된 리뷰 제외)
 - **이메일 인증**: 리뷰 작성/수정/삭제 시 이메일 인증 필요 (`EmailVerificationRequiredException`, `EmailVerificationPurpose.LOCATION_REVIEW`)
-- **평점 자동 업데이트**: 리뷰 작성/수정/삭제 시 서비스 평균 평점 자동 계산 및 업데이트
+- **평점 자동 업데이트**: 리뷰 작성/수정/삭제 시 서비스 평균 평점 자동 계산 및 업데이트 (삭제된 리뷰 제외)
 - **시간 관리**: `BaseTimeEntity`를 상속하여 `createdAt`, `updatedAt` 자동 관리
 - **Soft Delete**: `isDeleted`, `deletedAt` 필드로 Soft Delete 지원
 - **API 인증**: 클래스 레벨에 `@PreAuthorize("isAuthenticated()")` 적용
 - **응답 형식**: Map 형태로 감싸서 반환 (`{"review": {...}, "message": "..."}`, `{"reviews": [...], "count": N}`)
 
-### 8.7 성능 최적화
+### 8.8 성능 최적화
 - **인덱스 전략**: 지역 계층별 인덱스로 조회 성능 향상
 - **캐싱**: 인기 서비스 조회 시 `@Cacheable` 적용
 - **하이브리드 데이터 로딩**: 초기 위치 기반 검색(5km) 또는 전체 조회 + 클라이언트 필터링
@@ -1135,7 +1214,7 @@ public List<LocationServiceDTO> getPopularLocationServices(String category) {
 - **프론트엔드 최적화**: 메모이제이션, 배치 처리, 마커 개수 제한 (500 → 20)
 - **UX 최적화**: "지도는 상태를 바꾸지 않는다" 원칙으로 불필요한 API 호출 제거
 
-### 8.8 프론트엔드 주요 로직
+### 8.9 프론트엔드 주요 로직
 
 #### 핵심 UX 설계 원칙
 1. **"지도는 상태를 바꾸지 않는다"**: 지도 이동 시 자동 API 호출 제거, "이 지역 검색" 버튼으로 사용자 확인 후 실행
@@ -1180,9 +1259,12 @@ public List<LocationServiceDTO> getPopularLocationServices(String category) {
 - **좌표 제거**: 좌표 대신 주소만 표시
 - **UI 개선**: 길찾기 화면과 상세페이지 닫기 버튼 통합
 
-### 8.9 엔티티 설계 특징
+### 8.10 엔티티 설계 특징
 - **BaseTimeEntity 사용**: LocationServiceReview는 `BaseTimeEntity`를 상속하여 `createdAt`, `updatedAt` 자동 관리
 - **LocationService**: `createdAt`, `updatedAt` 없음 (DB에 컬럼 없음, 공공데이터 기반이므로)
+- **Soft Delete 필드**: 
+  - `LocationService`: `isDeleted` (Boolean, 기본값 false), `deletedAt` (LocalDateTime)
+  - `LocationServiceReview`: `isDeleted` (Boolean, 기본값 false), `deletedAt` (LocalDateTime)
 - **지역 계층 구조**: sido → sigungu → eupmyeondong → roadName
 - **카테고리 계층 구조**: category1 → category2 → category3
 - **데이터 출처 관리**: `dataSource` 필드로 데이터 출처 구분 (PUBLIC)
