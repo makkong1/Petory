@@ -50,6 +50,7 @@ public class ConversationService {
         private final ConversationParticipantConverter participantConverter;
         private final ChatMessageConverter messageConverter;
         private final CareRequestRepository careRequestRepository;
+        private final com.linkup.Petory.domain.care.repository.CareApplicationRepository careApplicationRepository;
 
         /**
          * 사용자별 활성 채팅방 목록 조회 (N+1 문제 최적화)
@@ -544,8 +545,9 @@ public class ConversationService {
          */
         @Transactional
         public void confirmCareDeal(Long conversationIdx, Long userId) {
-                Conversation conversation = conversationRepository.findById(conversationIdx)
-                                .orElseThrow(() -> new RuntimeException("Conversation not found"));
+                // 비관적 락으로 채팅방 조회 (동시성 제어)
+                Conversation conversation = conversationRepository.findByIdWithLock(conversationIdx)
+                                .orElseThrow(() -> new IllegalArgumentException("채팅방을 찾을 수 없습니다."));
 
                 // 펫케어 관련 채팅방인지 확인
                 if (conversation.getRelatedType() != RelatedType.CARE_REQUEST
@@ -612,19 +614,21 @@ public class ConversationService {
                                                                                 : null;
 
                                                 if (existingApplication == null) {
+                                                        // TransientObjectException 해결을 위한 확실한 영속 객체 참조 (Proxy) 가져오기
+                                                        CareRequest careRequestRef = careRequestRepository
+                                                                        .getReferenceById(relatedIdx);
+
                                                         // CareApplication이 없으면 생성
                                                         CareApplication newApplication = CareApplication.builder()
-                                                                        .careRequest(careRequest)
+                                                                        .careRequest(careRequestRef) // Proxy 객체 사용
                                                                         .provider(usersRepository.findById(providerId)
                                                                                         .orElseThrow(() -> new RuntimeException(
                                                                                                         "Provider not found")))
                                                                         .status(CareApplicationStatus.ACCEPTED)
                                                                         .build();
-                                                        if (careRequest.getApplications() == null) {
-                                                                careRequest.setApplications(
-                                                                                new java.util.ArrayList<>());
-                                                        }
-                                                        careRequest.getApplications().add(newApplication);
+
+                                                        // 명시적으로 저장 및 플러시
+                                                        careApplicationRepository.saveAndFlush(newApplication);
                                                 } else {
                                                         // 이미 있으면 승인 상태로 변경
                                                         existingApplication.setStatus(CareApplicationStatus.ACCEPTED);
