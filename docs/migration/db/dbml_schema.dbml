@@ -1,0 +1,513 @@
+// ============================================
+// USERS & AUTH
+// ============================================
+
+Table Users {
+  idx bigint [pk, increment]
+  id varchar(50) [not null, unique, note: '로그인용 아이디']
+  username varchar(50) [not null, unique, note: '사용자 이름']
+  nickname varchar(50) [unique, note: '닉네임 (소셜 로그인 사용자 필수 설정)']
+  email varchar(100) [not null, unique]
+  password varchar(255) [not null]
+  profile_image varchar(500)
+  birth_date varchar(20)
+  gender varchar(10)
+  email_verified boolean [default: false]
+  role varchar(20) [not null, note: 'USER, SERVICE_PROVIDER, ADMIN, MASTER']
+  phone varchar(20)
+  location varchar(255)
+  pet_info text
+  refresh_token varchar(255)
+  refresh_expiration datetime
+  last_login_at datetime
+  status varchar(20) [not null, default: 'ACTIVE', note: 'ACTIVE, BANNED, SUSPENDED']
+  warning_count int [not null, default: 0]
+  suspended_until datetime
+  is_deleted boolean [default: false]
+  deleted_at datetime
+  created_at datetime [default: `CURRENT_TIMESTAMP`]
+  updated_at datetime [default: `CURRENT_TIMESTAMP`]
+}
+
+Table SocialUser {
+  idx bigint [pk, increment]
+  users_idx bigint [not null, ref: > Users.idx]
+  provider varchar(25) [not null, note: 'GOOGLE, NAVER, KAKAO']
+  provider_id varchar(255) [not null]
+  provider_data text [note: 'Provider별 원본 데이터 JSON']
+  provider_profile_image varchar(500)
+  provider_name varchar(100)
+  provider_phone varchar(50)
+  provider_age_range varchar(20)
+  created_at datetime [default: `CURRENT_TIMESTAMP`]
+  updated_at datetime [default: `CURRENT_TIMESTAMP`]
+  
+  indexes {
+    (provider, provider_id) [unique, name: 'uk_socialuser_provider_providerid']
+    users_idx
+    provider
+  }
+}
+
+Table user_sanctions {
+  idx bigint [pk, increment]
+  user_idx bigint [not null, ref: > Users.idx]
+  sanction_type varchar(20) [not null, note: 'WARNING, SUSPENSION, BAN']
+  reason varchar(500) [not null]
+  duration_days int
+  starts_at datetime [not null]
+  ends_at datetime
+  admin_idx bigint [ref: > Users.idx]
+  report_idx bigint
+  created_at datetime [not null]
+  
+  indexes {
+    user_idx
+    ends_at
+  }
+}
+
+// ========================================================
+// PETS (반려동물 프로필)
+// ========================================================
+
+Table pets {
+  idx bigint [pk, increment]
+  user_idx bigint [not null, ref: > Users.idx]
+  pet_name varchar(50) [not null]
+  pet_type varchar(20) [not null, note: 'DOG, CAT, OTHER']
+  breed varchar(50)
+  gender varchar(10) [note: 'M, F, UNKNOWN']
+  age varchar(30)
+  color varchar(50)
+  weight decimal(5,2)
+  birth_date date
+  is_neutered boolean [not null, default: false]
+  health_info text
+  special_notes text
+  profile_image_url varchar(500)
+  is_deleted boolean [not null, default: false]
+  created_at datetime [default: `CURRENT_TIMESTAMP`]
+  updated_at datetime [default: `CURRENT_TIMESTAMP`]
+  deleted_at datetime
+  
+  indexes {
+    user_idx
+    is_deleted
+    pet_type
+    breed
+  }
+}
+
+Table pet_vaccinations {
+  idx bigint [pk, increment]
+  pet_idx bigint [not null, ref: > pets.idx]
+  vaccine_name varchar(200) [not null]
+  vaccinated_at date
+  next_due date
+  notes varchar(500)
+  is_deleted boolean [not null, default: false]
+  created_at datetime [default: `CURRENT_TIMESTAMP`]
+  updated_at datetime [default: `CURRENT_TIMESTAMP`]
+  
+  indexes {
+    pet_idx
+    is_deleted
+  }
+}
+
+// ============================================
+// CARE (펫시터 매칭 / 후기)
+// ============================================
+
+Table CareRequest {
+  idx bigint [pk, increment]
+  user_idx bigint [not null, ref: > Users.idx]
+  pet_idx bigint [ref: > pets.idx]
+  title varchar(200)
+  description text
+  date datetime
+  status varchar(20) [not null, default: 'OPEN', note: 'OPEN, IN_PROGRESS, COMPLETED, CANCELLED']
+  is_deleted boolean [default: false]
+  deleted_at datetime
+  created_at datetime [default: `CURRENT_TIMESTAMP`]
+  updated_at datetime [default: `CURRENT_TIMESTAMP`]
+}
+
+Table CareApplication {
+  idx bigint [pk, increment]
+  care_request_idx bigint [not null, ref: > CareRequest.idx]
+  provider_idx bigint [not null, ref: > Users.idx]
+  status varchar(20) [not null, default: 'PENDING', note: 'PENDING, ACCEPTED, REJECTED']
+  message text
+  created_at datetime [default: `CURRENT_TIMESTAMP`]
+  updated_at datetime [default: `CURRENT_TIMESTAMP`]
+}
+
+Table CareReview {
+  idx bigint [pk, increment]
+  care_application_idx bigint [not null, ref: > CareApplication.idx]
+  reviewer_idx bigint [not null, ref: > Users.idx]
+  reviewee_idx bigint [not null, ref: > Users.idx]
+  rating int [not null]
+  comment text
+  created_at datetime [default: `CURRENT_TIMESTAMP`]
+  updated_at datetime [default: `CURRENT_TIMESTAMP`]
+}
+
+Table carerequest_comment {
+  idx bigint [pk, increment]
+  care_request_idx bigint [not null, ref: > CareRequest.idx]
+  user_idx bigint [not null, ref: > Users.idx]
+  content text
+  created_at datetime [default: `CURRENT_TIMESTAMP`]
+  is_deleted boolean [default: false]
+  deleted_at datetime
+}
+
+// ============================================
+// COMMUNITY (게시판 / 댓글)
+// ============================================
+
+Table Board {
+  idx bigint [pk, increment]
+  user_idx bigint [not null, ref: > Users.idx]
+  title varchar(100)
+  content text
+  status varchar(20) [not null, default: 'ACTIVE', note: 'ACTIVE, BLINDED, DELETED']
+  category varchar(50)
+  view_count int [default: 0]
+  like_count int [default: 0]
+  comment_count int [default: 0]
+  last_reaction_at datetime
+  is_deleted boolean [default: false]
+  deleted_at datetime
+  created_at datetime [default: `CURRENT_TIMESTAMP`]
+  updated_at datetime [default: `CURRENT_TIMESTAMP`]
+}
+
+Table Comment {
+  idx bigint [pk, increment]
+  board_idx bigint [not null, ref: > Board.idx]
+  user_idx bigint [not null, ref: > Users.idx]
+  content text
+  status varchar(20) [not null, default: 'ACTIVE', note: 'ACTIVE, BLINDED, DELETED']
+  is_deleted boolean [default: false]
+  deleted_at datetime
+  created_at datetime [default: `CURRENT_TIMESTAMP`]
+  updated_at datetime [default: `CURRENT_TIMESTAMP`]
+}
+
+Table board_reaction {
+  idx bigint [pk, increment]
+  board_idx bigint [not null, ref: > Board.idx]
+  user_idx bigint [not null, ref: > Users.idx]
+  reaction_type varchar(20) [not null, note: 'LIKE, DISLIKE']
+  created_at datetime [default: `CURRENT_TIMESTAMP`]
+  
+  indexes {
+    (board_idx, user_idx) [unique]
+  }
+}
+
+Table comment_reaction {
+  idx bigint [pk, increment]
+  comment_idx bigint [not null, ref: > Comment.idx]
+  user_idx bigint [not null, ref: > Users.idx]
+  reaction_type varchar(20) [not null, note: 'LIKE, DISLIKE']
+  created_at datetime [default: `CURRENT_TIMESTAMP`]
+  
+  indexes {
+    (comment_idx, user_idx) [unique]
+  }
+}
+
+Table board_popularity_snapshot {
+  snapshot_id bigint [pk, increment]
+  board_id bigint [not null, ref: > Board.idx]
+  period_type varchar(20) [not null, note: 'WEEKLY, MONTHLY']
+  period_start_date date [not null]
+  period_end_date date [not null]
+  ranking int [not null]
+  popularity_score int [not null]
+  like_count int [not null]
+  comment_count int [not null]
+  view_count int [not null]
+  created_at datetime [default: `CURRENT_TIMESTAMP`]
+}
+
+// ============================================
+// REPORT (신고)
+// ============================================
+
+Table Report {
+  idx bigint [pk, increment]
+  target_type varchar(32) [not null, note: 'BOARD, COMMENT, MISSING_PET, PET_CARE_PROVIDER']
+  target_idx bigint [not null]
+  reporter_idx bigint [not null, ref: > Users.idx]
+  reason text [not null]
+  status varchar(16) [not null, default: 'PENDING', note: 'PENDING, RESOLVED, REJECTED']
+  handled_by bigint [ref: > Users.idx]
+  handled_at datetime
+  action_taken varchar(32) [not null, default: 'NONE', note: 'NONE, DELETE_CONTENT, SUSPEND_USER, WARN_USER, OTHER']
+  admin_note text
+  created_at datetime [not null]
+  updated_at datetime [not null]
+  
+  indexes {
+    (target_type, target_idx, reporter_idx) [unique]
+  }
+}
+
+// ============================================
+// MISSING PET (실종/목격 게시판)
+// ============================================
+
+Table MissingPetBoard {
+  idx bigint [pk, increment]
+  user_idx bigint [not null, ref: > Users.idx]
+  title varchar(100) [not null]
+  content text
+  pet_name varchar(50)
+  species varchar(50)
+  breed varchar(50)
+  gender varchar(10) [note: 'M, F']
+  age varchar(30)
+  color varchar(50)
+  lost_date date
+  lost_location varchar(255)
+  latitude decimal(15,12)
+  longitude decimal(15,12)
+  status varchar(20) [default: 'MISSING', note: 'MISSING, FOUND, RESOLVED']
+  is_deleted boolean [default: false]
+  deleted_at datetime
+  created_at datetime [default: `CURRENT_TIMESTAMP`]
+  updated_at datetime [default: `CURRENT_TIMESTAMP`]
+}
+
+Table MissingPetComment {
+  idx bigint [pk, increment]
+  board_idx bigint [not null, ref: > MissingPetBoard.idx]
+  user_idx bigint [not null, ref: > Users.idx]
+  content text [not null]
+  address varchar(255)
+  latitude decimal(15,12)
+  longitude decimal(15,12)
+  is_deleted boolean [default: false]
+  deleted_at datetime
+  created_at datetime [default: `CURRENT_TIMESTAMP`]
+}
+
+// ============================================
+// FILE (범용 파일 관리)
+// ============================================
+
+Table File {
+  idx bigint [pk, increment]
+  target_type varchar(32) [not null, note: 'BOARD, COMMENT, CARE_COMMENT, MISSING_PET, PET']
+  target_idx bigint [not null]
+  file_path varchar(255) [not null]
+  file_type varchar(50)
+  created_at datetime [default: `CURRENT_TIMESTAMP`]
+}
+
+// ============================================
+// LOCATION SERVICE
+// ============================================
+
+Table locationservice {
+  idx bigint [pk, increment]
+  name varchar(150) [not null]
+  address varchar(255)
+  latitude double
+  longitude double
+  rating double
+  description text
+  phone varchar(255)
+  website varchar(255)
+  pet_friendly boolean [default: false]
+  category1 varchar(100)
+  category2 varchar(100)
+  category3 varchar(100)
+  sido varchar(50)
+  sigungu varchar(50)
+  eupmyeondong varchar(50)
+  road_name varchar(100)
+  zip_code varchar(10)
+  closed_day varchar(255)
+  operating_hours varchar(255)
+  parking_available boolean [default: false]
+  price_info varchar(255)
+  is_pet_only boolean
+  pet_size varchar(100)
+  pet_restrictions varchar(255)
+  pet_extra_fee varchar(255)
+  indoor boolean
+  outdoor boolean
+  last_updated date
+  data_source varchar(50) [default: 'PUBLIC']
+  is_deleted boolean [default: false]
+  deleted_at datetime
+}
+
+Table LocationServiceReview {
+  idx bigint [pk, increment]
+  service_idx bigint [not null, ref: > locationservice.idx]
+  user_idx bigint [not null, ref: > Users.idx]
+  rating int [not null, note: '1~5']
+  comment text
+  is_deleted boolean [default: false]
+  deleted_at datetime
+  created_at datetime [default: `CURRENT_TIMESTAMP`]
+  updated_at datetime [default: `CURRENT_TIMESTAMP`]
+}
+
+// ============================================
+// MEETUP (산책 모임)
+// ============================================
+
+Table Meetup {
+  idx bigint [pk, increment]
+  title varchar(200) [not null]
+  description text
+  location varchar(255)
+  latitude double
+  longitude double
+  date datetime [not null]
+  organizer_idx bigint [not null, ref: > Users.idx]
+  max_participants int [default: 10]
+  current_participants int [default: 0]
+  status varchar(20) [default: 'RECRUITING', note: 'RECRUITING, CLOSED, COMPLETED']
+  is_deleted boolean [default: false]
+  deleted_at datetime
+  created_at datetime [default: `CURRENT_TIMESTAMP`]
+  updated_at datetime [default: `CURRENT_TIMESTAMP`]
+  
+  indexes {
+    status
+    date
+    (latitude, longitude)
+    (date, status)
+  }
+}
+
+Table MeetupParticipants {
+  meetup_idx bigint [pk, ref: > Meetup.idx]
+  user_idx bigint [pk, ref: > Users.idx]
+  joined_at datetime [default: `CURRENT_TIMESTAMP`]
+}
+
+// ============================================
+// Statistics (통계테이블)
+// ============================================
+
+Table DailyStatistics {
+  id bigint [pk, increment]
+  stat_date date [unique, not null]
+  new_users int [default: 0]
+  new_posts int [default: 0]
+  new_care_requests int [default: 0]
+  completed_cares int [default: 0]
+  total_revenue decimal(15,2) [default: 0]
+  active_users int [default: 0]
+  created_at datetime [default: `CURRENT_TIMESTAMP`]
+  updated_at datetime [default: `CURRENT_TIMESTAMP`]
+}
+
+// ============================================
+// Notifications (알림 테이블)
+// ============================================
+
+Table notifications {
+  idx bigint [pk, increment]
+  user_idx bigint [not null, ref: > Users.idx]
+  type varchar(50) [not null]
+  title varchar(255) [not null]
+  content varchar(500)
+  related_id bigint
+  related_type varchar(50)
+  is_read boolean [not null, default: false]
+  created_at datetime [default: `CURRENT_TIMESTAMP`]
+}
+
+// ============================================
+// Conversation (채팅방 테이블)
+// ============================================
+
+Table Conversation {
+  idx bigint [pk, increment]
+  conversation_type varchar(20) [not null, note: 'DIRECT, GROUP, CARE_REQUEST, MISSING_PET, MEETUP, ADMIN_SUPPORT']
+  title varchar(200)
+  related_type varchar(20) [note: 'CARE_REQUEST, CARE_APPLICATION, MISSING_PET_BOARD, MEETUP, USER']
+  related_idx bigint
+  status varchar(20) [not null, default: 'ACTIVE', note: 'ACTIVE, CLOSED, ARCHIVED']
+  last_message_at datetime
+  last_message_preview varchar(200)
+  is_deleted boolean [default: false]
+  deleted_at datetime
+  created_at datetime [default: `CURRENT_TIMESTAMP`]
+  updated_at datetime [default: `CURRENT_TIMESTAMP`]
+  
+  indexes {
+    (conversation_type, status, last_message_at)
+    (related_type, related_idx)
+    (is_deleted, deleted_at)
+  }
+}
+
+// ============================================
+// ChatMessage (메시지 테이블)
+// ============================================
+
+Table ChatMessage {
+  idx bigint [pk, increment]
+  conversation_idx bigint [not null, ref: > Conversation.idx]
+  sender_idx bigint [not null, ref: > Users.idx]
+  message_type varchar(20) [not null, default: 'TEXT', note: 'TEXT, IMAGE, FILE, SYSTEM, NOTICE']
+  content text [not null]
+  reply_to_message_idx bigint [ref: > ChatMessage.idx]
+  is_deleted boolean [default: false]
+  deleted_at datetime
+  created_at datetime [default: `CURRENT_TIMESTAMP`]
+  updated_at datetime [default: `CURRENT_TIMESTAMP`]
+  
+  indexes {
+    (conversation_idx, created_at)
+    (sender_idx, created_at)
+    (message_type, created_at)
+    (is_deleted, deleted_at)
+    content [type: fulltext]
+  }
+}
+
+// ============================================
+// ConversationParticipant (참여자 테이블)
+// ============================================
+
+Table ConversationParticipant {
+  idx bigint [pk, increment]
+  conversation_idx bigint [not null, ref: > Conversation.idx]
+  user_idx bigint [not null, ref: > Users.idx]
+  role varchar(20) [not null, default: 'MEMBER', note: 'MEMBER, ADMIN, MODERATOR']
+  unread_count int [not null, default: 0]
+  last_read_message_idx bigint [ref: > ChatMessage.idx]
+  last_read_at datetime
+  status varchar(20) [not null, default: 'ACTIVE', note: 'ACTIVE, LEFT, KICKED, MUTED']
+  joined_at datetime [default: `CURRENT_TIMESTAMP`]
+  left_at datetime
+  deal_confirmed boolean [default: false]
+  deal_confirmed_at datetime
+  is_deleted boolean [default: false]
+  deleted_at datetime
+  created_at datetime [default: `CURRENT_TIMESTAMP`]
+  updated_at datetime [default: `CURRENT_TIMESTAMP`]
+  
+  indexes {
+    (conversation_idx, user_idx) [unique]
+    (user_idx, status, unread_count)
+    conversation_idx
+    status
+    (user_idx, unread_count)
+  }
+}
+
