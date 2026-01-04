@@ -476,6 +476,7 @@ CREATE INDEX fk_carerequest_pet ON carerequest(pet_idx);
 
 -- 사용자별 조회
 CREATE INDEX user_idx ON carerequest(user_idx);
+
 ```
 
 **careapplication 테이블**:

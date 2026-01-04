@@ -502,7 +502,7 @@ CREATE INDEX idx_conversation_deleted ON conversation(is_deleted, deleted_at);
 -- 관련 엔티티 조회
 CREATE INDEX idx_conversation_related ON conversation(related_type, related_idx);
 
--- 타입 및 상태별 조회
+-- 타입 및 상태별 조회 (last_message_at 포함)
 CREATE INDEX idx_conversation_type_status ON conversation(conversation_type, status, last_message_at);
 ```
 
@@ -526,8 +526,8 @@ CREATE UNIQUE INDEX uk_participant_conversation_user ON conversationparticipant(
 
 **chatmessage 테이블**:
 ```sql
--- 내용 검색
-CREATE INDEX idx_chat_message_content ON chatmessage(content);
+-- 내용 검색 (Full-Text)
+CREATE FULLTEXT INDEX idx_chat_message_content ON chatmessage(content);
 
 -- 채팅방별 메시지 조회 (시간순)
 CREATE INDEX idx_chat_message_conversation_created ON chatmessage(conversation_idx, created_at);

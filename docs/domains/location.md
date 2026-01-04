@@ -1064,7 +1064,7 @@ CREATE FULLTEXT INDEX ft_name_desc ON locationservice(name, description);
 CREATE INDEX idx_address ON locationservice(address);
 CREATE INDEX idx_address_detail ON locationservice(address);
 
--- 카테고리 및 평점 조회
+-- 평점 조회
 CREATE INDEX idx_category_rating ON locationservice(rating);
 
 -- 위치 기반 검색 (위도, 경도)

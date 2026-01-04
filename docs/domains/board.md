@@ -806,8 +806,8 @@ CREATE INDEX idx_board_deleted_created ON board(is_deleted, created_at);
 -- 상태별 조회
 CREATE INDEX idx_board_status ON board(status);
 
--- 검색 (제목, 내용)
-CREATE INDEX idx_board_title_content ON board(title, content);
+-- 검색 (제목, 내용) - Full-Text 인덱스
+CREATE FULLTEXT INDEX idx_board_title_content ON board(title, content);
 
 -- 사용자별 게시글 조회
 CREATE INDEX idx_board_user_deleted_created ON board(user_idx, is_deleted, created_at);
@@ -853,15 +853,16 @@ CREATE INDEX idx_comment_status ON comment(status);
 
 -- 사용자별 댓글 조회
 CREATE INDEX user_idx ON comment(user_idx);
+
 ```
 
 **comment_reaction 테이블**:
 ```sql
 -- 사용자별 반응 조회
-CREATE INDEX FK24cjwe1ksjmeujkgoa6f2pya ON comment_reaction(user_idx);
+CREATE INDEX idx_comment_reaction_user ON comment_reaction(user_idx);
 
 -- 댓글-사용자 조합 (Unique 제약조건)
-CREATE UNIQUE INDEX UKbes4ghhrkss5cdpx28ugh86gh ON comment_reaction(comment_idx, user_idx);
+CREATE UNIQUE INDEX uk_comment_reaction_comment_user ON comment_reaction(comment_idx, user_idx);
 ```
 
 **선정 이유**:
