@@ -450,44 +450,62 @@ public CommentDTO addComment(Long boardId, CommentDTO dto) {
 
 ---
 
-### 6. 펫케어 지원 승인 동시성 문제 (개선 필요)
+### 6. 펫케어 거래 확정 동시성 문제 (개선 필요)
 
 **문제 상황:**
-- 펫케어 요청에 여러 지원이 있을 때
-- 요청자가 2명의 지원을 동시에 승인하려 하면 둘 다 승인될 수 있음
-- 비즈니스 규칙: 1개 요청당 1명만 승인 가능
+- 펫케어 요청이 채팅 기반 거래 확정 방식으로 동작
+- 양쪽 모두 거래 확정 시 자동으로 CareApplication 승인 및 CareRequest 상태 변경
+- 여러 채팅방에서 동시에 확정하는 경우는 없지만, `allConfirmed` 체크와 상태 변경 사이에 Race Condition 가능성
 
-**현재 구현 (문제 있음):**
+**현재 구현:**
 ```java
-// CareRequestService.java (가정)
+// ConversationService.java
 @Transactional
-public void approveApplication(long requestId, long applicationId) {
-    CareRequest request = careRequestRepository.findById(requestId).orElseThrow();
+public void confirmCareDeal(Long conversationIdx, Long userId) {
+    Conversation conversation = conversationRepository.findById(conversationIdx).orElseThrow();
     
-    // 이미 승인된 지원 확인
-    boolean hasApproved = applicationRepository.existsByRequestAndStatus(
-        request, CareApplicationStatus.APPROVED
-    );
+    // 이미 거래 확정했는지 확인
+    ConversationParticipant participant = participantRepository
+        .findByConversationIdxAndUserIdx(conversationIdx, userId).orElseThrow();
     
-    if (hasApproved) {
-        throw new IllegalStateException("이미 승인된 지원이 있습니다.");
+    if (Boolean.TRUE.equals(participant.getDealConfirmed())) {
+        throw new IllegalStateException("이미 거래 확정을 완료했습니다.");
     }
     
-    // 승인 처리
-    CareApplication application = applicationRepository.findById(applicationId).orElseThrow();
-    application.setStatus(CareApplicationStatus.APPROVED);
-    applicationRepository.save(application);
+    // 거래 확정 처리
+    participant.setDealConfirmed(true);
+    participant.setDealConfirmedAt(LocalDateTime.now());
+    participantRepository.save(participant);
     
-    request.setStatus(CareRequestStatus.IN_PROGRESS);
-    careRequestRepository.save(request);
+    // 양쪽 모두 거래 확정했는지 확인
+    List<ConversationParticipant> allParticipants = participantRepository
+        .findByConversationIdxAndStatus(conversationIdx, ParticipantStatus.ACTIVE);
+    
+    boolean allConfirmed = allParticipants.stream()
+        .allMatch(p -> Boolean.TRUE.equals(p.getDealConfirmed()));
+    
+    // 양쪽 모두 확정했으면 CareRequest 상태 변경 및 지원 승인 처리
+    if (allConfirmed && allParticipants.size() == 2) {
+        CareRequest careRequest = careRequestRepository.findById(relatedIdx).orElseThrow();
+        
+        // 요청 상태가 OPEN인 경우에만 처리
+        if (careRequest.getStatus() == CareRequestStatus.OPEN) {
+            // CareApplication 찾기 또는 생성
+            // ...
+            careRequest.setStatus(CareRequestStatus.IN_PROGRESS);
+            careRequestRepository.save(careRequest);
+        }
+    }
 }
 ```
 
 **문제점:**
-- 두 요청이 동시에 `hasApproved`를 확인하면 둘 다 false
-- 둘 다 승인 처리 진행
+- `allConfirmed` 체크와 `careRequest.setStatus(IN_PROGRESS)` 사이에 다른 트랜잭션이 끼어들 수 있음
+- 여러 트랜잭션이 동시에 `allConfirmed = true`를 확인하고 상태 변경을 시도할 수 있음
+- 하지만 `careRequest.getStatus() == OPEN` 체크가 있어서, 이미 `IN_PROGRESS`로 변경된 경우는 무시됨
+- 실제로는 1개 요청당 1개 채팅방이므로 문제 발생 가능성은 낮지만, 이론적으로는 가능
 
-**개선 방안 1: 비관적 락**
+**개선 방안: 비관적 락**
 ```java
 // Repository에 추가
 @Lock(LockModeType.PESSIMISTIC_WRITE)
@@ -496,53 +514,28 @@ CareRequest findByIdWithLock(@Param("id") Long id);
 
 // Service에서 사용
 @Transactional
-public void approveApplication(long requestId, long applicationId) {
-    // 락 획득 (다른 트랜잭션은 대기)
-    CareRequest request = careRequestRepository.findByIdWithLock(requestId);
+public void confirmCareDeal(Long conversationIdx, Long userId) {
+    // ... (기존 로직)
     
-    boolean hasApproved = applicationRepository.existsByRequestAndStatus(
-        request, CareApplicationStatus.APPROVED
-    );
-    
-    if (hasApproved) {
-        throw new IllegalStateException("이미 승인된 지원이 있습니다.");
-    }
-    
-    // 승인 처리
-    CareApplication application = applicationRepository.findById(applicationId).orElseThrow();
-    application.setStatus(CareApplicationStatus.APPROVED);
-    applicationRepository.save(application);
-    
-    request.setStatus(CareRequestStatus.IN_PROGRESS);
-    careRequestRepository.save(request);
-}
-```
-
-**개선 방안 2: Unique 제약조건 (부분 인덱스)**
-```sql
--- MySQL 8.0.13+ 또는 PostgreSQL
-CREATE UNIQUE INDEX idx_unique_approved_application 
-ON care_application(care_request_idx) 
-WHERE status = 'APPROVED';
-```
-
-```java
-@Transactional
-public void approveApplication(long requestId, long applicationId) {
-    try {
-        CareApplication application = applicationRepository.findById(applicationId).orElseThrow();
-        application.setStatus(CareApplicationStatus.APPROVED);
-        applicationRepository.save(application);  // Unique 제약 체크
+    if (allConfirmed && allParticipants.size() == 2) {
+        // 락 획득 (다른 트랜잭션은 대기)
+        CareRequest careRequest = careRequestRepository.findByIdWithLock(relatedIdx).orElseThrow();
         
-        CareRequest request = application.getCareRequest();
-        request.setStatus(CareRequestStatus.IN_PROGRESS);
-        careRequestRepository.save(request);
-        
-    } catch (DataIntegrityViolationException e) {
-        throw new IllegalStateException("이미 승인된 지원이 있습니다.");
+        // 다시 상태 확인 (락 획득 후)
+        if (careRequest.getStatus() == CareRequestStatus.OPEN) {
+            // CareApplication 처리
+            // ...
+            careRequest.setStatus(CareRequestStatus.IN_PROGRESS);
+            careRequestRepository.save(careRequest);
+        }
     }
 }
 ```
+
+**효과:**
+- 비관적 락으로 동시 접근 방지
+- 상태 변경이 원자적으로 처리됨
+- Race Condition 완전 방지
 
 ---
 
