@@ -90,11 +90,16 @@ public class LocationServiceReviewService {
         return converter.toDTO(savedReview);
     }
 
-    // 리뷰 삭제
+    // 리뷰 삭제 (Soft Delete)
     @Transactional
     public void deleteReview(Long reviewIdx) {
         LocationServiceReview review = reviewRepository.findById(reviewIdx)
                 .orElseThrow(() -> new RuntimeException("리뷰를 찾을 수 없습니다."));
+
+        // 이미 삭제된 리뷰인지 확인
+        if (review.getIsDeleted() != null && review.getIsDeleted()) {
+            throw new RuntimeException("이미 삭제된 리뷰입니다.");
+        }
 
         // 이메일 인증 확인
         Users user = review.getUser();
@@ -104,10 +109,13 @@ public class LocationServiceReviewService {
                     com.linkup.Petory.domain.user.entity.EmailVerificationPurpose.LOCATION_REVIEW);
         }
 
-        Long serviceIdx = review.getService().getIdx();
-        reviewRepository.delete(review);
+        // Soft Delete 처리
+        review.setIsDeleted(true);
+        review.setDeletedAt(java.time.LocalDateTime.now());
+        reviewRepository.save(review);
 
         // 서비스 평점 업데이트
+        Long serviceIdx = review.getService().getIdx();
         updateServiceRating(serviceIdx);
     }
 
