@@ -1,48 +1,46 @@
 package com.linkup.Petory.domain.location.repository;
 
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
-import org.springframework.stereotype.Repository;
-
-import com.linkup.Petory.domain.location.entity.LocationServiceReview;
-
 import java.util.List;
 import java.util.Optional;
 
-@Repository
-public interface LocationServiceReviewRepository extends JpaRepository<LocationServiceReview, Long> {
+import com.linkup.Petory.domain.location.entity.LocationServiceReview;
 
-    // 특정 서비스의 모든 리뷰 조회
-    @Query("SELECT r FROM LocationServiceReview r WHERE " +
-            "r.service.idx = :serviceIdx AND " +
-            "(r.isDeleted IS NULL OR r.isDeleted = false) " +
-            "ORDER BY r.createdAt DESC")
-    List<LocationServiceReview> findByServiceIdxOrderByCreatedAtDesc(@Param("serviceIdx") Long serviceIdx);
+/**
+ * LocationServiceReview 도메인 Repository 인터페이스입니다.
+ */
+public interface LocationServiceReviewRepository {
 
-    // 특정 사용자의 리뷰 조회
-    @Query("SELECT r FROM LocationServiceReview r WHERE " +
-            "r.user.idx = :userIdx AND " +
-            "(r.isDeleted IS NULL OR r.isDeleted = false) " +
-            "ORDER BY r.createdAt DESC")
-    List<LocationServiceReview> findByUserIdxOrderByCreatedAtDesc(@Param("userIdx") Long userIdx);
+    // 기본 CRUD 메서드
+    LocationServiceReview save(LocationServiceReview review);
 
-    // 특정 서비스의 평균 평점 계산
-    @Query("SELECT AVG(r.rating) FROM LocationServiceReview r WHERE " +
-            "r.service.idx = :serviceIdx AND " +
-            "(r.isDeleted IS NULL OR r.isDeleted = false)")
-    Optional<Double> findAverageRatingByServiceIdx(@Param("serviceIdx") Long serviceIdx);
+    Optional<LocationServiceReview> findById(Long id);
 
-    // 특정 서비스의 리뷰 개수
-    @Query("SELECT COUNT(r) FROM LocationServiceReview r WHERE " +
-            "r.service.idx = :serviceIdx AND " +
-            "(r.isDeleted IS NULL OR r.isDeleted = false)")
-    Long countByServiceIdx(@Param("serviceIdx") Long serviceIdx);
+    void delete(LocationServiceReview review);
 
-    // 특정 사용자가 특정 서비스에 리뷰를 작성했는지 확인
-    @Query("SELECT COUNT(r) > 0 FROM LocationServiceReview r WHERE " +
-            "r.service.idx = :serviceIdx AND " +
-            "r.user.idx = :userIdx AND " +
-            "(r.isDeleted IS NULL OR r.isDeleted = false)")
-    boolean existsByServiceIdxAndUserIdx(@Param("serviceIdx") Long serviceIdx, @Param("userIdx") Long userIdx);
+    void deleteById(Long id);
+
+    /**
+     * 특정 서비스의 모든 리뷰 조회
+     */
+    List<LocationServiceReview> findByServiceIdxOrderByCreatedAtDesc(Long serviceIdx);
+
+    /**
+     * 특정 사용자의 리뷰 조회
+     */
+    List<LocationServiceReview> findByUserIdxOrderByCreatedAtDesc(Long userIdx);
+
+    /**
+     * 특정 서비스의 평균 평점 계산
+     */
+    Optional<Double> findAverageRatingByServiceIdx(Long serviceIdx);
+
+    /**
+     * 특정 서비스의 리뷰 개수
+     */
+    Long countByServiceIdx(Long serviceIdx);
+
+    /**
+     * 특정 사용자가 특정 서비스에 리뷰를 작성했는지 확인
+     */
+    boolean existsByServiceIdxAndUserIdx(Long serviceIdx, Long userIdx);
 }
