@@ -1,22 +1,15 @@
 package com.linkup.Petory.domain.care.repository;
 
 import java.util.List;
-import java.util.Optional;
+
+import org.springframework.data.jpa.repository.JpaRepository;
 
 import com.linkup.Petory.domain.care.entity.CareReview;
 
 /**
- * CareReview 도메인 Repository 인터페이스입니다.
+ * Spring Data JPA 전용 인터페이스입니다.
  */
-public interface CareReviewRepository {
-
-    CareReview save(CareReview careReview);
-
-    Optional<CareReview> findById(Long id);
-
-    void delete(CareReview careReview);
-
-    void deleteById(Long id);
+public interface SpringDataJpaCareReviewRepository extends JpaRepository<CareReview, Long> {
 
     /**
      * 특정 사용자(reviewee)에 대한 리뷰 목록 조회
@@ -38,3 +31,4 @@ public interface CareReviewRepository {
      */
     boolean existsByCareApplicationIdxAndReviewerIdx(Long careApplicationIdx, Long reviewerIdx);
 }
+
