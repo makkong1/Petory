@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import styled from 'styled-components';
-import { missingPetAdminApi } from '../../../api/missingPetAdminApi';
+import { missingPetAdminApi } from '../../../api/missingPetAdminApi.js';
 
 const MissingPetManagementSection = () => {
   const [status, setStatus] = useState('');

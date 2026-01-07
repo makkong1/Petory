@@ -4,6 +4,7 @@ import com.linkup.Petory.domain.user.dto.LoginRequest;
 import com.linkup.Petory.domain.user.dto.TokenResponse;
 import com.linkup.Petory.domain.user.dto.UsersDTO;
 import com.linkup.Petory.domain.user.service.AuthService;
+import com.linkup.Petory.domain.user.service.EmailVerificationService;
 import com.linkup.Petory.domain.user.service.UsersService;
 import com.linkup.Petory.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +26,7 @@ public class AuthController {
 
     private final AuthService authService;
     private final UsersService usersService;
+    private final EmailVerificationService emailVerificationService;
     private final JwtUtil jwtUtil;
     private final AuthenticationManager authenticationManager;
 
@@ -186,6 +188,45 @@ public class AuthController {
             log.error("로그아웃 실패: {}", e.getMessage());
             Map<String, Object> response = new HashMap<>();
             response.put("error", "로그아웃 중 오류가 발생했습니다.");
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    /**
+     * 비밀번호 찾기 - 비밀번호 재설정 이메일 발송 (인증 불필요)
+     */
+    @PostMapping("/forgot-password")
+    public ResponseEntity<Map<String, Object>> forgotPassword(@RequestBody Map<String, String> request) {
+        try {
+            String email = request.get("email");
+
+            if (email == null || email.isEmpty()) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "이메일을 입력해주세요.");
+                return ResponseEntity.badRequest().body(response);
+            }
+
+            emailVerificationService.sendPasswordResetEmail(email);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "비밀번호 재설정 링크가 이메일로 발송되었습니다. 이메일을 확인해주세요.");
+
+            log.info("비밀번호 찾기 이메일 발송 성공: email={}", email);
+            return ResponseEntity.ok(response);
+
+        } catch (RuntimeException e) {
+            log.error("비밀번호 찾기 실패: {}", e.getMessage());
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        } catch (Exception e) {
+            log.error("비밀번호 찾기 중 오류 발생: {}", e.getMessage());
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", "비밀번호 재설정 이메일 발송 중 오류가 발생했습니다.");
             return ResponseEntity.badRequest().body(response);
         }
     }

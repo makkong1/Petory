@@ -58,6 +58,10 @@ public class LocationServiceDTO {
     private java.time.LocalDate lastUpdated;
     private String dataSource;
     
+    // Soft Delete 필드
+    private Boolean isDeleted;
+    private java.time.LocalDateTime deletedAt;
+    
     // 하위 호환성을 위한 필드 (deprecated)
     @Deprecated
     private java.time.LocalTime openingTime; // operatingHours로 통합됨

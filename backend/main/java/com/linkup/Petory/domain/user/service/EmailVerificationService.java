@@ -86,6 +86,29 @@ public class EmailVerificationService {
     }
 
     /**
+     * 비밀번호 재설정 이메일 발송 (이메일 기반, 인증 불필요)
+     * 
+     * @param email 이메일 주소
+     */
+    public void sendPasswordResetEmail(String email) {
+        if (email == null || email.isEmpty()) {
+            throw new RuntimeException("이메일을 입력해주세요.");
+        }
+
+        // 해당 이메일로 가입된 사용자가 있는지 확인
+        Users user = usersRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("해당 이메일로 가입된 사용자를 찾을 수 없습니다."));
+
+        // 인증 토큰 생성 (이메일 기반)
+        String token = jwtUtil.createEmailVerificationTokenByEmail(email, EmailVerificationPurpose.PASSWORD_RESET);
+
+        // 이메일 발송 (비동기)
+        emailService.sendVerificationEmail(email, token, EmailVerificationPurpose.PASSWORD_RESET);
+
+        log.info("비밀번호 재설정 이메일 발송 요청: email={}, userId={}", email, user.getId());
+    }
+
+    /**
      * 회원가입 전 이메일 인증 완료 처리 (Redis에 저장)
      * 
      * @param token 인증 토큰

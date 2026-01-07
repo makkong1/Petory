@@ -2,6 +2,7 @@ package com.linkup.Petory.domain.user.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.BatchSize;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -81,7 +82,10 @@ public class Pet extends BaseTimeEntity {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
+    // [3단계 최적화] PetVaccination N+1 문제 해결: @BatchSize 사용
+    // Hibernate의 중첩 컬렉션 FETCH JOIN 제한으로 인해 @BatchSize로 대체
     @OneToMany(mappedBy = "pet", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @BatchSize(size = 50) // 한 번에 최대 50개의 Pet의 vaccinations를 배치로 조회
     private List<PetVaccination> vaccinations; // 예방접종 기록 목록
 
 }

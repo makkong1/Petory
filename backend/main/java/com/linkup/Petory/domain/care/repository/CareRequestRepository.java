@@ -16,24 +16,38 @@ import com.linkup.Petory.domain.user.entity.Users;
 public interface CareRequestRepository extends JpaRepository<CareRequest, Long> {
 
         // 사용자별 케어 요청 조회 (최신순) - 작성자도 활성 상태여야 함
-        @Query("SELECT cr FROM CareRequest cr JOIN FETCH cr.user u LEFT JOIN FETCH cr.pet WHERE cr.user = :user AND cr.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY cr.createdAt DESC")
+        // [1단계 최적화] CareApplication N+1 문제 해결: LEFT JOIN FETCH cr.applications 추가
+        // [3단계 최적화] PetVaccination N+1 문제 해결: @BatchSize 사용 (Hibernate 중첩 컬렉션 제한으로 인해
+        // FETCH JOIN 제거)
+        @Query("SELECT DISTINCT cr FROM CareRequest cr JOIN FETCH cr.user u LEFT JOIN FETCH cr.pet LEFT JOIN FETCH cr.applications WHERE cr.user = :user AND cr.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY cr.createdAt DESC")
         List<CareRequest> findByUserAndIsDeletedFalseOrderByCreatedAtDesc(@Param("user") Users user);
 
         // 전체 케어 요청 조회 - 작성자도 활성 상태여야 함
-        @Query("SELECT cr FROM CareRequest cr JOIN FETCH cr.user u LEFT JOIN FETCH cr.pet WHERE cr.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY cr.createdAt DESC")
+        // [1단계 최적화] CareApplication N+1 문제 해결: LEFT JOIN FETCH cr.applications 추가
+        // [3단계 최적화] PetVaccination N+1 문제 해결: @BatchSize 사용 (Hibernate 중첩 컬렉션 제한으로 인해
+        // FETCH JOIN 제거)
+        @Query("SELECT DISTINCT cr FROM CareRequest cr JOIN FETCH cr.user u LEFT JOIN FETCH cr.pet LEFT JOIN FETCH cr.applications WHERE cr.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY cr.createdAt DESC")
         List<CareRequest> findAllActiveRequests();
 
         // 상태별 케어 요청 조회 - 작성자도 활성 상태여야 함
-        @Query("SELECT cr FROM CareRequest cr JOIN FETCH cr.user u LEFT JOIN FETCH cr.pet WHERE cr.status = :status AND cr.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY cr.createdAt DESC")
+        // [1단계 최적화] CareApplication N+1 문제 해결: LEFT JOIN FETCH cr.applications 추가
+        // [3단계 최적화] PetVaccination N+1 문제 해결: @BatchSize 사용 (Hibernate 중첩 컬렉션 제한으로 인해
+        // FETCH JOIN 제거)
+        @Query("SELECT DISTINCT cr FROM CareRequest cr JOIN FETCH cr.user u LEFT JOIN FETCH cr.pet LEFT JOIN FETCH cr.applications WHERE cr.status = :status AND cr.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY cr.createdAt DESC")
         List<CareRequest> findByStatusAndIsDeletedFalse(@Param("status") CareRequestStatus status);
 
         // 위치별 케어 요청 조회 (사용자 위치 기반)
         List<CareRequest> findByUser_LocationContaining(String location);
 
         // 제목이나 설명에 키워드 포함된 케어 요청 검색 - 작성자도 활성 상태여야 함
-        @Query("SELECT cr FROM CareRequest cr JOIN cr.user u WHERE cr.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' AND " +
+        // [1단계 최적화] CareApplication N+1 문제 해결: LEFT JOIN FETCH cr.applications 추가
+        // [3단계 최적화] PetVaccination N+1 문제 해결: @BatchSize 사용 (Hibernate 중첩 컬렉션 제한으로 인해
+        // FETCH JOIN 제거)
+        @Query("SELECT DISTINCT cr FROM CareRequest cr JOIN FETCH cr.user u LEFT JOIN FETCH cr.pet LEFT JOIN FETCH cr.applications WHERE cr.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' AND "
+                        +
                         "(LOWER(cr.title) LIKE LOWER(CONCAT('%', :titleKeyword, '%')) OR " +
-                        "LOWER(CAST(cr.description AS string)) LIKE LOWER(CONCAT('%', :descKeyword, '%')))")
+                        "LOWER(CAST(cr.description AS string)) LIKE LOWER(CONCAT('%', :descKeyword, '%'))) " +
+                        "ORDER BY cr.createdAt DESC")
         List<CareRequest> findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCaseAndIsDeletedFalse(
                         @Param("titleKeyword") String titleKeyword,
                         @Param("descKeyword") String descKeyword);
@@ -45,8 +59,16 @@ public interface CareRequestRepository extends JpaRepository<CareRequest, Long> 
                         @Param("statuses") List<CareRequestStatus> statuses);
 
         // 단일 케어 요청 조회 (펫 정보 포함)
+        // [3단계 최적화] PetVaccination N+1 문제 해결: @BatchSize 사용 (Hibernate 중첩 컬렉션 제한으로 인해
+        // FETCH JOIN 제거)
         @Query("SELECT cr FROM CareRequest cr LEFT JOIN FETCH cr.pet LEFT JOIN FETCH cr.user WHERE cr.idx = :idx")
         java.util.Optional<CareRequest> findByIdWithPet(@Param("idx") Long idx);
+
+        // 단일 케어 요청 조회 (펫 정보 및 지원 정보 포함)
+        // [3단계 최적화] PetVaccination N+1 문제 해결: @BatchSize 사용 (Hibernate 중첩 컬렉션 제한으로 인해
+        // FETCH JOIN 제거)
+        @Query("SELECT cr FROM CareRequest cr LEFT JOIN FETCH cr.pet LEFT JOIN FETCH cr.user LEFT JOIN FETCH cr.applications WHERE cr.idx = :idx")
+        java.util.Optional<CareRequest> findByIdWithApplications(@Param("idx") Long idx);
 
         // 통계용
         long countByCreatedAtBetween(LocalDateTime start, LocalDateTime end);

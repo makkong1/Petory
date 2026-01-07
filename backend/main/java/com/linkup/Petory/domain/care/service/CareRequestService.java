@@ -3,6 +3,9 @@ package com.linkup.Petory.domain.care.service;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -10,16 +13,18 @@ import com.linkup.Petory.domain.care.converter.CareRequestConverter;
 import com.linkup.Petory.domain.care.dto.CareRequestDTO;
 import com.linkup.Petory.domain.care.entity.CareRequest;
 import com.linkup.Petory.domain.care.entity.CareRequestStatus;
+import com.linkup.Petory.domain.care.entity.CareApplicationStatus;
 import com.linkup.Petory.domain.care.repository.CareRequestRepository;
 import com.linkup.Petory.domain.user.entity.Pet;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException;
 import com.linkup.Petory.domain.user.repository.PetRepository;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
-import com.linkup.Petory.domain.user.service.EmailVerificationService;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class CareRequestService {
@@ -28,7 +33,20 @@ public class CareRequestService {
     private final UsersRepository usersRepository;
     private final PetRepository petRepository;
     private final CareRequestConverter careRequestConverter;
-    private final EmailVerificationService emailVerificationService;
+    // private final EmailVerificationService emailVerificationService;
+
+    /**
+     * 현재 사용자가 관리자(ADMIN 또는 MASTER)인지 확인
+     */
+    private boolean isAdmin() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || authentication.getAuthorities() == null) {
+            return false;
+        }
+        return authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .anyMatch(authority -> authority.equals("ROLE_ADMIN") || authority.equals("ROLE_MASTER"));
+    }
 
     // 전체 케어 요청 조회 (필터링 포함) - 작성자도 활성 상태여야 함
     @Transactional(readOnly = true)
@@ -61,7 +79,7 @@ public class CareRequestService {
         if (Boolean.TRUE.equals(request.getIsDeleted())) {
             throw new RuntimeException("CareRequest not found");
         }
-        
+
         return careRequestConverter.toDTO(request);
     }
 
@@ -71,9 +89,11 @@ public class CareRequestService {
         // 이메일 인증 확인
         Users user = usersRepository.findById(dto.getUserId())
                 .orElseThrow(() -> new RuntimeException("User not found"));
-        
+
         if (user.getEmailVerified() == null || !user.getEmailVerified()) {
-            throw new EmailVerificationRequiredException("펫케어 서비스 이용을 위해 이메일 인증이 필요합니다.");
+            throw new EmailVerificationRequiredException(
+                    "펫케어 서비스 이용을 위해 이메일 인증이 필요합니다.",
+                    com.linkup.Petory.domain.user.entity.EmailVerificationPurpose.PET_CARE);
         }
 
         CareRequest.CareRequestBuilder builder = CareRequest.builder()
@@ -100,9 +120,14 @@ public class CareRequestService {
 
     // 케어 요청 수정
     @Transactional
-    public CareRequestDTO updateCareRequest(Long idx, CareRequestDTO dto) {
+    public CareRequestDTO updateCareRequest(Long idx, CareRequestDTO dto, Long currentUserId) {
         CareRequest request = careRequestRepository.findById(idx)
                 .orElseThrow(() -> new RuntimeException("CareRequest not found"));
+
+        // 작성자 확인 (관리자는 우회)
+        if (!isAdmin() && !request.getUser().getIdx().equals(currentUserId)) {
+            throw new RuntimeException("본인의 케어 요청만 수정할 수 있습니다.");
+        }
 
         if (dto.getTitle() != null)
             request.setTitle(dto.getTitle());
@@ -131,9 +156,15 @@ public class CareRequestService {
 
     // 케어 요청 삭제
     @Transactional
-    public void deleteCareRequest(Long idx) {
+    public void deleteCareRequest(Long idx, Long currentUserId) {
         CareRequest request = careRequestRepository.findById(idx)
                 .orElseThrow(() -> new RuntimeException("CareRequest not found"));
+
+        // 작성자 확인 (관리자는 우회)
+        if (!isAdmin() && !request.getUser().getIdx().equals(currentUserId)) {
+            throw new RuntimeException("본인의 케어 요청만 삭제할 수 있습니다.");
+        }
+
         request.setIsDeleted(true);
         request.setDeletedAt(java.time.LocalDateTime.now());
         careRequestRepository.save(request);
@@ -151,9 +182,23 @@ public class CareRequestService {
 
     // 상태 변경
     @Transactional
-    public CareRequestDTO updateStatus(Long idx, String status) {
-        CareRequest request = careRequestRepository.findById(idx)
+    public CareRequestDTO updateStatus(Long idx, String status, Long currentUserId) {
+        CareRequest request = careRequestRepository.findByIdWithApplications(idx)
                 .orElseThrow(() -> new RuntimeException("CareRequest not found"));
+
+        // 관리자는 권한 검증 우회
+        if (!isAdmin()) {
+            // 작성자 또는 승인된 제공자만 상태 변경 가능
+            boolean isRequester = request.getUser().getIdx().equals(currentUserId);
+            boolean isAcceptedProvider = request.getApplications() != null &&
+                    request.getApplications().stream()
+                            .anyMatch(app -> app.getStatus() == CareApplicationStatus.ACCEPTED
+                                    && app.getProvider().getIdx().equals(currentUserId));
+
+            if (!isRequester && !isAcceptedProvider) {
+                throw new RuntimeException("작성자 또는 승인된 제공자만 상태를 변경할 수 있습니다.");
+            }
+        }
 
         request.setStatus(CareRequestStatus.valueOf(status));
         CareRequest updated = careRequestRepository.save(request);
@@ -166,9 +211,11 @@ public class CareRequestService {
         if (keyword == null || keyword.trim().isEmpty()) {
             return getAllCareRequests(null, null);
         }
+
         List<CareRequest> requests = careRequestRepository
                 .findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCaseAndIsDeletedFalse(
                         keyword.trim(), keyword.trim());
+
         return careRequestConverter.toDTOList(requests);
     }
 }

@@ -257,7 +257,9 @@ public class BoardService {
         // 이메일 인증 확인
         Users user = board.getUser();
         if (user.getEmailVerified() == null || !user.getEmailVerified()) {
-            throw new EmailVerificationRequiredException("게시글 수정을 위해 이메일 인증이 필요합니다.");
+            throw new EmailVerificationRequiredException(
+                    "게시글 수정을 위해 이메일 인증이 필요합니다.",
+                    com.linkup.Petory.domain.user.entity.EmailVerificationPurpose.BOARD_EDIT);
         }
 
         if (dto.getTitle() != null)
@@ -287,7 +289,9 @@ public class BoardService {
         // 이메일 인증 확인
         Users user = board.getUser();
         if (user.getEmailVerified() == null || !user.getEmailVerified()) {
-            throw new EmailVerificationRequiredException("게시글 삭제를 위해 이메일 인증이 필요합니다.");
+            throw new EmailVerificationRequiredException(
+                    "게시글 삭제를 위해 이메일 인증이 필요합니다.",
+                    com.linkup.Petory.domain.user.entity.EmailVerificationPurpose.BOARD_EDIT);
         }
 
         // Soft delete: mark as DELETED and keep related data for audit/hard-delete

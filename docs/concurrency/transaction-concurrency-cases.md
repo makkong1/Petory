@@ -315,7 +315,93 @@ try {
 
 ---
 
-### 3. 댓글 수 동기화 문제 (개선 필요)
+### 3. 경고 횟수 원자적 증가 (구현 완료)
+
+**문제 상황:**
+- 여러 관리자가 동시에 같은 사용자에게 경고를 부여하면 경고 횟수가 부정확할 수 있음
+- Lost Update 발생 가능
+
+**해결 코드:**
+```java
+// UsersRepository.java
+@Modifying
+@Query("UPDATE Users u SET u.warningCount = u.warningCount + 1 WHERE u.idx = :userId")
+int incrementWarningCount(@Param("userId") Long userId);
+
+// UserSanctionService.java
+@Transactional
+public UserSanction addWarning(Long userId, String reason, Long adminId, Long reportId) {
+    // ...
+    sanctionRepository.save(warning);
+    
+    // 경고 횟수 원자적 증가 (DB 레벨에서 처리)
+    usersRepository.incrementWarningCount(userId);
+    
+    // 업데이트된 사용자 정보 다시 조회
+    user = usersRepository.findById(userId).orElseThrow();
+    
+    // 경고 3회 이상이면 자동 이용제한
+    if (user.getWarningCount() >= WARNING_THRESHOLD) {
+        addSuspension(userId, ...);
+    }
+    
+    return warning;
+}
+```
+
+**효과:**
+- DB 레벨에서 원자적 증가
+- 여러 관리자가 동시에 경고를 부여해도 정확한 횟수 보장
+- Lost Update 완전 방지
+
+---
+
+### 4. 모임 참여 인원 원자적 증가 (구현 완료)
+
+**문제 상황:**
+- 여러 사용자가 동시에 모임에 참여하면 최대 인원을 초과할 수 있음
+- Race Condition 발생 가능
+
+**해결 코드:**
+```java
+// MeetupRepository.java
+@Modifying
+@Query("UPDATE Meetup m SET m.currentParticipants = m.currentParticipants + 1 " +
+       "WHERE m.idx = :meetupIdx " +
+       "  AND m.currentParticipants < m.maxParticipants")
+int incrementParticipantsIfAvailable(@Param("meetupIdx") Long meetupIdx);
+
+// MeetupService.java
+@Transactional
+public void joinMeetup(Long meetupIdx, String userId) {
+    // ...
+    // 원자적 UPDATE 쿼리로 인원 증가 (조건 체크 포함)
+    int updated = meetupRepository.incrementParticipantsIfAvailable(meetupIdx);
+    
+    if (updated == 0) {
+        throw new IllegalStateException("모임 인원이 가득 찼습니다.");
+    }
+    
+    // 업데이트 후 모임 정보 다시 조회
+    Meetup meetup = meetupRepository.findById(meetupIdx).orElseThrow();
+    
+    // 참가자 추가
+    MeetupParticipants participant = MeetupParticipants.builder()
+            .meetup(meetup)
+            .user(user)
+            .build();
+    meetupParticipantsRepository.save(participant);
+}
+```
+
+**효과:**
+- DB 레벨에서 원자적 증가 및 조건 체크
+- 최대 인원 초과 방지
+- 동시에 여러 사용자가 참여해도 정확한 인원 수 보장
+
+---
+
+### 5. 댓글 수 동기화 문제 (개선 필요)
 
 **현재 구현:**
 ```java
@@ -364,44 +450,62 @@ public CommentDTO addComment(Long boardId, CommentDTO dto) {
 
 ---
 
-### 4. 펫케어 지원 승인 동시성 문제 (개선 필요)
+### 6. 펫케어 거래 확정 동시성 문제 (개선 필요)
 
 **문제 상황:**
-- 펫케어 요청에 여러 지원이 있을 때
-- 요청자가 2명의 지원을 동시에 승인하려 하면 둘 다 승인될 수 있음
-- 비즈니스 규칙: 1개 요청당 1명만 승인 가능
+- 펫케어 요청이 채팅 기반 거래 확정 방식으로 동작
+- 양쪽 모두 거래 확정 시 자동으로 CareApplication 승인 및 CareRequest 상태 변경
+- 여러 채팅방에서 동시에 확정하는 경우는 없지만, `allConfirmed` 체크와 상태 변경 사이에 Race Condition 가능성
 
-**현재 구현 (문제 있음):**
+**현재 구현:**
 ```java
-// CareRequestService.java (가정)
+// ConversationService.java
 @Transactional
-public void approveApplication(long requestId, long applicationId) {
-    CareRequest request = careRequestRepository.findById(requestId).orElseThrow();
+public void confirmCareDeal(Long conversationIdx, Long userId) {
+    Conversation conversation = conversationRepository.findById(conversationIdx).orElseThrow();
     
-    // 이미 승인된 지원 확인
-    boolean hasApproved = applicationRepository.existsByRequestAndStatus(
-        request, CareApplicationStatus.APPROVED
-    );
+    // 이미 거래 확정했는지 확인
+    ConversationParticipant participant = participantRepository
+        .findByConversationIdxAndUserIdx(conversationIdx, userId).orElseThrow();
     
-    if (hasApproved) {
-        throw new IllegalStateException("이미 승인된 지원이 있습니다.");
+    if (Boolean.TRUE.equals(participant.getDealConfirmed())) {
+        throw new IllegalStateException("이미 거래 확정을 완료했습니다.");
     }
     
-    // 승인 처리
-    CareApplication application = applicationRepository.findById(applicationId).orElseThrow();
-    application.setStatus(CareApplicationStatus.APPROVED);
-    applicationRepository.save(application);
+    // 거래 확정 처리
+    participant.setDealConfirmed(true);
+    participant.setDealConfirmedAt(LocalDateTime.now());
+    participantRepository.save(participant);
     
-    request.setStatus(CareRequestStatus.IN_PROGRESS);
-    careRequestRepository.save(request);
+    // 양쪽 모두 거래 확정했는지 확인
+    List<ConversationParticipant> allParticipants = participantRepository
+        .findByConversationIdxAndStatus(conversationIdx, ParticipantStatus.ACTIVE);
+    
+    boolean allConfirmed = allParticipants.stream()
+        .allMatch(p -> Boolean.TRUE.equals(p.getDealConfirmed()));
+    
+    // 양쪽 모두 확정했으면 CareRequest 상태 변경 및 지원 승인 처리
+    if (allConfirmed && allParticipants.size() == 2) {
+        CareRequest careRequest = careRequestRepository.findById(relatedIdx).orElseThrow();
+        
+        // 요청 상태가 OPEN인 경우에만 처리
+        if (careRequest.getStatus() == CareRequestStatus.OPEN) {
+            // CareApplication 찾기 또는 생성
+            // ...
+            careRequest.setStatus(CareRequestStatus.IN_PROGRESS);
+            careRequestRepository.save(careRequest);
+        }
+    }
 }
 ```
 
 **문제점:**
-- 두 요청이 동시에 `hasApproved`를 확인하면 둘 다 false
-- 둘 다 승인 처리 진행
+- `allConfirmed` 체크와 `careRequest.setStatus(IN_PROGRESS)` 사이에 다른 트랜잭션이 끼어들 수 있음
+- 여러 트랜잭션이 동시에 `allConfirmed = true`를 확인하고 상태 변경을 시도할 수 있음
+- 하지만 `careRequest.getStatus() == OPEN` 체크가 있어서, 이미 `IN_PROGRESS`로 변경된 경우는 무시됨
+- 실제로는 1개 요청당 1개 채팅방이므로 문제 발생 가능성은 낮지만, 이론적으로는 가능
 
-**개선 방안 1: 비관적 락**
+**개선 방안: 비관적 락**
 ```java
 // Repository에 추가
 @Lock(LockModeType.PESSIMISTIC_WRITE)
@@ -410,53 +514,28 @@ CareRequest findByIdWithLock(@Param("id") Long id);
 
 // Service에서 사용
 @Transactional
-public void approveApplication(long requestId, long applicationId) {
-    // 락 획득 (다른 트랜잭션은 대기)
-    CareRequest request = careRequestRepository.findByIdWithLock(requestId);
+public void confirmCareDeal(Long conversationIdx, Long userId) {
+    // ... (기존 로직)
     
-    boolean hasApproved = applicationRepository.existsByRequestAndStatus(
-        request, CareApplicationStatus.APPROVED
-    );
-    
-    if (hasApproved) {
-        throw new IllegalStateException("이미 승인된 지원이 있습니다.");
-    }
-    
-    // 승인 처리
-    CareApplication application = applicationRepository.findById(applicationId).orElseThrow();
-    application.setStatus(CareApplicationStatus.APPROVED);
-    applicationRepository.save(application);
-    
-    request.setStatus(CareRequestStatus.IN_PROGRESS);
-    careRequestRepository.save(request);
-}
-```
-
-**개선 방안 2: Unique 제약조건 (부분 인덱스)**
-```sql
--- MySQL 8.0.13+ 또는 PostgreSQL
-CREATE UNIQUE INDEX idx_unique_approved_application 
-ON care_application(care_request_idx) 
-WHERE status = 'APPROVED';
-```
-
-```java
-@Transactional
-public void approveApplication(long requestId, long applicationId) {
-    try {
-        CareApplication application = applicationRepository.findById(applicationId).orElseThrow();
-        application.setStatus(CareApplicationStatus.APPROVED);
-        applicationRepository.save(application);  // Unique 제약 체크
+    if (allConfirmed && allParticipants.size() == 2) {
+        // 락 획득 (다른 트랜잭션은 대기)
+        CareRequest careRequest = careRequestRepository.findByIdWithLock(relatedIdx).orElseThrow();
         
-        CareRequest request = application.getCareRequest();
-        request.setStatus(CareRequestStatus.IN_PROGRESS);
-        careRequestRepository.save(request);
-        
-    } catch (DataIntegrityViolationException e) {
-        throw new IllegalStateException("이미 승인된 지원이 있습니다.");
+        // 다시 상태 확인 (락 획득 후)
+        if (careRequest.getStatus() == CareRequestStatus.OPEN) {
+            // CareApplication 처리
+            // ...
+            careRequest.setStatus(CareRequestStatus.IN_PROGRESS);
+            careRequestRepository.save(careRequest);
+        }
     }
 }
 ```
+
+**효과:**
+- 비관적 락으로 동시 접근 방지
+- 상태 변경이 원자적으로 처리됨
+- Race Condition 완전 방지
 
 ---
 
@@ -489,13 +568,15 @@ public void criticalMethod() {
 2. **읽기 전용 최적화**: `@Transactional(readOnly = true)` 기본값 사용
 3. **조회수 중복 방지**: BoardViewLog를 통한 사용자별 1회 제한
 4. **반응 중복 방지**: Unique 제약조건으로 DB 레벨 보장
+5. **경고 횟수 원자적 증가**: DB 레벨 UPDATE 쿼리로 Lost Update 방지
+6. **모임 참여 인원 원자적 증가**: DB 레벨 UPDATE 쿼리로 최대 인원 초과 방지
 
 ### 개선 필요 🔄
 1. **댓글 수 동기화**: UPDATE 쿼리로 원자적 증가 필요
 2. **펫케어 지원 승인**: 비관적 락 또는 Unique 제약조건 필요
-3. **모임 참여 인원**: 낙관적/비관적 락 적용 필요
 
 ### 성능 영향
 - **읽기 전용 트랜잭션**: 쓰기 락 미발생으로 조회 성능 향상
 - **트랜잭션 범위 최소화**: 불필요한 락 유지 시간 감소
+- **원자적 UPDATE 쿼리**: DB 레벨에서 처리하여 성능 및 정확성 향상
 

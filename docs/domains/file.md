@@ -326,16 +326,24 @@ GET /api/uploads/file?path=uploads/board/user/123/456/20240101_abc123def456.jpg
 ### 7.1 DB 최적화
 
 #### 인덱스 전략
+
+**file 테이블**:
 ```sql
--- 대상별 파일 조회
-CREATE INDEX idx_file_target 
-ON file(target_type, target_idx);
+-- Primary Key
+-- PRIMARY KEY (idx)
+```
+
+**참고**: 파일 테이블은 주로 `target_type`과 `target_idx`로 조회하므로, 애플리케이션 레벨에서 배치 조회를 통해 N+1 문제를 해결합니다. 필요시 다음 인덱스 추가를 고려할 수 있습니다:
+
+```sql
+-- 대상별 파일 조회 (필요시 추가)
+CREATE INDEX idx_file_target ON file(target_type, target_idx);
 ```
 
 **선정 이유**:
-- 자주 조회되는 컬럼 조합 (`target_type`, `target_idx`)
-- WHERE 절에서 자주 사용되는 조건
-- 배치 조회 쿼리 (`findByTargetTypeAndTargetIdxIn`) 최적화
+- PRIMARY KEY만 기본으로 존재
+- 배치 조회로 N+1 문제 해결
+- 필요시 복합 인덱스 추가로 조회 성능 향상 가능
 
 ### 7.2 애플리케이션 레벨 최적화
 

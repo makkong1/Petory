@@ -19,6 +19,7 @@ import ActivityPage from './components/Activity/ActivityPage';
 import MeetupPage from './components/Meetup/MeetupPage';
 import ChatWidget from './components/Chat/ChatWidget';
 import EmailVerificationPage from './components/Auth/EmailVerificationPage';
+import EmailVerificationPrompt from './components/Common/EmailVerificationPrompt';
 import { setupApiInterceptors } from './api/authApi';
 
 
@@ -28,6 +29,8 @@ function AppContent() {
   const [authMode, setAuthMode] = useState('login'); // 'login' or 'register'
   const [redirectToLogin, setRedirectToLogin] = useState(false);
   const [showGlobalPermissionModal, setShowGlobalPermissionModal] = useState(false);
+  const [showGlobalEmailVerificationPrompt, setShowGlobalEmailVerificationPrompt] = useState(false);
+  const [emailVerificationPurpose, setEmailVerificationPurpose] = useState(null);
 
   // 로그인 페이지로 리다이렉트
   useEffect(() => {
@@ -60,6 +63,33 @@ function AppContent() {
     };
   }, []);
 
+  // 전역 이메일 인증 필요 이벤트 리스너 (서버 예외 발생 시 백업용)
+  useEffect(() => {
+    const handleEmailVerificationRequired = (event) => {
+      const { purpose, currentUrl } = event.detail;
+      setEmailVerificationPurpose(purpose);
+      setShowGlobalEmailVerificationPrompt(true);
+    };
+
+    window.addEventListener('emailVerificationRequired', handleEmailVerificationRequired);
+
+    return () => {
+      window.removeEventListener('emailVerificationRequired', handleEmailVerificationRequired);
+    };
+  }, []);
+
+  // 전역 이메일 인증 확인 다이얼로그 핸들러
+  const handleEmailVerificationConfirm = () => {
+    const currentUrl = window.location.pathname + window.location.search;
+    const redirectUrl = `/email-verification?redirect=${encodeURIComponent(currentUrl)}${emailVerificationPurpose ? `&purpose=${emailVerificationPurpose}` : ''}`;
+    window.location.href = redirectUrl;
+  };
+
+  const handleEmailVerificationCancel = () => {
+    setShowGlobalEmailVerificationPrompt(false);
+    setEmailVerificationPurpose(null);
+  };
+
   // 전역 탭 전환 함수 등록
   useEffect(() => {
     window.setActiveTab = (tab) => {
@@ -81,16 +111,17 @@ function AppContent() {
   const [isOAuth2Callback, setIsOAuth2Callback] = useState(() => {
     if (typeof window === 'undefined') return false;
     const urlParams = new URLSearchParams(window.location.search);
-    return window.location.pathname.includes('oauth2/callback') || 
-           urlParams.has('accessToken') ||
-           urlParams.has('error');
+    return window.location.pathname.includes('oauth2/callback') ||
+      urlParams.has('accessToken') ||
+      urlParams.has('error');
   });
 
   // 이메일 인증 페이지 체크
   const [isEmailVerificationPage, setIsEmailVerificationPage] = useState(() => {
     if (typeof window === 'undefined') return false;
     const urlParams = new URLSearchParams(window.location.search);
-    return window.location.pathname.includes('email-verify') ||
+    return window.location.pathname.includes('email-verification') ||
+      window.location.pathname.includes('email-verify') ||
       urlParams.has('token');
   });
 
@@ -154,7 +185,7 @@ function AppContent() {
         return <ActivityPage />;
       case 'home':
       default:
-        return <HomePage setActiveTab={setActiveTab} />;
+        return <HomePage setActiveTab={setActiveTab} user={user} />;
     }
   };
 
@@ -163,6 +194,12 @@ function AppContent() {
       <PermissionDeniedModal
         isOpen={showGlobalPermissionModal}
         onClose={() => setShowGlobalPermissionModal(false)}
+      />
+      <EmailVerificationPrompt
+        isOpen={showGlobalEmailVerificationPrompt}
+        onConfirm={handleEmailVerificationConfirm}
+        onCancel={handleEmailVerificationCancel}
+        purpose={emailVerificationPurpose}
       />
       <Navigation
         activeTab={activeTab}

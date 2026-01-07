@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import styled from 'styled-components';
 import { missingPetApi } from '../../api/missingPetApi';
 import { useAuth } from '../../contexts/AuthContext';
+import { useEmailVerification } from '../../hooks/useEmailVerification';
 import MissingPetBoardForm from './MissingPetBoardForm';
 import MissingPetBoardDetail from './MissingPetBoardDetail';
 
@@ -20,6 +21,7 @@ const statusLabel = {
 
 const MissingPetBoardPage = () => {
   const { user } = useAuth();
+  const { checkAndRedirect, EmailVerificationPromptComponent } = useEmailVerification('MISSING_PET');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [boards, setBoards] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -55,6 +57,7 @@ const MissingPetBoardPage = () => {
   const loadBoardDetail = useCallback(
     async (id) => {
       if (!id) return;
+      
       try {
         setDetailLoading(true);
         const response = await missingPetApi.get(id);
@@ -106,6 +109,11 @@ const MissingPetBoardPage = () => {
     if (!user) {
       window.dispatchEvent(new Event('showPermissionModal'));
       return;
+    }
+
+    // 이메일 인증 체크
+    if (!checkAndRedirect()) {
+      return; // 이메일 인증이 필요하면 확인 다이얼로그 표시되고 함수 종료
     }
 
     try {
@@ -168,6 +176,7 @@ const MissingPetBoardPage = () => {
 
   return (
     <>
+      <EmailVerificationPromptComponent />
       <Wrapper>
         <Header>
           <div>

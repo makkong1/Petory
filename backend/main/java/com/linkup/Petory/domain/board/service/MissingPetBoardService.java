@@ -1,8 +1,10 @@
 package com.linkup.Petory.domain.board.service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -24,7 +26,9 @@ import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -38,16 +42,29 @@ public class MissingPetBoardService {
     private final NotificationService notificationService;
 
     public List<MissingPetBoardDTO> getBoards(MissingPetStatus status) {
+        // JOIN FETCH를 사용하여 댓글까지 함께 조회 (N+1 문제 해결)
         List<MissingPetBoard> boards = status == null
-                ? boardRepository.findAllByOrderByCreatedAtDesc()
-                : boardRepository.findByStatusOrderByCreatedAtDesc(status);
+                ? boardRepository.findAllWithCommentsByOrderByCreatedAtDesc()
+                : boardRepository.findByStatusWithCommentsOrderByCreatedAtDesc(status);
+
+        // 게시글 ID 목록 추출
+        List<Long> boardIds = boards.stream()
+                .map(MissingPetBoard::getIdx)
+                .collect(Collectors.toList());
+
+        // 파일 배치 조회 (N+1 문제 해결)
+        Map<Long, List<FileDTO>> filesByBoardId = attachmentFileService.getAttachmentsBatch(
+                FileTargetType.MISSING_PET, boardIds);
+
+        // DTO 변환 (파일 정보 포함)
         return boards.stream()
-                .map(this::mapBoardWithAttachments)
+                .map(board -> mapBoardWithAttachmentsFromBatch(board, filesByBoardId))
                 .collect(Collectors.toList());
     }
 
     public MissingPetBoardDTO getBoard(Long id) {
-        MissingPetBoard board = boardRepository.findByIdWithUser(id)
+        // JOIN FETCH를 사용하여 댓글까지 함께 조회 (N+1 문제 해결)
+        MissingPetBoard board = boardRepository.findByIdWithComments(id)
                 .orElseThrow(() -> new IllegalArgumentException("Missing pet board not found"));
 
         // 삭제된 게시글인지 확인
@@ -65,7 +82,9 @@ public class MissingPetBoardService {
 
         // 이메일 인증 확인
         if (user.getEmailVerified() == null || !user.getEmailVerified()) {
-            throw new com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException("실종 제보 작성을 위해 이메일 인증이 필요합니다.");
+            throw new com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException(
+                    "실종 제보 작성을 위해 이메일 인증이 필요합니다.",
+                    com.linkup.Petory.domain.user.entity.EmailVerificationPurpose.MISSING_PET);
         }
 
         MissingPetBoard board = MissingPetBoard.builder()
@@ -101,7 +120,9 @@ public class MissingPetBoardService {
         // 이메일 인증 확인
         Users user = board.getUser();
         if (user.getEmailVerified() == null || !user.getEmailVerified()) {
-            throw new com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException("실종 제보 수정을 위해 이메일 인증이 필요합니다.");
+            throw new com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException(
+                    "실종 제보 수정을 위해 이메일 인증이 필요합니다.",
+                    com.linkup.Petory.domain.user.entity.EmailVerificationPurpose.MISSING_PET);
         }
 
         if (StringUtils.hasText(dto.getTitle())) {
@@ -167,7 +188,9 @@ public class MissingPetBoardService {
         // 이메일 인증 확인
         Users user = board.getUser();
         if (user.getEmailVerified() == null || !user.getEmailVerified()) {
-            throw new com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException("실종 제보 삭제를 위해 이메일 인증이 필요합니다.");
+            throw new com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException(
+                    "실종 제보 삭제를 위해 이메일 인증이 필요합니다.",
+                    com.linkup.Petory.domain.user.entity.EmailVerificationPurpose.MISSING_PET);
         }
         // soft delete board and related comments
         board.setIsDeleted(true);
@@ -185,6 +208,7 @@ public class MissingPetBoardService {
         MissingPetBoard board = boardRepository.findById(boardId)
                 .orElseThrow(() -> new IllegalArgumentException("Missing pet board not found"));
         List<MissingPetComment> comments = commentRepository.findByBoardAndIsDeletedFalseOrderByCreatedAtAsc(board);
+
         return comments.stream()
                 .map(this::mapCommentWithAttachments)
                 .collect(Collectors.toList());
@@ -215,19 +239,14 @@ public class MissingPetBoardService {
                     dto.getImageUrl(), null);
         }
 
-        // 알림 발송: 댓글 작성자가 게시글 작성자가 아닌 경우에만 알림 발송
+        // 알림 발송: 댓글 작성자가 게시글 작성자가 아닌 경우에만 알림 발송 (비동기 처리)
         Long boardOwnerId = board.getUser().getIdx();
         if (!boardOwnerId.equals(user.getIdx())) {
-            notificationService.createNotification(
+            sendMissingPetCommentNotificationAsync(
                     boardOwnerId,
-                    NotificationType.MISSING_PET_COMMENT,
-                    "실종 제보 게시글에 새로운 댓글이 달렸습니다",
-                    String.format("%s님이 댓글을 남겼습니다: %s", user.getUsername(),
-                            dto.getContent() != null && dto.getContent().length() > 50
-                                    ? dto.getContent().substring(0, 50) + "..."
-                                    : dto.getContent()),
-                    board.getIdx(),
-                    "MISSING_PET");
+                    user.getUsername(),
+                    dto.getContent(),
+                    board.getIdx());
         }
 
         return mapCommentWithAttachments(saved);
@@ -257,6 +276,18 @@ public class MissingPetBoardService {
         return dto;
     }
 
+    /**
+     * 배치 조회된 파일 정보를 사용하여 게시글 DTO 매핑 (N+1 문제 해결)
+     */
+    private MissingPetBoardDTO mapBoardWithAttachmentsFromBatch(MissingPetBoard board,
+            Map<Long, List<FileDTO>> filesByBoardId) {
+        MissingPetBoardDTO dto = missingPetConverter.toBoardDTO(board);
+        List<FileDTO> attachments = filesByBoardId.getOrDefault(board.getIdx(), List.of());
+        dto.setAttachments(attachments);
+        dto.setImageUrl(extractPrimaryFileUrl(attachments));
+        return dto;
+    }
+
     private MissingPetCommentDTO mapCommentWithAttachments(MissingPetComment comment) {
         MissingPetCommentDTO dto = missingPetConverter.toCommentDTO(comment);
         List<FileDTO> attachments = attachmentFileService.getAttachments(FileTargetType.MISSING_PET_COMMENT,
@@ -278,6 +309,32 @@ public class MissingPetBoardService {
             return primary.getDownloadUrl();
         }
         return attachmentFileService.buildDownloadUrl(primary.getFilePath());
+    }
+
+    /**
+     * 실종제보 댓글 알림 발송 (비동기 처리)
+     * 알림 발송 실패 시에도 댓글 작성은 성공하도록 분리
+     */
+    @Async
+    public void sendMissingPetCommentNotificationAsync(Long boardOwnerId, String username, String content,
+            Long boardIdx) {
+        try {
+            String notificationContent = content != null && content.length() > 50
+                    ? content.substring(0, 50) + "..."
+                    : content;
+
+            notificationService.createNotification(
+                    boardOwnerId,
+                    NotificationType.MISSING_PET_COMMENT,
+                    "실종 제보 게시글에 새로운 댓글이 달렸습니다",
+                    String.format("%s님이 댓글을 남겼습니다: %s", username, notificationContent),
+                    boardIdx,
+                    "MISSING_PET");
+        } catch (Exception e) {
+            log.error("실종제보 댓글 알림 발송 실패: boardOwnerId={}, boardIdx={}, error={}",
+                    boardOwnerId, boardIdx, e.getMessage(), e);
+            // 알림 발송 실패는 로깅만 하고 예외를 던지지 않음 (댓글 작성과 분리)
+        }
     }
 
 }

@@ -392,20 +392,16 @@ POST /api/admin/statistics/init?days=30
 ### 7.1 DB 최적화
 
 #### 인덱스 전략
-```sql
--- 날짜별 통계 조회 (Unique 제약조건)
-CREATE UNIQUE INDEX uk_statistics_date 
-ON dailystatistics(stat_date);
 
--- 기간별 통계 조회
-CREATE INDEX idx_statistics_date 
-ON dailystatistics(stat_date DESC);
+**dailystatistics 테이블**:
+```sql
+-- 날짜별 통계 조회 (Unique 제약조건, 중복 방지)
+CREATE UNIQUE INDEX stat_date ON dailystatistics(stat_date);
 ```
 
 **선정 이유**:
-- 자주 조회되는 컬럼 (`stat_date`)
-- WHERE 절에서 자주 사용되는 조건 (`stat_date BETWEEN`)
-- 최신순 정렬을 위한 인덱스 (`stat_date DESC`)
+- 자주 조회되는 컬럼 (stat_date)
+- WHERE 절에서 자주 사용되는 조건 (stat_date BETWEEN)
 - 중복 방지를 위한 Unique 제약조건
 
 ### 7.2 애플리케이션 레벨 최적화

@@ -32,6 +32,14 @@ public class LocationServiceReview extends BaseTimeEntity {
     @Lob
     private String comment; // 리뷰 내용
 
+    // Soft Delete 필드
+    @Column(name = "is_deleted")
+    @Builder.Default
+    private Boolean isDeleted = false;
+
+    @Column(name = "deleted_at")
+    private java.time.LocalDateTime deletedAt;
+
     // createdAt, updatedAt은 BaseTimeEntity에서 상속받음
     // @PrePersist, @PreUpdate는 BaseTimeEntity의 @EntityListeners가 자동 처리
 }

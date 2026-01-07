@@ -112,6 +112,14 @@ public class LocationService {
     @Builder.Default
     private String dataSource = "PUBLIC"; // 데이터 출처 (PUBLIC: 공공데이터)
 
+    // Soft Delete 필드
+    @Column(name = "is_deleted")
+    @Builder.Default
+    private Boolean isDeleted = false;
+
+    @Column(name = "deleted_at")
+    private java.time.LocalDateTime deletedAt;
+
     // created_at, updated_at는 DB에 없으므로 주석 처리
     // 필요시 DB에 컬럼 추가 후 활성화
     // @Column(name = "created_at", nullable = false, updatable = false)
