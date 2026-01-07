@@ -3,16 +3,23 @@ package com.linkup.Petory.domain.board.repository;
 import java.util.List;
 import java.util.Optional;
 
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
-
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.board.entity.Board;
 import com.linkup.Petory.domain.board.entity.BoardReaction;
 import com.linkup.Petory.domain.board.entity.ReactionType;
 
-public interface BoardReactionRepository extends JpaRepository<BoardReaction, Long> {
+/**
+ * BoardReaction 도메인 Repository 인터페이스입니다.
+ */
+public interface BoardReactionRepository {
+
+    BoardReaction save(BoardReaction reaction);
+
+    Optional<BoardReaction> findById(Long id);
+
+    void delete(BoardReaction reaction);
+
+    void deleteById(Long id);
 
     long countByBoardAndReactionType(Board board, ReactionType reactionType);
 
@@ -22,21 +29,13 @@ public interface BoardReactionRepository extends JpaRepository<BoardReaction, Lo
 
     /**
      * 여러 게시글의 좋아요/싫어요 카운트를 한 번에 조회 (배치 조회)
-     * 반환값: Map<BoardId, Map<ReactionType, Count>>
+     * 반환값: List<Object[]> [boardId, reactionType, count]
      */
-    @Query("SELECT br.board.idx as boardId, br.reactionType as reactionType, COUNT(br) as count " +
-           "FROM BoardReaction br " +
-           "WHERE br.board.idx IN :boardIds " +
-           "GROUP BY br.board.idx, br.reactionType")
-    List<Object[]> countByBoardsGroupByReactionType(@Param("boardIds") List<Long> boardIds);
+    List<Object[]> countByBoardsGroupByReactionType(List<Long> boardIds);
 
     /**
      * 단일 게시글의 좋아요/싫어요 카운트를 한 번에 조회
-     * 반환값: [boardId, reactionType, count] 형태의 Object[] 리스트
+     * 반환값: List<Object[]> [boardId, reactionType, count]
      */
-    @Query("SELECT br.board.idx as boardId, br.reactionType as reactionType, COUNT(br) as count " +
-           "FROM BoardReaction br " +
-           "WHERE br.board.idx = :boardId " +
-           "GROUP BY br.board.idx, br.reactionType")
-    List<Object[]> countByBoardGroupByReactionType(@Param("boardId") Long boardId);
+    List<Object[]> countByBoardGroupByReactionType(Long boardId);
 }

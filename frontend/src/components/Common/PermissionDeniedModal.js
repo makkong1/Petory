@@ -12,7 +12,7 @@ const PermissionDeniedModal = ({ isOpen, onClose }) => {
           <ModalTitle>권한 없음</ModalTitle>
         </ModalHeader>
         <ModalBody>
-          <Message>당신 권한 없어요!</Message>
+          <Message>당신 접근하면 안돼요!</Message>
           <SubMessage>이 기능을 사용하려면 적절한 권한이 필요합니다.</SubMessage>
         </ModalBody>
         <ModalFooter>
