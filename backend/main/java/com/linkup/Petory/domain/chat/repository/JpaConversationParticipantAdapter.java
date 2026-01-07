@@ -116,5 +116,10 @@ public class JpaConversationParticipantAdapter implements ConversationParticipan
             ParticipantStatus status) {
         return jpaRepository.findParticipantsByConversationIdxsAndStatus(conversationIdxs, status);
     }
+
+    @Override
+    public void deleteAllInBatch(List<ConversationParticipant> participants) {
+        jpaRepository.deleteAllInBatch(participants);
+    }
 }
 

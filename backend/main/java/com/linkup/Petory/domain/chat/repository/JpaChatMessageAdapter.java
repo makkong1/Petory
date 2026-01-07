@@ -32,6 +32,11 @@ public class JpaChatMessageAdapter implements ChatMessageRepository {
     }
 
     @Override
+    public List<ChatMessage> saveAll(List<ChatMessage> chatMessages) {
+        return jpaRepository.saveAll(chatMessages);
+    }
+
+    @Override
     public Optional<ChatMessage> findById(Long id) {
         return jpaRepository.findById(id);
     }
