@@ -20,6 +20,8 @@ public interface LocationServiceRepository {
     // 기본 CRUD 메서드
     LocationService save(LocationService locationService);
 
+    List<LocationService> saveAll(List<LocationService> locationServices);
+
     Optional<LocationService> findById(Long id);
 
     void delete(LocationService locationService);

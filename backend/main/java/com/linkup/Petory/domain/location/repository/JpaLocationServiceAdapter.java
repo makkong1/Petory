@@ -26,6 +26,11 @@ public class JpaLocationServiceAdapter implements LocationServiceRepository {
     }
 
     @Override
+    public List<LocationService> saveAll(List<LocationService> locationServices) {
+        return jpaRepository.saveAll(locationServices);
+    }
+
+    @Override
     public Optional<LocationService> findById(Long id) {
         return jpaRepository.findById(id);
     }
