@@ -3,70 +3,75 @@ package com.linkup.Petory.domain.chat.repository;
 import java.util.List;
 import java.util.Optional;
 
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Lock;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
-import org.springframework.stereotype.Repository;
-
 import com.linkup.Petory.domain.chat.entity.Conversation;
 import com.linkup.Petory.domain.chat.entity.ConversationStatus;
 import com.linkup.Petory.domain.chat.entity.ConversationType;
 import com.linkup.Petory.domain.chat.entity.RelatedType;
 
-@Repository
-public interface ConversationRepository extends JpaRepository<Conversation, Long> {
+/**
+ * Conversation 도메인 Repository 인터페이스입니다.
+ * 
+ * 이 인터페이스는 도메인 레벨의 순수 인터페이스로, JPA나 다른 기술에 의존하지 않습니다.
+ * 다양한 데이터베이스 구현체(JPA, MyBatis, NoSQL 등)로 교체 가능하도록 설계되었습니다.
+ * 
+ * 구현체:
+ * - JpaConversationAdapter: JPA 기반 구현체
+ * - 다른 DB로 변경 시 새로운 어댑터를 만들고 @Primary를 옮기면 됩니다.
+ */
+public interface ConversationRepository {
 
-        // 사용자별 활성 채팅방 조회 (탈퇴한 사용자 제외)
-        @Query("SELECT DISTINCT c FROM Conversation c " +
-                        "INNER JOIN c.participants p " +
-                        "INNER JOIN p.user u " +
-                        "WHERE p.user.idx = :userId " +
-                        "  AND p.status = 'ACTIVE' " +
-                        "  AND c.status = :status " +
-                        "  AND c.isDeleted = false " +
-                        "  AND u.isDeleted = false " +
-                        "ORDER BY c.lastMessageAt DESC NULLS LAST, c.createdAt DESC")
-        List<Conversation> findActiveConversationsByUser(
-                        @Param("userId") Long userId,
-                        @Param("status") ConversationStatus status);
+    // 기본 CRUD 메서드
+    Conversation save(Conversation conversation);
 
-        // 채팅방 타입별 조회
-        List<Conversation> findByConversationTypeAndStatusAndIsDeletedFalse(
-                        ConversationType conversationType,
-                        ConversationStatus status);
+    Optional<Conversation> findById(Long id);
 
-        // 관련 엔티티로 조회
-        Optional<Conversation> findByRelatedTypeAndRelatedIdxAndIsDeletedFalse(
-                        RelatedType relatedType,
-                        Long relatedIdx);
+    void delete(Conversation conversation);
 
-        // 관련 엔티티로 여러 개 조회
-        List<Conversation> findByRelatedTypeAndRelatedIdxInAndIsDeletedFalse(
-                        RelatedType relatedType,
-                        List<Long> relatedIdxs);
+    void deleteById(Long id);
 
-        // 두 사용자 간 1:1 채팅방 조회
-        @Query("SELECT DISTINCT c FROM Conversation c " +
-                        "INNER JOIN c.participants p1 ON p1.user.idx = :user1Idx AND p1.status = 'ACTIVE' " +
-                        "INNER JOIN c.participants p2 ON p2.user.idx = :user2Idx AND p2.status = 'ACTIVE' " +
-                        "WHERE c.conversationType = 'DIRECT' " +
-                        "  AND c.status = 'ACTIVE' " +
-                        "  AND c.isDeleted = false")
-        Optional<Conversation> findDirectConversationBetweenUsers(
-                        @Param("user1Idx") Long user1Idx,
-                        @Param("user2Idx") Long user2Idx);
+    /**
+     * 사용자별 활성 채팅방 조회 (탈퇴한 사용자 제외)
+     */
+    List<Conversation> findActiveConversationsByUser(
+            Long userId,
+            ConversationStatus status);
 
-        // 채팅방 참여자 수 조회
-        @Query("SELECT c.idx, COUNT(p) FROM Conversation c " +
-                        "LEFT JOIN c.participants p " +
-                        "WHERE c.idx IN :conversationIdxs " +
-                        "  AND (p IS NULL OR p.status = 'ACTIVE') " +
-                        "GROUP BY c.idx")
-        List<Object[]> countParticipantsByConversationIdxs(@Param("conversationIdxs") List<Long> conversationIdxs);
+    /**
+     * 채팅방 타입별 조회
+     */
+    List<Conversation> findByConversationTypeAndStatusAndIsDeletedFalse(
+            ConversationType conversationType,
+            ConversationStatus status);
 
-        // 비관적 락을 사용한 채팅방 조회 (동시성 제어용)
-        @Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
-        @Query("SELECT c FROM Conversation c WHERE c.idx = :idx")
-        Optional<Conversation> findByIdWithLock(@Param("idx") Long idx);
+    /**
+     * 관련 엔티티로 조회
+     */
+    Optional<Conversation> findByRelatedTypeAndRelatedIdxAndIsDeletedFalse(
+            RelatedType relatedType,
+            Long relatedIdx);
+
+    /**
+     * 관련 엔티티로 여러 개 조회
+     */
+    List<Conversation> findByRelatedTypeAndRelatedIdxInAndIsDeletedFalse(
+            RelatedType relatedType,
+            List<Long> relatedIdxs);
+
+    /**
+     * 두 사용자 간 1:1 채팅방 조회
+     */
+    Optional<Conversation> findDirectConversationBetweenUsers(
+            Long user1Idx,
+            Long user2Idx);
+
+    /**
+     * 채팅방 참여자 수 조회
+     * 반환값: List<Object[]> [conversationIdx, count]
+     */
+    List<Object[]> countParticipantsByConversationIdxs(List<Long> conversationIdxs);
+
+    /**
+     * 비관적 락을 사용한 채팅방 조회 (동시성 제어용)
+     */
+    Optional<Conversation> findByIdWithLock(Long idx);
 }

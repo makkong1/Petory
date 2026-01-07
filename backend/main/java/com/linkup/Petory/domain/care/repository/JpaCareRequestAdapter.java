@@ -48,6 +48,11 @@ public class JpaCareRequestAdapter implements CareRequestRepository {
     }
 
     @Override
+    public CareRequest getReferenceById(Long id) {
+        return jpaRepository.getReferenceById(id);
+    }
+
+    @Override
     public void delete(CareRequest careRequest) {
         jpaRepository.delete(careRequest);
     }

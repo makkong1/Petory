@@ -20,16 +20,21 @@ import com.linkup.Petory.domain.user.entity.Users;
  */
 public interface CareRequestRepository {
 
-        // 기본 CRUD 메서드
-        CareRequest save(CareRequest careRequest);
+    // 기본 CRUD 메서드
+    CareRequest save(CareRequest careRequest);
 
-        List<CareRequest> saveAll(List<CareRequest> careRequests);
+    List<CareRequest> saveAll(List<CareRequest> careRequests);
 
-        Optional<CareRequest> findById(Long id);
+    Optional<CareRequest> findById(Long id);
 
-        void delete(CareRequest careRequest);
+    /**
+     * ID로 엔티티 참조 조회 (프록시 객체 반환, 실제 조회는 지연됨)
+     */
+    CareRequest getReferenceById(Long id);
 
-        void deleteById(Long id);
+    void delete(CareRequest careRequest);
+
+    void deleteById(Long id);
 
         /**
          * 사용자별 케어 요청 조회 (최신순) - 작성자도 활성 상태여야 함

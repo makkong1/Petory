@@ -28,6 +28,11 @@ public class JpaCareApplicationAdapter implements CareApplicationRepository {
     }
 
     @Override
+    public CareApplication saveAndFlush(CareApplication careApplication) {
+        return jpaRepository.saveAndFlush(careApplication);
+    }
+
+    @Override
     public Optional<CareApplication> findById(Long id) {
         return jpaRepository.findById(id);
     }

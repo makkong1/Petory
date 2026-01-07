@@ -14,6 +14,8 @@ public interface CareApplicationRepository {
 
     CareApplication save(CareApplication careApplication);
 
+    CareApplication saveAndFlush(CareApplication careApplication);
+
     Optional<CareApplication> findById(Long id);
 
     void delete(CareApplication careApplication);
