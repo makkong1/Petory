@@ -32,6 +32,16 @@ public class JpaAttachmentFileAdapter implements AttachmentFileRepository {
     }
 
     @Override
+    public List<AttachmentFile> findAll() {
+        return jpaRepository.findAll();
+    }
+
+    @Override
+    public long count() {
+        return jpaRepository.count();
+    }
+
+    @Override
     public void delete(AttachmentFile attachmentFile) {
         jpaRepository.delete(attachmentFile);
     }

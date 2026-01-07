@@ -16,6 +16,10 @@ public interface AttachmentFileRepository {
 
     Optional<AttachmentFile> findById(Long id);
 
+    List<AttachmentFile> findAll();
+
+    long count();
+
     void delete(AttachmentFile attachmentFile);
 
     void deleteById(Long id);

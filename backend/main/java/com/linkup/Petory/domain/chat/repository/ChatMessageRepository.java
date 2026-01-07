@@ -20,6 +20,8 @@ public interface ChatMessageRepository {
     // 기본 CRUD 메서드
     ChatMessage save(ChatMessage chatMessage);
 
+    List<ChatMessage> saveAll(List<ChatMessage> chatMessages);
+
     Optional<ChatMessage> findById(Long id);
 
     void delete(ChatMessage chatMessage);

@@ -96,5 +96,10 @@ public interface ConversationParticipantRepository {
     List<ConversationParticipant> findParticipantsByConversationIdxsAndStatus(
         List<Long> conversationIdxs,
         ParticipantStatus status);
+
+    /**
+     * 배치 삭제 (테스트용)
+     */
+    void deleteAllInBatch(List<ConversationParticipant> participants);
 }
 
