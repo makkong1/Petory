@@ -117,6 +117,8 @@ public class LocationService {
     @Builder.Default
     private Boolean isDeleted = false;
 
+    // deleted_at 컬럼 추가 필요
+    // 마이그레이션 SQL 실행: docs/migration/db/add_locationservice_soft_delete_columns.sql
     @Column(name = "deleted_at")
     private java.time.LocalDateTime deletedAt;
 
