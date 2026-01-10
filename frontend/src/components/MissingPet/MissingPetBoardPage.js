@@ -60,8 +60,39 @@ const MissingPetBoardPage = () => {
       
       try {
         setDetailLoading(true);
+        
+        // 성능 측정 시작
+        const startTime = performance.now();
+        const startMemory = performance.memory ? performance.memory.usedJSHeapSize : null;
+        
         const response = await missingPetApi.get(id);
-        setActiveBoard(response.data);
+        
+        // 성능 측정 종료
+        const endTime = performance.now();
+        const endMemory = performance.memory ? performance.memory.usedJSHeapSize : null;
+        const executionTime = Math.round(endTime - startTime);
+        const memoryUsed = startMemory && endMemory ? Math.round((endMemory - startMemory) / 1024 / 1024 * 100) / 100 : null;
+        
+        const board = response.data;
+        const commentCount = board.comments ? board.comments.length : 0;
+        
+        // 성능 측정 로그 출력
+        console.log('=== [성능 측정] 게시글 상세 조회 완료 ===');
+        console.log(`  - 게시글 ID: ${id}`);
+        console.log(`  - 실행 시간: ${executionTime}ms`);
+        if (commentCount > 0) {
+          console.log(`  - 평균 댓글당 시간: ${Math.round((executionTime / commentCount) * 100) / 100}ms`);
+        }
+        console.log(`  - 조회된 댓글 수: ${commentCount}개`);
+        if (memoryUsed !== null) {
+          console.log(`  - 메모리 사용량: ${memoryUsed > 0 ? '+' : ''}${memoryUsed}MB`);
+        }
+        if (performance.memory) {
+          console.log(`  - 현재 메모리: ${Math.round(performance.memory.usedJSHeapSize / 1024 / 1024)}MB`);
+          console.log(`  - 최대 메모리: ${Math.round(performance.memory.jsHeapSizeLimit / 1024 / 1024)}MB`);
+        }
+        
+        setActiveBoard(board);
       } catch (err) {
         alert(err.response?.data?.error || err.message);
       } finally {

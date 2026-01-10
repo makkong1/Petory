@@ -21,12 +21,20 @@ import com.linkup.Petory.domain.board.dto.MissingPetBoardDTO;
 import com.linkup.Petory.domain.board.dto.MissingPetCommentDTO;
 import com.linkup.Petory.domain.board.entity.MissingPetStatus;
 import com.linkup.Petory.domain.board.service.MissingPetBoardService;
+import com.linkup.Petory.domain.board.service.MissingPetCommentService;
 import com.linkup.Petory.domain.chat.dto.ConversationDTO;
 import com.linkup.Petory.domain.chat.service.ConversationService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * 실종 제보 게시글 및 댓글 API 컨트롤러
+ * 
+ * 서비스 분리:
+ * - MissingPetBoardService: 게시글 관련 로직 (CRUD)
+ * - MissingPetCommentService: 댓글 관련 로직 (CRUD)
+ */
 @Slf4j
 @RestController
 @RequestMapping("/api/missing-pets")
@@ -34,25 +42,49 @@ import lombok.extern.slf4j.Slf4j;
 public class MissingPetBoardController {
 
     private final MissingPetBoardService missingPetBoardService;
+    private final MissingPetCommentService missingPetCommentService;
     private final ConversationService conversationService;
 
+    // ==================== 게시글 관련 API (MissingPetBoardService) ====================
+
+    /**
+     * 실종 제보 목록 조회
+     * GET /api/missing-pets?status={status}
+     * 서비스: MissingPetBoardService.getBoards()
+     */
     @GetMapping
     public ResponseEntity<List<MissingPetBoardDTO>> listBoards(
             @RequestParam(required = false) MissingPetStatus status) {
         return ResponseEntity.ok(missingPetBoardService.getBoards(status));
     }
 
+    /**
+     * 실종 제보 상세 조회
+     * GET /api/missing-pets/{id}
+     * 서비스: MissingPetBoardService.getBoard()
+     * 참고: 댓글은 별도 API로 조회 (GET /api/missing-pets/{id}/comments)
+     */
     @GetMapping("/{id}")
     public ResponseEntity<MissingPetBoardDTO> getBoard(@PathVariable Long id) {
         return ResponseEntity.ok(missingPetBoardService.getBoard(id));
     }
 
+    /**
+     * 실종 제보 작성
+     * POST /api/missing-pets
+     * 서비스: MissingPetBoardService.createBoard()
+     */
     @PostMapping
     public ResponseEntity<MissingPetBoardDTO> createBoard(@RequestBody MissingPetBoardDTO request) {
         MissingPetBoardDTO created = missingPetBoardService.createBoard(request);
         return ResponseEntity.ok(created);
     }
 
+    /**
+     * 실종 제보 수정
+     * PUT /api/missing-pets/{id}
+     * 서비스: MissingPetBoardService.updateBoard()
+     */
     @PutMapping("/{id}")
     public ResponseEntity<MissingPetBoardDTO> updateBoard(
             @PathVariable Long id,
@@ -61,6 +93,11 @@ public class MissingPetBoardController {
         return ResponseEntity.ok(updated);
     }
 
+    /**
+     * 실종 제보 상태 변경
+     * PATCH /api/missing-pets/{id}/status
+     * 서비스: MissingPetBoardService.updateStatus()
+     */
     @PatchMapping("/{id}/status")
     public ResponseEntity<MissingPetBoardDTO> updateStatus(
             @PathVariable Long id,
@@ -75,6 +112,12 @@ public class MissingPetBoardController {
         return ResponseEntity.ok(updated);
     }
 
+    /**
+     * 실종 제보 삭제 (소프트 삭제)
+     * DELETE /api/missing-pets/{id}
+     * 서비스: MissingPetBoardService.deleteBoard()
+     * 참고: 관련 댓글도 함께 소프트 삭제됨 (MissingPetCommentService.deleteAllCommentsByBoard())
+     */
     @DeleteMapping("/{id}")
     public ResponseEntity<Map<String, Object>> deleteBoard(@PathVariable Long id) {
         missingPetBoardService.deleteBoard(id);
@@ -83,28 +126,55 @@ public class MissingPetBoardController {
         return ResponseEntity.ok(response);
     }
 
+    // ==================== 댓글 관련 API (MissingPetCommentService)
+    // ====================
+
+    /**
+     * 댓글 목록 조회
+     * GET /api/missing-pets/{id}/comments
+     * 서비스: MissingPetCommentService.getComments()
+     */
     @GetMapping("/{id}/comments")
     public ResponseEntity<List<MissingPetCommentDTO>> getComments(@PathVariable Long id) {
-        return ResponseEntity.ok(missingPetBoardService.getComments(id));
+        return ResponseEntity.ok(missingPetCommentService.getComments(id));
     }
 
+    /**
+     * 댓글 작성
+     * POST /api/missing-pets/{id}/comments
+     * 서비스: MissingPetCommentService.addComment()
+     */
     @PostMapping("/{id}/comments")
     public ResponseEntity<MissingPetCommentDTO> addComment(
             @PathVariable Long id,
             @RequestBody MissingPetCommentDTO request) {
-        MissingPetCommentDTO created = missingPetBoardService.addComment(id, request);
+        MissingPetCommentDTO created = missingPetCommentService.addComment(id, request);
         return ResponseEntity.ok(created);
     }
 
+    /**
+     * 댓글 삭제 (소프트 삭제)
+     * DELETE /api/missing-pets/{boardId}/comments/{commentId}
+     * 서비스: MissingPetCommentService.deleteComment()
+     */
     @DeleteMapping("/{boardId}/comments/{commentId}")
     public ResponseEntity<Map<String, Object>> deleteComment(
             @PathVariable Long boardId,
             @PathVariable Long commentId) {
-        missingPetBoardService.deleteComment(boardId, commentId);
+        missingPetCommentService.deleteComment(boardId, commentId);
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
         return ResponseEntity.ok(response);
     }
+
+    // ==================== 채팅 관련 API ====================
+
+    /**
+     * 실종제보 채팅 시작 ("목격했어요" 버튼 클릭)
+     * POST /api/missing-pets/{boardIdx}/start-chat?witnessId={witnessId}
+     * 서비스: MissingPetBoardService.getBoard() +
+     * ConversationService.createMissingPetChat()
+     */
 
     /**
      * 실종제보 채팅 시작 ("목격했어요" 버튼 클릭)
@@ -117,10 +187,10 @@ public class MissingPetBoardController {
         // 실종제보 조회하여 제보자 ID 확인
         MissingPetBoardDTO board = missingPetBoardService.getBoard(boardIdx);
         Long reporterId = board.getUserId();
-        
+
         ConversationDTO conversation = conversationService.createMissingPetChat(
                 boardIdx, reporterId, witnessId);
-        
+
         return ResponseEntity.ok(conversation);
     }
 }
