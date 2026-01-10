@@ -3,6 +3,7 @@ package com.linkup.Petory.domain.board.service;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.springframework.cache.annotation.CacheEvict;
@@ -61,7 +62,8 @@ public class CommentService {
                 .orElseThrow(() -> new IllegalArgumentException("Board not found"));
 
         Pageable pageable = PageRequest.of(page, size);
-        Page<Comment> commentPage = commentRepository.findByBoardIdAndIsDeletedFalseOrderByCreatedAtAsc(boardId, pageable);
+        Page<Comment> commentPage = commentRepository.findByBoardIdAndIsDeletedFalseOrderByCreatedAtAsc(boardId,
+                pageable);
 
         if (commentPage.isEmpty()) {
             return CommentPageResponseDTO.builder()
@@ -83,10 +85,18 @@ public class CommentService {
                 .collect(Collectors.toList());
 
         // 댓글 파일 배치 조회 (N+1 문제 해결)
+        Map<Long, List<FileDTO>> filesByCommentId = attachmentFileService.getAttachmentsBatch(
+                FileTargetType.COMMENT, commentIds);
+
+        // DTO 변환 (배치 조회된 파일 정보 사용)
+        // mapWithReactionCountsWithoutFiles를 사용하여 개별 파일 조회를 방지하고, 배치 조회 결과 사용
         List<CommentDTO> commentDTOs = comments.stream()
                 .map(comment -> {
-                    CommentDTO dto = mapWithReactionCounts(comment);
-                    // 파일은 mapWithReactionCounts에서 이미 처리됨
+                    CommentDTO dto = mapWithReactionCountsWithoutFiles(comment);
+                    // 배치 조회된 파일 정보 설정 (N+1 문제 해결)
+                    List<FileDTO> attachments = filesByCommentId.getOrDefault(comment.getIdx(), List.of());
+                    dto.setAttachments(attachments);
+                    dto.setCommentFilePath(extractPrimaryFileUrl(attachments));
                     return dto;
                 })
                 .collect(Collectors.toList());
@@ -252,6 +262,20 @@ public class CommentService {
         List<FileDTO> attachments = attachmentFileService.getAttachments(FileTargetType.COMMENT, comment.getIdx());
         dto.setAttachments(attachments);
         dto.setCommentFilePath(extractPrimaryFileUrl(attachments));
+        return dto;
+    }
+
+    /**
+     * 댓글 DTO 변환 (반응 수 포함, 파일 정보 제외)
+     * 배치 조회 시 사용하여 N+1 문제 방지
+     */
+    private CommentDTO mapWithReactionCountsWithoutFiles(Comment comment) {
+        CommentDTO dto = commentConverter.toDTO(comment);
+        long likeCount = commentReactionRepository.countByCommentAndReactionType(comment, ReactionType.LIKE);
+        long dislikeCount = commentReactionRepository.countByCommentAndReactionType(comment, ReactionType.DISLIKE);
+        dto.setLikeCount(Math.toIntExact(likeCount));
+        dto.setDislikeCount(Math.toIntExact(dislikeCount));
+        // 파일 정보는 호출자가 배치 조회 결과로 설정
         return dto;
     }
 

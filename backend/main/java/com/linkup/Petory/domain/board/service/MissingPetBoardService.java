@@ -444,18 +444,6 @@ public class MissingPetBoardService {
     }
 
     /**
-     * 배치 조회된 파일 정보를 사용하여 게시글 DTO 매핑 (N+1 문제 해결)
-     */
-    private MissingPetBoardDTO mapBoardWithAttachmentsFromBatch(MissingPetBoard board,
-            Map<Long, List<FileDTO>> filesByBoardId) {
-        MissingPetBoardDTO dto = missingPetConverter.toBoardDTO(board);
-        List<FileDTO> attachments = filesByBoardId.getOrDefault(board.getIdx(), List.of());
-        dto.setAttachments(attachments);
-        dto.setImageUrl(extractPrimaryFileUrl(attachments));
-        return dto;
-    }
-
-    /**
      * 첨부파일 목록에서 첫 번째 파일의 다운로드 URL 추출
      * 게시글의 대표 이미지 URL로 사용
      */

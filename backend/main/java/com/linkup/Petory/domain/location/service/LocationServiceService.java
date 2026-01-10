@@ -57,7 +57,7 @@ public class LocationServiceService {
 
         long methodStartTime = System.currentTimeMillis();
 
-        List<com.linkup.Petory.domain.location.entity.LocationService> services;
+        List<LocationService> services;
 
         // 지역 계층 우선순위에 따라 조회
         long queryStartTime = System.currentTimeMillis();
@@ -269,7 +269,7 @@ public class LocationServiceService {
         service.setIsDeleted(true);
         service.setDeletedAt(java.time.LocalDateTime.now());
         locationServiceRepository.save(service);
-        
+
         log.info("위치 서비스가 삭제되었습니다. serviceIdx: {}", serviceIdx);
     }
 }
