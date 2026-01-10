@@ -25,7 +25,7 @@ api.interceptors.request.use(
 );
 
 export const commentApi = {
-  list: (boardId) => api.get(`/${boardId}/comments`),
+  list: (boardId, page = 0, size = 20) => api.get(`/${boardId}/comments`, { params: { page, size } }),
   create: (boardId, payload) => api.post(`/${boardId}/comments`, payload),
   delete: (boardId, commentId) => api.delete(`/${boardId}/comments/${commentId}`),
 };

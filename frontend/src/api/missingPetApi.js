@@ -32,7 +32,7 @@ export const missingPetApi = {
   update: (id, payload) => api.put(`/${id}`, payload),
   updateStatus: (id, status) => api.patch(`/${id}/status`, { status }),
   delete: (id) => api.delete(`/${id}`),
-  getComments: (id) => api.get(`/${id}/comments`),
+  getComments: (id, page = 0, size = 20) => api.get(`/${id}/comments`, { params: { page, size } }),
   addComment: (id, payload) => api.post(`/${id}/comments`, payload),
   deleteComment: (boardId, commentId) => api.delete(`/${boardId}/comments/${commentId}`),
   startChat: (boardIdx, witnessId) => api.post(`/${boardIdx}/start-chat`, null, {

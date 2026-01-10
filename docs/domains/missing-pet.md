@@ -148,7 +148,7 @@ public MissingPetBoardDTO updateStatus(Long id, MissingPetStatus status) {
 ```java
 @Transactional
 public void deleteBoard(Long id) {
-    MissingPetBoard board = boardRepository.findById(id)
+    MissingPetBoard board = boardRepository.findByIdWithUser(id)
             .orElseThrow(() -> new IllegalArgumentException("Missing pet board not found"));
     
     // 이메일 인증 확인
@@ -157,15 +157,13 @@ public void deleteBoard(Long id) {
         throw new EmailVerificationRequiredException("실종 제보 삭제를 위해 이메일 인증이 필요합니다.");
     }
     
-    // soft delete board and related comments
+    // 게시글 소프트 삭제
     board.setIsDeleted(true);
     board.setDeletedAt(LocalDateTime.now());
-    if (board.getComments() != null) {
-        for (MissingPetComment c : board.getComments()) {
-            c.setIsDeleted(true);
-            c.setDeletedAt(LocalDateTime.now());
-        }
-    }
+    
+    // 관련 댓글 모두 소프트 삭제 (MissingPetCommentService 사용)
+    commentService.deleteAllCommentsByBoard(board);
+    
     boardRepository.saveAndFlush(board);
 }
 ```
@@ -173,10 +171,10 @@ public void deleteBoard(Long id) {
 **핵심 로직**:
 - **이메일 인증 확인**: 삭제 시 이메일 인증 필요
 - **Soft Delete**: 게시글과 관련 댓글 모두 Soft Delete
-- **연관 댓글 삭제**: `board.getComments()`를 순회하며 모든 댓글 Soft Delete
+- **연관 댓글 삭제**: `MissingPetCommentService.deleteAllCommentsByBoard()`를 통해 댓글 삭제 위임
 
 #### 로직 4: 댓글 작성 및 알림 발송
-**구현 위치**: `MissingPetBoardService.addComment()`
+**구현 위치**: `MissingPetCommentService.addComment()`
 
 ```java
 @Transactional
@@ -241,7 +239,7 @@ public MissingPetCommentDTO addComment(Long boardId, MissingPetCommentDTO dto) {
 - **댓글 추가**: 댓글 저장 후 `board.getComments().add(saved)` 호출
 
 ```java
-// MissingPetBoardService.java
+// MissingPetCommentService.java
 @Async
 public void sendMissingPetCommentNotificationAsync(Long boardOwnerId, String username, String content, Long boardIdx) {
     try {
@@ -273,34 +271,74 @@ public void sendMissingPetCommentNotificationAsync(Long boardOwnerId, String use
   - 파일 첨부는 첫 번째 파일만 저장
 
 #### 로직 5: 파일 첨부 매핑
-**구현 위치**: `MissingPetBoardService.mapBoardWithAttachments()`, `mapCommentWithAttachments()`
+**구현 위치**: 
+- 게시글: `MissingPetBoardService.mapBoardWithAttachments()`, `mapBoardWithAttachmentsFromBatch()`
+- 댓글: `MissingPetCommentService.mapCommentWithAttachments()`
 
 **핵심 로직**:
-- **파일 조회**: `attachmentFileService.getAttachments()`로 첨부 파일 조회
+- **파일 조회**: `attachmentFileService.getAttachments()` 또는 `getAttachmentsBatch()`로 첨부 파일 조회
 - **주요 이미지 URL 추출**: 첫 번째 파일의 다운로드 URL을 `imageUrl`로 설정
 - **첨부 파일 목록**: `attachments` 필드에 모든 첨부 파일 정보 포함
+- **배치 조회**: 목록 조회 시 `getAttachmentsBatch()`로 N+1 문제 해결
 
 ### 3.2 서비스 메서드 구조
 
-#### MissingPetBoardService
+#### MissingPetBoardService (게시글 전용)
 | 메서드 | 설명 | 주요 로직 |
 |--------|------|-----------|
-| `getBoards()` | 실종 제보 목록 조회 | 상태별 필터링, 첨부 파일 포함 |
-| `getBoard()` | 특정 실종 제보 조회 | 사용자 정보 포함, 삭제 확인, 첨부 파일 포함 |
+| `getBoards()` | 실종 제보 목록 조회 | 상태별 필터링, 게시글+작성자만 조회, 첨부 파일 배치 조회 |
+| `getBoard()` | 특정 실종 제보 조회 | 게시글+작성자만 조회, 댓글 수만 포함, 첨부 파일 포함 |
 | `createBoard()` | 실종 제보 생성 | 이메일 인증 확인, 파일 첨부 처리 |
 | `updateBoard()` | 실종 제보 수정 | 이메일 인증 확인, 선택적 업데이트, 파일 첨부 처리, 위치 정보 업데이트 |
 | `updateStatus()` | 상태 변경 | MISSING → FOUND → RESOLVED (RequestBody로 status 받음) |
-| `deleteBoard()` | 실종 제보 삭제 | 이메일 인증 확인, Soft Delete, 관련 댓글 삭제 |
-| `getComments()` | 댓글 목록 조회 | 삭제되지 않은 댓글만, 작성자 활성 상태 확인, 첨부 파일 포함 |
-| `addComment()` | 댓글 작성 | 파일 첨부 처리 (첫 번째 파일만), 알림 발송 (비동기), 댓글 목록에 추가 |
+| `deleteBoard()` | 실종 제보 삭제 | 이메일 인증 확인, Soft Delete, 댓글 삭제는 `MissingPetCommentService`에 위임 |
+
+**특징**:
+- 댓글은 별도 API로 조회 (조인 폭발 방지)
+- 댓글 수만 조회 (`MissingPetCommentService.getCommentCount()` 사용)
+
+#### MissingPetCommentService (댓글 전용)
+| 메서드 | 설명 | 주요 로직 |
+|--------|------|-----------|
+| `getComments()` | 댓글 목록 조회 | 삭제되지 않은 댓글만, 작성자 활성 상태 확인, 첨부 파일 배치 조회 |
+| `addComment()` | 댓글 작성 | 파일 첨부 처리 (첫 번째 파일만), 알림 발송 (비동기) |
 | `deleteComment()` | 댓글 삭제 | Soft Delete |
+| `getCommentCount()` | 댓글 수 조회 | 게시글의 댓글 수만 조회 (현재는 목록 조회 후 size 사용, 향후 COUNT 쿼리로 최적화 예정) |
+| `deleteAllCommentsByBoard()` | 게시글의 모든 댓글 삭제 | 게시글 삭제 시 호출됨, 모든 댓글 Soft Delete |
 | `sendMissingPetCommentNotificationAsync()` | 알림 발송 (비동기) | `@Async` 사용, 알림 발송 실패해도 댓글 작성은 성공 |
 
-### 3.3 트랜잭션 처리
+### 3.3 서비스 분리 구조
+
+**분리 이유**:
+- **조인 폭발 방지**: 게시글과 댓글을 함께 조회할 경우 댓글이 많아지면 조인 결과가 기하급수적으로 증가
+- **페이징 가능**: 댓글을 별도 API로 조회하면 페이징 적용 가능
+- **책임 분리**: 게시글과 댓글의 비즈니스 로직을 명확히 분리
+- **확장성**: 각 서비스를 독립적으로 최적화 가능
+
+**서비스 구조**:
+```
+MissingPetBoardService (게시글 전용)
+  ├─ getBoards()           // 목록 조회 (댓글 제외)
+  ├─ getBoard()            // 상세 조회 (댓글 수만 포함)
+  ├─ createBoard()         // 생성
+  ├─ updateBoard()         // 수정
+  ├─ updateStatus()        // 상태 변경
+  └─ deleteBoard()         // 삭제 (댓글 삭제는 MissingPetCommentService에 위임)
+
+MissingPetCommentService (댓글 전용)
+  ├─ getComments()                      // 목록 조회
+  ├─ addComment()                       // 작성
+  ├─ deleteComment()                    // 삭제
+  ├─ getCommentCount()                  // 댓글 수 조회
+  ├─ deleteAllCommentsByBoard()         // 게시글의 모든 댓글 삭제
+  └─ sendMissingPetCommentNotificationAsync()  // 알림 발송 (비동기)
+```
+
+### 3.4 트랜잭션 처리
 - **트랜잭션 범위**: 
-  - 실종 제보 생성/수정/삭제: `@Transactional`
-  - 댓글 작성/삭제: `@Transactional`
-  - 조회 메서드: `@Transactional(readOnly = true)` (클래스 레벨)
+  - 실종 제보 생성/수정/삭제: `@Transactional` (MissingPetBoardService)
+  - 댓글 작성/삭제: `@Transactional` (MissingPetCommentService)
+  - 조회 메서드: `@Transactional(readOnly = true)` (클래스 레벨, 양쪽 서비스 모두)
 - **격리 수준**: 기본값 (READ_COMMITTED)
 - **이메일 인증**: 실종 제보 작성/수정/삭제 시 이메일 인증 확인 (`EmailVerificationRequiredException`)
 
@@ -474,9 +512,10 @@ public enum MissingPetGender {
 ```
 domain/board/
   ├── controller/
-  │   └── MissingPetBoardController.java
+  │   └── MissingPetBoardController.java       # 게시글 + 댓글 API
   ├── service/
-  │   └── MissingPetBoardService.java
+  │   ├── MissingPetBoardService.java          # 게시글 전용 서비스
+  │   └── MissingPetCommentService.java        # 댓글 전용 서비스
   ├── entity/
   │   ├── MissingPetBoard.java
   │   ├── MissingPetComment.java
@@ -505,18 +544,33 @@ erDiagram
 ### 4.4 API 설계
 
 #### REST API
-| 엔드포인트 | Method | 설명 |
-|-----------|--------|------|
-| `/api/missing-pets` | GET | 실종 제보 목록 조회 (status 파라미터로 필터링) |
-| `/api/missing-pets/{id}` | GET | 특정 실종 제보 조회 |
-| `/api/missing-pets` | POST | 실종 제보 생성 (인증 필요) |
-| `/api/missing-pets/{id}` | PUT | 실종 제보 수정 (인증 필요) |
-| `/api/missing-pets/{id}/status` | PATCH | 상태 변경 (RequestBody: `{"status": "MISSING"}`) |
-| `/api/missing-pets/{id}` | DELETE | 실종 제보 삭제 (인증 필요, 응답: `{"success": true}`) |
-| `/api/missing-pets/{id}/comments` | GET | 댓글 목록 조회 |
-| `/api/missing-pets/{id}/comments` | POST | 댓글 작성 (인증 필요, 파일 첨부 지원 - 첫 번째 파일만 저장) |
-| `/api/missing-pets/{boardId}/comments/{commentId}` | DELETE | 댓글 삭제 (인증 필요, 응답: `{"success": true}`) |
-| `/api/missing-pets/{boardIdx}/start-chat` | POST | 실종제보 채팅 시작 (인증 필요, witnessId 파라미터) |
+
+**게시글 관련 API** (MissingPetBoardService 사용):
+| 엔드포인트 | Method | 설명 | 서비스 메서드 |
+|-----------|--------|------|-------------|
+| `/api/missing-pets` | GET | 실종 제보 목록 조회 (status 파라미터로 필터링, 댓글 제외) | `getBoards()` |
+| `/api/missing-pets/{id}` | GET | 특정 실종 제보 조회 (댓글 수만 포함, 댓글 목록은 별도 API로 조회) | `getBoard()` |
+| `/api/missing-pets` | POST | 실종 제보 생성 (인증 필요) | `createBoard()` |
+| `/api/missing-pets/{id}` | PUT | 실종 제보 수정 (인증 필요) | `updateBoard()` |
+| `/api/missing-pets/{id}/status` | PATCH | 상태 변경 (RequestBody: `{"status": "MISSING"}`) | `updateStatus()` |
+| `/api/missing-pets/{id}` | DELETE | 실종 제보 삭제 (인증 필요, 관련 댓글도 함께 삭제, 응답: `{"success": true}`) | `deleteBoard()` |
+
+**댓글 관련 API** (MissingPetCommentService 사용):
+| 엔드포인트 | Method | 설명 | 서비스 메서드 |
+|-----------|--------|------|-------------|
+| `/api/missing-pets/{id}/comments` | GET | 댓글 목록 조회 (삭제되지 않은 댓글만, 작성자 정보 포함) | `getComments()` |
+| `/api/missing-pets/{id}/comments` | POST | 댓글 작성 (인증 필요, 파일 첨부 지원 - 첫 번째 파일만 저장) | `addComment()` |
+| `/api/missing-pets/{boardId}/comments/{commentId}` | DELETE | 댓글 삭제 (인증 필요, 응답: `{"success": true}`) | `deleteComment()` |
+
+**채팅 관련 API**:
+| 엔드포인트 | Method | 설명 | 서비스 메서드 |
+|-----------|--------|------|-------------|
+| `/api/missing-pets/{boardIdx}/start-chat` | POST | 실종제보 채팅 시작 (인증 필요, witnessId 파라미터) | `getBoard()` + `ConversationService.createMissingPetChat()` |
+
+**참고**: 
+- 게시글 상세 조회(`GET /api/missing-pets/{id}`)는 댓글 목록을 포함하지 않음
+- 댓글 목록은 별도 API(`GET /api/missing-pets/{id}/comments`)로 조회 필요
+- 이는 조인 폭발 방지 및 페이징 지원을 위한 설계 결정
 
 **실종 제보 생성 요청 예시**:
 ```http
@@ -692,23 +746,34 @@ List<MissingPetBoard> findAllByOrderByCreatedAtDesc();
 
 ### 7.4 최적화 핵심 포인트
 
-#### 1단계: 댓글 N+1 해결
-- **문제**: 각 게시글마다 `board.getComments()` 호출 시 LAZY 로딩으로 개별 쿼리 발생
-- **해결**: Repository 쿼리에 `LEFT JOIN FETCH b.comments c` 및 `LEFT JOIN FETCH c.user cu` 추가
-- **효과**: 103개 쿼리 → 0개 (메인 쿼리에 포함)
+#### 1단계: 서비스 분리 및 조인 폭발 방지
+- **문제**: 게시글과 댓글을 함께 조회할 경우 댓글이 많아지면 조인 결과가 기하급수적으로 증가 (Cartesian Product)
+- **해결**: 게시글과 댓글 조회를 완전히 분리
+  - `getBoard()`: 게시글+작성자만 조회, 댓글 수만 포함
+  - `getComments()`: 댓글 목록은 별도 API로 조회
+- **효과**: 조인 폭발 방지, 페이징 지원 가능, 확장성 향상
 
 #### 2단계: 파일 N+1 해결
-- **문제**: 각 게시글마다 `getAttachments()` 호출로 개별 쿼리 발생
-- **해결**: `getAttachmentsBatch()` 메서드로 게시글 ID 목록을 한 번에 조회
-- **효과**: 103개 쿼리 → 1개 (배치 조회, IN 절 사용)
+- **문제**: 각 게시글/댓글마다 `getAttachments()` 호출로 개별 쿼리 발생
+- **해결**: `getAttachmentsBatch()` 메서드로 ID 목록을 한 번에 조회
+  - 게시글 목록: `getBoards()`에서 배치 조회
+  - 댓글 목록: `getComments()`에서 배치 조회
+- **효과**: N개 쿼리 → 1개 (배치 조회, IN 절 사용)
 
 ### 7.5 성능 개선 결과
 
+**최적화 전후 비교**:
 | 항목 | 최적화 전 | 최적화 후 | 개선율 |
 |------|----------|----------|--------|
 | **쿼리 수** | 207개 | 3개 | **98.5% 감소** |
 | **실행 시간** | 571ms | 79ms | **86% 감소** |
 | **메모리 사용** | 11MB | 4MB | **64% 감소** |
+
+**주요 최적화 기법**:
+1. **서비스 분리**: 게시글과 댓글 조회 분리로 조인 폭발 방지
+2. **Fetch Join**: 게시글+작성자, 댓글+작성자 정보를 한 번에 조회
+3. **배치 조회**: 파일 첨부 정보를 IN 절로 한 번에 조회
+4. **비동기 처리**: 알림 발송을 비동기로 처리하여 응답 시간 단축
 
 ### 7.6 기술 스택
 
@@ -741,9 +806,10 @@ List<MissingPetBoard> findAllByOrderByCreatedAtDesc();
 - **채팅방 생성**: 제보자와 목격자 간 1:1 채팅방 생성 (`createMissingPetChat()`)
 
 ### 8.4 성능 최적화
+- **서비스 분리**: 게시글과 댓글 조회를 분리하여 조인 폭발 방지 및 페이징 지원
 - **N+1 문제 해결**: `JOIN FETCH`로 사용자 정보를 함께 조회
 - **활성 사용자 필터링**: 삭제되지 않고 활성 상태인 사용자만 조회
-- **파일 배치 조회**: `getAttachmentsBatch()`로 게시글 목록의 파일을 한 번에 조회 (N+1 문제 해결)
+- **파일 배치 조회**: `getAttachmentsBatch()`로 게시글/댓글 목록의 파일을 한 번에 조회 (N+1 문제 해결)
 - **인덱스 전략**: 상태별, 위치별, 사용자별 인덱스로 조회 성능 향상
 - **비동기 알림**: `@Async`로 알림 발송을 비동기 처리하여 댓글 작성 응답 시간 단축
 

@@ -4,6 +4,8 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.context.annotation.Primary;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
 import com.linkup.Petory.domain.board.entity.MissingPetBoard;
@@ -99,6 +101,16 @@ public class JpaMissingPetBoardAdapter implements MissingPetBoardRepository {
     @Override
     public List<MissingPetBoard> findByUserAndIsDeletedFalseOrderByCreatedAtDesc(Users user) {
         return jpaRepository.findByUserAndIsDeletedFalseOrderByCreatedAtDesc(user);
+    }
+
+    @Override
+    public Page<MissingPetBoard> findAllByOrderByCreatedAtDesc(Pageable pageable) {
+        return jpaRepository.findAllByOrderByCreatedAtDesc(pageable);
+    }
+
+    @Override
+    public Page<MissingPetBoard> findByStatusOrderByCreatedAtDesc(MissingPetStatus status, Pageable pageable) {
+        return jpaRepository.findByStatusOrderByCreatedAtDesc(status, pageable);
     }
 }
 

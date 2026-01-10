@@ -3,6 +3,9 @@ package com.linkup.Petory.domain.board.repository;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
 import com.linkup.Petory.domain.board.entity.Board;
 import com.linkup.Petory.domain.board.entity.Comment;
 import com.linkup.Petory.domain.user.entity.Users;
@@ -51,4 +54,9 @@ public interface CommentRepository {
      * 관리자용: 작성자 상태 체크 없이 조회 (삭제된 사용자 댓글도 포함)
      */
     List<Comment> findByBoardAndIsDeletedFalseForAdmin(Board board);
+
+    /**
+     * 페이징 지원 - 게시글별 댓글 조회
+     */
+    Page<Comment> findByBoardIdAndIsDeletedFalseOrderByCreatedAtAsc(Long boardId, Pageable pageable);
 }

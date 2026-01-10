@@ -2,6 +2,8 @@ package com.linkup.Petory.domain.board.repository;
 
 import java.util.List;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -43,5 +45,10 @@ public interface SpringDataJpaCommentRepository extends JpaRepository<Comment, L
     // 관리자용: 작성자 상태 체크 없이 조회 (삭제된 사용자 댓글도 포함)
     @Query("SELECT c FROM Comment c JOIN FETCH c.user u WHERE c.board = :board AND c.isDeleted = false ORDER BY c.createdAt ASC")
     List<Comment> findByBoardAndIsDeletedFalseForAdmin(@Param("board") Board board);
+
+    // 페이징 지원 - 게시글별 댓글 조회 (JOIN FETCH와 페이징 호환을 위해 COUNT 쿼리 별도 지정)
+    @Query(value = "SELECT c FROM Comment c JOIN FETCH c.user u WHERE c.board.idx = :boardId AND c.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY c.createdAt ASC",
+           countQuery = "SELECT COUNT(c) FROM Comment c JOIN c.user u WHERE c.board.idx = :boardId AND c.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE'")
+    Page<Comment> findByBoardIdAndIsDeletedFalseOrderByCreatedAtAsc(@Param("boardId") Long boardId, Pageable pageable);
 }
 

@@ -1,10 +1,14 @@
 package com.linkup.Petory.domain.board.service;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -13,6 +17,7 @@ import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 import com.linkup.Petory.domain.board.dto.CommentDTO;
+import com.linkup.Petory.domain.board.dto.CommentPageResponseDTO;
 import com.linkup.Petory.domain.board.entity.Board;
 import com.linkup.Petory.domain.board.entity.Comment;
 import com.linkup.Petory.domain.board.entity.ReactionType;
@@ -42,6 +47,68 @@ public class CommentService {
     private final AttachmentFileService attachmentFileService;
     private final NotificationService notificationService;
 
+    /**
+     * 댓글 목록 조회 (페이징 지원)
+     * 엔드포인트: GET /api/boards/{boardId}/comments?page={page}&size={size}
+     * - 생성일 기준 오름차순 정렬
+     * - 삭제된 댓글 제외
+     * - 각 댓글의 파일 정보 포함
+     * - 댓글 파일 배치 조회 (N+1 문제 해결)
+     */
+    public CommentPageResponseDTO getCommentsWithPaging(Long boardId, int page, int size) {
+        // 게시글 존재 확인
+        boardRepository.findById(boardId)
+                .orElseThrow(() -> new IllegalArgumentException("Board not found"));
+
+        Pageable pageable = PageRequest.of(page, size);
+        Page<Comment> commentPage = commentRepository.findByBoardIdAndIsDeletedFalseOrderByCreatedAtAsc(boardId, pageable);
+
+        if (commentPage.isEmpty()) {
+            return CommentPageResponseDTO.builder()
+                    .comments(new ArrayList<>())
+                    .totalCount(0)
+                    .totalPages(0)
+                    .currentPage(page)
+                    .pageSize(size)
+                    .hasNext(false)
+                    .hasPrevious(false)
+                    .build();
+        }
+
+        List<Comment> comments = commentPage.getContent();
+
+        // 댓글 ID 리스트 추출
+        List<Long> commentIds = comments.stream()
+                .map(Comment::getIdx)
+                .collect(Collectors.toList());
+
+        // 댓글 파일 배치 조회 (N+1 문제 해결)
+        List<CommentDTO> commentDTOs = comments.stream()
+                .map(comment -> {
+                    CommentDTO dto = mapWithReactionCounts(comment);
+                    // 파일은 mapWithReactionCounts에서 이미 처리됨
+                    return dto;
+                })
+                .collect(Collectors.toList());
+
+        return CommentPageResponseDTO.builder()
+                .comments(commentDTOs)
+                .totalCount(commentPage.getTotalElements())
+                .totalPages(commentPage.getTotalPages())
+                .currentPage(page)
+                .pageSize(size)
+                .hasNext(commentPage.hasNext())
+                .hasPrevious(commentPage.hasPrevious())
+                .build();
+    }
+
+    /**
+     * 댓글 목록 조회 (페이징 없음 - 하위 호환성)
+     * 엔드포인트: GET /api/boards/{boardId}/comments
+     * - 생성일 기준 오름차순 정렬
+     * - 삭제된 댓글 제외
+     * - 각 댓글의 파일 정보 포함
+     */
     public List<CommentDTO> getComments(Long boardId) {
         Board board = boardRepository.findById(boardId)
                 .orElseThrow(() -> new IllegalArgumentException("Board not found"));

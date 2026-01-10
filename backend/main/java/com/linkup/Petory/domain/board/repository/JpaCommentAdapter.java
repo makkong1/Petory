@@ -4,6 +4,8 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.context.annotation.Primary;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
 import com.linkup.Petory.domain.board.entity.Board;
@@ -79,6 +81,11 @@ public class JpaCommentAdapter implements CommentRepository {
     @Override
     public List<Comment> findByBoardAndIsDeletedFalseForAdmin(Board board) {
         return jpaRepository.findByBoardAndIsDeletedFalseForAdmin(board);
+    }
+
+    @Override
+    public Page<Comment> findByBoardIdAndIsDeletedFalseOrderByCreatedAtAsc(Long boardId, Pageable pageable) {
+        return jpaRepository.findByBoardIdAndIsDeletedFalseOrderByCreatedAtAsc(boardId, pageable);
     }
 }
 

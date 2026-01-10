@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.linkup.Petory.domain.board.dto.BoardDTO;
 import com.linkup.Petory.domain.board.dto.BoardPageResponseDTO;
 import com.linkup.Petory.domain.board.dto.CommentDTO;
+import com.linkup.Petory.domain.board.dto.CommentPageResponseDTO;
 import com.linkup.Petory.domain.board.dto.ReactionRequest;
 import com.linkup.Petory.domain.board.dto.ReactionSummaryDTO;
 import com.linkup.Petory.domain.board.dto.BoardPopularitySnapshotDTO;
@@ -105,10 +106,18 @@ public class BoardController {
         return ResponseEntity.ok(boardService.searchBoardsWithPaging(keyword, searchType, page, size));
     }
 
+    /**
+     * 댓글 목록 조회 (페이징 지원)
+     * GET /api/boards/{boardId}/comments?page={page}&size={size}
+     * 서비스: CommentService.getCommentsWithPaging()
+     */
     @PreAuthorize("permitAll()")
     @GetMapping("/{boardId}/comments")
-    public ResponseEntity<List<CommentDTO>> getComments(@PathVariable Long boardId) {
-        return ResponseEntity.ok(commentService.getComments(boardId));
+    public ResponseEntity<CommentPageResponseDTO> getComments(
+            @PathVariable Long boardId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(commentService.getCommentsWithPaging(boardId, page, size));
     }
 
     @PreAuthorize("isAuthenticated()")
