@@ -7,7 +7,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import com.linkup.Petory.domain.location.dto.LocationServiceLoadResponse;
-import com.linkup.Petory.domain.location.repository.LocationServiceRepository;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,7 +21,7 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class LocationServiceAdminService {
 
-    private final LocationServiceRepository locationServiceRepository;
+    // private final LocationServiceRepository locationServiceRepository;
 
     /**
      * 초기 데이터 로드 (카카오맵 API 의존성 제거로 인해 비활성화)
