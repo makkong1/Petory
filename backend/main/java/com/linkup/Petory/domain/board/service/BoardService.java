@@ -430,22 +430,6 @@ public class BoardService {
     }
 
     /**
-     * 반응 카운트 조회 결과(Object[])를 Map으로 변환 (단일 조회용)
-     * 
-     * @param results Repository에서 반환된 Object[] 리스트 [boardId, reactionType, count]
-     * @return Map<ReactionType, Count>
-     */
-    private Map<ReactionType, Long> parseReactionCountResults(List<Object[]> results) {
-        Map<ReactionType, Long> counts = new HashMap<>();
-        for (Object[] result : results) {
-            ReactionType reactionType = (ReactionType) result[1];
-            Long count = ((Number) result[2]).longValue();
-            counts.put(reactionType, count);
-        }
-        return counts;
-    }
-
-    /**
      * 배치 조회 결과(Object[])를 Map으로 변환
      * 
      * @param results Repository에서 반환된 Object[] 리스트 [boardId, reactionType, count]
@@ -487,34 +471,6 @@ public class BoardService {
         dto.setAttachments(attachments);
         dto.setBoardFilePath(extractPrimaryFileUrl(attachments));
     }
-
-    // /**
-    // * 게시글에 반응 정보(좋아요/싫어요 카운트) 매핑
-    // *
-    // * @deprecated 단일 조회 시 mapBoardsWithReactionsBatch를 활용하도록 변경됨.
-    // * 호환성을 위해 유지되지만, mapBoardWithDetails에서 더 이상 사용되지 않음.
-    // */
-    // @Deprecated
-    // private void mapReactionCounts(BoardDTO dto, Long boardId) {
-    // List<Object[]> results =
-    // boardReactionRepository.countByBoardGroupByReactionType(boardId);
-    // Map<ReactionType, Long> counts = parseReactionCountResults(results);
-    // applyReactionCounts(dto, counts);
-    // }
-
-    // /**
-    // * 게시글에 첨부파일 정보 매핑
-    // *
-    // * @deprecated 단일 조회 시 mapBoardsWithReactionsBatch를 활용하도록 변경됨.
-    // * 호환성을 위해 유지되지만, mapBoardWithDetails에서 더 이상 사용되지 않음.
-    // */
-    // @Deprecated
-    // private void mapAttachmentInfo(BoardDTO dto, Long boardId) {
-    // List<FileDTO> attachments =
-    // attachmentFileService.getAttachments(FileTargetType.BOARD, boardId);
-    // dto.setAttachments(attachments);
-    // dto.setBoardFilePath(extractPrimaryFileUrl(attachments));
-    // }
 
     /**
      * 여러 게시글에 반응 정보를 배치로 매핑 (목록 조회용 - N+1 문제 해결)
