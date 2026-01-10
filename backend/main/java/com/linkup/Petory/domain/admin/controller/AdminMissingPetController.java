@@ -69,7 +69,8 @@ public class AdminMissingPetController {
      */
     @GetMapping("/{id}")
     public ResponseEntity<MissingPetBoardDTO> getMissingPet(@PathVariable Long id) {
-        return ResponseEntity.ok(missingPetBoardService.getBoard(id));
+        // 관리자 페이지에서는 댓글 불필요하므로 null 전달
+        return ResponseEntity.ok(missingPetBoardService.getBoard(id, null, null));
     }
 
     /**

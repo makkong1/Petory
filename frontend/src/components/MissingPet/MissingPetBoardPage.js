@@ -34,13 +34,37 @@ const MissingPetBoardPage = () => {
   const [activeBoard, setActiveBoard] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
 
-  const fetchBoards = useCallback(async () => {
+  // 서버 사이드 페이징 상태
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(20);
+  const [totalCount, setTotalCount] = useState(0);
+  const [hasNext, setHasNext] = useState(false);
+
+  // 서버 사이드 페이징으로 게시글 가져오기
+  const fetchBoards = useCallback(async (pageNum = 0, reset = false) => {
     try {
       setLoading(true);
       setError(null);
-      const params = statusFilter === 'ALL' ? {} : { status: statusFilter };
-      const response = await missingPetApi.list(params);
-      setBoards(response.data || []);
+
+      const requestParams = {
+        ...(statusFilter !== 'ALL' ? { status: statusFilter } : {}),
+        page: pageNum,
+        size: pageSize
+      };
+
+      const response = await missingPetApi.list(requestParams);
+      const pageData = response.data || {};
+      const boardsData = pageData.boards || [];
+
+      if (reset) {
+        setBoards(boardsData);
+      } else {
+        setBoards(prevBoards => [...prevBoards, ...boardsData]);
+      }
+
+      setTotalCount(pageData.totalCount || 0);
+      setHasNext(pageData.hasNext || false);
+      setPage(pageNum);
       setLastUpdated(new Date());
     } catch (err) {
       const message = err.response?.data?.error || err.message;
@@ -48,11 +72,13 @@ const MissingPetBoardPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter]);
+  }, [statusFilter, pageSize]);
 
+  // 카테고리나 페이지 크기 변경 시 게시글 다시 로드
   useEffect(() => {
-    fetchBoards();
-  }, [fetchBoards]);
+    fetchBoards(0, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusFilter, pageSize]);
 
   const loadBoardDetail = useCallback(
     async (id) => {
@@ -122,7 +148,7 @@ const MissingPetBoardPage = () => {
   }, [loadBoardDetail]);
 
   const refreshBoardDetail = useCallback(async () => {
-    await fetchBoards();
+    await fetchBoards(0, true);
     if (activeBoardId) {
       await loadBoardDetail(activeBoardId);
     }
@@ -171,7 +197,7 @@ const MissingPetBoardPage = () => {
 
       const response = await missingPetApi.create(payload);
       setIsFormOpen(false);
-      await fetchBoards();
+      await fetchBoards(0, true);
 
       if (response?.data?.idx) {
         const newId = response.data.idx;
@@ -193,6 +219,20 @@ const MissingPetBoardPage = () => {
     loadBoardDetail(board.idx);
   };
 
+  // 더 보기 버튼 클릭 핸들러
+  const handleLoadMore = useCallback(() => {
+    if (!loading && hasNext) {
+      fetchBoards(page + 1, false);
+    }
+  }, [loading, hasNext, page, fetchBoards]);
+
+  // 페이지 크기 변경 핸들러
+  const handlePageSizeChange = useCallback((newSize) => {
+    setPageSize(newSize);
+    setPage(0);
+    setBoards([]);
+  }, []);
+
   const closeDrawer = useCallback(() => {
     setIsDrawerOpen(false);
     setActiveBoardId(null);
@@ -201,7 +241,7 @@ const MissingPetBoardPage = () => {
   }, []);
 
   const handleBoardDeleted = useCallback(async () => {
-    await fetchBoards();
+    await fetchBoards(0, true);
     closeDrawer();
   }, [fetchBoards, closeDrawer]);
 
@@ -254,7 +294,27 @@ const MissingPetBoardPage = () => {
           </UpdatedAt>
         )}
 
-        {boards.length === 0 && !loading && !error ? (
+        <PageSizeSelector>
+          <PageSizeLabel>페이지당 게시글 수:</PageSizeLabel>
+          <PageSizeButtons>
+            <PageSizeButton active={pageSize === 20} onClick={() => handlePageSizeChange(20)}>
+              20
+            </PageSizeButton>
+            <PageSizeButton active={pageSize === 50} onClick={() => handlePageSizeChange(50)}>
+              50
+            </PageSizeButton>
+            <PageSizeButton active={pageSize === 100} onClick={() => handlePageSizeChange(100)}>
+              100
+            </PageSizeButton>
+          </PageSizeButtons>
+        </PageSizeSelector>
+
+        {loading && boards.length === 0 ? (
+          <LoadingContainer>
+            <LoadingSpinner />
+            <LoadingMessage>실종 신고 정보를 불러오는 중...</LoadingMessage>
+          </LoadingContainer>
+        ) : boards.length === 0 && !error ? (
           <EmptyState>
             <p>등록된 실종 신고가 없습니다.</p>
             <span>새로운 제보가 등록되면 이곳에서 확인하실 수 있습니다.</span>
@@ -303,6 +363,17 @@ const MissingPetBoardPage = () => {
               </BoardCard>
             ))}
           </BoardGrid>
+        )}
+
+        {hasNext && (
+          <LoadMoreContainer>
+            <LoadMoreButton
+              onClick={handleLoadMore}
+              disabled={loading}
+            >
+              {loading ? '로딩 중...' : `더 보기 (${boards.length} / ${totalCount})`}
+            </LoadMoreButton>
+          </LoadMoreContainer>
         )}
       </Wrapper>
 
@@ -670,5 +741,112 @@ const DrawerLoader = styled.div`
   z-index: 1001;
   font-weight: 600;
   color: ${(props) => props.theme.colors.text};
+`;
+
+const LoadingContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: ${props => props.theme.spacing.xxl};
+  min-height: 400px;
+  gap: ${props => props.theme.spacing.lg};
+`;
+
+const LoadingSpinner = styled.div`
+  width: 48px;
+  height: 48px;
+  border: 4px solid ${props => props.theme.colors.border};
+  border-top-color: ${props => props.theme.colors.primary};
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+`;
+
+const LoadingMessage = styled.div`
+  text-align: center;
+  color: ${props => props.theme.colors.textSecondary};
+  font-size: ${props => props.theme.typography.body1.fontSize};
+`;
+
+const PageSizeSelector = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${props => props.theme.spacing.md};
+  padding: ${props => props.theme.spacing.md} ${props => props.theme.spacing.lg};
+  margin-bottom: ${props => props.theme.spacing.md};
+  background: ${props => props.theme.colors.surface};
+  border-radius: ${props => props.theme.borderRadius.md};
+`;
+
+const PageSizeLabel = styled.span`
+  font-size: ${props => props.theme.typography.body2.fontSize};
+  color: ${props => props.theme.colors.textSecondary};
+  font-weight: 500;
+`;
+
+const PageSizeButtons = styled.div`
+  display: flex;
+  gap: ${props => props.theme.spacing.xs};
+`;
+
+const PageSizeButton = styled.button`
+  padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.md};
+  border: 1px solid ${props => props.theme.colors.border};
+  border-radius: ${props => props.theme.borderRadius.md};
+  background: ${props => props.active ? props.theme.colors.primary : 'transparent'};
+  color: ${props => props.active ? 'white' : props.theme.colors.text};
+  font-size: ${props => props.theme.typography.body2.fontSize};
+  font-weight: ${props => props.active ? 600 : 400};
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: ${props => props.active ? props.theme.colors.primary : props.theme.colors.background};
+    border-color: ${props => props.theme.colors.primary};
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+`;
+
+const LoadMoreContainer = styled.div`
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: ${props => props.theme.spacing.xl} 0;
+  margin-top: ${props => props.theme.spacing.lg};
+`;
+
+const LoadMoreButton = styled.button`
+  background: ${props => props.theme.colors.gradient};
+  color: white;
+  border: none;
+  padding: ${props => props.theme.spacing.md} ${props => props.theme.spacing.xl};
+  border-radius: ${props => props.theme.borderRadius.xl};
+  font-size: ${props => props.theme.typography.body1.fontSize};
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(255, 126, 54, 0.25);
+  
+  &:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(255, 126, 54, 0.35);
+  }
+  
+  &:active {
+    transform: translateY(0);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
 `;
 

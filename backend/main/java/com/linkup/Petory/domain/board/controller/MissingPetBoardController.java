@@ -18,7 +18,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.linkup.Petory.domain.board.dto.MissingPetBoardDTO;
+import com.linkup.Petory.domain.board.dto.MissingPetBoardPageResponseDTO;
 import com.linkup.Petory.domain.board.dto.MissingPetCommentDTO;
+import com.linkup.Petory.domain.board.dto.MissingPetCommentPageResponseDTO;
 import com.linkup.Petory.domain.board.entity.MissingPetStatus;
 import com.linkup.Petory.domain.board.service.MissingPetBoardService;
 import com.linkup.Petory.domain.board.service.MissingPetCommentService;
@@ -48,25 +50,37 @@ public class MissingPetBoardController {
     // ==================== 게시글 관련 API (MissingPetBoardService) ====================
 
     /**
-     * 실종 제보 목록 조회
-     * GET /api/missing-pets?status={status}
-     * 서비스: MissingPetBoardService.getBoards()
+     * 실종 제보 목록 조회 (페이징 지원)
+     * GET /api/missing-pets?status={status}&page={page}&size={size}
+     * 서비스: MissingPetBoardService.getBoardsWithPaging()
      */
     @GetMapping
-    public ResponseEntity<List<MissingPetBoardDTO>> listBoards(
-            @RequestParam(required = false) MissingPetStatus status) {
-        return ResponseEntity.ok(missingPetBoardService.getBoards(status));
+    public ResponseEntity<MissingPetBoardPageResponseDTO> listBoards(
+            @RequestParam(required = false) MissingPetStatus status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(missingPetBoardService.getBoardsWithPaging(status, page, size));
     }
 
     /**
-     * 실종 제보 상세 조회
-     * GET /api/missing-pets/{id}
+     * 실종 제보 상세 조회 (댓글 페이징 지원)
+     * GET
+     * /api/missing-pets/{id}?commentPage={commentPage}&commentSize={commentSize}
      * 서비스: MissingPetBoardService.getBoard()
-     * 참고: 댓글은 별도 API로 조회 (GET /api/missing-pets/{id}/comments)
+     * - 댓글 페이징 처리 (commentPage, commentSize 파라미터)
+     * - 기본값: commentPage=0, commentSize=20 (첫 페이지, 20개씩)
+     * - 댓글 제외: commentSize=0
+     * - 댓글 전체: 별도 API 사용 (GET /api/missing-pets/{id}/comments)
      */
     @GetMapping("/{id}")
-    public ResponseEntity<MissingPetBoardDTO> getBoard(@PathVariable Long id) {
-        return ResponseEntity.ok(missingPetBoardService.getBoard(id));
+    public ResponseEntity<MissingPetBoardDTO> getBoard(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "0") int commentPage,
+            @RequestParam(defaultValue = "20") int commentSize) {
+        // commentSize가 0이면 댓글 제외
+        Integer page = commentSize > 0 ? commentPage : null;
+        Integer size = commentSize > 0 ? commentSize : null;
+        return ResponseEntity.ok(missingPetBoardService.getBoard(id, page, size));
     }
 
     /**
@@ -130,13 +144,16 @@ public class MissingPetBoardController {
     // ====================
 
     /**
-     * 댓글 목록 조회
-     * GET /api/missing-pets/{id}/comments
-     * 서비스: MissingPetCommentService.getComments()
+     * 댓글 목록 조회 (페이징 지원)
+     * GET /api/missing-pets/{id}/comments?page={page}&size={size}
+     * 서비스: MissingPetCommentService.getCommentsWithPaging()
      */
     @GetMapping("/{id}/comments")
-    public ResponseEntity<List<MissingPetCommentDTO>> getComments(@PathVariable Long id) {
-        return ResponseEntity.ok(missingPetCommentService.getComments(id));
+    public ResponseEntity<MissingPetCommentPageResponseDTO> getComments(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(missingPetCommentService.getCommentsWithPaging(id, page, size));
     }
 
     /**
@@ -185,7 +202,7 @@ public class MissingPetBoardController {
             @PathVariable Long boardIdx,
             @RequestParam Long witnessId) {
         // 실종제보 조회하여 제보자 ID 확인
-        MissingPetBoardDTO board = missingPetBoardService.getBoard(boardIdx);
+        MissingPetBoardDTO board = missingPetBoardService.getBoard(boardIdx, null, null);
         Long reporterId = board.getUserId();
 
         ConversationDTO conversation = conversationService.createMissingPetChat(

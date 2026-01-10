@@ -3,6 +3,8 @@ package com.linkup.Petory.domain.board.repository;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -62,5 +64,15 @@ public interface SpringDataJpaMissingPetBoardRepository extends JpaRepository<Mi
     // 사용자별 게시글 조회 (삭제되지 않은 것만, 최신순) - 작성자도 활성 상태여야 함
     @Query("SELECT b FROM MissingPetBoard b JOIN FETCH b.user u WHERE b.user = :user AND b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY b.createdAt DESC")
     List<MissingPetBoard> findByUserAndIsDeletedFalseOrderByCreatedAtDesc(@Param("user") Users user);
+
+    // 페이징 지원 - 전체 조회 (JOIN FETCH와 페이징 호환을 위해 COUNT 쿼리 별도 지정)
+    @Query(value = "SELECT b FROM MissingPetBoard b JOIN FETCH b.user u WHERE b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY b.createdAt DESC",
+           countQuery = "SELECT COUNT(b) FROM MissingPetBoard b JOIN b.user u WHERE b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE'")
+    Page<MissingPetBoard> findAllByOrderByCreatedAtDesc(Pageable pageable);
+
+    // 페이징 지원 - 상태별 조회 (JOIN FETCH와 페이징 호환을 위해 COUNT 쿼리 별도 지정)
+    @Query(value = "SELECT b FROM MissingPetBoard b JOIN FETCH b.user u WHERE b.status = :status AND b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY b.createdAt DESC",
+           countQuery = "SELECT COUNT(b) FROM MissingPetBoard b JOIN b.user u WHERE b.status = :status AND b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE'")
+    Page<MissingPetBoard> findByStatusOrderByCreatedAtDesc(@Param("status") MissingPetStatus status, Pageable pageable);
 }
 

@@ -1,9 +1,13 @@
 package com.linkup.Petory.domain.board.service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -11,6 +15,7 @@ import org.springframework.util.StringUtils;
 
 import com.linkup.Petory.domain.board.converter.MissingPetConverter;
 import com.linkup.Petory.domain.board.dto.MissingPetCommentDTO;
+import com.linkup.Petory.domain.board.dto.MissingPetCommentPageResponseDTO;
 import com.linkup.Petory.domain.board.entity.MissingPetBoard;
 import com.linkup.Petory.domain.board.entity.MissingPetComment;
 import com.linkup.Petory.domain.board.repository.MissingPetBoardRepository;
@@ -40,7 +45,68 @@ public class MissingPetCommentService {
     private final NotificationService notificationService;
 
     /**
-     * 댓글 목록 조회
+     * 댓글 목록 조회 (페이징 지원)
+     * 엔드포인트: GET /api/missing-pets/{id}/comments?page={page}&size={size}
+     * - 생성일 기준 오름차순 정렬
+     * - 삭제된 댓글 제외
+     * - 각 댓글의 파일 정보 포함
+     * - 댓글 파일 배치 조회 (N+1 문제 해결)
+     */
+    public MissingPetCommentPageResponseDTO getCommentsWithPaging(Long boardId, int page, int size) {
+        // 게시글 존재 확인
+        boardRepository.findById(boardId)
+                .orElseThrow(() -> new IllegalArgumentException("Missing pet board not found"));
+
+        Pageable pageable = PageRequest.of(page, size);
+        Page<MissingPetComment> commentPage = commentRepository.findByBoardIdAndIsDeletedFalseOrderByCreatedAtAsc(boardId, pageable);
+
+        if (commentPage.isEmpty()) {
+            return MissingPetCommentPageResponseDTO.builder()
+                    .comments(new ArrayList<>())
+                    .totalCount(0)
+                    .totalPages(0)
+                    .currentPage(page)
+                    .pageSize(size)
+                    .hasNext(false)
+                    .hasPrevious(false)
+                    .build();
+        }
+
+        List<MissingPetComment> comments = commentPage.getContent();
+
+        // 댓글 ID 리스트 추출
+        List<Long> commentIds = comments.stream()
+                .map(MissingPetComment::getIdx)
+                .collect(Collectors.toList());
+
+        // 댓글 파일 배치 조회 (N+1 문제 해결)
+        Map<Long, List<FileDTO>> filesByCommentId = attachmentFileService.getAttachmentsBatch(
+                FileTargetType.MISSING_PET_COMMENT, commentIds);
+
+        // DTO 변환 (배치 조회된 파일 정보 사용)
+        List<MissingPetCommentDTO> commentDTOs = comments.stream()
+                .map(comment -> {
+                    MissingPetCommentDTO dto = missingPetConverter.toCommentDTO(comment);
+                    List<FileDTO> attachments = filesByCommentId.getOrDefault(comment.getIdx(), List.of());
+                    dto.setAttachments(attachments);
+                    dto.setImageUrl(extractPrimaryFileUrl(attachments));
+                    return dto;
+                })
+                .collect(Collectors.toList());
+
+        return MissingPetCommentPageResponseDTO.builder()
+                .comments(commentDTOs)
+                .totalCount(commentPage.getTotalElements())
+                .totalPages(commentPage.getTotalPages())
+                .currentPage(page)
+                .pageSize(size)
+                .hasNext(commentPage.hasNext())
+                .hasPrevious(commentPage.hasPrevious())
+                .build();
+    }
+
+    /**
+     * 댓글 목록 조회 (페이징 없음 - 하위 호환성)
      * 엔드포인트: GET /api/missing-pets/{id}/comments
      * - 생성일 기준 오름차순 정렬
      * - 삭제된 댓글 제외
@@ -150,6 +216,24 @@ public class MissingPetCommentService {
         // TODO: COUNT 쿼리로 최적화 필요 (현재는 댓글 목록 조회 후 size() 사용)
         List<MissingPetComment> comments = commentRepository.findByBoardAndIsDeletedFalseOrderByCreatedAtAsc(board);
         return comments.size();
+    }
+
+    /**
+     * 게시글별 댓글 수 배치 조회 (N+1 문제 해결)
+     * @param boardIds 게시글 ID 목록
+     * @return 게시글 ID를 키로 하는 댓글 수 맵
+     */
+    public Map<Long, Integer> getCommentCountsBatch(List<Long> boardIds) {
+        if (boardIds == null || boardIds.isEmpty()) {
+            return Map.of();
+        }
+        
+        List<Object[]> results = commentRepository.countCommentsByBoardIds(boardIds);
+        return results.stream()
+                .collect(Collectors.toMap(
+                        row -> ((Long) row[0]),
+                        row -> ((Long) row[1]).intValue()
+                ));
     }
 
     /**

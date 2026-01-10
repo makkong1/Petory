@@ -3,6 +3,9 @@ package com.linkup.Petory.domain.board.repository;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
 import com.linkup.Petory.domain.board.entity.MissingPetBoard;
 import com.linkup.Petory.domain.board.entity.MissingPetComment;
 import com.linkup.Petory.domain.user.entity.Users;
@@ -39,4 +42,16 @@ public interface MissingPetCommentRepository {
      * 사용자별 댓글 조회 (삭제되지 않은 것만, 최신순) - 작성자도 활성 상태여야 함
      */
     List<MissingPetComment> findByUserAndIsDeletedFalseOrderByCreatedAtDesc(Users user);
+
+    /**
+     * 게시글별 댓글 수 배치 조회 (N+1 문제 해결)
+     * @param boardIds 게시글 ID 목록
+     * @return [게시글 ID, 댓글 수] 쌍의 리스트
+     */
+    List<Object[]> countCommentsByBoardIds(List<Long> boardIds);
+
+    /**
+     * 페이징 지원 - 게시글별 댓글 조회
+     */
+    Page<MissingPetComment> findByBoardIdAndIsDeletedFalseOrderByCreatedAtAsc(Long boardId, Pageable pageable);
 }

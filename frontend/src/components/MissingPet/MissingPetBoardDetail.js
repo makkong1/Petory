@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import styled from 'styled-components';
 import { missingPetApi } from '../../api/missingPetApi';
 import { reportApi } from '../../api/reportApi';
@@ -31,10 +31,66 @@ const MissingPetBoardDetail = ({
   const [selectedUserId, setSelectedUserId] = useState(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
+  // 댓글 페이징 상태
+  const [comments, setComments] = useState([]);
+  const [commentPage, setCommentPage] = useState(0);
+  const [commentPageSize, setCommentPageSize] = useState(20);
+  const [commentTotalCount, setCommentTotalCount] = useState(0);
+  const [commentHasNext, setCommentHasNext] = useState(false);
+  const [loadingComments, setLoadingComments] = useState(false);
+
   const handleViewProfile = (userId) => {
     setSelectedUserId(userId);
     setIsProfileModalOpen(true);
   };
+
+  // 댓글 페이징으로 가져오기
+  const fetchComments = useCallback(async (pageNum = 0, reset = false) => {
+    if (!board?.idx) return;
+    
+    try {
+      setLoadingComments(true);
+      const response = await missingPetApi.getComments(board.idx, pageNum, commentPageSize);
+      const pageData = response.data || {};
+      const commentsData = pageData.comments || [];
+
+      if (reset) {
+        setComments(commentsData);
+      } else {
+        setComments(prevComments => [...prevComments, ...commentsData]);
+      }
+
+      setCommentTotalCount(pageData.totalCount || 0);
+      setCommentHasNext(pageData.hasNext || false);
+      setCommentPage(pageNum);
+    } catch (err) {
+      console.error('댓글 조회 실패:', err);
+    } finally {
+      setLoadingComments(false);
+    }
+  }, [board?.idx, commentPageSize]);
+
+  // 댓글 더 보기
+  const handleLoadMoreComments = useCallback(() => {
+    if (!loadingComments && commentHasNext) {
+      fetchComments(commentPage + 1, false);
+    }
+  }, [loadingComments, commentHasNext, commentPage, fetchComments]);
+
+  // 게시글 변경 시 댓글 초기화 및 로드
+  useEffect(() => {
+    if (board?.idx) {
+      // 초기 댓글은 board.comments에서 가져오거나 별도로 로드
+      if (board.comments && Array.isArray(board.comments)) {
+        setComments(board.comments);
+        setCommentTotalCount(board.commentCount || board.comments.length);
+        setCommentHasNext((board.commentCount || 0) > (board.comments.length || 0));
+      } else {
+        // board.comments가 없으면 별도 API로 로드
+        fetchComments(0, true);
+      }
+    }
+  }, [board?.idx, board?.comments, board?.commentCount, fetchComments]);
 
   if (!board) {
     return null;
@@ -68,6 +124,8 @@ const MissingPetBoardDetail = ({
       setCommentLat(null);
       setCommentLng(null);
       setShowAddressMap(false);
+      // 댓글 목록 새로고침
+      await fetchComments(0, true);
       onRefresh();
       // 알림 개수 즉시 업데이트 (다른 사용자에게 알림이 갔을 수 있음)
       window.dispatchEvent(new Event('notificationUpdate'));
@@ -104,6 +162,8 @@ const MissingPetBoardDetail = ({
     try {
       await missingPetApi.deleteComment(board.idx, commentId);
       onDeleteComment?.(commentId);
+      // 댓글 목록 새로고침
+      await fetchComments(0, true);
       onRefresh();
     } catch (err) {
       alert(err.response?.data?.error || err.message);
@@ -386,10 +446,10 @@ const MissingPetBoardDetail = ({
             </Section>
 
             <Section>
-              <SectionTitle>댓글 및 제보</SectionTitle>
-              {board.comments && board.comments.length > 0 ? (
+              <SectionTitle>댓글 및 제보 {commentTotalCount > 0 && `(${commentTotalCount}개)`}</SectionTitle>
+              {comments.length > 0 ? (
                 <CommentList>
-                  {board.comments.map((item) => (
+                  {comments.map((item) => (
                     <CommentItem key={item.idx}>
                       <CommentHeader>
                         <CommentAuthor
@@ -426,6 +486,17 @@ const MissingPetBoardDetail = ({
                 </CommentList>
               ) : (
                 <EmptyComments>아직 제보가 없습니다. 가장 먼저 댓글을 남겨보세요!</EmptyComments>
+              )}
+
+              {commentHasNext && (
+                <LoadMoreCommentsContainer>
+                  <LoadMoreCommentsButton
+                    onClick={handleLoadMoreComments}
+                    disabled={loadingComments}
+                  >
+                    {loadingComments ? '로딩 중...' : `댓글 더 보기 (${comments.length} / ${commentTotalCount})`}
+                  </LoadMoreCommentsButton>
+                </LoadMoreCommentsContainer>
               )}
 
               <CommentForm onSubmit={handleAddComment}>
@@ -1061,6 +1132,37 @@ const CommentSubmit = styled.button`
 
   &:hover:not(:disabled) {
     background: ${(props) => props.theme.colors.primaryDark};
+  }
+`;
+
+const LoadMoreCommentsContainer = styled.div`
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: ${props => props.theme.spacing.md} 0;
+  margin-top: ${props => props.theme.spacing.sm};
+`;
+
+const LoadMoreCommentsButton = styled.button`
+  background: ${props => props.theme.colors.surface};
+  color: ${props => props.theme.colors.text};
+  border: 1px solid ${props => props.theme.colors.border};
+  border-radius: ${props => props.theme.borderRadius.md};
+  padding: ${props => props.theme.spacing.sm} ${props => props.theme.spacing.lg};
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: ${props => props.theme.typography.body2.fontSize};
+
+  &:hover:not(:disabled) {
+    background: ${props => props.theme.colors.surfaceHover};
+    border-color: ${props => props.theme.colors.primary};
+    color: ${props => props.theme.colors.primary};
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
   }
 `;
 

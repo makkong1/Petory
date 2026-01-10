@@ -3,6 +3,9 @@ package com.linkup.Petory.domain.board.repository;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
 import com.linkup.Petory.domain.board.entity.MissingPetBoard;
 import com.linkup.Petory.domain.board.entity.MissingPetStatus;
 import com.linkup.Petory.domain.user.entity.Users;
@@ -58,4 +61,14 @@ public interface MissingPetBoardRepository {
      * 사용자별 게시글 조회 (삭제되지 않은 것만, 최신순) - 작성자도 활성 상태여야 함
      */
     List<MissingPetBoard> findByUserAndIsDeletedFalseOrderByCreatedAtDesc(Users user);
+
+    /**
+     * 페이징 지원 - 전체 조회
+     */
+    Page<MissingPetBoard> findAllByOrderByCreatedAtDesc(Pageable pageable);
+
+    /**
+     * 페이징 지원 - 상태별 조회
+     */
+    Page<MissingPetBoard> findByStatusOrderByCreatedAtDesc(MissingPetStatus status, Pageable pageable);
 }

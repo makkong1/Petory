@@ -1,15 +1,22 @@
 package com.linkup.Petory.domain.board.service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import com.linkup.Petory.domain.board.converter.MissingPetConverter;
 import com.linkup.Petory.domain.board.dto.MissingPetBoardDTO;
+import com.linkup.Petory.domain.board.dto.MissingPetBoardPageResponseDTO;
+import com.linkup.Petory.domain.board.dto.MissingPetCommentDTO;
+import com.linkup.Petory.domain.board.dto.MissingPetCommentPageResponseDTO;
 import com.linkup.Petory.domain.board.entity.MissingPetBoard;
 import com.linkup.Petory.domain.board.entity.MissingPetStatus;
 import com.linkup.Petory.domain.board.repository.MissingPetBoardRepository;
@@ -35,11 +42,111 @@ public class MissingPetBoardService {
     private final AttachmentFileService attachmentFileService;
 
     /**
-     * 실종 제보 목록 조회
+     * 실종 제보 목록 조회 (페이징 지원)
+     * 엔드포인트: GET /api/missing-pets?page={page}&size={size}&status={status}
+     * - 상태별 필터링 지원 (status 파라미터)
+     * - 페이징 지원 (page, size 파라미터)
+     * - 최신순 정렬
+     * - 게시글 파일 배치 조회 (N+1 문제 해결)
+     * - 댓글 수 배치 조회 (N+1 문제 해결)
+     * - 댓글은 포함하지 않음 (조인 폭발 방지)
+     */
+    public MissingPetBoardPageResponseDTO getBoardsWithPaging(MissingPetStatus status, int page, int size) {
+        // 성능 측정 시작
+        long startTime = System.currentTimeMillis();
+        Runtime runtime = Runtime.getRuntime();
+        long startMemory = runtime.totalMemory() - runtime.freeMemory();
+
+        log.info("=== [성능 측정] 게시글 목록 조회 시작 (페이징) ===");
+        log.info("  - 상태 필터: {}", status != null ? status : "전체");
+        log.info("  - 페이지: {}, 크기: {}", page, size);
+
+        Pageable pageable = PageRequest.of(page, size);
+
+        // 게시글 + 작성자 페이징 조회 (댓글 제외 - 조인 폭발 방지)
+        Page<MissingPetBoard> boardPage = status == null
+                ? boardRepository.findAllByOrderByCreatedAtDesc(pageable)
+                : boardRepository.findByStatusOrderByCreatedAtDesc(status, pageable);
+
+        if (boardPage.isEmpty()) {
+            return MissingPetBoardPageResponseDTO.builder()
+                    .boards(new ArrayList<>())
+                    .totalCount(0)
+                    .totalPages(0)
+                    .currentPage(page)
+                    .pageSize(size)
+                    .hasNext(false)
+                    .hasPrevious(false)
+                    .build();
+        }
+
+        List<MissingPetBoard> boards = boardPage.getContent();
+
+        // 게시글 ID 목록 추출
+        List<Long> boardIds = boards.stream()
+                .map(MissingPetBoard::getIdx)
+                .collect(Collectors.toList());
+
+        // 파일 배치 조회 (N+1 문제 해결)
+        Map<Long, List<FileDTO>> filesByBoardId = attachmentFileService.getAttachmentsBatch(
+                FileTargetType.MISSING_PET, boardIds);
+
+        // 댓글 수 배치 조회 (N+1 문제 해결)
+        Map<Long, Integer> commentCountsByBoardId = commentService.getCommentCountsBatch(boardIds);
+
+        // DTO 변환 (파일 정보 포함, 댓글은 빈 리스트)
+        // toBoardDTOWithoutComments 사용으로 N+1 문제 방지 (댓글 lazy loading 트리거 안함)
+        List<MissingPetBoardDTO> boardDTOs = boards.stream()
+                .map(board -> {
+                    MissingPetBoardDTO dto = missingPetConverter.toBoardDTOWithoutComments(board);
+                    // 파일 정보 추가
+                    List<FileDTO> attachments = filesByBoardId.getOrDefault(board.getIdx(), List.of());
+                    dto.setAttachments(attachments);
+                    dto.setImageUrl(extractPrimaryFileUrl(attachments));
+                    // 댓글 수 추가
+                    int commentCount = commentCountsByBoardId.getOrDefault(board.getIdx(), 0);
+                    dto.setCommentCount(commentCount);
+                    return dto;
+                })
+                .collect(Collectors.toList());
+
+        // 성능 측정 종료
+        long endTime = System.currentTimeMillis();
+        long endMemory = runtime.totalMemory() - runtime.freeMemory();
+        long executionTime = endTime - startTime;
+        long memoryUsed = endMemory - startMemory;
+        long currentMemoryMB = endMemory / 1024 / 1024;
+        long maxMemoryMB = runtime.maxMemory() / 1024 / 1024;
+        double avgTimePerBoard = boards.isEmpty() ? 0 : (double) executionTime / boards.size();
+
+        // 성능 측정 로그 출력
+        log.info("=== [성능 측정] 게시글 목록 조회 완료 (페이징) ===");
+        log.info("  - 조회된 게시글 수: {}개", boards.size());
+        log.info("  - 전체 게시글 수: {}개", boardPage.getTotalElements());
+        log.info("  - 실행 시간: {}ms", executionTime);
+        log.info("  - 평균 게시글당 시간: {}ms", String.format("%.2f", avgTimePerBoard));
+        log.info("  - 상태: {}", status != null ? status : "전체");
+        log.info("  - 메모리 사용량: {}MB (증가: {}MB)", currentMemoryMB, memoryUsed / 1024 / 1024);
+        log.info("  - 최대 메모리: {}MB", maxMemoryMB);
+
+        return MissingPetBoardPageResponseDTO.builder()
+                .boards(boardDTOs)
+                .totalCount(boardPage.getTotalElements())
+                .totalPages(boardPage.getTotalPages())
+                .currentPage(page)
+                .pageSize(size)
+                .hasNext(boardPage.hasNext())
+                .hasPrevious(boardPage.hasPrevious())
+                .build();
+    }
+
+    /**
+     * 실종 제보 목록 조회 (페이징 없음 - 하위 호환성)
      * 엔드포인트: GET /api/missing-pets
      * - 상태별 필터링 지원 (status 파라미터)
      * - 최신순 정렬
      * - 게시글 파일 배치 조회 (N+1 문제 해결)
+     * - 댓글 수 배치 조회 (N+1 문제 해결)
      * - 댓글은 포함하지 않음 (조인 폭발 방지)
      */
     public List<MissingPetBoardDTO> getBoards(MissingPetStatus status) {
@@ -65,12 +172,21 @@ public class MissingPetBoardService {
         Map<Long, List<FileDTO>> filesByBoardId = attachmentFileService.getAttachmentsBatch(
                 FileTargetType.MISSING_PET, boardIds);
 
+        // 댓글 수 배치 조회 (N+1 문제 해결)
+        Map<Long, Integer> commentCountsByBoardId = commentService.getCommentCountsBatch(boardIds);
+
         // DTO 변환 (파일 정보 포함, 댓글은 빈 리스트)
+        // toBoardDTOWithoutComments 사용으로 N+1 문제 방지 (댓글 lazy loading 트리거 안함)
         List<MissingPetBoardDTO> result = boards.stream()
                 .map(board -> {
-                    MissingPetBoardDTO dto = mapBoardWithAttachmentsFromBatch(board, filesByBoardId);
-                    // 댓글은 빈 리스트로 설정 (목록에서는 댓글 불필요)
-                    dto.setComments(List.of());
+                    MissingPetBoardDTO dto = missingPetConverter.toBoardDTOWithoutComments(board);
+                    // 파일 정보 추가
+                    List<FileDTO> attachments = filesByBoardId.getOrDefault(board.getIdx(), List.of());
+                    dto.setAttachments(attachments);
+                    dto.setImageUrl(extractPrimaryFileUrl(attachments));
+                    // 댓글 수 추가
+                    int commentCount = commentCountsByBoardId.getOrDefault(board.getIdx(), 0);
+                    dto.setCommentCount(commentCount);
                     return dto;
                 })
                 .collect(Collectors.toList());
@@ -97,15 +213,16 @@ public class MissingPetBoardService {
     }
 
     /**
-     * 실종 제보 상세 조회
-     * 엔드포인트: GET /api/missing-pets/{id}
-     * - 게시글, 작성자 정보만 조회 (댓글은 별도 API로 조회)
+     * 실종 제보 상세 조회 (댓글 페이징 지원)
+     * 엔드포인트: GET
+     * /api/missing-pets/{id}?commentPage={commentPage}&commentSize={commentSize}
+     * - 게시글, 작성자 정보 조회
      * - 게시글 파일 조회
-     * 
-     * 참고: 댓글은 GET /api/missing-pets/{id}/comments 로 별도 조회
-     * 이유: 댓글 조인 시 조인 폭발 방지 및 페이징 가능
+     * - 댓글 페이징 처리 (commentPage, commentSize 파라미터)
+     * - commentPage, commentSize가 모두 제공되면 댓글 페이징 조회
+     * - 제공되지 않으면 댓글 제외 (빈 리스트, 댓글 수만 포함)
      */
-    public MissingPetBoardDTO getBoard(Long id) {
+    public MissingPetBoardDTO getBoard(Long id, Integer commentPage, Integer commentSize) {
         // 성능 측정 시작
         long startTime = System.currentTimeMillis();
         Runtime runtime = Runtime.getRuntime();
@@ -124,15 +241,24 @@ public class MissingPetBoardService {
         List<FileDTO> boardAttachments = attachmentFileService.getAttachments(
                 FileTargetType.MISSING_PET, board.getIdx());
 
-        // 댓글 수만 조회 (댓글 목록은 별도 API로)
+        // 댓글 수 조회
         int commentCount = commentService.getCommentCount(board);
 
-        // DTO 변환 (댓글은 포함하지 않음)
-        MissingPetBoardDTO dto = missingPetConverter.toBoardDTO(board);
+        // 댓글 페이징 조회 (파라미터가 제공된 경우)
+        List<MissingPetCommentDTO> comments = List.of();
+        if (commentPage != null && commentSize != null && commentSize > 0) {
+            MissingPetCommentPageResponseDTO commentPageResponse = commentService.getCommentsWithPaging(id, commentPage,
+                    commentSize);
+            comments = commentPageResponse.getComments();
+            log.info("  - 댓글 페이징 조회: 페이지 {}, 크기 {}, 조회된 댓글 {}개", commentPage, commentSize, comments.size());
+        }
+
+        // DTO 변환
+        MissingPetBoardDTO dto = missingPetConverter.toBoardDTOWithoutComments(board);
         dto.setAttachments(boardAttachments);
         dto.setImageUrl(extractPrimaryFileUrl(boardAttachments));
-        // 댓글은 빈 리스트로 설정, 댓글 수는 실제 카운트 사용
-        dto.setComments(List.of());
+        // 댓글 목록과 댓글 수 설정
+        dto.setComments(comments);
         dto.setCommentCount(commentCount);
 
         // 성능 측정 종료
@@ -147,11 +273,7 @@ public class MissingPetBoardService {
         log.info("=== [성능 측정] 게시글 상세 조회 완료 ===");
         log.info("  - 게시글 ID: {}", id);
         log.info("  - 실행 시간: {}ms", executionTime);
-        if (commentCount > 0) {
-            double avgTimePerComment = (double) executionTime / commentCount;
-            log.info("  - 평균 댓글당 시간: {}ms", String.format("%.2f", avgTimePerComment));
-        }
-        log.info("  - 조회된 댓글 수: {}개", commentCount);
+        log.info("  - 조회된 댓글 수: {}개 (전체 댓글 수: {}개)", comments.size(), commentCount);
         log.info("  - 메모리 사용량: {}MB (증가: {}MB)", currentMemoryMB, memoryUsed / 1024 / 1024);
         log.info("  - 최대 메모리: {}MB", maxMemoryMB);
 
