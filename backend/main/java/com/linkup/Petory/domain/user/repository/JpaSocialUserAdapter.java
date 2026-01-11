@@ -1,5 +1,6 @@
 package com.linkup.Petory.domain.user.repository;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.context.annotation.Primary;
@@ -37,6 +38,11 @@ public class JpaSocialUserAdapter implements SocialUserRepository {
     @Override
     public Optional<SocialUser> findById(Long id) {
         return jpaRepository.findById(id);
+    }
+
+    @Override
+    public List<SocialUser> findAll() {
+        return jpaRepository.findAll();
     }
 
     @Override

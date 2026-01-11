@@ -12,6 +12,7 @@ import com.linkup.Petory.domain.board.dto.MissingPetBoardDTO;
 import com.linkup.Petory.domain.board.dto.MissingPetCommentDTO;
 import com.linkup.Petory.domain.board.entity.MissingPetStatus;
 import com.linkup.Petory.domain.board.service.MissingPetBoardService;
+import com.linkup.Petory.domain.board.service.MissingPetCommentService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -28,6 +29,7 @@ import lombok.RequiredArgsConstructor;
 public class AdminMissingPetController {
 
     private final MissingPetBoardService missingPetBoardService;
+    private final MissingPetCommentService missingPetCommentService;
 
     /**
      * 실종 제보 목록 조회 (필터링 지원)
@@ -37,9 +39,9 @@ public class AdminMissingPetController {
             @RequestParam(value = "status", required = false) MissingPetStatus status,
             @RequestParam(value = "deleted", required = false) Boolean deleted,
             @RequestParam(value = "q", required = false) String q) {
-        
+
         List<MissingPetBoardDTO> all = missingPetBoardService.getBoards(status);
-        
+
         // 삭제 여부 필터
         if (deleted != null) {
             final boolean wantDeleted = deleted.booleanValue();
@@ -47,7 +49,7 @@ public class AdminMissingPetController {
                     .filter(b -> Boolean.TRUE.equals(b.getDeleted()) == wantDeleted)
                     .collect(Collectors.toList());
         }
-        
+
         // 검색어 필터
         if (q != null && !q.isBlank()) {
             String keyword = q.toLowerCase();
@@ -58,7 +60,7 @@ public class AdminMissingPetController {
                             || (b.getUsername() != null && b.getUsername().toLowerCase().contains(keyword)))
                     .collect(Collectors.toList());
         }
-        
+
         return ResponseEntity.ok(all);
     }
 
@@ -67,7 +69,8 @@ public class AdminMissingPetController {
      */
     @GetMapping("/{id}")
     public ResponseEntity<MissingPetBoardDTO> getMissingPet(@PathVariable Long id) {
-        return ResponseEntity.ok(missingPetBoardService.getBoard(id));
+        // 관리자 페이지에서는 댓글 불필요하므로 null 전달
+        return ResponseEntity.ok(missingPetBoardService.getBoard(id, null, null));
     }
 
     /**
@@ -105,13 +108,14 @@ public class AdminMissingPetController {
 
     /**
      * 댓글 목록 조회
+     * 서비스: MissingPetCommentService.getComments()
      */
     @GetMapping("/{boardId}/comments")
     public ResponseEntity<List<MissingPetCommentDTO>> listComments(
             @PathVariable Long boardId,
             @RequestParam(value = "deleted", required = false) Boolean deleted) {
-        List<MissingPetCommentDTO> comments = missingPetBoardService.getComments(boardId);
-        
+        List<MissingPetCommentDTO> comments = missingPetCommentService.getComments(boardId);
+
         // 삭제 여부 필터
         if (deleted != null) {
             final boolean wantDeleted = deleted.booleanValue();
@@ -119,19 +123,19 @@ public class AdminMissingPetController {
                     .filter(c -> Boolean.TRUE.equals(c.getDeleted()) == wantDeleted)
                     .collect(Collectors.toList());
         }
-        
+
         return ResponseEntity.ok(comments);
     }
 
     /**
      * 댓글 삭제
+     * 서비스: MissingPetCommentService.deleteComment()
      */
     @PostMapping("/{boardId}/comments/{commentId}/delete")
     public ResponseEntity<Void> deleteComment(
             @PathVariable Long boardId,
             @PathVariable Long commentId) {
-        missingPetBoardService.deleteComment(boardId, commentId);
+        missingPetCommentService.deleteComment(boardId, commentId);
         return ResponseEntity.noContent().build();
     }
 }
-

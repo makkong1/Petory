@@ -2,6 +2,9 @@ package com.linkup.Petory.domain.location.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Entity
@@ -103,10 +106,12 @@ public class LocationService {
     @Column(columnDefinition = "TEXT")
     private String description; // 서비스 설명
 
-    private Double rating; // 평균 평점
+    @Column(name = "rating")
+    @Builder.Default
+    private Double rating = 0.0; // 기본값 설정
 
     @Column(name = "last_updated")
-    private java.time.LocalDate lastUpdated; // 최종작성일
+    private LocalDate lastUpdated; // 최종작성일
 
     @Column(name = "data_source", length = 50)
     @Builder.Default
@@ -117,8 +122,10 @@ public class LocationService {
     @Builder.Default
     private Boolean isDeleted = false;
 
+    // deleted_at 컬럼 추가 필요
+    // 마이그레이션 SQL 실행: docs/migration/db/add_locationservice_soft_delete_columns.sql
     @Column(name = "deleted_at")
-    private java.time.LocalDateTime deletedAt;
+    private LocalDateTime deletedAt;
 
     // created_at, updated_at는 DB에 없으므로 주석 처리
     // 필요시 DB에 컬럼 추가 후 활성화

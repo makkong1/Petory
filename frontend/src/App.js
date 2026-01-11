@@ -19,7 +19,7 @@ import ActivityPage from './components/Activity/ActivityPage';
 import MeetupPage from './components/Meetup/MeetupPage';
 import ChatWidget from './components/Chat/ChatWidget';
 import EmailVerificationPage from './components/Auth/EmailVerificationPage';
-import EmailVerificationPrompt from './components/Common/EmailVerificationPrompt';
+import EmailVerificationPrompt from './components/Common/EmailVerificationPrompt.js';
 import { setupApiInterceptors } from './api/authApi';
 
 

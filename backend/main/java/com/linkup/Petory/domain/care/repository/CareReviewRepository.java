@@ -1,14 +1,22 @@
 package com.linkup.Petory.domain.care.repository;
 
 import java.util.List;
-
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
+import java.util.Optional;
 
 import com.linkup.Petory.domain.care.entity.CareReview;
 
-@Repository
-public interface CareReviewRepository extends JpaRepository<CareReview, Long> {
+/**
+ * CareReview 도메인 Repository 인터페이스입니다.
+ */
+public interface CareReviewRepository {
+
+    CareReview save(CareReview careReview);
+
+    Optional<CareReview> findById(Long id);
+
+    void delete(CareReview careReview);
+
+    void deleteById(Long id);
 
     /**
      * 특정 사용자(reviewee)에 대한 리뷰 목록 조회

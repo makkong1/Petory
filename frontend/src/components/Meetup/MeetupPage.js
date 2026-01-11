@@ -265,7 +265,11 @@ const MeetupPage = () => {
 
   // 모임 목록 조회
   const fetchMeetups = useCallback(async (filterSido = null, filterSigungu = null, filterEupmyeondong = null) => {
-    if (!mapCenter || !mapCenter.lat || !mapCenter.lng) {
+    // mapCenter가 없으면 기본 위치 사용
+    const centerToUse = mapCenter && mapCenter.lat && mapCenter.lng ? mapCenter : DEFAULT_CENTER;
+    
+    if (!centerToUse || !centerToUse.lat || !centerToUse.lng) {
+      console.warn('⚠️ 지도 중심 위치를 확인할 수 없습니다.');
       return;
     }
 
@@ -277,32 +281,37 @@ const MeetupPage = () => {
     setLoading(true);
     try {
       const response = await meetupApi.getNearbyMeetups(
-        mapCenter.lat,
-        mapCenter.lng,
+        centerToUse.lat,
+        centerToUse.lng,
         radius
       );
       const allMeetups = response.data.meetups || [];
+      console.log(`📍 [산책모임 조회] 총 ${allMeetups.length}개 모임 조회됨 (반경 ${radius}km)`);
 
-      // 선택된 지역으로 필터링
+      // 선택된 지역으로 필터링 (빈 문자열이 아닌 경우에만 필터링)
       let filteredMeetups = allMeetups;
-      if (targetFilterSido) {
+      if (targetFilterSido && targetFilterSido.trim() !== '') {
+        console.log(`🔍 [산책모임 필터링] 시도: ${targetFilterSido}, 시군구: ${targetFilterSigungu || '(없음)'}, 읍면동: ${targetFilterEupmyeondong || '(없음)'}`);
         filteredMeetups = filteredMeetups.filter(meetup => {
           if (!meetup.location) return false;
           const locationParts = meetup.location.split(' ');
           if (locationParts.length < 1) return false;
           if (locationParts[0] !== targetFilterSido) return false;
 
-          if (targetFilterSigungu) {
+          if (targetFilterSigungu && targetFilterSigungu.trim() !== '') {
             if (locationParts.length < 2) return false;
             if (locationParts[1] !== targetFilterSigungu) return false;
 
-            if (targetFilterEupmyeondong) {
+            if (targetFilterEupmyeondong && targetFilterEupmyeondong.trim() !== '') {
               if (locationParts.length < 3) return false;
               if (locationParts[2] !== targetFilterEupmyeondong) return false;
             }
           }
           return true;
         });
+        console.log(`✅ [산책모임 필터링] 필터링 후 ${filteredMeetups.length}개 모임 남음`);
+      } else {
+        console.log(`ℹ️ [산책모임 필터링] 지역 필터 없음 - 전체 ${filteredMeetups.length}개 모임 표시`);
       }
 
       setMeetups(filteredMeetups);
@@ -383,7 +392,10 @@ const MeetupPage = () => {
 
   // mapCenter 또는 radius가 변경될 때 모임 자동 조회
   useEffect(() => {
-    if (mapCenter && mapCenter.lat && mapCenter.lng) {
+    // mapCenter가 없어도 기본 위치로 조회 (fetchMeetups 내부에서 처리)
+    const centerToUse = mapCenter && mapCenter.lat && mapCenter.lng ? mapCenter : DEFAULT_CENTER;
+    
+    if (centerToUse && centerToUse.lat && centerToUse.lng) {
       // 초기 로드이거나 프로그래매틱 이동이 아닐 때만 조회
       if (isInitialLoadRef.current) {
         // 초기 로드 시에는 항상 조회
@@ -396,6 +408,10 @@ const MeetupPage = () => {
         // 프로그래매틱 이동이면 플래그만 리셋 (리스트 조회 안 함)
         isProgrammaticMoveRef.current = false;
       }
+    } else {
+      // mapCenter가 없으면 기본 위치로 조회 시도
+      console.log('⚠️ mapCenter가 없어 기본 위치로 조회 시도');
+      fetchMeetups();
     }
   }, [mapCenter, radius, fetchMeetups]);
 

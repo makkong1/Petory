@@ -400,7 +400,7 @@ const LocationServiceMap = () => {
             let distance = null;
             const lat = parseFloat(service.latitude);
             const lng = parseFloat(service.longitude);
-            
+
             if (!isNaN(lat) && !isNaN(lng)) {
               if (targetLocation) {
                 distance = calculateDistance(
@@ -634,8 +634,8 @@ const LocationServiceMap = () => {
       // 초기 로드 중이므로 프로그래매틱 이동으로 설정
       isProgrammaticMoveRef.current = true;
 
-      // 1단계: 내 위치 가져오기
-      const getCurrentLocation = () => {
+      // 1단계: 내 위치 가져오기 (재시도 로직 포함)
+      const getCurrentLocation = (retryCount = 0, useHighAccuracy = false) => {
         return new Promise((resolve, reject) => {
           if (!navigator.geolocation) {
             reject(new Error('Geolocation을 지원하지 않습니다.'));
@@ -643,9 +643,9 @@ const LocationServiceMap = () => {
           }
 
           const options = {
-            enableHighAccuracy: false,
-            timeout: 5000,
-            maximumAge: 0,
+            enableHighAccuracy: useHighAccuracy,
+            timeout: 10000, // 10초로 증가
+            maximumAge: 60000, // 1분 이내 캐시된 위치 사용 허용
           };
 
           navigator.geolocation.getCurrentPosition(
@@ -656,7 +656,18 @@ const LocationServiceMap = () => {
               });
             },
             (error) => {
-              reject(error);
+              // 재시도 로직: 최대 2번 재시도
+              if (retryCount < 2) {
+                console.log(`📍 위치 가져오기 재시도 ${retryCount + 1}/2...`);
+                // 첫 번째 재시도는 고정밀도로 시도
+                setTimeout(() => {
+                  getCurrentLocation(retryCount + 1, true)
+                    .then(resolve)
+                    .catch(reject);
+                }, 1000);
+              } else {
+                reject(error);
+              }
             },
             options
           );
@@ -758,26 +769,85 @@ const LocationServiceMap = () => {
         }, 2000); // 2초 후 리셋 (지도 로드 완료 대기)
       } catch (error) {
         console.warn('위치 정보를 가져올 수 없습니다:', error);
+        console.warn('에러 코드:', error.code, '에러 메시지:', error.message);
 
         // 위치 권한 거부 시 빈 상태 UX 표시
         if (error.code === 1) {
-          // PERMISSION_DENIED
+          // PERMISSION_DENIED - 사용자가 위치 권한을 거부함
           setAllServices([]);
           setServices([]);
-          setStatusMessage('');
+          setStatusMessage('위치 권한이 필요합니다. 브라우저 설정에서 위치 권한을 허용해주세요.');
           setError(null);
           // 빈 상태는 UI에서 처리됨
-        } else {
-          // 위치 정보를 가져올 수 없으면 기본 위치(서울)로 설정하고 전체 조회
+        } else if (error.code === 2) {
+          // POSITION_UNAVAILABLE - 위치 정보를 사용할 수 없음
+          console.warn('⚠️ 위치 정보를 사용할 수 없습니다. 기본 위치로 설정합니다.');
           setMapCenter(DEFAULT_CENTER);
-          setMapLevel(10); // 전국 뷰
-          isProgrammaticMoveRef.current = true; // 초기 로드 중
-
-          setStatusMessage('전체 서비스를 불러오는 중...');
+          setMapLevel(10);
+          isProgrammaticMoveRef.current = true;
+          setStatusMessage('위치를 확인할 수 없어 전체 서비스를 불러옵니다...');
 
           try {
             const response = await locationServiceApi.searchPlaces({
-              size: 0, // 전체 조회 (0이면 백엔드에서 제한 없음)
+              size: 0, // 전체 조회
+            });
+
+            if (response.data?.services) {
+              setAllServices(response.data.services);
+              setServices(response.data.services);
+              initialLoadTypeRef.current = 'all';
+              setStatusMessage(`전체 ${response.data.services.length}개의 장소를 찾았습니다.`);
+            } else {
+              setAllServices([]);
+              setServices([]);
+              setStatusMessage('서비스를 불러올 수 없습니다.');
+            }
+          } catch (fetchError) {
+            console.error('전체 서비스 조회 실패:', fetchError);
+            setAllServices([]);
+            setServices([]);
+            setStatusMessage('서비스를 불러오는 중 오류가 발생했습니다.');
+          }
+        } else if (error.code === 3) {
+          // TIMEOUT - 타임아웃
+          console.warn('⚠️ 위치 가져오기 타임아웃. 기본 위치로 설정합니다.');
+          setMapCenter(DEFAULT_CENTER);
+          setMapLevel(10);
+          isProgrammaticMoveRef.current = true;
+          setStatusMessage('위치 확인 시간이 초과되어 전체 서비스를 불러옵니다...');
+
+          try {
+            const response = await locationServiceApi.searchPlaces({
+              size: 0, // 전체 조회
+            });
+
+            if (response.data?.services) {
+              setAllServices(response.data.services);
+              setServices(response.data.services);
+              initialLoadTypeRef.current = 'all';
+              setStatusMessage(`전체 ${response.data.services.length}개의 장소를 찾았습니다.`);
+            } else {
+              setAllServices([]);
+              setServices([]);
+              setStatusMessage('서비스를 불러올 수 없습니다.');
+            }
+          } catch (fetchError) {
+            console.error('전체 서비스 조회 실패:', fetchError);
+            setAllServices([]);
+            setServices([]);
+            setStatusMessage('서비스를 불러오는 중 오류가 발생했습니다.');
+          }
+        } else {
+          // 기타 에러
+          console.warn('⚠️ 위치 정보를 가져올 수 없습니다. 기본 위치로 설정합니다.');
+          setMapCenter(DEFAULT_CENTER);
+          setMapLevel(10);
+          isProgrammaticMoveRef.current = true;
+          setStatusMessage('위치를 확인할 수 없어 전체 서비스를 불러옵니다...');
+
+          try {
+            const response = await locationServiceApi.searchPlaces({
+              size: 0, // 전체 조회
             });
 
             if (response.data?.services) {
@@ -1363,23 +1433,23 @@ const LocationServiceMap = () => {
     if (!userLocation) {
       return;
     }
-    
+
     // 내 위치로 지도 중심 이동
     if (userLocation.lat && userLocation.lng) {
       // 프로그래매틱 이동 플래그 설정 (API 자동 재조회 방지)
       isProgrammaticMoveRef.current = true;
-      
+
       setMapCenter({
         lat: userLocation.lat,
         lng: userLocation.lng
       });
-      
+
       // 내 위치를 잘 볼 수 있도록 줌 레벨 조정 (2km 반경 정도)
       const zoomLevel = calculateMapLevelFromRadius(2);
       setMapLevel(zoomLevel);
-      
+
       setStatusMessage('내 위치로 이동했습니다.');
-      
+
       // 지도 이동 후 플래그 리셋
       setTimeout(() => {
         isProgrammaticMoveRef.current = false;
@@ -1389,6 +1459,417 @@ const LocationServiceMap = () => {
 
   return (
     <Container>
+      {selectedService && (
+        <ServiceDetailPanel onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            setSelectedService(null);
+            setShowDirections(false);
+          }
+        }}>
+          <DetailContent onClick={(e) => e.stopPropagation()}>
+            <CloseButton onClick={() => {
+              // 길찾기 화면이 열려있으면 길찾기만 닫기, 아니면 상세페이지 전체 닫기
+              if (showDirections) {
+                setShowDirections(false);
+              } else {
+                setSelectedService(null);
+                setShowDirections(false);
+              }
+            }}>✕</CloseButton>
+            <DetailLeft>
+              <ServiceTitle>{selectedService.name}</ServiceTitle>
+              <ServiceInfo>
+                {selectedService.rating && (
+                  <ServiceInfoItem>
+                    <strong>평점</strong>
+                    <span>⭐ {selectedService.rating.toFixed(1)}</span>
+                  </ServiceInfoItem>
+                )}
+                {selectedService.category && (
+                  <ServiceInfoItem>
+                    <strong>분류</strong>
+                    <span>{selectedService.category}</span>
+                  </ServiceInfoItem>
+                )}
+                {selectedService.description && (
+                  <ServiceInfoItem>
+                    <strong>설명</strong>
+                    <span>{selectedService.description}</span>
+                  </ServiceInfoItem>
+                )}
+                {selectedService.address && (
+                  <ServiceInfoItem>
+                    <strong>주소</strong>
+                    <span>{selectedService.address}</span>
+                  </ServiceInfoItem>
+                )}
+                {selectedService.phone && (
+                  <ServiceInfoItem>
+                    <strong>전화</strong>
+                    <span>
+                      <a href={`tel:${selectedService.phone}`} style={{ color: 'inherit', textDecoration: 'none' }}>
+                        {selectedService.phone}
+                      </a>
+                    </span>
+                  </ServiceInfoItem>
+                )}
+                {selectedService.website && (
+                  <ServiceInfoItem>
+                    <strong>웹사이트</strong>
+                    <span>
+                      <a href={selectedService.website} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>
+                        {selectedService.website}
+                      </a>
+                    </span>
+                  </ServiceInfoItem>
+                )}
+                {selectedService.operatingHours && (
+                  <ServiceInfoItem>
+                    <strong>운영시간</strong>
+                    <span>{selectedService.operatingHours}</span>
+                  </ServiceInfoItem>
+                )}
+                {selectedService.closedDay && (
+                  <ServiceInfoItem>
+                    <strong>휴무일</strong>
+                    <span>{selectedService.closedDay}</span>
+                  </ServiceInfoItem>
+                )}
+                {selectedService.priceInfo && (
+                  <ServiceInfoItem>
+                    <strong>가격 정보</strong>
+                    <span>{selectedService.priceInfo}</span>
+                  </ServiceInfoItem>
+                )}
+                {selectedService.parkingAvailable !== null && selectedService.parkingAvailable !== undefined && (
+                  <ServiceInfoItem>
+                    <strong>주차</strong>
+                    <span>{selectedService.parkingAvailable ? '가능' : '불가능'}</span>
+                  </ServiceInfoItem>
+                )}
+                {(selectedService.indoor !== null && selectedService.indoor !== undefined) ||
+                  (selectedService.outdoor !== null && selectedService.outdoor !== undefined) ? (
+                  <ServiceInfoItem>
+                    <strong>장소 유형</strong>
+                    <span>
+                      {selectedService.indoor ? '실내' : ''}
+                      {selectedService.indoor && selectedService.outdoor ? ' / ' : ''}
+                      {selectedService.outdoor ? '실외' : ''}
+                    </span>
+                  </ServiceInfoItem>
+                ) : null}
+                {selectedService.petFriendly !== null && selectedService.petFriendly !== undefined && (
+                  <ServiceInfoItem>
+                    <strong>반려동물 동반</strong>
+                    <span>{selectedService.petFriendly ? '✅ 가능' : '❌ 불가능'}</span>
+                  </ServiceInfoItem>
+                )}
+                {selectedService.isPetOnly !== null && selectedService.isPetOnly !== undefined && selectedService.isPetOnly && (
+                  <ServiceInfoItem>
+                    <strong>반려동물 전용</strong>
+                    <span>✅ 예</span>
+                  </ServiceInfoItem>
+                )}
+                {selectedService.petSize && (
+                  <ServiceInfoItem>
+                    <strong>입장 가능 동물 크기</strong>
+                    <span>{selectedService.petSize}</span>
+                  </ServiceInfoItem>
+                )}
+                {selectedService.petRestrictions && (
+                  <ServiceInfoItem>
+                    <strong>반려동물 제한사항</strong>
+                    <span>{selectedService.petRestrictions}</span>
+                  </ServiceInfoItem>
+                )}
+                {selectedService.petExtraFee && (
+                  <ServiceInfoItem>
+                    <strong>애견 동반 추가 요금</strong>
+                    <span>{selectedService.petExtraFee}</span>
+                  </ServiceInfoItem>
+                )}
+                {selectedService.distanceLabel && (
+                  <ServiceInfoItem>
+                    <strong>거리</strong>
+                    <span>{selectedService.distanceLabel}</span>
+                  </ServiceInfoItem>
+                )}
+              </ServiceInfo>
+            </DetailLeft>
+            <DetailRight>
+              {showDirections && selectedService.latitude && selectedService.longitude ? (
+                <DirectionsContainer>
+                  <DirectionsHeader>
+                    <DirectionsTitle>길찾기</DirectionsTitle>
+                  </DirectionsHeader>
+                  <DirectionsInfo>
+                    <div style={{ marginBottom: '1rem' }}>
+                      <strong>도착지:</strong> {selectedService.name || selectedService.address}
+                    </div>
+                    {userLocation && (
+                      <div style={{ marginBottom: '1rem', padding: '0.75rem', background: 'rgba(3, 199, 90, 0.1)', borderRadius: '6px' }}>
+                        <strong>출발지:</strong> {startLocationAddress || userLocationAddress || '현재 위치'}
+                      </div>
+                    )}
+                    <DirectionsLink
+                      href={`https://map.naver.com/p/search/${encodeURIComponent(selectedService.name || selectedService.address || '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={async (e) => {
+                        if (userLocation && !userLocationAddress && !startLocationAddress) {
+                          try {
+                            console.log('📍 출발지 좌표를 주소로 변환 중...', { lat: userLocation.lat, lng: userLocation.lng });
+                            const addressData = await geocodingApi.coordinatesToAddress(
+                              userLocation.lat,
+                              userLocation.lng
+                            );
+                            console.log('📍 출발지 주소 변환 API 응답:', addressData);
+
+                            if (addressData && addressData.success !== false && addressData.address) {
+                              setStartLocationAddress(addressData.address);
+                              console.log('✅ 출발지 주소 변환 성공:', addressData.address);
+                            } else {
+                              console.warn('⚠️ 출발지 주소 변환 실패:', addressData?.message || addressData?.error);
+                            }
+                          } catch (error) {
+                            console.error('❌ 출발지 주소 변환 실패:', error);
+                            console.error('❌ 에러 상세:', error.response?.data || error.message);
+                          }
+                        }
+
+                        if (userLocation && selectedService.latitude && selectedService.longitude) {
+                          try {
+                            console.log('🔍 길찾기 API 호출 시작...');
+                            const directionsData = await geocodingApi.getDirections(
+                              userLocation.lat,
+                              userLocation.lng,
+                              selectedService.latitude,
+                              selectedService.longitude,
+                              'traoptimal'
+                            );
+                            console.log('📊 길찾기 API 응답:', directionsData);
+                            if (directionsData.success && directionsData.data) {
+                              console.log('✅ 경로 데이터 수신 성공:', directionsData.data);
+                              setDirectionsData(directionsData.data);
+                            } else {
+                              console.warn('⚠️ 경로 데이터 수신 실패:', directionsData);
+                              setDirectionsData(null);
+                            }
+                          } catch (error) {
+                            console.error('❌ 길찾기 API 호출 실패:', error);
+                            setDirectionsData(null);
+                          }
+                        }
+                      }}
+                    >
+                      네이버맵에서 장소 검색 ↗
+                    </DirectionsLink>
+                  </DirectionsInfo>
+                  <DirectionsMessage>
+                    <strong>안내:</strong> 네이버맵은 보안상의 이유로 외부에서 출발지/도착지를 자동으로 입력할 수 없습니다.
+                    <br />
+                    위 링크를 클릭하여 네이버맵에서 도착지를 검색한 후, 출발지를 직접 입력해주세요.
+                    {userLocation && (startLocationAddress || userLocationAddress) && (
+                      <>
+                        <br />
+                        <br />
+                        <strong>출발지:</strong> {startLocationAddress || userLocationAddress}
+                        <br />
+                        네이버맵에서 이 주소를 검색하거나 "현재 위치"를 선택하세요.
+                      </>
+                    )}
+                  </DirectionsMessage>
+                  {directionsData && (
+                    <DirectionsSummary>
+                      <div style={{ marginBottom: '0.5rem', fontWeight: 600, color: '#03C75A' }}>
+                        📍 경로 정보 (백엔드 API 응답)
+                      </div>
+                      <SummaryItem>
+                        <strong>예상 소요 시간:</strong>
+                        <span>
+                          {(() => {
+                            try {
+                              const convertDurationToMinutes = (duration) => {
+                                if (!duration) return null;
+                                if (duration > 1000) {
+                                  return Math.round(duration / 1000 / 60);
+                                } else {
+                                  return Math.round(duration / 60);
+                                }
+                              };
+
+                              const formatDuration = (minutes) => {
+                                if (!minutes || minutes < 0) return '정보 없음';
+                                const hours = Math.floor(minutes / 60);
+                                const mins = minutes % 60;
+
+                                if (hours > 0 && mins > 0) {
+                                  return `${hours}시간 ${mins}분`;
+                                } else if (hours > 0) {
+                                  return `${hours}시간`;
+                                } else {
+                                  return `${mins}분`;
+                                }
+                              };
+
+                              const route = directionsData.route;
+                              let durationMinutes = null;
+
+                              if (route && route.traoptimal && Array.isArray(route.traoptimal) && route.traoptimal.length > 0) {
+                                const summary = route.traoptimal[0].summary;
+                                if (summary && summary.duration) {
+                                  console.log('📊 duration 값 (traoptimal):', summary.duration, '타입:', typeof summary.duration);
+                                  durationMinutes = convertDurationToMinutes(summary.duration);
+                                }
+                              }
+
+                              if (!durationMinutes && route && route.trafast && Array.isArray(route.trafast) && route.trafast.length > 0) {
+                                const summary = route.trafast[0].summary;
+                                if (summary && summary.duration) {
+                                  console.log('📊 duration 값 (trafast):', summary.duration, '타입:', typeof summary.duration);
+                                  durationMinutes = convertDurationToMinutes(summary.duration);
+                                }
+                              }
+
+                              if (durationMinutes !== null) {
+                                return formatDuration(durationMinutes);
+                              }
+                              return '정보 없음';
+                            } catch (e) {
+                              console.error('경로 데이터 파싱 오류:', e, directionsData);
+                              return '파싱 오류';
+                            }
+                          })()}
+                        </span>
+                      </SummaryItem>
+                      <SummaryItem>
+                        <strong>예상 거리:</strong>
+                        <span>
+                          {(() => {
+                            try {
+                              const route = directionsData.route;
+                              if (route && route.traoptimal && Array.isArray(route.traoptimal) && route.traoptimal.length > 0) {
+                                const summary = route.traoptimal[0].summary;
+                                if (summary && summary.distance) {
+                                  return `${(summary.distance / 1000).toFixed(1)}km`;
+                                }
+                              }
+                              if (route && route.trafast && Array.isArray(route.trafast) && route.trafast.length > 0) {
+                                const summary = route.trafast[0].summary;
+                                if (summary && summary.distance) {
+                                  return `${(summary.distance / 1000).toFixed(1)}km`;
+                                }
+                              }
+                              return '정보 없음';
+                            } catch (e) {
+                              console.error('경로 데이터 파싱 오류:', e, directionsData);
+                              return '파싱 오류';
+                            }
+                          })()}
+                        </span>
+                      </SummaryItem>
+                      <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: '#666', lineHeight: '1.5' }}>
+                        * 실시간 교통 상황(정체, 공사 등)을 반영한 예상 시간입니다.
+                        <br />
+                        * 실제 소요 시간은 교통 상황에 따라 달라질 수 있습니다.
+                        <br />
+                        (네이버맵 웹사이트는 별도로 열어야 합니다)
+                      </div>
+                    </DirectionsSummary>
+                  )}
+                </DirectionsContainer>
+              ) : (
+                <>
+                  <ActionSectionTitle>편의 기능</ActionSectionTitle>
+                  <ActionButtons>
+                    {selectedService.latitude && selectedService.longitude && (
+                      <ActionButton
+                        onClick={async () => {
+                          setShowDirections(true);
+                          if (userLocation && !userLocationAddress && !startLocationAddress) {
+                            try {
+                              console.log('📍 출발지 좌표를 주소로 변환 중...', { lat: userLocation.lat, lng: userLocation.lng });
+                              const addressData = await geocodingApi.coordinatesToAddress(
+                                userLocation.lat,
+                                userLocation.lng
+                              );
+                              console.log('📍 출발지 주소 변환 API 응답:', addressData);
+
+                              if (addressData && addressData.success !== false && addressData.address) {
+                                setStartLocationAddress(addressData.address);
+                                console.log('✅ 출발지 주소 변환 성공:', addressData.address);
+                              } else {
+                                console.warn('⚠️ 출발지 주소 변환 실패:', addressData?.message || addressData?.error);
+                              }
+                            } catch (error) {
+                              console.error('❌ 출발지 주소 변환 실패:', error);
+                              console.error('❌ 에러 상세:', error.response?.data || error.message);
+                            }
+                          }
+                        }}
+                        primary
+                      >
+                        🗺️ 네이버맵 길찾기
+                      </ActionButton>
+                    )}
+                    {selectedService.phone && (
+                      <ActionButton
+                        as="a"
+                        href={`tel:${selectedService.phone}`}
+                      >
+                        📞 전화하기
+                      </ActionButton>
+                    )}
+                    {selectedService.address && (
+                      <ActionButton
+                        onClick={() => {
+                          navigator.clipboard.writeText(selectedService.address);
+                          setStatusMessage('주소가 클립보드에 복사되었습니다.');
+                          setTimeout(() => setStatusMessage(''), 2000);
+                        }}
+                      >
+                        📋 주소 복사
+                      </ActionButton>
+                    )}
+                    {selectedService.latitude && selectedService.longitude && (
+                      <ActionButton
+                        onClick={() => {
+                          const url = `https://map.naver.com/v5/search/${encodeURIComponent(selectedService.name || '')}`;
+                          navigator.clipboard.writeText(url);
+                          setStatusMessage('네이버맵 링크가 클립보드에 복사되었습니다.');
+                          setTimeout(() => setStatusMessage(''), 2000);
+                        }}
+                      >
+                        🔗 링크 공유
+                      </ActionButton>
+                    )}
+                    {selectedService.placeUrl && (
+                      <ActionButton
+                        as="a"
+                        href={selectedService.placeUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        📍 카카오맵 보기
+                      </ActionButton>
+                    )}
+                    {selectedService.website && (
+                      <ActionButton
+                        as="a"
+                        href={selectedService.website}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        🌐 웹사이트 방문
+                      </ActionButton>
+                    )}
+                  </ActionButtons>
+                </>
+              )}
+            </DetailRight>
+          </DetailContent>
+        </ServiceDetailPanel>
+      )}
       <Header>
         <HeaderTop>
           <Title>지도에서 반려동물 서비스 찾기</Title>
@@ -1684,430 +2165,6 @@ const LocationServiceMap = () => {
             )}
           </ServiceListContent>
         </ServiceListPanel>
-
-        {selectedService && (
-          <ServiceDetailPanel onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              setSelectedService(null);
-              setShowDirections(false);
-            }
-          }}>
-            <DetailContent onClick={(e) => e.stopPropagation()}>
-              <CloseButton onClick={() => {
-                // 길찾기 화면이 열려있으면 길찾기만 닫기, 아니면 상세페이지 전체 닫기
-                if (showDirections) {
-                  setShowDirections(false);
-                } else {
-                  setSelectedService(null);
-                  setShowDirections(false);
-                }
-              }}>✕</CloseButton>
-              <DetailLeft>
-                <ServiceTitle>{selectedService.name}</ServiceTitle>
-                <ServiceInfo>
-                  {selectedService.rating && (
-                    <ServiceInfoItem>
-                      <strong>평점</strong>
-                      <span>⭐ {selectedService.rating.toFixed(1)}</span>
-                    </ServiceInfoItem>
-                  )}
-                  {selectedService.category && (
-                    <ServiceInfoItem>
-                      <strong>분류</strong>
-                      <span>{selectedService.category}</span>
-                    </ServiceInfoItem>
-                  )}
-                  {selectedService.description && (
-                    <ServiceInfoItem>
-                      <strong>설명</strong>
-                      <span>{selectedService.description}</span>
-                    </ServiceInfoItem>
-                  )}
-                  {selectedService.address && (
-                    <ServiceInfoItem>
-                      <strong>주소</strong>
-                      <span>{selectedService.address}</span>
-                    </ServiceInfoItem>
-                  )}
-                  {selectedService.phone && (
-                    <ServiceInfoItem>
-                      <strong>전화</strong>
-                      <span>
-                        <a href={`tel:${selectedService.phone}`} style={{ color: 'inherit', textDecoration: 'none' }}>
-                          {selectedService.phone}
-                        </a>
-                      </span>
-                    </ServiceInfoItem>
-                  )}
-                  {selectedService.website && (
-                    <ServiceInfoItem>
-                      <strong>웹사이트</strong>
-                      <span>
-                        <a href={selectedService.website} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>
-                          {selectedService.website}
-                        </a>
-                      </span>
-                    </ServiceInfoItem>
-                  )}
-                  {selectedService.operatingHours && (
-                    <ServiceInfoItem>
-                      <strong>운영시간</strong>
-                      <span>{selectedService.operatingHours}</span>
-                    </ServiceInfoItem>
-                  )}
-                  {selectedService.closedDay && (
-                    <ServiceInfoItem>
-                      <strong>휴무일</strong>
-                      <span>{selectedService.closedDay}</span>
-                    </ServiceInfoItem>
-                  )}
-                  {selectedService.priceInfo && (
-                    <ServiceInfoItem>
-                      <strong>가격 정보</strong>
-                      <span>{selectedService.priceInfo}</span>
-                    </ServiceInfoItem>
-                  )}
-                  {selectedService.parkingAvailable !== null && selectedService.parkingAvailable !== undefined && (
-                    <ServiceInfoItem>
-                      <strong>주차</strong>
-                      <span>{selectedService.parkingAvailable ? '가능' : '불가능'}</span>
-                    </ServiceInfoItem>
-                  )}
-                  {(selectedService.indoor !== null && selectedService.indoor !== undefined) ||
-                    (selectedService.outdoor !== null && selectedService.outdoor !== undefined) ? (
-                    <ServiceInfoItem>
-                      <strong>장소 유형</strong>
-                      <span>
-                        {selectedService.indoor ? '실내' : ''}
-                        {selectedService.indoor && selectedService.outdoor ? ' / ' : ''}
-                        {selectedService.outdoor ? '실외' : ''}
-                      </span>
-                    </ServiceInfoItem>
-                  ) : null}
-                  {selectedService.petFriendly !== null && selectedService.petFriendly !== undefined && (
-                    <ServiceInfoItem>
-                      <strong>반려동물 동반</strong>
-                      <span>{selectedService.petFriendly ? '✅ 가능' : '❌ 불가능'}</span>
-                    </ServiceInfoItem>
-                  )}
-                  {selectedService.isPetOnly !== null && selectedService.isPetOnly !== undefined && selectedService.isPetOnly && (
-                    <ServiceInfoItem>
-                      <strong>반려동물 전용</strong>
-                      <span>✅ 예</span>
-                    </ServiceInfoItem>
-                  )}
-                  {selectedService.petSize && (
-                    <ServiceInfoItem>
-                      <strong>입장 가능 동물 크기</strong>
-                      <span>{selectedService.petSize}</span>
-                    </ServiceInfoItem>
-                  )}
-                  {selectedService.petRestrictions && (
-                    <ServiceInfoItem>
-                      <strong>반려동물 제한사항</strong>
-                      <span>{selectedService.petRestrictions}</span>
-                    </ServiceInfoItem>
-                  )}
-                  {selectedService.petExtraFee && (
-                    <ServiceInfoItem>
-                      <strong>애견 동반 추가 요금</strong>
-                      <span>{selectedService.petExtraFee}</span>
-                    </ServiceInfoItem>
-                  )}
-                  {selectedService.distanceLabel && (
-                    <ServiceInfoItem>
-                      <strong>거리</strong>
-                      <span>{selectedService.distanceLabel}</span>
-                    </ServiceInfoItem>
-                  )}
-                </ServiceInfo>
-              </DetailLeft>
-              <DetailRight>
-                {showDirections && selectedService.latitude && selectedService.longitude ? (
-                  <DirectionsContainer>
-                    <DirectionsHeader>
-                      <DirectionsTitle>길찾기</DirectionsTitle>
-                      {/* 길찾기 닫기 버튼 제거 - 상단 CloseButton 사용 */}
-                    </DirectionsHeader>
-                    <DirectionsInfo>
-                      <div style={{ marginBottom: '1rem' }}>
-                        <strong>도착지:</strong> {selectedService.name || selectedService.address}
-                      </div>
-                      {userLocation && (
-                        <div style={{ marginBottom: '1rem', padding: '0.75rem', background: 'rgba(3, 199, 90, 0.1)', borderRadius: '6px' }}>
-                          <strong>출발지:</strong> {startLocationAddress || userLocationAddress || '현재 위치'}
-                        </div>
-                      )}
-                      <DirectionsLink
-                        href={`https://map.naver.com/p/search/${encodeURIComponent(selectedService.name || selectedService.address || '')}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={async (e) => {
-                          // 출발지 좌표를 주소로 변환 (userLocationAddress가 없을 때만)
-                          if (userLocation && !userLocationAddress && !startLocationAddress) {
-                            try {
-                              console.log('📍 출발지 좌표를 주소로 변환 중...', { lat: userLocation.lat, lng: userLocation.lng });
-                              const addressData = await geocodingApi.coordinatesToAddress(
-                                userLocation.lat,
-                                userLocation.lng
-                              );
-                              console.log('📍 출발지 주소 변환 API 응답:', addressData);
-
-                              if (addressData && addressData.success !== false && addressData.address) {
-                                setStartLocationAddress(addressData.address);
-                                console.log('✅ 출발지 주소 변환 성공:', addressData.address);
-                              } else {
-                                console.warn('⚠️ 출발지 주소 변환 실패:', addressData?.message || addressData?.error);
-                              }
-                            } catch (error) {
-                              console.error('❌ 출발지 주소 변환 실패:', error);
-                              console.error('❌ 에러 상세:', error.response?.data || error.message);
-                            }
-                          }
-
-                          // 네이버맵 Directions API 호출하여 경로 정보 표시
-                          if (userLocation && selectedService.latitude && selectedService.longitude) {
-                            try {
-                              console.log('🔍 길찾기 API 호출 시작...');
-                              const directionsData = await geocodingApi.getDirections(
-                                userLocation.lat,
-                                userLocation.lng,
-                                selectedService.latitude,
-                                selectedService.longitude,
-                                'traoptimal'
-                              );
-                              console.log('📊 길찾기 API 응답:', directionsData);
-                              if (directionsData.success && directionsData.data) {
-                                console.log('✅ 경로 데이터 수신 성공:', directionsData.data);
-                                setDirectionsData(directionsData.data);
-                              } else {
-                                console.warn('⚠️ 경로 데이터 수신 실패:', directionsData);
-                                setDirectionsData(null);
-                              }
-                            } catch (error) {
-                              console.error('❌ 길찾기 API 호출 실패:', error);
-                              setDirectionsData(null);
-                            }
-                          }
-                        }}
-                      >
-                        네이버맵에서 장소 검색 ↗
-                      </DirectionsLink>
-                    </DirectionsInfo>
-                    <DirectionsMessage>
-                      <strong>안내:</strong> 네이버맵은 보안상의 이유로 외부에서 출발지/도착지를 자동으로 입력할 수 없습니다.
-                      <br />
-                      위 링크를 클릭하여 네이버맵에서 도착지를 검색한 후, 출발지를 직접 입력해주세요.
-                      {userLocation && (startLocationAddress || userLocationAddress) && (
-                        <>
-                          <br />
-                          <br />
-                          <strong>출발지:</strong> {startLocationAddress || userLocationAddress}
-                          <br />
-                          네이버맵에서 이 주소를 검색하거나 "현재 위치"를 선택하세요.
-                        </>
-                      )}
-                    </DirectionsMessage>
-                    {directionsData && (
-                      <DirectionsSummary>
-                        <div style={{ marginBottom: '0.5rem', fontWeight: 600, color: '#03C75A' }}>
-                          📍 경로 정보 (백엔드 API 응답)
-                        </div>
-                        <SummaryItem>
-                          <strong>예상 소요 시간:</strong>
-                          <span>
-                            {(() => {
-                              // 실시간 교통 상황을 반영한 예상 시간
-                              try {
-                                // duration을 분으로 변환하는 함수 (네이버 Directions API는 밀리초 단위)
-                                const convertDurationToMinutes = (duration) => {
-                                  if (!duration) return null;
-                                  // duration이 밀리초 단위인지 확인 (일반적으로 1000 이상)
-                                  // 네이버 Directions API는 보통 밀리초 단위
-                                  if (duration > 1000) {
-                                    return Math.round(duration / 1000 / 60); // 밀리초 -> 초 -> 분
-                                  } else {
-                                    return Math.round(duration / 60); // 초 -> 분
-                                  }
-                                };
-
-                                // 시간과 분으로 포맷팅하는 함수
-                                const formatDuration = (minutes) => {
-                                  if (!minutes || minutes < 0) return '정보 없음';
-                                  const hours = Math.floor(minutes / 60);
-                                  const mins = minutes % 60;
-
-                                  if (hours > 0 && mins > 0) {
-                                    return `${hours}시간 ${mins}분`;
-                                  } else if (hours > 0) {
-                                    return `${hours}시간`;
-                                  } else {
-                                    return `${mins}분`;
-                                  }
-                                };
-
-                                const route = directionsData.route;
-                                let durationMinutes = null;
-
-                                // 최적 경로(traoptimal) 확인
-                                if (route && route.traoptimal && Array.isArray(route.traoptimal) && route.traoptimal.length > 0) {
-                                  const summary = route.traoptimal[0].summary;
-                                  if (summary && summary.duration) {
-                                    console.log('📊 duration 값 (traoptimal):', summary.duration, '타입:', typeof summary.duration);
-                                    durationMinutes = convertDurationToMinutes(summary.duration);
-                                  }
-                                }
-
-                                // 최단 경로(trafast) 확인 (traoptimal이 없을 경우)
-                                if (!durationMinutes && route && route.trafast && Array.isArray(route.trafast) && route.trafast.length > 0) {
-                                  const summary = route.trafast[0].summary;
-                                  if (summary && summary.duration) {
-                                    console.log('📊 duration 값 (trafast):', summary.duration, '타입:', typeof summary.duration);
-                                    durationMinutes = convertDurationToMinutes(summary.duration);
-                                  }
-                                }
-
-                                if (durationMinutes !== null) {
-                                  return formatDuration(durationMinutes);
-                                }
-                                return '정보 없음';
-                              } catch (e) {
-                                console.error('경로 데이터 파싱 오류:', e, directionsData);
-                                return '파싱 오류';
-                              }
-                            })()}
-                          </span>
-                        </SummaryItem>
-                        <SummaryItem>
-                          <strong>예상 거리:</strong>
-                          <span>
-                            {(() => {
-                              try {
-                                const route = directionsData.route;
-                                if (route && route.traoptimal && Array.isArray(route.traoptimal) && route.traoptimal.length > 0) {
-                                  const summary = route.traoptimal[0].summary;
-                                  if (summary && summary.distance) {
-                                    return `${(summary.distance / 1000).toFixed(1)}km`;
-                                  }
-                                }
-                                // 다른 경로 옵션 확인
-                                if (route && route.trafast && Array.isArray(route.trafast) && route.trafast.length > 0) {
-                                  const summary = route.trafast[0].summary;
-                                  if (summary && summary.distance) {
-                                    return `${(summary.distance / 1000).toFixed(1)}km`;
-                                  }
-                                }
-                                return '정보 없음';
-                              } catch (e) {
-                                console.error('경로 데이터 파싱 오류:', e, directionsData);
-                                return '파싱 오류';
-                              }
-                            })()}
-                          </span>
-                        </SummaryItem>
-                        <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: '#666', lineHeight: '1.5' }}>
-                          * 실시간 교통 상황(정체, 공사 등)을 반영한 예상 시간입니다.
-                          <br />
-                          * 실제 소요 시간은 교통 상황에 따라 달라질 수 있습니다.
-                          <br />
-                          (네이버맵 웹사이트는 별도로 열어야 합니다)
-                        </div>
-                      </DirectionsSummary>
-                    )}
-                  </DirectionsContainer>
-                ) : (
-                  <>
-                    <ActionSectionTitle>편의 기능</ActionSectionTitle>
-                    <ActionButtons>
-                      {selectedService.latitude && selectedService.longitude && (
-                        <ActionButton
-                          onClick={async () => {
-                            setShowDirections(true);
-                            // 길찾기 화면 열 때 출발지 주소 변환 (userLocationAddress가 없을 때만)
-                            if (userLocation && !userLocationAddress && !startLocationAddress) {
-                              try {
-                                console.log('📍 출발지 좌표를 주소로 변환 중...', { lat: userLocation.lat, lng: userLocation.lng });
-                                const addressData = await geocodingApi.coordinatesToAddress(
-                                  userLocation.lat,
-                                  userLocation.lng
-                                );
-                                console.log('📍 출발지 주소 변환 API 응답:', addressData);
-
-                                if (addressData && addressData.success !== false && addressData.address) {
-                                  setStartLocationAddress(addressData.address);
-                                  console.log('✅ 출발지 주소 변환 성공:', addressData.address);
-                                } else {
-                                  console.warn('⚠️ 출발지 주소 변환 실패:', addressData?.message || addressData?.error);
-                                }
-                              } catch (error) {
-                                console.error('❌ 출발지 주소 변환 실패:', error);
-                                console.error('❌ 에러 상세:', error.response?.data || error.message);
-                              }
-                            }
-                          }}
-                          primary
-                        >
-                          🗺️ 네이버맵 길찾기
-                        </ActionButton>
-                      )}
-                      {selectedService.phone && (
-                        <ActionButton
-                          as="a"
-                          href={`tel:${selectedService.phone}`}
-                        >
-                          📞 전화하기
-                        </ActionButton>
-                      )}
-                      {selectedService.address && (
-                        <ActionButton
-                          onClick={() => {
-                            navigator.clipboard.writeText(selectedService.address);
-                            setStatusMessage('주소가 클립보드에 복사되었습니다.');
-                            setTimeout(() => setStatusMessage(''), 2000);
-                          }}
-                        >
-                          📋 주소 복사
-                        </ActionButton>
-                      )}
-                      {selectedService.latitude && selectedService.longitude && (
-                        <ActionButton
-                          onClick={() => {
-                            const url = `https://map.naver.com/v5/search/${encodeURIComponent(selectedService.name || '')}`;
-                            navigator.clipboard.writeText(url);
-                            setStatusMessage('네이버맵 링크가 클립보드에 복사되었습니다.');
-                            setTimeout(() => setStatusMessage(''), 2000);
-                          }}
-                        >
-                          🔗 링크 공유
-                        </ActionButton>
-                      )}
-                      {selectedService.placeUrl && (
-                        <ActionButton
-                          as="a"
-                          href={selectedService.placeUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          📍 카카오맵 보기
-                        </ActionButton>
-                      )}
-                      {selectedService.website && (
-                        <ActionButton
-                          as="a"
-                          href={selectedService.website}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          🌐 웹사이트 방문
-                        </ActionButton>
-                      )}
-                    </ActionButtons>
-                  </>
-                )}
-              </DetailRight>
-            </DetailContent>
-          </ServiceDetailPanel>
-        )}
       </MapArea>
     </Container>
   );
@@ -2710,7 +2767,7 @@ const ServiceDetailPanel = styled.div`
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.5);
-  z-index: 1000;
+  z-index: 3000; /* Header(z-index: 2000)보다 위에 표시 */
   display: flex;
   align-items: center;
   justify-content: center;

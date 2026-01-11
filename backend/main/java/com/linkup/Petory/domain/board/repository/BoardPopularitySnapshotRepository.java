@@ -1,34 +1,49 @@
 package com.linkup.Petory.domain.board.repository;
 
-import com.linkup.Petory.domain.board.entity.BoardPopularitySnapshot;
-import com.linkup.Petory.domain.board.entity.PopularityPeriodType;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
-
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
-@Repository
-public interface BoardPopularitySnapshotRepository extends JpaRepository<BoardPopularitySnapshot, Long> {
+import com.linkup.Petory.domain.board.entity.BoardPopularitySnapshot;
+import com.linkup.Petory.domain.board.entity.PopularityPeriodType;
 
-        List<BoardPopularitySnapshot> findByPeriodTypeAndPeriodStartDateAndPeriodEndDateOrderByRankingAsc(
-                        PopularityPeriodType periodType,
-                        LocalDate periodStartDate,
-                        LocalDate periodEndDate);
+/**
+ * BoardPopularitySnapshot 도메인 Repository 인터페이스입니다.
+ */
+public interface BoardPopularitySnapshotRepository {
 
-        // 기간 범위 내의 스냅샷 조회 (기간이 겹치는 경우)
-        // 조건: 스냅샷 시작일 <= 조회 종료일 AND 스냅샷 종료일 >= 조회 시작일
-        List<BoardPopularitySnapshot> findByPeriodTypeAndPeriodStartDateLessThanEqualAndPeriodEndDateGreaterThanEqualOrderByRankingAsc(
-                        PopularityPeriodType periodType,
-                        LocalDate periodStartDate, // 스냅샷 시작일 <= 이 값 (조회 종료일)
-                        LocalDate periodEndDate); // 스냅샷 종료일 >= 이 값 (조회 시작일)
+    BoardPopularitySnapshot save(BoardPopularitySnapshot snapshot);
 
-        // 가장 최근 스냅샷 조회
-        List<BoardPopularitySnapshot> findTop30ByPeriodTypeOrderByPeriodEndDateDescRankingAsc(
-                        PopularityPeriodType periodType);
+    List<BoardPopularitySnapshot> saveAll(List<BoardPopularitySnapshot> snapshots);
 
-        void deleteByPeriodTypeAndPeriodStartDateAndPeriodEndDate(
-                        PopularityPeriodType periodType,
-                        LocalDate periodStartDate,
-                        LocalDate periodEndDate);
+    Optional<BoardPopularitySnapshot> findById(Long id);
+
+    void delete(BoardPopularitySnapshot snapshot);
+
+    void deleteById(Long id);
+
+    List<BoardPopularitySnapshot> findByPeriodTypeAndPeriodStartDateAndPeriodEndDateOrderByRankingAsc(
+            PopularityPeriodType periodType,
+            LocalDate periodStartDate,
+            LocalDate periodEndDate);
+
+    /**
+     * 기간 범위 내의 스냅샷 조회 (기간이 겹치는 경우)
+     * 조건: 스냅샷 시작일 <= 조회 종료일 AND 스냅샷 종료일 >= 조회 시작일
+     */
+    List<BoardPopularitySnapshot> findByPeriodTypeAndPeriodStartDateLessThanEqualAndPeriodEndDateGreaterThanEqualOrderByRankingAsc(
+            PopularityPeriodType periodType,
+            LocalDate periodStartDate, // 스냅샷 시작일 <= 이 값 (조회 종료일)
+            LocalDate periodEndDate); // 스냅샷 종료일 >= 이 값 (조회 시작일)
+
+    /**
+     * 가장 최근 스냅샷 조회
+     */
+    List<BoardPopularitySnapshot> findTop30ByPeriodTypeOrderByPeriodEndDateDescRankingAsc(
+            PopularityPeriodType periodType);
+
+    void deleteByPeriodTypeAndPeriodStartDateAndPeriodEndDate(
+            PopularityPeriodType periodType,
+            LocalDate periodStartDate,
+            LocalDate periodEndDate);
 }

@@ -12,6 +12,7 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -200,13 +201,11 @@ public class NaverMapService {
 
                 // 네이버맵 지오코딩 응답 파싱
                 if (responseBody != null && responseBody.containsKey("addresses")) {
-                    @SuppressWarnings("unchecked")
-                    java.util.List<?> addressesList = (java.util.List<?>) responseBody.get("addresses");
+                    List<?> addressesList = (List<?>) responseBody.get("addresses");
 
                     if (addressesList != null && addressesList.size() > 0) {
 
-                        @SuppressWarnings("unchecked")
-                        java.util.List<Map<String, Object>> addresses = (java.util.List<Map<String, Object>>) addressesList;
+                        List<Map<String, Object>> addresses = (List<Map<String, Object>>) addressesList;
 
                         Map<String, Object> firstAddress = addresses.get(0);
                         String latitudeStr = (String) firstAddress.get("y");
@@ -318,12 +317,10 @@ public class NaverMapService {
 
                 // 네이버맵 역지오코딩 응답 파싱
                 if (responseBody != null && responseBody.containsKey("results")) {
-                    @SuppressWarnings("unchecked")
-                    java.util.List<?> resultsList = (java.util.List<?>) responseBody.get("results");
+                    List<?> resultsList = (List<?>) responseBody.get("results");
 
                     if (resultsList != null && resultsList.size() > 0) {
-                        @SuppressWarnings("unchecked")
-                        java.util.List<Map<String, Object>> results = (java.util.List<Map<String, Object>>) resultsList;
+                        List<Map<String, Object>> results = (List<Map<String, Object>>) resultsList;
 
                         Map<String, Object> firstResult = results.get(0);
                         @SuppressWarnings("unchecked")

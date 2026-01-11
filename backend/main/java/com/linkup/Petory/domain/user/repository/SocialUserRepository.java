@@ -1,5 +1,6 @@
 package com.linkup.Petory.domain.user.repository;
 
+import java.util.List;
 import java.util.Optional;
 
 import com.linkup.Petory.domain.user.entity.Provider;
@@ -20,6 +21,8 @@ public interface SocialUserRepository {
     SocialUser save(SocialUser socialUser);
 
     Optional<SocialUser> findById(Long id);
+
+    List<SocialUser> findAll();
 
     void delete(SocialUser socialUser);
 
