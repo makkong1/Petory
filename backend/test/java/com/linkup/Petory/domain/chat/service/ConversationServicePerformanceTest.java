@@ -34,6 +34,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Transactional
 class ConversationServicePerformanceTest {
 
+        // 유저 도메인에 채팅방 목록 조회 성능 비교: 수정 전 vs 수정 후
+
         @Autowired
         private ConversationRepository conversationRepository;
 
@@ -137,8 +139,8 @@ class ConversationServicePerformanceTest {
                                                 .messageType(MessageType.TEXT)
                                                 .isDeleted(false)
                                                 .build();
-                                                // BaseTimeEntity가 createdAt을 자동 관리하므로 수동 설정 불가
-                                                // 시간 순서는 실제 저장 시 자동으로 설정됨
+                                // BaseTimeEntity가 createdAt을 자동 관리하므로 수동 설정 불가
+                                // 시간 순서는 실제 저장 시 자동으로 설정됨
                                 messages.add(chatMessageRepository.save(message));
                         }
 
@@ -161,7 +163,15 @@ class ConversationServicePerformanceTest {
                 List<Conversation> conversations = conversationRepository
                                 .findActiveConversationsByUser(userId, ConversationStatus.ACTIVE);
 
-                return conversations.stream()
+                // 로그를 위한 데이터 수집
+                List<ConversationParticipant> myParticipantsList = new ArrayList<>();
+                Map<Long, ConversationParticipant> myParticipantMap = new java.util.HashMap<>();
+                List<ConversationParticipant> allParticipantsList = new ArrayList<>();
+                Map<Long, List<ConversationParticipant>> participantsMap = new java.util.HashMap<>();
+                List<ChatMessage> latestMessagesList = new ArrayList<>();
+                Map<Long, ChatMessage> latestMessageMap = new java.util.HashMap<>();
+
+                List<ConversationDTO> result = conversations.stream()
                                 .map(conv -> {
                                         ConversationDTO dto = conversationConverter.toDTO(conv);
 
@@ -172,6 +182,8 @@ class ConversationServicePerformanceTest {
 
                                         if (myParticipant != null) {
                                                 dto.setUnreadCount(myParticipant.getUnreadCount());
+                                                myParticipantsList.add(myParticipant);
+                                                myParticipantMap.put(conv.getIdx(), myParticipant);
                                         }
 
                                         // N+1 문제: 각 채팅방마다 개별 쿼리
@@ -180,22 +192,72 @@ class ConversationServicePerformanceTest {
                                                                         ParticipantStatus.ACTIVE);
                                         if (participants != null) {
                                                 dto.setParticipants(participantConverter.toDTOList(participants));
+                                                allParticipantsList.addAll(participants);
+                                                participantsMap.put(conv.getIdx(), participants);
                                         }
 
                                         // 메모리 부하: 모든 메시지 로드
+                                        ChatMessage lastMessage = null;
                                         if (conv.getMessages() != null && !conv.getMessages().isEmpty()) {
-                                                conv.getMessages().stream()
+                                                lastMessage = conv.getMessages().stream()
                                                                 .max((m1, m2) -> m1.getCreatedAt()
                                                                                 .compareTo(m2.getCreatedAt()))
-                                                                .ifPresent(lastMessage -> {
-                                                                        dto.setLastMessage(messageConverter
-                                                                                        .toDTO(lastMessage));
-                                                                });
+                                                                .orElse(null);
+                                                if (lastMessage != null) {
+                                                        dto.setLastMessage(messageConverter.toDTO(lastMessage));
+                                                        latestMessagesList.add(lastMessage);
+                                                        latestMessageMap.put(conv.getIdx(), lastMessage);
+                                                }
                                         }
 
                                         return dto;
                                 })
                                 .collect(Collectors.toList());
+
+                // 로그 출력
+                System.out.println("myParticipants (" + myParticipantsList.size() + "개):");
+                myParticipantsList.forEach(p -> System.out.println(
+                                "  - idx: " + p.getIdx() + ", conversationIdx: " + p.getConversation().getIdx()
+                                                + ", userIdx: " + p.getUser().getIdx() + ", unreadCount: "
+                                                + p.getUnreadCount() + ", status: " + p.getStatus()));
+                System.out.println();
+
+                System.out.println("myParticipantMap:");
+                myParticipantMap.forEach((convIdx, participant) -> System.out.println(
+                                "  - conversationIdx: " + convIdx + " -> participantIdx: " + participant.getIdx()
+                                                + ", unreadCount: " + participant.getUnreadCount()));
+                System.out.println();
+
+                System.out.println("allParticipants (" + allParticipantsList.size() + "개):");
+                allParticipantsList.forEach(p -> System.out.println(
+                                "  - idx: " + p.getIdx() + ", conversationIdx: " + p.getConversation().getIdx()
+                                                + ", userIdx: " + p.getUser().getIdx() + ", status: " + p.getStatus()));
+                System.out.println();
+
+                System.out.println("participantsMap:");
+                participantsMap.forEach((convIdx, participants) -> {
+                        System.out.println("  - conversationIdx: " + convIdx + " -> " + participants.size()
+                                        + "명");
+                        participants.forEach(p -> System.out.println(
+                                        "    * participantIdx: " + p.getIdx() + ", userIdx: "
+                                                        + p.getUser().getIdx()));
+                });
+                System.out.println();
+
+                System.out.println("latestMessages (" + latestMessagesList.size() + "개):");
+                latestMessagesList.forEach(m -> System.out.println(
+                                "  - idx: " + m.getIdx() + ", conversationIdx: " + m.getConversation().getIdx()
+                                                + ", senderIdx: " + m.getSender().getIdx() + ", content: "
+                                                + m.getContent() + ", createdAt: " + m.getCreatedAt()));
+                System.out.println();
+
+                System.out.println("latestMessageMap:");
+                latestMessageMap.forEach((convIdx, message) -> System.out.println(
+                                "  - conversationIdx: " + convIdx + " -> messageIdx: " + message.getIdx()
+                                                + ", content: " + message.getContent()));
+                System.out.println();
+
+                return result;
         }
 
         /**
@@ -216,28 +278,66 @@ class ConversationServicePerformanceTest {
                 // 배치 조회: 현재 사용자의 참여자 정보
                 List<ConversationParticipant> myParticipants = participantRepository
                                 .findParticipantsByConversationIdxsAndUserIdx(conversationIdxs, userId);
+                System.out.println("myParticipants (" + myParticipants.size() + "개):");
+                myParticipants.forEach(p -> System.out.println(
+                                "  - idx: " + p.getIdx() + ", conversationIdx: " + p.getConversation().getIdx()
+                                                + ", userIdx: " + p.getUser().getIdx() + ", unreadCount: "
+                                                + p.getUnreadCount() + ", status: " + p.getStatus()));
+                System.out.println();
+
                 Map<Long, ConversationParticipant> myParticipantMap = myParticipants.stream()
                                 .collect(Collectors.toMap(
                                                 p -> p.getConversation().getIdx(),
                                                 p -> p,
                                                 (existing, replacement) -> existing));
+                System.out.println("myParticipantMap:");
+                myParticipantMap.forEach((convIdx, participant) -> System.out.println(
+                                "  - conversationIdx: " + convIdx + " -> participantIdx: " + participant.getIdx()
+                                                + ", unreadCount: " + participant.getUnreadCount()));
+                System.out.println();
 
                 // 배치 조회: 모든 활성 참여자 정보
                 List<ConversationParticipant> allParticipants = participantRepository
                                 .findParticipantsByConversationIdxsAndStatus(conversationIdxs,
                                                 ParticipantStatus.ACTIVE);
+                System.out.println("allParticipants (" + allParticipants.size() + "개):");
+                allParticipants.forEach(p -> System.out.println(
+                                "  - idx: " + p.getIdx() + ", conversationIdx: " + p.getConversation().getIdx()
+                                                + ", userIdx: " + p.getUser().getIdx() + ", status: " + p.getStatus()));
+                System.out.println();
+
                 Map<Long, List<ConversationParticipant>> participantsMap = allParticipants.stream()
                                 .collect(Collectors.groupingBy(p -> p.getConversation().getIdx()));
+                System.out.println("participantsMap:");
+                participantsMap.forEach((convIdx, participants) -> {
+                        System.out.println("  - conversationIdx: " + convIdx + " -> " + participants.size()
+                                        + "명");
+                        participants.forEach(p -> System.out.println(
+                                        "    * participantIdx: " + p.getIdx() + ", userIdx: "
+                                                        + p.getUser().getIdx()));
+                });
+                System.out.println();
 
                 // 배치 조회: 각 채팅방의 최신 메시지
                 List<ChatMessage> latestMessages = chatMessageRepository
                                 .findLatestMessagesByConversationIdxs(conversationIdxs);
+                System.out.println("latestMessages (" + latestMessages.size() + "개):");
+                latestMessages.forEach(m -> System.out.println(
+                                "  - idx: " + m.getIdx() + ", conversationIdx: " + m.getConversation().getIdx()
+                                                + ", senderIdx: " + m.getSender().getIdx() + ", content: "
+                                                + m.getContent() + ", createdAt: " + m.getCreatedAt()));
+                System.out.println();
+
                 Map<Long, ChatMessage> latestMessageMap = latestMessages.stream()
                                 .collect(Collectors.toMap(
                                                 m -> m.getConversation().getIdx(),
                                                 m -> m,
                                                 (existing, replacement) -> existing));
-
+                System.out.println("latestMessageMap:");
+                latestMessageMap.forEach((convIdx, message) -> System.out.println(
+                                "  - conversationIdx: " + convIdx + " -> messageIdx: " + message.getIdx()
+                                                + ", content: " + message.getContent()));
+                System.out.println();
                 return conversations.stream()
                                 .map(conv -> {
                                         ConversationDTO dto = conversationConverter.toDTO(conv);
