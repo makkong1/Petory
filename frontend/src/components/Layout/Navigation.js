@@ -3,6 +3,7 @@ import styled from 'styled-components';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import UserProfileModal from '../User/UserProfileModal';
+import PetCoinChargePage from '../Payment/PetCoinChargePage';
 import { notificationApi } from '../../api/notificationApi';
 
 const Navigation = ({ activeTab, setActiveTab, user, onNavigateToBoard }) => {
@@ -11,6 +12,7 @@ const Navigation = ({ activeTab, setActiveTab, user, onNavigateToBoard }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [isChargePageOpen, setIsChargePageOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
@@ -314,6 +316,9 @@ const Navigation = ({ activeTab, setActiveTab, user, onNavigateToBoard }) => {
                     </NotificationDropdown>
                   )}
                 </div>
+                <CoinChargeButton type="button" onClick={() => setIsChargePageOpen(true)}>
+                  💰 코인 충전
+                </CoinChargeButton>
                 <UserInfo type="button" onClick={() => setIsProfileOpen(true)}>
                   <span role="img" aria-label="user">
                     👤
@@ -340,14 +345,19 @@ const Navigation = ({ activeTab, setActiveTab, user, onNavigateToBoard }) => {
         </NavContent>
       </NavContainer>
       {user && (
-        <UserProfileModal
-          isOpen={isProfileOpen}
-          userId={user.idx}
-          onClose={() => setIsProfileOpen(false)}
-          onUpdated={(updated) => {
-            updateUserProfile?.(updated);
-          }}
-        />
+        <>
+          <UserProfileModal
+            isOpen={isProfileOpen}
+            userId={user.idx}
+            onClose={() => setIsProfileOpen(false)}
+            onUpdated={(updated) => {
+              updateUserProfile?.(updated);
+            }}
+          />
+          {isChargePageOpen && (
+            <PetCoinChargePage onClose={() => setIsChargePageOpen(false)} />
+          )}
+        </>
       )}
     </>
   );
@@ -471,6 +481,32 @@ const RightSection = styled.div`
   align-items: center;
   gap: ${props => props.theme.spacing.md};
   position: relative;
+`;
+
+const CoinChargeButton = styled.button`
+  display: inline-flex;
+  align-items: center;
+  gap: ${props => props.theme.spacing.xs};
+  color: white;
+  font-size: ${props => props.theme.typography.body2.fontSize};
+  background: ${props => props.theme.colors.primary || '#FF7E36'};
+  border: none;
+  padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.sm};
+  border-radius: ${props => props.theme.borderRadius.sm};
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 500;
+
+  &:hover {
+    background: ${props => props.theme.colors.primaryDark || '#e66a2b'};
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(255, 126, 54, 0.3);
+  }
+
+  @media (max-width: 768px) {
+    font-size: 12px;
+    padding: ${props => props.theme.spacing.xs};
+  }
 `;
 
 const UserInfo = styled.button`

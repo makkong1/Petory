@@ -33,6 +33,8 @@ import com.linkup.Petory.domain.care.entity.CareApplication;
 import com.linkup.Petory.domain.care.entity.CareApplicationStatus;
 import com.linkup.Petory.domain.care.entity.CareRequestStatus;
 import com.linkup.Petory.domain.care.repository.CareRequestRepository;
+import com.linkup.Petory.domain.care.repository.CareApplicationRepository;
+import com.linkup.Petory.domain.payment.service.PetCoinEscrowService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -50,7 +52,8 @@ public class ConversationService {
         private final ConversationParticipantConverter participantConverter;
         private final ChatMessageConverter messageConverter;
         private final CareRequestRepository careRequestRepository;
-        private final com.linkup.Petory.domain.care.repository.CareApplicationRepository careApplicationRepository;
+        private final CareApplicationRepository careApplicationRepository;
+        private final PetCoinEscrowService petCoinEscrowService;
 
         /**
          * 사용자별 활성 채팅방 목록 조회 (N+1 문제 최적화)
@@ -613,6 +616,13 @@ public class ConversationService {
                                                                                                 .orElse(null)
                                                                                 : null;
 
+                                                // 요청자와 제공자 정보 가져오기
+                                                Users requester = careRequest.getUser();
+                                                Users provider = usersRepository.findById(providerId)
+                                                                .orElseThrow(() -> new RuntimeException(
+                                                                                "Provider not found"));
+
+                                                CareApplication finalApplication;
                                                 if (existingApplication == null) {
                                                         // TransientObjectException 해결을 위한 확실한 영속 객체 참조 (Proxy) 가져오기
                                                         CareRequest careRequestRef = careRequestRepository
@@ -621,22 +631,49 @@ public class ConversationService {
                                                         // CareApplication이 없으면 생성
                                                         CareApplication newApplication = CareApplication.builder()
                                                                         .careRequest(careRequestRef) // Proxy 객체 사용
-                                                                        .provider(usersRepository.findById(providerId)
-                                                                                        .orElseThrow(() -> new RuntimeException(
-                                                                                                        "Provider not found")))
+                                                                        .provider(provider)
                                                                         .status(CareApplicationStatus.ACCEPTED)
                                                                         .build();
 
                                                         // 명시적으로 저장 및 플러시
-                                                        careApplicationRepository.saveAndFlush(newApplication);
+                                                        finalApplication = careApplicationRepository.saveAndFlush(newApplication);
                                                 } else {
                                                         // 이미 있으면 승인 상태로 변경
                                                         existingApplication.setStatus(CareApplicationStatus.ACCEPTED);
+                                                        finalApplication = existingApplication;
                                                 }
 
                                                 // CareRequest 상태를 IN_PROGRESS로 변경
                                                 careRequest.setStatus(CareRequestStatus.IN_PROGRESS);
                                                 careRequestRepository.save(careRequest);
+
+                                                // 펫코인 차감 및 에스크로 생성
+                                                Integer offeredCoins = careRequest.getOfferedCoins();
+                                                log.info("거래 확정 시 펫코인 처리 시작: careRequestIdx={}, offeredCoins={}, requesterId={}, providerId={}",
+                                                                relatedIdx, offeredCoins, requester.getIdx(), provider.getIdx());
+                                                
+                                                if (offeredCoins != null && offeredCoins > 0) {
+                                                        try {
+                                                                petCoinEscrowService.createEscrow(
+                                                                                careRequest,
+                                                                                finalApplication,
+                                                                                requester,
+                                                                                provider,
+                                                                                offeredCoins);
+                                                                log.info("펫코인 차감 및 에스크로 생성 완료: careRequestIdx={}, amount={}, escrowIdx={}",
+                                                                                relatedIdx, offeredCoins, "확인 필요");
+                                                        } catch (Exception e) {
+                                                                log.error("펫코인 차감 및 에스크로 생성 실패: careRequestIdx={}, amount={}, requesterId={}, providerId={}, error={}, stackTrace={}",
+                                                                                relatedIdx, offeredCoins, requester.getIdx(), provider.getIdx(), 
+                                                                                e.getMessage(), 
+                                                                                java.util.Arrays.toString(e.getStackTrace()));
+                                                                // 코인 차감 실패 시 거래 확정은 진행하되, 로그만 남김
+                                                                // 실제 운영 환경에서는 예외를 다시 던져서 거래 확정을 롤백할 수도 있음
+                                                        }
+                                                } else {
+                                                        log.warn("펫코인 가격이 설정되지 않음: careRequestIdx={}, offeredCoins={}", 
+                                                                        relatedIdx, offeredCoins);
+                                                }
 
                                                 log.info("거래 확정 완료: conversationIdx={}, careRequestIdx={}, providerId={}, 상태 변경: OPEN -> IN_PROGRESS",
                                                                 conversationIdx, relatedIdx, providerId);

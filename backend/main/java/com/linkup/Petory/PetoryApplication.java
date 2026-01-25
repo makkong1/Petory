@@ -7,6 +7,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.web.servlet.ServletComponentScan;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
+import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -18,7 +19,7 @@ import org.springframework.web.filter.HiddenHttpMethodFilter;
 @EnableScheduling // 주기적 작업을 활성화
 @EnableAsync
 @EnableCaching
-@org.springframework.data.jpa.repository.config.EnableJpaAuditing // JPA Auditing 활성화
+@EnableJpaAuditing // JPA Auditing 활성화
 @EnableMethodSecurity(prePostEnabled = true) // @PreAuthorize 작동 활성화
 public class PetoryApplication {
 

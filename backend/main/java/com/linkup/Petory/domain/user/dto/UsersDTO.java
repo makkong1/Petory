@@ -31,6 +31,12 @@ public class UsersDTO {
     private Integer warningCount;
     private LocalDateTime suspendedUntil;
     
+    // 펫코인 관련 필드
+    private Integer petCoinBalance; // 펫코인 잔액
+    
+    // 이메일 인증 관련 필드
+    private Boolean emailVerified; // 이메일 인증 여부
+    
     // 소프트 삭제 관련 필드
     private Boolean isDeleted;
     private LocalDateTime deletedAt;
