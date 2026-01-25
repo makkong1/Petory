@@ -33,7 +33,6 @@ public class CareRequestService {
     private final UsersRepository usersRepository;
     private final PetRepository petRepository;
     private final CareRequestConverter careRequestConverter;
-    // private final EmailVerificationService emailVerificationService;
 
     /**
      * 현재 사용자가 관리자(ADMIN 또는 MASTER)인지 확인

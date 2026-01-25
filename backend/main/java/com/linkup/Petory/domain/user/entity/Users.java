@@ -81,6 +81,10 @@ public class Users extends BaseTimeEntity {
     @Builder.Default
     private Integer warningCount = 0;
 
+    @Column(name = "pet_coin_balance", nullable = false)
+    @Builder.Default
+    private Integer petCoinBalance = 0; // 펫코인 잔액
+
     @Column(name = "suspended_until")
     private LocalDateTime suspendedUntil; // 이용제한 종료일 (null이면 영구 차단)
 
