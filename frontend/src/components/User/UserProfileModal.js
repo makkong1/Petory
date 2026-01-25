@@ -327,6 +327,12 @@ const UserProfileModal = ({ isOpen, userId, onClose, onUpdated }) => {
                     {profile.user.location}
                   </UserLocation>
                 )}
+                {profile.user?.petCoinBalance !== undefined && (
+                  <UserCoinBalance>
+                    <CoinIcon>💰</CoinIcon>
+                    {profile.user.petCoinBalance?.toLocaleString() || 0} 코인
+                  </UserCoinBalance>
+                )}
                 {profile.user?.role && (
                   <UserRole>
                     {profile.user.role === 'SERVICE_PROVIDER' ? '서비스 제공자' : '일반 사용자'}
@@ -756,6 +762,22 @@ const UserLocation = styled.div`
 
 const LocationIcon = styled.span`
   font-size: 0.9rem;
+`;
+
+const UserCoinBalance = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${(props) => props.theme.spacing.xs};
+  color: ${(props) => props.theme.colors.primary || '#FF7E36'};
+  font-size: 1rem;
+  font-weight: 600;
+  padding: ${(props) => props.theme.spacing.xs} ${(props) => props.theme.spacing.md};
+  background: ${(props) => props.theme.colors.surfaceElevated || '#f8f9fa'};
+  border-radius: ${(props) => props.theme.borderRadius.md};
+`;
+
+const CoinIcon = styled.span`
+  font-size: 1rem;
 `;
 
 const UserRole = styled.div`

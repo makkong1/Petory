@@ -45,6 +45,9 @@ public class CareRequest extends BaseTimeEntity {
 
     private LocalDateTime date;
 
+    @Column(name = "offered_coins")
+    private Integer offeredCoins; // 제시한 코인 가격 (요청자가 설정)
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default

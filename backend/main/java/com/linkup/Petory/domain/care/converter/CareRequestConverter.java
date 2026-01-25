@@ -35,6 +35,7 @@ public class CareRequestConverter {
                 .title(request.getTitle())
                 .description(request.getDescription())
                 .date(request.getDate())
+                .offeredCoins(request.getOfferedCoins())
                 .status(request.getStatus().name())
                 .createdAt(request.getCreatedAt())
                 .deleted(request.getIsDeleted())

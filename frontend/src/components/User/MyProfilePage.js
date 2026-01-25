@@ -330,6 +330,12 @@ const MyProfilePage = () => {
         <UserInfo>
           <UserName>{user.nickname || '사용자'}</UserName>
           <UserEmail>{user.email || ''}</UserEmail>
+          {user.petCoinBalance !== undefined && (
+            <UserCoinBalance>
+              <CoinIcon>💰</CoinIcon>
+              {user.petCoinBalance?.toLocaleString() || 0} 코인
+            </UserCoinBalance>
+          )}
         </UserInfo>
       </Header>
 
@@ -700,6 +706,23 @@ const UserName = styled.div`
 const UserEmail = styled.div`
   font-size: 0.9rem;
   color: ${(props) => props.theme.colors.textSecondary};
+`;
+
+const UserCoinBalance = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${(props) => props.theme.spacing.xs};
+  color: ${(props) => props.theme.colors.primary || '#FF7E36'};
+  font-size: 1rem;
+  font-weight: 600;
+  padding: ${(props) => props.theme.spacing.xs} ${(props) => props.theme.spacing.md};
+  background: ${(props) => props.theme.colors.surfaceElevated || '#f8f9fa'};
+  border-radius: ${(props) => props.theme.borderRadius.md};
+  margin-top: ${(props) => props.theme.spacing.xs};
+`;
+
+const CoinIcon = styled.span`
+  font-size: 1rem;
 `;
 
 const PetSection = styled.div`

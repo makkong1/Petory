@@ -49,7 +49,7 @@ public class Users extends BaseTimeEntity {
     @Column(name = "gender", length = 10)
     private String gender; // 성별 (네이버: M/F, 구글: 제공 안 함)
 
-    @Column(name = "email_verified")
+    @Column(name = "email_verified", columnDefinition = "TINYINT(1)")
     private Boolean emailVerified; // 이메일 인증 여부 (구글: email_verified, 네이버: 기본 true)
 
     @Enumerated(EnumType.STRING)
@@ -80,6 +80,10 @@ public class Users extends BaseTimeEntity {
     @Column(name = "warning_count", nullable = false)
     @Builder.Default
     private Integer warningCount = 0;
+
+    @Column(name = "pet_coin_balance", nullable = false)
+    @Builder.Default
+    private Integer petCoinBalance = 0; // 펫코인 잔액
 
     @Column(name = "suspended_until")
     private LocalDateTime suspendedUntil; // 이용제한 종료일 (null이면 영구 차단)
