@@ -37,6 +37,8 @@ public class UsersConverter {
                 .status(user.getStatus() != null ? user.getStatus().name() : null)
                 .warningCount(user.getWarningCount())
                 .suspendedUntil(user.getSuspendedUntil())
+                .petCoinBalance(user.getPetCoinBalance())
+                .emailVerified(user.getEmailVerified())
                 .isDeleted(user.getIsDeleted())
                 .deletedAt(user.getDeletedAt())
                 .build();

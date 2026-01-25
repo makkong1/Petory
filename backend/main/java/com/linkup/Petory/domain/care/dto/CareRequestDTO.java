@@ -19,6 +19,7 @@ public class CareRequestDTO {
     private String title;
     private String description;
     private LocalDateTime date;
+    private Integer offeredCoins; // 제시한 코인 가격
     private String status; // OPEN, IN_PROGRESS, COMPLETED, CANCELLED
     private LocalDateTime createdAt;
     private Boolean deleted;

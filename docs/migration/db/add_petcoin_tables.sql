@@ -1,6 +1,7 @@
 -- 펫코인 시스템을 위한 테이블 생성
 -- 1. Users 테이블에 펫코인 잔액 컬럼 추가
 -- 2. 펫코인 거래 내역 테이블 생성
+-- 3. CareRequest 테이블에 offered_coins 컬럼 추가
 
 -- ============================================
 -- 1. Users 테이블에 펫코인 잔액 컬럼 추가
@@ -68,3 +69,9 @@ CREATE TABLE pet_coin_escrow (
     
     CONSTRAINT chk_escrow_amount_positive CHECK (amount > 0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='펫코인 에스크로 (거래 확정 시 임시 보관)';
+
+-- ============================================
+-- 4. CareRequest 테이블에 offered_coins 컬럼 추가
+-- ============================================
+ALTER TABLE carerequest
+ADD COLUMN offered_coins INT DEFAULT NULL COMMENT '제시한 코인 가격 (요청자가 설정)';
