@@ -3,12 +3,12 @@ package com.linkup.Petory.domain.payment.controller;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
+import com.linkup.Petory.domain.payment.converter.PetCoinTransactionConverter;
 import com.linkup.Petory.domain.payment.dto.PetCoinBalanceResponse;
 import com.linkup.Petory.domain.payment.dto.PetCoinChargeRequest;
 import com.linkup.Petory.domain.payment.dto.PetCoinTransactionDTO;
@@ -23,7 +23,10 @@ import lombok.extern.slf4j.Slf4j;
 
 /**
  * 일반 사용자용 펫코인 컨트롤러
- * - 개발/테스트 환경에서만 활성화되는 테스트 충전 기능 포함
+ * 
+ * 주의: 현재는 실제 결제 시스템(PG) 연동 없이 테스트 충전 기능을 사용합니다.
+ * 실제 운영 시에는 이 충전 엔드포인트를 PG 연동으로 대체하거나,
+ * 별도의 결제 서비스로 분리하여 구현해야 합니다.
  */
 @Slf4j
 @RestController
@@ -34,10 +37,7 @@ public class PetCoinController {
         private final PetCoinService petCoinService;
         private final UsersRepository usersRepository;
         private final PetCoinTransactionRepository transactionRepository;
-        private final com.linkup.Petory.domain.payment.converter.PetCoinTransactionConverter transactionConverter;
-
-        @Value("${spring.profiles.active:prod}")
-        private String activeProfile;
+        private final PetCoinTransactionConverter transactionConverter;
 
         /**
          * 현재 사용자 코인 잔액 조회
@@ -85,17 +85,15 @@ public class PetCoinController {
         }
 
         /**
-         * 테스트 코인 충전 (개발/테스트 환경에서만 활성화)
-         * 프로덕션 환경에서는 비활성화되어야 함
+         * 코인 충전
+         * 
+         * 현재는 실제 결제 시스템 연동 없이 시뮬레이션으로 처리합니다.
+         * 실제 운영 시에는 이 메서드를 PG 연동으로 대체하거나,
+         * 별도의 결제 서비스로 분리하여 구현해야 합니다.
          */
         @PostMapping("/charge")
         public ResponseEntity<PetCoinTransactionDTO> chargeCoins(
                         @RequestBody PetCoinChargeRequest request) {
-                // 프로덕션 환경에서는 비활성화
-                if ("prod".equals(activeProfile)) {
-                        throw new IllegalStateException("프로덕션 환경에서는 테스트 충전 기능을 사용할 수 없습니다.");
-                }
-
                 Long userId = getCurrentUserId();
                 Users user = usersRepository.findById(userId)
                                 .orElseThrow(() -> new RuntimeException("User not found"));
@@ -107,9 +105,9 @@ public class PetCoinController {
                 PetCoinTransaction transaction = petCoinService.chargeCoins(
                                 user,
                                 request.getAmount(),
-                                request.getDescription() != null ? request.getDescription() : "테스트 충전");
+                                request.getDescription() != null ? request.getDescription() : "코인 충전");
 
-                log.info("테스트 코인 충전: userId={}, amount={}", userId, request.getAmount());
+                log.info("코인 충전 완료: userId={}, amount={}", userId, request.getAmount());
 
                 return ResponseEntity.ok(transactionConverter.toDTO(transaction));
         }
@@ -123,10 +121,9 @@ public class PetCoinController {
                         throw new RuntimeException("인증이 필요합니다.");
                 }
 
-                // JWT에서 사용자 ID 추출 (실제 구현에 맞게 수정 필요)
-                // 예시: UserDetails에서 ID 추출
-                String username = authentication.getName();
-                Users user = usersRepository.findByUsername(username)
+                // authentication.getName()은 userId (id 필드, String)를 반환
+                String userId = authentication.getName();
+                Users user = usersRepository.findByIdString(userId)
                                 .orElseThrow(() -> new RuntimeException("User not found"));
 
                 return user.getIdx();

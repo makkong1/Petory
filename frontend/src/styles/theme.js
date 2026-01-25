@@ -7,6 +7,7 @@ export const lightTheme = {
     secondary: '#4A90E2',
     background: '#FFFFFF',
     surface: '#F8F9FA',
+    surfaceElevated: '#F8F9FA',
     surfaceHover: '#F1F3F4',
     text: '#212121',
     textSecondary: '#757575',
@@ -19,6 +20,7 @@ export const lightTheme = {
     shadow: 'rgba(0, 0, 0, 0.1)',
     shadowHover: 'rgba(0, 0, 0, 0.15)',
     gradient: 'linear-gradient(135deg, #FF7E36 0%, #FF9558 100%)',
+    overlay: 'rgba(0, 0, 0, 0.5)',
   },
   spacing: {
     xs: '4px',
@@ -54,6 +56,7 @@ export const darkTheme = {
     secondary: '#64B5F6',
     background: '#1A1A1A', // 더 밝게
     surface: '#2D2D2D', // 더 밝게
+    surfaceElevated: '#363636', // 다크 모드용 elevated 배경
     surfaceHover: '#3A3A3A', // 더 밝게
     text: '#F5F5F5', // 더 밝게
     textSecondary: '#C5C5C5', // 더 밝게
@@ -66,6 +69,7 @@ export const darkTheme = {
     shadow: 'rgba(0, 0, 0, 0.4)',
     shadowHover: 'rgba(0, 0, 0, 0.5)',
     gradient: 'linear-gradient(135deg, #FF7E36 0%, #FF9558 100%)',
+    overlay: 'rgba(0, 0, 0, 0.7)',
   },
   spacing: lightTheme.spacing,
   borderRadius: lightTheme.borderRadius,
