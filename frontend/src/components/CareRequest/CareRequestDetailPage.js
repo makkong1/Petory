@@ -423,6 +423,15 @@ const CareRequestDetailPage = ({
                     </DateValue>
                   </DateInfo>
                 ) : null}
+                {careRequest?.offeredCoins && careRequest.offeredCoins > 0 && (
+                  <CoinInfoSection>
+                    <CoinInfo>
+                      <CoinIcon>💰</CoinIcon>
+                      <CoinLabel>제시 코인</CoinLabel>
+                      <CoinAmount>{careRequest.offeredCoins.toLocaleString()} 코인</CoinAmount>
+                    </CoinInfo>
+                  </CoinInfoSection>
+                )}
               </ContentSection>
 
               {careRequest?.pet && (
@@ -940,6 +949,33 @@ const DateValue = styled.span`
 const TimeIcon = styled.span`
   font-size: 1.1rem;
   line-height: 1;
+`;
+
+const CoinInfoSection = styled.div`
+  margin-top: ${(props) => props.theme.spacing.md};
+  padding-top: ${(props) => props.theme.spacing.md};
+  border-top: 1px solid ${(props) => props.theme.colors.borderLight};
+`;
+
+const CoinInfo = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${(props) => props.theme.spacing.sm};
+`;
+
+const CoinIcon = styled.span`
+  font-size: 1.3rem;
+`;
+
+const CoinLabel = styled.span`
+  color: ${(props) => props.theme.colors.textSecondary};
+  font-size: ${(props) => props.theme.typography.body2.fontSize};
+`;
+
+const CoinAmount = styled.span`
+  color: ${(props) => props.theme.colors.primary};
+  font-weight: 600;
+  font-size: ${(props) => props.theme.typography.h3.fontSize};
 `;
 
 const CommentSection = styled.section`
