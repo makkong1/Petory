@@ -53,7 +53,7 @@ const PetCoinChargePage = ({ onClose }) => {
       setSelectedAmount(null);
       setCustomAmount('');
       await fetchBalance();
-      
+
       // 2초 후 성공 메시지 제거
       setTimeout(() => {
         setSuccess('');
@@ -275,15 +275,15 @@ const ChargeOptions = styled.div`
 
 const ChargeOption = styled.div`
   padding: 20px;
-  border: 2px solid ${props => 
-    props.selected 
+  border: 2px solid ${props =>
+    props.selected
       ? (props.theme.colors.primary || '#FF7E36')
       : (props.theme.colors.border || '#e0e0e0')};
   border-radius: 12px;
   cursor: pointer;
   transition: all 0.2s ease;
-  background: ${props => 
-    props.selected 
+  background: ${props =>
+    props.selected
       ? (props.theme.colors.primaryLight || '#fff5f0')
       : (props.theme.colors.surface || '#ffffff')};
   text-align: center;

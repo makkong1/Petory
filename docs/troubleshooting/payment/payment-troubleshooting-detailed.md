@@ -1,14 +1,5 @@
 # Payment 도메인 - 트러블슈팅 해결 상세
 
-## 📋 목차
-
-1. [개요](#개요)
-2. [문제 1: 자동 완료 처리 문제](#문제-1-자동-완료-처리-문제)
-3. [문제 2: 거래 취소 시 환불 처리 미구현](#문제-2-거래-취소-시-환불-처리-미구현)
-4. [문제 3: 거래 확정 시 에스크로 생성 실패 처리](#문제-3-거래-확정-시-에스크로-생성-실패-처리)
-5. [문제 4: 거래 완료 시 코인 지급 실패 처리](#문제-4-거래-완료-시-코인-지급-실패-처리)
-6. [해결 완료 요약](#해결-완료-요약)
-
 ---
 
 ## 개요
@@ -113,7 +104,6 @@ public class CareRequestScheduler {
 - 직접 상태 변경 대신 `careRequestService.updateStatus()` 호출
 - 개별 요청별 예외 처리 추가 (한 요청 실패가 다른 요청에 영향 없음)
 - 성공/실패 카운트 로깅 추가
-- 파일: `backend/main/java/com/linkup/Petory/domain/care/service/CareRequestScheduler.java`
 
 ### 결과
 
@@ -209,6 +199,34 @@ sequenceDiagram
 
 ```java
 // CareRequestService.java - updateStatus() 메서드에 추가
+// ... 권한 검증 로직 ...
+
+CareRequestStatus oldStatus = request.getStatus();
+CareRequestStatus newStatus = CareRequestStatus.valueOf(status);
+
+request.setStatus(newStatus);
+CareRequest updated = careRequestRepository.save(request);
+
+// 상태가 COMPLETED로 변경될 때 에스크로에서 제공자에게 코인 지급
+if (oldStatus != CareRequestStatus.COMPLETED && newStatus == CareRequestStatus.COMPLETED) {
+    PetCoinEscrow escrow = petCoinEscrowService.findByCareRequest(request);
+    if (escrow != null && escrow.getStatus() == EscrowStatus.HOLD) {
+        try {
+            petCoinEscrowService.releaseToProvider(escrow);
+            log.info("거래 완료 시 제공자에게 코인 지급 완료: careRequestIdx={}, escrowIdx={}, amount={}",
+                    request.getIdx(), escrow.getIdx(), escrow.getAmount());
+        } catch (Exception e) {
+            log.error("거래 완료 시 제공자에게 코인 지급 실패: careRequestIdx={}, error={}",
+                    request.getIdx(), e.getMessage(), e);
+            // 코인 지급 실패 시 상태 변경 롤백
+            throw new RuntimeException("코인 지급 처리 중 오류가 발생했습니다.", e);
+        }
+    } else {
+        log.warn("에스크로를 찾을 수 없거나 이미 처리됨: careRequestIdx={}", request.getIdx());
+    }
+}
+
+// 상태가 CANCELLED로 변경될 때 에스크로에서 요청자에게 코인 환불
 if (newStatus == CareRequestStatus.CANCELLED) {
     PetCoinEscrow escrow = petCoinEscrowService.findByCareRequest(request);
     if (escrow != null && escrow.getStatus() == EscrowStatus.HOLD) {
@@ -226,12 +244,15 @@ if (newStatus == CareRequestStatus.CANCELLED) {
         log.warn("에스크로를 찾을 수 없거나 이미 처리됨: careRequestIdx={}", request.getIdx());
     }
 }
+
+return careRequestConverter.toDTO(updated);
 ```
 
 #### 변경 사항
 
 - `CANCELLED` 상태 변경 시 환불 처리 로직 추가
-- 환불 실패 시 예외를 다시 던져 상태 변경 롤백
+- `COMPLETED` 상태 변경 시 코인 지급 실패 시 롤백 처리 추가 (기존에는 로그만 남김)
+- 환불/지급 실패 시 예외를 다시 던져 상태 변경 롤백
 - 상세 로깅 추가
 - 파일: `backend/main/java/com/linkup/Petory/domain/care/service/CareRequestService.java`
 
@@ -365,7 +386,6 @@ public void confirmCareDeal(Long conversationIdx, Long userId) {
 - `try-catch` 블록 제거하여 예외가 자동으로 전파되도록 함
 - 에스크로 생성 실패 시 트랜잭션 롤백 보장
 - `offeredCoins`가 null이거나 0인 경우 예외 발생
-- 파일: `backend/main/java/com/linkup/Petory/domain/chat/service/ConversationService.java`
 
 ### 결과
 
@@ -467,30 +487,98 @@ sequenceDiagram
 
 ```java
 // CareRequestService.java - updateStatus() 메서드 수정
-if (oldStatus != CareRequestStatus.COMPLETED && newStatus == CareRequestStatus.COMPLETED) {
-    PetCoinEscrow escrow = petCoinEscrowService.findByCareRequest(request);
-    if (escrow != null && escrow.getStatus() == EscrowStatus.HOLD) {
-        try {
-            petCoinEscrowService.releaseToProvider(escrow);
-            log.info("거래 완료 시 제공자에게 코인 지급 완료: careRequestIdx={}, escrowIdx={}, amount={}",
-                    request.getIdx(), escrow.getIdx(), escrow.getAmount());
-        } catch (Exception e) {
-            log.error("거래 완료 시 제공자에게 코인 지급 실패: careRequestIdx={}, error={}",
-                    request.getIdx(), e.getMessage(), e);
-            // 코인 지급 실패 시 상태 변경 롤백
-            throw new RuntimeException("코인 지급 처리 중 오류가 발생했습니다.", e);
+@Transactional
+public CareRequestDTO updateStatus(Long idx, String status, Long currentUserId) {
+    CareRequest request = careRequestRepository.findByIdWithApplications(idx)
+            .orElseThrow(() -> new RuntimeException("CareRequest not found"));
+
+    // 관리자는 권한 검증 우회
+    if (!isAdmin()) {
+        // 작성자 또는 승인된 제공자만 상태 변경 가능
+        boolean isRequester = request.getUser().getIdx().equals(currentUserId);
+        boolean isAcceptedProvider = request.getApplications() != null &&
+                request.getApplications().stream()
+                        .anyMatch(app -> app.getStatus() == CareApplicationStatus.ACCEPTED
+                                && app.getProvider().getIdx().equals(currentUserId));
+
+        if (!isRequester && !isAcceptedProvider) {
+            throw new RuntimeException("작성자 또는 승인된 제공자만 상태를 변경할 수 있습니다.");
         }
-    } else {
-        log.warn("에스크로를 찾을 수 없거나 이미 처리됨: careRequestIdx={}", request.getIdx());
     }
+
+    CareRequestStatus oldStatus = request.getStatus();
+    CareRequestStatus newStatus = CareRequestStatus.valueOf(status);
+
+    request.setStatus(newStatus);
+    CareRequest updated = careRequestRepository.save(request);
+
+    // 상태가 COMPLETED로 변경될 때 에스크로에서 제공자에게 코인 지급
+    if (oldStatus != CareRequestStatus.COMPLETED && newStatus == CareRequestStatus.COMPLETED) {
+        // 비관적 락으로 에스크로 조회 (동시 요청 시 중복 지급 방지)
+        PetCoinEscrow escrow = petCoinEscrowService.findByCareRequestForUpdate(request);
+        if (escrow != null && escrow.getStatus() == EscrowStatus.HOLD) {
+            try {
+                petCoinEscrowService.releaseToProvider(escrow);
+                log.info("거래 완료 시 제공자에게 코인 지급 완료: careRequestIdx={}, escrowIdx={}, amount={}",
+                        request.getIdx(), escrow.getIdx(), escrow.getAmount());
+            } catch (Exception e) {
+                log.error("거래 완료 시 제공자에게 코인 지급 실패: careRequestIdx={}, error={}",
+                        request.getIdx(), e.getMessage(), e);
+                // 코인 지급 실패 시 상태 변경 롤백
+                throw new RuntimeException("코인 지급 처리 중 오류가 발생했습니다.", e);
+            }
+        } else {
+            log.warn("에스크로를 찾을 수 없거나 이미 처리됨: careRequestIdx={}", request.getIdx());
+        }
+    }
+
+    // 상태가 CANCELLED로 변경될 때 에스크로에서 요청자에게 코인 환불
+    if (newStatus == CareRequestStatus.CANCELLED) {
+        // 비관적 락으로 에스크로 조회 (동시 요청 시 중복 환불 방지)
+        PetCoinEscrow escrow = petCoinEscrowService.findByCareRequestForUpdate(request);
+        if (escrow != null && escrow.getStatus() == EscrowStatus.HOLD) {
+            try {
+                petCoinEscrowService.refundToRequester(escrow);
+                log.info("거래 취소 시 요청자에게 코인 환불 완료: careRequestIdx={}, escrowIdx={}, amount={}",
+                        request.getIdx(), escrow.getIdx(), escrow.getAmount());
+            } catch (Exception e) {
+                log.error("거래 취소 시 요청자에게 코인 환불 실패: careRequestIdx={}, error={}",
+                        request.getIdx(), e.getMessage(), e);
+                // 환불 실패 시 상태 변경 롤백
+                throw new RuntimeException("환불 처리 중 오류가 발생했습니다.", e);
+            }
+        } else {
+            log.warn("에스크로를 찾을 수 없거나 이미 처리됨: careRequestIdx={}", request.getIdx());
+        }
+    }
+
+    return careRequestConverter.toDTO(updated);
 }
 ```
 
 #### 변경 사항
 
-- 코인 지급 실패 시 예외를 다시 던져 상태 변경 롤백
+- 코인 지급 실패 시 예외를 다시 던져 상태 변경 롤백 (기존에는 로그만 남김)
+- `CANCELLED` 상태 변경 시 환불 처리 로직도 포함됨 (같은 메서드 내)
+- 환불/지급 실패 시 모두 롤백 처리
 - 상세 로깅 추가
-- 파일: `backend/main/java/com/linkup/Petory/domain/care/service/CareRequestService.java`
+
+#### 추가 개선: 동시성 제어 강화 (고급 포인트)
+
+**발견된 문제:**
+- 초기 구현에서는 `findByCareRequest()`를 락 없이 조회
+- 조회 시점과 `releaseToProvider()` 호출 사이에 다른 트랜잭션이 끼어들 수 있음
+- 동시 요청 시 불필요한 메서드 호출 및 잠재적 중복 처리 가능성
+
+**추가 개선 사항:**
+1. `PetCoinEscrowRepository`에 `findByCareRequestForUpdate()` 메서드 추가 (비관적 락)
+2. `PetCoinEscrowService`에 `findByCareRequestForUpdate()` 메서드 추가
+3. `CareRequestService.updateStatus()`에서 `findByCareRequest()` → `findByCareRequestForUpdate()`로 변경
+
+**개선 효과:**
+- 에스크로 조회 시점부터 락을 획득하여 동시성 제어
+- 첫 번째 요청만 처리되고, 두 번째 요청은 락 대기 후 상태 체크에서 차단
+- 중복 지급/환불 완전 방지
 
 ### 결과
 
@@ -505,6 +593,8 @@ if (oldStatus != CareRequestStatus.COMPLETED && newStatus == CareRequestStatus.C
 - ✅ 코인 지급 실패 시 상태 변경 롤백
 - ✅ 제공자 손실 방지
 - ✅ 데이터 일관성 보장
+- ✅ 에스크로 조회 시점부터 비관적 락 사용으로 동시성 제어 강화
+- ✅ 중복 지급/환불 완전 방지
 
 #### 테스트 시나리오
 
@@ -527,7 +617,12 @@ sequenceDiagram
     Frontend->>CareRequestService: updateStatus(COMPLETED)
     
     CareRequestService->>DB: 상태 COMPLETED로 변경
-    CareRequestService->>EscrowService: findByCareRequest()
+    
+    Note over CareRequestService: ✅ 개선: 조회 시점부터 락 사용
+    CareRequestService->>EscrowService: findByCareRequestForUpdate() (비관적 락)
+    EscrowService->>DB: SELECT ... FOR UPDATE (락 획득)
+    DB->>EscrowService: 에스크로 반환 (락 보유)
+    
     CareRequestService->>EscrowService: releaseToProvider()
     EscrowService->>PetCoinService: payoutCoins()
     
@@ -546,6 +641,8 @@ sequenceDiagram
         CareRequestService->>Frontend: 성공 응답
         Frontend->>User: 거래 완료
     end
+    
+    Note over CareRequestService: 동시 요청 시: 두 번째 요청은 락 대기 후<br/>이미 RELEASED 상태 확인하여 중복 처리 방지
 ```
 
 ---
@@ -616,11 +713,6 @@ public PetCoinTransaction deductCoins(Users user, Integer amount, ...) {
 - `SpringDataJpaUsersRepository`에 비관적 락 쿼리 추가
 - `JpaUsersAdapter`에 구현 추가
 - `PetCoinService.deductCoins()`에서 락 사용
-- 파일:
-  - `backend/main/java/com/linkup/Petory/domain/user/repository/UsersRepository.java`
-  - `backend/main/java/com/linkup/Petory/domain/user/repository/SpringDataJpaUsersRepository.java`
-  - `backend/main/java/com/linkup/Petory/domain/user/repository/JpaUsersAdapter.java`
-  - `backend/main/java/com/linkup/Petory/domain/payment/service/PetCoinService.java`
 
 ### 결과
 
@@ -760,11 +852,6 @@ public PetCoinEscrow releaseToProvider(PetCoinEscrow escrow) {
 - `SpringDataJpaPetCoinEscrowRepository`에 비관적 락 쿼리 추가
 - `JpaPetCoinEscrowAdapter`에 구현 추가
 - `PetCoinEscrowService.releaseToProvider()`와 `refundToRequester()`에서 락 사용
-- 파일:
-  - `backend/main/java/com/linkup/Petory/domain/payment/repository/PetCoinEscrowRepository.java`
-  - `backend/main/java/com/linkup/Petory/domain/payment/repository/SpringDataJpaPetCoinEscrowRepository.java`
-  - `backend/main/java/com/linkup/Petory/domain/payment/repository/JpaPetCoinEscrowAdapter.java`
-  - `backend/main/java/com/linkup/Petory/domain/payment/service/PetCoinEscrowService.java`
 
 ### 결과
 
@@ -855,19 +942,7 @@ sequenceDiagram
 - **동시성 제어**: 비관적 락으로 Race Condition 방지
   - 잔액 확인과 차감이 원자적으로 처리됨
   - 에스크로 상태 변경이 원자적으로 처리됨
+  - 에스크로 조회 시점부터 락을 획득하여 중복 처리 완전 방지 (문제 4 추가 개선)
   - 음수 잔액 및 중복 지급/환불 방지
 
-### 변경된 파일
-
-1. `backend/main/java/com/linkup/Petory/domain/care/service/CareRequestScheduler.java`
-2. `backend/main/java/com/linkup/Petory/domain/care/service/CareRequestService.java`
-3. `backend/main/java/com/linkup/Petory/domain/chat/service/ConversationService.java`
-4. `backend/main/java/com/linkup/Petory/domain/user/repository/UsersRepository.java`
-5. `backend/main/java/com/linkup/Petory/domain/user/repository/SpringDataJpaUsersRepository.java`
-6. `backend/main/java/com/linkup/Petory/domain/user/repository/JpaUsersAdapter.java`
-7. `backend/main/java/com/linkup/Petory/domain/payment/service/PetCoinService.java`
-8. `backend/main/java/com/linkup/Petory/domain/payment/repository/PetCoinEscrowRepository.java`
-9. `backend/main/java/com/linkup/Petory/domain/payment/repository/SpringDataJpaPetCoinEscrowRepository.java`
-10. `backend/main/java/com/linkup/Petory/domain/payment/repository/JpaPetCoinEscrowAdapter.java`
-11. `backend/main/java/com/linkup/Petory/domain/payment/service/PetCoinEscrowService.java`
 

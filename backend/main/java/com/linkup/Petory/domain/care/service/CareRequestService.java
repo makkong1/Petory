@@ -231,7 +231,8 @@ public class CareRequestService {
 
         // 상태가 COMPLETED로 변경될 때 에스크로에서 제공자에게 코인 지급
         if (oldStatus != CareRequestStatus.COMPLETED && newStatus == CareRequestStatus.COMPLETED) {
-            PetCoinEscrow escrow = petCoinEscrowService.findByCareRequest(request);
+            // 비관적 락으로 에스크로 조회 (동시 요청 시 중복 지급 방지)
+            PetCoinEscrow escrow = petCoinEscrowService.findByCareRequestForUpdate(request);
             if (escrow != null && escrow.getStatus() == EscrowStatus.HOLD) {
                 try {
                     petCoinEscrowService.releaseToProvider(escrow);
@@ -240,7 +241,28 @@ public class CareRequestService {
                 } catch (Exception e) {
                     log.error("거래 완료 시 제공자에게 코인 지급 실패: careRequestIdx={}, error={}",
                             request.getIdx(), e.getMessage(), e);
-                    // 코인 지급 실패 시에도 상태 변경은 유지 (운영 환경에서는 롤백 고려)
+                    // 코인 지급 실패 시 상태 변경 롤백
+                    throw new RuntimeException("코인 지급 처리 중 오류가 발생했습니다.", e);
+                }
+            } else {
+                log.warn("에스크로를 찾을 수 없거나 이미 처리됨: careRequestIdx={}", request.getIdx());
+            }
+        }
+
+        // 상태가 CANCELLED로 변경될 때 에스크로에서 요청자에게 코인 환불
+        if (newStatus == CareRequestStatus.CANCELLED) {
+            // 비관적 락으로 에스크로 조회 (동시 요청 시 중복 환불 방지)
+            PetCoinEscrow escrow = petCoinEscrowService.findByCareRequestForUpdate(request);
+            if (escrow != null && escrow.getStatus() == EscrowStatus.HOLD) {
+                try {
+                    petCoinEscrowService.refundToRequester(escrow);
+                    log.info("거래 취소 시 요청자에게 코인 환불 완료: careRequestIdx={}, escrowIdx={}, amount={}",
+                            request.getIdx(), escrow.getIdx(), escrow.getAmount());
+                } catch (Exception e) {
+                    log.error("거래 취소 시 요청자에게 코인 환불 실패: careRequestIdx={}, error={}",
+                            request.getIdx(), e.getMessage(), e);
+                    // 환불 실패 시 상태 변경 롤백
+                    throw new RuntimeException("환불 처리 중 오류가 발생했습니다.", e);
                 }
             } else {
                 log.warn("에스크로를 찾을 수 없거나 이미 처리됨: careRequestIdx={}", request.getIdx());

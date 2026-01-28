@@ -23,6 +23,12 @@ public interface PetCoinEscrowRepository {
     Optional<PetCoinEscrow> findByCareRequest(CareRequest careRequest);
 
     /**
+     * 비관적 락을 사용한 CareRequest로 에스크로 조회 (동시성 제어용)
+     * 상태 변경 시 Race Condition 방지를 위해 사용
+     */
+    Optional<PetCoinEscrow> findByCareRequestForUpdate(CareRequest careRequest);
+
+    /**
      * 사용자별 에스크로 조회 (요청자 또는 제공자)
      */
     List<PetCoinEscrow> findByRequesterOrProvider(Users user);

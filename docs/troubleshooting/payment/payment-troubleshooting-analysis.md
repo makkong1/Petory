@@ -17,6 +17,14 @@
 - **인덱스**: 인덱스 설계 및 최적화 능력 필수
 - **실운영 고려**: 실제 운영 환경을 고려한 에러 처리, 로깅, 모니터링
 
+### 📅 업데이트 이력
+- 2026-01-28: Critical 우선순위 문제 6개 해결 완료
+  - 트랜잭션 일관성 문제 (1.1, 1.2)
+  - 동시성 문제 (2.2, 2.3)
+  - 거래 취소 시 환불 처리 (6.1)
+  - 자동 완료 처리 문제 (7.1)
+  - 데이터베이스 제약조건 (10.1, 10.2)
+
 ### 현재 구현 상태 요약
 
 #### ✅ 잘 구현된 부분
@@ -25,22 +33,34 @@
 - 모든 서비스 메서드에 `@Transactional` 적용
 - 에스크로 생성/지급/환불 로직 구현 완료
 
-#### ⚠️ 개선이 필요한 부분
-- **트랜잭션 일관성**: 에스크로 생성/지급 실패 시 롤백 처리 미흡
+#### ✅ 해결 완료된 부분
+- **트랜잭션 일관성**: 에스크로 생성/지급 실패 시 롤백 처리 완료 ✅
 - **동시성 제어**: 
-  - `PetCoinService.deductCoins()`: 락 없이 조회
-  - `PetCoinEscrowService`: 락 없이 상태 확인 후 변경
-- **거래 취소 시 환불**: `CANCELLED` 상태 변경 시 환불 로직 없음
-- **자동 완료 처리**: 스케줄러가 직접 상태 변경하여 에스크로 처리 안 됨
-- **데이터베이스 제약조건**: 잔액 음수 방지 제약조건 없음
+  - `PetCoinService.deductCoins()`: 비관적 락 추가 완료 ✅
+  - `PetCoinEscrowService`: 비관적 락 추가 완료 ✅
+- **거래 취소 시 환불**: `CANCELLED` 상태 변경 시 환불 로직 추가 완료 ✅
+- **자동 완료 처리**: 스케줄러에서 서비스 메서드 호출로 변경 완료 ✅
+- **데이터베이스 제약조건**: 
+  - 잔액 음수 방지 제약조건 추가 완료 ✅
+  - 에스크로 중복 방지 제약조건 이미 존재 (unique = true) ✅
+
+#### ⚠️ 개선이 필요한 부분
+- **데이터 불일치 문제**: offeredCoins 검증 강화 필요
+- **잔액 부족 문제**: UX 개선 필요 (명확한 에러 메시지)
+- **에스크로 상태 관리**: Idempotency 키, 처리 이력 기록 필요
+- **로깅 및 모니터링**: 알림 시스템 연동, 모니터링 대시보드 필요
 
 ---
 
 ## 🔴 1. 트랜잭션 일관성 문제
 
-### 1.1 거래 확정 시 에스크로 생성 실패 처리
+### 1.1 거래 확정 시 에스크로 생성 실패 처리 ✅ 해결 완료
 
-**문제 상황:**
+**현재 구현 상태:**
+- ✅ 예외를 다시 던져 트랜잭션 롤백 처리 완료
+- ✅ `offeredCoins`가 null이거나 0인 경우 거래 확정 불가하도록 예외 발생
+
+**문제 상황 (해결 전):**
 ```java
 // ConversationService.java (line 655-672)
 if (offeredCoins != null && offeredCoins > 0) {
@@ -82,9 +102,12 @@ if (offeredCoins != null && offeredCoins > 0) {
 
 ---
 
-### 1.2 거래 완료 시 코인 지급 실패 처리
+### 1.2 거래 완료 시 코인 지급 실패 처리 ✅ 해결 완료
 
-**문제 상황:**
+**현재 구현 상태:**
+- ✅ 코인 지급 실패 시 예외를 다시 던져 상태 변경 롤백 처리 완료
+
+**문제 상황 (해결 전):**
 ```java
 // CareRequestService.java (line 232-243)
 if (oldStatus != CareRequestStatus.COMPLETED && newStatus == CareRequestStatus.COMPLETED) {
@@ -144,7 +167,8 @@ if (oldStatus != CareRequestStatus.COMPLETED && newStatus == CareRequestStatus.C
 **현재 구현 상태:**
 - ✅ `ConversationService.confirmCareDeal()`에서 비관적 락 사용 (`findByIdWithLock`)
 - ✅ `PetCoinEscrow` 엔티티에 `@JoinColumn(unique = true)` 제약조건 존재
-- ⚠️ 하지만 `PetCoinEscrowService.createEscrow()` 내부에서는 락 없이 조회
+- ✅ 데이터베이스 레벨에서 UNIQUE 제약조건으로 중복 방지됨
+- ⚠️ 애플리케이션 레벨 락은 없지만, DB 제약조건으로 충분히 방지됨
 
 **문제 상황:**
 ```java
@@ -199,8 +223,8 @@ escrowRepository.findByCareRequest(careRequest)
 ### 2.2 잔액 확인과 차감 사이의 Race Condition
 
 **현재 구현 상태:**
-- ⚠️ `PetCoinService.deductCoins()`에서 락 없이 조회 후 차감
-- ⚠️ 데이터베이스 제약조건 없음
+- ✅ `PetCoinService.deductCoins()`에서 비관적 락 사용 (`findByIdForUpdate`)
+- ✅ 데이터베이스 제약조건 추가 완료 (`chk_pet_coin_balance`)
 
 **문제 상황:**
 ```java
@@ -233,39 +257,38 @@ if (balanceBefore < amount) {
 - 음수 잔액 발생 가능
 - 데이터 무결성 위반
 
-**해결 방안:**
-1. **데이터베이스 제약조건 추가 (필수)**
+**해결 방안 (구현 완료):**
+1. **데이터베이스 제약조건 추가** ✅
    ```sql
    ALTER TABLE users 
    ADD CONSTRAINT chk_pet_coin_balance CHECK (pet_coin_balance >= 0);
    ```
    - 최종 방어선으로 음수 잔액 방지
 
-2. **비관적 락 추가 (권장)**
+2. **비관적 락 추가** ✅
    ```java
-   // UsersRepository에 추가
+   // UsersRepository에 추가 완료
    @Lock(LockModeType.PESSIMISTIC_WRITE)
    Optional<Users> findByIdForUpdate(Long idx);
    
-   // PetCoinService.deductCoins()에서 사용
+   // PetCoinService.deductCoins()에서 사용 완료
    Users currentUser = usersRepository.findByIdForUpdate(user.getIdx())
        .orElseThrow(() -> new RuntimeException("User not found"));
    ```
 
-3. **SELECT FOR UPDATE 쿼리**
-   ```java
-   @Query("SELECT u FROM Users u WHERE u.idx = :idx")
-   @Lock(LockModeType.PESSIMISTIC_WRITE)
-   Optional<Users> findByIdForUpdate(@Param("idx") Long idx);
-   ```
+**구현 완료:**
+- ✅ `UsersRepository`에 `findByIdForUpdate()` 메서드 추가
+- ✅ `SpringDataJpaUsersRepository`에 비관적 락 쿼리 추가
+- ✅ `PetCoinService.deductCoins()`에서 락 사용
+- ✅ 데이터베이스 제약조건 추가 완료
 
 ---
 
 ### 2.3 에스크로 상태 변경 시 Race Condition
 
 **현재 구현 상태:**
-- ⚠️ `PetCoinEscrowService.releaseToProvider()`와 `refundToRequester()`에서 락 없이 상태 확인 후 변경
-- ⚠️ 동시성 제어 없음
+- ✅ `PetCoinEscrowService.releaseToProvider()`와 `refundToRequester()`에서 비관적 락 사용 (`findByIdForUpdate`)
+- ✅ 동시성 제어 완료
 
 **문제 상황:**
 ```java
@@ -294,29 +317,22 @@ if (escrow.getStatus() != EscrowStatus.HOLD) {
 - 코인 이중 지급 또는 이중 환불
 - 데이터 불일치
 
-**해결 방안:**
-1. **비관적 락 추가 (권장)**
+**해결 방안 (구현 완료):**
+1. **비관적 락 추가** ✅
    ```java
-   // SpringDataJpaPetCoinEscrowRepository.java
+   // SpringDataJpaPetCoinEscrowRepository.java에 추가 완료
    @Lock(LockModeType.PESSIMISTIC_WRITE)
    Optional<PetCoinEscrow> findByIdForUpdate(Long idx);
    
-   // PetCoinEscrowService에서 사용
+   // PetCoinEscrowService에서 사용 완료
    PetCoinEscrow escrow = escrowRepository.findByIdForUpdate(escrow.getIdx())
        .orElseThrow(() -> new RuntimeException("Escrow not found"));
    ```
 
-2. **낙관적 락 추가**
-   ```java
-   // PetCoinEscrow 엔티티에 추가
-   @Version
-   private Long version;
-   ```
-   - 동시 수정 시 `OptimisticLockException` 발생하여 감지
-
-3. **데이터베이스 트리거 (선택사항)**
-   - 상태 변경 시 이전 상태 검증
-   - 애플리케이션 레벨 보호가 더 유연함
+**구현 완료:**
+- ✅ `PetCoinEscrowRepository`에 `findByIdForUpdate()` 메서드 추가
+- ✅ `SpringDataJpaPetCoinEscrowRepository`에 비관적 락 쿼리 추가
+- ✅ `PetCoinEscrowService.releaseToProvider()`와 `refundToRequester()`에서 락 사용
 
 ---
 
@@ -501,12 +517,12 @@ if (escrow.getStatus() != EscrowStatus.HOLD) {
 
 ## 🔴 6. 거래 취소 시 환불 처리 미구현
 
-### 6.1 환불 로직 미구현
+### 6.1 환불 로직 미구현 ✅ 해결 완료
 
 **현재 구현 상태:**
 - ✅ `PetCoinEscrowService.refundToRequester()` 메서드는 구현되어 있음
-- ❌ 하지만 실제로 호출하는 곳이 없음
-- ❌ `CareRequestService.updateStatus()`에서 `CANCELLED` 상태 변경 시 환불 처리 없음
+- ✅ `CareRequestService.updateStatus()`에서 `CANCELLED` 상태 변경 시 환불 처리 추가 완료
+- ✅ 환불 실패 시 상태 변경 롤백 처리 완료
 
 **문제 상황:**
 ```java
@@ -560,12 +576,12 @@ if (oldStatus != CareRequestStatus.COMPLETED && newStatus == CareRequestStatus.C
 
 ## 🔴 7. 자동 완료 처리 문제
 
-### 7.1 스케줄러를 통한 자동 완료 시 에스크로 처리
+### 7.1 스케줄러를 통한 자동 완료 시 에스크로 처리 ✅ 해결 완료
 
 **현재 구현 상태:**
-- ❌ `CareRequestScheduler.updateExpiredCareRequests()`가 직접 상태 변경
-- ❌ 에스크로 처리 로직이 `CareRequestService.updateStatus()`에만 있음
-- ❌ 스케줄러가 직접 상태를 변경하여 에스크로 처리 안 됨
+- ✅ `CareRequestScheduler.updateExpiredCareRequests()`에서 `CareRequestService.updateStatus()` 호출로 변경 완료
+- ✅ 스케줄러 실행 시에도 에스크로 처리 정상 작동
+- ✅ 수동 완료와 자동 완료의 처리 방식 일치
 
 **문제 상황:**
 ```java
@@ -604,25 +620,6 @@ careRequestRepository.saveAll(expiredRequests);
        }
    }
    ```
-
-2. **공통 메서드 추출**
-   ```java
-   // CareRequestService.java
-   @Transactional
-   private void completeCareRequest(CareRequest request) {
-       request.setStatus(CareRequestStatus.COMPLETED);
-       careRequestRepository.save(request);
-       
-       // 에스크로 처리
-       PetCoinEscrow escrow = petCoinEscrowService.findByCareRequest(request);
-       if (escrow != null && escrow.getStatus() == EscrowStatus.HOLD) {
-           petCoinEscrowService.releaseToProvider(escrow);
-       }
-   }
-   
-   // updateStatus()와 스케줄러에서 모두 사용
-   ```
-
 ---
 
 ## 🔴 8. 트랜잭션 범위 문제
@@ -678,86 +675,90 @@ careRequestRepository.saveAll(expiredRequests);
 
 ## 🔴 10. 데이터베이스 제약조건 부족
 
-### 10.1 잔액 음수 방지 제약조건 없음
+### 10.1 잔액 음수 방지 제약조건 ✅ 해결 완료
 
-**문제점:**
-- 애플리케이션 레벨에서만 검증
-- 데이터베이스 레벨 제약조건 없음
+**현재 구현 상태:**
+- ✅ 데이터베이스 제약조건 추가 완료
+- ✅ 애플리케이션 레벨 검증 + DB 제약조건으로 이중 보호
 
-**해결 방안:**
+**구현 완료:**
 ```sql
 ALTER TABLE users 
 ADD CONSTRAINT chk_pet_coin_balance CHECK (pet_coin_balance >= 0);
 ```
 
-### 10.2 에스크로 중복 방지 제약조건
+---
 
-**문제점:**
-- `care_request_idx`에 UNIQUE 제약조건 필요
+### 10.2 에스크로 중복 방지 제약조건 ✅ 이미 존재
 
-**해결 방안:**
-```sql
-ALTER TABLE pet_coin_escrow 
-ADD CONSTRAINT uk_escrow_care_request UNIQUE (care_request_idx);
-```
+**현재 구현 상태:**
+- ✅ `PetCoinEscrow` 엔티티에 `@JoinColumn(unique = true)` 제약조건 존재
+- ✅ 마이그레이션 파일에 `UNIQUE KEY uk_care_request (care_request_idx)` 존재
+- ✅ 데이터베이스 레벨에서 중복 방지됨
+
+**참고:**
+- JPA의 `unique = true`와 마이그레이션의 `UNIQUE KEY`가 동일한 제약조건을 생성
+- 추가 SQL 실행 시 중복 인덱스 경고 발생하지만 기능상 문제 없음
+- 별도 추가 작업 불필요
 
 ---
 
 ## 📊 우선순위별 정리
 
-### 🔴 Critical (즉시 해결 필요)
-1. **트랜잭션 일관성 문제** (1.1, 1.2)
-   - 에스크로 생성 실패 시 롤백 처리
-   - 코인 지급 실패 시 롤백 처리
-2. **동시성 문제** (2.2, 2.3)
-   - 잔액 확인과 차감 사이의 Race Condition (락 추가 필요)
-   - 에스크로 상태 변경 시 Race Condition (락 추가 필요)
-3. **거래 취소 시 환불 처리 미구현** (6.1)
-   - CANCELLED 상태 변경 시 환불 로직 추가 필수
-4. **자동 완료 처리 문제** (7.1)
-   - 스케줄러에서 서비스 메서드 호출로 변경
+### ✅ Critical 우선순위 - 해결 완료
+1. **트랜잭션 일관성 문제** (1.1, 1.2) ✅
+   - ✅ 에스크로 생성 실패 시 롤백 처리 완료
+   - ✅ 코인 지급 실패 시 롤백 처리 완료
+2. **동시성 문제** (2.2, 2.3) ✅
+   - ✅ 잔액 확인과 차감 사이의 Race Condition 해결 (비관적 락 추가)
+   - ✅ 에스크로 상태 변경 시 Race Condition 해결 (비관적 락 추가)
+3. **거래 취소 시 환불 처리** (6.1) ✅
+   - ✅ CANCELLED 상태 변경 시 환불 로직 추가 완료
+4. **자동 완료 처리 문제** (7.1) ✅
+   - ✅ 스케줄러에서 서비스 메서드 호출로 변경 완료
+5. **데이터베이스 제약조건** (10.1, 10.2) ✅
+   - ✅ 잔액 음수 방지 제약조건 추가 완료
+   - ✅ 에스크로 중복 방지 제약조건 이미 존재
 
 ### 🟡 High (단기간 내 해결 필요)
-5. **동시성 문제** (2.1)
-   - 에스크로 중복 생성 방지 (락 추가 또는 예외 처리 개선)
-6. **데이터 불일치 문제** (3.1, 3.2)
+6. **동시성 문제** (2.1)
+   - 에스크로 중복 생성 방지 (DB 제약조건으로 방지되지만, 애플리케이션 레벨 락 추가 고려)
+7. **데이터 불일치 문제** (3.1, 3.2)
    - offeredCoins 검증 강화
    - 에스크로 없이 COMPLETED 상태 변경 방지
-7. **잔액 부족 문제** (4.1)
+8. **잔액 부족 문제** (4.1)
    - 사용자 경험 개선 (명확한 에러 메시지)
 
 ### 🟢 Medium (중장기 개선)
-8. **에스크로 상태 관리 문제** (5.1)
+9. **에스크로 상태 관리 문제** (5.1)
    - Idempotency 키 추가
    - 처리 이력 기록
-9. **로깅 및 모니터링 부족** (9.1)
-   - 알림 시스템 연동
-   - 모니터링 대시보드
-10. **데이터베이스 제약조건 부족** (10.1, 10.2)
-    - 잔액 음수 방지 제약조건 (필수)
-    - 에스크로 중복 방지 제약조건 (이미 있지만 명시적 추가 고려)
+10. **로깅 및 모니터링 부족** (9.1)
+    - 알림 시스템 연동
+    - 모니터링 대시보드
 
 ---
 
 ## 📝 체크리스트
 
 ### 개발 단계
-- [ ] **트랜잭션 롤백 로직 구현**
-  - [ ] ConversationService: 에스크로 생성 실패 시 예외 재던지기
-  - [ ] CareRequestService: 코인 지급 실패 시 롤백 처리
-- [ ] **동시성 제어 (락) 구현**
-  - [ ] PetCoinService: Users 조회 시 비관적 락 추가
-  - [ ] PetCoinEscrowService: 에스크로 조회 시 비관적 락 추가
-  - [ ] PetCoinEscrowService: 상태 변경 시 비관적 락 추가
-- [ ] **거래 취소 시 환불 처리 구현**
-  - [ ] CareRequestService.updateStatus()에 CANCELLED 처리 로직 추가
-- [ ] **자동 완료 처리 수정**
-  - [ ] CareRequestScheduler에서 CareRequestService.updateStatus() 호출로 변경
-- [ ] **데이터베이스 제약조건 추가**
-  - [ ] users 테이블에 잔액 음수 방지 제약조건 추가
+- [x] **트랜잭션 롤백 로직 구현** ✅
+  - [x] ConversationService: 에스크로 생성 실패 시 예외 재던지기
+  - [x] CareRequestService: 코인 지급 실패 시 롤백 처리
+- [x] **동시성 제어 (락) 구현** ✅
+  - [x] PetCoinService: Users 조회 시 비관적 락 추가 (`findByIdForUpdate`)
+  - [x] PetCoinEscrowService: 에스크로 조회 시 비관적 락 추가 (`findByIdForUpdate`)
+  - [x] PetCoinEscrowService: 상태 변경 시 비관적 락 추가 (`releaseToProvider`, `refundToRequester`)
+- [x] **거래 취소 시 환불 처리 구현** ✅
+  - [x] CareRequestService.updateStatus()에 CANCELLED 처리 로직 추가
+- [x] **자동 완료 처리 수정** ✅
+  - [x] CareRequestScheduler에서 CareRequestService.updateStatus() 호출로 변경
+- [x] **데이터베이스 제약조건 추가** ✅
+  - [x] users 테이블에 잔액 음수 방지 제약조건 추가 (`chk_pet_coin_balance`)
+  - [x] pet_coin_escrow 테이블에 에스크로 중복 방지 제약조건 확인 (이미 존재)
 - [ ] **사전 검증 강화**
   - [ ] CareRequest 생성 시 offeredCoins 검증
-  - [ ] 거래 확정 시 offeredCoins 재검증
+  - [x] 거래 확정 시 offeredCoins 재검증 (예외 발생)
 
 ### 테스트 단계
 - [ ] **동시성 테스트**
@@ -784,9 +785,3 @@ ADD CONSTRAINT uk_escrow_care_request UNIQUE (care_request_idx);
 - [ ] 환불 처리 실패 알림
 
 ---
-
-## 🔗 관련 문서
-
-- [Payment 도메인 문서](../domains/payment.md)
-- [펫케어 코인 관련 흐름 문서](../architecture/펫케어 코인 관련 흐름.md)
-- [동시성 처리 가이드](../concurrency/transaction-concurrency-cases.md)
