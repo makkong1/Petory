@@ -74,11 +74,11 @@ const CareRequestList = () => {
     { key: 'COMPLETED', label: '완료', count: careRequests.filter(c => c.status === 'COMPLETED').length }
   ];
 
-  // 작성일 기준 오래된 순으로 정렬
+  // 작성일 기준 최신순으로 정렬
   const sortedRequests = [...careRequests].sort((a, b) => {
     const dateA = new Date(a.createdAt || a.date || 0);
     const dateB = new Date(b.createdAt || b.date || 0);
-    return dateA - dateB; // 오래된 것부터
+    return dateB - dateA; // 최신 것부터
   });
 
   const filteredRequests = activeFilter === 'ALL'
@@ -417,6 +417,13 @@ const CareRequestList = () => {
 
               <CardDescription>{request.description}</CardDescription>
 
+              {request?.offeredCoins && request.offeredCoins > 0 && (
+                <CoinInfo>
+                  <CoinIcon>💰</CoinIcon>
+                  <CoinAmount>{request.offeredCoins.toLocaleString()} 코인</CoinAmount>
+                </CoinInfo>
+              )}
+
               <CardFooter>
                 <AuthorInfo>
                   <AuthorAvatar>
@@ -677,6 +684,27 @@ const CardDescription = styled.p`
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
+`;
+
+const CoinInfo = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${props => props.theme.spacing.xs};
+  margin: ${props => props.theme.spacing.sm} 0;
+  padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.sm};
+  background: ${props => props.theme.colors.surfaceElevated || props.theme.colors.surface};
+  border-radius: ${props => props.theme.borderRadius.md};
+  width: fit-content;
+`;
+
+const CoinIcon = styled.span`
+  font-size: 1.1rem;
+`;
+
+const CoinAmount = styled.span`
+  color: ${props => props.theme.colors.primary};
+  font-weight: 600;
+  font-size: ${props => props.theme.typography.body1.fontSize};
 `;
 
 const CardFooter = styled.div`

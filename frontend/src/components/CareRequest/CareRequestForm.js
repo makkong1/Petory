@@ -52,7 +52,10 @@ const CareRequestForm = ({ onCancel, onCreated }) => {
       const fetchBalance = async () => {
         try {
           const response = await paymentApi.getBalance();
-          setCoinBalance(response.data?.balance || 0);
+          // paymentApi.getBalance()는 이미 response.data를 반환하므로
+          // response.balance로 직접 접근
+          const balance = response?.balance ?? 0;
+          setCoinBalance(balance);
         } catch (err) {
           console.error('코인 잔액 조회 실패:', err);
           setCoinBalance(0);
