@@ -33,16 +33,19 @@
 #### 주요 기능 1-1: 채팅 후 거래 확정 및 완료
 - **설명**: 펫케어 요청자가 서비스 제공자와 채팅을 시작한 후, 양쪽 모두 거래를 확정하면 펫케어 서비스가 시작되고, 서비스 완료 후 완료 처리할 수 있습니다.
 - **사용자 시나리오**:
-  1. 펫케어 요청 생성 (OPEN 상태)
+  1. 펫케어 요청 생성 (OPEN 상태) - 요청자가 제시할 코인 가격(`offeredCoins`) 설정
   2. 서비스 제공자가 "채팅하기" 버튼 클릭하여 채팅방 생성
   3. 채팅방에서 가격, 시간, 서비스 내용 등 조건 협의
   4. 양쪽 모두 "거래 확정" 버튼 클릭
   5. 양쪽 모두 확정 시 자동으로:
      - CareApplication 생성 및 ACCEPTED 상태로 설정
      - CareRequest 상태 변경 (OPEN → IN_PROGRESS)
+     - **펫코인 차감 및 에스크로 생성**: 요청자가 설정한 코인만큼 차감되어 에스크로에 임시 보관
   6. 서비스 진행 (IN_PROGRESS 상태)
   7. 서비스 완료 후 채팅방에서 "서비스 완료" 버튼 클릭
   8. CareRequest 상태 변경 (IN_PROGRESS → COMPLETED)
+     - **펫코인 지급**: 에스크로에 보관된 코인이 제공자에게 지급됨
+- **펫코인 관련**: 상세 내용은 [Payment 도메인 문서](../domains/payment.md) 참조
 - **스크린샷/영상**: 
 
 #### 주요 기능 2: 펫케어 리뷰 시스템
@@ -97,6 +100,8 @@
   - 제공자 찾기 (요청자가 아닌 참여자)
   - 기존 `CareApplication`이 있으면 승인, 없으면 생성 (`ACCEPTED` 상태)
   - `CareRequest` 상태를 `IN_PROGRESS`로 변경
+  - **펫코인 차감 및 에스크로 생성**: 요청자가 설정한 코인만큼 차감되어 에스크로에 임시 보관
+    - 상세 내용은 [Payment 도메인 문서](../domains/payment.md) 참조
 
 **동시성 제어**: `@Transactional`로 트랜잭션 보장
 
@@ -158,7 +163,20 @@ public CareRequestDTO updateCareRequest(Long idx, CareRequestDTO dto, Long curre
   - 관리자는 모든 요청 수정 가능
   - 펫 연결 해제 기능 제공
 
-#### 로직 4: 상태 변경 권한 체크
+#### 로직 4: 상태 변경 및 펫코인 지급
+**구현 위치**: `CareRequestService.updateStatus()`
+
+**핵심 로직**:
+1. 권한 확인 (작성자 또는 승인된 제공자만 가능)
+2. 상태 변경
+3. **펫코인 지급 처리** (상태가 `COMPLETED`로 변경될 때):
+   - 에스크로 조회 (`PetCoinEscrowService.findByCareRequest`)
+   - 에스크로 상태가 `HOLD`인 경우:
+     - 제공자에게 코인 지급 (`PetCoinEscrowService.releaseToProvider`)
+     - 에스크로 상태를 `RELEASED`로 변경
+   - 상세 내용은 [Payment 도메인 문서](../domains/payment.md) 참조
+
+#### 로직 4-1: 상태 변경 권한 체크
 ```java
 // CareRequestService.java
 @Transactional
@@ -179,13 +197,27 @@ public CareRequestDTO updateStatus(Long idx, String status, Long currentUserId) 
         }
     }
     
-    request.setStatus(CareRequestStatus.valueOf(status));
-    return careRequestConverter.toDTO(careRequestRepository.save(request));
+    CareRequestStatus oldStatus = request.getStatus();
+    CareRequestStatus newStatus = CareRequestStatus.valueOf(status);
+    request.setStatus(newStatus);
+    CareRequest updated = careRequestRepository.save(request);
+    
+    // 상태가 COMPLETED로 변경될 때 펫코인 지급
+    if (oldStatus != CareRequestStatus.COMPLETED && newStatus == CareRequestStatus.COMPLETED) {
+        PetCoinEscrow escrow = petCoinEscrowService.findByCareRequest(request);
+        if (escrow != null && escrow.getStatus() == EscrowStatus.HOLD) {
+            petCoinEscrowService.releaseToProvider(escrow);
+        }
+    }
+    
+    return careRequestConverter.toDTO(updated);
 }
 ```
 
 **설명**:
-- **처리 흐름**: 요청 조회 (지원 목록 포함) → 권한 확인 (관리자 우회) → 상태 변경
+- **처리 흐름**: 요청 조회 (지원 목록 포함) → 권한 확인 (관리자 우회) → 상태 변경 → 펫코인 지급 처리 (COMPLETED 시)
+- **펫코인 지급**: 상태가 `COMPLETED`로 변경될 때 에스크로에서 제공자에게 코인 지급
+  - 상세 내용은 [Payment 도메인 문서](../domains/payment.md) 참조
 - **주요 판단 기준**: 
   - 작성자 또는 승인된 제공자만 상태 변경 가능
   - 관리자는 모든 요청의 상태 변경 가능

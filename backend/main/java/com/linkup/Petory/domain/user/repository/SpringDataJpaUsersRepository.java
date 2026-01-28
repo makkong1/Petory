@@ -4,11 +4,14 @@ import java.util.Optional;
 import java.time.LocalDateTime;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.linkup.Petory.domain.user.entity.Users;
+
+import jakarta.persistence.LockModeType;
 
 /**
  * Spring Data JPA 전용 인터페이스입니다.
@@ -61,9 +64,18 @@ public interface SpringDataJpaUsersRepository extends JpaRepository<Users, Long>
 
     /**
      * 경고 횟수 원자적 증가 (동시성 문제 해결)
+     * 
      * @return 업데이트된 행 수
      */
     @Modifying
     @Query("UPDATE Users u SET u.warningCount = u.warningCount + 1 WHERE u.idx = :userId")
     int incrementWarningCount(@Param("userId") Long userId);
+
+    /**
+     * 비관적 락을 사용한 사용자 조회 (동시성 제어용)
+     * 코인 차감 시 Race Condition 방지를 위해 사용
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT u FROM Users u WHERE u.idx = :idx")
+    Optional<Users> findByIdForUpdate(@Param("idx") Long idx);
 }

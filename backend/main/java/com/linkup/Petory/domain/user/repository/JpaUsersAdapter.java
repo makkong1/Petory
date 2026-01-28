@@ -101,4 +101,9 @@ public class JpaUsersAdapter implements UsersRepository {
     public int incrementWarningCount(Long userId) {
         return jpaRepository.incrementWarningCount(userId);
     }
+
+    @Override
+    public Optional<Users> findByIdForUpdate(Long idx) {
+        return jpaRepository.findByIdForUpdate(idx);
+    }
 }

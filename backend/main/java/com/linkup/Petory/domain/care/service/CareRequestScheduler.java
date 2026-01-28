@@ -17,6 +17,9 @@ import lombok.extern.slf4j.Slf4j;
 /**
  * 펫케어 요청의 상태를 자동으로 업데이트하는 스케줄러
  * 날짜가 지난 요청은 자동으로 COMPLETED 상태로 변경
+ * 
+ * 변경 이력:
+ * - 2026-01-28: CareRequestService.updateStatus()를 호출하여 에스크로 처리 포함
  */
 @Slf4j
 @Service
@@ -24,10 +27,16 @@ import lombok.extern.slf4j.Slf4j;
 public class CareRequestScheduler {
 
     private final CareRequestRepository careRequestRepository;
+    private final CareRequestService careRequestService;
 
     /**
      * 매 시간마다 실행 (정각에 실행)
      * 날짜가 지난 OPEN 또는 IN_PROGRESS 상태의 요청을 COMPLETED로 변경
+     * 
+     * 변경 사항:
+     * - 직접 상태 변경 대신 CareRequestService.updateStatus() 호출
+     * - 에스크로 처리 로직이 포함된 서비스 메서드 사용
+     * - 개별 요청별 예외 처리 추가
      */
     @Scheduled(cron = "0 0 * * * ?") // 매 시간 정각에 실행
     @Transactional
@@ -47,16 +56,30 @@ public class CareRequestScheduler {
             return;
         }
 
-        int updatedCount = 0;
+        int totalCount = expiredRequests.size();
+        int successCount = 0;
+        int failureCount = 0;
+
         for (CareRequest request : expiredRequests) {
-            request.setStatus(CareRequestStatus.COMPLETED);
-            updatedCount++;
-            log.debug("펫케어 요청 상태 변경: id={}, title={}, date={}, status=OPEN/IN_PROGRESS -> COMPLETED",
-                    request.getIdx(), request.getTitle(), request.getDate());
+            try {
+                // 서비스 메서드를 통해 상태 변경 (에스크로 처리 포함)
+                // 스케줄러는 시스템 작업이므로 currentUserId는 null
+                careRequestService.updateStatus(
+                        request.getIdx(),
+                        "COMPLETED",
+                        null);
+                successCount++;
+                log.debug("펫케어 요청 상태 변경 완료: id={}, title={}, date={}, status=OPEN/IN_PROGRESS -> COMPLETED",
+                        request.getIdx(), request.getTitle(), request.getDate());
+            } catch (Exception e) {
+                failureCount++;
+                log.error("펫케어 요청 상태 변경 실패: id={}, title={}, date={}, error={}",
+                        request.getIdx(), request.getTitle(), request.getDate(), e.getMessage(), e);
+            }
         }
 
-        careRequestRepository.saveAll(expiredRequests);
-        log.info("펫케어 요청 상태 자동 업데이트 완료: {}건의 요청이 COMPLETED로 변경됨", updatedCount);
+        log.info("펫케어 요청 상태 자동 업데이트 완료: 총 {}건 중 성공 {}건, 실패 {}건",
+                totalCount, successCount, failureCount);
     }
 
     /**
