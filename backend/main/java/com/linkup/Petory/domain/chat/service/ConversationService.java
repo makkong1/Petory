@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
@@ -520,7 +521,7 @@ public class ConversationService {
                                                         .findByConversationIdxAndStatus(conv.getIdx(),
                                                                         ParticipantStatus.ACTIVE);
 
-                                        java.util.Set<Long> participantIds = participants.stream()
+                                        Set<Long> participantIds = participants.stream()
                                                         .map(p -> p.getUser().getIdx())
                                                         .collect(Collectors.toSet());
 
@@ -636,7 +637,8 @@ public class ConversationService {
                                                                         .build();
 
                                                         // 명시적으로 저장 및 플러시
-                                                        finalApplication = careApplicationRepository.saveAndFlush(newApplication);
+                                                        finalApplication = careApplicationRepository
+                                                                        .saveAndFlush(newApplication);
                                                 } else {
                                                         // 이미 있으면 승인 상태로 변경
                                                         existingApplication.setStatus(CareApplicationStatus.ACCEPTED);
@@ -650,8 +652,9 @@ public class ConversationService {
                                                 // 펫코인 차감 및 에스크로 생성
                                                 Integer offeredCoins = careRequest.getOfferedCoins();
                                                 log.info("거래 확정 시 펫코인 처리 시작: careRequestIdx={}, offeredCoins={}, requesterId={}, providerId={}",
-                                                                relatedIdx, offeredCoins, requester.getIdx(), provider.getIdx());
-                                                
+                                                                relatedIdx, offeredCoins, requester.getIdx(),
+                                                                provider.getIdx());
+
                                                 if (offeredCoins != null && offeredCoins > 0) {
                                                         try {
                                                                 petCoinEscrowService.createEscrow(
@@ -664,14 +667,16 @@ public class ConversationService {
                                                                                 relatedIdx, offeredCoins, "확인 필요");
                                                         } catch (Exception e) {
                                                                 log.error("펫코인 차감 및 에스크로 생성 실패: careRequestIdx={}, amount={}, requesterId={}, providerId={}, error={}, stackTrace={}",
-                                                                                relatedIdx, offeredCoins, requester.getIdx(), provider.getIdx(), 
-                                                                                e.getMessage(), 
-                                                                                java.util.Arrays.toString(e.getStackTrace()));
+                                                                                relatedIdx, offeredCoins,
+                                                                                requester.getIdx(), provider.getIdx(),
+                                                                                e.getMessage(),
+                                                                                java.util.Arrays.toString(
+                                                                                                e.getStackTrace()));
                                                                 // 코인 차감 실패 시 거래 확정은 진행하되, 로그만 남김
                                                                 // 실제 운영 환경에서는 예외를 다시 던져서 거래 확정을 롤백할 수도 있음
                                                         }
                                                 } else {
-                                                        log.warn("펫코인 가격이 설정되지 않음: careRequestIdx={}, offeredCoins={}", 
+                                                        log.warn("펫코인 가격이 설정되지 않음: careRequestIdx={}, offeredCoins={}",
                                                                         relatedIdx, offeredCoins);
                                                 }
 
