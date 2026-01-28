@@ -31,4 +31,10 @@ public interface PetCoinEscrowRepository {
      * 상태별 에스크로 조회
      */
     List<PetCoinEscrow> findByStatus(EscrowStatus status);
+
+    /**
+     * 비관적 락을 사용한 에스크로 조회 (동시성 제어용)
+     * 상태 변경 시 Race Condition 방지를 위해 사용
+     */
+    Optional<PetCoinEscrow> findByIdForUpdate(Long idx);
 }
