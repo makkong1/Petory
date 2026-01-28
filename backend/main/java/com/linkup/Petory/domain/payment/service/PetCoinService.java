@@ -86,8 +86,8 @@ public class PetCoinService {
                         throw new IllegalArgumentException("차감 금액은 0보다 커야 합니다.");
                 }
 
-                // 사용자 최신 정보 조회
-                Users currentUser = usersRepository.findById(user.getIdx())
+                // 사용자 최신 정보 조회 (비관적 락으로 Race Condition 방지)
+                Users currentUser = usersRepository.findByIdForUpdate(user.getIdx())
                                 .orElseThrow(() -> new RuntimeException("User not found"));
 
                 Integer balanceBefore = currentUser.getPetCoinBalance();

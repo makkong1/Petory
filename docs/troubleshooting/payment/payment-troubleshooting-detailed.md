@@ -550,6 +550,289 @@ sequenceDiagram
 
 ---
 
+## 문제 5: 잔액 확인과 차감 사이의 Race Condition (2.2)
+
+### 원인 분석
+
+#### 문제 상황
+
+- `PetCoinService.deductCoins()`에서 락 없이 조회 후 차감
+- 잔액 확인과 차감 사이에 다른 트랜잭션이 끼어들 수 있음
+- 두 거래가 동시에 잔액을 확인하고 둘 다 통과할 수 있음
+
+#### 근본 원인
+
+- `@Transactional`이 있어도 같은 트랜잭션 내에서도 다른 트랜잭션이 끼어들 수 있음
+- 락 없이 조회하여 동시성 제어 부재
+
+#### 시나리오
+
+- 사용자 잔액: 100 코인
+- 거래 A: 80 코인 차감 시도
+- 거래 B: 50 코인 차감 시도
+1. 거래 A: 잔액 확인 → 100 (통과)
+2. 거래 B: 잔액 확인 → 100 (통과)
+3. 거래 A: 차감 → 잔액 20
+4. 거래 B: 차감 → 잔액 -30 (음수!)
+
+#### 영향
+
+- 음수 잔액 발생 가능
+- 데이터 무결성 위반
+
+### 해결 방법
+
+#### 구현
+
+1. `UsersRepository`에 `findByIdForUpdate()` 메서드 추가 (비관적 락)
+2. `PetCoinService.deductCoins()`에서 락을 사용하여 조회
+
+#### 코드 변경
+
+```java
+// UsersRepository.java
+Optional<Users> findByIdForUpdate(Long idx);
+
+// SpringDataJpaUsersRepository.java
+@Lock(LockModeType.PESSIMISTIC_WRITE)
+@Query("SELECT u FROM Users u WHERE u.idx = :idx")
+Optional<Users> findByIdForUpdate(@Param("idx") Long idx);
+
+// PetCoinService.java - deductCoins() 메서드 수정
+@Transactional
+public PetCoinTransaction deductCoins(Users user, Integer amount, ...) {
+    // 비관적 락으로 사용자 조회 (Race Condition 방지)
+    Users currentUser = usersRepository.findByIdForUpdate(user.getIdx())
+            .orElseThrow(() -> new RuntimeException("User not found"));
+    
+    Integer balanceBefore = currentUser.getPetCoinBalance();
+    // ... 나머지 로직 동일
+}
+```
+
+#### 변경 사항
+
+- `UsersRepository`에 `findByIdForUpdate()` 메서드 추가
+- `SpringDataJpaUsersRepository`에 비관적 락 쿼리 추가
+- `JpaUsersAdapter`에 구현 추가
+- `PetCoinService.deductCoins()`에서 락 사용
+- 파일:
+  - `backend/main/java/com/linkup/Petory/domain/user/repository/UsersRepository.java`
+  - `backend/main/java/com/linkup/Petory/domain/user/repository/SpringDataJpaUsersRepository.java`
+  - `backend/main/java/com/linkup/Petory/domain/user/repository/JpaUsersAdapter.java`
+  - `backend/main/java/com/linkup/Petory/domain/payment/service/PetCoinService.java`
+
+### 결과
+
+#### 해결 전
+
+- 잔액 확인과 차감 사이에 Race Condition 발생 가능
+- 음수 잔액 발생 가능
+
+#### 해결 후
+
+- ✅ 비관적 락으로 동시성 제어
+- ✅ 잔액 확인과 차감이 원자적으로 처리됨
+- ✅ 음수 잔액 발생 방지
+
+#### 테스트 시나리오
+
+1. 잔액 100 코인인 사용자 생성
+2. 동시에 80 코인, 50 코인 차감 요청
+3. 하나는 성공, 하나는 잔액 부족 예외 발생 확인
+4. 최종 잔액이 20 코인인지 확인 (음수 발생 안 함)
+
+#### 시퀀스 다이어그램
+
+```mermaid
+sequenceDiagram
+    participant UserA as 사용자 A
+    participant UserB as 사용자 B
+    participant PetCoinService as PetCoinService
+    participant UsersRepo as UsersRepository
+    participant DB as MySQL
+    
+    Note over UserA,UserB: 동시에 코인 차감 요청
+    UserA->>PetCoinService: deductCoins(80)
+    UserB->>PetCoinService: deductCoins(50)
+    
+    Note over PetCoinService: ❌ 기존: 락 없이 조회
+    PetCoinService->>UsersRepo: findById() (락 없음)
+    UsersRepo->>DB: SELECT (락 없음)
+    DB->>UsersRepo: 잔액 100 반환
+    UsersRepo->>PetCoinService: 잔액 100
+    
+    PetCoinService->>UsersRepo: findById() (락 없음)
+    UsersRepo->>DB: SELECT (락 없음)
+    DB->>UsersRepo: 잔액 100 반환
+    UsersRepo->>PetCoinService: 잔액 100
+    
+    Note over PetCoinService: 두 거래 모두 잔액 확인 통과
+    PetCoinService->>DB: UPDATE 잔액 20
+    PetCoinService->>DB: UPDATE 잔액 -30 (음수!)
+    
+    Note over PetCoinService: ✅ 개선: 비관적 락 사용
+    PetCoinService->>UsersRepo: findByIdForUpdate()
+    UsersRepo->>DB: SELECT ... FOR UPDATE (락 획득)
+    DB->>UsersRepo: 잔액 100 반환 (락 보유)
+    
+    Note over PetCoinService: 다른 트랜잭션은 대기
+    PetCoinService->>DB: UPDATE 잔액 20
+    DB->>PetCoinService: 커밋 (락 해제)
+    
+    PetCoinService->>UsersRepo: findByIdForUpdate()
+    UsersRepo->>DB: SELECT ... FOR UPDATE (락 획득)
+    DB->>UsersRepo: 잔액 20 반환
+    UsersRepo->>PetCoinService: 잔액 20
+    PetCoinService->>UserB: 잔액 부족 예외 발생
+```
+
+---
+
+## 문제 6: 에스크로 상태 변경 시 Race Condition (2.3)
+
+### 원인 분석
+
+#### 문제 상황
+
+- `PetCoinEscrowService.releaseToProvider()`와 `refundToRequester()`에서 락 없이 상태 확인 후 변경
+- 상태 확인과 변경 사이에 다른 트랜잭션이 끼어들 수 있음
+- 동일한 에스크로에 대해 중복 지급/환불 가능
+
+#### 근본 원인
+
+- 락 없이 상태 확인 후 변경하여 동시성 제어 부재
+- `@Transactional`이 있어도 같은 트랜잭션 내에서도 다른 트랜잭션이 끼어들 수 있음
+
+#### 시나리오
+
+- 에스크로 상태: `HOLD`
+- 관리자 A: 지급 시도
+- 관리자 B: 환불 시도
+1. 관리자 A: 상태 확인 → `HOLD` (통과)
+2. 관리자 B: 상태 확인 → `HOLD` (통과)
+3. 관리자 A: 지급 완료 → 상태 `RELEASED`
+4. 관리자 B: 환불 완료 → 상태 `REFUNDED` (중복 처리!)
+
+#### 영향
+
+- 코인 이중 지급 또는 이중 환불
+- 데이터 불일치
+
+### 해결 방법
+
+#### 구현
+
+1. `PetCoinEscrowRepository`에 `findByIdForUpdate()` 메서드 추가 (비관적 락)
+2. `PetCoinEscrowService.releaseToProvider()`와 `refundToRequester()`에서 락 사용
+
+#### 코드 변경
+
+```java
+// PetCoinEscrowRepository.java
+Optional<PetCoinEscrow> findByIdForUpdate(Long idx);
+
+// SpringDataJpaPetCoinEscrowRepository.java
+@Lock(LockModeType.PESSIMISTIC_WRITE)
+@Query("SELECT e FROM PetCoinEscrow e WHERE e.idx = :idx")
+Optional<PetCoinEscrow> findByIdForUpdate(@Param("idx") Long idx);
+
+// PetCoinEscrowService.java - releaseToProvider() 메서드 수정
+@Transactional
+public PetCoinEscrow releaseToProvider(PetCoinEscrow escrow) {
+    // 비관적 락으로 에스크로 조회 (Race Condition 방지)
+    PetCoinEscrow lockedEscrow = escrowRepository.findByIdForUpdate(escrow.getIdx())
+            .orElseThrow(() -> new RuntimeException("Escrow not found"));
+
+    if (lockedEscrow.getStatus() != EscrowStatus.HOLD) {
+        throw new IllegalStateException("HOLD 상태의 에스크로만 지급할 수 있습니다.");
+    }
+
+    // 락으로 조회한 에스크로 사용
+    escrow = lockedEscrow;
+    // ... 나머지 로직 동일
+}
+```
+
+#### 변경 사항
+
+- `PetCoinEscrowRepository`에 `findByIdForUpdate()` 메서드 추가
+- `SpringDataJpaPetCoinEscrowRepository`에 비관적 락 쿼리 추가
+- `JpaPetCoinEscrowAdapter`에 구현 추가
+- `PetCoinEscrowService.releaseToProvider()`와 `refundToRequester()`에서 락 사용
+- 파일:
+  - `backend/main/java/com/linkup/Petory/domain/payment/repository/PetCoinEscrowRepository.java`
+  - `backend/main/java/com/linkup/Petory/domain/payment/repository/SpringDataJpaPetCoinEscrowRepository.java`
+  - `backend/main/java/com/linkup/Petory/domain/payment/repository/JpaPetCoinEscrowAdapter.java`
+  - `backend/main/java/com/linkup/Petory/domain/payment/service/PetCoinEscrowService.java`
+
+### 결과
+
+#### 해결 전
+
+- 상태 확인과 변경 사이에 Race Condition 발생 가능
+- 코인 이중 지급/환불 가능
+
+#### 해결 후
+
+- ✅ 비관적 락으로 동시성 제어
+- ✅ 상태 확인과 변경이 원자적으로 처리됨
+- ✅ 중복 지급/환불 방지
+
+#### 테스트 시나리오
+
+1. `HOLD` 상태의 에스크로 생성
+2. 동시에 지급/환불 요청
+3. 하나는 성공, 하나는 상태 검증 실패 예외 발생 확인
+4. 에스크로 상태가 `RELEASED` 또는 `REFUNDED` 중 하나로만 변경됨 확인
+
+#### 시퀀스 다이어그램
+
+```mermaid
+sequenceDiagram
+    participant AdminA as 관리자 A
+    participant AdminB as 관리자 B
+    participant EscrowService as PetCoinEscrowService
+    participant EscrowRepo as PetCoinEscrowRepository
+    participant DB as MySQL
+    
+    Note over AdminA,AdminB: 동시에 에스크로 처리 요청
+    AdminA->>EscrowService: releaseToProvider()
+    AdminB->>EscrowService: refundToRequester()
+    
+    Note over EscrowService: ❌ 기존: 락 없이 조회
+    EscrowService->>EscrowRepo: findById() (락 없음)
+    EscrowRepo->>DB: SELECT (락 없음)
+    DB->>EscrowRepo: 상태 HOLD 반환
+    EscrowRepo->>EscrowService: 상태 HOLD
+    
+    EscrowService->>EscrowRepo: findById() (락 없음)
+    EscrowRepo->>DB: SELECT (락 없음)
+    DB->>EscrowRepo: 상태 HOLD 반환
+    EscrowRepo->>EscrowService: 상태 HOLD
+    
+    Note over EscrowService: 두 요청 모두 상태 확인 통과
+    EscrowService->>DB: UPDATE 상태 RELEASED
+    EscrowService->>DB: UPDATE 상태 REFUNDED (중복 처리!)
+    
+    Note over EscrowService: ✅ 개선: 비관적 락 사용
+    EscrowService->>EscrowRepo: findByIdForUpdate()
+    EscrowRepo->>DB: SELECT ... FOR UPDATE (락 획득)
+    DB->>EscrowRepo: 상태 HOLD 반환 (락 보유)
+    
+    Note over EscrowService: 다른 트랜잭션은 대기
+    EscrowService->>DB: UPDATE 상태 RELEASED
+    DB->>EscrowService: 커밋 (락 해제)
+    
+    EscrowService->>EscrowRepo: findByIdForUpdate()
+    EscrowRepo->>DB: SELECT ... FOR UPDATE (락 획득)
+    DB->>EscrowRepo: 상태 RELEASED 반환
+    EscrowRepo->>EscrowService: 상태 RELEASED
+    EscrowService->>AdminB: 상태 검증 실패 예외 발생
+```
+
+---
+
 ## 해결 완료 요약
 
 ### 완료된 문제
@@ -560,6 +843,8 @@ sequenceDiagram
 | 거래 취소 시 환불 처리 (6.1) | ✅ 완료 | CANCELLED 상태 변경 시 환불 로직 추가 |
 | 에스크로 생성 실패 처리 (1.1) | ✅ 완료 | 트랜잭션 롤백 처리 추가 |
 | 코인 지급 실패 처리 (1.2) | ✅ 완료 | 롤백 처리 추가 |
+| 잔액 확인과 차감 사이의 Race Condition (2.2) | ✅ 완료 | 비관적 락 추가 |
+| 에스크로 상태 변경 시 Race Condition (2.3) | ✅ 완료 | 비관적 락 추가 |
 
 ### 전체 개선 효과
 
@@ -567,4 +852,22 @@ sequenceDiagram
 - **데이터 무결성**: 에스크로 생성/지급 실패 시 자동 롤백으로 데이터 불일치 방지
 - **비즈니스 로직 완성**: 거래 취소 시 자동 환불 처리로 사용자 손실 방지
 - **처리 방식 일관성**: 수동 완료와 자동 완료의 처리 방식 통일
+- **동시성 제어**: 비관적 락으로 Race Condition 방지
+  - 잔액 확인과 차감이 원자적으로 처리됨
+  - 에스크로 상태 변경이 원자적으로 처리됨
+  - 음수 잔액 및 중복 지급/환불 방지
+
+### 변경된 파일
+
+1. `backend/main/java/com/linkup/Petory/domain/care/service/CareRequestScheduler.java`
+2. `backend/main/java/com/linkup/Petory/domain/care/service/CareRequestService.java`
+3. `backend/main/java/com/linkup/Petory/domain/chat/service/ConversationService.java`
+4. `backend/main/java/com/linkup/Petory/domain/user/repository/UsersRepository.java`
+5. `backend/main/java/com/linkup/Petory/domain/user/repository/SpringDataJpaUsersRepository.java`
+6. `backend/main/java/com/linkup/Petory/domain/user/repository/JpaUsersAdapter.java`
+7. `backend/main/java/com/linkup/Petory/domain/payment/service/PetCoinService.java`
+8. `backend/main/java/com/linkup/Petory/domain/payment/repository/PetCoinEscrowRepository.java`
+9. `backend/main/java/com/linkup/Petory/domain/payment/repository/SpringDataJpaPetCoinEscrowRepository.java`
+10. `backend/main/java/com/linkup/Petory/domain/payment/repository/JpaPetCoinEscrowAdapter.java`
+11. `backend/main/java/com/linkup/Petory/domain/payment/service/PetCoinEscrowService.java`
 

@@ -47,4 +47,9 @@ public class JpaPetCoinEscrowAdapter implements PetCoinEscrowRepository {
     public List<PetCoinEscrow> findByStatus(EscrowStatus status) {
         return jpaRepository.findByStatus(status);
     }
+
+    @Override
+    public Optional<PetCoinEscrow> findByIdForUpdate(Long idx) {
+        return jpaRepository.findByIdForUpdate(idx);
+    }
 }

@@ -70,7 +70,14 @@ public interface UsersRepository {
 
     /**
      * 경고 횟수 원자적 증가 (동시성 문제 해결)
+     * 
      * @return 업데이트된 행 수
      */
     int incrementWarningCount(Long userId);
+
+    /**
+     * 비관적 락을 사용한 사용자 조회 (동시성 제어용)
+     * 코인 차감 시 Race Condition 방지를 위해 사용
+     */
+    Optional<Users> findByIdForUpdate(Long idx);
 }
