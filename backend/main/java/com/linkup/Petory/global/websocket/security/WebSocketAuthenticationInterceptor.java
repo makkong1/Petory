@@ -5,6 +5,7 @@ import java.util.Map;
 import org.springframework.http.server.ServerHttpRequest;
 import org.springframework.http.server.ServerHttpResponse;
 import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -42,7 +43,7 @@ public class WebSocketAuthenticationInterceptor implements HandshakeInterceptor 
 
         try {
             String token = null;
-            
+
             // 쿼리 파라미터에서 JWT 토큰 추출
             String query = request.getURI().getQuery();
             if (query != null) {
@@ -112,7 +113,7 @@ public class WebSocketAuthenticationInterceptor implements HandshakeInterceptor 
     public void afterHandshake(@NonNull ServerHttpRequest request,
             @NonNull ServerHttpResponse response,
             @NonNull WebSocketHandler wsHandler,
-            Exception exception) {
+            @Nullable Exception exception) {
         // 핸드셰이크 후 추가 처리 (필요 시)
         if (exception != null) {
             log.error("WebSocket 핸드셰이크 후 오류: {}", exception.getMessage());
