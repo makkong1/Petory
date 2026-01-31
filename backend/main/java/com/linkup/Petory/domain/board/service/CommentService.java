@@ -66,15 +66,14 @@ public class CommentService {
                 pageable);
 
         if (commentPage.isEmpty()) {
-            return CommentPageResponseDTO.builder()
-                    .comments(new ArrayList<>())
-                    .totalCount(0)
-                    .totalPages(0)
-                    .currentPage(page)
-                    .pageSize(size)
-                    .hasNext(false)
-                    .hasPrevious(false)
-                    .build();
+            return new CommentPageResponseDTO(
+                    new ArrayList<>(),
+                    0,
+                    0,
+                    page,
+                    size,
+                    false,
+                    false);
         }
 
         List<Comment> comments = commentPage.getContent();
@@ -101,15 +100,14 @@ public class CommentService {
                 })
                 .collect(Collectors.toList());
 
-        return CommentPageResponseDTO.builder()
-                .comments(commentDTOs)
-                .totalCount(commentPage.getTotalElements())
-                .totalPages(commentPage.getTotalPages())
-                .currentPage(page)
-                .pageSize(size)
-                .hasNext(commentPage.hasNext())
-                .hasPrevious(commentPage.hasPrevious())
-                .build();
+        return new CommentPageResponseDTO(
+                commentDTOs,
+                commentPage.getTotalElements(),
+                commentPage.getTotalPages(),
+                page,
+                size,
+                commentPage.hasNext(),
+                commentPage.hasPrevious());
     }
 
     /**

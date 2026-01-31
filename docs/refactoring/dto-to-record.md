@@ -65,4 +65,5 @@
 ## 적용 예시
 
 - `BoardPopularitySnapshotDTO` (응답 전용) → record로 전환 완료
+- Board 도메인 일괄 리팩토링 → `docs/refactoring/board/dto-record-refactoring.md` 참고
 - Converter: `.builder()` → `new DTO(...)`, `dto.getXxx()` → `dto.xxx()`

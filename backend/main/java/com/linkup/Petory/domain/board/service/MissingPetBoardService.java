@@ -69,15 +69,14 @@ public class MissingPetBoardService {
                 : boardRepository.findByStatusOrderByCreatedAtDesc(status, pageable);
 
         if (boardPage.isEmpty()) {
-            return MissingPetBoardPageResponseDTO.builder()
-                    .boards(new ArrayList<>())
-                    .totalCount(0)
-                    .totalPages(0)
-                    .currentPage(page)
-                    .pageSize(size)
-                    .hasNext(false)
-                    .hasPrevious(false)
-                    .build();
+            return new MissingPetBoardPageResponseDTO(
+                    new ArrayList<>(),
+                    0,
+                    0,
+                    page,
+                    size,
+                    false,
+                    false);
         }
 
         List<MissingPetBoard> boards = boardPage.getContent();
@@ -129,15 +128,14 @@ public class MissingPetBoardService {
         log.info("  - 메모리 사용량: {}MB (증가: {}MB)", currentMemoryMB, memoryUsed / 1024 / 1024);
         log.info("  - 최대 메모리: {}MB", maxMemoryMB);
 
-        return MissingPetBoardPageResponseDTO.builder()
-                .boards(boardDTOs)
-                .totalCount(boardPage.getTotalElements())
-                .totalPages(boardPage.getTotalPages())
-                .currentPage(page)
-                .pageSize(size)
-                .hasNext(boardPage.hasNext())
-                .hasPrevious(boardPage.hasPrevious())
-                .build();
+        return new MissingPetBoardPageResponseDTO(
+                boardDTOs,
+                boardPage.getTotalElements(),
+                boardPage.getTotalPages(),
+                page,
+                size,
+                boardPage.hasNext(),
+                boardPage.hasPrevious());
     }
 
     /**
@@ -249,7 +247,7 @@ public class MissingPetBoardService {
         if (commentPage != null && commentSize != null && commentSize > 0) {
             MissingPetCommentPageResponseDTO commentPageResponse = commentService.getCommentsWithPaging(id, commentPage,
                     commentSize);
-            comments = commentPageResponse.getComments();
+            comments = commentPageResponse.comments();
             log.info("  - 댓글 페이징 조회: 페이지 {}, 크기 {}, 조회된 댓글 {}개", commentPage, commentSize, comments.size());
         }
 

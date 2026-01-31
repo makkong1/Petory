@@ -129,11 +129,10 @@ public class ReactionService {
                     .map(BoardReaction::getReactionType)
                     .orElse(null);
         }
-        return ReactionSummaryDTO.builder()
-                .likeCount(Math.toIntExact(likeCount))
-                .dislikeCount(Math.toIntExact(dislikeCount))
-                .userReaction(userReaction)
-                .build();
+        return new ReactionSummaryDTO(
+                Math.toIntExact(likeCount),
+                Math.toIntExact(dislikeCount),
+                userReaction);
     }
 
     private ReactionSummaryDTO buildCommentSummary(Comment comment, Users user) {
@@ -145,11 +144,10 @@ public class ReactionService {
                     .map(CommentReaction::getReactionType)
                     .orElse(null);
         }
-        return ReactionSummaryDTO.builder()
-                .likeCount(Math.toIntExact(likeCount))
-                .dislikeCount(Math.toIntExact(dislikeCount))
-                .userReaction(userReaction)
-                .build();
+        return new ReactionSummaryDTO(
+                Math.toIntExact(likeCount),
+                Math.toIntExact(dislikeCount),
+                userReaction);
     }
 
     /**
