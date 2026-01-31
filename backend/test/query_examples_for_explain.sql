@@ -3,42 +3,75 @@
 -- 워크벤치에서 실행하여 Full Scan 여부 확인
 -- ============================================
 
--- 1. 제목으로 검색 쿼리 (LIKE %:title%)
--- 예상: Full Table Scan 발생 (인덱스 사용 불가)
-EXPLAIN 
-SELECT b.*, u.*
-FROM board b
-INNER JOIN users u ON b.user_idx = u.idx
-WHERE b.title LIKE '%펫케어%'
-  AND b.is_deleted = false
-  AND u.is_deleted = false
-  AND u.status = 'ACTIVE'
-ORDER BY b.created_at DESC;
+-- ============================================
+-- [DEPRECATED] 제목/내용 개별 검색 쿼리
+-- 2026-01-31 리팩토링으로 삭제됨
+-- → FULLTEXT 통합 검색(searchByKeywordWithPaging)으로 대체
+-- ============================================
 
--- 2. 내용으로 검색 쿼리 (LIKE %:content%)
+-- 1. [DEPRECATED] 제목으로 검색 쿼리 (LIKE %:title%)
 -- 예상: Full Table Scan 발생 (인덱스 사용 불가)
+-- EXPLAIN 
+-- SELECT b.*, u.*
+-- FROM board b
+-- INNER JOIN users u ON b.user_idx = u.idx
+-- WHERE b.title LIKE '%펫케어%'
+--   AND b.is_deleted = false
+--   AND u.is_deleted = false
+--   AND u.status = 'ACTIVE'
+-- ORDER BY b.created_at DESC;
+
+-- 2. [DEPRECATED] 내용으로 검색 쿼리 (LIKE %:content%)
+-- 예상: Full Table Scan 발생 (인덱스 사용 불가)
+-- EXPLAIN
+-- SELECT b.*, u.*
+-- FROM board b
+-- INNER JOIN users u ON b.user_idx = u.idx
+-- WHERE b.content LIKE '%산책%'
+--   AND b.is_deleted = false
+--   AND u.is_deleted = false
+--   AND u.status = 'ACTIVE'
+-- ORDER BY b.created_at DESC;
+
+-- ============================================
+-- [NEW] 닉네임 검색 쿼리 (searchByNicknameWithPaging)
+-- 2026-01-31 리팩토링으로 추가됨
+-- JOIN 쿼리로 1번에 처리 + DB 레벨 페이징
+-- ============================================
+
+-- 1. 닉네임으로 검색 (부분 일치, 페이징)
+-- 예상: users 테이블 Full Scan (idx_users_nickname 인덱스 없으면)
+--       또는 인덱스 사용 (idx_users_nickname 있으면)
 EXPLAIN
 SELECT b.*, u.*
 FROM board b
 INNER JOIN users u ON b.user_idx = u.idx
-WHERE b.content LIKE '%산책%'
-  AND b.is_deleted = false
-  AND u.is_deleted = false
-  AND u.status = 'ACTIVE'
-ORDER BY b.created_at DESC;
-
--- 3. 제목으로 검색 (페이징 포함)
--- LIMIT 추가하여 페이징 시뮬레이션
-EXPLAIN
-SELECT b.*, u.*
-FROM board b
-INNER JOIN users u ON b.user_idx = u.idx
-WHERE b.title LIKE '%펫케어%'
+WHERE u.nickname LIKE '%홍길%'
   AND b.is_deleted = false
   AND u.is_deleted = false
   AND u.status = 'ACTIVE'
 ORDER BY b.created_at DESC
 LIMIT 0, 20;
+
+-- 2. 닉네임으로 검색 (EXPLAIN ANALYZE - 실제 실행 시간 측정)
+-- MySQL 8.0.18+ 에서 사용 가능
+EXPLAIN ANALYZE
+SELECT b.*, u.*
+FROM board b
+INNER JOIN users u ON b.user_idx = u.idx
+WHERE u.nickname LIKE '%홍길%'
+  AND b.is_deleted = false
+  AND u.is_deleted = false
+  AND u.status = 'ACTIVE'
+ORDER BY b.created_at DESC
+LIMIT 0, 20;
+
+-- 3. 닉네임 인덱스 확인 및 생성
+-- users.nickname 인덱스가 없으면 추가 권장
+SHOW INDEX FROM users WHERE Column_name = 'nickname';
+
+-- 인덱스가 없으면 생성 (LIKE '%value%'는 Full Scan이지만 데이터 적으면 괜찮음)
+-- CREATE INDEX idx_users_nickname ON users(nickname);
 
 -- ============================================
 -- 참고: LIKE 패턴별 인덱스 사용 가능 여부

@@ -5,14 +5,12 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -343,48 +341,17 @@ public class BoardService {
         Page<Board> boardPage;
 
         // 검색 타입에 따라 다른 쿼리 실행
+        // B: TITLE/CONTENT 개별 검색 제거 → TITLE_CONTENT(FULLTEXT)로 통합
+        // C: NICKNAME 검색 최적화 → JOIN 쿼리 1번으로 DB 레벨 페이징
         switch (searchType != null ? searchType.toUpperCase() : "TITLE_CONTENT") {
-            case "ID":
-                // 작성자 ID로 검색 (Users 엔티티의 id 필드)
-                log.info("🔍 [BoardService.searchBoardsWithPaging] ID 검색: keyword = {}", trimmedKeyword);
-                Optional<Users> userOpt = usersRepository.findByIdString(trimmedKeyword);
-                log.info("🔍 [BoardService.searchBoardsWithPaging] 사용자 조회 결과: {}", userOpt.isPresent() ? "존재함" : "없음");
-                if (userOpt.isPresent()) {
-                    Users user = userOpt.get();
-                    log.info("🔍 [BoardService.searchBoardsWithPaging] 사용자 정보: idx={}, id={}, isDeleted={}, status={}",
-                            user.getIdx(), user.getId(), user.getIsDeleted(), user.getStatus());
-                    // 작성자가 활성 상태인 경우에만 검색
-                    if (!Boolean.TRUE.equals(user.getIsDeleted())
-                            && user.getStatus() == com.linkup.Petory.domain.user.entity.UserStatus.ACTIVE) {
-                        List<Board> userBoards = boardRepository.findByUserAndIsDeletedFalseOrderByCreatedAtDesc(user);
-                        log.info("🔍 [BoardService.searchBoardsWithPaging] 작성한 게시글 수: {}", userBoards.size());
-                        // 페이징 처리
-                        int start = (int) pageable.getOffset();
-                        int end = Math.min(start + pageable.getPageSize(), userBoards.size());
-                        List<Board> pagedBoards = start < userBoards.size()
-                                ? userBoards.subList(start, end)
-                                : new ArrayList<>();
-                        boardPage = new PageImpl<>(pagedBoards, pageable, userBoards.size());
-                    } else {
-                        log.warn("⚠️ [BoardService.searchBoardsWithPaging] 사용자가 비활성 상태: isDeleted={}, status={}",
-                                user.getIsDeleted(), user.getStatus());
-                        boardPage = Page.empty(pageable);
-                    }
-                } else {
-                    log.warn("⚠️ [BoardService.searchBoardsWithPaging] 사용자를 찾을 수 없음: id={}", trimmedKeyword);
-                    boardPage = Page.empty(pageable);
-                }
-                break;
-            case "TITLE":
-                boardPage = boardRepository.findByTitleContainingAndIsDeletedFalseOrderByCreatedAtDesc(trimmedKeyword,
-                        pageable);
-                break;
-            case "CONTENT":
-                boardPage = boardRepository.findByContentContainingAndIsDeletedFalseOrderByCreatedAtDesc(trimmedKeyword,
-                        pageable);
+            case "NICKNAME":
+                // 작성자 닉네임으로 검색 - JOIN 쿼리로 최적화 (2 Query → 1 Query)
+                log.info("🔍 [BoardService.searchBoardsWithPaging] 닉네임 검색: keyword = {}", trimmedKeyword);
+                boardPage = boardRepository.searchByNicknameWithPaging(trimmedKeyword, pageable);
                 break;
             case "TITLE_CONTENT":
             default:
+                // 제목+내용 통합 검색 (FULLTEXT 인덱스 활용)
                 boardPage = boardRepository.searchByKeywordWithPaging(trimmedKeyword, pageable);
                 break;
         }
