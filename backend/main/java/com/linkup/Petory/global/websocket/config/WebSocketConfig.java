@@ -1,6 +1,7 @@
 package com.linkup.Petory.global.websocket.config;
 
 import org.springframework.context.annotation.Configuration;
+import org.springframework.lang.NonNull;
 import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
@@ -30,7 +31,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
      * 클라이언트가 WebSocket 연결을 시작할 수 있는 엔드포인트
      */
     @Override
-    public void registerStompEndpoints(StompEndpointRegistry registry) {
+    public void registerStompEndpoints(@NonNull StompEndpointRegistry registry) {
         // WebSocket 연결 엔드포인트
         // 클라이언트: ws://localhost:8080/ws?token=xxx 또는 ws://localhost:8080/chat?token=xxx
         registry.addEndpoint("/ws", "/chat")
@@ -44,15 +45,15 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
      * 메시지 브로커 설정
      */
     @Override
-    public void configureMessageBroker(MessageBrokerRegistry registry) {
+    public void configureMessageBroker(@NonNull MessageBrokerRegistry registry) {
         // 서버 → 클라이언트 (구독 경로)
         // 클라이언트가 구독할 수 있는 토픽 프리픽스
         registry.enableSimpleBroker("/topic", "/queue", "/user");
-        
+
         // 클라이언트 → 서버 (전송 경로)
         // 클라이언트가 메시지를 보낼 때 사용하는 프리픽스
         registry.setApplicationDestinationPrefixes("/app");
-        
+
         // 사용자별 개인 메시지 프리픽스
         // /user/{userId}/queue/messages 형태로 사용
         registry.setUserDestinationPrefix("/user");
@@ -63,8 +64,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
      * 메시지 전송/구독 전에 인증 체크
      */
     @Override
-    public void configureClientInboundChannel(ChannelRegistration registration) {
+    public void configureClientInboundChannel(@NonNull ChannelRegistration registration) {
         registration.interceptors(authChannelInterceptor);
     }
 }
-
