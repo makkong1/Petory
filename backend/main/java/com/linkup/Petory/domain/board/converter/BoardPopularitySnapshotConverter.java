@@ -25,36 +25,35 @@ public class BoardPopularitySnapshotConverter {
         Board board = snapshot.getBoard();
         String boardFilePath = resolvePrimaryFileUrl(board);
 
-        return BoardPopularitySnapshotDTO.builder()
-                .snapshotId(snapshot.getSnapshotId())
-                .boardId(board != null ? board.getIdx() : null)
-                .periodType(snapshot.getPeriodType())
-                .periodStartDate(snapshot.getPeriodStartDate())
-                .periodEndDate(snapshot.getPeriodEndDate())
-                .ranking(snapshot.getRanking())
-                .popularityScore(snapshot.getPopularityScore())
-                .likeCount(snapshot.getLikeCount())
-                .commentCount(snapshot.getCommentCount())
-                .viewCount(snapshot.getViewCount())
-                .boardTitle(board != null ? board.getTitle() : null)
-                .boardCategory(board != null ? board.getCategory() : null)
-                .boardFilePath(boardFilePath)
-                .createdAt(snapshot.getCreatedAt())
-                .build();
+        return new BoardPopularitySnapshotDTO(
+                snapshot.getSnapshotId(),
+                board != null ? board.getIdx() : null,
+                snapshot.getPeriodType(),
+                snapshot.getPeriodStartDate(),
+                snapshot.getPeriodEndDate(),
+                snapshot.getRanking(),
+                snapshot.getPopularityScore(),
+                snapshot.getLikeCount(),
+                snapshot.getCommentCount(),
+                snapshot.getViewCount(),
+                board != null ? board.getTitle() : null,
+                board != null ? board.getCategory() : null,
+                boardFilePath,
+                snapshot.getCreatedAt());
     }
 
     public BoardPopularitySnapshot toEntity(BoardPopularitySnapshotDTO dto) {
         BoardPopularitySnapshot snapshot = new BoardPopularitySnapshot();
-        snapshot.setSnapshotId(dto.getSnapshotId());
-        snapshot.setPeriodType(dto.getPeriodType());
-        snapshot.setPeriodStartDate(dto.getPeriodStartDate());
-        snapshot.setPeriodEndDate(dto.getPeriodEndDate());
-        snapshot.setRanking(dto.getRanking());
-        snapshot.setPopularityScore(dto.getPopularityScore());
-        snapshot.setLikeCount(dto.getLikeCount());
-        snapshot.setCommentCount(dto.getCommentCount());
-        snapshot.setViewCount(dto.getViewCount());
-        snapshot.setCreatedAt(dto.getCreatedAt());
+        snapshot.setSnapshotId(dto.snapshotId());
+        snapshot.setPeriodType(dto.periodType());
+        snapshot.setPeriodStartDate(dto.periodStartDate());
+        snapshot.setPeriodEndDate(dto.periodEndDate());
+        snapshot.setRanking(dto.ranking());
+        snapshot.setPopularityScore(dto.popularityScore());
+        snapshot.setLikeCount(dto.likeCount());
+        snapshot.setCommentCount(dto.commentCount());
+        snapshot.setViewCount(dto.viewCount());
+        snapshot.setCreatedAt(dto.createdAt());
         return snapshot;
     }
 

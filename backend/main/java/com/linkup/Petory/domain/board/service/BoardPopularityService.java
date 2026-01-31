@@ -195,7 +195,7 @@ public class BoardPopularityService {
         for (int i = 0; i < boardIds.size(); i += BATCH_SIZE) {
             int end = Math.min(i + BATCH_SIZE, boardIds.size());
             List<Long> batch = boardIds.subList(i, end);
-            
+
             List<Object[]> results = boardReactionRepository.countByBoardsGroupByReactionType(batch);
 
             for (Object[] result : results) {
@@ -232,7 +232,7 @@ public class BoardPopularityService {
         for (int i = 0; i < boardIds.size(); i += BATCH_SIZE) {
             int end = Math.min(i + BATCH_SIZE, boardIds.size());
             List<Long> batch = boardIds.subList(i, end);
-            
+
             List<Object[]> results = commentRepository.countByBoardsAndIsDeletedFalse(batch);
 
             for (Object[] result : results) {
@@ -265,7 +265,7 @@ public class BoardPopularityService {
         for (int i = 0; i < boardIds.size(); i += BATCH_SIZE) {
             int end = Math.min(i + BATCH_SIZE, boardIds.size());
             List<Long> batch = boardIds.subList(i, end);
-            
+
             List<Object[]> results = boardViewLogRepository.countByBoards(batch);
 
             for (Object[] result : results) {
@@ -291,9 +291,28 @@ public class BoardPopularityService {
         return new PeriodRange(periodStart, periodEnd);
     }
 
+    /**
+     * record타입은 Java 16+ 불변 데이터 캐리어. 생성자/Getter/equals/hashCode/toString 자동 생성.
+     */
+
+    /**
+     * 인기글 집계 기간 범위
+     * 
+     * @param periodStart 집계 시작일 (포함)
+     * @param periodEnd   집계 종료일 (포함)
+     */
     private record PeriodRange(LocalDate periodStart, LocalDate periodEnd) {
     }
 
+    /**
+     * 게시글 인기도 점수 및 구성 요소
+     *
+     * @param board    게시글 엔티티
+     * @param score    종합 인기도 점수
+     * @param likes    좋아요 수
+     * @param comments 댓글 수
+     * @param views    조회수
+     */
     private record BoardScore(Board board, int score, int likes, int comments, int views) {
     }
 }

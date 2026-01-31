@@ -140,11 +140,11 @@ public class BoardController {
     public ResponseEntity<ReactionSummaryDTO> reactToBoard(
             @PathVariable Long boardId,
             @RequestBody ReactionRequest request) {
-        if (request.getUserId() == null || request.getReactionType() == null) {
+        if (request.userId() == null || request.reactionType() == null) {
             throw new IllegalArgumentException("userId and reactionType are required");
         }
-        ReactionSummaryDTO summary = reactionService.reactToBoard(boardId, request.getUserId(),
-                request.getReactionType());
+        ReactionSummaryDTO summary = reactionService.reactToBoard(boardId, request.userId(),
+                request.reactionType());
         return ResponseEntity.ok(summary);
     }
 
@@ -154,11 +154,11 @@ public class BoardController {
             @PathVariable Long boardId,
             @PathVariable Long commentId,
             @RequestBody ReactionRequest request) {
-        if (request.getUserId() == null || request.getReactionType() == null) {
+        if (request.userId() == null || request.reactionType() == null) {
             throw new IllegalArgumentException("userId and reactionType are required");
         }
-        ReactionSummaryDTO summary = reactionService.reactToComment(commentId, request.getUserId(),
-                request.getReactionType());
+        ReactionSummaryDTO summary = reactionService.reactToComment(commentId, request.userId(),
+                request.reactionType());
         return ResponseEntity.ok(summary);
     }
 }

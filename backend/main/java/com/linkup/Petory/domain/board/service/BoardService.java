@@ -143,29 +143,27 @@ public class BoardService {
         boolean hasNextPage = page < totalPages - 1;
 
         if (pagedBoards.isEmpty()) {
-            return BoardPageResponseDTO.builder()
-                    .boards(new ArrayList<>())
-                    .totalCount(totalCount)
-                    .totalPages(totalPages)
-                    .currentPage(page)
-                    .pageSize(size)
-                    .hasNext(hasNextPage)
-                    .hasPrevious(page > 0)
-                    .build();
+            return new BoardPageResponseDTO(
+                    new ArrayList<>(),
+                    totalCount,
+                    totalPages,
+                    page,
+                    size,
+                    hasNextPage,
+                    page > 0);
         }
 
         // 배치 조회로 N+1 문제 해결
         List<BoardDTO> boardDTOs = mapBoardsWithReactionsBatch(pagedBoards);
 
-        return BoardPageResponseDTO.builder()
-                .boards(boardDTOs)
-                .totalCount(totalCount)
-                .totalPages(totalPages)
-                .currentPage(page)
-                .pageSize(size)
-                .hasNext(hasNextPage)
-                .hasPrevious(page > 0)
-                .build();
+        return new BoardPageResponseDTO(
+                boardDTOs,
+                totalCount,
+                totalPages,
+                page,
+                size,
+                hasNextPage,
+                page > 0);
     }
 
     // 전체 게시글 조회 (페이징 지원)
@@ -180,29 +178,27 @@ public class BoardService {
         }
 
         if (boardPage.isEmpty()) {
-            return BoardPageResponseDTO.builder()
-                    .boards(new ArrayList<>())
-                    .totalCount(0)
-                    .totalPages(0)
-                    .currentPage(page)
-                    .pageSize(size)
-                    .hasNext(false)
-                    .hasPrevious(false)
-                    .build();
+            return new BoardPageResponseDTO(
+                    new ArrayList<>(),
+                    0,
+                    0,
+                    page,
+                    size,
+                    false,
+                    false);
         }
 
         // 배치 조회로 N+1 문제 해결
         List<BoardDTO> boardDTOs = mapBoardsWithReactionsBatch(boardPage.getContent());
 
-        return BoardPageResponseDTO.builder()
-                .boards(boardDTOs)
-                .totalCount(boardPage.getTotalElements())
-                .totalPages(boardPage.getTotalPages())
-                .currentPage(page)
-                .pageSize(size)
-                .hasNext(boardPage.hasNext())
-                .hasPrevious(boardPage.hasPrevious())
-                .build();
+        return new BoardPageResponseDTO(
+                boardDTOs,
+                boardPage.getTotalElements(),
+                boardPage.getTotalPages(),
+                page,
+                size,
+                boardPage.hasNext(),
+                boardPage.hasPrevious());
     }
 
     // 단일 게시글 조회 + 조회수 증가
@@ -332,15 +328,14 @@ public class BoardService {
     // 게시글 검색 (페이징 지원)
     public BoardPageResponseDTO searchBoardsWithPaging(String keyword, String searchType, int page, int size) {
         if (keyword == null || keyword.trim().isEmpty()) {
-            return BoardPageResponseDTO.builder()
-                    .boards(new ArrayList<>())
-                    .totalCount(0)
-                    .totalPages(0)
-                    .currentPage(page)
-                    .pageSize(size)
-                    .hasNext(false)
-                    .hasPrevious(false)
-                    .build();
+            return new BoardPageResponseDTO(
+                    new ArrayList<>(),
+                    0,
+                    0,
+                    page,
+                    size,
+                    false,
+                    false);
         }
 
         String trimmedKeyword = keyword.trim();
@@ -395,29 +390,27 @@ public class BoardService {
         }
 
         if (boardPage.isEmpty()) {
-            return BoardPageResponseDTO.builder()
-                    .boards(new ArrayList<>())
-                    .totalCount(0)
-                    .totalPages(0)
-                    .currentPage(page)
-                    .pageSize(size)
-                    .hasNext(false)
-                    .hasPrevious(false)
-                    .build();
+            return new BoardPageResponseDTO(
+                    new ArrayList<>(),
+                    0,
+                    0,
+                    page,
+                    size,
+                    false,
+                    false);
         }
 
         // 배치 조회로 N+1 문제 해결
         List<BoardDTO> boardDTOs = mapBoardsWithReactionsBatch(boardPage.getContent());
 
-        return BoardPageResponseDTO.builder()
-                .boards(boardDTOs)
-                .totalCount(boardPage.getTotalElements())
-                .totalPages(boardPage.getTotalPages())
-                .currentPage(page)
-                .pageSize(size)
-                .hasNext(boardPage.hasNext())
-                .hasPrevious(boardPage.hasPrevious())
-                .build();
+        return new BoardPageResponseDTO(
+                boardDTOs,
+                boardPage.getTotalElements(),
+                boardPage.getTotalPages(),
+                page,
+                size,
+                boardPage.hasNext(),
+                boardPage.hasPrevious());
     }
 
     /**
@@ -685,28 +678,26 @@ public class BoardService {
         Page<Board> boardPage = boardRepository.findAll(spec, pageable);
 
         if (boardPage.isEmpty()) {
-            return BoardPageResponseDTO.builder()
-                    .boards(new ArrayList<>())
-                    .totalCount(0)
-                    .totalPages(0)
-                    .currentPage(page)
-                    .pageSize(size)
-                    .hasNext(false)
-                    .hasPrevious(false)
-                    .build();
+            return new BoardPageResponseDTO(
+                    new ArrayList<>(),
+                    0,
+                    0,
+                    page,
+                    size,
+                    false,
+                    false);
         }
 
         // 배치 조회로 N+1 문제 해결
         List<BoardDTO> boardDTOs = mapBoardsWithReactionsBatch(boardPage.getContent());
 
-        return BoardPageResponseDTO.builder()
-                .boards(boardDTOs)
-                .totalCount(boardPage.getTotalElements())
-                .totalPages(boardPage.getTotalPages())
-                .currentPage(page)
-                .pageSize(size)
-                .hasNext(boardPage.hasNext())
-                .hasPrevious(boardPage.hasPrevious())
-                .build();
+        return new BoardPageResponseDTO(
+                boardDTOs,
+                boardPage.getTotalElements(),
+                boardPage.getTotalPages(),
+                page,
+                size,
+                boardPage.hasNext(),
+                boardPage.hasPrevious());
     }
 }
