@@ -37,26 +37,26 @@ public interface SpringDataJpaBoardRepository extends JpaRepository<Board, Long>
 
     // 카테고리별 삭제되지 않은 게시글 조회 (최신순) - 페이징 - 작성자도 활성 상태여야 함
     @Query("SELECT b FROM Board b JOIN FETCH b.user u WHERE b.category = :category AND b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY b.createdAt DESC")
-    Page<Board> findByCategoryAndIsDeletedFalseOrderByCreatedAtDesc(@Param("category") String category, Pageable pageable);
+    Page<Board> findByCategoryAndIsDeletedFalseOrderByCreatedAtDesc(@Param("category") String category,
+            Pageable pageable);
 
     // 사용자별 삭제되지 않은 게시글 조회 (최신순) - 작성자도 활성 상태여야 함
     @Query("SELECT b FROM Board b JOIN FETCH b.user u WHERE b.user = :user AND b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY b.createdAt DESC")
     List<Board> findByUserAndIsDeletedFalseOrderByCreatedAtDesc(@Param("user") Users user);
 
     // 작성자 닉네임으로 검색 (페이징) - JOIN 쿼리로 최적화
-    @Query("SELECT b FROM Board b JOIN FETCH b.user u WHERE u.nickname LIKE %:nickname% AND b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY b.createdAt DESC")
+    @Query("SELECT b FROM Board b JOIN FETCH b.user u WHERE u.nickname LIKE :nickname% AND b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY b.createdAt DESC")
     Page<Board> searchByNicknameWithPaging(@Param("nickname") String nickname, Pageable pageable);
 
     // FULLTEXT 인덱스 사용 쿼리 (제목+내용) - 페이징 - 작성자도 활성 상태여야 함
     @Query(value = "SELECT b.*, MATCH(b.title, b.content) AGAINST(:kw IN BOOLEAN MODE) AS relevance "
-                    + "FROM board b " 
-                    + "INNER JOIN users u ON b.user_idx = u.idx "
-                    + "WHERE b.is_deleted = false "
-                    + "AND u.is_deleted = false "
-                    + "AND u.status = 'ACTIVE' "
-                    + "AND MATCH(b.title, b.content) AGAINST(:kw IN BOOLEAN MODE) "
-                    + "ORDER BY relevance DESC, b.created_at DESC", 
-                    countQuery = "SELECT COUNT(*) FROM board b "
+            + "FROM board b "
+            + "INNER JOIN users u ON b.user_idx = u.idx "
+            + "WHERE b.is_deleted = false "
+            + "AND u.is_deleted = false "
+            + "AND u.status = 'ACTIVE' "
+            + "AND MATCH(b.title, b.content) AGAINST(:kw IN BOOLEAN MODE) "
+            + "ORDER BY relevance DESC, b.created_at DESC", countQuery = "SELECT COUNT(*) FROM board b "
                     + "INNER JOIN users u ON b.user_idx = u.idx "
                     + "WHERE b.is_deleted = false "
                     + "AND u.is_deleted = false "
@@ -78,4 +78,3 @@ public interface SpringDataJpaBoardRepository extends JpaRepository<Board, Long>
     @Query("SELECT b FROM Board b JOIN FETCH b.user u ORDER BY b.createdAt DESC")
     List<Board> findAllForAdmin();
 }
-
