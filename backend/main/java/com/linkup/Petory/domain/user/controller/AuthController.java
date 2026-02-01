@@ -39,22 +39,22 @@ public class AuthController {
             // Spring Security 인증 처리 (id로 인증)
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(
-                            loginRequest.getId(),
-                            loginRequest.getPassword()));
+                            loginRequest.id(),
+                            loginRequest.password()));
 
             // AuthService를 통해 로그인 처리 (Access Token + Refresh Token 발급)
             // 내부에서 제재 체크도 수행
-            TokenResponse tokenResponse = authService.login(loginRequest.getId(), loginRequest.getPassword());
+            TokenResponse tokenResponse = authService.login(loginRequest.id(), loginRequest.password());
 
             Map<String, Object> response = new HashMap<>();
-            response.put("accessToken", tokenResponse.getAccessToken());
-            response.put("refreshToken", tokenResponse.getRefreshToken());
-            response.put("user", tokenResponse.getUser());
+            response.put("accessToken", tokenResponse.accessToken());
+            response.put("refreshToken", tokenResponse.refreshToken());
+            response.put("user", tokenResponse.user());
             response.put("message", "로그인 성공");
 
             log.info("tokenResponse: {}", response);
 
-            log.info("로그인 성공: {}", loginRequest.getId());
+            log.info("로그인 성공: {}", loginRequest.id());
             return ResponseEntity.ok(response);
 
         } catch (AuthenticationException e) {
@@ -142,9 +142,9 @@ public class AuthController {
             TokenResponse tokenResponse = authService.refreshAccessToken(refreshToken);
 
             Map<String, Object> response = new HashMap<>();
-            response.put("accessToken", tokenResponse.getAccessToken());
-            response.put("refreshToken", tokenResponse.getRefreshToken());
-            response.put("user", tokenResponse.getUser());
+            response.put("accessToken", tokenResponse.accessToken());
+            response.put("refreshToken", tokenResponse.refreshToken());
+            response.put("user", tokenResponse.user());
             response.put("message", "토큰 갱신 성공");
 
             log.info("Access Token 갱신 성공");

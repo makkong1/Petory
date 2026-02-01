@@ -40,20 +40,20 @@ public class AdminPaymentController {
         @PostMapping("/charge")
         public ResponseEntity<PetCoinTransactionDTO> chargeCoins(
                         @RequestBody PetCoinChargeRequest request) {
-                if (request.getUserId() == null) {
+                if (request.userId() == null) {
                         throw new IllegalArgumentException("사용자 ID가 필요합니다.");
                 }
-                if (request.getAmount() == null || request.getAmount() <= 0) {
+                if (request.amount() == null || request.amount() <= 0) {
                         throw new IllegalArgumentException("충전 금액은 0보다 커야 합니다.");
                 }
 
-                Users user = usersRepository.findById(request.getUserId())
+                Users user = usersRepository.findById(request.userId())
                                 .orElseThrow(() -> new RuntimeException("User not found"));
 
                 PetCoinTransaction transaction = petCoinService.chargeCoins(
                                 user,
-                                request.getAmount(),
-                                request.getDescription() != null ? request.getDescription() : "관리자 지급");
+                                request.amount(),
+                                request.description() != null ? request.description() : "관리자 지급");
 
                 return ResponseEntity.ok(transactionConverter.toDTO(transaction));
         }
@@ -68,10 +68,7 @@ public class AdminPaymentController {
 
                 Integer balance = petCoinService.getBalance(user);
 
-                return ResponseEntity.ok(PetCoinBalanceResponse.builder()
-                                .userId(userId)
-                                .balance(balance)
-                                .build());
+                return ResponseEntity.ok(new PetCoinBalanceResponse(userId, balance));
         }
 
         /**
