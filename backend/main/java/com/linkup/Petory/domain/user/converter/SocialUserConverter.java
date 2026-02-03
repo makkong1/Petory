@@ -11,19 +11,19 @@ import com.linkup.Petory.domain.user.entity.Users;
 public class SocialUserConverter {
 
     public SocialUserDTO toDTO(SocialUser socialUser) {
-        return SocialUserDTO.builder()
-                .idx(socialUser.getIdx())
-                .provider(socialUser.getProvider().name())
-                .providerId(socialUser.getProviderId())
-                .build();
+        return new SocialUserDTO(
+                socialUser.getIdx(),
+                socialUser.getProvider().name(),
+                socialUser.getProviderId()
+        );
     }
 
     public SocialUser toEntity(SocialUserDTO dto, Users user) {
         return SocialUser.builder()
-                .idx(dto.getIdx())
+                .idx(dto.idx())
                 .user(user)
-                .provider(Provider.valueOf(dto.getProvider()))
-                .providerId(dto.getProviderId())
+                .provider(Provider.valueOf(dto.provider()))
+                .providerId(dto.providerId())
                 .build();
     }
 }

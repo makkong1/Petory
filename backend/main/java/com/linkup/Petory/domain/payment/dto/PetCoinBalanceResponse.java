@@ -1,18 +1,10 @@
 package com.linkup.Petory.domain.payment.dto;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
 /**
- * 코인 잔액 응답 DTO
+ * 코인 잔액 응답 DTO (record)
+ * - 불변 객체로 응답 데이터의 의도치 않은 변경 방지
  */
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class PetCoinBalanceResponse {
-    private Long userId;
-    private Integer balance;
-}
+public record PetCoinBalanceResponse(
+    Long userId,
+    Integer balance
+) {}

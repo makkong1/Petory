@@ -90,32 +90,26 @@ public class CareRequestService {
     // 케어 요청 생성
     @Transactional
     public CareRequestDTO createCareRequest(CareRequestDTO dto) {
-        // 이메일 인증 확인
+        // 사용자 조회 (1회만)
         Users user = usersRepository.findById(dto.getUserId())
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        // DB에서 직접 조회하여 최신 값 확인
-        Users freshUser = usersRepository.findById(dto.getUserId())
-                .orElseThrow(() -> new RuntimeException("User not found"));
-        Boolean emailVerified = freshUser.getEmailVerified();
-
-        log.info("이메일 인증 체크: userId={}, emailVerified={}, type={}, equalsTrue={}, hashCode={}",
-                dto.getUserId(), emailVerified,
-                emailVerified != null ? emailVerified.getClass().getName() : "null",
-                Boolean.TRUE.equals(emailVerified),
-                emailVerified != null ? emailVerified.hashCode() : "null");
-
-        // Boolean.TRUE.equals()를 사용하면 null-safe 체크 가능
-        // MySQL의 TINYINT(1) 값 1은 true로 매핑되어야 함
-        // 만약 여전히 문제가 발생한다면 DB 값이 실제로 1이 아닐 수 있음
-        if (!Boolean.TRUE.equals(emailVerified)) {
-            log.warn("이메일 인증 미완료: userId={}, emailVerified={}, emailVerified==true={}, emailVerified==Boolean.TRUE={}",
-                    dto.getUserId(), emailVerified,
-                    emailVerified == true,
-                    emailVerified == Boolean.TRUE);
+        // 이메일 인증 확인
+        if (!Boolean.TRUE.equals(user.getEmailVerified())) {
+            log.debug("이메일 인증 미완료: userId={}", dto.getUserId());
             throw new EmailVerificationRequiredException(
                     "펫케어 서비스 이용을 위해 이메일 인증이 필요합니다.",
                     EmailVerificationPurpose.PET_CARE);
+        }
+
+        // 제공 코인 유효성 검증
+        if (dto.getOfferedCoins() == null || dto.getOfferedCoins() <= 0) {
+            throw new RuntimeException("제공 코인은 0보다 커야 합니다.");
+        }
+
+        // 사용자 잔액 확인
+        if (user.getPetCoinBalance() < dto.getOfferedCoins()) {
+            throw new RuntimeException("펫코인 잔액이 부족합니다.");
         }
 
         CareRequest.CareRequestBuilder builder = CareRequest.builder()

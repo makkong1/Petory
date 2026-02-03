@@ -1,18 +1,13 @@
 package com.linkup.Petory.domain.chat.dto;
 
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
-public class SendMessageRequest {
-    private Long conversationIdx;
-    private String content;
-    private String messageType;  // TEXT, IMAGE, FILE, etc.
-    private Long replyToMessageIdx;  // 답장 기능
+/**
+ * 메시지 전송 요청 DTO (record)
+ * - 불변 객체로 요청 데이터의 의도치 않은 변경 방지
+ */
+public record SendMessageRequest(
+        Long conversationIdx,
+        String content,
+        String messageType, // TEXT, IMAGE, FILE, etc.
+        Long replyToMessageIdx // 답장 기능
+) {
 }
-

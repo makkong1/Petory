@@ -85,11 +85,6 @@ public class JpaBoardAdapter implements BoardRepository {
     }
 
     @Override
-    public List<Board> findAllByOrderByCreatedAtDesc() {
-        return jpaRepository.findAllByOrderByCreatedAtDesc();
-    }
-
-    @Override
     public List<Board> findAllByIsDeletedFalseOrderByCreatedAtDesc() {
         return jpaRepository.findAllByIsDeletedFalseOrderByCreatedAtDesc();
     }
@@ -97,11 +92,6 @@ public class JpaBoardAdapter implements BoardRepository {
     @Override
     public Page<Board> findAllByIsDeletedFalseOrderByCreatedAtDesc(Pageable pageable) {
         return jpaRepository.findAllByIsDeletedFalseOrderByCreatedAtDesc(pageable);
-    }
-
-    @Override
-    public List<Board> findByCategoryOrderByCreatedAtDesc(String category) {
-        return jpaRepository.findByCategoryOrderByCreatedAtDesc(category);
     }
 
     @Override
@@ -115,33 +105,13 @@ public class JpaBoardAdapter implements BoardRepository {
     }
 
     @Override
-    public List<Board> findByUserOrderByCreatedAtDesc(Users user) {
-        return jpaRepository.findByUserOrderByCreatedAtDesc(user);
-    }
-
-    @Override
     public List<Board> findByUserAndIsDeletedFalseOrderByCreatedAtDesc(Users user) {
         return jpaRepository.findByUserAndIsDeletedFalseOrderByCreatedAtDesc(user);
     }
 
     @Override
-    public List<Board> findByTitleContainingAndIsDeletedFalseOrderByCreatedAtDesc(String title) {
-        return jpaRepository.findByTitleContainingAndIsDeletedFalseOrderByCreatedAtDesc(title);
-    }
-
-    @Override
-    public Page<Board> findByTitleContainingAndIsDeletedFalseOrderByCreatedAtDesc(String title, Pageable pageable) {
-        return jpaRepository.findByTitleContainingAndIsDeletedFalseOrderByCreatedAtDesc(title, pageable);
-    }
-
-    @Override
-    public List<Board> findByContentContainingAndIsDeletedFalseOrderByCreatedAtDesc(String content) {
-        return jpaRepository.findByContentContainingAndIsDeletedFalseOrderByCreatedAtDesc(content);
-    }
-
-    @Override
-    public Page<Board> findByContentContainingAndIsDeletedFalseOrderByCreatedAtDesc(String content, Pageable pageable) {
-        return jpaRepository.findByContentContainingAndIsDeletedFalseOrderByCreatedAtDesc(content, pageable);
+    public Page<Board> searchByNicknameWithPaging(String nickname, Pageable pageable) {
+        return jpaRepository.searchByNicknameWithPaging(nickname, pageable);
     }
 
     @Override
@@ -160,11 +130,6 @@ public class JpaBoardAdapter implements BoardRepository {
     }
 
     @Override
-    public Page<Board> findAllByIsDeletedFalseForAdmin(Pageable pageable) {
-        return jpaRepository.findAllByIsDeletedFalseForAdmin(pageable);
-    }
-
-    @Override
     public List<Board> findAllByIsDeletedFalseForAdmin() {
         return jpaRepository.findAllByIsDeletedFalseForAdmin();
     }
@@ -172,11 +137,6 @@ public class JpaBoardAdapter implements BoardRepository {
     @Override
     public List<Board> findAllForAdmin() {
         return jpaRepository.findAllForAdmin();
-    }
-
-    @Override
-    public Page<Board> findByCategoryAndIsDeletedFalseForAdmin(String category, Pageable pageable) {
-        return jpaRepository.findByCategoryAndIsDeletedFalseForAdmin(category, pageable);
     }
 }
 

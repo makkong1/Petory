@@ -31,3 +31,19 @@
 3. **아키텍처 일관성**: 프로젝트의 아키텍처 패턴 준수
 4. **디자인 패턴 적용**: 적절한 디자인 패턴 활용으로 코드 품질 향상
 5. **실운영 고려**: 실제 운영 환경을 고려한 에러 처리, 로깅, 모니터링
+
+## 리팩토링 규칙
+
+### DTO → record
+
+- **Response DTO**: 새로 만드는 DTO는 record 우선
+- **Request DTO**: Jackson 역직렬화 확인 후 record 적용
+- **적용 불가**: setter로 인-place 수정하는 DTO, 필드 10개 이상 + 빌더 필수
+- **참고**: `docs/refactoring/dto-to-record.md`, `docs/refactoring/recordType/board/dto-record-refactoring.md`
+
+### 검색 쿼리 (LIKE·인덱스)
+
+- **`LIKE '%값%'`**: B-tree 인덱스 미사용 → 풀 스캔 유발. 가능하면 피할 것
+- **해결 방향**: `LIKE '값%'` (접두사), FULLTEXT, 검색 엔진
+- **예시**: Board 검색 → TITLE/CONTENT 개별 `LIKE %...%` 대신 FULLTEXT `MATCH(title, content) AGAINST`로 통합
+- **참고**: `docs/refactoring/recordType/board/board-search-optimization.md`

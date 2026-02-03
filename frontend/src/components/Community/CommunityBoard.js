@@ -37,7 +37,7 @@ const CommunityBoard = () => {
 
   // 검색 상태
   const [searchKeyword, setSearchKeyword] = useState('');
-  const [searchType, setSearchType] = useState('TITLE_CONTENT'); // ID, TITLE, CONTENT, TITLE_CONTENT
+  const [searchType, setSearchType] = useState('TITLE_CONTENT'); // NICKNAME, TITLE, CONTENT, TITLE_CONTENT
   const [isSearchMode, setIsSearchMode] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchPage, setSearchPage] = useState(0);
@@ -713,10 +713,8 @@ const CommunityBoard = () => {
             value={searchType}
             onChange={handleSearchTypeChange}
           >
-            <option value="ID">ID</option>
-            <option value="TITLE">제목</option>
-            <option value="CONTENT">내용</option>
             <option value="TITLE_CONTENT">제목+내용</option>
+            <option value="NICKNAME">작성자</option>
           </SearchTypeSelect>
           <SearchButton onClick={() => handleSearch(0, true)} disabled={searchLoading}>
             {searchLoading ? '검색 중...' : '🔍 검색'}

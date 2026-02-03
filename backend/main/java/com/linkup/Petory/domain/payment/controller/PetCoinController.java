@@ -50,10 +50,7 @@ public class PetCoinController {
 
                 Integer balance = petCoinService.getBalance(user);
 
-                return ResponseEntity.ok(PetCoinBalanceResponse.builder()
-                                .userId(userId)
-                                .balance(balance)
-                                .build());
+                return ResponseEntity.ok(new PetCoinBalanceResponse(userId, balance));
         }
 
         /**
@@ -98,16 +95,16 @@ public class PetCoinController {
                 Users user = usersRepository.findById(userId)
                                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-                if (request.getAmount() == null || request.getAmount() <= 0) {
+                if (request.amount() == null || request.amount() <= 0) {
                         throw new IllegalArgumentException("충전 금액은 0보다 커야 합니다.");
                 }
 
                 PetCoinTransaction transaction = petCoinService.chargeCoins(
                                 user,
-                                request.getAmount(),
-                                request.getDescription() != null ? request.getDescription() : "코인 충전");
+                                request.amount(),
+                                request.description() != null ? request.description() : "코인 충전");
 
-                log.info("코인 충전 완료: userId={}, amount={}", userId, request.getAmount());
+                log.info("코인 충전 완료: userId={}, amount={}", userId, request.amount());
 
                 return ResponseEntity.ok(transactionConverter.toDTO(transaction));
         }
