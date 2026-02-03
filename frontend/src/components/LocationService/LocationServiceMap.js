@@ -349,6 +349,9 @@ const LocationServiceMap = () => {
         ? effectiveCategoryType
         : undefined;
 
+      // 키워드 처리 (keywordOverride가 있으면 사용, 없으면 현재 keyword 상태 사용)
+      const effectiveKeyword = keywordOverride ?? (keyword && keyword.trim() ? keyword.trim() : undefined);
+
       try {
 
         // 지역 계층별 검색만 수행 (내 위치는 거리 계산용으로만 사용)
@@ -375,6 +378,7 @@ const LocationServiceMap = () => {
               longitude: targetLocation.lng,
               radius: 5000, // 5km 반경
               category: apiCategory,
+              keyword: effectiveKeyword,
             });
           } else {
             // 사용자 위치가 없으면 전체 조회
@@ -382,6 +386,7 @@ const LocationServiceMap = () => {
             initialLoadTypeRef.current = 'all';
             response = await locationServiceApi.searchPlaces({
               category: apiCategory,
+              keyword: effectiveKeyword,
               size: 0, // 전체 조회 (0이면 백엔드에서 제한 없음)
             });
           }
@@ -397,20 +402,20 @@ const LocationServiceMap = () => {
           // 백엔드에서 이미 위치 기반 필터링이 완료되었으므로 거리 계산은 선택적
           // (표시용 거리 정보는 필요 시 계산)
           let allFetchedServices = (response.data?.services || []).map((service) => {
-            let distance = null;
             const lat = parseFloat(service.latitude);
             const lng = parseFloat(service.longitude);
 
-            if (!isNaN(lat) && !isNaN(lng)) {
-              if (targetLocation) {
-                distance = calculateDistance(
-                  targetLocation.lat,
-                  targetLocation.lng,
-                  lat,
-                  lng
-                );
-              }
+            // 백엔드에서 거리 정보를 받아서 사용 (없으면 계산)
+            let distance = service.distance || null;
+            if (distance === null && !isNaN(lat) && !isNaN(lng) && targetLocation) {
+              distance = calculateDistance(
+                targetLocation.lat,
+                targetLocation.lng,
+                lat,
+                lng
+              );
             }
+
             return {
               ...service,
               latitude: lat,
@@ -463,6 +468,7 @@ const LocationServiceMap = () => {
             longitude,
             radius,
             category: apiCategory,
+            keyword: effectiveKeyword,
           });
 
           if (latestRequestRef.current !== requestId) {
@@ -470,11 +476,12 @@ const LocationServiceMap = () => {
           }
 
           const fetchedServices = (response.data?.services || []).map((service) => {
-            let distance = null;
             const lat = parseFloat(service.latitude);
             const lng = parseFloat(service.longitude);
 
-            if (!isNaN(lat) && !isNaN(lng)) {
+            // 백엔드에서 거리 정보를 받아서 사용 (없으면 계산)
+            let distance = service.distance || null;
+            if (distance === null && !isNaN(lat) && !isNaN(lng)) {
               distance = calculateDistance(
                 latitude,
                 longitude,
@@ -482,6 +489,7 @@ const LocationServiceMap = () => {
                 lng
               );
             }
+
             return {
               ...service,
               latitude: lat,
@@ -522,6 +530,7 @@ const LocationServiceMap = () => {
             sigungu: apiSigungu,
             eupmyeondong: apiEupmyeondong,
             category: apiCategory,
+            keyword: effectiveKeyword,
             size: 0, // 전체 조회 (0이면 백엔드에서 제한 없음)
           });
 
@@ -572,6 +581,7 @@ const LocationServiceMap = () => {
               sigungu: selectedSigungu || undefined,
               eupmyeondong: selectedEupmyeondong || undefined,
               category: apiCategory,
+              keyword: effectiveKeyword,
             });
 
             if (latestRequestRef.current !== requestId) {
@@ -714,10 +724,12 @@ const LocationServiceMap = () => {
         setStatusMessage('주변 서비스를 불러오는 중...');
 
         // 2단계: 초기 로드는 내 위치 기반 반경 검색 (빠르고 적은 데이터)
+        const currentKeyword = keyword && keyword.trim() ? keyword.trim() : undefined;
         const response = await locationServiceApi.searchPlaces({
           latitude: location.lat,
           longitude: location.lng,
           radius: 5000, // 5km 반경
+          keyword: currentKeyword,
         });
 
         if (response.data?.services) {
@@ -788,7 +800,9 @@ const LocationServiceMap = () => {
           setStatusMessage('위치를 확인할 수 없어 전체 서비스를 불러옵니다...');
 
           try {
+            const currentKeyword = keyword && keyword.trim() ? keyword.trim() : undefined;
             const response = await locationServiceApi.searchPlaces({
+              keyword: currentKeyword,
               size: 0, // 전체 조회
             });
 
@@ -817,7 +831,9 @@ const LocationServiceMap = () => {
           setStatusMessage('위치 확인 시간이 초과되어 전체 서비스를 불러옵니다...');
 
           try {
+            const currentKeyword = keyword && keyword.trim() ? keyword.trim() : undefined;
             const response = await locationServiceApi.searchPlaces({
+              keyword: currentKeyword,
               size: 0, // 전체 조회
             });
 
@@ -846,7 +862,9 @@ const LocationServiceMap = () => {
           setStatusMessage('위치를 확인할 수 없어 전체 서비스를 불러옵니다...');
 
           try {
+            const currentKeyword = keyword && keyword.trim() ? keyword.trim() : undefined;
             const response = await locationServiceApi.searchPlaces({
+              keyword: currentKeyword,
               size: 0, // 전체 조회
             });
 
@@ -884,19 +902,17 @@ const LocationServiceMap = () => {
   const handleKeywordSubmit = useCallback(
     (event) => {
       event.preventDefault();
-      setCategoryType(CATEGORY_CUSTOM);
-      // 키워드 검색은 전체 데이터에서 필터링 (지도 없이)
-      if (allServices.length > 0) {
-        filterServicesByRegion(allServices, selectedSido, selectedSigungu, selectedEupmyeondong, keyword);
-      } else {
-        // allServices가 없으면 초기 로드
-        fetchServices({
-          isInitialLoad: true,
-          categoryOverride: CATEGORY_CUSTOM,
-        });
+      if (!keyword || !keyword.trim()) {
+        return; // 빈 키워드는 무시
       }
+
+      // 키워드 검색: 백엔드에 keyword 전달하여 FULLTEXT 검색 수행
+      fetchServices({
+        keywordOverride: keyword.trim(),
+        categoryOverride: categoryType !== CATEGORY_DEFAULT ? categoryType : undefined,
+      });
     },
-    [fetchServices, keyword, selectedSido, selectedSigungu, selectedEupmyeondong, allServices, filterServicesByRegion]
+    [fetchServices, keyword, categoryType]
   );
 
   // 지도 위치 업데이트 함수
@@ -1932,6 +1948,21 @@ const LocationServiceMap = () => {
         </HeaderTop>
 
         <SearchControls $isOpen={showKeywordControls && searchMode === 'keyword'}>
+          <SearchBar onSubmit={handleKeywordSubmit}>
+            <SearchInput
+              type="text"
+              placeholder="키워드 검색 (예: 동물병원, 카페, 호텔 등)"
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleKeywordSubmit(e);
+                }
+              }}
+            />
+            <SearchButton type="submit">검색</SearchButton>
+          </SearchBar>
           <RegionButtonGrid>
             {KEYWORD_CATEGORIES.map((cat) => (
               <RegionButton
