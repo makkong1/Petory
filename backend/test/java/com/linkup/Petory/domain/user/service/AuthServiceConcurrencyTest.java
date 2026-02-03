@@ -90,7 +90,7 @@ class AuthServiceConcurrencyTest {
 
                     TokenResponse response = authService.refreshAccessToken(refreshToken);
                     successCount.incrementAndGet();
-                    refreshTokens.add(response.getRefreshToken());
+                    refreshTokens.add(response.refreshToken());
                 } catch (Exception e) {
                     failureCount.incrementAndGet();
                     exceptions.add(e);
@@ -140,11 +140,11 @@ class AuthServiceConcurrencyTest {
 
                     String currentToken = lastRefreshToken.get();
                     TokenResponse response = authService.refreshAccessToken(currentToken);
-                    lastRefreshToken.set(response.getRefreshToken());
-                    allRefreshTokens.add(response.getRefreshToken());
+                    lastRefreshToken.set(response.refreshToken());
+                    allRefreshTokens.add(response.refreshToken());
 
                     System.out.println(
-                            "Thread " + threadId + " 성공: " + response.getAccessToken().substring(0, 20) + "...");
+                            "Thread " + threadId + " 성공: " + response.accessToken().substring(0, 20) + "...");
                 } catch (Exception e) {
                     System.out.println("Thread " + threadId + " 실패: " + e.getMessage());
                 }
