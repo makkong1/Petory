@@ -56,14 +56,22 @@ public interface SpringDataJpaLocationServiceRepository extends JpaRepository<Lo
         // 이름으로 서비스 검색 (이름, 설명, 카테고리 포함)
         // ⚠️ 성능 문제: LIKE '%keyword%' + OR 조건 5개 + filesort → 인덱스 불가
         // 개선: FULLTEXT INDEX 활용 (MATCH ... AGAINST) 또는 Elasticsearch 도입 검토
-        @Query("SELECT ls FROM LocationService ls WHERE " +
-                        "(ls.name LIKE CONCAT('%', :keyword, '%') " +
-                        "OR ls.description LIKE CONCAT('%', :keyword, '%') " +
-                        "OR ls.category1 LIKE CONCAT('%', :keyword, '%') " +
-                        "OR ls.category2 LIKE CONCAT('%', :keyword, '%') " +
-                        "OR ls.category3 LIKE CONCAT('%', :keyword, '%')) AND " +
-                        "(ls.isDeleted IS NULL OR ls.isDeleted = false) " +
-                        "ORDER BY ls.rating DESC")
+        // @Query("SELECT ls FROM LocationService ls WHERE " +
+        // "(ls.name LIKE CONCAT('%', :keyword, '%') " +
+        // "OR ls.description LIKE CONCAT('%', :keyword, '%') " +
+        // "OR ls.category1 LIKE CONCAT('%', :keyword, '%') " +
+        // "OR ls.category2 LIKE CONCAT('%', :keyword, '%') " +
+        // "OR ls.category3 LIKE CONCAT('%', :keyword, '%')) AND " +
+        // "(ls.isDeleted IS NULL OR ls.isDeleted = false) " +
+        // "ORDER BY ls.rating DESC")
+        // List<LocationService> findByNameContaining(@Param("keyword") String keyword);
+
+        // FULLTEXT INDEX 활용 - BOOLEAN MODE + 와일드카드
+        @Query(value = "SELECT * FROM locationservice " +
+                        "WHERE MATCH(name, description, category1, category2, category3) " +
+                        "AGAINST(CONCAT(:keyword, '*') IN BOOLEAN MODE) " +
+                        "AND is_deleted = 0 " +
+                        "ORDER BY rating DESC", nativeQuery = true)
         List<LocationService> findByNameContaining(@Param("keyword") String keyword);
 
         // 특정 평점 이상의 서비스 조회

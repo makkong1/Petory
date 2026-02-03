@@ -324,6 +324,262 @@ const LocationServiceMap = () => {
 
   // 지도 bounds 기반 필터링 제거됨 (지도 미사용)
 
+  // ========== 검색 전략 함수 분리 ==========
+
+  /**
+   * 초기 로드 전략
+   */
+  const handleInitialLoad = useCallback(async ({
+    targetLocation,
+    apiCategory,
+    effectiveKeyword,
+    requestId,
+    selectedSido,
+    selectedSigungu,
+    selectedEupmyeondong,
+  }) => {
+    const totalStartTime = performance.now();
+    console.log('🚀 [성능 측정] 초기 로드 시작');
+
+    const apiStartTime = performance.now();
+    let response;
+
+    if (targetLocation) {
+      console.log('📍 [초기 로드] 내 위치 기반 반경 검색 (5km)');
+      initialLoadTypeRef.current = 'location-based';
+      response = await locationServiceApi.searchPlaces({
+        latitude: targetLocation.lat,
+        longitude: targetLocation.lng,
+        radius: 5000,
+        category: apiCategory,
+        keyword: effectiveKeyword,
+      });
+    } else {
+      console.log('🌐 [초기 로드] 사용자 위치 없음 - 전체 조회');
+      initialLoadTypeRef.current = 'all';
+      response = await locationServiceApi.searchPlaces({
+        category: apiCategory,
+        keyword: effectiveKeyword,
+        size: 0,
+      });
+    }
+
+    if (latestRequestRef.current !== requestId) {
+      return;
+    }
+
+    const apiTime = performance.now() - apiStartTime;
+    console.log(`⏱️  [성능 측정] API 호출 시간: ${apiTime.toFixed(2)}ms`);
+    console.log(`📊 [성능 측정] 조회된 데이터 수: ${response.data?.services?.length || 0}개`);
+
+    const allFetchedServices = (response.data?.services || []).map((service) => {
+      const lat = parseFloat(service.latitude);
+      const lng = parseFloat(service.longitude);
+
+      let distance = service.distance || null;
+      if (distance === null && !isNaN(lat) && !isNaN(lng) && targetLocation) {
+        distance = calculateDistance(
+          targetLocation.lat,
+          targetLocation.lng,
+          lat,
+          lng
+        );
+      }
+
+      return {
+        ...service,
+        latitude: lat,
+        longitude: lng,
+        distance,
+      };
+    });
+
+    setAllServices(allFetchedServices);
+
+    if (targetLocation) {
+      setStatusMessage(`내 주변 5km 이내 ${allFetchedServices.length}개의 장소를 찾았습니다.`);
+    } else {
+      setStatusMessage(`전체 ${allFetchedServices.length}개의 장소를 찾았습니다.`);
+    }
+
+    const filterStartTime = performance.now();
+    filterServicesByRegion(allFetchedServices, selectedSido, selectedSigungu, selectedEupmyeondong, apiCategory);
+    const filterTime = performance.now() - filterStartTime;
+    console.log(`⏱️  [성능 측정] 필터링 시간: ${filterTime.toFixed(2)}ms`);
+
+    if (performance.memory) {
+      const memoryUsed = (performance.memory.usedJSHeapSize / 1024 / 1024).toFixed(2);
+      const memoryTotal = (performance.memory.totalJSHeapSize / 1024 / 1024).toFixed(2);
+      console.log(`💾 [성능 측정] 메모리 사용량: ${memoryUsed} MB / ${memoryTotal} MB`);
+    }
+
+    const totalTime = performance.now() - totalStartTime;
+    console.log(`✅ [성능 측정] 전체 처리 시간: ${totalTime.toFixed(2)}ms`);
+    console.log(`📈 [성능 측정] 시간 분해: API(${apiTime.toFixed(2)}ms) + 필터링(${filterTime.toFixed(2)}ms) = ${totalTime.toFixed(2)}ms`);
+
+    isInitialLoadRef.current = false;
+    isSearchModeRef.current = false;
+    setSelectedService(null);
+    setLoading(false);
+  }, [filterServicesByRegion]);
+
+  /**
+   * 위치 기반 검색 전략
+   */
+  const handleLocationBasedSearch = useCallback(async ({
+    latitude,
+    longitude,
+    radius,
+    apiCategory,
+    effectiveKeyword,
+    requestId,
+  }) => {
+    console.log('📍 [위치 기반 검색] API 호출:', { latitude, longitude, radius });
+
+    const response = await locationServiceApi.searchPlaces({
+      latitude,
+      longitude,
+      radius,
+      category: apiCategory,
+      keyword: effectiveKeyword,
+    });
+
+    if (latestRequestRef.current !== requestId) {
+      return;
+    }
+
+    const fetchedServices = (response.data?.services || []).map((service) => {
+      const lat = parseFloat(service.latitude);
+      const lng = parseFloat(service.longitude);
+
+      let distance = service.distance || null;
+      if (distance === null && !isNaN(lat) && !isNaN(lng)) {
+        distance = calculateDistance(latitude, longitude, lat, lng);
+      }
+
+      return {
+        ...service,
+        latitude: lat,
+        longitude: lng,
+        distance,
+      };
+    });
+
+    fetchedServices.sort((a, b) => {
+      if (a.distance === null && b.distance === null) return 0;
+      if (a.distance === null) return 1;
+      if (b.distance === null) return -1;
+      return a.distance - b.distance;
+    });
+
+    console.log(`📍 [위치 기반 검색] 결과: ${fetchedServices.length}개 서비스`);
+
+    setAllServices(fetchedServices);
+    setServices(fetchedServices);
+    setStatusMessage(`주변 ${radius / 1000}km 이내 ${fetchedServices.length}개의 장소를 찾았습니다.`);
+    setSelectedService(null);
+    setLoading(false);
+  }, []);
+
+  /**
+   * 지역 검색 전략 실행
+   */
+  const executeRegionSearchStrategy = useCallback(async ({
+    region,
+    apiCategory,
+    effectiveKeyword,
+    requestId,
+    selectedSido,
+    selectedSigungu,
+    selectedEupmyeondong,
+  }) => {
+    const regionParts = region.trim().split(/\s+/);
+    const apiSido = regionParts[0] || undefined;
+    const apiSigungu = regionParts[1] || undefined;
+    const apiEupmyeondong = regionParts[2] || undefined;
+
+    const response = await locationServiceApi.searchPlaces({
+      sido: apiSido,
+      sigungu: apiSigungu,
+      eupmyeondong: apiEupmyeondong,
+      category: apiCategory,
+      keyword: effectiveKeyword,
+      size: 0,
+    });
+
+    if (latestRequestRef.current !== requestId) {
+      return;
+    }
+
+    const fetchedServices = (response.data?.services || []).map((service) => ({
+      ...service,
+      latitude: parseFloat(service.latitude),
+      longitude: parseFloat(service.longitude),
+    }));
+
+    setAllServices(fetchedServices);
+    filterServicesByRegion(fetchedServices, selectedSido, selectedSigungu, selectedEupmyeondong, apiCategory);
+
+    isSearchModeRef.current = false;
+    setStatusMessage('');
+    setSelectedService(null);
+    setLoading(false);
+  }, [filterServicesByRegion]);
+
+  /**
+   * 하이브리드 전략 (현재 데이터 범위 확인 후 필터링 또는 재요청)
+   */
+  const handleHybridSearch = useCallback(async ({
+    allServices,
+    selectedSido,
+    selectedSigungu,
+    selectedEupmyeondong,
+    apiCategory,
+    effectiveKeyword,
+    requestId,
+  }) => {
+    const loadedSidos = new Set(allServices.map(s => s.sido).filter(Boolean));
+    const loadedSigungus = new Set(allServices.map(s => s.sigungu).filter(Boolean));
+
+    const isRegionInLoadedData =
+      (!selectedSido || loadedSidos.has(selectedSido)) &&
+      (!selectedSigungu || loadedSigungus.has(selectedSigungu));
+
+    if (isRegionInLoadedData) {
+      console.log('📍 [하이브리드] 현재 데이터 범위 내 - 프론트엔드 필터링');
+      filterServicesByRegion(allServices, selectedSido, selectedSigungu, selectedEupmyeondong, apiCategory);
+      setLoading(false);
+      return;
+    }
+
+    console.log('🌐 [하이브리드] 현재 데이터 범위 밖 - 백엔드 재요청');
+    const response = await locationServiceApi.searchPlaces({
+      sido: selectedSido || undefined,
+      sigungu: selectedSigungu || undefined,
+      eupmyeondong: selectedEupmyeondong || undefined,
+      category: apiCategory,
+      keyword: effectiveKeyword,
+    });
+
+    if (latestRequestRef.current !== requestId) {
+      return;
+    }
+
+    const fetchedServices = (response.data?.services || []).map((service) => ({
+      ...service,
+      latitude: parseFloat(service.latitude),
+      longitude: parseFloat(service.longitude),
+      distance: null,
+    }));
+
+    setAllServices(fetchedServices);
+    filterServicesByRegion(fetchedServices, selectedSido, selectedSigungu, selectedEupmyeondong, apiCategory);
+    setStatusMessage(`총 ${fetchedServices.length}개의 장소를 찾았습니다.`);
+    setLoading(false);
+  }, [filterServicesByRegion]);
+
+  // ========== 메인 검색 함수 (단순화) ==========
+
   const fetchServices = useCallback(
     async ({
       region,
@@ -349,251 +605,64 @@ const LocationServiceMap = () => {
         ? effectiveCategoryType
         : undefined;
 
+      // 키워드 처리 (keywordOverride가 있으면 사용, 없으면 현재 keyword 상태 사용)
+      const effectiveKeyword = keywordOverride ?? (keyword && keyword.trim() ? keyword.trim() : undefined);
+
       try {
-
-        // 지역 계층별 검색만 수행 (내 위치는 거리 계산용으로만 사용)
-        const regionParams = {};
-
-        // 초기 로드 시 전략 선택
+        // 검색 전략 선택 및 실행
         if (isInitialLoad) {
           const targetLocation = userLocationOverride || userLocation;
-
-          // ========== 성능 측정 시작 ==========
-          const totalStartTime = performance.now();
-          console.log('🚀 [성능 측정] 초기 로드 시작');
-
-          // 전략: 위치 기반 검색 (5km 반경) + 백엔드 카테고리 필터링
-          const apiStartTime = performance.now();
-          let response;
-
-          if (targetLocation) {
-            // 초기 로드는 내 위치 기반 반경 검색 (빠르고 적은 데이터)
-            console.log('📍 [초기 로드] 내 위치 기반 반경 검색 (5km)');
-            initialLoadTypeRef.current = 'location-based';
-            response = await locationServiceApi.searchPlaces({
-              latitude: targetLocation.lat,
-              longitude: targetLocation.lng,
-              radius: 5000, // 5km 반경
-              category: apiCategory,
-            });
-          } else {
-            // 사용자 위치가 없으면 전체 조회
-            console.log('🌐 [초기 로드] 사용자 위치 없음 - 전체 조회');
-            initialLoadTypeRef.current = 'all';
-            response = await locationServiceApi.searchPlaces({
-              category: apiCategory,
-              size: 0, // 전체 조회 (0이면 백엔드에서 제한 없음)
-            });
-          }
-
-          const apiTime = performance.now() - apiStartTime;
-          console.log(`⏱️  [성능 측정] API 호출 시간: ${apiTime.toFixed(2)}ms`);
-          console.log(`📊 [성능 측정] 조회된 데이터 수: ${response.data?.services?.length || 0}개`);
-
-          if (latestRequestRef.current !== requestId) {
-            return;
-          }
-
-          // 백엔드에서 이미 위치 기반 필터링이 완료되었으므로 거리 계산은 선택적
-          // (표시용 거리 정보는 필요 시 계산)
-          let allFetchedServices = (response.data?.services || []).map((service) => {
-            let distance = null;
-            const lat = parseFloat(service.latitude);
-            const lng = parseFloat(service.longitude);
-
-            if (!isNaN(lat) && !isNaN(lng)) {
-              if (targetLocation) {
-                distance = calculateDistance(
-                  targetLocation.lat,
-                  targetLocation.lng,
-                  lat,
-                  lng
-                );
-              }
-            }
-            return {
-              ...service,
-              latitude: lat,
-              longitude: lng,
-              distance,
-            };
+          await handleInitialLoad({
+            targetLocation,
+            apiCategory,
+            effectiveKeyword,
+            requestId,
+            selectedSido,
+            selectedSigungu,
+            selectedEupmyeondong,
           });
-
-          // 전체 데이터를 allServices에 저장 (지역 필터링에 사용)
-          setAllServices(allFetchedServices);
-
-          // 사용자 위치가 있으면 메시지 표시
-          if (targetLocation) {
-            setStatusMessage(`내 주변 5km 이내 ${allFetchedServices.length}개의 장소를 찾았습니다.`);
-          } else {
-            setStatusMessage(`전체 ${allFetchedServices.length}개의 장소를 찾았습니다.`);
-          }
-
-          // 선택된 지역에 따라 필터링 (현재 로드된 데이터 기준)
-          const filterStartTime = performance.now();
-          filterServicesByRegion(allFetchedServices, selectedSido, selectedSigungu, selectedEupmyeondong, apiCategory);
-          const filterTime = performance.now() - filterStartTime;
-          console.log(`⏱️  [성능 측정] 필터링 시간: ${filterTime.toFixed(2)}ms`);
-
-          // 메모리 사용량 측정
-          if (performance.memory) {
-            const memoryUsed = (performance.memory.usedJSHeapSize / 1024 / 1024).toFixed(2);
-            const memoryTotal = (performance.memory.totalJSHeapSize / 1024 / 1024).toFixed(2);
-            console.log(`💾 [성능 측정] 메모리 사용량: ${memoryUsed} MB / ${memoryTotal} MB`);
-          }
-
-          const totalTime = performance.now() - totalStartTime;
-          console.log(`✅ [성능 측정] 전체 처리 시간: ${totalTime.toFixed(2)}ms`);
-          console.log(`📈 [성능 측정] 시간 분해: API(${apiTime.toFixed(2)}ms) + 필터링(${filterTime.toFixed(2)}ms) = ${totalTime.toFixed(2)}ms`);
-          // ========== 성능 측정 종료 ==========
-
-          isInitialLoadRef.current = false;
-          isSearchModeRef.current = false;
-          setSelectedService(null);
-          setLoading(false);
           return;
         }
 
-        // 위치 기반 검색 처리 (latitude, longitude, radius가 모두 있을 때)
         if (latitude != null && longitude != null && radius != null) {
-          console.log('📍 [위치 기반 검색] API 호출:', { latitude, longitude, radius });
-
-          const response = await locationServiceApi.searchPlaces({
+          await handleLocationBasedSearch({
             latitude,
             longitude,
             radius,
-            category: apiCategory,
+            apiCategory,
+            effectiveKeyword,
+            requestId,
           });
-
-          if (latestRequestRef.current !== requestId) {
-            return;
-          }
-
-          const fetchedServices = (response.data?.services || []).map((service) => {
-            let distance = null;
-            const lat = parseFloat(service.latitude);
-            const lng = parseFloat(service.longitude);
-
-            if (!isNaN(lat) && !isNaN(lng)) {
-              distance = calculateDistance(
-                latitude,
-                longitude,
-                lat,
-                lng
-              );
-            }
-            return {
-              ...service,
-              latitude: lat,
-              longitude: lng,
-              distance,
-            };
-          });
-
-          // 거리순 정렬 (가까운 순)
-          fetchedServices.sort((a, b) => {
-            if (a.distance === null && b.distance === null) return 0;
-            if (a.distance === null) return 1;
-            if (b.distance === null) return -1;
-            return a.distance - b.distance;
-          });
-
-          console.log(`📍 [위치 기반 검색] 결과: ${fetchedServices.length}개 서비스`);
-
-          setAllServices(fetchedServices);
-          setServices(fetchedServices);
-          setStatusMessage(`주변 ${radius / 1000}km 이내 ${fetchedServices.length}개의 장소를 찾았습니다.`);
-          setSelectedService(null);
-          setLoading(false);
           return;
         }
 
-        // 지역 검색이 명시적으로 요청된 경우 서버에서 데이터 가져오기
         if (region) {
-          // region 파라미터를 파싱하여 sido, sigungu, eupmyeondong 추출
-          // region 형식: "서울특별시" 또는 "서울특별시 강남구" 또는 "서울특별시 강남구 역삼동"
-          const regionParts = region.trim().split(/\s+/);
-          let apiSido = regionParts[0] || undefined;
-          let apiSigungu = regionParts[1] || undefined;
-          let apiEupmyeondong = regionParts[2] || undefined;
-
-          const response = await locationServiceApi.searchPlaces({
-            sido: apiSido,
-            sigungu: apiSigungu,
-            eupmyeondong: apiEupmyeondong,
-            category: apiCategory,
-            size: 0, // 전체 조회 (0이면 백엔드에서 제한 없음)
+          await executeRegionSearchStrategy({
+            region,
+            apiCategory,
+            effectiveKeyword,
+            requestId,
+            selectedSido,
+            selectedSigungu,
+            selectedEupmyeondong,
           });
-
-          if (latestRequestRef.current !== requestId) {
-            return;
-          }
-
-          const fetchedServices = (response.data?.services || []).map((service) => ({
-            ...service,
-            latitude: parseFloat(service.latitude),
-            longitude: parseFloat(service.longitude),
-          }));
-
-          // 지역별 데이터를 allServices에 업데이트하고 필터링
-          setAllServices(fetchedServices);
-          filterServicesByRegion(fetchedServices, selectedSido, selectedSigungu, selectedEupmyeondong, apiCategory);
-
-          isSearchModeRef.current = false;
-          setStatusMessage('');
-          setSelectedService(null);
-          setLoading(false);
           return;
         }
 
-        // 초기 로드가 아니고 지역 검색도 아닌 경우
-        // 하이브리드 전략: 현재 데이터 범위 내면 필터링, 범위 밖이면 백엔드 재요청
         if (allServices.length > 0) {
-          // 현재 로드된 데이터의 지역 범위 확인
-          const loadedSidos = new Set(allServices.map(s => s.sido).filter(Boolean));
-          const loadedSigungus = new Set(allServices.map(s => s.sigungu).filter(Boolean));
-
-          // 선택한 지역이 현재 데이터 범위 내에 있는지 확인
-          const isRegionInLoadedData =
-            (!selectedSido || loadedSidos.has(selectedSido)) &&
-            (!selectedSigungu || loadedSigungus.has(selectedSigungu));
-
-          if (isRegionInLoadedData) {
-            // 현재 데이터 범위 내: 프론트엔드 필터링
-            console.log('📍 [하이브리드] 현재 데이터 범위 내 - 프론트엔드 필터링');
-            filterServicesByRegion(allServices, selectedSido, selectedSigungu, selectedEupmyeondong, apiCategory);
-            setLoading(false);
-            return;
-          } else {
-            // 현재 데이터 범위 밖: 백엔드 재요청
-            console.log('🌐 [하이브리드] 현재 데이터 범위 밖 - 백엔드 재요청');
-            const response = await locationServiceApi.searchPlaces({
-              sido: selectedSido || undefined,
-              sigungu: selectedSigungu || undefined,
-              eupmyeondong: selectedEupmyeondong || undefined,
-              category: apiCategory,
-            });
-
-            if (latestRequestRef.current !== requestId) {
-              return;
-            }
-
-            const fetchedServices = (response.data?.services || []).map((service) => ({
-              ...service,
-              latitude: parseFloat(service.latitude),
-              longitude: parseFloat(service.longitude),
-              distance: null, // 지역 검색 시 거리는 계산하지 않음
-            }));
-
-            setAllServices(fetchedServices);
-            filterServicesByRegion(fetchedServices, selectedSido, selectedSigungu, selectedEupmyeondong, apiCategory);
-            setStatusMessage(`총 ${fetchedServices.length}개의 장소를 찾았습니다.`);
-            setLoading(false);
-            return;
-          }
+          await handleHybridSearch({
+            allServices,
+            selectedSido,
+            selectedSigungu,
+            selectedEupmyeondong,
+            apiCategory,
+            effectiveKeyword,
+            requestId,
+          });
+          return;
         }
 
-        // allServices가 없으면 다시 로드
+        // allServices가 없으면 종료
         setLoading(false);
         return;
       } catch (err) {
@@ -610,7 +679,19 @@ const LocationServiceMap = () => {
         }
       }
     },
-    [categoryType, selectedSido, selectedSigungu, selectedEupmyeondong, filterServicesByRegion, allServices, userLocation]
+    [
+      categoryType,
+      keyword,
+      selectedSido,
+      selectedSigungu,
+      selectedEupmyeondong,
+      allServices,
+      userLocation,
+      handleInitialLoad,
+      handleLocationBasedSearch,
+      executeRegionSearchStrategy,
+      handleHybridSearch,
+    ]
   );
 
   useEffect(() => {
@@ -714,10 +795,12 @@ const LocationServiceMap = () => {
         setStatusMessage('주변 서비스를 불러오는 중...');
 
         // 2단계: 초기 로드는 내 위치 기반 반경 검색 (빠르고 적은 데이터)
+        const currentKeyword = keyword && keyword.trim() ? keyword.trim() : undefined;
         const response = await locationServiceApi.searchPlaces({
           latitude: location.lat,
           longitude: location.lng,
           radius: 5000, // 5km 반경
+          keyword: currentKeyword,
         });
 
         if (response.data?.services) {
@@ -788,7 +871,9 @@ const LocationServiceMap = () => {
           setStatusMessage('위치를 확인할 수 없어 전체 서비스를 불러옵니다...');
 
           try {
+            const currentKeyword = keyword && keyword.trim() ? keyword.trim() : undefined;
             const response = await locationServiceApi.searchPlaces({
+              keyword: currentKeyword,
               size: 0, // 전체 조회
             });
 
@@ -817,7 +902,9 @@ const LocationServiceMap = () => {
           setStatusMessage('위치 확인 시간이 초과되어 전체 서비스를 불러옵니다...');
 
           try {
+            const currentKeyword = keyword && keyword.trim() ? keyword.trim() : undefined;
             const response = await locationServiceApi.searchPlaces({
+              keyword: currentKeyword,
               size: 0, // 전체 조회
             });
 
@@ -846,7 +933,9 @@ const LocationServiceMap = () => {
           setStatusMessage('위치를 확인할 수 없어 전체 서비스를 불러옵니다...');
 
           try {
+            const currentKeyword = keyword && keyword.trim() ? keyword.trim() : undefined;
             const response = await locationServiceApi.searchPlaces({
+              keyword: currentKeyword,
               size: 0, // 전체 조회
             });
 
@@ -884,19 +973,17 @@ const LocationServiceMap = () => {
   const handleKeywordSubmit = useCallback(
     (event) => {
       event.preventDefault();
-      setCategoryType(CATEGORY_CUSTOM);
-      // 키워드 검색은 전체 데이터에서 필터링 (지도 없이)
-      if (allServices.length > 0) {
-        filterServicesByRegion(allServices, selectedSido, selectedSigungu, selectedEupmyeondong, keyword);
-      } else {
-        // allServices가 없으면 초기 로드
-        fetchServices({
-          isInitialLoad: true,
-          categoryOverride: CATEGORY_CUSTOM,
-        });
+      if (!keyword || !keyword.trim()) {
+        return; // 빈 키워드는 무시
       }
+
+      // 키워드 검색: 백엔드에 keyword 전달하여 FULLTEXT 검색 수행
+      fetchServices({
+        keywordOverride: keyword.trim(),
+        categoryOverride: categoryType !== CATEGORY_DEFAULT ? categoryType : undefined,
+      });
     },
-    [fetchServices, keyword, selectedSido, selectedSigungu, selectedEupmyeondong, allServices, filterServicesByRegion]
+    [fetchServices, keyword, categoryType]
   );
 
   // 지도 위치 업데이트 함수
@@ -1932,6 +2019,21 @@ const LocationServiceMap = () => {
         </HeaderTop>
 
         <SearchControls $isOpen={showKeywordControls && searchMode === 'keyword'}>
+          <SearchBar onSubmit={handleKeywordSubmit}>
+            <SearchInput
+              type="text"
+              placeholder="키워드 검색 (예: 동물병원, 카페, 호텔 등)"
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleKeywordSubmit(e);
+                }
+              }}
+            />
+            <SearchButton type="submit">검색</SearchButton>
+          </SearchBar>
           <RegionButtonGrid>
             {KEYWORD_CATEGORIES.map((cat) => (
               <RegionButton

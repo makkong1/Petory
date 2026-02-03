@@ -25,8 +25,8 @@ const addAuthToken = (config) => {
 api.interceptors.request.use(addAuthToken, (error) => Promise.reject(error));
 
 const adminApi = axios.create({
-    baseURL: 'http://localhost:8080/api/admin/location-services',
-    headers: { 'Content-Type': 'application/json' },
+  baseURL: 'http://localhost:8080/api/admin/location-services',
+  headers: { 'Content-Type': 'application/json' },
 });
 
 adminApi.interceptors.request.use(addAuthToken, (error) => Promise.reject(error));
@@ -45,19 +45,21 @@ export const locationServiceApi = {
    * @param {string} params.eupmyeondong 읍면동 (선택, 예: "상계동", "동산동")
    * @param {string} params.roadName 도로명 (선택, 예: "상계로", "동세로")
    * @param {string} params.category 카테고리 (선택, 예: "동물약국", "미술관")
+   * @param {string} params.keyword 키워드 (선택, 이름/설명/카테고리 검색, 예: "동물병원", "카페")
    * @param {number} params.size 최대 결과 수 (선택, 기본값: 500)
    * @returns {Promise} 검색 결과
    */
-  searchPlaces: ({ 
+  searchPlaces: ({
     latitude,
     longitude,
     radius,
-    sido, 
-    sigungu, 
-    eupmyeondong, 
-    roadName, 
-    category, 
-    size 
+    sido,
+    sigungu,
+    eupmyeondong,
+    roadName,
+    category,
+    keyword,
+    size
   } = {}) =>
     api.get('/search', {
       params: {
@@ -69,6 +71,7 @@ export const locationServiceApi = {
         ...(eupmyeondong && { eupmyeondong }),
         ...(roadName && { roadName }),
         ...(category && { category }),
+        ...(keyword && { keyword }),
         ...(typeof size === 'number' && { size }),
       },
     }),
