@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState, useReducer } 
 import styled from 'styled-components';
 import { locationServiceApi } from '../../api/locationServiceApi';
 import { geocodingApi } from '../../api/geocodingApi';
+import { locationServiceReviewApi } from '../../api/locationServiceReviewApi';
+import { useAuth } from '../../contexts/AuthContext';
 import MapContainer from './MapContainer';
 
 const DEFAULT_CENTER = { lat: 37.5665, lng: 126.9780 };
@@ -348,11 +350,21 @@ const formatDistance = (meters) => {
 };
 
 const LocationServiceMap = () => {
+  const { user } = useAuth();
   const [allServices, setAllServices] = useState([]); // 전체 서비스 데이터 (하이브리드용)
   const [services, setServices] = useState([]); // 현재 표시할 서비스 (필터링된 데이터)
   // ✅ UI 상태를 useReducer로 관리
   const [uiState, dispatchUI] = useReducer(uiReducer, initialUIState);
   const { loading, error, statusMessage, selectedService, hoveredService, showDirections, showKeywordControls, showRegionControls } = uiState;
+
+  // 리뷰 관련 상태
+  const [reviews, setReviews] = useState([]);
+  const [loadingReviews, setLoadingReviews] = useState(false);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [editingReview, setEditingReview] = useState(null);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
 
   // ✅ 검색 상태를 useReducer로 관리
   const [searchState, dispatchSearch] = useReducer(searchReducer, initialSearchState);
@@ -386,6 +398,118 @@ const LocationServiceMap = () => {
   // "지도는 상태를 바꾸지 않는다" 원칙 적용
   const [pendingSearchLocation, setPendingSearchLocation] = useState(null); // 대기 중인 검색 위치
   const [showSearchButton, setShowSearchButton] = useState(false); // "이 지역 검색" 버튼 표시 여부
+
+  // 리뷰 조회
+  const fetchReviews = useCallback(async (serviceIdx) => {
+    if (!serviceIdx) return;
+    setLoadingReviews(true);
+    try {
+      const response = await locationServiceReviewApi.getReviewsByService(serviceIdx);
+      setReviews(response.data?.reviews || []);
+    } catch (error) {
+      console.error('리뷰 조회 실패:', error);
+      setReviews([]);
+    } finally {
+      setLoadingReviews(false);
+    }
+  }, []);
+
+  // 서비스 선택 시 리뷰 조회
+  useEffect(() => {
+    if (selectedService?.idx) {
+      fetchReviews(selectedService.idx);
+    } else {
+      setReviews([]);
+    }
+  }, [selectedService?.idx, fetchReviews]);
+
+  // 리뷰 작성
+  const handleSubmitReview = async () => {
+    if (!selectedService?.idx || !user?.idx) {
+      alert('리뷰 작성에 필요한 정보가 없습니다.');
+      return;
+    }
+
+    if (!reviewComment.trim()) {
+      alert('리뷰 내용을 입력해주세요.');
+      return;
+    }
+
+    setSubmittingReview(true);
+    try {
+      if (editingReview) {
+        // 리뷰 수정
+        await locationServiceReviewApi.updateReview(editingReview.idx, {
+          rating: reviewRating,
+          comment: reviewComment.trim(),
+        });
+        alert('리뷰가 수정되었습니다.');
+      } else {
+        // 리뷰 작성
+        await locationServiceReviewApi.createReview({
+          serviceIdx: selectedService.idx,
+          userIdx: user.idx,
+          rating: reviewRating,
+          comment: reviewComment.trim(),
+        });
+        alert('리뷰가 작성되었습니다.');
+      }
+
+      setShowReviewModal(false);
+      setEditingReview(null);
+      setReviewRating(5);
+      setReviewComment('');
+      // 리뷰 목록 새로고침
+      await fetchReviews(selectedService.idx);
+    } catch (error) {
+      console.error('리뷰 작성/수정 실패:', error);
+      const errorMessage = error.response?.data?.error || error.message || '리뷰 작성에 실패했습니다.';
+      alert(errorMessage);
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
+  // 리뷰 삭제
+  const handleDeleteReview = async (reviewIdx) => {
+    if (!window.confirm('리뷰를 삭제하시겠습니까?')) {
+      return;
+    }
+
+    try {
+      await locationServiceReviewApi.deleteReview(reviewIdx);
+      alert('리뷰가 삭제되었습니다.');
+      // 리뷰 목록 새로고침
+      if (selectedService?.idx) {
+        await fetchReviews(selectedService.idx);
+      }
+    } catch (error) {
+      console.error('리뷰 삭제 실패:', error);
+      alert(error.response?.data?.error || '리뷰 삭제에 실패했습니다.');
+    }
+  };
+
+  // 리뷰 작성 모달 열기
+  const handleOpenReviewModal = () => {
+    setEditingReview(null);
+    setReviewRating(5);
+    setReviewComment('');
+    setShowReviewModal(true);
+  };
+
+  // 리뷰 수정 모달 열기
+  const handleEditReview = (review) => {
+    setEditingReview(review);
+    setReviewRating(review.rating);
+    setReviewComment(review.comment || '');
+    setShowReviewModal(true);
+  };
+
+  // 내가 작성한 리뷰 확인
+  const myReview = useMemo(() => {
+    if (!user?.idx || !reviews.length) return null;
+    return reviews.find(review => review.userIdx === user.idx);
+  }, [reviews, user?.idx]);
 
   // 클라이언트에서 지역별 필터링 (시도, 시군구, 읍면동) - 최적화: 한 번의 순회로 처리
   const filterServicesByRegion = useCallback((allServicesData, sido, sigungu, eupmyeondong, category) => {
@@ -1834,6 +1958,57 @@ const LocationServiceMap = () => {
               </ServiceInfo>
             </DetailLeft>
             <DetailRight>
+              {!showDirections && (
+                <>
+                  <ActionSectionTitle>리뷰</ActionSectionTitle>
+                  {loadingReviews ? (
+                    <div style={{ padding: '2rem', textAlign: 'center', color: '#666' }}>리뷰를 불러오는 중...</div>
+                  ) : (
+                    <>
+                      {user && !myReview && (
+                        <ActionButtons>
+                          <ActionButton onClick={handleOpenReviewModal} primary>
+                            ✍️ 리뷰 작성하기
+                          </ActionButton>
+                        </ActionButtons>
+                      )}
+                      {reviews.length === 0 ? (
+                        <div style={{ padding: '2rem', textAlign: 'center', color: '#999' }}>
+                          아직 작성된 리뷰가 없습니다.
+                        </div>
+                      ) : (
+                        <ReviewsList>
+                          {reviews.map((review) => (
+                            <ReviewItem key={review.idx}>
+                              <ReviewHeader>
+                                <ReviewRating>
+                                  {'⭐'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}
+                                </ReviewRating>
+                                <ReviewDate>
+                                  {new Date(review.createdAt).toLocaleDateString('ko-KR')}
+                                </ReviewDate>
+                                {user?.idx === review.userIdx && (
+                                  <ReviewActions>
+                                    <ReviewActionButton onClick={() => handleEditReview(review)}>
+                                      수정
+                                    </ReviewActionButton>
+                                    <ReviewActionButton onClick={() => handleDeleteReview(review.idx)} danger>
+                                      삭제
+                                    </ReviewActionButton>
+                                  </ReviewActions>
+                                )}
+                              </ReviewHeader>
+                              {review.comment && (
+                                <ReviewComment>{review.comment}</ReviewComment>
+                              )}
+                            </ReviewItem>
+                          ))}
+                        </ReviewsList>
+                      )}
+                    </>
+                  )}
+                </>
+              )}
               {showDirections && selectedService.latitude && selectedService.longitude ? (
                 <DirectionsContainer>
                   <DirectionsHeader>
@@ -2416,6 +2591,53 @@ const LocationServiceMap = () => {
           </ServiceListContent>
         </ServiceListPanel>
       </MapArea>
+
+      {/* 리뷰 작성/수정 모달 */}
+      {showReviewModal && (
+        <ReviewModal onClick={() => setShowReviewModal(false)}>
+          <ReviewModalContent onClick={(e) => e.stopPropagation()}>
+            <ReviewModalHeader>
+              <ReviewModalTitle>{editingReview ? '리뷰 수정' : '리뷰 작성'}</ReviewModalTitle>
+              <ReviewModalClose onClick={() => setShowReviewModal(false)}>✕</ReviewModalClose>
+            </ReviewModalHeader>
+            <ReviewModalBody>
+              <ReviewRatingSection>
+                <ReviewLabel>평점</ReviewLabel>
+                <StarRating>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <StarButton
+                      key={star}
+                      type="button"
+                      onClick={() => setReviewRating(star)}
+                      active={star <= reviewRating}
+                    >
+                      ⭐
+                    </StarButton>
+                  ))}
+                  <RatingText>{reviewRating}점</RatingText>
+                </StarRating>
+              </ReviewRatingSection>
+              <ReviewCommentSection>
+                <ReviewLabel>리뷰 내용</ReviewLabel>
+                <ReviewTextarea
+                  value={reviewComment}
+                  onChange={(e) => setReviewComment(e.target.value)}
+                  placeholder="서비스에 대한 리뷰를 작성해주세요..."
+                  rows={5}
+                />
+              </ReviewCommentSection>
+            </ReviewModalBody>
+            <ReviewModalFooter>
+              <ReviewCancelButton onClick={() => setShowReviewModal(false)}>
+                취소
+              </ReviewCancelButton>
+              <ReviewSubmitButton onClick={handleSubmitReview} disabled={submittingReview || !reviewComment.trim()}>
+                {submittingReview ? '작성 중...' : editingReview ? '수정하기' : '작성하기'}
+              </ReviewSubmitButton>
+            </ReviewModalFooter>
+          </ReviewModalContent>
+        </ReviewModal>
+      )}
     </Container>
   );
 };
@@ -3310,5 +3532,237 @@ const DetailLink = styled.a`
   &:hover {
     background: ${props => props.theme.colors.primary}dd;
     transform: translateY(-1px);
+  }
+`;
+
+// 리뷰 관련 스타일
+const ReviewsList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-height: 500px;
+  overflow-y: auto;
+  padding: 0.5rem 0;
+`;
+
+const ReviewItem = styled.div`
+  padding: 1rem;
+  background: ${props => props.theme.colors.surface};
+  border: 1px solid ${props => props.theme.colors.border};
+  border-radius: 8px;
+`;
+
+const ReviewHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+`;
+
+const ReviewRating = styled.div`
+  font-size: 1rem;
+  color: ${props => props.theme.colors.warning || '#f59e0b'};
+`;
+
+const ReviewDate = styled.div`
+  font-size: 0.85rem;
+  color: ${props => props.theme.colors.textSecondary};
+`;
+
+const ReviewActions = styled.div`
+  display: flex;
+  gap: 0.5rem;
+`;
+
+const ReviewActionButton = styled.button`
+  padding: 0.25rem 0.75rem;
+  background: ${props => props.danger ? '#ef4444' : props.theme.colors.primary};
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    opacity: 0.8;
+    transform: translateY(-1px);
+  }
+`;
+
+const ReviewComment = styled.div`
+  color: ${props => props.theme.colors.text};
+  font-size: 0.95rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+`;
+
+const ReviewModal = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 4000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+`;
+
+const ReviewModalContent = styled.div`
+  background: ${props => props.theme.colors.surface || '#ffffff'};
+  border-radius: 12px;
+  width: 100%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+`;
+
+const ReviewModalHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid ${props => props.theme.colors.border};
+`;
+
+const ReviewModalTitle = styled.h2`
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: ${props => props.theme.colors.text};
+`;
+
+const ReviewModalClose = styled.button`
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: ${props => props.theme.colors.textSecondary};
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: ${props => props.theme.colors.surfaceHover};
+  }
+`;
+
+const ReviewModalBody = styled.div`
+  padding: 20px;
+`;
+
+const ReviewRatingSection = styled.div`
+  margin-bottom: 20px;
+`;
+
+const ReviewCommentSection = styled.div`
+  margin-bottom: 20px;
+`;
+
+const ReviewLabel = styled.label`
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: ${props => props.theme.colors.text};
+`;
+
+const StarRating = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+`;
+
+const StarButton = styled.button`
+  background: transparent;
+  border: none;
+  font-size: 28px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  filter: ${({ active }) => active ? 'none' : 'grayscale(100%) opacity(0.3)'};
+  transition: all 0.2s ease;
+
+  &:hover {
+    transform: scale(1.1);
+  }
+`;
+
+const RatingText = styled.span`
+  margin-left: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: ${props => props.theme.colors.text};
+`;
+
+const ReviewTextarea = styled.textarea`
+  width: 100%;
+  padding: 12px;
+  border: 1px solid ${props => props.theme.colors.border};
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+  color: ${props => props.theme.colors.text};
+  background: ${props => props.theme.colors.background};
+
+  &:focus {
+    outline: none;
+    border-color: ${props => props.theme.colors.primary};
+  }
+`;
+
+const ReviewModalFooter = styled.div`
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 20px;
+  border-top: 1px solid ${props => props.theme.colors.border};
+`;
+
+const ReviewCancelButton = styled.button`
+  padding: 10px 20px;
+  background: ${props => props.theme.colors.surface};
+  color: ${props => props.theme.colors.text};
+  border: 1px solid ${props => props.theme.colors.border};
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: ${props => props.theme.colors.surfaceHover};
+  }
+`;
+
+const ReviewSubmitButton = styled.button`
+  padding: 10px 20px;
+  background: ${props => props.theme.colors.primary};
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover:not(:disabled) {
+    background: ${props => props.theme.colors.primaryDark};
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
   }
 `;
