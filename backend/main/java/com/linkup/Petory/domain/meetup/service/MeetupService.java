@@ -24,7 +24,6 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map.Entry;
 import java.util.stream.Collectors;
 
 @Slf4j
