@@ -19,8 +19,13 @@ public interface SpringDataJpaMeetupParticipantsRepository extends JpaRepository
     @Query("SELECT mp FROM MeetupParticipants mp WHERE mp.meetup.idx = :meetupIdx ORDER BY mp.joinedAt ASC")
     List<MeetupParticipants> findByMeetupIdxOrderByJoinedAtAsc(@Param("meetupIdx") Long meetupIdx);
 
-    // 특정 사용자가 참여한 모임 목록
-    List<MeetupParticipants> findByUserIdxOrderByJoinedAtDesc(Long userIdx);
+    // 특정 사용자가 참여한 모임 목록 (JOIN FETCH 적용 - N+1 쿼리 해결)
+    @Query("SELECT mp FROM MeetupParticipants mp " +
+           "JOIN FETCH mp.meetup m " +
+           "JOIN FETCH mp.user u " +
+           "WHERE mp.user.idx = :userIdx " +
+           "ORDER BY mp.joinedAt DESC")
+    List<MeetupParticipants> findByUserIdxOrderByJoinedAtDesc(@Param("userIdx") Long userIdx);
 
     // 특정 모임의 참여자 수
     Long countByMeetupIdx(Long meetupIdx);

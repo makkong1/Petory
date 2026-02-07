@@ -3,6 +3,10 @@
 ## 개요
 Meetup 도메인의 백엔드 코드 분석을 통해 발견된 성능 이슈 및 리팩토링 포인트를 정리합니다.
 
+**문서 구조**:
+- `nearby-meetups/` - 반경 기반 모임 조회 최적화 (리팩토링)
+- `participants-query/` - 참여자 조회 N+1 쿼리 해결 (트러블슈팅)
+
 ---
 
 ## 🔴 Critical (긴급)
@@ -34,7 +38,7 @@ List<Meetup> nearbyMeetups = meetupRepository.findNearbyMeetups(lat, lng, radius
 
 **예상 효과**: O(n) → O(1) 메모리 사용, 쿼리 성능 10배 이상 개선
 
-**실제 성능 결과**: [성능 비교 분석](./performance-comparison.md)
+**실제 성능 결과**: [성능 비교 분석](./nearby-meetups/performance-comparison.md)
 
 | 지표 | Before | After (Bounding Box) | 개선율 | 비고 |
 |------|--------|---------------------|--------|------|
@@ -56,20 +60,21 @@ List<Meetup> nearbyMeetups = meetupRepository.findNearbyMeetups(lat, lng, radius
 - [x] EXPLAIN 실행 계획 확인 ✅ - [실행 계획 결과](./explain-results.md)
 
 **최종 최적화 결과**:
-- ✅ **인덱스 사용**: `idx_meetup_location` (type: range) - [인덱스 분석](./index-analysis.md)
+- ✅ **인덱스 사용**: `idx_meetup_location` (type: range) - [인덱스 분석](./nearby-meetups/index-analysis.md)
 - ✅ **스캔 행 수**: 2958개 → 117개 (**96% 감소**)
 - ✅ **인덱스 조건 푸시다운**: `Using index condition` 활용
 - ✅ **실제 성능 개선**: 전체 시간 43.8% 감소, DB 쿼리 40.7% 감소, 메모리 85.8% 감소
 
 ---
 
-### 2. N+1 쿼리 해결 - `findByUserIdxOrderByJoinedAtDesc()`
+### 2. N+1 쿼리 해결 - `findByUserIdxOrderByJoinedAtDesc()` ✅ **해결 완료**
 
 **파일**: `SpringDataJpaMeetupParticipantsRepository.java` (Line 23)
 
 **현재 문제**:
 - JOIN FETCH 없이 연관 엔티티 조회
 - `meetup`, `user` 접근 시 추가 쿼리 발생
+- PrepareStatement 수: 102개 (100개 참여 모임 기준)
 
 ```java
 // 현재 코드
@@ -85,6 +90,20 @@ List<MeetupParticipants> findByUserIdxOrderByJoinedAtDesc(Long userIdx);
        "ORDER BY mp.joinedAt DESC")
 List<MeetupParticipants> findByUserIdxOrderByJoinedAtDesc(@Param("userIdx") Long userIdx);
 ```
+
+**성능 측정 결과 (리팩토링 전)**:
+- ✅ 측정 완료 - [상세 결과](./participants-query/performance-results-participants-before.md)
+- 실행 시간: 102 ms
+- PrepareStatement 수: 102 개
+- 메모리 사용량: 4.5 MB
+- 결과 참여 모임 수: 100 개
+
+**실제 개선 효과** ✅:
+- ✅ PrepareStatement 수: 102개 → 2개 (**98.0% 감소**)
+- ⚠️ 실행 시간: 102ms → 178ms (단일 쿼리 복잡도 증가, 하지만 쿼리 수 감소로 전체 DB 부하 감소)
+- 메모리 사용량: 4.5MB → 6.0MB (JOIN FETCH로 한 번에 로드)
+
+**상세 결과**: [성능 비교 문서](./participants-query/performance-comparison-participants.md)
 
 ---
 
