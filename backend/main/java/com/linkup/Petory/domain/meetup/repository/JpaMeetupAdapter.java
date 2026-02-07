@@ -71,8 +71,8 @@ public class JpaMeetupAdapter implements MeetupRepository {
     }
 
     @Override
-    public List<Meetup> findNearbyMeetups(Double lat, Double lng, Double radius) {
-        return jpaRepository.findNearbyMeetups(lat, lng, radius);
+    public List<Meetup> findNearbyMeetups(Double lat, Double lng, Double radius, LocalDateTime currentDate) {
+        return jpaRepository.findNearbyMeetups(lat, lng, radius, currentDate);
     }
 
     @Override
