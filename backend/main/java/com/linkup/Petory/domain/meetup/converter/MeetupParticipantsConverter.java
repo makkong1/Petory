@@ -12,12 +12,12 @@ public class MeetupParticipantsConverter {
         if (participants == null)
             return null;
 
-        return MeetupParticipantsDTO.builder()
-                .meetupIdx(participants.getMeetup().getIdx())
-                .userIdx(participants.getUser().getIdx())
-                .username(participants.getUser().getUsername())
-                .joinedAt(participants.getJoinedAt())
-                .build();
+        return new MeetupParticipantsDTO(
+                participants.getMeetup().getIdx(),
+                participants.getUser().getIdx(),
+                participants.getUser().getUsername(),
+                participants.getJoinedAt()
+        );
     }
 
     public MeetupParticipants toEntity(MeetupParticipantsDTO dto) {
@@ -25,7 +25,7 @@ public class MeetupParticipantsConverter {
             return null;
 
         return MeetupParticipants.builder()
-                .joinedAt(dto.getJoinedAt())
+                .joinedAt(dto.joinedAt())
                 .build();
     }
 }

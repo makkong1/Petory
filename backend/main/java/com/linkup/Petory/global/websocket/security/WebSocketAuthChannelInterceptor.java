@@ -16,6 +16,9 @@ import org.springframework.stereotype.Component;
 
 import com.linkup.Petory.util.JwtUtil;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -53,7 +56,10 @@ public class WebSocketAuthChannelInterceptor implements ChannelInterceptor {
             }
 
             // 세션에서 토큰 또는 인증 정보 가져오기
-            Authentication auth = (Authentication) accessor.getSessionAttributes().get("authentication");
+            Map<String, Object> sessionAttrs = accessor.getSessionAttributes();
+            Authentication auth = sessionAttrs != null
+                    ? (Authentication) sessionAttrs.get("authentication")
+                    : null;
 
             if (auth == null && token != null && jwtUtil.validateToken(token)) {
                 String userId = jwtUtil.getIdFromToken(token);
@@ -66,9 +72,14 @@ public class WebSocketAuthChannelInterceptor implements ChannelInterceptor {
                                 null,
                                 userDetails.getAuthorities());
 
-                        // 세션에 저장
-                        accessor.getSessionAttributes().put("authentication", auth);
-                        accessor.getSessionAttributes().put("userId", userId);
+                        // 세션에 저장 (null이면 새 Map 생성)
+                        Map<String, Object> attrs = accessor.getSessionAttributes();
+                        if (attrs == null) {
+                            attrs = new HashMap<>();
+                            accessor.setSessionAttributes(attrs);
+                        }
+                        attrs.put("authentication", auth);
+                        attrs.put("userId", userId);
 
                         // SecurityContext에 설정
                         SecurityContextHolder.getContext().setAuthentication(auth);
@@ -90,7 +101,8 @@ public class WebSocketAuthChannelInterceptor implements ChannelInterceptor {
 
                 // Principal이 없으면 설정
                 if (accessor.getUser() == null) {
-                    String userId = (String) accessor.getSessionAttributes().get("userId");
+                    Map<String, Object> attrs = accessor.getSessionAttributes();
+                    String userId = attrs != null ? (String) attrs.get("userId") : null;
                     if (userId != null) {
                         accessor.setUser(new StompPrincipal(userId));
                     }

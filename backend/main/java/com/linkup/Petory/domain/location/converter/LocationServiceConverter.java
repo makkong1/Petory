@@ -49,22 +49,12 @@ public class LocationServiceConverter {
                 .dataSource(service.getDataSource())
                 .isDeleted(service.getIsDeleted())
                 .deletedAt(service.getDeletedAt())
-                // 하위 호환성을 위한 deprecated 필드
-                .openingTime(null) // operatingHours 문자열로 저장되므로 null
-                .closingTime(null) // 필요 시 operatingHours 파싱 필요
-                .imageUrl(null) // imageUrl 필드 제거됨
                 .build();
     }
 
     // fromDTO 메서드: DTO를 엔티티로 변환
     public LocationService fromDTO(LocationServiceDTO dto) {
-        // operatingHours 우선, 없으면 openingTime/closingTime에서 생성
         String operatingHours = dto.getOperatingHours();
-        if (operatingHours == null && dto.getOpeningTime() != null && dto.getClosingTime() != null) {
-            operatingHours = String.format("%02d:%02d~%02d:%02d",
-                    dto.getOpeningTime().getHour(), dto.getOpeningTime().getMinute(),
-                    dto.getClosingTime().getHour(), dto.getClosingTime().getMinute());
-        }
 
         // category3, category2, category1 순서로 카테고리 결정
         String categoryValue = dto.getCategory3() != null ? dto.getCategory3()

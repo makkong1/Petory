@@ -1,7 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, useReducer } from 'react';
 import styled from 'styled-components';
 import { locationServiceApi } from '../../api/locationServiceApi';
 import { geocodingApi } from '../../api/geocodingApi';
+import { locationServiceReviewApi } from '../../api/locationServiceReviewApi';
+import { useAuth } from '../../contexts/AuthContext';
 import MapContainer from './MapContainer';
 
 const DEFAULT_CENTER = { lat: 37.5665, lng: 126.9780 };
@@ -26,6 +28,142 @@ const calculateMapLevelFromRadius = (radiusKm) => {
 
 const CATEGORY_DEFAULT = 'all';
 const CATEGORY_CUSTOM = 'custom';
+
+// ========== 검색 상태 Reducer ==========
+const searchReducer = (state, action) => {
+  switch (action.type) {
+    case 'SET_KEYWORD':
+      return { ...state, keyword: action.payload };
+    case 'SET_KEYWORD_CATEGORY':
+      return { ...state, selectedKeywordCategory: action.payload };
+    case 'SET_ADDRESS_QUERY':
+      return { ...state, addressQuery: action.payload };
+    case 'SET_CATEGORY_TYPE':
+      return { ...state, categoryType: action.payload };
+    case 'SET_SEARCH_MODE':
+      return { ...state, searchMode: action.payload };
+    case 'RESET_SEARCH':
+      return {
+        keyword: '',
+        selectedKeywordCategory: '',
+        addressQuery: '',
+        categoryType: CATEGORY_DEFAULT,
+        searchMode: 'keyword',
+      };
+    default:
+      return state;
+  }
+};
+
+const initialSearchState = {
+  keyword: '',
+  selectedKeywordCategory: '',
+  addressQuery: '',
+  categoryType: CATEGORY_DEFAULT,
+  searchMode: 'keyword',
+};
+
+// ========== 지역 선택 상태 Reducer ==========
+const regionReducer = (state, action) => {
+  switch (action.type) {
+    case 'SET_SIDO':
+      return {
+        ...state,
+        selectedSido: action.payload,
+        selectedSigungu: '', // 시도 선택 시 시군구 초기화
+        selectedEupmyeondong: '', // 시도 선택 시 읍면동 초기화
+        currentView: 'sigungu', // 시군구 선택 화면으로 전환
+      };
+    case 'SET_SIGUNGU':
+      return {
+        ...state,
+        selectedSigungu: action.payload,
+        selectedEupmyeondong: '', // 시군구 선택 시 읍면동 초기화
+        currentView: 'sigungu',
+      };
+    case 'SET_EUPMYEONDONG':
+      return {
+        ...state,
+        selectedEupmyeondong: action.payload,
+      };
+    case 'SET_CURRENT_VIEW':
+      return { ...state, currentView: action.payload };
+    case 'SET_REGION':
+      // 한 번에 여러 지역 설정
+      return {
+        ...state,
+        selectedSido: action.payload.sido ?? state.selectedSido,
+        selectedSigungu: action.payload.sigungu ?? state.selectedSigungu,
+        selectedEupmyeondong: action.payload.eupmyeondong ?? state.selectedEupmyeondong,
+        currentView: action.payload.currentView ?? state.currentView,
+      };
+    case 'RESET_REGION':
+      return {
+        selectedSido: '',
+        selectedSigungu: '',
+        selectedEupmyeondong: '',
+        currentView: 'sido',
+      };
+    default:
+      return state;
+  }
+};
+
+const initialRegionState = {
+  selectedSido: '',
+  selectedSigungu: '',
+  selectedEupmyeondong: '',
+  currentView: 'sido',
+};
+
+// ========== UI 상태 Reducer ==========
+const uiReducer = (state, action) => {
+  switch (action.type) {
+    case 'SET_LOADING':
+      return { ...state, loading: action.payload };
+    case 'SET_ERROR':
+      return { ...state, error: action.payload };
+    case 'SET_STATUS_MESSAGE':
+      return { ...state, statusMessage: action.payload };
+    case 'SET_SELECTED_SERVICE':
+      return { ...state, selectedService: action.payload };
+    case 'SET_HOVERED_SERVICE':
+      return { ...state, hoveredService: action.payload };
+    case 'SET_SHOW_DIRECTIONS':
+      return { ...state, showDirections: action.payload };
+    case 'SET_SHOW_KEYWORD_CONTROLS':
+      return { ...state, showKeywordControls: action.payload };
+    case 'SET_SHOW_REGION_CONTROLS':
+      return { ...state, showRegionControls: action.payload };
+    case 'SET_UI':
+      // 한 번에 여러 UI 상태 업데이트
+      return { ...state, ...action.payload };
+    case 'RESET_UI':
+      return {
+        loading: false,
+        error: null,
+        statusMessage: '지도 준비 중...',
+        selectedService: null,
+        hoveredService: null,
+        showDirections: false,
+        showKeywordControls: false,
+        showRegionControls: false,
+      };
+    default:
+      return state;
+  }
+};
+
+const initialUIState = {
+  loading: false,
+  error: null,
+  statusMessage: '지도 준비 중...',
+  selectedService: null,
+  hoveredService: null,
+  showDirections: false,
+  showKeywordControls: false,
+  showRegionControls: false,
+};
 
 // 키워드 검색 카테고리 목록
 const KEYWORD_CATEGORIES = [
@@ -212,29 +350,35 @@ const formatDistance = (meters) => {
 };
 
 const LocationServiceMap = () => {
+  const { user } = useAuth();
   const [allServices, setAllServices] = useState([]); // 전체 서비스 데이터 (하이브리드용)
   const [services, setServices] = useState([]); // 현재 표시할 서비스 (필터링된 데이터)
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [statusMessage, setStatusMessage] = useState('지도 준비 중...');
-  const [keyword, setKeyword] = useState('');
-  const [selectedKeywordCategory, setSelectedKeywordCategory] = useState('');
-  const [addressQuery, setAddressQuery] = useState('');
-  const [categoryType, setCategoryType] = useState(CATEGORY_DEFAULT);
-  const [searchMode, setSearchMode] = useState('keyword');
-  const [selectedSido, setSelectedSido] = useState('');
-  const [selectedSigungu, setSelectedSigungu] = useState('');
-  const [selectedEupmyeondong, setSelectedEupmyeondong] = useState('');
-  const [currentView, setCurrentView] = useState('sido'); // 현재 화면: 'sido', 'sigungu', 'eupmyeondong'
-  const [selectedService, setSelectedService] = useState(null);
-  const [hoveredService, setHoveredService] = useState(null); // 리스트 아이템 호버 시 해당 서비스 상태
-  const [showDirections, setShowDirections] = useState(false);
+  // ✅ UI 상태를 useReducer로 관리
+  const [uiState, dispatchUI] = useReducer(uiReducer, initialUIState);
+  const { loading, error, statusMessage, selectedService, hoveredService, showDirections, showKeywordControls, showRegionControls } = uiState;
+
+  // 리뷰 관련 상태
+  const [reviews, setReviews] = useState([]);
+  const [loadingReviews, setLoadingReviews] = useState(false);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [editingReview, setEditingReview] = useState(null);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
+
+  // ✅ 검색 상태를 useReducer로 관리
+  const [searchState, dispatchSearch] = useReducer(searchReducer, initialSearchState);
+  const { keyword, selectedKeywordCategory, addressQuery, categoryType, searchMode } = searchState;
+
+  // ✅ 지역 선택 상태를 useReducer로 관리
+  const [regionState, dispatchRegion] = useReducer(regionReducer, initialRegionState);
+  const { selectedSido, selectedSigungu, selectedEupmyeondong, currentView } = regionState;
+
+  // 기타 상태 (아직 그룹화하지 않은 상태들)
   const [directionsData, setDirectionsData] = useState(null);
   const [startLocationAddress, setStartLocationAddress] = useState(null); // 출발지 주소 (좌표 변환 결과)
   const [hoveredSido, setHoveredSido] = useState(null); // 마우스 호버된 시/도
   const [currentMapView, setCurrentMapView] = useState('nation'); // 'nation', 'sido', 'sigungu'
-  const [showKeywordControls, setShowKeywordControls] = useState(false); // 키워드 태그 리스트 표시 여부
-  const [showRegionControls, setShowRegionControls] = useState(false); // 지역 태그 리스트 표시 여부
 
   // 선택된 지역의 하위 지역 목록 (서비스 데이터에서 추출)
   const [availableSigungus, setAvailableSigungus] = useState([]); // 선택된 시도의 시군구 목록
@@ -254,6 +398,118 @@ const LocationServiceMap = () => {
   // "지도는 상태를 바꾸지 않는다" 원칙 적용
   const [pendingSearchLocation, setPendingSearchLocation] = useState(null); // 대기 중인 검색 위치
   const [showSearchButton, setShowSearchButton] = useState(false); // "이 지역 검색" 버튼 표시 여부
+
+  // 리뷰 조회
+  const fetchReviews = useCallback(async (serviceIdx) => {
+    if (!serviceIdx) return;
+    setLoadingReviews(true);
+    try {
+      const response = await locationServiceReviewApi.getReviewsByService(serviceIdx);
+      setReviews(response.data?.reviews || []);
+    } catch (error) {
+      console.error('리뷰 조회 실패:', error);
+      setReviews([]);
+    } finally {
+      setLoadingReviews(false);
+    }
+  }, []);
+
+  // 서비스 선택 시 리뷰 조회
+  useEffect(() => {
+    if (selectedService?.idx) {
+      fetchReviews(selectedService.idx);
+    } else {
+      setReviews([]);
+    }
+  }, [selectedService?.idx, fetchReviews]);
+
+  // 리뷰 작성
+  const handleSubmitReview = async () => {
+    if (!selectedService?.idx || !user?.idx) {
+      alert('리뷰 작성에 필요한 정보가 없습니다.');
+      return;
+    }
+
+    if (!reviewComment.trim()) {
+      alert('리뷰 내용을 입력해주세요.');
+      return;
+    }
+
+    setSubmittingReview(true);
+    try {
+      if (editingReview) {
+        // 리뷰 수정
+        await locationServiceReviewApi.updateReview(editingReview.idx, {
+          rating: reviewRating,
+          comment: reviewComment.trim(),
+        });
+        alert('리뷰가 수정되었습니다.');
+      } else {
+        // 리뷰 작성
+        await locationServiceReviewApi.createReview({
+          serviceIdx: selectedService.idx,
+          userIdx: user.idx,
+          rating: reviewRating,
+          comment: reviewComment.trim(),
+        });
+        alert('리뷰가 작성되었습니다.');
+      }
+
+      setShowReviewModal(false);
+      setEditingReview(null);
+      setReviewRating(5);
+      setReviewComment('');
+      // 리뷰 목록 새로고침
+      await fetchReviews(selectedService.idx);
+    } catch (error) {
+      console.error('리뷰 작성/수정 실패:', error);
+      const errorMessage = error.response?.data?.error || error.message || '리뷰 작성에 실패했습니다.';
+      alert(errorMessage);
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
+  // 리뷰 삭제
+  const handleDeleteReview = async (reviewIdx) => {
+    if (!window.confirm('리뷰를 삭제하시겠습니까?')) {
+      return;
+    }
+
+    try {
+      await locationServiceReviewApi.deleteReview(reviewIdx);
+      alert('리뷰가 삭제되었습니다.');
+      // 리뷰 목록 새로고침
+      if (selectedService?.idx) {
+        await fetchReviews(selectedService.idx);
+      }
+    } catch (error) {
+      console.error('리뷰 삭제 실패:', error);
+      alert(error.response?.data?.error || '리뷰 삭제에 실패했습니다.');
+    }
+  };
+
+  // 리뷰 작성 모달 열기
+  const handleOpenReviewModal = () => {
+    setEditingReview(null);
+    setReviewRating(5);
+    setReviewComment('');
+    setShowReviewModal(true);
+  };
+
+  // 리뷰 수정 모달 열기
+  const handleEditReview = (review) => {
+    setEditingReview(review);
+    setReviewRating(review.rating);
+    setReviewComment(review.comment || '');
+    setShowReviewModal(true);
+  };
+
+  // 내가 작성한 리뷰 확인
+  const myReview = useMemo(() => {
+    if (!user?.idx || !reviews.length) return null;
+    return reviews.find(review => review.userIdx === user.idx);
+  }, [reviews, user?.idx]);
 
   // 클라이언트에서 지역별 필터링 (시도, 시군구, 읍면동) - 최적화: 한 번의 순회로 처리
   const filterServicesByRegion = useCallback((allServicesData, sido, sigungu, eupmyeondong, category) => {
@@ -319,10 +575,296 @@ const LocationServiceMap = () => {
     }
 
     setServices(filtered);
-    setStatusMessage(filtered.length === 0 ? '해당 지역에 표시할 장소가 없습니다.' : `총 ${filtered.length}개의 장소가 있습니다.`);
+    dispatchUI({ type: 'SET_STATUS_MESSAGE', payload: filtered.length === 0 ? '해당 지역에 표시할 장소가 없습니다.' : `총 ${filtered.length}개의 장소가 있습니다.` });
   }, []);
 
   // 지도 bounds 기반 필터링 제거됨 (지도 미사용)
+
+  // ========== 검색 전략 함수 분리 ==========
+
+  /**
+   * 초기 로드 전략
+   */
+  const handleInitialLoad = useCallback(async ({
+    targetLocation,
+    apiCategory,
+    effectiveKeyword,
+    requestId,
+    selectedSido,
+    selectedSigungu,
+    selectedEupmyeondong,
+  }) => {
+    const totalStartTime = performance.now();
+    console.log('🚀 [성능 측정] 초기 로드 시작');
+
+    const apiStartTime = performance.now();
+    let response;
+
+    if (targetLocation) {
+      console.log('📍 [초기 로드] 내 위치 기반 반경 검색 (5km)');
+      initialLoadTypeRef.current = 'location-based';
+      response = await locationServiceApi.searchPlaces({
+        latitude: targetLocation.lat,
+        longitude: targetLocation.lng,
+        radius: 5000,
+        category: apiCategory,
+        keyword: effectiveKeyword,
+      });
+    } else {
+      console.log('🌐 [초기 로드] 사용자 위치 없음 - 전체 조회');
+      initialLoadTypeRef.current = 'all';
+      response = await locationServiceApi.searchPlaces({
+        category: apiCategory,
+        keyword: effectiveKeyword,
+        size: 0,
+      });
+    }
+
+    if (latestRequestRef.current !== requestId) {
+      return;
+    }
+
+    const apiTime = performance.now() - apiStartTime;
+    console.log(`⏱️  [성능 측정] API 호출 시간: ${apiTime.toFixed(2)}ms`);
+    console.log(`📊 [성능 측정] 조회된 데이터 수: ${response.data?.services?.length || 0}개`);
+
+    const allFetchedServices = (response.data?.services || []).map((service) => {
+      const lat = parseFloat(service.latitude);
+      const lng = parseFloat(service.longitude);
+
+      let distance = service.distance || null;
+      if (distance === null && !isNaN(lat) && !isNaN(lng) && targetLocation) {
+        distance = calculateDistance(
+          targetLocation.lat,
+          targetLocation.lng,
+          lat,
+          lng
+        );
+      }
+
+      return {
+        ...service,
+        latitude: lat,
+        longitude: lng,
+        distance,
+      };
+    });
+
+    setAllServices(allFetchedServices);
+
+    if (targetLocation) {
+      dispatchUI({ type: 'SET_STATUS_MESSAGE', payload: `내 주변 5km 이내 ${allFetchedServices.length}개의 장소를 찾았습니다.` });
+    } else {
+      dispatchUI({ type: 'SET_STATUS_MESSAGE', payload: `전체 ${allFetchedServices.length}개의 장소를 찾았습니다.` });
+    }
+
+    const filterStartTime = performance.now();
+    filterServicesByRegion(allFetchedServices, selectedSido, selectedSigungu, selectedEupmyeondong, apiCategory);
+    const filterTime = performance.now() - filterStartTime;
+    console.log(`⏱️  [성능 측정] 필터링 시간: ${filterTime.toFixed(2)}ms`);
+
+    if (performance.memory) {
+      const memoryUsed = (performance.memory.usedJSHeapSize / 1024 / 1024).toFixed(2);
+      const memoryTotal = (performance.memory.totalJSHeapSize / 1024 / 1024).toFixed(2);
+      console.log(`💾 [성능 측정] 메모리 사용량: ${memoryUsed} MB / ${memoryTotal} MB`);
+    }
+
+    const totalTime = performance.now() - totalStartTime;
+    console.log(`✅ [성능 측정] 전체 처리 시간: ${totalTime.toFixed(2)}ms`);
+    console.log(`📈 [성능 측정] 시간 분해: API(${apiTime.toFixed(2)}ms) + 필터링(${filterTime.toFixed(2)}ms) = ${totalTime.toFixed(2)}ms`);
+
+    isInitialLoadRef.current = false;
+    isSearchModeRef.current = false;
+    dispatchUI({ type: 'SET_UI', payload: { selectedService: null, loading: false } });
+  }, [filterServicesByRegion]);
+
+  /**
+   * 위치 기반 검색 전략
+   */
+  const handleLocationBasedSearch = useCallback(async ({
+    latitude,
+    longitude,
+    radius,
+    apiCategory,
+    effectiveKeyword,
+    requestId,
+  }) => {
+    console.log('📍 [위치 기반 검색] API 호출:', { latitude, longitude, radius });
+
+    const response = await locationServiceApi.searchPlaces({
+      latitude,
+      longitude,
+      radius,
+      category: apiCategory,
+      keyword: effectiveKeyword,
+    });
+
+    if (latestRequestRef.current !== requestId) {
+      return;
+    }
+
+    const fetchedServices = (response.data?.services || []).map((service) => {
+      const lat = parseFloat(service.latitude);
+      const lng = parseFloat(service.longitude);
+
+      let distance = service.distance || null;
+      if (distance === null && !isNaN(lat) && !isNaN(lng)) {
+        distance = calculateDistance(latitude, longitude, lat, lng);
+      }
+
+      return {
+        ...service,
+        latitude: lat,
+        longitude: lng,
+        distance,
+      };
+    });
+
+    fetchedServices.sort((a, b) => {
+      if (a.distance === null && b.distance === null) return 0;
+      if (a.distance === null) return 1;
+      if (b.distance === null) return -1;
+      return a.distance - b.distance;
+    });
+
+    console.log(`📍 [위치 기반 검색] 결과: ${fetchedServices.length}개 서비스`);
+
+    setAllServices(fetchedServices);
+    setServices(fetchedServices);
+    dispatchUI({ type: 'SET_STATUS_MESSAGE', payload: `주변 ${radius / 1000}km 이내 ${fetchedServices.length}개의 장소를 찾았습니다.` });
+    dispatchUI({ type: 'SET_UI', payload: { selectedService: null, loading: false } });
+  }, []);
+
+  /**
+   * 지역 검색 전략 실행
+   */
+  const executeRegionSearchStrategy = useCallback(async ({
+    region,
+    apiCategory,
+    effectiveKeyword,
+    requestId,
+    selectedSido,
+    selectedSigungu,
+    selectedEupmyeondong,
+  }) => {
+    const regionParts = region.trim().split(/\s+/);
+    const apiSido = regionParts[0] || undefined;
+    const apiSigungu = regionParts[1] || undefined;
+    const apiEupmyeondong = regionParts[2] || undefined;
+
+    const response = await locationServiceApi.searchPlaces({
+      sido: apiSido,
+      sigungu: apiSigungu,
+      eupmyeondong: apiEupmyeondong,
+      category: apiCategory,
+      keyword: effectiveKeyword,
+      size: 0,
+    });
+
+    if (latestRequestRef.current !== requestId) {
+      return;
+    }
+
+    const fetchedServices = (response.data?.services || []).map((service) => ({
+      ...service,
+      latitude: parseFloat(service.latitude),
+      longitude: parseFloat(service.longitude),
+    }));
+
+    setAllServices(fetchedServices);
+    filterServicesByRegion(fetchedServices, selectedSido, selectedSigungu, selectedEupmyeondong, apiCategory);
+
+    isSearchModeRef.current = false;
+    dispatchUI({ type: 'SET_STATUS_MESSAGE', payload: '' });
+    dispatchUI({ type: 'SET_UI', payload: { selectedService: null, loading: false } });
+  }, [filterServicesByRegion]);
+
+  /**
+   * 하이브리드 전략 (현재 데이터 범위 확인 후 필터링 또는 재요청)
+   * 
+   * 개선: 지역 선택 시 항상 백엔드 재요청하여 일관성 확보
+   * - 초기 로드가 위치 기반(5km 반경)이면 allServices에 반경 내 데이터만 포함됨
+   * - 이후 지역 선택 시 프론트엔드 필터링만 하면 반경 밖 서비스가 누락됨
+   * - 해결: 지역 선택이 있으면 항상 백엔드 재요청
+   */
+  const handleHybridSearch = useCallback(async ({
+    allServices,
+    selectedSido,
+    selectedSigungu,
+    selectedEupmyeondong,
+    apiCategory,
+    effectiveKeyword,
+    requestId,
+  }) => {
+    // ✅ 개선: 지역 선택이 있으면 항상 백엔드 재요청 (일관성 확보)
+    if (selectedSido || selectedSigungu || selectedEupmyeondong) {
+      console.log('🌐 [하이브리드] 지역 선택 감지 - 백엔드 재요청 (일관성 확보)');
+      const response = await locationServiceApi.searchPlaces({
+        sido: selectedSido || undefined,
+        sigungu: selectedSigungu || undefined,
+        eupmyeondong: selectedEupmyeondong || undefined,
+        category: apiCategory,
+        keyword: effectiveKeyword,
+      });
+
+      if (latestRequestRef.current !== requestId) {
+        return;
+      }
+
+      const fetchedServices = (response.data?.services || []).map((service) => ({
+        ...service,
+        latitude: parseFloat(service.latitude),
+        longitude: parseFloat(service.longitude),
+        distance: null,
+      }));
+
+      setAllServices(fetchedServices);
+      filterServicesByRegion(fetchedServices, selectedSido, selectedSigungu, selectedEupmyeondong, apiCategory);
+      dispatchUI({ type: 'SET_UI', payload: { statusMessage: `총 ${fetchedServices.length}개의 장소를 찾았습니다.`, loading: false } });
+      return;
+    }
+
+    // 지역 선택이 없을 때만 기존 하이브리드 전략 사용 (카테고리/키워드 변경 등)
+    const loadedSidos = new Set(allServices.map(s => s.sido).filter(Boolean));
+    const loadedSigungus = new Set(allServices.map(s => s.sigungu).filter(Boolean));
+
+    const isRegionInLoadedData =
+      (!selectedSido || loadedSidos.has(selectedSido)) &&
+      (!selectedSigungu || loadedSigungus.has(selectedSigungu));
+
+    if (isRegionInLoadedData) {
+      console.log('📍 [하이브리드] 현재 데이터 범위 내 - 프론트엔드 필터링');
+      filterServicesByRegion(allServices, selectedSido, selectedSigungu, selectedEupmyeondong, apiCategory);
+      dispatchUI({ type: 'SET_LOADING', payload: false });
+      return;
+    }
+
+    console.log('🌐 [하이브리드] 현재 데이터 범위 밖 - 백엔드 재요청');
+    const response = await locationServiceApi.searchPlaces({
+      sido: selectedSido || undefined,
+      sigungu: selectedSigungu || undefined,
+      eupmyeondong: selectedEupmyeondong || undefined,
+      category: apiCategory,
+      keyword: effectiveKeyword,
+    });
+
+    if (latestRequestRef.current !== requestId) {
+      return;
+    }
+
+    const fetchedServices = (response.data?.services || []).map((service) => ({
+      ...service,
+      latitude: parseFloat(service.latitude),
+      longitude: parseFloat(service.longitude),
+      distance: null,
+    }));
+
+    setAllServices(fetchedServices);
+    filterServicesByRegion(fetchedServices, selectedSido, selectedSigungu, selectedEupmyeondong, apiCategory);
+    dispatchUI({ type: 'SET_UI', payload: { statusMessage: `총 ${fetchedServices.length}개의 장소를 찾았습니다.`, loading: false } });
+  }, [filterServicesByRegion]);
+
+  // ========== 메인 검색 함수 (단순화) ==========
 
   const fetchServices = useCallback(
     async ({
@@ -338,9 +880,7 @@ const LocationServiceMap = () => {
       const requestId = Date.now();
       latestRequestRef.current = requestId;
 
-      setLoading(true);
-      setStatusMessage('데이터 불러오는 중...');
-      setError(null);
+      dispatchUI({ type: 'SET_UI', payload: { loading: true, statusMessage: '데이터 불러오는 중...', error: null } });
 
       const effectiveCategoryType = categoryOverride ?? categoryType;
       const apiCategory = effectiveCategoryType &&
@@ -349,252 +889,65 @@ const LocationServiceMap = () => {
         ? effectiveCategoryType
         : undefined;
 
+      // 키워드 처리 (keywordOverride가 있으면 사용, 없으면 현재 keyword 상태 사용)
+      const effectiveKeyword = keywordOverride ?? (keyword && keyword.trim() ? keyword.trim() : undefined);
+
       try {
-
-        // 지역 계층별 검색만 수행 (내 위치는 거리 계산용으로만 사용)
-        const regionParams = {};
-
-        // 초기 로드 시 전략 선택
+        // 검색 전략 선택 및 실행
         if (isInitialLoad) {
           const targetLocation = userLocationOverride || userLocation;
-
-          // ========== 성능 측정 시작 ==========
-          const totalStartTime = performance.now();
-          console.log('🚀 [성능 측정] 초기 로드 시작');
-
-          // 전략: 위치 기반 검색 (5km 반경) + 백엔드 카테고리 필터링
-          const apiStartTime = performance.now();
-          let response;
-
-          if (targetLocation) {
-            // 초기 로드는 내 위치 기반 반경 검색 (빠르고 적은 데이터)
-            console.log('📍 [초기 로드] 내 위치 기반 반경 검색 (5km)');
-            initialLoadTypeRef.current = 'location-based';
-            response = await locationServiceApi.searchPlaces({
-              latitude: targetLocation.lat,
-              longitude: targetLocation.lng,
-              radius: 5000, // 5km 반경
-              category: apiCategory,
-            });
-          } else {
-            // 사용자 위치가 없으면 전체 조회
-            console.log('🌐 [초기 로드] 사용자 위치 없음 - 전체 조회');
-            initialLoadTypeRef.current = 'all';
-            response = await locationServiceApi.searchPlaces({
-              category: apiCategory,
-              size: 0, // 전체 조회 (0이면 백엔드에서 제한 없음)
-            });
-          }
-
-          const apiTime = performance.now() - apiStartTime;
-          console.log(`⏱️  [성능 측정] API 호출 시간: ${apiTime.toFixed(2)}ms`);
-          console.log(`📊 [성능 측정] 조회된 데이터 수: ${response.data?.services?.length || 0}개`);
-
-          if (latestRequestRef.current !== requestId) {
-            return;
-          }
-
-          // 백엔드에서 이미 위치 기반 필터링이 완료되었으므로 거리 계산은 선택적
-          // (표시용 거리 정보는 필요 시 계산)
-          let allFetchedServices = (response.data?.services || []).map((service) => {
-            let distance = null;
-            const lat = parseFloat(service.latitude);
-            const lng = parseFloat(service.longitude);
-
-            if (!isNaN(lat) && !isNaN(lng)) {
-              if (targetLocation) {
-                distance = calculateDistance(
-                  targetLocation.lat,
-                  targetLocation.lng,
-                  lat,
-                  lng
-                );
-              }
-            }
-            return {
-              ...service,
-              latitude: lat,
-              longitude: lng,
-              distance,
-            };
+          await handleInitialLoad({
+            targetLocation,
+            apiCategory,
+            effectiveKeyword,
+            requestId,
+            selectedSido,
+            selectedSigungu,
+            selectedEupmyeondong,
           });
-
-          // 전체 데이터를 allServices에 저장 (지역 필터링에 사용)
-          setAllServices(allFetchedServices);
-
-          // 사용자 위치가 있으면 메시지 표시
-          if (targetLocation) {
-            setStatusMessage(`내 주변 5km 이내 ${allFetchedServices.length}개의 장소를 찾았습니다.`);
-          } else {
-            setStatusMessage(`전체 ${allFetchedServices.length}개의 장소를 찾았습니다.`);
-          }
-
-          // 선택된 지역에 따라 필터링 (현재 로드된 데이터 기준)
-          const filterStartTime = performance.now();
-          filterServicesByRegion(allFetchedServices, selectedSido, selectedSigungu, selectedEupmyeondong, apiCategory);
-          const filterTime = performance.now() - filterStartTime;
-          console.log(`⏱️  [성능 측정] 필터링 시간: ${filterTime.toFixed(2)}ms`);
-
-          // 메모리 사용량 측정
-          if (performance.memory) {
-            const memoryUsed = (performance.memory.usedJSHeapSize / 1024 / 1024).toFixed(2);
-            const memoryTotal = (performance.memory.totalJSHeapSize / 1024 / 1024).toFixed(2);
-            console.log(`💾 [성능 측정] 메모리 사용량: ${memoryUsed} MB / ${memoryTotal} MB`);
-          }
-
-          const totalTime = performance.now() - totalStartTime;
-          console.log(`✅ [성능 측정] 전체 처리 시간: ${totalTime.toFixed(2)}ms`);
-          console.log(`📈 [성능 측정] 시간 분해: API(${apiTime.toFixed(2)}ms) + 필터링(${filterTime.toFixed(2)}ms) = ${totalTime.toFixed(2)}ms`);
-          // ========== 성능 측정 종료 ==========
-
-          isInitialLoadRef.current = false;
-          isSearchModeRef.current = false;
-          setSelectedService(null);
-          setLoading(false);
           return;
         }
 
-        // 위치 기반 검색 처리 (latitude, longitude, radius가 모두 있을 때)
         if (latitude != null && longitude != null && radius != null) {
-          console.log('📍 [위치 기반 검색] API 호출:', { latitude, longitude, radius });
-
-          const response = await locationServiceApi.searchPlaces({
+          await handleLocationBasedSearch({
             latitude,
             longitude,
             radius,
-            category: apiCategory,
+            apiCategory,
+            effectiveKeyword,
+            requestId,
           });
-
-          if (latestRequestRef.current !== requestId) {
-            return;
-          }
-
-          const fetchedServices = (response.data?.services || []).map((service) => {
-            let distance = null;
-            const lat = parseFloat(service.latitude);
-            const lng = parseFloat(service.longitude);
-
-            if (!isNaN(lat) && !isNaN(lng)) {
-              distance = calculateDistance(
-                latitude,
-                longitude,
-                lat,
-                lng
-              );
-            }
-            return {
-              ...service,
-              latitude: lat,
-              longitude: lng,
-              distance,
-            };
-          });
-
-          // 거리순 정렬 (가까운 순)
-          fetchedServices.sort((a, b) => {
-            if (a.distance === null && b.distance === null) return 0;
-            if (a.distance === null) return 1;
-            if (b.distance === null) return -1;
-            return a.distance - b.distance;
-          });
-
-          console.log(`📍 [위치 기반 검색] 결과: ${fetchedServices.length}개 서비스`);
-
-          setAllServices(fetchedServices);
-          setServices(fetchedServices);
-          setStatusMessage(`주변 ${radius / 1000}km 이내 ${fetchedServices.length}개의 장소를 찾았습니다.`);
-          setSelectedService(null);
-          setLoading(false);
           return;
         }
 
-        // 지역 검색이 명시적으로 요청된 경우 서버에서 데이터 가져오기
         if (region) {
-          // region 파라미터를 파싱하여 sido, sigungu, eupmyeondong 추출
-          // region 형식: "서울특별시" 또는 "서울특별시 강남구" 또는 "서울특별시 강남구 역삼동"
-          const regionParts = region.trim().split(/\s+/);
-          let apiSido = regionParts[0] || undefined;
-          let apiSigungu = regionParts[1] || undefined;
-          let apiEupmyeondong = regionParts[2] || undefined;
-
-          const response = await locationServiceApi.searchPlaces({
-            sido: apiSido,
-            sigungu: apiSigungu,
-            eupmyeondong: apiEupmyeondong,
-            category: apiCategory,
-            size: 0, // 전체 조회 (0이면 백엔드에서 제한 없음)
+          await executeRegionSearchStrategy({
+            region,
+            apiCategory,
+            effectiveKeyword,
+            requestId,
+            selectedSido,
+            selectedSigungu,
+            selectedEupmyeondong,
           });
-
-          if (latestRequestRef.current !== requestId) {
-            return;
-          }
-
-          const fetchedServices = (response.data?.services || []).map((service) => ({
-            ...service,
-            latitude: parseFloat(service.latitude),
-            longitude: parseFloat(service.longitude),
-          }));
-
-          // 지역별 데이터를 allServices에 업데이트하고 필터링
-          setAllServices(fetchedServices);
-          filterServicesByRegion(fetchedServices, selectedSido, selectedSigungu, selectedEupmyeondong, apiCategory);
-
-          isSearchModeRef.current = false;
-          setStatusMessage('');
-          setSelectedService(null);
-          setLoading(false);
           return;
         }
 
-        // 초기 로드가 아니고 지역 검색도 아닌 경우
-        // 하이브리드 전략: 현재 데이터 범위 내면 필터링, 범위 밖이면 백엔드 재요청
         if (allServices.length > 0) {
-          // 현재 로드된 데이터의 지역 범위 확인
-          const loadedSidos = new Set(allServices.map(s => s.sido).filter(Boolean));
-          const loadedSigungus = new Set(allServices.map(s => s.sigungu).filter(Boolean));
-
-          // 선택한 지역이 현재 데이터 범위 내에 있는지 확인
-          const isRegionInLoadedData =
-            (!selectedSido || loadedSidos.has(selectedSido)) &&
-            (!selectedSigungu || loadedSigungus.has(selectedSigungu));
-
-          if (isRegionInLoadedData) {
-            // 현재 데이터 범위 내: 프론트엔드 필터링
-            console.log('📍 [하이브리드] 현재 데이터 범위 내 - 프론트엔드 필터링');
-            filterServicesByRegion(allServices, selectedSido, selectedSigungu, selectedEupmyeondong, apiCategory);
-            setLoading(false);
-            return;
-          } else {
-            // 현재 데이터 범위 밖: 백엔드 재요청
-            console.log('🌐 [하이브리드] 현재 데이터 범위 밖 - 백엔드 재요청');
-            const response = await locationServiceApi.searchPlaces({
-              sido: selectedSido || undefined,
-              sigungu: selectedSigungu || undefined,
-              eupmyeondong: selectedEupmyeondong || undefined,
-              category: apiCategory,
-            });
-
-            if (latestRequestRef.current !== requestId) {
-              return;
-            }
-
-            const fetchedServices = (response.data?.services || []).map((service) => ({
-              ...service,
-              latitude: parseFloat(service.latitude),
-              longitude: parseFloat(service.longitude),
-              distance: null, // 지역 검색 시 거리는 계산하지 않음
-            }));
-
-            setAllServices(fetchedServices);
-            filterServicesByRegion(fetchedServices, selectedSido, selectedSigungu, selectedEupmyeondong, apiCategory);
-            setStatusMessage(`총 ${fetchedServices.length}개의 장소를 찾았습니다.`);
-            setLoading(false);
-            return;
-          }
+          await handleHybridSearch({
+            allServices,
+            selectedSido,
+            selectedSigungu,
+            selectedEupmyeondong,
+            apiCategory,
+            effectiveKeyword,
+            requestId,
+          });
+          return;
         }
 
-        // allServices가 없으면 다시 로드
-        setLoading(false);
+        // allServices가 없으면 종료
+        dispatchUI({ type: 'SET_LOADING', payload: false });
         return;
       } catch (err) {
         if (latestRequestRef.current !== requestId) {
@@ -602,15 +955,26 @@ const LocationServiceMap = () => {
         }
 
         const message = err.response?.data?.error || err.message;
-        setError(`장소 정보를 불러오지 못했습니다: ${message}`);
-        setStatusMessage('');
+        dispatchUI({ type: 'SET_UI', payload: { error: `장소 정보를 불러오지 못했습니다: ${message}`, statusMessage: '' } });
       } finally {
         if (latestRequestRef.current === requestId) {
-          setLoading(false);
+          dispatchUI({ type: 'SET_LOADING', payload: false });
         }
       }
     },
-    [categoryType, selectedSido, selectedSigungu, selectedEupmyeondong, filterServicesByRegion, allServices, userLocation]
+    [
+      categoryType,
+      keyword,
+      selectedSido,
+      selectedSigungu,
+      selectedEupmyeondong,
+      allServices,
+      userLocation,
+      handleInitialLoad,
+      handleLocationBasedSearch,
+      executeRegionSearchStrategy,
+      handleHybridSearch,
+    ]
   );
 
   useEffect(() => {
@@ -629,7 +993,7 @@ const LocationServiceMap = () => {
   useEffect(() => {
     // 초기 로드: 내 위치 기반으로 지도 표시 및 주변 서비스 조회
     const initializeMap = async () => {
-      setStatusMessage('위치 정보를 가져오는 중...');
+      dispatchUI({ type: 'SET_STATUS_MESSAGE', payload: '위치 정보를 가져오는 중...' });
 
       // 초기 로드 중이므로 프로그래매틱 이동으로 설정
       isProgrammaticMoveRef.current = true;
@@ -711,13 +1075,15 @@ const LocationServiceMap = () => {
         setMapCenter(location);
         setMapLevel(calculateMapLevelFromRadius(5)); // 5km 반경에 맞는 줌 레벨
 
-        setStatusMessage('주변 서비스를 불러오는 중...');
+        dispatchUI({ type: 'SET_STATUS_MESSAGE', payload: '주변 서비스를 불러오는 중...' });
 
         // 2단계: 초기 로드는 내 위치 기반 반경 검색 (빠르고 적은 데이터)
+        const currentKeyword = keyword && keyword.trim() ? keyword.trim() : undefined;
         const response = await locationServiceApi.searchPlaces({
           latitude: location.lat,
           longitude: location.lng,
           radius: 5000, // 5km 반경
+          keyword: currentKeyword,
         });
 
         if (response.data?.services) {
@@ -756,11 +1122,11 @@ const LocationServiceMap = () => {
           setServices(servicesWithDistance);
           initialLoadTypeRef.current = 'location-based';
 
-          setStatusMessage(`내 주변 5km 이내 ${servicesWithDistance.length}개의 장소를 찾았습니다.`);
+          dispatchUI({ type: 'SET_STATUS_MESSAGE', payload: `내 주변 5km 이내 ${servicesWithDistance.length}개의 장소를 찾았습니다.` });
         } else {
           setAllServices([]);
           setServices([]);
-          setStatusMessage('주변에 표시할 장소가 없습니다.');
+          dispatchUI({ type: 'SET_STATUS_MESSAGE', payload: '주변에 표시할 장소가 없습니다.' });
         }
 
         // 초기 로드 완료 후 사용자 드래그를 허용하기 위해 플래그 리셋
@@ -776,8 +1142,7 @@ const LocationServiceMap = () => {
           // PERMISSION_DENIED - 사용자가 위치 권한을 거부함
           setAllServices([]);
           setServices([]);
-          setStatusMessage('위치 권한이 필요합니다. 브라우저 설정에서 위치 권한을 허용해주세요.');
-          setError(null);
+          dispatchUI({ type: 'SET_UI', payload: { statusMessage: '위치 권한이 필요합니다. 브라우저 설정에서 위치 권한을 허용해주세요.', error: null } });
           // 빈 상태는 UI에서 처리됨
         } else if (error.code === 2) {
           // POSITION_UNAVAILABLE - 위치 정보를 사용할 수 없음
@@ -785,10 +1150,12 @@ const LocationServiceMap = () => {
           setMapCenter(DEFAULT_CENTER);
           setMapLevel(10);
           isProgrammaticMoveRef.current = true;
-          setStatusMessage('위치를 확인할 수 없어 전체 서비스를 불러옵니다...');
+          dispatchUI({ type: 'SET_STATUS_MESSAGE', payload: '위치를 확인할 수 없어 전체 서비스를 불러옵니다...' });
 
           try {
+            const currentKeyword = keyword && keyword.trim() ? keyword.trim() : undefined;
             const response = await locationServiceApi.searchPlaces({
+              keyword: currentKeyword,
               size: 0, // 전체 조회
             });
 
@@ -796,17 +1163,17 @@ const LocationServiceMap = () => {
               setAllServices(response.data.services);
               setServices(response.data.services);
               initialLoadTypeRef.current = 'all';
-              setStatusMessage(`전체 ${response.data.services.length}개의 장소를 찾았습니다.`);
+              dispatchUI({ type: 'SET_STATUS_MESSAGE', payload: `전체 ${response.data.services.length}개의 장소를 찾았습니다.` });
             } else {
               setAllServices([]);
               setServices([]);
-              setStatusMessage('서비스를 불러올 수 없습니다.');
+              dispatchUI({ type: 'SET_STATUS_MESSAGE', payload: '서비스를 불러올 수 없습니다.' });
             }
           } catch (fetchError) {
             console.error('전체 서비스 조회 실패:', fetchError);
             setAllServices([]);
             setServices([]);
-            setStatusMessage('서비스를 불러오는 중 오류가 발생했습니다.');
+            dispatchUI({ type: 'SET_STATUS_MESSAGE', payload: '서비스를 불러오는 중 오류가 발생했습니다.' });
           }
         } else if (error.code === 3) {
           // TIMEOUT - 타임아웃
@@ -814,10 +1181,12 @@ const LocationServiceMap = () => {
           setMapCenter(DEFAULT_CENTER);
           setMapLevel(10);
           isProgrammaticMoveRef.current = true;
-          setStatusMessage('위치 확인 시간이 초과되어 전체 서비스를 불러옵니다...');
+          dispatchUI({ type: 'SET_STATUS_MESSAGE', payload: '위치 확인 시간이 초과되어 전체 서비스를 불러옵니다...' });
 
           try {
+            const currentKeyword = keyword && keyword.trim() ? keyword.trim() : undefined;
             const response = await locationServiceApi.searchPlaces({
+              keyword: currentKeyword,
               size: 0, // 전체 조회
             });
 
@@ -825,17 +1194,17 @@ const LocationServiceMap = () => {
               setAllServices(response.data.services);
               setServices(response.data.services);
               initialLoadTypeRef.current = 'all';
-              setStatusMessage(`전체 ${response.data.services.length}개의 장소를 찾았습니다.`);
+              dispatchUI({ type: 'SET_STATUS_MESSAGE', payload: `전체 ${response.data.services.length}개의 장소를 찾았습니다.` });
             } else {
               setAllServices([]);
               setServices([]);
-              setStatusMessage('서비스를 불러올 수 없습니다.');
+              dispatchUI({ type: 'SET_STATUS_MESSAGE', payload: '서비스를 불러올 수 없습니다.' });
             }
           } catch (fetchError) {
             console.error('전체 서비스 조회 실패:', fetchError);
             setAllServices([]);
             setServices([]);
-            setStatusMessage('서비스를 불러오는 중 오류가 발생했습니다.');
+            dispatchUI({ type: 'SET_STATUS_MESSAGE', payload: '서비스를 불러오는 중 오류가 발생했습니다.' });
           }
         } else {
           // 기타 에러
@@ -843,10 +1212,12 @@ const LocationServiceMap = () => {
           setMapCenter(DEFAULT_CENTER);
           setMapLevel(10);
           isProgrammaticMoveRef.current = true;
-          setStatusMessage('위치를 확인할 수 없어 전체 서비스를 불러옵니다...');
+          dispatchUI({ type: 'SET_STATUS_MESSAGE', payload: '위치를 확인할 수 없어 전체 서비스를 불러옵니다...' });
 
           try {
+            const currentKeyword = keyword && keyword.trim() ? keyword.trim() : undefined;
             const response = await locationServiceApi.searchPlaces({
+              keyword: currentKeyword,
               size: 0, // 전체 조회
             });
 
@@ -854,16 +1225,15 @@ const LocationServiceMap = () => {
               setAllServices(response.data.services);
               setServices(response.data.services);
               initialLoadTypeRef.current = 'all';
-              setStatusMessage(`전체 ${response.data.services.length}개의 장소를 찾았습니다.`);
+              dispatchUI({ type: 'SET_STATUS_MESSAGE', payload: `전체 ${response.data.services.length}개의 장소를 찾았습니다.` });
             } else {
               setAllServices([]);
               setServices([]);
-              setStatusMessage('표시할 장소가 없습니다.');
+              dispatchUI({ type: 'SET_STATUS_MESSAGE', payload: '표시할 장소가 없습니다.' });
             }
           } catch (fetchError) {
             console.error('서비스 조회 실패:', fetchError);
-            setError(`장소 정보를 불러오지 못했습니다: ${fetchError.message}`);
-            setStatusMessage('');
+            dispatchUI({ type: 'SET_UI', payload: { error: `장소 정보를 불러오지 못했습니다: ${fetchError.message}`, statusMessage: '' } });
           }
 
           // 초기 로드 완료 후 사용자 드래그를 허용하기 위해 플래그 리셋
@@ -874,7 +1244,7 @@ const LocationServiceMap = () => {
         }
       } finally {
         isInitialLoadRef.current = false;
-        setLoading(false);
+        dispatchUI({ type: 'SET_LOADING', payload: false });
       }
     };
 
@@ -884,19 +1254,17 @@ const LocationServiceMap = () => {
   const handleKeywordSubmit = useCallback(
     (event) => {
       event.preventDefault();
-      setCategoryType(CATEGORY_CUSTOM);
-      // 키워드 검색은 전체 데이터에서 필터링 (지도 없이)
-      if (allServices.length > 0) {
-        filterServicesByRegion(allServices, selectedSido, selectedSigungu, selectedEupmyeondong, keyword);
-      } else {
-        // allServices가 없으면 초기 로드
-        fetchServices({
-          isInitialLoad: true,
-          categoryOverride: CATEGORY_CUSTOM,
-        });
+      if (!keyword || !keyword.trim()) {
+        return; // 빈 키워드는 무시
       }
+
+      // 키워드 검색: 백엔드에 keyword 전달하여 FULLTEXT 검색 수행
+      fetchServices({
+        keywordOverride: keyword.trim(),
+        categoryOverride: categoryType !== CATEGORY_DEFAULT ? categoryType : undefined,
+      });
     },
-    [fetchServices, keyword, selectedSido, selectedSigungu, selectedEupmyeondong, allServices, filterServicesByRegion]
+    [fetchServices, keyword, categoryType]
   );
 
   // 지도 위치 업데이트 함수
@@ -1060,21 +1428,20 @@ const LocationServiceMap = () => {
     const targetEupmyeondong = eupmyeondongOverride !== null ? eupmyeondongOverride : '';
 
     // 상태는 무조건 세팅해야 UI가 정상적으로 넘어감
-    setSelectedSido(targetSido);
-    setSelectedSigungu(targetSigungu);
-    setSelectedEupmyeondong(targetEupmyeondong);
+    // ✅ useReducer로 한 번에 업데이트
+    const newCurrentView = viewOverride
+      ? viewOverride
+      : (!targetSido ? 'sido' : 'sigungu');
 
-    // 화면 상태 업데이트 (viewOverride가 있으면 그것을 사용, 없으면 자동 계산)
-    // 동 선택 화면 제거: 시도 또는 시군구 선택 화면만 사용
-    if (viewOverride) {
-      setCurrentView(viewOverride);
-    } else {
-      if (!targetSido) {
-        setCurrentView('sido');
-      } else {
-        setCurrentView('sigungu');
-      }
-    }
+    dispatchRegion({
+      type: 'SET_REGION',
+      payload: {
+        sido: targetSido,
+        sigungu: targetSigungu,
+        eupmyeondong: targetEupmyeondong,
+        currentView: newCurrentView,
+      },
+    });
 
     // 전국 선택 시
     if (!targetSido) {
@@ -1111,8 +1478,7 @@ const LocationServiceMap = () => {
     }
 
     try {
-      setStatusMessage(`'${targetRegion}' 주변 장소를 검색하는 중...`);
-      setError(null);
+      dispatchUI({ type: 'SET_UI', payload: { statusMessage: `'${targetRegion}' 주변 장소를 검색하는 중...`, error: null } });
 
       await fetchServices({
         region: targetRegion,
@@ -1120,8 +1486,7 @@ const LocationServiceMap = () => {
       });
     } catch (err) {
       const message = err.response?.data?.error || err.message;
-      setError(`지역 검색에 실패했습니다: ${message}`);
-      setStatusMessage('');
+      dispatchUI({ type: 'SET_UI', payload: { error: `지역 검색에 실패했습니다: ${message}`, statusMessage: '' } });
     }
   }, [selectedSido, selectedSigungu, selectedEupmyeondong, categoryType, fetchServices, keyword]);
 
@@ -1131,8 +1496,7 @@ const LocationServiceMap = () => {
     }
 
     try {
-      setStatusMessage('주소를 찾는 중...');
-      setError(null);
+      dispatchUI({ type: 'SET_UI', payload: { statusMessage: '주소를 찾는 중...', error: null } });
 
       // 주소를 지역명으로 인식하여 지역 검색 수행
       const address = addressQuery.trim();
@@ -1148,9 +1512,10 @@ const LocationServiceMap = () => {
 
       if (foundSido) {
         // 시도가 포함된 경우 지역 검색으로 처리
-        setSelectedSido(foundSido);
-        setSelectedSigungu('');
-        setSelectedEupmyeondong('');
+        dispatchRegion({
+          type: 'SET_SIDO',
+          payload: foundSido,
+        });
         await handleRegionSearch(foundSido);
       } else {
         // 시도가 없으면 일반 지역 검색으로 처리
@@ -1161,8 +1526,8 @@ const LocationServiceMap = () => {
       }
     } catch (err) {
       const message = err.response?.data?.error || err.message;
-      setError(`주소 검색에 실패했습니다: ${message}`);
-      setStatusMessage('');
+      dispatchUI({ type: 'SET_ERROR', payload: `주소 검색에 실패했습니다: ${message}` });
+      dispatchUI({ type: 'SET_STATUS_MESSAGE', payload: '' });
     }
   }, [addressQuery, categoryType, fetchServices, keyword, handleRegionSearch]);
 
@@ -1261,7 +1626,7 @@ const LocationServiceMap = () => {
   }, [services, userLocation]);
 
   const handleServiceSelect = useCallback((service) => {
-    setSelectedService(service);
+    dispatchUI({ type: 'SET_SELECTED_SERVICE', payload: service });
 
     // 서비스 위치로 지도 이동
     if (service.latitude && service.longitude) {
@@ -1362,13 +1727,11 @@ const LocationServiceMap = () => {
       : undefined;
 
     // ✅ 지역 선택 상태 초기화 (지도 이동 후 검색 시 지역 선택 해제)
-    setSelectedSido('');
-    setSelectedSigungu('');
-    setSelectedEupmyeondong('');
+    dispatchRegion({ type: 'RESET_REGION' });
     setCurrentMapView('sido');
 
     // ✅ 지도 중심 좌표를 역지오코딩하여 시도/시군구 추출
-    setStatusMessage('지역 정보를 가져오는 중...');
+    dispatchUI({ type: 'SET_STATUS_MESSAGE', payload: '지역 정보를 가져오는 중...' });
 
     try {
       const addressData = await geocodingApi.coordinatesToAddress(
@@ -1416,11 +1779,11 @@ const LocationServiceMap = () => {
           radius: 5000, // 5km 반경
           categoryOverride: effectiveCategoryType,
         });
-        setStatusMessage('내 주변 5km 이내 장소를 검색했습니다.');
+        dispatchUI({ type: 'SET_STATUS_MESSAGE', payload: '내 주변 5km 이내 장소를 검색했습니다.' });
       } catch (fetchError) {
         console.error('❌ [이 지역 검색] 위치 기반 검색도 실패:', fetchError);
-        setError('장소 검색에 실패했습니다.');
-        setStatusMessage('');
+        dispatchUI({ type: 'SET_ERROR', payload: '장소 검색에 실패했습니다.' });
+        dispatchUI({ type: 'SET_STATUS_MESSAGE', payload: '' });
       }
     }
 
@@ -1448,7 +1811,7 @@ const LocationServiceMap = () => {
       const zoomLevel = calculateMapLevelFromRadius(2);
       setMapLevel(zoomLevel);
 
-      setStatusMessage('내 위치로 이동했습니다.');
+      dispatchUI({ type: 'SET_STATUS_MESSAGE', payload: '내 위치로 이동했습니다.' });
 
       // 지도 이동 후 플래그 리셋
       setTimeout(() => {
@@ -1462,18 +1825,16 @@ const LocationServiceMap = () => {
       {selectedService && (
         <ServiceDetailPanel onClick={(e) => {
           if (e.target === e.currentTarget) {
-            setSelectedService(null);
-            setShowDirections(false);
+            dispatchUI({ type: 'SET_UI', payload: { selectedService: null, showDirections: false } });
           }
         }}>
           <DetailContent onClick={(e) => e.stopPropagation()}>
             <CloseButton onClick={() => {
               // 길찾기 화면이 열려있으면 길찾기만 닫기, 아니면 상세페이지 전체 닫기
               if (showDirections) {
-                setShowDirections(false);
+                dispatchUI({ type: 'SET_SHOW_DIRECTIONS', payload: false });
               } else {
-                setSelectedService(null);
-                setShowDirections(false);
+                dispatchUI({ type: 'SET_UI', payload: { selectedService: null, showDirections: false } });
               }
             }}>✕</CloseButton>
             <DetailLeft>
@@ -1597,6 +1958,57 @@ const LocationServiceMap = () => {
               </ServiceInfo>
             </DetailLeft>
             <DetailRight>
+              {!showDirections && (
+                <>
+                  <ActionSectionTitle>리뷰</ActionSectionTitle>
+                  {loadingReviews ? (
+                    <div style={{ padding: '2rem', textAlign: 'center', color: '#666' }}>리뷰를 불러오는 중...</div>
+                  ) : (
+                    <>
+                      {user && !myReview && (
+                        <ActionButtons>
+                          <ActionButton onClick={handleOpenReviewModal} primary>
+                            ✍️ 리뷰 작성하기
+                          </ActionButton>
+                        </ActionButtons>
+                      )}
+                      {reviews.length === 0 ? (
+                        <div style={{ padding: '2rem', textAlign: 'center', color: '#999' }}>
+                          아직 작성된 리뷰가 없습니다.
+                        </div>
+                      ) : (
+                        <ReviewsList>
+                          {reviews.map((review) => (
+                            <ReviewItem key={review.idx}>
+                              <ReviewHeader>
+                                <ReviewRating>
+                                  {'⭐'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}
+                                </ReviewRating>
+                                <ReviewDate>
+                                  {new Date(review.createdAt).toLocaleDateString('ko-KR')}
+                                </ReviewDate>
+                                {user?.idx === review.userIdx && (
+                                  <ReviewActions>
+                                    <ReviewActionButton onClick={() => handleEditReview(review)}>
+                                      수정
+                                    </ReviewActionButton>
+                                    <ReviewActionButton onClick={() => handleDeleteReview(review.idx)} danger>
+                                      삭제
+                                    </ReviewActionButton>
+                                  </ReviewActions>
+                                )}
+                              </ReviewHeader>
+                              {review.comment && (
+                                <ReviewComment>{review.comment}</ReviewComment>
+                              )}
+                            </ReviewItem>
+                          ))}
+                        </ReviewsList>
+                      )}
+                    </>
+                  )}
+                </>
+              )}
               {showDirections && selectedService.latitude && selectedService.longitude ? (
                 <DirectionsContainer>
                   <DirectionsHeader>
@@ -1785,7 +2197,7 @@ const LocationServiceMap = () => {
                     {selectedService.latitude && selectedService.longitude && (
                       <ActionButton
                         onClick={async () => {
-                          setShowDirections(true);
+                          dispatchUI({ type: 'SET_SHOW_DIRECTIONS', payload: true });
                           if (userLocation && !userLocationAddress && !startLocationAddress) {
                             try {
                               console.log('📍 출발지 좌표를 주소로 변환 중...', { lat: userLocation.lat, lng: userLocation.lng });
@@ -1824,8 +2236,8 @@ const LocationServiceMap = () => {
                       <ActionButton
                         onClick={() => {
                           navigator.clipboard.writeText(selectedService.address);
-                          setStatusMessage('주소가 클립보드에 복사되었습니다.');
-                          setTimeout(() => setStatusMessage(''), 2000);
+                          dispatchUI({ type: 'SET_STATUS_MESSAGE', payload: '주소가 클립보드에 복사되었습니다.' });
+                          setTimeout(() => dispatchUI({ type: 'SET_STATUS_MESSAGE', payload: '' }), 2000);
                         }}
                       >
                         📋 주소 복사
@@ -1836,8 +2248,8 @@ const LocationServiceMap = () => {
                         onClick={() => {
                           const url = `https://map.naver.com/v5/search/${encodeURIComponent(selectedService.name || '')}`;
                           navigator.clipboard.writeText(url);
-                          setStatusMessage('네이버맵 링크가 클립보드에 복사되었습니다.');
-                          setTimeout(() => setStatusMessage(''), 2000);
+                          dispatchUI({ type: 'SET_STATUS_MESSAGE', payload: '네이버맵 링크가 클립보드에 복사되었습니다.' });
+                          setTimeout(() => dispatchUI({ type: 'SET_STATUS_MESSAGE', payload: '' }), 2000);
                         }}
                       >
                         🔗 링크 공유
@@ -1879,11 +2291,11 @@ const LocationServiceMap = () => {
                 type="button"
                 active={searchMode === 'keyword'}
                 onClick={() => {
-                  setSearchMode('keyword');
-                  setShowKeywordControls(!showKeywordControls);
+                  dispatchSearch({ type: 'SET_SEARCH_MODE', payload: 'keyword' });
+                  dispatchUI({ type: 'SET_SHOW_KEYWORD_CONTROLS', payload: !showKeywordControls });
                   // 다른 모드의 리스트는 닫기
                   if (showRegionControls) {
-                    setShowRegionControls(false);
+                    dispatchUI({ type: 'SET_SHOW_REGION_CONTROLS', payload: false });
                   }
                 }}
               >
@@ -1893,11 +2305,11 @@ const LocationServiceMap = () => {
                 type="button"
                 active={searchMode === 'region'}
                 onClick={() => {
-                  setSearchMode('region');
-                  setShowRegionControls(!showRegionControls);
+                  dispatchSearch({ type: 'SET_SEARCH_MODE', payload: 'region' });
+                  dispatchUI({ type: 'SET_SHOW_REGION_CONTROLS', payload: !showRegionControls });
                   // 다른 모드의 리스트는 닫기
                   if (showKeywordControls) {
-                    setShowKeywordControls(false);
+                    dispatchUI({ type: 'SET_SHOW_KEYWORD_CONTROLS', payload: false });
                   }
                 }}
               >
@@ -1915,9 +2327,7 @@ const LocationServiceMap = () => {
               <CurrentLocationButton
                 type="button"
                 onClick={async () => {
-                  setSelectedSido('');
-                  setSelectedSigungu('');
-                  setSelectedEupmyeondong('');
+                  dispatchRegion({ type: 'RESET_REGION' });
                   setCurrentMapView('nation');
                   await fetchServices({
                     isInitialLoad: true,
@@ -1932,17 +2342,32 @@ const LocationServiceMap = () => {
         </HeaderTop>
 
         <SearchControls $isOpen={showKeywordControls && searchMode === 'keyword'}>
+          <SearchBar onSubmit={handleKeywordSubmit}>
+            <SearchInput
+              type="text"
+              placeholder="키워드 검색 (예: 동물병원, 카페, 호텔 등)"
+              value={keyword}
+              onChange={(e) => dispatchSearch({ type: 'SET_KEYWORD', payload: e.target.value })}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleKeywordSubmit(e);
+                }
+              }}
+            />
+            <SearchButton type="submit">검색</SearchButton>
+          </SearchBar>
           <RegionButtonGrid>
             {KEYWORD_CATEGORIES.map((cat) => (
               <RegionButton
                 key={cat.value}
                 onClick={() => {
                   const categoryValue = cat.value;
-                  setSelectedKeywordCategory(categoryValue);
-                  setKeyword(categoryValue);
+                  dispatchSearch({ type: 'SET_KEYWORD_CATEGORY', payload: categoryValue });
+                  dispatchSearch({ type: 'SET_KEYWORD', payload: categoryValue });
                   if (categoryValue) {
                     // 카테고리 선택 시: 백엔드 재요청 (백엔드에서 카테고리 필터링)
-                    setCategoryType(CATEGORY_CUSTOM);
+                    dispatchSearch({ type: 'SET_CATEGORY_TYPE', payload: CATEGORY_CUSTOM });
                     const targetLocation = userLocation;
                     if (targetLocation) {
                       // 위치 기반 재요청
@@ -1964,7 +2389,7 @@ const LocationServiceMap = () => {
                     }
                   } else {
                     // 전체 선택 시: 백엔드 재요청
-                    setCategoryType(CATEGORY_DEFAULT);
+                    dispatchSearch({ type: 'SET_CATEGORY_TYPE', payload: CATEGORY_DEFAULT });
                     const targetLocation = userLocation;
                     if (targetLocation) {
                       // 위치 기반 재요청
@@ -2053,7 +2478,7 @@ const LocationServiceMap = () => {
       {error && (
         <ErrorBanner>
           {error}
-          <button onClick={() => setError(null)}>닫기</button>
+          <button onClick={() => dispatchUI({ type: 'SET_ERROR', payload: null })}>닫기</button>
         </ErrorBanner>
       )}
 
@@ -2132,8 +2557,8 @@ const LocationServiceMap = () => {
                   data-service-idx={service.idx || service.externalId}
                   isSelected={selectedService?.key === service.key}
                   onClick={() => handleServiceSelect(service)}
-                  onMouseEnter={() => setHoveredService(service)}
-                  onMouseLeave={() => setHoveredService(null)}
+                  onMouseEnter={() => dispatchUI({ type: 'SET_HOVERED_SERVICE', payload: service })}
+                  onMouseLeave={() => dispatchUI({ type: 'SET_HOVERED_SERVICE', payload: null })}
                 >
                   <ServiceListItemHeader>
                     <ServiceListItemName>{service.name}</ServiceListItemName>
@@ -2166,6 +2591,53 @@ const LocationServiceMap = () => {
           </ServiceListContent>
         </ServiceListPanel>
       </MapArea>
+
+      {/* 리뷰 작성/수정 모달 */}
+      {showReviewModal && (
+        <ReviewModal onClick={() => setShowReviewModal(false)}>
+          <ReviewModalContent onClick={(e) => e.stopPropagation()}>
+            <ReviewModalHeader>
+              <ReviewModalTitle>{editingReview ? '리뷰 수정' : '리뷰 작성'}</ReviewModalTitle>
+              <ReviewModalClose onClick={() => setShowReviewModal(false)}>✕</ReviewModalClose>
+            </ReviewModalHeader>
+            <ReviewModalBody>
+              <ReviewRatingSection>
+                <ReviewLabel>평점</ReviewLabel>
+                <StarRating>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <StarButton
+                      key={star}
+                      type="button"
+                      onClick={() => setReviewRating(star)}
+                      active={star <= reviewRating}
+                    >
+                      ⭐
+                    </StarButton>
+                  ))}
+                  <RatingText>{reviewRating}점</RatingText>
+                </StarRating>
+              </ReviewRatingSection>
+              <ReviewCommentSection>
+                <ReviewLabel>리뷰 내용</ReviewLabel>
+                <ReviewTextarea
+                  value={reviewComment}
+                  onChange={(e) => setReviewComment(e.target.value)}
+                  placeholder="서비스에 대한 리뷰를 작성해주세요..."
+                  rows={5}
+                />
+              </ReviewCommentSection>
+            </ReviewModalBody>
+            <ReviewModalFooter>
+              <ReviewCancelButton onClick={() => setShowReviewModal(false)}>
+                취소
+              </ReviewCancelButton>
+              <ReviewSubmitButton onClick={handleSubmitReview} disabled={submittingReview || !reviewComment.trim()}>
+                {submittingReview ? '작성 중...' : editingReview ? '수정하기' : '작성하기'}
+              </ReviewSubmitButton>
+            </ReviewModalFooter>
+          </ReviewModalContent>
+        </ReviewModal>
+      )}
     </Container>
   );
 };
@@ -3060,5 +3532,237 @@ const DetailLink = styled.a`
   &:hover {
     background: ${props => props.theme.colors.primary}dd;
     transform: translateY(-1px);
+  }
+`;
+
+// 리뷰 관련 스타일
+const ReviewsList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-height: 500px;
+  overflow-y: auto;
+  padding: 0.5rem 0;
+`;
+
+const ReviewItem = styled.div`
+  padding: 1rem;
+  background: ${props => props.theme.colors.surface};
+  border: 1px solid ${props => props.theme.colors.border};
+  border-radius: 8px;
+`;
+
+const ReviewHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+`;
+
+const ReviewRating = styled.div`
+  font-size: 1rem;
+  color: ${props => props.theme.colors.warning || '#f59e0b'};
+`;
+
+const ReviewDate = styled.div`
+  font-size: 0.85rem;
+  color: ${props => props.theme.colors.textSecondary};
+`;
+
+const ReviewActions = styled.div`
+  display: flex;
+  gap: 0.5rem;
+`;
+
+const ReviewActionButton = styled.button`
+  padding: 0.25rem 0.75rem;
+  background: ${props => props.danger ? '#ef4444' : props.theme.colors.primary};
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    opacity: 0.8;
+    transform: translateY(-1px);
+  }
+`;
+
+const ReviewComment = styled.div`
+  color: ${props => props.theme.colors.text};
+  font-size: 0.95rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+`;
+
+const ReviewModal = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 4000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+`;
+
+const ReviewModalContent = styled.div`
+  background: ${props => props.theme.colors.surface || '#ffffff'};
+  border-radius: 12px;
+  width: 100%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+`;
+
+const ReviewModalHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid ${props => props.theme.colors.border};
+`;
+
+const ReviewModalTitle = styled.h2`
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: ${props => props.theme.colors.text};
+`;
+
+const ReviewModalClose = styled.button`
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: ${props => props.theme.colors.textSecondary};
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: ${props => props.theme.colors.surfaceHover};
+  }
+`;
+
+const ReviewModalBody = styled.div`
+  padding: 20px;
+`;
+
+const ReviewRatingSection = styled.div`
+  margin-bottom: 20px;
+`;
+
+const ReviewCommentSection = styled.div`
+  margin-bottom: 20px;
+`;
+
+const ReviewLabel = styled.label`
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: ${props => props.theme.colors.text};
+`;
+
+const StarRating = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+`;
+
+const StarButton = styled.button`
+  background: transparent;
+  border: none;
+  font-size: 28px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  filter: ${({ active }) => active ? 'none' : 'grayscale(100%) opacity(0.3)'};
+  transition: all 0.2s ease;
+
+  &:hover {
+    transform: scale(1.1);
+  }
+`;
+
+const RatingText = styled.span`
+  margin-left: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: ${props => props.theme.colors.text};
+`;
+
+const ReviewTextarea = styled.textarea`
+  width: 100%;
+  padding: 12px;
+  border: 1px solid ${props => props.theme.colors.border};
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+  color: ${props => props.theme.colors.text};
+  background: ${props => props.theme.colors.background};
+
+  &:focus {
+    outline: none;
+    border-color: ${props => props.theme.colors.primary};
+  }
+`;
+
+const ReviewModalFooter = styled.div`
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 20px;
+  border-top: 1px solid ${props => props.theme.colors.border};
+`;
+
+const ReviewCancelButton = styled.button`
+  padding: 10px 20px;
+  background: ${props => props.theme.colors.surface};
+  color: ${props => props.theme.colors.text};
+  border: 1px solid ${props => props.theme.colors.border};
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: ${props => props.theme.colors.surfaceHover};
+  }
+`;
+
+const ReviewSubmitButton = styled.button`
+  padding: 10px 20px;
+  background: ${props => props.theme.colors.primary};
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover:not(:disabled) {
+    background: ${props => props.theme.colors.primaryDark};
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
   }
 `;

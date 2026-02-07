@@ -6,10 +6,11 @@ Location 도메인은 위치 기반 서비스 (병원, 카페, 공원, 펫샵 �
 
 **주요 기능**:
 - 지역 계층적 탐색 (시도 → 시군구 → 읍면동 → 도로명)
-- 위치 기반 반경 검색 (ST_Distance_Sphere 사용, 기본 5km)
+- 위치 기반 반경 검색 (ST_Distance_Sphere 사용, 기본 5km, 거리 정보 포함 ✅)
+- 키워드 검색 (FULLTEXT 인덱스 활용, name/description/category1-3 검색 ✅)
 - 카테고리별 서비스 검색
-- 거리 계산 (Haversine 공식)
-- 하이브리드 데이터 로딩 전략 (초기 로드 + 클라이언트 필터링)
+- 거리 계산 (Haversine 공식, 백엔드에서 계산 후 DTO 포함 ✅)
+- 하이브리드 데이터 로딩 전략 (초기 로드 + 클라이언트 필터링, 일관성 개선 ✅)
 - 위치 서비스 리뷰 시스템
 - 공공데이터 CSV 배치 임포트
 - 네이버맵 API 연동:
@@ -58,7 +59,7 @@ Location 도메인은 위치 기반 서비스 (병원, 카페, 공원, 펫샵 �
 > **"검색은 시군구 단위로, 필터링은 읍면동 단위로"**
 
 **로딩 프로세스**:
-1. **초기 진입**: 사용자 위치 기반 10km 반경 검색 (빠른 초기 컨텍스트 제공)
+1. **초기 진입**: 사용자 위치 기반 5km 반경 검색 (빠른 초기 컨텍스트 제공)
 2. **지도 이동/검색**: 지도 중심 좌표를 역지오코딩하여 **시도/시군구** 추출 후 해당 지역 전체 데이터 로드
 3. **읍면동 필터링**: 로드된 데이터 내에서 **클라이언트 사이드 필터링** 수행
 
@@ -67,17 +68,30 @@ Location 도메인은 위치 기반 서비스 (병원, 카페, 공원, 펫샵 �
 - **기본값 처리**: `radius` 기본값 10000m (10km), `size` 기본값 100
 - **size 파라미터**: null이면 100, 0 이하면 전체 조회 (null 전달)
 
+**✅ 일관성 개선 (2026-02-04)**:
+- **지역 선택 시 항상 백엔드 재요청**: 초기 로드 방식과 무관하게 동일한 검색 결과 제공
+- **문제 해결**: 초기 로드가 위치 기반이면 반경 밖 서비스 누락 문제 해결
+- **사용자 경험 향상**: 같은 지역 선택 시 항상 동일한 결과 제공
+
 **장점**:
 - **데이터 일관성**: 시군구 단위로 데이터를 가져오므로 지도 이동 시에도 마커가 유지됨
+- **검색 결과 일관성**: 지역 선택 시 항상 동일한 결과 제공 (초기 로드 방식과 무관)
 - **성능 최적화**: 인덱스가 잘 타는 `WHERE sido=? AND sigungu=?` 쿼리 사용으로 DB 부하 감소
 - **유연성**: 읍면동 경계의 모호함을 클라이언트 필터링으로 해결
 
-### 2.4 카테고리별 검색
+### 2.4 카테고리별 검색 및 키워드 검색
 
 **카테고리 필터링**:
 - category3 → category2 → category1 순서로 검색
 - 대소문자 무시
 - 최대 결과 수 제한 지원 (`maxResults` 파라미터)
+
+**키워드 검색** (FULLTEXT 인덱스 활용):
+- **검색 범위**: 이름(name), 설명(description), 카테고리(category1, category2, category3) 모두 검색
+- **FULLTEXT 인덱스**: `ft_search` 인덱스 사용 (name, description, category1, category2, category3 모두 포함)
+- **검색 모드**: BOOLEAN MODE + 와일드카드 (`CONCAT(:keyword, '*')`)
+- **쿼리**: `MATCH(name, description, category1, category2, category3) AGAINST(CONCAT(:keyword, '*') IN BOOLEAN MODE)`
+- **검증 완료**: 쿼리와 인덱스가 일치하며 정상 작동 확인 (2026-02-04)
 
 ### 2.5 거리 계산 및 길찾기
 
@@ -166,8 +180,10 @@ public List<LocationServiceDTO> searchLocationServicesByRegion(
 - **Soft Delete 제외**: 모든 조회 쿼리에서 삭제된 서비스 자동 제외
 - **성능 측정**: 각 단계별 실행 시간 로깅
 
-#### 로직 2: 위치 기반 반경 검색
+#### 로직 2: 위치 기반 반경 검색 (거리 정보 포함)
 **구현 위치**: `LocationServiceService.searchLocationServicesByLocation()`
+
+**✅ 개선 완료 (2026-02-03)**: 백엔드에서 거리 계산 후 DTO에 포함하여 반환
 
 ```java
 public List<LocationServiceDTO> searchLocationServicesByLocation(
@@ -229,6 +245,7 @@ public List<LocationServiceDTO> searchLocationServicesByLocation(
 - **반경 검색**: `ST_Distance_Sphere(POINT(longitude, latitude), POINT(?2, ?1)) <= ?3`
 - **POINT 형식**: `POINT(경도, 위도)` 순서 사용 (MySQL 표준)
 - **카테고리 필터링**: category3 → category2 → category1 순서로 검색 (대소문자 무시)
+- **거리 계산**: 백엔드에서 Haversine 공식으로 거리 계산 후 DTO에 포함하여 반환 ✅
 - **Soft Delete 제외**: 모든 조회 쿼리에서 삭제된 서비스 자동 제외
 - **성능 측정**: 각 단계별 실행 시간 로깅 (DB 쿼리 시간, 필터링 시간, DTO 변환 시간)
 - **사용 목적**: 사용자 위치 기반 주변 서비스 검색
@@ -249,7 +266,82 @@ List<LocationService> findByRadius(Double latitude, Double longitude, Double rad
 - Native Query의 경우 `(is_deleted IS NULL OR is_deleted = 0)` 조건 사용
 - 삭제된 데이터는 조회되지 않으며, 평점 계산에서도 제외됨
 
-#### 로직 3: 거리 계산 (Haversine 공식)
+#### 로직 3: 키워드 검색 (FULLTEXT 인덱스 활용)
+**구현 위치**: `LocationServiceService.searchLocationServicesByKeyword()`
+
+```java
+public List<LocationServiceDTO> searchLocationServicesByKeyword(
+        String keyword,
+        String category,
+        Integer maxResults) {
+    
+    // 키워드 검색 (FULLTEXT 인덱스 활용)
+    List<LocationService> services = locationServiceRepository.findByNameContaining(keyword);
+    
+    // 카테고리 필터링 (category3 → category2 → category1)
+    if (StringUtils.hasText(category) && !services.isEmpty()) {
+        String categoryLower = category.toLowerCase(Locale.ROOT).trim();
+        services = services.stream()
+                .filter(service -> {
+                    // category3 우선 확인
+                    if (service.getCategory3() != null) {
+                        String cat3 = service.getCategory3().toLowerCase(Locale.ROOT).trim();
+                        if (cat3.equals(categoryLower)) {
+                            return true;
+                        }
+                    }
+                    // category2 확인
+                    if (service.getCategory2() != null) {
+                        String cat2 = service.getCategory2().toLowerCase(Locale.ROOT).trim();
+                        if (cat2.equals(categoryLower)) {
+                            return true;
+                        }
+                    }
+                    // category1 확인
+                    if (service.getCategory1() != null) {
+                        String cat1 = service.getCategory1().toLowerCase(Locale.ROOT).trim();
+                        if (cat1.equals(categoryLower)) {
+                            return true;
+                        }
+                    }
+                    return false;
+                })
+                .collect(Collectors.toList());
+    }
+    
+    // 최대 결과 수 제한
+    if (maxResults != null && maxResults > 0) {
+        services = services.stream()
+                .limit(maxResults)
+                .collect(Collectors.toList());
+    }
+    
+    return services.stream()
+            .map(locationServiceConverter::toDTO)
+            .collect(Collectors.toList());
+}
+```
+
+**Repository 쿼리**:
+```java
+@Query(value = "SELECT * FROM locationservice " +
+                "WHERE MATCH(name, description, category1, category2, category3) " +
+                "AGAINST(CONCAT(:keyword, '*') IN BOOLEAN MODE) " +
+                "AND is_deleted = 0 " +
+                "ORDER BY rating DESC", nativeQuery = true)
+List<LocationService> findByNameContaining(@Param("keyword") String keyword);
+```
+
+**핵심 로직**:
+- **FULLTEXT 인덱스**: `ft_search` 인덱스 사용 (name, description, category1, category2, category3 모두 포함) ✅
+- **검색 범위**: 이름, 설명, 카테고리1-3 모두 검색
+- **검색 모드**: BOOLEAN MODE + 와일드카드 (`CONCAT(:keyword, '*')`)
+- **카테고리 필터링**: category3 → category2 → category1 순서로 검색 (대소문자 무시)
+- **Soft Delete 제외**: 모든 조회 쿼리에서 삭제된 서비스 자동 제외
+- **성능 측정**: 각 단계별 실행 시간 로깅
+- **검증 완료**: 쿼리와 인덱스 일치 확인 완료 (2026-02-04)
+
+#### 로직 4: 거리 계산 (Haversine 공식)
 **구현 위치**: `LocationServiceService.calculateDistance()`
 
 ```java
@@ -279,7 +371,7 @@ public Double calculateDistance(Double lat1, Double lng1, Double lat2, Double ln
 - **반환 단위**: 미터 단위
 - **사용 목적**: 내 위치에서 각 서비스까지의 거리 표시
 
-#### 로직 4: 네이버맵 지오코딩 (주소 → 좌표)
+#### 로직 5: 네이버맵 지오코딩 (주소 → 좌표)
 **구현 위치**: `NaverMapService.addressToCoordinates()`, `GeocodingController.addressToCoordinates()`
 
 **핵심 로직**:
@@ -292,7 +384,7 @@ public Double calculateDistance(Double lat1, Double lng1, Double lat2, Double ln
   - URL 디코딩 (`java.net.URLDecoder.decode(address, "UTF-8")`)
 - **응답 형식**: `{"latitude": ..., "longitude": ..., "success": true}`
 
-#### 로직 5: 네이버맵 역지오코딩 (좌표 → 주소)
+#### 로직 6: 네이버맵 역지오코딩 (좌표 → 주소)
 **구현 위치**: `NaverMapService.coordinatesToAddress()`
 
 **핵심 로직**:
@@ -301,7 +393,7 @@ public Double calculateDistance(Double lat1, Double lng1, Double lat2, Double ln
 - **주소 조합**: 시도, 시군구, 읍면동, 리를 조합하여 지번주소 생성
 - **반환 형식**: `Map<String, Object>` (`address`, `roadAddress`, `jibunAddress`)
 
-#### 로직 6: 네이버맵 길찾기
+#### 로직 7: 네이버맵 길찾기
 **구현 위치**: `NaverMapService.getDirections()`, `GeocodingController.getDirections()`
 
 **핵심 로직**:
@@ -313,7 +405,7 @@ public Double calculateDistance(Double lat1, Double lng1, Double lat2, Double ln
 - **파라미터 파싱**: 컨트롤러에서 `start`, `goal` 파라미터를 `,`로 분리하여 파싱
 - **기본값**: `option` 파라미터 기본값 "traoptimal"
 
-#### 로직 7: 리뷰 작성 및 평점 업데이트
+#### 로직 8: 리뷰 작성 및 평점 업데이트
 **구현 위치**: `LocationServiceReviewService.createReview()`
 
 **핵심 로직**:
@@ -322,7 +414,7 @@ public Double calculateDistance(Double lat1, Double lng1, Double lat2, Double ln
 - **리뷰 저장**: `LocationServiceReview` 엔티티 생성 및 저장
 - **평점 업데이트**: `updateServiceRating()`로 서비스 평균 평점 자동 계산 및 업데이트
 
-#### 로직 8: 리뷰 삭제 (Soft Delete)
+#### 로직 9: 리뷰 삭제 (Soft Delete)
 **구현 위치**: `LocationServiceReviewService.deleteReview()`
 
 ```java
@@ -381,7 +473,7 @@ public void updateServiceRating(Long serviceIdx) {
 - 모든 조회 쿼리에 `(isDeleted IS NULL OR isDeleted = false)` 조건 자동 적용
 - 삭제된 리뷰는 조회되지 않으며, 평점 계산에서도 제외됨
 
-#### 로직 9: 위치 서비스 삭제 (Soft Delete)
+#### 로직 10: 위치 서비스 삭제 (Soft Delete)
 **구현 위치**: `LocationServiceService.deleteService()`
 
 ```java
@@ -417,7 +509,8 @@ public void deleteService(Long serviceIdx) {
 | 메서드 | 설명 | 주요 로직 |
 |--------|------|-----------|
 | `searchLocationServicesByRegion()` | 지역 계층별 서비스 검색 | 우선순위 기반 조회, 카테고리 필터링, 최대 결과 수 제한, 성능 측정 로깅, Soft Delete 제외 |
-| `searchLocationServicesByLocation()` | 위치 기반 반경 검색 | ST_Distance_Sphere 사용, 카테고리 필터링, 최대 결과 수 제한, 성능 측정 로깅, Soft Delete 제외 |
+| `searchLocationServicesByLocation()` | 위치 기반 반경 검색 | ST_Distance_Sphere 사용, 카테고리 필터링, 거리 계산 및 DTO 포함 ✅, 최대 결과 수 제한, 성능 측정 로깅, Soft Delete 제외 |
+| `searchLocationServicesByKeyword()` | 키워드 검색 | FULLTEXT 인덱스 활용 (ft_search), name/description/category1-3 검색, 카테고리 필터링, 최대 결과 수 제한, 성능 측정 로깅, Soft Delete 제외 |
 | `calculateDistance()` | 거리 계산 | Haversine 공식 (미터 단위) |
 | `getPopularLocationServices()` | 인기 서비스 조회 | 카테고리별 상위 10개, `@Cacheable` 적용, Soft Delete 제외 (컨트롤러 엔드포인트 없음) |
 | `deleteService()` | 서비스 삭제 | Soft Delete 처리 (`isDeleted = true`, `deletedAt` 설정) |
@@ -658,7 +751,7 @@ erDiagram
 
 | 엔드포인트 | Method | 설명 |
 |-----------|--------|------|
-| `/api/location-services/search` | GET | 위치 기반 검색 또는 지역 계층별 서비스 검색 (하이브리드 전략: latitude/longitude/radius 있으면 위치 기반, 없으면 지역 계층별, radius 기본값 10000m, size 기본값 100, Soft Delete 제외, 응답: `{"services": [...], "count": N}`) |
+| `/api/location-services/search` | GET | 위치 기반 검색 또는 지역 계층별 서비스 검색 (하이브리드 전략: latitude/longitude/radius 있으면 위치 기반, 없으면 지역 계층별, keyword 있으면 키워드 검색 우선, radius 기본값 10000m, size 기본값 100, 거리 정보 포함 ✅, Soft Delete 제외, 응답: `{"services": [...], "count": N}`) |
 | `/api/location-services/{serviceIdx}` | DELETE | 위치 서비스 삭제 (Soft Delete, 응답: `{"message": "..."}`) |
 | `/api/location-service-reviews` | POST | 리뷰 작성 (인증 필요, 클래스 레벨 `@PreAuthorize`, 응답: `{"review": {...}, "message": "..."}`) |
 | `/api/location-service-reviews/{reviewIdx}` | PUT | 리뷰 수정 (인증 필요, 클래스 레벨 `@PreAuthorize`, 응답: `{"review": {...}, "message": "..."}`) |
@@ -934,10 +1027,11 @@ const handleSearchButtonClick = useCallback(() => {
 - **시도/시군구 선택**: 하드코딩된 중심 좌표 사용 (지오코딩 API 호출 없음)
 - **지오코딩 실패 시**: 시군구 중심 좌표로 fallback
 
-**하이브리드 필터링 전략**:
+**하이브리드 필터링 전략** (개선됨):
+- **✅ 일관성 개선 (2026-02-04)**: 지역 선택 시 항상 백엔드 재요청하여 검색 결과 일관성 확보
 - **데이터 범위 확인**: 현재 로드된 데이터의 시도/시군구 범위 확인
-- **범위 내**: 프론트엔드 필터링 (`filterServicesByRegion()`)
-- **범위 밖**: 백엔드 지역 기반 검색 재요청
+- **지역 선택 시**: 항상 백엔드 재요청 (초기 로드 방식과 무관하게 동일한 결과 제공)
+- **카테고리/키워드 변경 시**: 데이터 범위 내면 프론트엔드 필터링 (`filterServicesByRegion()`), 범위 밖이면 백엔드 재요청
 
 **지역 선택 후 지도 이동 시나리오 처리**:
 - **문제**: 지역 선택 상태와 위치 기반 검색이 충돌
@@ -1057,8 +1151,9 @@ const calculateMapLevelFromRadius = (radiusKm) => {
 
 **locationservice 테이블**:
 ```sql
--- Full-Text 검색 (이름, 설명)
-CREATE FULLTEXT INDEX ft_name_desc ON locationservice(name, description);
+-- Full-Text 검색 (이름, 설명, 카테고리)
+-- ✅ 실제 인덱스: ft_search (name, description, category1, category2, category3 모두 포함)
+CREATE FULLTEXT INDEX ft_search ON locationservice(name, description, category1, category2, category3);
 
 -- 주소별 조회
 CREATE INDEX idx_address ON locationservice(address);
@@ -1091,7 +1186,7 @@ CREATE INDEX user_idx ON locationservicereview(user_idx);
 - WHERE 절에서 자주 사용되는 조건
 - 평점 정렬을 위한 인덱스 (rating)
 - 위치 기반 검색을 위한 위도/경도 인덱스 (ST_Distance_Sphere 최적화)
-- Full-Text 검색으로 이름 및 설명 검색 성능 향상
+- Full-Text 검색으로 이름, 설명, 카테고리 검색 성능 향상 (`ft_search` 인덱스: name, description, category1-3 모두 포함)
 - JOIN에 사용되는 외래키 (service_idx, user_idx)
 
 ### 7.2 애플리케이션 레벨 최적화
@@ -1167,16 +1262,18 @@ public List<LocationServiceDTO> getPopularLocationServices(String category) {
 
 ### 8.3 하이브리드 데이터 로딩 전략
 - **초기 로드**: 사용자 위치 있으면 위치 기반 검색(5km), 없으면 전체 조회
-- **클라이언트 필터링**: 지역 선택 시 데이터 범위 내면 프론트엔드 필터링
-- **백엔드 재요청**: 데이터 범위 밖이거나 카테고리 변경 시 백엔드 재요청
+- **✅ 일관성 개선 (2026-02-04)**: 지역 선택 시 항상 백엔드 재요청하여 검색 결과 일관성 확보
+- **클라이언트 필터링**: 카테고리/키워드 변경 시 데이터 범위 내면 프론트엔드 필터링
+- **백엔드 재요청**: 지역 선택 시 항상 재요청, 데이터 범위 밖이거나 카테고리 변경 시 재요청
 - **성능 최적화**: 불필요한 API 호출 최소화
 - **"지도는 상태를 바꾸지 않는다" 원칙**: 지도 이동 시 자동 API 호출 제거, "이 지역 검색" 버튼으로 사용자 확인 후 실행
 
 ### 8.4 거리 계산
 - **Haversine 공식**: 지구 반경 6371000m 사용
+- **✅ 개선 완료 (2026-02-03)**: 백엔드에서 거리 계산 후 DTO에 포함하여 반환
 - **미터 단위 반환**: 내 위치에서 각 서비스까지의 거리 표시
 - **정확한 거리 계산**: 위도/경도 기반 정확한 거리 계산
-- **클라이언트 계산**: 프론트엔드에서 필요 시 거리 계산 (`useMemo` 사용)
+- **프론트엔드**: 백엔드 거리 정보 우선 사용, 없으면 클라이언트에서 계산 (하위 호환성)
 
 ### 8.5 네이버맵 API 연동
 - **지오코딩**: 주소를 좌표로 변환 (`addressToCoordinates()`)
@@ -1221,6 +1318,14 @@ public List<LocationServiceDTO> getPopularLocationServices(String category) {
 2. **InitialLoadSearch vs UserTriggeredSearch 분리**: 시스템 주도 vs 사용자 주도 검색 구분
 3. **빈 상태 UX 처리**: 검색 결과 0개, 위치 권한 거부, 너무 넓은 범위 시 명확한 안내 및 대안 제시
 
+#### 상태 관리 개선 (2026-02-04)
+- **✅ useReducer 도입**: 24개의 개별 useState → 3개의 useReducer로 그룹화
+- **검색 상태**: `searchReducer` (keyword, selectedKeywordCategory, addressQuery, categoryType, searchMode)
+- **지역 선택 상태**: `regionReducer` (selectedSido, selectedSigungu, selectedEupmyeondong, currentView)
+  - 시도 선택 시 시군구/읍면동 자동 초기화 로직 포함
+- **UI 상태**: `uiReducer` (loading, error, statusMessage, selectedService, hoveredService, showDirections, showKeywordControls, showRegionControls)
+- **개선 효과**: 코드 가독성 향상, 상태 업데이트 로직 중앙화, 유지보수성 향상
+
 #### 초기 로드 전략 (`LocationServiceMap.js`)
 1. **사용자 위치 확인**: `navigator.geolocation.getCurrentPosition()` 사용
 2. **전략 선택**:
@@ -1235,10 +1340,12 @@ public List<LocationServiceDTO> getPopularLocationServices(String category) {
 - **지오코딩 실패 시**: 시군구 중심 좌표로 fallback
 - **지역 선택 후 지도 이동**: "이 지역 검색" 버튼 클릭 시 지역 선택 상태 초기화 후 위치 기반 검색 실행
 
-#### 하이브리드 필터링 전략
-- **데이터 범위 확인**: 현재 로드된 데이터의 시도/시군구 범위 확인
-- **범위 내**: 프론트엔드 필터링 (`filterServicesByRegion()`)
-- **범위 밖**: 백엔드 지역 기반 검색 재요청
+#### 하이브리드 필터링 전략 (개선됨)
+- **✅ 일관성 개선 (2026-02-04)**: 지역 선택 시 항상 백엔드 재요청하여 검색 결과 일관성 확보
+- **지역 선택 시**: 항상 백엔드 재요청 (초기 로드 방식과 무관하게 동일한 결과 제공)
+- **카테고리/키워드 변경 시**: 데이터 범위 확인
+  - **범위 내**: 프론트엔드 필터링 (`filterServicesByRegion()`)
+  - **범위 밖**: 백엔드 지역 기반 검색 재요청
 
 #### 지도 연동 (`MapContainer.js`)
 - **네이버맵 API**: `ncpKeyId` 사용 (지도 표시만)
@@ -1269,3 +1376,59 @@ public List<LocationServiceDTO> getPopularLocationServices(String category) {
 - **카테고리 계층 구조**: category1 → category2 → category3
 - **데이터 출처 관리**: `dataSource` 필드로 데이터 출처 구분 (PUBLIC)
 - **추가 필드**: `phone`, `website` 필드 존재
+
+---
+
+## 9. 최근 리팩토링 내역 (2026-02-04)
+
+### 9.1 하이브리드 전략 일관성 개선 ✅
+
+**문제점**: 초기 로드가 위치 기반(5km 반경)이면 반경 밖 서비스 누락 문제
+
+**해결 내용**:
+- 지역 선택 시 항상 백엔드 재요청하도록 하이브리드 전략 수정
+- 초기 로드 방식과 무관하게 동일한 검색 결과 제공
+- 사용자 경험 향상: 같은 지역 선택 시 항상 동일한 결과
+
+**관련 문서**: `docs/refactoring/location/하이브리드-전략-일관성-개선.md`
+
+### 9.2 키워드 검색 품질 검증 ✅
+
+**검증 내용**:
+- FULLTEXT 인덱스 확인: `ft_search` 인덱스가 name, description, category1-3 모두 포함
+- 쿼리와 인덱스 일치 확인 완료
+- 검색 품질 정상 작동 확인
+
+**관련 문서**: `docs/refactoring/location/키워드-검색-품질-검증.md`
+
+### 9.3 상태 관리 개선 ✅
+
+**개선 내용**:
+- useReducer 도입: 24개의 개별 useState → 3개의 useReducer로 그룹화
+- 검색 상태 그룹화: `searchReducer` (5개 상태)
+- 지역 선택 상태 그룹화: `regionReducer` (4개 상태, 시도 선택 시 자동 초기화)
+- UI 상태 그룹화: `uiReducer` (8개 상태)
+
+**개선 효과**:
+- 코드 가독성 향상: 관련 상태가 그룹화됨
+- 상태 업데이트 로직 중앙화: reducer 함수에서 관리
+- 유지보수성 향상: 상태 그룹별로 관리하여 수정 용이
+
+**관련 문서**: `docs/refactoring/location/상태-관리-개선.md`
+
+### 9.4 거리 계산 중복 제거 ✅ (2026-02-03)
+
+**개선 내용**:
+- 백엔드에서 거리 계산 후 DTO에 포함하여 반환
+- 프론트엔드에서 백엔드 거리 정보 우선 사용
+- 하위 호환성 유지: 거리 정보 없으면 프론트엔드에서 계산
+
+**관련 문서**: `docs/refactoring/location/거리-계산-중복-제거.md`
+
+### 9.5 프론트엔드 검색 로직 단순화 ✅ (2026-02-03)
+
+**개선 내용**:
+- 검색 전략을 별도 함수로 분리 (약 300줄 → 약 50줄)
+- 각 검색 전략 독립적으로 관리 및 테스트 가능
+
+**관련 문서**: `docs/refactoring/location/프론트엔드-검색-로직-단순화.md`

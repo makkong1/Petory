@@ -212,6 +212,96 @@ public class LocationServiceService {
             log.debug("결과 수 제한: maxResults={}, 제한 후={}개", maxResults, services.size());
         }
 
+        // DTO로 변환 및 거리 정보 설정
+        long dtoConvertStartTime = System.currentTimeMillis();
+        List<LocationServiceDTO> result = services.stream()
+                .map(service -> {
+                    LocationServiceDTO dto = locationServiceConverter.toDTO(service);
+                    // 거리 계산 후 DTO에 설정
+                    if (service.getLatitude() != null && service.getLongitude() != null) {
+                        Double distance = calculateDistance(
+                                latitude, longitude,
+                                service.getLatitude(), service.getLongitude());
+                        dto.setDistance(distance);
+                    }
+                    return dto;
+                })
+                .collect(Collectors.toList());
+        long dtoConvertTime = System.currentTimeMillis() - dtoConvertStartTime;
+        log.info("⏱️  [성능 측정] DTO 변환 시간: {}ms, 변환된 레코드 수: {}개", dtoConvertTime, result.size());
+
+        long totalTime = System.currentTimeMillis() - methodStartTime;
+        log.info("✅ [성능 측정] searchLocationServicesByLocation 전체 시간: {}ms (쿼리: {}ms, 필터링: {}ms, DTO변환: {}ms)",
+                totalTime, queryTime, filterTime, dtoConvertTime);
+
+        return result;
+    }
+
+    /**
+     * 키워드로 서비스 검색 (이름, 설명, 카테고리 포함)
+     * FULLTEXT 인덱스를 활용한 효율적인 검색
+     * 
+     * @param keyword    검색 키워드 (필수)
+     * @param category   카테고리 필터 (선택)
+     * @param maxResults 최대 결과 수 (선택)
+     * @return 검색 결과
+     */
+    public List<LocationServiceDTO> searchLocationServicesByKeyword(
+            String keyword,
+            String category,
+            Integer maxResults) {
+
+        long methodStartTime = System.currentTimeMillis();
+
+        // 키워드 검색 (FULLTEXT 인덱스 활용)
+        long queryStartTime = System.currentTimeMillis();
+        List<LocationService> services = locationServiceRepository.findByNameContaining(keyword);
+        long queryTime = System.currentTimeMillis() - queryStartTime;
+        log.info("⏱️  [성능 측정] 키워드 검색 DB 쿼리 실행 시간: {}ms, 조회된 레코드 수: {}개", queryTime, services.size());
+
+        // 카테고리 필터링 (선택사항)
+        long filterStartTime = System.currentTimeMillis();
+        long filterTime = 0;
+        if (StringUtils.hasText(category) && !services.isEmpty()) {
+            String categoryLower = category.toLowerCase(Locale.ROOT).trim();
+            services = services.stream()
+                    .filter(service -> {
+                        // category3 우선 확인
+                        if (service.getCategory3() != null) {
+                            String cat3 = service.getCategory3().toLowerCase(Locale.ROOT).trim();
+                            if (cat3.equals(categoryLower)) {
+                                return true;
+                            }
+                        }
+                        // category2 확인
+                        if (service.getCategory2() != null) {
+                            String cat2 = service.getCategory2().toLowerCase(Locale.ROOT).trim();
+                            if (cat2.equals(categoryLower)) {
+                                return true;
+                            }
+                        }
+                        // category1 확인
+                        if (service.getCategory1() != null) {
+                            String cat1 = service.getCategory1().toLowerCase(Locale.ROOT).trim();
+                            if (cat1.equals(categoryLower)) {
+                                return true;
+                            }
+                        }
+                        return false;
+                    })
+                    .collect(Collectors.toList());
+            filterTime = System.currentTimeMillis() - filterStartTime;
+            log.info("⏱️  [성능 측정] 카테고리 필터링 시간: {}ms, 필터링 후 결과 수: {}개", filterTime, services.size());
+        }
+
+        // 최대 결과 수 제한 (null이거나 0이면 제한 없음)
+        if (maxResults != null && maxResults > 0) {
+            services = services.stream()
+                    .limit(maxResults)
+                    .collect(Collectors.toList());
+            log.debug("결과 수 제한: maxResults={}, 제한 후={}개", maxResults, services.size());
+        }
+
         // DTO로 변환
         long dtoConvertStartTime = System.currentTimeMillis();
         List<LocationServiceDTO> result = services.stream()
@@ -221,7 +311,7 @@ public class LocationServiceService {
         log.info("⏱️  [성능 측정] DTO 변환 시간: {}ms, 변환된 레코드 수: {}개", dtoConvertTime, result.size());
 
         long totalTime = System.currentTimeMillis() - methodStartTime;
-        log.info("✅ [성능 측정] searchLocationServicesByLocation 전체 시간: {}ms (쿼리: {}ms, 필터링: {}ms, DTO변환: {}ms)",
+        log.info("✅ [성능 측정] searchLocationServicesByKeyword 전체 시간: {}ms (쿼리: {}ms, 필터링: {}ms, DTO변환: {}ms)",
                 totalTime, queryTime, filterTime, dtoConvertTime);
 
         return result;

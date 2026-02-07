@@ -112,11 +112,7 @@ public class OAuth2Service {
 
         UsersDTO userDTO = usersService.getUserById(user.getId());
 
-        return TokenResponse.builder()
-                .accessToken(accessToken)
-                .refreshToken(refreshToken)
-                .user(userDTO)
-                .build();
+        return new TokenResponse(accessToken, refreshToken, userDTO);
     }
 
     /**

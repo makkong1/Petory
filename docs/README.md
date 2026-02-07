@@ -26,6 +26,7 @@
 
 - 게시판 (커뮤니티, 인기글 스냅샷)
 - 펫케어 요청/지원 시스템
+- 펫코인 결제 (에스크로, Care/Chat 연동, 동시성 제어)
 - 실종 동물 신고 및 찾기
 - 위치 기반 서비스 (병원, 카페 등)
 - 오프라인 모임
@@ -42,6 +43,7 @@
 | **User** | 사용자, 반려동물, 소셜 로그인, 제재 관리 | [상세보기](./domains/user.md) |
 | **Board** | 커뮤니티 게시판, 댓글, 반응, 인기글 | [상세보기](./domains/board.md) |
 | **Care** | 펫케어 요청, 지원, 댓글, 리뷰 | [상세보기](./domains/care.md) |
+| **Payment** | 펫코인 결제, 에스크로, Care/Chat 연동 | [상세보기](./domains/payment.md) |
 | **Missing Pet** | 실종 동물 신고 및 관리 | [상세보기](./domains/missing-pet.md) |
 | **Location** | 위치 기반 서비스, 리뷰 | [상세보기](./domains/location.md) |
 | **Meetup** | 오프라인 모임 | [상세보기](./domains/meetup.md) |
@@ -123,25 +125,12 @@
    - 문제: 동시 지원 승인 시 중복 선택
    - 해결 방안: 트랜잭션 격리 수준 조정 필요
 
+5. **펫코인 결제**
+   - 문제: 잔액 차감·에스크로 상태 변경·중복 지급/환불 시 Race Condition
+   - 해결: 비관적 락(`findByIdForUpdate`, `findByCareRequestForUpdate`), 지급/환불 실패 시 상태 변경 롤백  
+
 ## 다이어그램
 
 - [도메인 간 연관관계](./architecture/domain-relationships.md)
 - [데이터베이스 ERD](./architecture/erd.md)
-
-## 향후 개선 사항
-
-1. **성능**
-   - Redis 캐시 도입 검토
-   - 쿼리 성능 모니터링 시스템 구축
-   - 읽기 전용 레플리카 분리
-
-2. **동시성**
-   - 분산 락 도입 (Redis/Redisson)
-   - 이벤트 기반 아키텍처로 전환
-   - 메시지 큐 도입 (Kafka/RabbitMQ)
-
-3. **확장성**
-   - 마이크로서비스 아키텍처 검토
-   - API Gateway 도입
-   - 서비스 메시 구축
 

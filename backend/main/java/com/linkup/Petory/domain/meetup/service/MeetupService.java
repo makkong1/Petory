@@ -24,6 +24,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map.Entry;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -184,6 +185,7 @@ public class MeetupService {
     }
 
     // 반경 기반 모임 조회 (마커 표시용)
+    // ✅ 리팩토링: 인메모리 필터링 제거 → DB 쿼리로 최적화
     public List<MeetupDTO> getNearbyMeetups(Double lat, Double lng, Double radiusKm) {
         long startTime = System.currentTimeMillis();
         Runtime runtime = Runtime.getRuntime();
@@ -192,105 +194,16 @@ public class MeetupService {
         LocalDateTime now = LocalDateTime.now();
         log.info("반경 기반 모임 조회 요청: lat={}, lng={}, radius={}km, currentDate={}", lat, lng, radiusKm, now);
 
-        // 모든 모임을 가져와서 Java에서 필터링 (Native query 문제 회피, 소프트 삭제 제외)
+        // ✅ 개선: DB에서 한 번에 필터링 및 거리 계산 수행
         long dbStartTime = System.currentTimeMillis();
-        List<Meetup> allMeetups = meetupRepository.findAllNotDeleted();
+        List<Meetup> nearbyMeetups = meetupRepository.findNearbyMeetups(lat, lng, radiusKm, now);
         long dbTime = System.currentTimeMillis() - dbStartTime;
-        log.info("전체 모임 수: {}", allMeetups.size());
+        log.info("DB 쿼리 결과 모임 수: {}", nearbyMeetups.size());
 
-        // 거리 계산 함수 (Haversine 공식)
-        java.util.function.Function<Meetup, Double> calculateDistance = (meetup) -> {
-            if (meetup.getLatitude() == null || meetup.getLongitude() == null) {
-                return Double.MAX_VALUE;
-            }
-            double lat1 = Math.toRadians(lat);
-            double lat2 = Math.toRadians(meetup.getLatitude());
-            double lon1 = Math.toRadians(lng);
-            double lon2 = Math.toRadians(meetup.getLongitude());
-
-            double dLat = lat2 - lat1;
-            double dLon = lon2 - lon1;
-
-            double a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                    Math.cos(lat1) * Math.cos(lat2) *
-                            Math.sin(dLon / 2) * Math.sin(dLon / 2);
-            double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-            return 6371 * c; // 지구 반지름 6371km
-        };
-
-        // 필터링 및 정렬 (거리 정보를 함께 저장)
-        long filteringStartTime = System.currentTimeMillis();
-
-        // 필터링 통계 (람다 내부에서 수정 가능하도록 배열 사용)
-        int totalCount = allMeetups.size();
-        int[] noCoordinateCount = { 0 };
-        int[] pastDateCount = { 0 };
-        int[] completedCount = { 0 };
-        int[] outOfRadiusCount = { 0 };
-        int[] validAfterDateFilter = { 0 }; // 날짜 필터 통과한 모임 수
-
-        List<java.util.Map.Entry<Meetup, Double>> meetupsWithDistance = allMeetups.stream()
-                .filter(meetup -> {
-                    // 좌표가 있는지 확인
-                    if (meetup.getLatitude() == null || meetup.getLongitude() == null) {
-                        noCoordinateCount[0]++;
-                        return false;
-                    }
-
-                    // 미래 날짜만 포함
-                    boolean isFuture = meetup.getDate() != null && meetup.getDate().isAfter(now);
-                    if (!isFuture) {
-                        pastDateCount[0]++;
-                        return false; // 과거 날짜면 바로 제외
-                    }
-
-                    // COMPLETED 상태 제외
-                    boolean isNotCompleted = meetup.getStatus() == null ||
-                            !meetup.getStatus().equals(com.linkup.Petory.domain.meetup.entity.MeetupStatus.COMPLETED);
-                    if (!isNotCompleted) {
-                        completedCount[0]++;
-                        return false; // COMPLETED면 바로 제외
-                    }
-
-                    validAfterDateFilter[0]++; // 날짜와 상태 필터 통과
-                    return true;
-                })
-                .map(meetup -> {
-                    double distance = calculateDistance.apply(meetup);
-                    // 디버깅: 거리 계산 결과 로그 (최대 5개만)
-                    if (validAfterDateFilter[0] <= 5 || outOfRadiusCount[0] < 5) {
-                        log.debug("거리 계산: 모임 idx={}, title={}, 사용자위치=({}, {}), 모임위치=({}, {}), 거리={}km, 반경={}km",
-                                meetup.getIdx(), meetup.getTitle(),
-                                lat, lng, meetup.getLatitude(), meetup.getLongitude(),
-                                String.format("%.2f", distance), radiusKm);
-                    }
-                    return new java.util.AbstractMap.SimpleEntry<>(meetup, distance);
-                })
-                .filter(entry -> {
-                    boolean withinRadius = entry.getValue() <= radiusKm;
-                    if (!withinRadius) {
-                        outOfRadiusCount[0]++;
-                    } else {
-                        log.debug("✅ 반경 내 모임 발견: idx={}, title={}, 거리={}km",
-                                entry.getKey().getIdx(), entry.getKey().getTitle(),
-                                String.format("%.2f", entry.getValue()));
-                    }
-                    return withinRadius;
-                })
-                .sorted((e1, e2) -> {
-                    // 거리순 정렬, 같으면 날짜순
-                    int distanceCompare = Double.compare(e1.getValue(), e2.getValue());
-                    if (distanceCompare != 0) {
-                        return distanceCompare;
-                    }
-                    return e1.getKey().getDate().compareTo(e2.getKey().getDate());
-                })
-                .collect(Collectors.toList());
-        long filteringTime = System.currentTimeMillis() - filteringStartTime;
-
+        // ✅ 개선: DTO 변환만 수행 (필터링/정렬은 DB에서 완료)
         long conversionStartTime = System.currentTimeMillis();
-        List<MeetupDTO> filteredMeetups = meetupsWithDistance.stream()
-                .map(entry -> converter.toDTO(entry.getKey()))
+        List<MeetupDTO> result = nearbyMeetups.stream()
+                .map(converter::toDTO)
                 .collect(Collectors.toList());
         long conversionTime = System.currentTimeMillis() - conversionStartTime;
 
@@ -298,48 +211,20 @@ public class MeetupService {
         long memoryAfter = runtime.totalMemory() - runtime.freeMemory();
         long memoryUsed = memoryAfter - memoryBefore;
 
-        log.info("최종 필터링 후 모임 수: {}", filteredMeetups.size());
-        log.info("[필터링 통계] 전체: {}, 좌표없음: {}, 과거날짜: {}, COMPLETED: {}, 날짜/상태통과: {}, 반경초과: {}, 최종결과: {}",
-                totalCount, noCoordinateCount[0], pastDateCount[0], completedCount[0], validAfterDateFilter[0],
-                outOfRadiusCount[0],
-                filteredMeetups.size());
+        log.info("최종 결과 모임 수: {}", result.size());
         log.info(
-                "[성능 측정] getNearbyMeetups - 전체시간: {}ms, DB쿼리: {}ms, 필터링/정렬: {}ms, DTO변환: {}ms, 메모리사용: {}MB, 전체건수: {}, 결과건수: {}",
-                totalTime, dbTime, filteringTime, conversionTime, memoryUsed / (1024 * 1024), allMeetups.size(),
-                filteredMeetups.size());
+                "[성능 측정] getNearbyMeetups (개선 후) - 전체시간: {}ms, DB쿼리: {}ms, DTO변환: {}ms, 메모리사용: {}MB, 결과건수: {}",
+                totalTime, dbTime, conversionTime, memoryUsed / (1024 * 1024), result.size());
 
-        // 반경 통과한 모임들의 거리 정보 로그 (디버깅용)
-        if (filteredMeetups.isEmpty() && validAfterDateFilter[0] > 0) {
-            log.warn("⚠️ 반경 내 모임이 없습니다. 요청 위치: lat={}, lng={}, 반경={}km", lat, lng, radiusKm);
-            log.warn("⚠️ 날짜/상태 통과한 모임 {}개 중 반경 초과: {}개", validAfterDateFilter[0], outOfRadiusCount[0]);
-
-            // 반경 초과한 모임들의 거리 정보 출력 (최대 5개)
-            allMeetups.stream()
-                    .filter(meetup -> meetup.getLatitude() != null && meetup.getLongitude() != null)
-                    .filter(meetup -> meetup.getDate() != null && meetup.getDate().isAfter(now))
-                    .filter(meetup -> meetup.getStatus() == null ||
-                            !meetup.getStatus().equals(com.linkup.Petory.domain.meetup.entity.MeetupStatus.COMPLETED))
-                    .limit(5)
-                    .forEach(meetup -> {
-                        double distance = calculateDistance.apply(meetup);
-                        log.warn("  - 모임 idx={}, title={}, lat={}, lng={}, 거리={}km (반경={}km 초과)",
-                                meetup.getIdx(), meetup.getTitle(),
-                                meetup.getLatitude(), meetup.getLongitude(),
-                                String.format("%.2f", distance), radiusKm);
-                    });
-        }
-
-        // 반경 내 모임들의 거리 정보 로그 (최대 10개)
-        for (java.util.Map.Entry<Meetup, Double> entry : meetupsWithDistance.stream().limit(10)
-                .collect(Collectors.toList())) {
-            Meetup meetup = entry.getKey();
-            double distance = entry.getValue();
-            log.info("✅ 반경 내 모임: idx={}, title={}, date={}, lat={}, lng={}, 거리={}km",
+        // 반경 내 모임들의 정보 로그 (최대 10개)
+        for (int i = 0; i < Math.min(10, nearbyMeetups.size()); i++) {
+            Meetup meetup = nearbyMeetups.get(i);
+            log.info("✅ 반경 내 모임: idx={}, title={}, date={}, lat={}, lng={}",
                     meetup.getIdx(), meetup.getTitle(), meetup.getDate(),
-                    meetup.getLatitude(), meetup.getLongitude(), String.format("%.2f", distance));
+                    meetup.getLatitude(), meetup.getLongitude());
         }
 
-        return filteredMeetups;
+        return result;
     }
 
     // 특정 모임의 참가자 목록 조회

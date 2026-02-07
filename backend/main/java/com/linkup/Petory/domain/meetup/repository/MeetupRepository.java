@@ -58,8 +58,9 @@ public interface MeetupRepository {
 
     /**
      * 반경 기반 모임 조회 (Haversine 공식 사용, 소프트 삭제 제외)
+     * ✅ 리팩토링: currentDate 파라미터 추가 (날짜/상태 필터링을 DB에서 수행)
      */
-    List<Meetup> findNearbyMeetups(Double lat, Double lng, Double radius);
+    List<Meetup> findNearbyMeetups(Double lat, Double lng, Double radius, LocalDateTime currentDate);
 
     /**
      * Pessimistic Lock으로 동시 접근 방지

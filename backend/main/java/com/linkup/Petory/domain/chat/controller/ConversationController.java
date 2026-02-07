@@ -48,17 +48,17 @@ public class ConversationController {
     @PostMapping
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ConversationDTO> createConversation(@RequestBody CreateConversationRequest request) {
-        ConversationType conversationType = ConversationType.valueOf(request.getConversationType());
-        RelatedType relatedType = request.getRelatedType() != null
-                ? RelatedType.valueOf(request.getRelatedType())
+        ConversationType conversationType = ConversationType.valueOf(request.conversationType());
+        RelatedType relatedType = request.relatedType() != null
+                ? RelatedType.valueOf(request.relatedType())
                 : null;
 
         ConversationDTO dto = conversationService.createConversation(
                 conversationType,
                 relatedType,
-                request.getRelatedIdx(),
-                request.getTitle(),
-                request.getParticipantUserIds());
+                request.relatedIdx(),
+                request.title(),
+                request.participantUserIds());
 
         return ResponseEntity.ok(dto);
     }

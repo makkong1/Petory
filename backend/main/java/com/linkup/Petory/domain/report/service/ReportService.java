@@ -45,36 +45,36 @@ public class ReportService {
 
     @Transactional
     public ReportDTO createReport(ReportRequestDTO request) {
-        if (request.getTargetType() == null) {
+        if (request.targetType() == null) {
             throw new IllegalArgumentException("신고 대상 종류를 선택해주세요.");
         }
-        if (request.getTargetIdx() == null) {
+        if (request.targetIdx() == null) {
             throw new IllegalArgumentException("신고 대상 ID가 필요합니다.");
         }
-        if (request.getReporterId() == null) {
+        if (request.reporterId() == null) {
             throw new IllegalArgumentException("신고자 정보가 필요합니다.");
         }
-        if (!StringUtils.hasText(request.getReason())) {
+        if (!StringUtils.hasText(request.reason())) {
             throw new IllegalArgumentException("신고 사유를 입력해주세요.");
         }
 
-        Users reporter = usersRepository.findById(request.getReporterId())
+        Users reporter = usersRepository.findById(request.reporterId())
                 .orElseThrow(() -> new IllegalArgumentException("신고자 정보를 찾을 수 없습니다."));
 
-        validateTarget(request.getTargetType(), request.getTargetIdx());
+        validateTarget(request.targetType(), request.targetIdx());
 
         if (reportRepository.existsByTargetTypeAndTargetIdxAndReporterIdx(
-                request.getTargetType(),
-                request.getTargetIdx(),
+                request.targetType(),
+                request.targetIdx(),
                 reporter.getIdx())) {
             throw new IllegalStateException("이미 해당 대상을 신고하셨습니다.");
         }
 
         Report report = Report.builder()
-                .targetType(request.getTargetType())
-                .targetIdx(request.getTargetIdx())
+                .targetType(request.targetType())
+                .targetIdx(request.targetIdx())
                 .reporter(reporter)
-                .reason(request.getReason().trim())
+                .reason(request.reason().trim())
                 .build();
 
         Report saved = reportRepository.save(report);

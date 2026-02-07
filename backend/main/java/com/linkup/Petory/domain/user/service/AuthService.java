@@ -64,11 +64,7 @@ public class AuthService {
 
         UsersDTO userDTO = usersService.getUserById(id); // 3번
 
-        return TokenResponse.builder()
-                .accessToken(accessToken)
-                .refreshToken(refreshToken)
-                .user(userDTO)
-                .build();
+        return new TokenResponse(accessToken, refreshToken, userDTO);
     }
 
     /**
@@ -112,11 +108,7 @@ public class AuthService {
 
         UsersDTO userDTO = usersService.getUserById(user.getId());
 
-        return TokenResponse.builder()
-                .accessToken(newAccessToken)
-                .refreshToken(refreshToken) // 기존 Refresh Token 유지
-                .user(userDTO)
-                .build();
+        return new TokenResponse(newAccessToken, refreshToken, userDTO);  // 기존 Refresh Token 유지
     }
 
     /**

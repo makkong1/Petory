@@ -56,6 +56,13 @@
 - **상태 관리**: OPEN, IN_PROGRESS, COMPLETED, CANCELLED 상태 전이 로직
 - **채팅 연동**: 케어 요청 생성 시 1:1 채팅방 자동 생성 및 매칭 기반 소통
 
+### 펫코인 결제 (Payment)
+- **에스크로 시스템**: 거래 확정 시 코인 임시 보관 → 거래 완료 시 제공자 지급 / 취소 시 요청자 환불
+- **연동 흐름**: 채팅 거래 확정(ConversationService) → 코인 차감·에스크로 생성 / 상태 변경(CareRequestService) → 완료 시 지급·취소 시 환불 / 스케줄러 자동 완료 시에도 동일 로직
+- **동시성 제어**: 비관적 락(`findByIdForUpdate`, `findByCareRequestForUpdate`)으로 잔액 차감·에스크로 상태 변경·중복 지급/환불 방지
+- **트랜잭션 일관성**: 에스크로 생성·지급·환불 실패 시 상태 변경 롤백, 모든 거래 내역 `pet_coin_transaction` 기록
+- **확장성**: 현재 시뮬레이션 충전, 실제 운영 시 충전 단계만 PG 연동으로 교체 가능  
+
 ### 산책 & 오프라인 모임 (Meetup)
 - **모임 생성 및 참여**: 산책 모임 생성, 참여/취소 기능
 - **위치 기반 검색**: Haversine 공식을 활용한 반경 기반 모임 검색 (미터 단위)
@@ -188,6 +195,11 @@ Petory/
 │       │   │   │   ├── controller/  # ReportController
 │       │   │   │   ├── service/     # ReportService
 │       │   │   │   └── entity/      # Report
+│       │   │   ├── payment/         # 펫코인 결제
+│       │   │   │   ├── controller/  # PetCoinController, AdminPaymentController
+│       │   │   │   ├── service/     # PetCoinService, PetCoinEscrowService
+│       │   │   │   ├── entity/      # PetCoinTransaction, PetCoinEscrow
+│       │   │   │   └── repository/  # JPA Repository
 │       │   │   ├── statistics/      # 통계/대시보드
 │       │   │   │   ├── service/     # StatisticsService, StatisticsScheduler
 │       │   │   │   └── entity/      # DailyStatistics
@@ -229,6 +241,7 @@ Petory/
 - **LocationService**: 위치 기반 서비스 (POINT 타입으로 좌표 저장)
 - **Meetup**: 모임(산책/오프라인 등) 정보 및 참가자
 - **Chat/Conversation**: 채팅 대화방 및 메시지
+- **PetCoinTransaction / PetCoinEscrow**: 펫코인 거래 내역, 에스크로 (거래 확정 시 HOLD → 완료 시 RELEASED / 취소 시 REFUNDED)
 - **Notification**: 알림 (타입별 분류, 읽음 상태)
 - **Report**: 신고 (타입별 분류, 처리 상태)
 - **DailyStatistics**: 일별 통계 요약 (배치 작업으로 집계)
@@ -301,8 +314,7 @@ Petory/
 - **제재 시스템 경고 횟수**: DB 레벨 원자적 증가 쿼리로 Lost Update 방지
 - **모임 참여 인원 관리**: DB 레벨 원자적 증가 쿼리로 최대 인원 초과 방지
 - **소셜 로그인 중복 계정**: DB UNIQUE 제약조건 + 트랜잭션으로 Race Condition 방지
-
-**상세 사례 및 코드**: [트랜잭션 관리 & 동시성 제어 사례](./docs/concurrency/transaction-concurrency-cases.md)
+- **펫코인 결제**: 비관적 락으로 잔액 차감·에스크로 상태 변경·에스크로 조회 시 Race Condition 방지, 지급/환불 실패 시 상태 변경 롤백
 
 ---
 
@@ -327,6 +339,8 @@ Petory/
 
 - [커뮤니티 & 실종 제보 아키텍처](./docs/architecture/커뮤니티%20&%20실종%20제보%20아키텍처.md) - 게시글/댓글 작성·수정·삭제, 실종 제보, 블라인드 처리, 반응(좋아요/싫어요) 등의 로직 흐름
 - [펫 케어 & 매칭 아키텍처](./docs/architecture/펫%20케어%20&%20매칭%20아키텍처.md) - 케어 요청 생성·수정·삭제, 채팅 기반 매칭, 리뷰 작성, 상태 변경 등의 로직 흐름
+- [Payment 도메인 (펫코인 결제)](./docs/domains/payment.md) - 에스크로 흐름, Care/Chat 연동, 동시성 제어(비관적 락), 트랜잭션·롤백 정책
+- [펫케어 코인 관련 흐름](./docs/architecture/펫케어%20코인%20관련%20흐름.md) - 펫코인 결제·에스크로 흐름 다이어그램 및 시나리오
 - [위치 기반 서비스 아키텍처](./docs/architecture/위치%20기반%20서비스%20아키텍처.md) - 지역 계층 검색, 지오코딩/역지오코딩, 길찾기, 리뷰 작성 및 평점 업데이트, 거리 계산 등의 로직 흐름
 - [산책 & 오프라인 모임 아키텍처](./docs/architecture/산책%20&%20오프라인%20모임%20아키텍처.md) - 모임 생성·참여·취소, 반경 기반 검색, 채팅방 자동 생성, 동시성 제어 등의 로직 흐름
 - [채팅 시스템 아키텍처](./docs/architecture/채팅%20시스템%20설계.md) - 채팅방 생성·나가기·삭제, 메시지 전송·조회·읽음 처리, 펫케어 거래 확정, 재참여 처리 등의 로직 흐름

@@ -31,16 +31,17 @@ public class ChatMessageController {
     public ResponseEntity<ChatMessageDTO> sendMessage(
             @RequestBody SendMessageRequest request,
             @RequestParam Long senderIdx) {
-        
-        MessageType messageType = request.getMessageType() != null 
-            ? MessageType.valueOf(request.getMessageType()) : MessageType.TEXT;
-        
+
+        MessageType messageType = request.messageType() != null
+                ? MessageType.valueOf(request.messageType())
+                : MessageType.TEXT;
+
         ChatMessageDTO dto = chatMessageService.sendMessage(
-                request.getConversationIdx(),
+                request.conversationIdx(),
                 senderIdx,
-                request.getContent(),
+                request.content(),
                 messageType);
-        
+
         return ResponseEntity.ok(dto);
     }
 
@@ -117,4 +118,3 @@ public class ChatMessageController {
         return ResponseEntity.ok(chatMessageService.getUnreadCount(conversationIdx, userId));
     }
 }
-

@@ -57,18 +57,25 @@ public interface SpringDataJpaMeetupRepository extends JpaRepository<Meetup, Lon
     List<Meetup> findAvailableMeetups(@Param("currentDate") LocalDateTime currentDate);
 
     // 반경 기반 모임 조회 (Haversine 공식 사용, 소프트 삭제 제외)
+    // ✅ 리팩토링: 날짜/상태 필터링 추가 (인메모리 필터링 제거)
+    // ✅ 최적화: Bounding Box로 먼저 필터링 (idx_meetup_location 인덱스 활용)
+    // 위도 1도 ≈ 111km, 경도 1도 ≈ 111km * cos(위도)
     @Query(value = "SELECT m.* FROM meetup m " +
-                    "WHERE m.latitude IS NOT NULL AND m.longitude IS NOT NULL " +
+                    "WHERE m.date > :currentDate " +
+                    "AND (m.status IS NULL OR m.status != 'COMPLETED') " +
                     "AND (m.is_deleted = false OR m.is_deleted IS NULL) " +
+                    "AND m.latitude BETWEEN (:lat - :radius / 111.0) AND (:lat + :radius / 111.0) " +
+                    "AND m.longitude BETWEEN (:lng - :radius / (111.0 * cos(radians(:lat)))) AND (:lng + :radius / (111.0 * cos(radians(:lat)))) " +
                     "AND (6371 * acos(cos(radians(:lat)) * cos(radians(m.latitude)) * " +
-                    "cos(radians(m.longitude) - radians(:lng)) + " +
-                    "sin(radians(:lat)) * sin(radians(m.latitude)))) <= :radius " +
+                    "    cos(radians(m.longitude) - radians(:lng)) + " +
+                    "    sin(radians(:lat)) * sin(radians(m.latitude)))) <= :radius " +
                     "ORDER BY (6371 * acos(cos(radians(:lat)) * cos(radians(m.latitude)) * " +
-                    "cos(radians(m.longitude) - radians(:lng)) + " +
-                    "sin(radians(:lat)) * sin(radians(m.latitude)))) ASC, m.date ASC", nativeQuery = true)
+                    "         cos(radians(m.longitude) - radians(:lng)) + " +
+                    "         sin(radians(:lat)) * sin(radians(m.latitude)))) ASC, m.date ASC", nativeQuery = true)
     List<Meetup> findNearbyMeetups(@Param("lat") Double lat,
                     @Param("lng") Double lng,
-                    @Param("radius") Double radius);
+                    @Param("radius") Double radius,
+                    @Param("currentDate") LocalDateTime currentDate);
 
     // Pessimistic Lock으로 동시 접근 방지
     @Lock(LockModeType.PESSIMISTIC_WRITE)

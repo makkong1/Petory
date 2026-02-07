@@ -204,7 +204,7 @@ public class NaverMapService {
                     List<?> addressesList = (List<?>) responseBody.get("addresses");
 
                     if (addressesList != null && addressesList.size() > 0) {
-
+                        @SuppressWarnings("unchecked")
                         List<Map<String, Object>> addresses = (List<Map<String, Object>>) addressesList;
 
                         Map<String, Object> firstAddress = addresses.get(0);
@@ -320,6 +320,7 @@ public class NaverMapService {
                     List<?> resultsList = (List<?>) responseBody.get("results");
 
                     if (resultsList != null && resultsList.size() > 0) {
+                        @SuppressWarnings("unchecked")
                         List<Map<String, Object>> results = (List<Map<String, Object>>) resultsList;
 
                         Map<String, Object> firstResult = results.get(0);

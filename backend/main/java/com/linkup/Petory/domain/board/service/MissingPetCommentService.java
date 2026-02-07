@@ -61,15 +61,14 @@ public class MissingPetCommentService {
         Page<MissingPetComment> commentPage = commentRepository.findByBoardIdAndIsDeletedFalseOrderByCreatedAtAsc(boardId, pageable);
 
         if (commentPage.isEmpty()) {
-            return MissingPetCommentPageResponseDTO.builder()
-                    .comments(new ArrayList<>())
-                    .totalCount(0)
-                    .totalPages(0)
-                    .currentPage(page)
-                    .pageSize(size)
-                    .hasNext(false)
-                    .hasPrevious(false)
-                    .build();
+            return new MissingPetCommentPageResponseDTO(
+                    new ArrayList<>(),
+                    0,
+                    0,
+                    page,
+                    size,
+                    false,
+                    false);
         }
 
         List<MissingPetComment> comments = commentPage.getContent();
@@ -94,15 +93,14 @@ public class MissingPetCommentService {
                 })
                 .collect(Collectors.toList());
 
-        return MissingPetCommentPageResponseDTO.builder()
-                .comments(commentDTOs)
-                .totalCount(commentPage.getTotalElements())
-                .totalPages(commentPage.getTotalPages())
-                .currentPage(page)
-                .pageSize(size)
-                .hasNext(commentPage.hasNext())
-                .hasPrevious(commentPage.hasPrevious())
-                .build();
+        return new MissingPetCommentPageResponseDTO(
+                commentDTOs,
+                commentPage.getTotalElements(),
+                commentPage.getTotalPages(),
+                page,
+                size,
+                commentPage.hasNext(),
+                commentPage.hasPrevious());
     }
 
     /**

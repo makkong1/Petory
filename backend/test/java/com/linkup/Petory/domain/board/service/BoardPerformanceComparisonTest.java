@@ -59,8 +59,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Transactional
 class BoardPerformanceComparisonTest {
 
-    @Autowired
-    private BoardService boardService;
+    // @Autowired
+    // private BoardService boardService;
 
     @Autowired
     private BoardRepository boardRepository;

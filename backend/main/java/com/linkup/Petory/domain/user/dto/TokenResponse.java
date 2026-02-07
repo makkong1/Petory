@@ -1,16 +1,11 @@
 package com.linkup.Petory.domain.user.dto;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class TokenResponse {
-    private String accessToken;
-    private String refreshToken;
-    private UsersDTO user;
-}
+/**
+ * 토큰 응답 DTO (record)
+ * - 불변 객체로 응답 데이터의 의도치 않은 변경 방지
+ */
+public record TokenResponse(
+    String accessToken,
+    String refreshToken,
+    UsersDTO user
+) {}

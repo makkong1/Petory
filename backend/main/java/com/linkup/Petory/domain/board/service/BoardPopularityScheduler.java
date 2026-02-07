@@ -3,6 +3,9 @@ package com.linkup.Petory.domain.board.service;
 import com.linkup.Petory.domain.board.entity.PopularityPeriodType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
+import java.time.LocalDateTime;
+
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,11 +23,11 @@ public class BoardPopularityScheduler {
     @Scheduled(cron = "0 30 18 * * ?")
     @Transactional
     public void generateWeeklyPopularitySnapshots() {
-        log.info("주간 인기 게시글 스냅샷 생성 시작 - {}", java.time.LocalDateTime.now());
+        log.info("주간 인기 게시글 스냅샷 생성 시작 - {}", LocalDateTime.now());
 
         try {
             boardPopularityService.generateSnapshots(PopularityPeriodType.WEEKLY);
-            log.info("주간 인기 게시글 스냅샷 생성 완료 - {}", java.time.LocalDateTime.now());
+            log.info("주간 인기 게시글 스냅샷 생성 완료 - {}", LocalDateTime.now());
         } catch (Exception e) {
             log.error("주간 인기 게시글 스냅샷 생성 중 오류 발생", e);
         }
@@ -36,11 +39,11 @@ public class BoardPopularityScheduler {
     @Scheduled(cron = "0 30 18 ? * MON")
     @Transactional
     public void generateMonthlyPopularitySnapshots() {
-        log.info("월간 인기 게시글 스냅샷 생성 시작 - {}", java.time.LocalDateTime.now());
+        log.info("월간 인기 게시글 스냅샷 생성 시작 - {}", LocalDateTime.now());
 
         try {
             boardPopularityService.generateSnapshots(PopularityPeriodType.MONTHLY);
-            log.info("월간 인기 게시글 스냅샷 생성 완료 - {}", java.time.LocalDateTime.now());
+            log.info("월간 인기 게시글 스냅샷 생성 완료 - {}", LocalDateTime.now());
         } catch (Exception e) {
             log.error("월간 인기 게시글 스냅샷 생성 중 오류 발생", e);
         }
