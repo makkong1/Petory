@@ -49,10 +49,13 @@ public interface SpringDataJpaMeetupRepository extends JpaRepository<Meetup, Lon
     List<Meetup> findByKeyword(@Param("keyword") String keyword);
 
     // 참여 가능한 모임 조회 (최대 인원 미만, 소프트 삭제 제외)
-    @Query("SELECT m FROM Meetup m WHERE " +
-                    "m.maxParticipants > (SELECT COUNT(p) FROM MeetupParticipants p WHERE p.meetup.idx = m.idx) " +
-                    "AND m.date > :currentDate AND " +
-                    "(m.isDeleted = false OR m.isDeleted IS NULL) " +
+    // ✅ 리팩토링: 서브쿼리 → LEFT JOIN + GROUP BY + HAVING으로 변경
+    @Query("SELECT m FROM Meetup m " +
+                    "LEFT JOIN m.participants p " +
+                    "WHERE m.date > :currentDate " +
+                    "AND (m.isDeleted = false OR m.isDeleted IS NULL) " +
+                    "GROUP BY m.idx " +
+                    "HAVING COUNT(p) < m.maxParticipants " +
                     "ORDER BY m.date ASC")
     List<Meetup> findAvailableMeetups(@Param("currentDate") LocalDateTime currentDate);
 

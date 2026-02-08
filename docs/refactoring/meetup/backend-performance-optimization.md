@@ -132,17 +132,17 @@ Page<Meetup> findByStatusAndKeyword(
 
 ## 🟠 High Priority
 
-### 4. 서브쿼리 최적화 - `findAvailableMeetups()`
+### 4. 서브쿼리 최적화 - `findAvailableMeetups()` ✅ **리팩토링 완료**
 
 **파일**: `SpringDataJpaMeetupRepository.java` (Lines 51-57)
 
-**현재 문제**:
+**리팩토링 전 문제**:
 ```java
-// 각 행마다 서브쿼리 실행
+// 서브쿼리 사용 (실행 계획 비효율)
 (SELECT COUNT(p) FROM MeetupParticipants p WHERE p.meetup.idx = m.idx) < m.maxParticipants
 ```
 
-**해결 방안**:
+**리팩토링 후 해결**:
 ```java
 @Query("SELECT m FROM Meetup m " +
        "LEFT JOIN m.participants p " +
@@ -153,6 +153,13 @@ Page<Meetup> findByStatusAndKeyword(
        "ORDER BY m.date ASC")
 List<Meetup> findAvailableMeetups(@Param("currentDate") LocalDateTime currentDate);
 ```
+
+**리팩토링 결과**:
+- ✅ 서브쿼리 → LEFT JOIN + GROUP BY + HAVING으로 변경 완료
+- ✅ 실행 시간: 156ms → 57ms (**63.5% 감소**)
+- ✅ 메모리 사용량: 19.07 MB → 2.00 MB (**89.5% 감소**)
+- 📊 [성능 비교 결과](./subquery-optimization/performance-comparison.md)
+- 📊 [리팩토링 전 성능 측정 결과](./subquery-optimization/performance-results-before.md)
 
 ---
 
@@ -278,12 +285,12 @@ Meetup saved = meetupRepository.save(meetup);
 
 ## 체크리스트
 
-- [x] `getNearbyMeetups()` DB 쿼리로 변경 ✅ [성능 비교](./performance-comparison.md)
-- [x] 인덱스 활용 최적화 ✅ Bounding Box 방식으로 `idx_meetup_location` 활용 [인덱스 분석](./index-analysis.md)
-- [x] 쿼리 실행 계획 분석 ✅ [EXPLAIN 결과](./explain-results.md)
-- [ ] N+1 쿼리 해결 (JOIN FETCH 추가)
+- [x] `getNearbyMeetups()` DB 쿼리로 변경 ✅ [성능 비교](./nearby-meetups/performance-comparison.md)
+- [x] 인덱스 활용 최적화 ✅ Bounding Box 방식으로 `idx_meetup_location` 활용 [인덱스 분석](./nearby-meetups/index-analysis.md)
+- [x] 쿼리 실행 계획 분석 ✅ [EXPLAIN 결과](./nearby-meetups/explain-results.md)
+- [x] N+1 쿼리 해결 (JOIN FETCH 추가) ✅ [성능 비교](./participants-query/performance-comparison-participants.md)
 - [ ] Admin 필터링 DB 쿼리로 이동
-- [ ] 서브쿼리 → JOIN + GROUP BY 변경
+- [x] 서브쿼리 → JOIN + GROUP BY 변경 ✅ [리팩토링 완료](./subquery-optimization/서브쿼리%20최적화.md)
 - [ ] 중복 쿼리 제거
 - [ ] 캐싱 적용
 - [ ] 성능 측정 AOP 추출
