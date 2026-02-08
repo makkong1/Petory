@@ -28,6 +28,7 @@ import com.linkup.Petory.domain.care.repository.CareRequestRepository;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 
+import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -252,15 +253,15 @@ public class ActivityService {
 
         // 페이징 지원 메서드
         public ActivityPageResponseDTO getUserActivitiesWithPaging(long userId, String filter, int page, int size) {
-                System.out.println("=== [ActivityService] getUserActivitiesWithPaging 호출됨 - userId: " + userId 
+                System.out.println("=== [ActivityService] getUserActivitiesWithPaging 호출됨 - userId: " + userId
                                 + ", filter: " + filter + ", page: " + page + ", size: " + size + " ===");
-                
+
                 // 전체 활동 가져오기
                 List<ActivityDTO> allActivities = getUserActivities(userId);
-                
+
                 // 필터링 적용
                 List<ActivityDTO> filteredActivities = filterActivities(allActivities, filter);
-                
+
                 // 필터별 개수 계산
                 long allCount = allActivities.size();
                 long postsCount = allActivities.stream()
@@ -272,15 +273,15 @@ public class ActivityService {
                 long reviewsCount = allActivities.stream()
                                 .filter(a -> "LOCATION_REVIEW".equals(a.getType()))
                                 .count();
-                
+
                 // 페이징 적용
                 Pageable pageable = PageRequest.of(page, size);
                 int start = (int) pageable.getOffset();
                 int end = Math.min((start + pageable.getPageSize()), filteredActivities.size());
-                
+
                 List<ActivityDTO> pageContent = filteredActivities.subList(start, end);
                 Page<ActivityDTO> activityPage = new PageImpl<>(pageContent, pageable, filteredActivities.size());
-                
+
                 return ActivityPageResponseDTO.builder()
                                 .activities(activityPage.getContent())
                                 .totalCount(activityPage.getTotalElements())
@@ -295,12 +296,12 @@ public class ActivityService {
                                 .reviewsCount(reviewsCount)
                                 .build();
         }
-        
+
         private List<ActivityDTO> filterActivities(List<ActivityDTO> activities, String filter) {
                 if (filter == null || "ALL".equals(filter)) {
                         return activities;
                 }
-                
+
                 switch (filter) {
                         case "POSTS":
                                 return activities.stream()
@@ -318,16 +319,16 @@ public class ActivityService {
                                 return activities;
                 }
         }
-        
+
         private boolean isPostType(String type) {
-                return "CARE_REQUEST".equals(type) 
-                                || "BOARD".equals(type) 
+                return "CARE_REQUEST".equals(type)
+                                || "BOARD".equals(type)
                                 || "MISSING_PET".equals(type);
         }
-        
+
         private boolean isCommentType(String type) {
-                return "CARE_COMMENT".equals(type) 
-                                || "COMMENT".equals(type) 
+                return "CARE_COMMENT".equals(type)
+                                || "COMMENT".equals(type)
                                 || "MISSING_COMMENT".equals(type);
         }
 }
