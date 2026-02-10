@@ -49,7 +49,10 @@ ORDER BY m.date
 
 **성능 특성**:
 - 실행 시간: 156 ms
-- PrepareStatement 수: 6개 (Hibernate가 서브쿼리를 최적화하여 배치 처리)
+- PrepareStatement 수: 6개
+  - **PrepareStatement란**: JDBC에서 SQL 쿼리를 미리 컴파일하여 재사용할 수 있게 만든 객체
+  - **6개가 나온 이유**: Hibernate가 내부적으로 쿼리를 여러 단계로 분해하거나, 서브쿼리 최적화 과정에서 여러 PrepareStatement를 생성
+  - **주의**: 쿼리 실행 횟수(1개)와는 다름. 하나의 쿼리 실행이 내부적으로 여러 PrepareStatement를 사용할 수 있음
 - 메모리 사용량: 19.07 MB
 - 쿼리 실행 횟수: 1개 (Hibernate Statistics 기준)
 
@@ -69,6 +72,8 @@ ORDER BY m.date
 **성능 특성**:
 - 실행 시간: 57 ms (**63.5% 감소**)
 - PrepareStatement 수: 6개 (동일)
+  - JOIN 방식으로 변경했지만 PrepareStatement 수는 동일
+  - 이는 Hibernate의 내부 쿼리 처리 방식에 의한 것으로, 실제 쿼리 실행 횟수와는 별개
 - 메모리 사용량: 2.00 MB (**89.5% 감소**)
 - 쿼리 실행 횟수: 1개 (Hibernate Statistics 기준)
 
@@ -98,9 +103,21 @@ ORDER BY m.date
 
 **변화 없음** (6개 → 6개)
 
+**PrepareStatement란?**
+- JDBC에서 SQL 쿼리를 미리 컴파일하여 재사용할 수 있게 만든 객체
+- 파라미터화된 쿼리(`?` 플레이스홀더 사용)를 데이터베이스에 미리 전송하여 컴파일하고, 이후 파라미터만 바꿔가며 실행
+- 동일한 쿼리 구조를 반복 실행할 때 성능상 이점이 있음
+
+**왜 6개가 나왔는가?**
+- Hibernate가 내부적으로 쿼리를 처리하는 과정에서 여러 PrepareStatement를 생성
+- 서브쿼리 방식과 JOIN 방식 모두 Hibernate의 동일한 내부 처리 메커니즘을 사용하여 PrepareStatement 수가 동일하게 나옴
+- **중요**: PrepareStatement 수는 쿼리 실행 횟수와는 다름
+  - 쿼리 실행 횟수: 1개 (실제로 DB에 전송된 쿼리 수)
+  - PrepareStatement 수: 6개 (Hibernate가 내부적으로 생성한 PrepareStatement 객체 수)
+
 **분석**:
 - **N+1 문제가 아니었음**: PrepareStatement 수가 6개로 동일한 것을 보면, 서브쿼리가 각 행마다 실행되는 N+1 패턴이 아니었음
-- Hibernate가 서브쿼리를 최적화하여 배치 처리했기 때문에 PrepareStatement 수는 동일
+- 실제 쿼리 실행 횟수는 1개로 동일하므로, N+1 문제는 발생하지 않았음
 - **실제 문제**: N+1 문제가 아니라 서브쿼리 실행 계획의 비효율이었음
 - **실제 개선**: 쿼리 수가 아니라 쿼리 실행 계획 최적화와 메모리 사용량 감소에서 발생
 - JOIN 방식이 서브쿼리보다 더 효율적인 실행 계획을 생성하여 실행 시간과 메모리 사용량이 개선됨
@@ -142,10 +159,12 @@ ORDER BY m.date
 
 ## 📝 참고 사항
 
-- PrepareStatement 수가 동일한 것은 Hibernate가 서브쿼리를 최적화했기 때문
-- 실제 개선은 쿼리 실행 계획과 실행 시간에서 발생
-- 메모리 사용량 개선이 가장 큰 효과
-- 실행 시간 개선으로 사용자 경험 향상
+- **PrepareStatement 수**: Hibernate의 내부 쿼리 처리 방식에 의해 결정되며, 실제 쿼리 실행 횟수와는 다름
+  - 쿼리 실행 횟수: 1개 (실제 DB 쿼리 수)
+  - PrepareStatement 수: 6개 (Hibernate 내부 처리에서 생성된 객체 수)
+- **실제 개선**: 쿼리 실행 계획 최적화와 실행 시간, 메모리 사용량에서 발생
+- 메모리 사용량 개선이 가장 큰 효과 (89.5% 감소)
+- 실행 시간 개선으로 사용자 경험 향상 (63.5% 감소)
 
 ---
 
