@@ -13,7 +13,10 @@ import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 
+import com.linkup.Petory.domain.meetup.annotation.Timed;
 import com.linkup.Petory.domain.meetup.event.MeetupCreatedEvent;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -39,6 +42,9 @@ public class MeetupService {
     private final MeetupParticipantsConverter participantsConverter;
     private final ConversationService conversationService;
     private final ApplicationEventPublisher eventPublisher;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     // 모임 생성
     @Transactional
@@ -151,29 +157,10 @@ public class MeetupService {
     }
 
     // 모든 모임 조회 (소프트 삭제 제외)
+    @Timed("getAllMeetups")
     public List<MeetupDTO> getAllMeetups() {
-        long startTime = System.currentTimeMillis();
-        Runtime runtime = Runtime.getRuntime();
-        long memoryBefore = runtime.totalMemory() - runtime.freeMemory();
-
-        long dbStartTime = System.currentTimeMillis();
         List<Meetup> meetups = meetupRepository.findAllNotDeleted(); // 원래는 여기에서 n+1문제가 발생했지만 join fetch로 해결
-        long dbTime = System.currentTimeMillis() - dbStartTime;
-
-        long processingStartTime = System.currentTimeMillis();
-        List<MeetupDTO> result = meetups.stream()
-                .map(converter::toDTO)
-                .collect(Collectors.toList());
-        long processingTime = System.currentTimeMillis() - processingStartTime;
-
-        long totalTime = System.currentTimeMillis() - startTime;
-        long memoryAfter = runtime.totalMemory() - runtime.freeMemory();
-        long memoryUsed = memoryAfter - memoryBefore;
-
-        log.info("[성능 측정] getAllMeetups - 전체시간: {}ms, DB쿼리: {}ms, 처리시간: {}ms, 메모리사용: {}MB, 조회건수: {}",
-                totalTime, dbTime, processingTime, memoryUsed / (1024 * 1024), result.size());
-
-        return result;
+        return convertToDTOs(meetups);
     }
 
     // 특정 모임 조회 (참가자 목록 포함) - JOIN FETCH로 N+1 문제 해결
@@ -185,35 +172,16 @@ public class MeetupService {
 
     // 반경 기반 모임 조회 (마커 표시용)
     // ✅ 리팩토링: 인메모리 필터링 제거 → DB 쿼리로 최적화
+    @Timed("getNearbyMeetups")
     public List<MeetupDTO> getNearbyMeetups(Double lat, Double lng, Double radiusKm) {
-        long startTime = System.currentTimeMillis();
-        Runtime runtime = Runtime.getRuntime();
-        long memoryBefore = runtime.totalMemory() - runtime.freeMemory();
-
         LocalDateTime now = LocalDateTime.now();
         log.info("반경 기반 모임 조회 요청: lat={}, lng={}, radius={}km, currentDate={}", lat, lng, radiusKm, now);
 
-        // ✅ 개선: DB에서 한 번에 필터링 및 거리 계산 수행
-        long dbStartTime = System.currentTimeMillis();
         List<Meetup> nearbyMeetups = meetupRepository.findNearbyMeetups(lat, lng, radiusKm, now);
-        long dbTime = System.currentTimeMillis() - dbStartTime;
         log.info("DB 쿼리 결과 모임 수: {}", nearbyMeetups.size());
 
-        // ✅ 개선: DTO 변환만 수행 (필터링/정렬은 DB에서 완료)
-        long conversionStartTime = System.currentTimeMillis();
-        List<MeetupDTO> result = nearbyMeetups.stream()
-                .map(converter::toDTO)
-                .collect(Collectors.toList());
-        long conversionTime = System.currentTimeMillis() - conversionStartTime;
-
-        long totalTime = System.currentTimeMillis() - startTime;
-        long memoryAfter = runtime.totalMemory() - runtime.freeMemory();
-        long memoryUsed = memoryAfter - memoryBefore;
-
+        List<MeetupDTO> result = convertToDTOs(nearbyMeetups);
         log.info("최종 결과 모임 수: {}", result.size());
-        log.info(
-                "[성능 측정] getNearbyMeetups (개선 후) - 전체시간: {}ms, DB쿼리: {}ms, DTO변환: {}ms, 메모리사용: {}MB, 결과건수: {}",
-                totalTime, dbTime, conversionTime, memoryUsed / (1024 * 1024), result.size());
 
         // 반경 내 모임들의 정보 로그 (최대 10개)
         for (int i = 0; i < Math.min(10, nearbyMeetups.size()); i++) {
@@ -228,10 +196,9 @@ public class MeetupService {
 
     // 특정 모임의 참가자 목록 조회
     public List<MeetupParticipantsDTO> getMeetupParticipants(Long meetupIdx) {
-        return meetupParticipantsRepository.findByMeetupIdxOrderByJoinedAtAsc(meetupIdx)
-                .stream()
-                .map(participantsConverter::toDTO)
-                .collect(Collectors.toList());
+        return convertToParticipantDTOs(
+                meetupParticipantsRepository.findByMeetupIdxOrderByJoinedAtAsc(meetupIdx)
+        );
     }
 
     // 모임 참가 (원자적 UPDATE 쿼리 방식 - 권장)
@@ -276,9 +243,8 @@ public class MeetupService {
                         meetupIdx, userId, meetup.getCurrentParticipants(), meetup.getMaxParticipants());
                 throw new RuntimeException("모임 인원이 가득 찼습니다.");
             }
-            // 업데이트된 모임 정보 다시 조회
-            meetup = meetupRepository.findById(meetupIdx)
-                    .orElseThrow(() -> new RuntimeException("모임을 찾을 수 없습니다."));
+            // 영속성 컨텍스트 새로고침 (중복 DB 쿼리 제거)
+            entityManager.refresh(meetup);
         }
 
         // 참가자 추가
@@ -349,88 +315,44 @@ public class MeetupService {
     }
 
     // 지역별 모임 조회
+    @Timed("getMeetupsByLocation")
     public List<MeetupDTO> getMeetupsByLocation(Double minLat, Double maxLat, Double minLng, Double maxLng) {
-        long startTime = System.currentTimeMillis();
-        Runtime runtime = Runtime.getRuntime();
-        long memoryBefore = runtime.totalMemory() - runtime.freeMemory();
-
-        long dbStartTime = System.currentTimeMillis();
         List<Meetup> meetups = meetupRepository.findByLocationRange(minLat, maxLat, minLng, maxLng);
-        long dbTime = System.currentTimeMillis() - dbStartTime;
-
-        long processingStartTime = System.currentTimeMillis();
-        List<MeetupDTO> result = meetups.stream()
-                .map(converter::toDTO)
-                .collect(Collectors.toList());
-        long processingTime = System.currentTimeMillis() - processingStartTime;
-
-        long totalTime = System.currentTimeMillis() - startTime;
-        long memoryAfter = runtime.totalMemory() - runtime.freeMemory();
-        long memoryUsed = memoryAfter - memoryBefore;
-
-        log.info("[성능 측정] getMeetupsByLocation - 전체시간: {}ms, DB쿼리: {}ms, 처리시간: {}ms, 메모리사용: {}MB, 조회건수: {}",
-                totalTime, dbTime, processingTime, memoryUsed / (1024 * 1024), result.size());
-
-        return result;
+        return convertToDTOs(meetups);
     }
 
     // 키워드로 모임 검색
+    @Timed("searchMeetupsByKeyword")
     public List<MeetupDTO> searchMeetupsByKeyword(String keyword) {
-        long startTime = System.currentTimeMillis();
-        Runtime runtime = Runtime.getRuntime();
-        long memoryBefore = runtime.totalMemory() - runtime.freeMemory();
-
-        long dbStartTime = System.currentTimeMillis();
         List<Meetup> meetups = meetupRepository.findByKeyword(keyword);
-        long dbTime = System.currentTimeMillis() - dbStartTime;
-
-        long processingStartTime = System.currentTimeMillis();
-        List<MeetupDTO> result = meetups.stream()
-                .map(converter::toDTO)
-                .collect(Collectors.toList());
-        long processingTime = System.currentTimeMillis() - processingStartTime;
-
-        long totalTime = System.currentTimeMillis() - startTime;
-        long memoryAfter = runtime.totalMemory() - runtime.freeMemory();
-        long memoryUsed = memoryAfter - memoryBefore;
-
-        log.info("[성능 측정] searchMeetupsByKeyword - 전체시간: {}ms, DB쿼리: {}ms, 처리시간: {}ms, 메모리사용: {}MB, 조회건수: {}, 키워드: {}",
-                totalTime, dbTime, processingTime, memoryUsed / (1024 * 1024), result.size(), keyword);
-
-        return result;
+        return convertToDTOs(meetups);
     }
 
     // 참여 가능한 모임 조회
+    @Timed("getAvailableMeetups")
     public List<MeetupDTO> getAvailableMeetups() {
-        long startTime = System.currentTimeMillis();
-        Runtime runtime = Runtime.getRuntime();
-        long memoryBefore = runtime.totalMemory() - runtime.freeMemory();
-
-        long dbStartTime = System.currentTimeMillis();
         List<Meetup> meetups = meetupRepository.findAvailableMeetups(LocalDateTime.now());
-        long dbTime = System.currentTimeMillis() - dbStartTime;
-
-        long processingStartTime = System.currentTimeMillis();
-        List<MeetupDTO> result = meetups.stream()
-                .map(converter::toDTO)
-                .collect(Collectors.toList());
-        long processingTime = System.currentTimeMillis() - processingStartTime;
-
-        long totalTime = System.currentTimeMillis() - startTime;
-        long memoryAfter = runtime.totalMemory() - runtime.freeMemory();
-        long memoryUsed = memoryAfter - memoryBefore;
-
-        log.info("[성능 측정] getAvailableMeetups - 전체시간: {}ms, DB쿼리: {}ms, 처리시간: {}ms, 메모리사용: {}MB, 조회건수: {}",
-                totalTime, dbTime, processingTime, memoryUsed / (1024 * 1024), result.size());
-
-        return result;
+        return convertToDTOs(meetups);
     }
 
     // 주최자별 모임 조회
     public List<MeetupDTO> getMeetupsByOrganizer(Long organizerIdx) {
-        return meetupRepository.findByOrganizerIdxOrderByCreatedAtDesc(organizerIdx)
-                .stream()
+        return convertToDTOs(
+                meetupRepository.findByOrganizerIdxOrderByCreatedAtDesc(organizerIdx)
+        );
+    }
+
+    // 공통 메서드: Meetup 엔티티 리스트를 DTO 리스트로 변환
+    private List<MeetupDTO> convertToDTOs(List<Meetup> meetups) {
+        return meetups.stream()
                 .map(converter::toDTO)
+                .collect(Collectors.toList());
+    }
+
+    // 공통 메서드: MeetupParticipants 엔티티 리스트를 DTO 리스트로 변환
+    private List<MeetupParticipantsDTO> convertToParticipantDTOs(List<MeetupParticipants> participants) {
+        return participants.stream()
+                .map(participantsConverter::toDTO)
                 .collect(Collectors.toList());
     }
 }

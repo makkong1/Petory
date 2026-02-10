@@ -175,28 +175,65 @@ List<Meetup> findAvailableMeetups(@Param("currentDate") LocalDateTime currentDat
 
 ## 🟡 Medium Priority
 
-### 6. 중복 DB 쿼리 제거
+### 6. 중복 DB 쿼리 제거 ✅ **리팩토링 완료**
 
-**파일**: `MeetupService.java` (Lines 354-413)
+**파일**: `MeetupService.java` (Lines 237-297)
 
+**리팩토링 전 문제**:
 ```java
 // 현재: 같은 meetup 두 번 조회
-Meetup meetup = meetupRepository.findById(meetupIdx); // Line 357
+Meetup meetup = meetupRepository.findById(meetupIdx); // 첫 번째 조회
 // ... 처리 ...
-Meetup updatedMeetup = meetupRepository.findById(meetupIdx); // Line 396 (불필요)
+meetup = meetupRepository.findById(meetupIdx); // 두 번째 조회 (불필요)
 ```
 
-**해결**: 첫 조회 결과 재사용 또는 atomic update 쿼리 사용
+**리팩토링 후 해결**:
+```java
+// 첫 번째 조회
+Meetup meetup = meetupRepository.findById(meetupIdx);
+// ... 처리 ...
+// 영속성 컨텍스트 새로고침 (중복 DB 쿼리 제거)
+entityManager.refresh(meetup);
+```
+
+**리팩토링 결과**:
+- ✅ 중복 `findById()` 호출 제거
+- ✅ `entityManager.refresh()` 사용으로 영속성 컨텍스트 동기화
+- 📊 [상세 리팩토링 문서](./duplicate-query-removal.md)
 
 ---
 
-### 7. Stream 연산 최적화
+### 7. Stream 연산 최적화 ✅ **리팩토링 완료**
 
-**파일**: `MeetupService.java` (Lines 232-288)
+**파일**: `MeetupService.java`
 
-**문제**: 여러 번의 stream pass와 중간 컬렉션 생성
+**리팩토링 전 문제**:
+- 여러 메서드에서 동일한 Stream 변환 로직 반복 (7개 메서드)
+- 코드 중복으로 인한 유지보수 어려움
+- 가독성 저하
 
-**해결**: 단일 stream으로 통합, `peek()` 활용
+**리팩토링 후 해결**:
+```java
+// 공통 메서드 추출
+private List<MeetupDTO> convertToDTOs(List<Meetup> meetups) {
+    return meetups.stream()
+            .map(converter::toDTO)
+            .collect(Collectors.toList());
+}
+
+// 사용 예시
+public List<MeetupDTO> getAllMeetups() {
+    // ...
+    List<MeetupDTO> result = convertToDTOs(meetups);
+    // ...
+}
+```
+
+**리팩토링 결과**:
+- ✅ 중복 코드 제거 (7개 메서드 → 공통 메서드 2개)
+- ✅ 유지보수성 향상 (변경 시 한 곳만 수정)
+- ✅ 가독성 향상 (비즈니스 로직 명확화)
+- 📊 [상세 리팩토링 문서](./stream-operation-refactoring.md)
 
 ---
 
@@ -291,7 +328,8 @@ Meetup saved = meetupRepository.save(meetup);
 - [x] N+1 쿼리 해결 (JOIN FETCH 추가) ✅ [성능 비교](./participants-query/performance-comparison-participants.md)
 - [ ] Admin 필터링 DB 쿼리로 이동
 - [x] 서브쿼리 → JOIN + GROUP BY 변경 ✅ [리팩토링 완료](./subquery-optimization/서브쿼리%20최적화.md)
-- [ ] 중복 쿼리 제거
+- [x] 중복 쿼리 제거 ✅ [리팩토링 완료](./duplicate-query-removal.md)
+- [x] Stream 연산 최적화 ✅ [리팩토링 완료](./stream-operation-refactoring.md)
 - [ ] 캐싱 적용
 - [ ] 성능 측정 AOP 추출
 
