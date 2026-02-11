@@ -7,6 +7,7 @@ import java.time.LocalDateTime;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import com.linkup.Petory.domain.user.entity.Role;
 import com.linkup.Petory.domain.user.entity.Users;
 
 /**
@@ -80,4 +81,9 @@ public interface UsersRepository {
      * 코인 차감 시 Race Condition 방지를 위해 사용
      */
     Optional<Users> findByIdForUpdate(Long idx);
+
+    /**
+     * 사용자 역할만 조회 (경량 조회용, 삭제 권한 검증 등)
+     */
+    Optional<Role> findRoleByIdx(Long idx);
 }

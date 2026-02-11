@@ -4,12 +4,12 @@
 Meetup 도메인의 백엔드 코드 분석을 통해 발견된 성능 이슈 및 리팩토링 포인트를 정리합니다.
 
 **문서 구조**:
-- `nearby-meetups/` - 반경 기반 모임 조회 최적화 (리팩토링)
-- `participants-query/` - 참여자 조회 N+1 쿼리 해결 (트러블슈팅)
+- **리팩토링**: `nearby-meetups/`, `subquery-optimization/`, `duplicate-query-removal/`, `stream-operation-refactoring/`
+- **트러블슈팅**: `participants-query/` - 참여자 조회 N+1 쿼리 (런타임 발견 이슈)
 
 ---
 
-## 🔴 Critical (긴급)
+## 🔴 Critical (긴급) - 리팩토링
 
 ### 1. 인메모리 필터링 제거 - `getNearbyMeetups()` ✅ **해결 완료**
 
@@ -67,47 +67,7 @@ List<Meetup> nearbyMeetups = meetupRepository.findNearbyMeetups(lat, lng, radius
 
 ---
 
-### 2. N+1 쿼리 해결 - `findByUserIdxOrderByJoinedAtDesc()` ✅ **해결 완료**
-
-**파일**: `SpringDataJpaMeetupParticipantsRepository.java` (Line 23)
-
-**현재 문제**:
-- JOIN FETCH 없이 연관 엔티티 조회
-- `meetup`, `user` 접근 시 추가 쿼리 발생
-- PrepareStatement 수: 102개 (100개 참여 모임 기준)
-
-```java
-// 현재 코드
-List<MeetupParticipants> findByUserIdxOrderByJoinedAtDesc(Long userIdx);
-```
-
-**해결 방안**:
-```java
-@Query("SELECT mp FROM MeetupParticipants mp " +
-       "JOIN FETCH mp.meetup m " +
-       "JOIN FETCH mp.user u " +
-       "WHERE mp.user.idx = :userIdx " +
-       "ORDER BY mp.joinedAt DESC")
-List<MeetupParticipants> findByUserIdxOrderByJoinedAtDesc(@Param("userIdx") Long userIdx);
-```
-
-**성능 측정 결과 (리팩토링 전)**:
-- ✅ 측정 완료 - [상세 결과](./participants-query/performance-results-participants-before.md)
-- 실행 시간: 102 ms
-- PrepareStatement 수: 102 개
-- 메모리 사용량: 4.5 MB
-- 결과 참여 모임 수: 100 개
-
-**실제 개선 효과** ✅:
-- ✅ PrepareStatement 수: 102개 → 2개 (**98.0% 감소**)
-- ⚠️ 실행 시간: 102ms → 178ms (단일 쿼리 복잡도 증가, 하지만 쿼리 수 감소로 전체 DB 부하 감소)
-- 메모리 사용량: 4.5MB → 6.0MB (JOIN FETCH로 한 번에 로드)
-
-**상세 결과**: [성능 비교 문서](./participants-query/performance-comparison-participants.md)
-
----
-
-### 3. Admin 컨트롤러 인메모리 필터링
+### 2. Admin 컨트롤러 인메모리 필터링
 
 **파일**: `AdminMeetupController.java` (Lines 35-64)
 
@@ -130,7 +90,41 @@ Page<Meetup> findByStatusAndKeyword(
 
 ---
 
-## 🟠 High Priority
+## 🔴 트러블슈팅 (런타임 발견 이슈)
+
+### 3. N+1 쿼리 해결 - `findByUserIdxOrderByJoinedAtDesc()` ✅ **해결 완료**
+
+**파일**: `SpringDataJpaMeetupParticipantsRepository.java` (Line 23)
+
+**발견 경로**: 참여 모임 목록 조회 시 PrepareStatement 수 급증 (102개) → 프로파일링으로 N+1 발견
+
+**문제 원인**:
+- JOIN FETCH 없이 연관 엔티티 조회
+- `meetup`, `user` 접근 시 Lazy Loading으로 추가 쿼리 발생
+- 참여 모임 100개 기준: PrepareStatement 102개
+
+```java
+// Before
+List<MeetupParticipants> findByUserIdxOrderByJoinedAtDesc(Long userIdx);
+```
+
+**해결**:
+```java
+@Query("SELECT mp FROM MeetupParticipants mp " +
+       "JOIN FETCH mp.meetup m " +
+       "JOIN FETCH mp.user u " +
+       "WHERE mp.user.idx = :userIdx " +
+       "ORDER BY mp.joinedAt DESC")
+List<MeetupParticipants> findByUserIdxOrderByJoinedAtDesc(@Param("userIdx") Long userIdx);
+```
+
+**성능 측정 결과**:
+- PrepareStatement 수: 102개 → 2개 (**98.0% 감소**)
+- 상세: [participants-query/performance-comparison-participants.md](./participants-query/performance-comparison-participants.md)
+
+---
+
+## 🟠 High Priority - 리팩토링
 
 ### 4. 서브쿼리 최적화 - `findAvailableMeetups()` ✅ **리팩토링 완료**
 
@@ -325,7 +319,7 @@ Meetup saved = meetupRepository.save(meetup);
 - [x] `getNearbyMeetups()` DB 쿼리로 변경 ✅ [성능 비교](./nearby-meetups/performance-comparison.md)
 - [x] 인덱스 활용 최적화 ✅ Bounding Box 방식으로 `idx_meetup_location` 활용 [인덱스 분석](./nearby-meetups/index-analysis.md)
 - [x] 쿼리 실행 계획 분석 ✅ [EXPLAIN 결과](./nearby-meetups/explain-results.md)
-- [x] N+1 쿼리 해결 (JOIN FETCH 추가) ✅ [성능 비교](./participants-query/performance-comparison-participants.md)
+- [x] N+1 쿼리 해결 (트러블슈팅) ✅ [성능 비교](./participants-query/performance-comparison-participants.md)
 - [ ] Admin 필터링 DB 쿼리로 이동
 - [x] 서브쿼리 → JOIN + GROUP BY 변경 ✅ [리팩토링 완료](./subquery-optimization/서브쿼리%20최적화.md)
 - [x] 중복 쿼리 제거 ✅ [리팩토링 완료](./duplicate-query-removal.md)
