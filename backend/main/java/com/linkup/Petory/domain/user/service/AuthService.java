@@ -1,5 +1,6 @@
 package com.linkup.Petory.domain.user.service;
 
+import com.linkup.Petory.domain.user.converter.UsersConverter;
 import com.linkup.Petory.domain.user.dto.TokenResponse;
 import com.linkup.Petory.domain.user.dto.UsersDTO;
 import com.linkup.Petory.domain.user.entity.UserStatus;
@@ -20,7 +21,7 @@ public class AuthService {
 
     private final JwtUtil jwtUtil;
     private final UsersRepository usersRepository;
-    private final UsersService usersService;
+    private final UsersConverter usersConverter;
 
     /**
      * 로그인 - Access Token과 Refresh Token 발급
@@ -28,7 +29,7 @@ public class AuthService {
     @Transactional
     public TokenResponse login(String id, String password) {
         Users user = usersRepository.findByIdString(id)
-                .orElseThrow(() -> new RuntimeException("유저 없음")); // 1번번
+                .orElseThrow(() -> new RuntimeException("유저 없음"));
 
         // 제재 상태 확인
         if (user.getStatus() == UserStatus.BANNED) {
@@ -58,11 +59,11 @@ public class AuthService {
         user.setRefreshToken(refreshToken);
         user.setRefreshExpiration(LocalDateTime.now().plusDays(1));
         user.setLastLoginAt(LocalDateTime.now()); // 통계용: 마지막 로그인 시간 업데이트
-        usersRepository.save(user); // 2번
+        usersRepository.save(user);
 
         log.info("로그인 성공: {}, Refresh Token 저장 완료", id);
 
-        UsersDTO userDTO = usersService.getUserById(id); // 3번
+        UsersDTO userDTO = usersConverter.toDTO(user);
 
         return new TokenResponse(accessToken, refreshToken, userDTO);
     }
@@ -106,7 +107,7 @@ public class AuthService {
         log.info("✅ Access Token 재발급 성공: userId={}, 발급시간={}",
                 user.getId(), LocalDateTime.now());
 
-        UsersDTO userDTO = usersService.getUserById(user.getId());
+        UsersDTO userDTO = usersConverter.toDTO(user);
 
         return new TokenResponse(newAccessToken, refreshToken, userDTO);  // 기존 Refresh Token 유지
     }

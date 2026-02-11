@@ -7,6 +7,7 @@ import java.time.LocalDateTime;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Repository;
 
+import com.linkup.Petory.domain.user.entity.Role;
 import com.linkup.Petory.domain.user.entity.Users;
 
 import org.springframework.data.domain.Page;
@@ -105,5 +106,10 @@ public class JpaUsersAdapter implements UsersRepository {
     @Override
     public Optional<Users> findByIdForUpdate(Long idx) {
         return jpaRepository.findByIdForUpdate(idx);
+    }
+
+    @Override
+    public Optional<Role> findRoleByIdx(Long idx) {
+        return jpaRepository.findRoleByIdx(idx);
     }
 }

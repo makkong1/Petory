@@ -1,6 +1,7 @@
 package com.linkup.Petory.domain.user.service;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -15,6 +16,7 @@ import com.linkup.Petory.domain.user.dto.PetDTO;
 import com.linkup.Petory.domain.user.dto.UsersDTO;
 import com.linkup.Petory.domain.user.dto.UserPageResponseDTO;
 import com.linkup.Petory.domain.user.entity.EmailVerificationPurpose;
+import com.linkup.Petory.domain.user.entity.Role;
 import com.linkup.Petory.domain.user.entity.UserStatus;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
@@ -79,6 +81,15 @@ public class UsersService {
     // 단일 조회 (펫 정보 포함)
     public UsersDTO getUser(long idx) {
         return getUserWithPets(idx);
+    }
+
+    /**
+     * 사용자 역할만 조회 (경량 조회용)
+     * - Admin 삭제 권한 검증 등 전체 프로필이 불필요한 경우 사용
+     */
+    @Transactional(readOnly = true)
+    public Optional<Role> getRoleById(Long idx) {
+        return usersRepository.findRoleByIdx(idx);
     }
 
     // username으로 조회

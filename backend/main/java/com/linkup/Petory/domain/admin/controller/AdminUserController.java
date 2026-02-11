@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.*;
 
 import com.linkup.Petory.domain.user.dto.UsersDTO;
 import com.linkup.Petory.domain.user.dto.UserPageResponseDTO;
+import com.linkup.Petory.domain.user.entity.Role;
 import com.linkup.Petory.domain.user.service.UsersService;
 
 import lombok.RequiredArgsConstructor;
@@ -91,9 +92,8 @@ public class AdminUserController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
         // ADMIN 계정 삭제는 AdminUserManagementController에서만 가능
-        UsersDTO user = usersService.getUser(id);
-        if (user.getRole() != null &&
-                (user.getRole().equals("ADMIN") || user.getRole().equals("MASTER"))) {
+        var role = usersService.getRoleById(id);
+        if (role.isPresent() && (role.get() == Role.ADMIN || role.get() == Role.MASTER)) {
             throw new IllegalArgumentException("관리자 계정 삭제는 별도 엔드포인트를 사용해주세요.");
         }
         usersService.deleteUser(id);

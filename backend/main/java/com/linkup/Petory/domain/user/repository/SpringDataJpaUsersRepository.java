@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import com.linkup.Petory.domain.user.entity.Role;
 import com.linkup.Petory.domain.user.entity.Users;
 
 import jakarta.persistence.LockModeType;
@@ -78,4 +79,10 @@ public interface SpringDataJpaUsersRepository extends JpaRepository<Users, Long>
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT u FROM Users u WHERE u.idx = :idx")
     Optional<Users> findByIdForUpdate(@Param("idx") Long idx);
+
+    /**
+     * 사용자 역할만 조회 (경량 조회용, 삭제 권한 검증 등)
+     */
+    @Query("SELECT u.role FROM Users u WHERE u.idx = :idx")
+    Optional<Role> findRoleByIdx(@Param("idx") Long idx);
 }
