@@ -5,6 +5,7 @@ import java.util.List;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.BatchSize;
 
 import com.linkup.Petory.domain.common.BaseTimeEntity;
 
@@ -62,6 +63,7 @@ public class Users extends BaseTimeEntity {
     private String petInfo;
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+    @BatchSize(size = 50) // N+1 방지: 한 번에 최대 50개 User의 socialUsers 배치 조회
     private List<SocialUser> socialUsers;
 
     // Refresh Token 관련 필드
