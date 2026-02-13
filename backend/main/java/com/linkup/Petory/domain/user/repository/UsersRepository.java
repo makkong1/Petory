@@ -50,6 +50,12 @@ public interface UsersRepository {
     Optional<Users> findByEmail(String email);
 
     /**
+     * 닉네임/사용자명/이메일 중복 검사 (1회 쿼리로 통합)
+     * 탈퇴하지 않은 사용자만 조회 (Soft Delete 필터링)
+     */
+    Optional<Users> findByNicknameOrUsernameOrEmail(String nickname, String username, String email);
+
+    /**
      * 로그인용 아이디(String 타입 id 필드)로 조회
      */
     Optional<Users> findByIdString(String id);

@@ -12,34 +12,16 @@ User 도메인의 백엔드 코드 분석을 통해 발견된 성능 이슈 및 
 
 ## 🔴 Critical (긴급) - 리팩토링
 
-### 1. 전체 사용자 조회 - `getAllUsers()` 메모리 전체 로드
+### 1. 전체 사용자 조회 - `getAllUsers()` 메모리 전체 로드 ✅ **해결 완료**
 
-**파일**: `UsersService.java` (Lines 40-42), `AdminUserController.java` (Lines 33-37)
-
-**현재 문제**:
+**이전 문제**:
 - `findAll()`로 전체 사용자를 메모리에 로드
-- 탈퇴한 사용자(isDeleted) 포함
 - 사용자 수가 많아질수록 메모리/응답 시간 증가
 
-```java
-// 현재 코드 (비효율적)
-public List<UsersDTO> getAllUsers() {
-    return usersConverter.toDTOList(usersRepository.findAll());
-}
-```
-
-**해결 방안**:
-```java
-// Repository에 탈퇴 제외 조회 메서드 추가
-@Query("SELECT u FROM Users u WHERE u.isDeleted = false OR u.isDeleted IS NULL")
-List<Users> findAllNotDeleted();
-
-// 또는 페이징만 사용 (getAllUsersWithPaging 이미 존재)
-// getAllUsers() deprecate 또는 페이징 강제
-```
-
-**예상 효과**: 탈퇴 사용자 제외로 불필요한 데이터 로드 감소, 대량 데이터 시 메모리 개선 
--- 이 부분은 탈퇴한사람까지 해야함 / 차라리 자료구조,알고리즘 이쪽을 좀 분석하는 방향으로 
+**적용 결과**:
+- ✅ `getAllUsers()` 제거, `getAllUsersWithPaging()` 페이징만 사용
+- ✅ 프론트엔드가 이미 `/paging` API만 호출 → 변경 없음
+- ✅ `GET /api/admin/users` 엔드포인트 제거
 
 ---
 
@@ -95,9 +77,9 @@ return new TokenResponse(accessToken, refreshToken, userDTO);
 
 ## 🔴 트러블슈팅 (런타임 발견 이슈)
 
-### 4. N+1 쿼리 - `UsersConverter.socialUsers` 접근
+### 4. N+1 쿼리 - `UsersConverter.socialUsers` 접근 ✅ **해결 완료**
 
-**파일**: `UsersConverter.java` (Lines 31-36)
+**파일**: `UsersConverter.java` (Lines 31-36), `Users.java`
 
 **발견 경로**: `getAllUsers()`, `getAllUsersWithPaging()` 호출 시 사용자 수가 많을수록 쿼리 수 급증 → 프로파일링으로 N+1 발견
 
@@ -118,6 +100,10 @@ return new TokenResponse(accessToken, refreshToken, userDTO);
 1. **@BatchSize**: Users 엔티티 `socialUsers`에 `@BatchSize(size = 50)` 추가 → 가장 간단
 2. **JOIN FETCH**: `findAllWithSocialUsers()` 메서드 추가
 3. **선택적 로딩**: socialUsers 불필요한 API는 `toDTOWithoutSocialUsers()` 사용
+
+**적용 결과**:
+- ✅ `Users.java`의 `socialUsers`에 `@BatchSize(size = 50)` 추가
+- Hibernate가 `WHERE user_idx IN (...)` 형태로 배치 조회 → 100명 시 101 쿼리 → 3 쿼리로 감소
 
 **상세**: [social-users-query/troubleshooting.md](./social-users-query/troubleshooting.md)
 
@@ -200,25 +186,17 @@ while (usersRepository.findByIdString(uniqueId).isPresent()) {
 
 ---
 
-### 8. 회원가입 시 중복 검사 3회 개별 쿼리
+### 8. 회원가입 시 중복 검사 3회 개별 쿼리 ✅ **해결 완료**
 
-**파일**: `UsersService.java` (Lines 110-126)
+**파일**: `UsersService.java`, `SpringDataJpaUsersRepository.java`
 
-**현재 문제**:
+**이전 문제**:
 - `findByNickname`, `findByUsername`, `findByEmail` 각각 1회씩 = 3회 DB 조회
-- 순차 실행으로 총 3번의 round-trip
 
-**해결 방안**:
-- 단일 쿼리로 통합 (존재 여부만 반환하는 메서드)
-```java
-@Query("SELECT CASE WHEN COUNT(u) > 0 THEN true ELSE false END FROM Users u " +
-       "WHERE u.nickname = :nickname OR u.username = :username OR u.email = :email " +
-       "AND (u.isDeleted = false OR u.isDeleted IS NULL)")
-boolean existsByNicknameOrUsernameOrEmail(@Param("nickname") String nickname, 
-                                          @Param("username") String username, 
-                                          @Param("email") String email);
-```
-- 단, 어느 필드가 중복인지 구분하려면 개별 쿼리 유지 필요 → 사용자 경험 위해 현재 구조 유지 가능
+**적용 결과**:
+- ✅ `findByNicknameOrUsernameOrEmail()` 단일 쿼리로 통합
+- ✅ 반환된 User의 필드 비교로 중복 항목 구분 → 동일한 에러 메시지 유지
+- ✅ 3 round-trip → 1 round-trip
 
 ---
 
@@ -316,10 +294,11 @@ public UsersDTO updateMyProfile(String userId, UsersDTO dto) { ... }
 
 ## 체크리스트
 
-- [ ] `getAllUsers()` 탈퇴 사용자 제외 또는 페이징 강제
-- [ ] UsersConverter socialUsers N+1 해결 (트러블슈팅) [상세](./social-users-query/troubleshooting.md)
+- [x] `getAllUsers()` 제거, 페이징만 사용 ✅
+- [x] UsersConverter socialUsers N+1 해결 (@BatchSize) ✅ [상세](./social-users-query/troubleshooting.md)
 - [x] AuthService login/refresh 중복 조회 제거 ✅ [시퀀스 다이어그램](./auth-duplicate-query/sequence-diagram.md)
 - [x] AdminUserController deleteUser 불필요한 getUser 제거 ✅ [시퀀스 다이어그램](./admin-delete-optimization/sequence-diagram.md)
+- [x] 회원가입 중복 검사 3회 → 1회 쿼리 통합 ✅
 - [ ] CareReviewService getReviewsByReviewee + getAverageRating 통합
 - [ ] OAuth2Service generateUniqueId/Username 최적화
 - [ ] UserSanctionService addWarning 중복 findById 제거
@@ -332,7 +311,9 @@ public UsersDTO updateMyProfile(String userId, UsersDTO dto) { ... }
 
 | 항목 | Before | After |
 |------|--------|-------|
-| getAllUsers | 전체 로드 + socialUsers N+1 | 탈퇴 제외 + JOIN FETCH |
+| getAllUsers | 전체 로드 | 페이징만 사용 ✅ |
+| socialUsers N+1 | 101 쿼리 (100명) | 3 쿼리 (@BatchSize) ✅ |
 | 로그인/Refresh | User 2회 조회 | User 1회 조회 |
 | 프로필+리뷰 | 리뷰 쿼리 2회 | 리뷰 쿼리 1회 |
 | Admin 삭제 | User+Pet 전체 조회 | 역할만 조회 |
+| 회원가입 중복 검사 | 3회 쿼리 | 1회 쿼리 ✅ |

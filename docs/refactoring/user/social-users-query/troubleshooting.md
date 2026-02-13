@@ -126,7 +126,31 @@ public UsersDTO toDTOWithoutSocialUsers(Users user) {
 
 ---
 
-## 5. 권장 적용 순서
+## 5. 적용 결과 ✅ **해결 완료**
+
+### 5.1 수정 내용
+
+**파일**: `Users.java`
+
+```java
+@OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+@BatchSize(size = 50)  // N+1 방지: 한 번에 최대 50개 User의 socialUsers 배치 조회
+private List<SocialUser> socialUsers;
+```
+
+### 5.2 해결 원리
+
+- **Before**: `getSocialUsers()` 호출 시 User마다 개별 쿼리 → 1 + N개 쿼리
+- **After**: Hibernate가 `WHERE user_idx IN (1,2,...,50)` 형태로 **배치 조회** → 1 + ceil(N/50)개 쿼리
+
+| 사용자 수 | Before | After |
+|----------|--------|-------|
+| 20명 | 21 쿼리 | 2 쿼리 |
+| 100명 | 101 쿼리 | 3 쿼리 |
+
+---
+
+## 6. 권장 적용 순서 (참고)
 
 1. **@BatchSize** 적용 (가장 간단, 즉시 효과)
 2. 상세 프로필 필요 시 **JOIN FETCH** 메서드 추가 및 `getAllUsers()` 등에서 분리 사용
@@ -134,7 +158,7 @@ public UsersDTO toDTOWithoutSocialUsers(Users user) {
 
 ---
 
-## 6. 시퀀스 다이어그램 (N+1 발생 흐름)
+## 7. 시퀀스 다이어그램 (N+1 발생 흐름)
 
 ```mermaid
 sequenceDiagram
@@ -167,7 +191,7 @@ sequenceDiagram
 
 ---
 
-## 7. 참고 자료
+## 8. 참고 자료
 
 - Meetup 도메인 유사 사례: [participants-query/performance-comparison-participants.md](../../meetup/participants-query/performance-comparison-participants.md)
 - Hibernate @BatchSize: [BatchSize 공식 문서](https://docs.jboss.org/hibernate/orm/6.0/javadocs/org/hibernate/annotations/BatchSize.html)
