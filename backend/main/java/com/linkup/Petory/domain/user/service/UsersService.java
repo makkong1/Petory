@@ -1,6 +1,7 @@
 package com.linkup.Petory.domain.user.service;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 import org.springframework.data.domain.Page;
@@ -111,21 +112,15 @@ public class UsersService {
             throw new RuntimeException("닉네임은 50자 이하여야 합니다.");
         }
 
-        // 닉네임 중복 검사
-        usersRepository.findByNickname(nickname)
-                .ifPresent(existingUser -> {
-                    throw new RuntimeException("이미 사용 중인 닉네임입니다.");
-                });
-
-        // username 중복 검사
-        usersRepository.findByUsername(dto.getUsername())
-                .ifPresent(existingUser -> {
-                    throw new RuntimeException("이미 사용 중인 사용자명입니다.");
-                });
-
-        // email 중복 검사
-        usersRepository.findByEmail(dto.getEmail())
-                .ifPresent(existingUser -> {
+        // 닉네임/사용자명/이메일 중복 검사 (1회 쿼리)
+        usersRepository.findByNicknameOrUsernameOrEmail(nickname, dto.getUsername(), dto.getEmail())
+                .ifPresent(existing -> {
+                    if (Objects.equals(existing.getNickname(), nickname)) {
+                        throw new RuntimeException("이미 사용 중인 닉네임입니다.");
+                    }
+                    if (Objects.equals(existing.getUsername(), dto.getUsername())) {
+                        throw new RuntimeException("이미 사용 중인 사용자명입니다.");
+                    }
                     throw new RuntimeException("이미 사용 중인 이메일입니다.");
                 });
 
