@@ -1,7 +1,5 @@
 package com.linkup.Petory.domain.admin.controller;
 
-import java.util.List;
-
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -26,16 +24,6 @@ import lombok.RequiredArgsConstructor;
 public class AdminUserController {
 
     private final UsersService usersService;
-
-    /**
-     * 일반 사용자 목록 조회 (USER, SERVICE_PROVIDER만) - 기존 API (하위 호환성 유지)
-     */
-    @GetMapping
-    public ResponseEntity<List<UsersDTO>> getAllUsers() {
-        List<UsersDTO> users = usersService.getAllUsers();
-        // ADMIN과 MASTER는 필터링하지 않고 전체 조회 가능
-        return ResponseEntity.ok(users);
-    }
 
     /**
      * 일반 사용자 목록 조회 (페이징 지원)

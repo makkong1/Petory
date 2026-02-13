@@ -37,14 +37,6 @@ public class UsersService {
     private final EmailVerificationService emailVerificationService;
 
     /**
-     * 전체 사용자 조회 (관리자용)
-     * - AdminUserController에서 사용
-     */
-    public List<UsersDTO> getAllUsers() {
-        return usersConverter.toDTOList(usersRepository.findAll());
-    }
-
-    /**
      * 전체 사용자 조회 (페이징 지원, 관리자용)
      * - AdminUserController에서 사용
      */
