@@ -707,7 +707,7 @@ erDiagram
 ### 관리자 (Admin)
 | 엔드포인트 | Method | 설명 | 요청/응답 |
 |-----------|--------|------|----------|
-| `/api/admin/boards` | GET | 게시글 목록 조회 (필터링) | `status`, `deleted`, `category`, `q` → `List<BoardDTO>` |
+| `/api/admin/boards/{id}` | GET | 단일 게시글 조회 (조회수 증가 없음) | - → `BoardDTO` |
 | `/api/admin/boards/paging` | GET | 게시글 목록 조회 (페이징) | `status`, `deleted`, `category`, `q`, `page`, `size` → `BoardPageResponseDTO` |
 | `/api/admin/boards/{id}/blind` | PATCH | 게시글 블라인드 처리 | - → `BoardDTO` |
 | `/api/admin/boards/{id}/unblind` | PATCH | 게시글 블라인드 해제 | - → `BoardDTO` |
