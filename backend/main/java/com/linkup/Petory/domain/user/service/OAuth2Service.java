@@ -16,6 +16,8 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.dao.DataIntegrityViolationException;
+
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Optional;
@@ -160,7 +162,6 @@ public class OAuth2Service {
         Users user;
 
         Map<String, Object> attributes = oauth2User.getAttributes();
-        boolean isNewUser = false;
 
         if (existingUserOpt.isPresent()) {
             // 기존 사용자가 있으면 소셜 계정 연결
@@ -173,26 +174,8 @@ public class OAuth2Service {
             // 기존 사용자의 nickname이 없으면 설정 필요 (null 유지, 프론트에서 설정하도록)
             // nickname은 사용자가 직접 설정해야 함
         } else {
-            // 신규 사용자 생성
-            isNewUser = true;
-            String uniqueId = generateUniqueId(provider, providerId);
-            String uniqueUsername = generateUniqueUsername(name, email);
-
-            user = Users.builder()
-                    .id(uniqueId)
-                    .username(uniqueUsername)
-                    .nickname(null) // 소셜 로그인 사용자는 처음에 닉네임 없음 (설정 필요)
-                    .email(email)
-                    .password(UUID.randomUUID().toString()) // 소셜 로그인은 비밀번호 불필요
-                    .role(Role.USER)
-                    .status(UserStatus.ACTIVE)
-
-                    .build();
-
-            // 소셜 데이터로 사용자 정보 설정
-            setUserSocialData(user, attributes, provider);
-
-            user = usersRepository.save(user);
+            // 신규 사용자 생성 (DB Unique 제약 + 재시도: 동시 가입 시 충돌 대비)
+            user = createNewUserWithRetry(provider, providerId, email, name, attributes);
             log.info("신규 소셜 로그인 사용자 생성: userId={}, email={}", user.getId(), email);
         }
 
@@ -225,35 +208,56 @@ public class OAuth2Service {
     }
 
     /**
-     * 고유한 ID 생성 (provider_providerId 형식)
+     * 신규 사용자 생성 (DataIntegrityViolationException 시 UUID 재생성 후 재시도)
      */
-    private String generateUniqueId(Provider provider, String providerId) {
-        String baseId = provider.name().toLowerCase() + "_" + providerId;
-        String uniqueId = baseId;
-        int suffix = 1;
+    private Users createNewUserWithRetry(Provider provider, String providerId, String email, String name,
+            Map<String, Object> attributes) {
+        int maxRetries = 3;
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+            String uniqueId = generateUniqueId(provider, providerId);
+            String uniqueUsername = generateUniqueUsername(name, email);
 
-        while (usersRepository.findByIdString(uniqueId).isPresent()) {
-            uniqueId = baseId + "_" + suffix;
-            suffix++;
+            Users user = Users.builder()
+                    .id(uniqueId)
+                    .username(uniqueUsername)
+                    .nickname(null)
+                    .email(email)
+                    .password(UUID.randomUUID().toString())
+                    .role(Role.USER)
+                    .status(UserStatus.ACTIVE)
+                    .build();
+
+            setUserSocialData(user, attributes, provider);
+
+            try {
+                return usersRepository.save(user);
+            } catch (DataIntegrityViolationException e) {
+                if (attempt == maxRetries) {
+                    log.error("OAuth 사용자 생성 재시도 {}회 실패: provider={}, email={}", maxRetries, provider, email, e);
+                    throw new RuntimeException("회원가입 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.", e);
+                }
+                log.warn("OAuth 사용자 생성 충돌, 재시도 {}/{}: {}", attempt, maxRetries, e.getMessage());
+            }
         }
-
-        return uniqueId;
+        throw new RuntimeException("회원가입 중 오류가 발생했습니다.");
     }
 
     /**
-     * 고유한 username 생성
+     * 고유한 ID 생성 (provider_providerId_uuid 형식)
+     * UUID 8자리 추가로 충돌 확률 극히 낮음 → while 루프 DB 조회 제거
+     */
+    private String generateUniqueId(Provider provider, String providerId) {
+        String baseId = provider.name().toLowerCase() + "_" + providerId;
+        return baseId + "_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+    }
+
+    /**
+     * 고유한 username 생성 (baseUsername_uuid 형식)
+     * UUID 8자리 추가로 충돌 확률 극히 낮음 → while 루프 DB 조회 제거
      */
     private String generateUniqueUsername(String name, String email) {
         String baseUsername = name != null && !name.isEmpty() ? name : email.split("@")[0];
-        String uniqueUsername = baseUsername;
-        int suffix = 1;
-
-        while (usersRepository.findByUsername(uniqueUsername).isPresent()) {
-            uniqueUsername = baseUsername + "_" + suffix;
-            suffix++;
-        }
-
-        return uniqueUsername;
+        return baseUsername + "_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
     }
 
     /**

@@ -131,58 +131,49 @@ Optional<Users> findByIdStringWithPets(@Param("userId") String userId);
 
 ---
 
-### 6. 프로필+리뷰 조회 시 중복 쿼리 - `getAverageRating` vs `getReviewsByReviewee`
+### 6. 프로필+리뷰 조회 시 중복 쿼리 - `getAverageRating` vs `getReviewsByReviewee` ✅ **해결 완료**
 
-**파일**: `UserProfileController.java` (Lines 52-69, 279-292), `CareReviewService.java` (Lines 33-69)
+**파일**: `UserProfileController.java`, `CareReviewService.java`, `ReviewSummaryDTO.java` (신규)
 
-**현재 문제**:
+**이전 문제**:
 - `getMyProfile()`, `getUserProfile()`: `getReviewsByReviewee` + `getAverageRating` 2번 호출
 - **동일 쿼리 2번 실행**: `findByRevieweeIdxOrderByCreatedAtDesc`가 두 메서드에서 각각 호출됨
 
-```java
-// CareReviewService
-public List<CareReviewDTO> getReviewsByReviewee(Long revieweeIdx) {
-    List<CareReview> reviews = reviewRepository.findByRevieweeIdxOrderByCreatedAtDesc(revieweeIdx);
-    // ...
-}
+**리팩토링 결과**:
+- ✅ `ReviewSummaryDTO` 신규 생성 (reviews, averageRating, reviewCount)
+- ✅ `CareReviewService.getReviewsWithAverage(Long revieweeIdx)` 통합 메서드 추가
+- ✅ 리뷰 1회 조회 후 DTO 변환 + 평균 평점 계산 + 개수 반환
+- ✅ `UserProfileController.getMyProfile()`, `getUserProfile()`에서 `getReviewsWithAverage` 사용으로 변경
+- ✅ 프로필+리뷰 조회 시 리뷰 쿼리 2회 → 1회로 감소
 
-public Double getAverageRating(Long revieweeIdx) {
-    List<CareReview> reviews = reviewRepository.findByRevieweeIdxOrderByCreatedAtDesc(revieweeIdx);  // 동일 쿼리!
-    // ...
-}
-```
-
-**해결 방안**:
 ```java
-// 통합 메서드 추가
+// CareReviewService - 통합 메서드
 public ReviewSummaryDTO getReviewsWithAverage(Long revieweeIdx) {
     List<CareReview> reviews = reviewRepository.findByRevieweeIdxOrderByCreatedAtDesc(revieweeIdx);
-    Double avg = reviews.isEmpty() ? null : reviews.stream().mapToInt(CareReview::getRating).average().orElse(0);
-    return new ReviewSummaryDTO(reviewConverter.toDTOList(reviews), avg, reviews.size());
+    Double avg = reviews.isEmpty() ? null
+            : reviews.stream().mapToInt(CareReview::getRating).average().orElse(0);
+    return ReviewSummaryDTO.builder()
+            .reviews(reviews.stream().map(reviewConverter::toDTO).collect(Collectors.toList()))
+            .averageRating(avg)
+            .reviewCount(reviews.size())
+            .build();
 }
 ```
 
 ---
 
-### 7. OAuth2 고유 ID/Username 생성 - while 루프 DB 조회
+### 7. OAuth2 고유 ID/Username 생성 - while 루프 DB 조회 ✅ **해결 완료**
 
-**파일**: `OAuth2Service.java` (Lines 230-257)
+**파일**: `OAuth2Service.java`
 
-**현재 문제**:
+**이전 문제**:
 - `generateUniqueId()`, `generateUniqueUsername()`: while 루프에서 매번 DB 조회
 - 중복 가능성이 낮을 때도 최소 1회, 충돌 시 N회 쿼리 발생
 
-```java
-while (usersRepository.findByIdString(uniqueId).isPresent()) {
-    uniqueId = baseId + "_" + suffix;
-    suffix++;
-}
-```
-
-**해결 방안**:
-1. **UUID 활용**: `baseId + "_" + UUID.randomUUID().toString().substring(0, 8)` - 충돌 확률 극히 낮음
-2. **DB Unique 제약 + 재시도**: save 시 `DataIntegrityViolationException` catch 후 suffix 증가하여 재시도 (현재 createUser에 이미 적용됨)
-3. **Redis/분산 ID**: 고유 ID 생성器 사용 (규모 큰 경우)
+**리팩토링 결과**:
+- ✅ **옵션 1 (UUID)**: `baseId + "_" + UUID 8자리` 형식으로 변경 → DB 조회 0회
+- ✅ **옵션 2 (재시도)**: `createNewUserWithRetry()` 추가, `DataIntegrityViolationException` 시 UUID 재생성 후 최대 3회 재시도
+- ✅ ID: `google_123456789_a1b2c3d4`, Username: `홍길동_a1b2c3d4` 형식
 
 ---
 
@@ -221,35 +212,38 @@ user = usersRepository.findById(userId).orElseThrow(...);
 
 ---
 
-### 10. UserProfileController updateMyProfile - 불필요한 getMyProfile
+### 10. UserProfileController updateMyProfile - 불필요한 getMyProfile ✅ **해결 완료**
 
-**파일**: `UserProfileController.java` (Lines 78-89)
+**파일**: `UserProfileController.java`, `UsersService.java`
 
-**현재 문제**:
+**이전 문제**:
 - `updateMyProfile` 호출 시 `getMyProfile(userId)`로 currentUser 조회 후 idx 비교
 - 이미 `getCurrentUserId()`로 userId 보유 중인데, idx 비교를 위해 전체 프로필(Pet 포함) 조회
 
-**해결 방안**:
-- userId로 이미 본인 확인 가능하므로, idx 비교가 필요한 경우 `usersService.getUserIdx(userId)` 같은 경량 메서드 추가
-- 또는 클라이언트에서 dto.idx를 보내지 않도록 협의
+**리팩토링 결과**:
+- ✅ idx 검증 로직을 `UsersService.updateMyProfile` 내부로 통합
+- ✅ Controller에서 `getMyProfile` 호출 제거 → User+Pet 전체 조회 제거
+- ✅ `updateMyProfile`에서 User 1회 조회 후 idx 검증 + 업데이트 처리
 
 ---
 
-### 11. UserProfileController updateMyProfile - getMyProfile 2번 가능성
+### 11. UserProfileController updateMyProfile - getMyProfile 2번 가능성 ✅ **해결 완료**
 
-**파일**: `UserProfileController.java` (Lines 78-89)
+**파일**: `UserProfileController.java`, `UsersService.java`
 
-**현재 문제**:
+**이전 문제**:
 - `updateMyProfile`: `getMyProfile` 1회 (idx 확인용) → `updateMyProfile` 내부에서 `findByIdString` 1회
 - 같은 트랜잭션 내에서 User를 2번 조회
 
-**해결 방안**: `updateMyProfile`에 idx 검증 로직 통합 또는 `getCurrentUserIdx()` 경량 조회
+**리팩토링 결과**:
+- ✅ 10번과 동시 해결: idx 검증을 `updateMyProfile` 내부로 통합
+- ✅ User 조회 2회 → 1회로 감소 (`findByIdString` 1회만 실행)
 
 ---
 
 ## 🟢 Low Priority
 
-### 12. 데이터베이스 인덱스 추가
+### 12. 데이터베이스 인덱스 추가 -- 굳이??
 
 **Entity 클래스에 추가 필요**:
 ```java
@@ -299,10 +293,11 @@ public UsersDTO updateMyProfile(String userId, UsersDTO dto) { ... }
 - [x] AuthService login/refresh 중복 조회 제거 ✅ [시퀀스 다이어그램](./auth-duplicate-query/sequence-diagram.md)
 - [x] AdminUserController deleteUser 불필요한 getUser 제거 ✅ [시퀀스 다이어그램](./admin-delete-optimization/sequence-diagram.md)
 - [x] 회원가입 중복 검사 3회 → 1회 쿼리 통합 ✅
-- [ ] CareReviewService getReviewsByReviewee + getAverageRating 통합
-- [ ] OAuth2Service generateUniqueId/Username 최적화
+- [x] CareReviewService getReviewsByReviewee + getAverageRating 통합 ✅
+- [x] UserProfileController updateMyProfile 불필요한 getMyProfile 제거 (idx 검증 통합) ✅
+- [x] OAuth2Service generateUniqueId/Username 최적화 (UUID + 재시도) ✅
 - [ ] UserSanctionService addWarning 중복 findById 제거
-- [ ] 인덱스 추가
+- [ ] 인덱스 추가 -- 보류
 - [ ] 캐싱 적용 (선택)
 
 ---
@@ -314,6 +309,8 @@ public UsersDTO updateMyProfile(String userId, UsersDTO dto) { ... }
 | getAllUsers | 전체 로드 | 페이징만 사용 ✅ |
 | socialUsers N+1 | 101 쿼리 (100명) | 3 쿼리 (@BatchSize) ✅ |
 | 로그인/Refresh | User 2회 조회 | User 1회 조회 |
-| 프로필+리뷰 | 리뷰 쿼리 2회 | 리뷰 쿼리 1회 |
+| 프로필+리뷰 | 리뷰 쿼리 2회 | 리뷰 쿼리 1회 ✅ |
 | Admin 삭제 | User+Pet 전체 조회 | 역할만 조회 |
 | 회원가입 중복 검사 | 3회 쿼리 | 1회 쿼리 ✅ |
+| updateMyProfile | getMyProfile(User+Pet) + findById | findById 1회 ✅ |
+| OAuth2 ID/Username 생성 | while 루프 N회 DB 조회 | UUID 0회 + 재시도 ✅ |
