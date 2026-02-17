@@ -332,6 +332,11 @@ public class UsersService {
         Users user = usersRepository.findByIdString(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
+        // dto.idx가 있으면 본인 프로필인지 검증 (다른 사용자 idx로 수정 시도 방지)
+        if (dto.getIdx() != null && !dto.getIdx().equals(user.getIdx())) {
+            throw new RuntimeException("본인의 프로필만 수정할 수 있습니다.");
+        }
+
         // 일반 사용자가 수정 가능한 필드만 업데이트
         if (dto.getUsername() != null && !dto.getUsername().isEmpty()) {
             // 닉네임 중복 확인

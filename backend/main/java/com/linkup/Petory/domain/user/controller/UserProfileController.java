@@ -54,17 +54,15 @@ public class UserProfileController {
     public ResponseEntity<UserProfileWithReviewsDTO> getMyProfile() {
         String userId = getCurrentUserId();
         UsersDTO user = usersService.getMyProfile(userId);
-        
-        // UsersDTO의 idx를 사용하여 리뷰 조회
+
         Long userIdx = user.getIdx();
-        List<CareReviewDTO> reviews = careReviewService.getReviewsByReviewee(userIdx);
-        Double averageRating = careReviewService.getAverageRating(userIdx);
+        var reviewSummary = careReviewService.getReviewsWithAverage(userIdx);
 
         UserProfileWithReviewsDTO profile = UserProfileWithReviewsDTO.builder()
                 .user(user)
-                .reviews(reviews)
-                .averageRating(averageRating)
-                .reviewCount(reviews.size())
+                .reviews(reviewSummary.getReviews())
+                .averageRating(reviewSummary.getAverageRating())
+                .reviewCount(reviewSummary.getReviewCount())
                 .build();
 
         return ResponseEntity.ok(profile);
@@ -78,15 +76,6 @@ public class UserProfileController {
     @PutMapping("/me")
     public ResponseEntity<UsersDTO> updateMyProfile(@RequestBody UsersDTO dto) {
         String userId = getCurrentUserId();
-        
-        // 현재 사용자의 UsersDTO를 가져와서 idx 확인
-        UsersDTO currentUser = usersService.getMyProfile(userId);
-        
-        // 본인의 프로필만 수정 가능 (dto에 idx가 있으면 확인)
-        if (dto.getIdx() != null && !dto.getIdx().equals(currentUser.getIdx())) {
-            throw new RuntimeException("본인의 프로필만 수정할 수 있습니다.");
-        }
-        
         UsersDTO updated = usersService.updateMyProfile(userId, dto);
         return ResponseEntity.ok(updated);
     }
@@ -282,14 +271,13 @@ public class UserProfileController {
     @GetMapping("/{userId}/profile")
     public ResponseEntity<UserProfileWithReviewsDTO> getUserProfile(@PathVariable Long userId) {
         UsersDTO user = usersService.getUser(userId);
-        List<CareReviewDTO> reviews = careReviewService.getReviewsByReviewee(userId);
-        Double averageRating = careReviewService.getAverageRating(userId);
+        var reviewSummary = careReviewService.getReviewsWithAverage(userId);
 
         UserProfileWithReviewsDTO profile = UserProfileWithReviewsDTO.builder()
                 .user(user)
-                .reviews(reviews)
-                .averageRating(averageRating)
-                .reviewCount(reviews.size())
+                .reviews(reviewSummary.getReviews())
+                .averageRating(reviewSummary.getAverageRating())
+                .reviewCount(reviewSummary.getReviewCount())
                 .build();
 
         return ResponseEntity.ok(profile);

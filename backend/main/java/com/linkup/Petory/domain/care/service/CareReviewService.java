@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.linkup.Petory.domain.care.converter.CareReviewConverter;
 import com.linkup.Petory.domain.care.dto.CareReviewDTO;
+import com.linkup.Petory.domain.care.dto.ReviewSummaryDTO;
 import com.linkup.Petory.domain.care.entity.CareApplication;
 import com.linkup.Petory.domain.care.entity.CareApplicationStatus;
 import com.linkup.Petory.domain.care.entity.CareReview;
@@ -47,6 +48,22 @@ public class CareReviewService {
         return reviews.stream()
                 .map(reviewConverter::toDTO)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * 리뷰 목록 + 평균 평점 + 개수를 한 번의 쿼리로 조회
+     * getReviewsByReviewee + getAverageRating 중복 호출 방지
+     */
+    @Transactional(readOnly = true)
+    public ReviewSummaryDTO getReviewsWithAverage(Long revieweeIdx) {
+        List<CareReview> reviews = reviewRepository.findByRevieweeIdxOrderByCreatedAtDesc(revieweeIdx);
+        Double avg = reviews.isEmpty() ? null
+                : reviews.stream().mapToInt(CareReview::getRating).average().orElse(0);
+        return ReviewSummaryDTO.builder()
+                .reviews(reviews.stream().map(reviewConverter::toDTO).collect(Collectors.toList()))
+                .averageRating(avg)
+                .reviewCount(reviews.size())
+                .build();
     }
 
     /**
