@@ -27,9 +27,7 @@ import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -52,15 +50,6 @@ public class MissingPetBoardService {
      * - 댓글은 포함하지 않음 (조인 폭발 방지)
      */
     public MissingPetBoardPageResponseDTO getBoardsWithPaging(MissingPetStatus status, int page, int size) {
-        // 성능 측정 시작
-        long startTime = System.currentTimeMillis();
-        Runtime runtime = Runtime.getRuntime();
-        long startMemory = runtime.totalMemory() - runtime.freeMemory();
-
-        log.info("=== [성능 측정] 게시글 목록 조회 시작 (페이징) ===");
-        log.info("  - 상태 필터: {}", status != null ? status : "전체");
-        log.info("  - 페이지: {}, 크기: {}", page, size);
-
         Pageable pageable = PageRequest.of(page, size);
 
         // 게시글 + 작성자 페이징 조회 (댓글 제외 - 조인 폭발 방지)
@@ -101,32 +90,13 @@ public class MissingPetBoardService {
                     // 파일 정보 추가
                     List<FileDTO> attachments = filesByBoardId.getOrDefault(board.getIdx(), List.of());
                     dto.setAttachments(attachments);
-                    dto.setImageUrl(extractPrimaryFileUrl(attachments));
+                    dto.setImageUrl(attachmentFileService.extractPrimaryFileUrl(attachments));
                     // 댓글 수 추가
                     int commentCount = commentCountsByBoardId.getOrDefault(board.getIdx(), 0);
                     dto.setCommentCount(commentCount);
                     return dto;
                 })
                 .collect(Collectors.toList());
-
-        // 성능 측정 종료
-        long endTime = System.currentTimeMillis();
-        long endMemory = runtime.totalMemory() - runtime.freeMemory();
-        long executionTime = endTime - startTime;
-        long memoryUsed = endMemory - startMemory;
-        long currentMemoryMB = endMemory / 1024 / 1024;
-        long maxMemoryMB = runtime.maxMemory() / 1024 / 1024;
-        double avgTimePerBoard = boards.isEmpty() ? 0 : (double) executionTime / boards.size();
-
-        // 성능 측정 로그 출력
-        log.info("=== [성능 측정] 게시글 목록 조회 완료 (페이징) ===");
-        log.info("  - 조회된 게시글 수: {}개", boards.size());
-        log.info("  - 전체 게시글 수: {}개", boardPage.getTotalElements());
-        log.info("  - 실행 시간: {}ms", executionTime);
-        log.info("  - 평균 게시글당 시간: {}ms", String.format("%.2f", avgTimePerBoard));
-        log.info("  - 상태: {}", status != null ? status : "전체");
-        log.info("  - 메모리 사용량: {}MB (증가: {}MB)", currentMemoryMB, memoryUsed / 1024 / 1024);
-        log.info("  - 최대 메모리: {}MB", maxMemoryMB);
 
         return new MissingPetBoardPageResponseDTO(
                 boardDTOs,
@@ -148,14 +118,6 @@ public class MissingPetBoardService {
      * - 댓글은 포함하지 않음 (조인 폭발 방지)
      */
     public List<MissingPetBoardDTO> getBoards(MissingPetStatus status) {
-        // 성능 측정 시작
-        long startTime = System.currentTimeMillis();
-        Runtime runtime = Runtime.getRuntime();
-        long startMemory = runtime.totalMemory() - runtime.freeMemory();
-
-        log.info("=== [성능 측정] 게시글 목록 조회 시작 ===");
-        log.info("  - 상태 필터: {}", status != null ? status : "전체");
-
         // 게시글 + 작성자만 조회 (댓글 제외 - 조인 폭발 방지)
         List<MissingPetBoard> boards = status == null
                 ? boardRepository.findAllByOrderByCreatedAtDesc()
@@ -181,31 +143,13 @@ public class MissingPetBoardService {
                     // 파일 정보 추가
                     List<FileDTO> attachments = filesByBoardId.getOrDefault(board.getIdx(), List.of());
                     dto.setAttachments(attachments);
-                    dto.setImageUrl(extractPrimaryFileUrl(attachments));
+                    dto.setImageUrl(attachmentFileService.extractPrimaryFileUrl(attachments));
                     // 댓글 수 추가
                     int commentCount = commentCountsByBoardId.getOrDefault(board.getIdx(), 0);
                     dto.setCommentCount(commentCount);
                     return dto;
                 })
                 .collect(Collectors.toList());
-
-        // 성능 측정 종료
-        long endTime = System.currentTimeMillis();
-        long endMemory = runtime.totalMemory() - runtime.freeMemory();
-        long executionTime = endTime - startTime;
-        long memoryUsed = endMemory - startMemory;
-        long currentMemoryMB = endMemory / 1024 / 1024;
-        long maxMemoryMB = runtime.maxMemory() / 1024 / 1024;
-        double avgTimePerBoard = boards.isEmpty() ? 0 : (double) executionTime / boards.size();
-
-        // 성능 측정 로그 출력
-        log.info("=== [성능 측정] 게시글 목록 조회 완료 ===");
-        log.info("  - 조회된 게시글 수: {}개", boards.size());
-        log.info("  - 실행 시간: {}ms", executionTime);
-        log.info("  - 평균 게시글당 시간: {}ms", String.format("%.2f", avgTimePerBoard));
-        log.info("  - 상태: {}", status != null ? status : "전체");
-        log.info("  - 메모리 사용량: {}MB (증가: {}MB)", currentMemoryMB, memoryUsed / 1024 / 1024);
-        log.info("  - 최대 메모리: {}MB", maxMemoryMB);
 
         return result;
     }
@@ -221,11 +165,6 @@ public class MissingPetBoardService {
      * - 제공되지 않으면 댓글 제외 (빈 리스트, 댓글 수만 포함)
      */
     public MissingPetBoardDTO getBoard(Long id, Integer commentPage, Integer commentSize) {
-        // 성능 측정 시작
-        long startTime = System.currentTimeMillis();
-        Runtime runtime = Runtime.getRuntime();
-        long startMemory = runtime.totalMemory() - runtime.freeMemory();
-
         // 게시글 + 작성자만 조회 (댓글 제외)
         MissingPetBoard board = boardRepository.findByIdWithUser(id)
                 .orElseThrow(() -> new IllegalArgumentException("Missing pet board not found"));
@@ -248,32 +187,15 @@ public class MissingPetBoardService {
             MissingPetCommentPageResponseDTO commentPageResponse = commentService.getCommentsWithPaging(id, commentPage,
                     commentSize);
             comments = commentPageResponse.comments();
-            log.info("  - 댓글 페이징 조회: 페이지 {}, 크기 {}, 조회된 댓글 {}개", commentPage, commentSize, comments.size());
         }
 
         // DTO 변환
         MissingPetBoardDTO dto = missingPetConverter.toBoardDTOWithoutComments(board);
         dto.setAttachments(boardAttachments);
-        dto.setImageUrl(extractPrimaryFileUrl(boardAttachments));
+        dto.setImageUrl(attachmentFileService.extractPrimaryFileUrl(boardAttachments));
         // 댓글 목록과 댓글 수 설정
         dto.setComments(comments);
         dto.setCommentCount(commentCount);
-
-        // 성능 측정 종료
-        long endTime = System.currentTimeMillis();
-        long endMemory = runtime.totalMemory() - runtime.freeMemory();
-        long executionTime = endTime - startTime;
-        long memoryUsed = endMemory - startMemory;
-        long currentMemoryMB = endMemory / 1024 / 1024;
-        long maxMemoryMB = runtime.maxMemory() / 1024 / 1024;
-
-        // 성능 측정 로그 출력
-        log.info("=== [성능 측정] 게시글 상세 조회 완료 ===");
-        log.info("  - 게시글 ID: {}", id);
-        log.info("  - 실행 시간: {}ms", executionTime);
-        log.info("  - 조회된 댓글 수: {}개 (전체 댓글 수: {}개)", comments.size(), commentCount);
-        log.info("  - 메모리 사용량: {}MB (증가: {}MB)", currentMemoryMB, memoryUsed / 1024 / 1024);
-        log.info("  - 최대 메모리: {}MB", maxMemoryMB);
 
         return dto;
     }
@@ -437,26 +359,8 @@ public class MissingPetBoardService {
         MissingPetBoardDTO dto = missingPetConverter.toBoardDTO(board);
         List<FileDTO> attachments = attachmentFileService.getAttachments(FileTargetType.MISSING_PET, board.getIdx());
         dto.setAttachments(attachments);
-        dto.setImageUrl(extractPrimaryFileUrl(attachments));
+        dto.setImageUrl(attachmentFileService.extractPrimaryFileUrl(attachments));
         return dto;
-    }
-
-    /**
-     * 첨부파일 목록에서 첫 번째 파일의 다운로드 URL 추출
-     * 게시글의 대표 이미지 URL로 사용
-     */
-    private String extractPrimaryFileUrl(List<FileDTO> attachments) {
-        if (attachments == null || attachments.isEmpty()) {
-            return null;
-        }
-        FileDTO primary = attachments.get(0);
-        if (primary == null) {
-            return null;
-        }
-        if (StringUtils.hasText(primary.getDownloadUrl())) {
-            return primary.getDownloadUrl();
-        }
-        return attachmentFileService.buildDownloadUrl(primary.getFilePath());
     }
 
 }

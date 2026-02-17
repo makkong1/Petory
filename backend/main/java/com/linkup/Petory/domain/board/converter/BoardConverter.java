@@ -15,11 +15,9 @@ import lombok.RequiredArgsConstructor;
 public class BoardConverter {
 
     // Entity → DTO
+    // commentCount만 사용 (board.getComments() 접근 시 Lazy Loading 트리거 → N+1 방지)
     public BoardDTO toDTO(Board board) {
-        Integer aggregatedCommentCount = board.getCommentCount();
-        if (aggregatedCommentCount == null && board.getComments() != null) {
-            aggregatedCommentCount = board.getComments().size();
-        }
+        Integer commentCount = board.getCommentCount() != null ? board.getCommentCount() : 0;
 
         return BoardDTO.builder()
                 .idx(board.getIdx())
@@ -33,9 +31,9 @@ public class BoardConverter {
                 .userId(board.getUser() != null ? board.getUser().getIdx() : null)
                 .username(board.getUser() != null ? board.getUser().getUsername() : null)
                 .userLocation(board.getUser() != null ? board.getUser().getLocation() : null)
-                .commentCount(aggregatedCommentCount != null ? aggregatedCommentCount : 0)
+                .commentCount(commentCount)
                 .likes(board.getLikeCount() != null ? board.getLikeCount() : 0)
-                .dislikes(0)
+                .dislikes(board.getDislikeCount() != null ? board.getDislikeCount() : 0)
                 .views(board.getViewCount() != null ? board.getViewCount() : 0)
                 .lastReactionAt(board.getLastReactionAt())
                 .build();

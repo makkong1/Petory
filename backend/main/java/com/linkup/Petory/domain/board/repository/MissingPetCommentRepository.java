@@ -39,6 +39,11 @@ public interface MissingPetCommentRepository {
     List<MissingPetComment> findByBoardAndIsDeletedFalseOrderByCreatedAtAsc(MissingPetBoard board);
 
     /**
+     * 게시글의 댓글 수 조회 (COUNT 쿼리 - N건 로드 방지)
+     */
+    long countByBoardAndIsDeletedFalse(MissingPetBoard board);
+
+    /**
      * 사용자별 댓글 조회 (삭제되지 않은 것만, 최신순) - 작성자도 활성 상태여야 함
      */
     List<MissingPetComment> findByUserAndIsDeletedFalseOrderByCreatedAtDesc(Users user);

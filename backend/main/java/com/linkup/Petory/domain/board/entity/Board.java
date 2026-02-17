@@ -47,6 +47,11 @@ public class Board extends BaseTimeEntity {
     private Integer likeCount = 0;
 
     @Builder.Default
+    @Column(name = "dislike_count")
+    private Integer dislikeCount = 0;
+
+
+    @Builder.Default
     @Column(name = "comment_count")
     private Integer commentCount = 0;
 
