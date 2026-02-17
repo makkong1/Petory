@@ -182,4 +182,23 @@ public class AttachmentFileService {
                 .queryParam("path", relativePath)
                 .toUriString();
     }
+
+    /**
+     * 첨부파일 목록에서 첫 번째 파일의 다운로드 URL 추출
+     * @param attachments 첨부파일 목록 (null/empty 허용)
+     * @return downloadUrl이 있으면 반환, 없으면 filePath로 buildDownloadUrl 생성
+     */
+    public String extractPrimaryFileUrl(List<? extends FileDTO> attachments) {
+        if (attachments == null || attachments.isEmpty()) {
+            return null;
+        }
+        FileDTO primary = attachments.get(0);
+        if (primary == null) {
+            return null;
+        }
+        if (StringUtils.hasText(primary.getDownloadUrl())) {
+            return primary.getDownloadUrl();
+        }
+        return buildDownloadUrl(primary.getFilePath());
+    }
 }

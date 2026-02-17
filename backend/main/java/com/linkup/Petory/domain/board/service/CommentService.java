@@ -32,7 +32,6 @@ import com.linkup.Petory.domain.file.entity.FileTargetType;
 import com.linkup.Petory.domain.file.service.AttachmentFileService;
 import com.linkup.Petory.domain.notification.entity.NotificationType;
 import com.linkup.Petory.domain.notification.service.NotificationService;
-import org.springframework.util.StringUtils;
 
 import lombok.RequiredArgsConstructor;
 
@@ -264,7 +263,7 @@ public class CommentService {
         dto.setDislikeCount(Math.toIntExact(dislikeCount));
         List<FileDTO> attachments = attachmentFileService.getAttachments(FileTargetType.COMMENT, comment.getIdx());
         dto.setAttachments(attachments);
-        dto.setCommentFilePath(extractPrimaryFileUrl(attachments));
+        dto.setCommentFilePath(attachmentFileService.extractPrimaryFileUrl(attachments));
         return dto;
     }
 
@@ -308,24 +307,10 @@ public class CommentService {
                     dto.setDislikeCount(Math.toIntExact(counts.getOrDefault(ReactionType.DISLIKE, 0L)));
                     List<FileDTO> attachments = filesByCommentId.getOrDefault(comment.getIdx(), List.of());
                     dto.setAttachments(attachments);
-                    dto.setCommentFilePath(extractPrimaryFileUrl(attachments));
+                    dto.setCommentFilePath(attachmentFileService.extractPrimaryFileUrl(attachments));
                     return dto;
                 })
                 .collect(Collectors.toList());
-    }
-
-    private String extractPrimaryFileUrl(List<FileDTO> attachments) {
-        if (attachments == null || attachments.isEmpty()) {
-            return null;
-        }
-        FileDTO primary = attachments.get(0);
-        if (primary == null) {
-            return null;
-        }
-        if (StringUtils.hasText(primary.getDownloadUrl())) {
-            return primary.getDownloadUrl();
-        }
-        return attachmentFileService.buildDownloadUrl(primary.getFilePath());
     }
 
     /**

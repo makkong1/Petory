@@ -8,7 +8,6 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -33,7 +32,6 @@ import com.linkup.Petory.domain.board.entity.BoardViewLog;
 import com.linkup.Petory.domain.file.dto.FileDTO;
 import com.linkup.Petory.domain.file.entity.FileTargetType;
 import com.linkup.Petory.domain.file.service.AttachmentFileService;
-import org.springframework.util.StringUtils;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -212,7 +210,7 @@ public class BoardService {
     }
 
     // 단일 게시글 조회 + 조회수 증가
-    @Cacheable(value = "boardDetail", key = "#idx")
+    // @Cacheable 제거: 조회수 실시간 반영을 위해 캐시 미사용 (캐시 시 incrementViewCount 미실행 문제)
     @Transactional
     public BoardDTO getBoard(long idx, Long viewerId) {
         Board board = boardRepository.findById(idx)
@@ -441,7 +439,7 @@ public class BoardService {
     private void applyAttachmentInfo(BoardDTO dto, Long boardId, Map<Long, List<FileDTO>> attachmentsMap) {
         List<FileDTO> attachments = attachmentsMap.getOrDefault(boardId, new ArrayList<>());
         dto.setAttachments(attachments);
-        dto.setBoardFilePath(extractPrimaryFileUrl(attachments));
+        dto.setBoardFilePath(attachmentFileService.extractPrimaryFileUrl(attachments));
     }
 
     /**
@@ -541,20 +539,6 @@ public class BoardService {
                 .build();
         boardViewLogRepository.save(log);
         return true;
-    }
-
-    private String extractPrimaryFileUrl(List<? extends FileDTO> attachments) {
-        if (attachments == null || attachments.isEmpty()) {
-            return null;
-        }
-        FileDTO primary = attachments.get(0);
-        if (primary == null) {
-            return null;
-        }
-        if (StringUtils.hasText(primary.getDownloadUrl())) {
-            return primary.getDownloadUrl();
-        }
-        return attachmentFileService.buildDownloadUrl(primary.getFilePath());
     }
 
     /**

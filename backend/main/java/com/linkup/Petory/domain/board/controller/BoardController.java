@@ -46,7 +46,6 @@ public class BoardController {
             @RequestParam(required = false) String category,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        System.out.println("=== API 호출됨: GET /api/boards ===");
         return ResponseEntity.ok(boardService.getAllBoardsWithPaging(category, page, size));
     }
 

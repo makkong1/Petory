@@ -11,7 +11,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
 
 import com.linkup.Petory.domain.board.converter.MissingPetConverter;
 import com.linkup.Petory.domain.board.dto.MissingPetCommentDTO;
@@ -88,7 +87,7 @@ public class MissingPetCommentService {
                     MissingPetCommentDTO dto = missingPetConverter.toCommentDTO(comment);
                     List<FileDTO> attachments = filesByCommentId.getOrDefault(comment.getIdx(), List.of());
                     dto.setAttachments(attachments);
-                    dto.setImageUrl(extractPrimaryFileUrl(attachments));
+                    dto.setImageUrl(attachmentFileService.extractPrimaryFileUrl(attachments));
                     return dto;
                 })
                 .collect(Collectors.toList());
@@ -133,7 +132,7 @@ public class MissingPetCommentService {
                     MissingPetCommentDTO dto = missingPetConverter.toCommentDTO(comment);
                     List<FileDTO> attachments = filesByCommentId.getOrDefault(comment.getIdx(), List.of());
                     dto.setAttachments(attachments);
-                    dto.setImageUrl(extractPrimaryFileUrl(attachments));
+                    dto.setImageUrl(attachmentFileService.extractPrimaryFileUrl(attachments));
                     return dto;
                 })
                 .collect(Collectors.toList());
@@ -206,14 +205,12 @@ public class MissingPetCommentService {
     }
 
     /**
-     * 게시글의 댓글 수 조회
+     * 게시글의 댓글 수 조회 (COUNT 쿼리 사용 - N건 로드 방지)
      * @param board 게시글 엔티티
      * @return 댓글 수
      */
     public int getCommentCount(MissingPetBoard board) {
-        // TODO: COUNT 쿼리로 최적화 필요 (현재는 댓글 목록 조회 후 size() 사용)
-        List<MissingPetComment> comments = commentRepository.findByBoardAndIsDeletedFalseOrderByCreatedAtAsc(board);
-        return comments.size();
+        return (int) commentRepository.countByBoardAndIsDeletedFalse(board);
     }
 
     /**
@@ -257,26 +254,8 @@ public class MissingPetCommentService {
         List<FileDTO> attachments = attachmentFileService.getAttachments(FileTargetType.MISSING_PET_COMMENT,
                 comment.getIdx());
         dto.setAttachments(attachments);
-        dto.setImageUrl(extractPrimaryFileUrl(attachments));
+        dto.setImageUrl(attachmentFileService.extractPrimaryFileUrl(attachments));
         return dto;
-    }
-
-    /**
-     * 첨부파일 목록에서 첫 번째 파일의 다운로드 URL 추출
-     * 댓글의 대표 이미지 URL로 사용
-     */
-    private String extractPrimaryFileUrl(List<FileDTO> attachments) {
-        if (attachments == null || attachments.isEmpty()) {
-            return null;
-        }
-        FileDTO primary = attachments.get(0);
-        if (primary == null) {
-            return null;
-        }
-        if (StringUtils.hasText(primary.getDownloadUrl())) {
-            return primary.getDownloadUrl();
-        }
-        return attachmentFileService.buildDownloadUrl(primary.getFilePath());
     }
 
     /**

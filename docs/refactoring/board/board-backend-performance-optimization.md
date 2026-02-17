@@ -113,6 +113,10 @@ public int getCommentCount(MissingPetBoard board) {
 long countByBoardAndIsDeletedFalse(@Param("board") MissingPetBoard board);
 ```
 
+**적용 결과** ✅:
+- ✅ `countByBoardAndIsDeletedFalse` COUNT 쿼리 추가 (Repository, Adapter)
+- ✅ `getCommentCount`: N건 로드 → 1 COUNT 쿼리
+
 ---
 
 ## 🔴 트러블슈팅 (런타임 발견 이슈)
@@ -155,6 +159,8 @@ List<Object[]> countByCommentsGroupByReactionType(@Param("commentIds") List<Long
 - ✅ `getCommentsWithPaging`, `getComments`, `getCommentsForAdmin` 배치 조회 적용
 - ✅ 댓글 N개 시 2N 쿼리 → 1~2 쿼리로 감소
 
+**상세**: [comment-reaction-query/troubleshooting.md](./comment-reaction-query/troubleshooting.md)
+
 ---
 
 ## 🟠 High Priority - 리팩토링
@@ -184,18 +190,19 @@ boolean existsByBoardIdxAndUserId(@Param("boardIdx") Long boardIdx, @Param("user
 
 ---
 
-### 6. BoardController - 디버그 로그 제거
+### 6. BoardController - 디버그 로그 제거 ✅
 
 **파일**: `BoardController.java` (Line 49)
 
 **현재 문제**:
 - `System.out.println("=== API 호출됨: GET /api/boards ===");` 프로덕션 코드에 남아있음
 
-**해결**: 제거 또는 `log.debug()`로 변경 (필요 시)
+**적용 결과** ✅:
+- ✅ `System.out.println` 제거
 
 ---
 
-### 7. MissingPetBoardService - 프로덕션 성능 측정 로그
+### 7. MissingPetBoardService - 프로덕션 성능 측정 로그 ✅
 
 **파일**: `MissingPetBoardService.java` (Lines 54-128, 151-211, 224-276)
 
@@ -204,14 +211,12 @@ boolean existsByBoardIdxAndUserId(@Param("boardIdx") Long boardIdx, @Param("user
 - 실행 시간, 메모리 사용량, 게시글당 평균 시간 등 매 요청마다 출력
 - 프로덕션 로그 과다 → 로그 스토리지/가독성 저하
 
-**해결 방안**:
-1. `log.debug()`로 변경 (기본 로그 레벨에서 비활성화)
-2. 또는 프로파일링용 `@Profile("dev")` 조건부 로깅
-3. 또는 성능 측정 코드 제거 (개발 완료 후)
+**적용 결과** ✅:
+- ✅ 성능 측정 코드 전체 제거 (`getBoardsWithPaging`, `getBoards`, `getBoard`)
 
 ---
 
-### 8. BoardService.getBoard - @Cacheable + @Transactional 혼용
+### 8. BoardService.getBoard - @Cacheable + @Transactional 혼용 ✅
 
 **파일**: `BoardService.java` (Lines 202-214)
 
@@ -220,16 +225,14 @@ boolean existsByBoardIdxAndUserId(@Param("boardIdx") Long boardIdx, @Param("user
 - `getBoard()`는 조회수 증가 로직 포함 → **캐시 시 조회수 미반영** 가능
 - 동일 게시글 재요청 시 캐시에서 반환 → `incrementViewCount` 미실행
 
-**검토 사항**:
-- 조회수 증가가 캐시 bypass와 함께 동작하는지 확인
-- `@Cacheable`은 메서드 결과를 캐시하므로, 첫 요청 후 동일 idx 요청 시 메서드 자체가 호출되지 않음
-- **권장**: 조회수 실시간 반영이 중요하면 `@Cacheable` 제거 또는 `CacheEvict` 전략 재검토
+**적용 결과** ✅:
+- ✅ `@Cacheable` 제거 (조회수 실시간 반영 우선)
 
 ---
 
 ## 🟡 Medium Priority
 
-### 9. extractPrimaryFileUrl 중복 코드
+### 9. extractPrimaryFileUrl 중복 코드 ✅
 
 **파일**: `BoardService`, `CommentService`, `MissingPetBoardService`, `MissingPetCommentService`
 
@@ -237,13 +240,13 @@ boolean existsByBoardIdxAndUserId(@Param("boardIdx") Long boardIdx, @Param("user
 - 동일 로직이 4개 서비스에 중복 구현
 - `attachments` null/empty 체크 → 첫 번째 파일의 `downloadUrl` 또는 `buildDownloadUrl(filePath)` 반환
 
-**해결 방안**:
-- `AttachmentFileService` 또는 공통 유틸 클래스에 `extractPrimaryFileUrl(List<FileDTO> attachments)` 메서드 추가
-- 각 서비스에서 해당 메서드 호출
+**적용 결과** ✅:
+- ✅ `AttachmentFileService.extractPrimaryFileUrl(List<? extends FileDTO>)` 추가
+- ✅ 4개 서비스에서 중복 메서드 제거, `attachmentFileService.extractPrimaryFileUrl()` 호출로 변경
 
 ---
 
-### 10. CommentService - getComments, getCommentsForAdmin N+1
+### 10. CommentService - getComments, getCommentsForAdmin N+1 ✅
 
 **파일**: `CommentService.java` (Lines 120-143)
 
@@ -252,13 +255,14 @@ boolean existsByBoardIdxAndUserId(@Param("boardIdx") Long boardIdx, @Param("user
 - 댓글별 반응 2회 + 파일 1회 = **3N 쿼리**
 - Admin 댓글 목록, 비페이징 댓글 목록 API에서 사용
 
-**해결 방안**:
-- 3번(Comment 반응 배치 조회) 적용 후 `mapWithReactionCounts`도 배치 조회 버전 사용
-- 파일은 `getAttachmentsBatch`로 배치 조회 (CommentService.getCommentsWithPaging 패턴)
+**적용 결과** ✅:
+- ✅ 트러블슈팅 4 적용 시 함께 해결됨
+- ✅ `getReactionCountsBatch` + `getAttachmentsBatch` + `mapCommentsWithReactionCountsBatch` 사용
+- ✅ 3N 쿼리 → 3~4 쿼리로 감소
 
 ---
 
-### 11. BoardConverter.toDTO - comments Lazy Loading 위험
+### 11. BoardConverter.toDTO - comments Lazy Loading 위험 ✅
 
 **파일**: `BoardConverter.java` (Lines 18-21)
 
@@ -269,45 +273,41 @@ if (aggregatedCommentCount == null && board.getComments() != null) {
 }
 ```
 - `board.getComments()` 접근 시 Lazy Loading → N+1
-- `mapBoardWithDetails` → `mapBoardsWithReactionsBatch` → `boardConverter.toDTO(board)` 호출 경로에서 `board`는 단건
-- `mapBoardsWithReactionsBatch`는 commentCount를 Board 엔티티에서 가져오지 않고, BoardDTO에 reaction/attachment만 설정
-- BoardConverter.toDTO에서 `board.getCommentCount()` 우선 사용하고, null일 때만 comments.size() 사용
-- **Board 엔티티에 commentCount 필드 있음** (실시간 업데이트됨) → `board.getCommentCount()` 사용 시 comments 접근 불필요
-- **수정**: `board.getComments() != null` 체크 제거, `aggregatedCommentCount = board.getCommentCount()`만 사용
+
+**적용 결과** ✅:
+- ✅ `board.getComments()` 접근 제거
+- ✅ `board.getCommentCount()`만 사용 (null 시 0)
 
 ---
 
-### 12. AdminBoardController listBoards - getAllBoards 2회 호출
+### 12. AdminBoardController listBoards - getAllBoards 2회 호출 ✅
 
 **파일**: `AdminBoardController.java` (Lines 38-48)
 
 **현재 문제** (1번과 연계):
-- `deleted=true` 요청 시:
-  1. `getAllBoards(category)` → 결과를 `all`에 할당
-  2. `allIncludingDeleted = boardService.getAllBoards(null)` → **전체 재조회**
-  3. category 필터 적용 후 `all = allIncludingDeleted`
-- 동일 API 내에서 `getAllBoards` 2회 호출
+- `deleted=true` 요청 시 `getAllBoards` 2회 호출
 
-**해결**: 1번 적용 시 함께 해결 (엔드포인트 제거 또는 페이징 전환)
+**적용 결과** ✅:
+- ✅ Critical 1 적용 시 함께 해결됨 (`listBoards` 엔드포인트 제거)
 
 ---
 
 ## 🟢 Low Priority
 
-### 13. ReactionService - buildBoardSummary/buildCommentSummary 중복 쿼리
+### 13. ReactionService - buildBoardSummary/buildCommentSummary 중복 쿼리 ✅
 
 **파일**: `ReactionService.java` (Lines 123-151)
 
 **현재 문제**:
-- `reactToBoard()` 완료 후 `buildBoardSummary()` 호출
-- `buildBoardSummary()`: `countByBoardAndReactionType` 2회 + `findByBoardAndUser` 1회 (user != null 시)
-- `reactToBoard()` 내부에서 이미 반응 변경 처리했는데, 완료 후 다시 count 조회
-- 실시간 likeCount 업데이트를 Board 엔티티에 하고 있으므로, summary는 Board.likeCount + Board.dislikeCount 사용 가능
-- 단, Board 엔티티에 dislikeCount 없음 (BoardDTO에는 있음) → BoardReaction에서 집계
+- `reactToBoard()` 완료 후 `buildBoardSummary()` 호출 → count 2회 + find 1회
+- `reactToComment()` 완료 후 `buildCommentSummary()` 호출 → count 2회 + find 1회
 
-**개선 포인트**:
-- `updateBoardLikeCount`에서 likeCount만 업데이트, dislikeCount는 배치 조회 또는 요청 시점 count
-- 또는 `reactToBoard` 반환 시 이미 계산된 값 전달 (previousReactionType, currentReactionType 기반)
+**적용 결과** ✅:
+- ✅ Board 엔티티에 `dislikeCount` 추가, `updateBoardReactionCounts`로 like/dislike 실시간 업데이트
+- ✅ `reactToBoard`: `buildBoardSummaryFromCounts` 사용 → **0 추가 쿼리** (엔티티 값만 사용)
+- ✅ `reactToComment`: `buildCommentSummaryWithUserReaction` 사용 → userReaction 계산값 전달, **findByCommentAndUser 1회 제거**
+- ✅ BoardConverter: `dislikes`에 `board.getDislikeCount()` 사용
+- ✅ DB 마이그레이션: `docs/migration/db/add_board_dislike_count_column.sql`
 
 ---
 
@@ -339,12 +339,12 @@ if (aggregatedCommentCount == null && board.getComments() != null) {
 - [x] AdminBoardController `listBoards` (페이징 없음) 제거 또는 `/paging` 전환 ✅
 - [x] AdminBoardController `listBoardsWithPaging` → `getAdminBoardsWithPagingOptimized` 사용 ✅
 - [x] CommentService 댓글 반응 배치 조회 (countByCommentsGroupByReactionType) ✅
-- [ ] MissingPetCommentService getCommentCount → COUNT 쿼리
-- [ ] BoardController System.out.println 제거
-- [ ] MissingPetBoardService 성능 측정 로그 log.debug 또는 제거
-- [ ] BoardService getBoard @Cacheable vs 조회수 동기화 검토
-- [ ] extractPrimaryFileUrl 공통화
-- [ ] BoardConverter toDTO comments Lazy Loading 방지 (commentCount만 사용)
+- [x] MissingPetCommentService getCommentCount → COUNT 쿼리 ✅
+- [x] BoardController System.out.println 제거 ✅
+- [x] MissingPetBoardService 성능 측정 로그 제거 ✅
+- [x] BoardService getBoard @Cacheable 제거 (조회수 실시간 반영) ✅
+- [x] extractPrimaryFileUrl 공통화 ✅
+- [x] BoardConverter toDTO comments Lazy Loading 방지 (commentCount만 사용) ✅
 - [ ] BoardViewLogRepository existsByBoardIdxAndUserId 추가 (shouldIncrementView 최적화)
 
 ---
@@ -364,5 +364,6 @@ if (aggregatedCommentCount == null && board.getComments() != null) {
 ## 관련 문서
 
 - [User 백엔드 성능 최적화](../user/user-backend-performance-optimization.md)
+- [CommentService 댓글 반응 N+1 트러블슈팅](./comment-reaction-query/troubleshooting.md)
 - [Board 검색 최적화](../recordType/board/board-search-optimization.md)
 - [Board DTO Record 리팩토링](../recordType/board/dto-record-refactoring.md)
