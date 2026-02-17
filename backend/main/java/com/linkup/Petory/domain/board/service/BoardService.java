@@ -199,6 +199,18 @@ public class BoardService {
                 boardPage.hasPrevious());
     }
 
+    /**
+     * 관리자용 단일 게시글 조회 (조회수 증가 없음)
+     * - AdminBoardController에서 사용
+     * - 삭제된 게시글도 조회 가능
+     */
+    @Transactional(readOnly = true)
+    public BoardDTO getBoardForAdmin(long idx) {
+        Board board = boardRepository.findById(idx)
+                .orElseThrow(() -> new RuntimeException("Board not found"));
+        return mapBoardWithDetails(board);
+    }
+
     // 단일 게시글 조회 + 조회수 증가
     @Cacheable(value = "boardDetail", key = "#idx")
     @Transactional

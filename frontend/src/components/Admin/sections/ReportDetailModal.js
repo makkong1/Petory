@@ -37,8 +37,8 @@ const ReportDetailModal = ({ reportId, onClose, onHandled }) => {
         // 게시글 상태 확인 (BOARD 타입일 때만)
         if (data?.report?.targetType === 'BOARD' && data?.target?.id) {
           try {
-            const boardRes = await communityAdminApi.listBoards({ status: 'ALL' });
-            const board = boardRes.data?.find(b => b.idx === data.target.id);
+            const boardRes = await communityAdminApi.getBoard(data.target.id);
+            const board = boardRes.data;
             if (board) {
               setTargetStatus(board.status);
               setTargetDeleted(board.deleted || false);

@@ -26,50 +26,6 @@ public class AdminBoardController {
     private final BoardService boardService;
     private final CommentService commentService;
 
-    // Boards moderation list with filters (status: ALL/ACTIVE/BLINDED/DELETED;
-    // deleted: true/false; category; q) - 기존 API (하위 호환성 유지)
-    @GetMapping
-    public ResponseEntity<List<BoardDTO>> listBoards(
-            @RequestParam(value = "status", required = false, defaultValue = "ALL") String status,
-            @RequestParam(value = "deleted", required = false) Boolean deleted,
-            @RequestParam(value = "category", required = false) String category,
-            @RequestParam(value = "q", required = false) String q) {
-        List<BoardDTO> all = boardService.getAllBoards(category); // already excludes deleted
-        // include deleted if requested
-        if (Boolean.TRUE.equals(deleted)) {
-            // fetch all (including deleted) then filter by category/q
-            List<BoardDTO> allIncludingDeleted = boardService.getAllBoards(null);
-            if (category != null && !"ALL".equalsIgnoreCase(category)) {
-                allIncludingDeleted = allIncludingDeleted.stream()
-                        .filter(b -> category.equalsIgnoreCase(b.getCategory()))
-                        .collect(Collectors.toList());
-            }
-            all = allIncludingDeleted;
-        }
-        // filter by deleted flag when provided
-        if (deleted != null) {
-            final boolean wantDeleted = deleted.booleanValue();
-            all = all.stream().filter(b -> Boolean.TRUE.equals(b.getDeleted()) == wantDeleted)
-                    .collect(Collectors.toList());
-        }
-        // filter by status when provided (except ALL)
-        if (status != null && !"ALL".equalsIgnoreCase(status)) {
-            all = all.stream()
-                    .filter(b -> status.equalsIgnoreCase(b.getStatus()))
-                    .collect(Collectors.toList());
-        }
-        // filter by keyword
-        if (q != null && !q.isBlank()) {
-            String kw = q.toLowerCase();
-            all = all.stream()
-                    .filter(b -> (b.getTitle() != null && b.getTitle().toLowerCase().contains(kw))
-                            || (b.getContent() != null && b.getContent().toLowerCase().contains(kw))
-                            || (b.getUsername() != null && b.getUsername().toLowerCase().contains(kw)))
-                    .collect(Collectors.toList());
-        }
-        return ResponseEntity.ok(all);
-    }
-
     // Boards moderation list with pagination (페이징 지원)
     @GetMapping("/paging")
     public ResponseEntity<BoardPageResponseDTO> listBoardsWithPaging(
@@ -79,7 +35,17 @@ public class AdminBoardController {
             @RequestParam(value = "q", required = false) String q,
             @RequestParam(value = "page", defaultValue = "0") int page,
             @RequestParam(value = "size", defaultValue = "20") int size) {
-        return ResponseEntity.ok(boardService.getAdminBoardsWithPaging(status, deleted, category, q, page, size));
+        return ResponseEntity.ok(boardService.getAdminBoardsWithPagingOptimized(status, deleted, category, q, page, size));
+    }
+
+    /**
+     * 관리자용 단일 게시글 조회 (조회수 증가 없음)
+     * GET /api/admin/boards/{id}
+     * - 삭제된 게시글도 조회 가능
+     */
+    @GetMapping("/{id}")
+    public ResponseEntity<BoardDTO> getBoard(@PathVariable("id") Long id) {
+        return ResponseEntity.ok(boardService.getBoardForAdmin(id));
     }
 
     @PatchMapping("/{id}/blind")

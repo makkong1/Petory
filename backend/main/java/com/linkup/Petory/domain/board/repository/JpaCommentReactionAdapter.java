@@ -1,5 +1,6 @@
 package com.linkup.Petory.domain.board.repository;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.context.annotation.Primary;
@@ -55,6 +56,11 @@ public class JpaCommentReactionAdapter implements CommentReactionRepository {
     @Override
     public void deleteByComment(Comment comment) {
         jpaRepository.deleteByComment(comment);
+    }
+
+    @Override
+    public List<Object[]> countByCommentsGroupByReactionType(List<Long> commentIds) {
+        return jpaRepository.countByCommentsGroupByReactionType(commentIds);
     }
 }
 

@@ -2,6 +2,7 @@ package com.linkup.Petory.domain.board.service;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -87,18 +88,12 @@ public class CommentService {
         Map<Long, List<FileDTO>> filesByCommentId = attachmentFileService.getAttachmentsBatch(
                 FileTargetType.COMMENT, commentIds);
 
-        // DTO 변환 (배치 조회된 파일 정보 사용)
-        // mapWithReactionCountsWithoutFiles를 사용하여 개별 파일 조회를 방지하고, 배치 조회 결과 사용
-        List<CommentDTO> commentDTOs = comments.stream()
-                .map(comment -> {
-                    CommentDTO dto = mapWithReactionCountsWithoutFiles(comment);
-                    // 배치 조회된 파일 정보 설정 (N+1 문제 해결)
-                    List<FileDTO> attachments = filesByCommentId.getOrDefault(comment.getIdx(), List.of());
-                    dto.setAttachments(attachments);
-                    dto.setCommentFilePath(extractPrimaryFileUrl(attachments));
-                    return dto;
-                })
-                .collect(Collectors.toList());
+        // 댓글 반응(좋아요/싫어요) 배치 조회 (N+1 문제 해결)
+        Map<Long, Map<ReactionType, Long>> reactionCountsMap = getReactionCountsBatch(commentIds);
+
+        // DTO 변환 (배치 조회된 반응/파일 정보 사용)
+        List<CommentDTO> commentDTOs = mapCommentsWithReactionCountsBatch(
+                comments, reactionCountsMap, filesByCommentId);
 
         return new CommentPageResponseDTO(
                 commentDTOs,
@@ -122,9 +117,14 @@ public class CommentService {
                 .orElseThrow(() -> new IllegalArgumentException("Board not found"));
         // 일반 사용자용: 작성자도 활성 상태여야 함
         List<Comment> comments = commentRepository.findByBoardAndIsDeletedFalseOrderByCreatedAtAsc(board);
-        return comments.stream()
-                .map(this::mapWithReactionCounts)
-                .collect(Collectors.toList());
+        if (comments.isEmpty()) {
+            return new ArrayList<>();
+        }
+        List<Long> commentIds = comments.stream().map(Comment::getIdx).collect(Collectors.toList());
+        Map<Long, Map<ReactionType, Long>> reactionCountsMap = getReactionCountsBatch(commentIds);
+        Map<Long, List<FileDTO>> filesByCommentId = attachmentFileService.getAttachmentsBatch(
+                FileTargetType.COMMENT, commentIds);
+        return mapCommentsWithReactionCountsBatch(comments, reactionCountsMap, filesByCommentId);
     }
 
     /**
@@ -136,9 +136,14 @@ public class CommentService {
         Board board = boardRepository.findById(boardId)
                 .orElseThrow(() -> new IllegalArgumentException("Board not found"));
         List<Comment> comments = commentRepository.findByBoardAndIsDeletedFalseForAdmin(board);
-        return comments.stream()
-                .map(this::mapWithReactionCounts)
-                .collect(Collectors.toList());
+        if (comments.isEmpty()) {
+            return new ArrayList<>();
+        }
+        List<Long> commentIds = comments.stream().map(Comment::getIdx).collect(Collectors.toList());
+        Map<Long, Map<ReactionType, Long>> reactionCountsMap = getReactionCountsBatch(commentIds);
+        Map<Long, List<FileDTO>> filesByCommentId = attachmentFileService.getAttachmentsBatch(
+                FileTargetType.COMMENT, commentIds);
+        return mapCommentsWithReactionCountsBatch(comments, reactionCountsMap, filesByCommentId);
     }
 
     @CacheEvict(value = "boardDetail", key = "#boardId")
@@ -264,17 +269,49 @@ public class CommentService {
     }
 
     /**
-     * 댓글 DTO 변환 (반응 수 포함, 파일 정보 제외)
-     * 배치 조회 시 사용하여 N+1 문제 방지
+     * 여러 댓글의 반응(좋아요/싫어요) 카운트를 배치로 조회
+     * 반환값: Map<CommentId, Map<ReactionType, Count>>
      */
-    private CommentDTO mapWithReactionCountsWithoutFiles(Comment comment) {
-        CommentDTO dto = commentConverter.toDTO(comment);
-        long likeCount = commentReactionRepository.countByCommentAndReactionType(comment, ReactionType.LIKE);
-        long dislikeCount = commentReactionRepository.countByCommentAndReactionType(comment, ReactionType.DISLIKE);
-        dto.setLikeCount(Math.toIntExact(likeCount));
-        dto.setDislikeCount(Math.toIntExact(dislikeCount));
-        // 파일 정보는 호출자가 배치 조회 결과로 설정
-        return dto;
+    private Map<Long, Map<ReactionType, Long>> getReactionCountsBatch(List<Long> commentIds) {
+        if (commentIds.isEmpty()) {
+            return new HashMap<>();
+        }
+        final int BATCH_SIZE = 500;
+        Map<Long, Map<ReactionType, Long>> countsMap = new HashMap<>();
+        for (int i = 0; i < commentIds.size(); i += BATCH_SIZE) {
+            int end = Math.min(i + BATCH_SIZE, commentIds.size());
+            List<Long> batch = commentIds.subList(i, end);
+            List<Object[]> results = commentReactionRepository.countByCommentsGroupByReactionType(batch);
+            for (Object[] result : results) {
+                Long commentId = ((Number) result[0]).longValue();
+                ReactionType reactionType = (ReactionType) result[1];
+                Long count = ((Number) result[2]).longValue();
+                countsMap.computeIfAbsent(commentId, k -> new HashMap<>()).put(reactionType, count);
+            }
+        }
+        return countsMap;
+    }
+
+    /**
+     * 댓글 목록을 DTO로 변환 (배치 조회된 반응/파일 정보 사용)
+     */
+    private List<CommentDTO> mapCommentsWithReactionCountsBatch(
+            List<Comment> comments,
+            Map<Long, Map<ReactionType, Long>> reactionCountsMap,
+            Map<Long, List<FileDTO>> filesByCommentId) {
+        return comments.stream()
+                .map(comment -> {
+                    CommentDTO dto = commentConverter.toDTO(comment);
+                    Map<ReactionType, Long> counts = reactionCountsMap.getOrDefault(
+                            comment.getIdx(), new HashMap<>());
+                    dto.setLikeCount(Math.toIntExact(counts.getOrDefault(ReactionType.LIKE, 0L)));
+                    dto.setDislikeCount(Math.toIntExact(counts.getOrDefault(ReactionType.DISLIKE, 0L)));
+                    List<FileDTO> attachments = filesByCommentId.getOrDefault(comment.getIdx(), List.of());
+                    dto.setAttachments(attachments);
+                    dto.setCommentFilePath(extractPrimaryFileUrl(attachments));
+                    return dto;
+                })
+                .collect(Collectors.toList());
     }
 
     private String extractPrimaryFileUrl(List<FileDTO> attachments) {
