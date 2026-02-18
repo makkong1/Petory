@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -33,7 +34,8 @@ public interface SpringDataJpaPetCoinTransactionRepository
             @Param("relatedIdx") Long relatedIdx);
 
     /**
-     * 사용자별 거래 내역 페이징 조회
+     * 사용자별 거래 내역 페이징 조회 (JOIN FETCH user로 N+1 방지)
      */
+    @EntityGraph(attributePaths = "user")
     Page<PetCoinTransaction> findByUserOrderByCreatedAtDesc(Users user, Pageable pageable);
 }
