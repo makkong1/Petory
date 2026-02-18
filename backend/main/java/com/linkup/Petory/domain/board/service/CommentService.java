@@ -87,7 +87,7 @@ public class CommentService {
         Map<Long, List<FileDTO>> filesByCommentId = attachmentFileService.getAttachmentsBatch(
                 FileTargetType.COMMENT, commentIds);
 
-        // 댓글 반응(좋아요/싫어요) 배치 조회 (N+1 문제 해결)
+        // [리팩토링] 댓글 반응(좋아요/싫어요) 배치 조회 - 2N 쿼리 → 1~2 쿼리
         Map<Long, Map<ReactionType, Long>> reactionCountsMap = getReactionCountsBatch(commentIds);
 
         // DTO 변환 (배치 조회된 반응/파일 정보 사용)
@@ -269,6 +269,7 @@ public class CommentService {
 
     /**
      * 여러 댓글의 반응(좋아요/싫어요) 카운트를 배치로 조회
+     * [리팩토링] countByCommentsGroupByReactionType - N개 댓글 시 2N 쿼리 → 1~2 쿼리
      * 반환값: Map<CommentId, Map<ReactionType, Count>>
      */
     private Map<Long, Map<ReactionType, Long>> getReactionCountsBatch(List<Long> commentIds) {
@@ -293,6 +294,7 @@ public class CommentService {
 
     /**
      * 댓글 목록을 DTO로 변환 (배치 조회된 반응/파일 정보 사용)
+     * [리팩토링] mapWithReactionCounts 3N 쿼리 → 배치 조회로 3~4 쿼리
      */
     private List<CommentDTO> mapCommentsWithReactionCountsBatch(
             List<Comment> comments,

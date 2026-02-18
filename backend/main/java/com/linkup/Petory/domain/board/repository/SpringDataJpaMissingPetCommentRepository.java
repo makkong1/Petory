@@ -25,6 +25,7 @@ public interface SpringDataJpaMissingPetCommentRepository extends JpaRepository<
 
     /**
      * 게시글의 댓글 수 조회 (COUNT 쿼리 - N건 로드 방지)
+     * [리팩토링] findByBoard + size() → COUNT 쿼리 1회
      * soft-deleted 제외, 작성자도 활성 상태여야 함
      */
     @Query("SELECT COUNT(mc) FROM MissingPetComment mc JOIN mc.user u " +

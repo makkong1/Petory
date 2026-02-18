@@ -145,7 +145,7 @@ public class ReactionService {
                 userReaction);
     }
 
-    /** reactToBoard 반환용 - DB 재조회 없이 엔티티 값 사용 */
+    /** [리팩토링] reactToBoard 반환용 - count 2회 + find 1회 제거, 엔티티 likeCount/dislikeCount 사용 */
     private ReactionSummaryDTO buildBoardSummaryFromCounts(int likeCount, int dislikeCount,
             ReactionType userReaction) {
         return new ReactionSummaryDTO(likeCount, dislikeCount, userReaction);
@@ -166,7 +166,7 @@ public class ReactionService {
                 userReaction);
     }
 
-    /** reactToComment 반환용 - userReaction만 전달, count는 DB 조회 */
+    /** [리팩토링] reactToComment 반환용 - findByCommentAndUser 1회 제거, userReaction 계산값 전달 */
     private ReactionSummaryDTO buildCommentSummaryWithUserReaction(Comment comment, ReactionType userReaction) {
         long likeCount = commentReactionRepository.countByCommentAndReactionType(comment, ReactionType.LIKE);
         long dislikeCount = commentReactionRepository.countByCommentAndReactionType(comment, ReactionType.DISLIKE);
@@ -178,6 +178,7 @@ public class ReactionService {
 
     /**
      * 게시글의 likeCount, dislikeCount를 실시간으로 업데이트
+     * [리팩토링] Board 엔티티 dislikeCount 추가, buildBoardSummary count 쿼리 제거
      *
      * @param board                게시글 엔티티
      * @param previousReactionType 이전 반응 타입 (null이면 새로 추가)

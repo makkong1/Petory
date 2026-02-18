@@ -29,6 +29,7 @@ public interface CommentReactionRepository {
 
     /**
      * 여러 댓글의 좋아요/싫어요 카운트를 한 번에 조회 (배치 조회)
+     * [리팩토링] N개 댓글 시 2N 쿼리 → 1 쿼리 (N+1 제거)
      * 반환값: List<Object[]> [commentId, reactionType, count]
      */
     List<Object[]> countByCommentsGroupByReactionType(List<Long> commentIds);

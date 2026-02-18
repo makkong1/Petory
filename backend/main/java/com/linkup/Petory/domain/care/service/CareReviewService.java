@@ -52,7 +52,7 @@ public class CareReviewService {
 
     /**
      * 리뷰 목록 + 평균 평점 + 개수를 한 번의 쿼리로 조회
-     * getReviewsByReviewee + getAverageRating 중복 호출 방지
+     * [리팩토링] getReviewsByReviewee + getAverageRating 2회 → 1회 (프로필+리뷰 조회 시)
      */
     @Transactional(readOnly = true)
     public ReviewSummaryDTO getReviewsWithAverage(Long revieweeIdx) {

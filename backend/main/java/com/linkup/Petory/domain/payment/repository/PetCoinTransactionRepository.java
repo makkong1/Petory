@@ -29,6 +29,7 @@ public interface PetCoinTransactionRepository {
 
     /**
      * 사용자별 거래 내역 페이징 조회 (최신순)
+     * [리팩토링] DB 페이징, Page 응답
      */
     Page<PetCoinTransaction> findByUserOrderByCreatedAtDesc(Users user, Pageable pageable);
 

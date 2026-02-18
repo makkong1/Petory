@@ -51,6 +51,7 @@ public class PetCoinController {
 
         /**
          * 현재 사용자 거래 내역 조회 (DB 페이징)
+         * [리팩토링] 메모리 페이징 → DB 페이징, Page 응답 형식
          */
         @GetMapping("/transactions")
         public ResponseEntity<Page<PetCoinTransactionDTO>> getMyTransactions(
@@ -89,6 +90,7 @@ public class PetCoinController {
 
         /**
          * 현재 로그인한 사용자 조회 (요청당 1회만 조회)
+         * [리팩토링] getCurrentUserId + findById → getCurrentUser 1회 조회로 User 중복 조회 제거
          */
         private Users getCurrentUser() {
                 Authentication authentication = SecurityContextHolder.getContext().getAuthentication();

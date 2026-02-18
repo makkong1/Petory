@@ -170,8 +170,10 @@ public class MeetupService {
         return converter.toDTO(meetup);
     }
 
-    // 반경 기반 모임 조회 (마커 표시용)
-    // ✅ 리팩토링: 인메모리 필터링 제거 → DB 쿼리로 최적화
+    /**
+     * 반경 기반 모임 조회 (마커 표시용)
+     * [리팩토링] findAllNotDeleted + 인메모리 Haversine → findNearbyMeetups DB 쿼리 (Bounding Box + 인덱스 활용)
+     */
     @Timed("getNearbyMeetups")
     public List<MeetupDTO> getNearbyMeetups(Double lat, Double lng, Double radiusKm) {
         LocalDateTime now = LocalDateTime.now();
@@ -243,7 +245,7 @@ public class MeetupService {
                         meetupIdx, userId, meetup.getCurrentParticipants(), meetup.getMaxParticipants());
                 throw new RuntimeException("모임 인원이 가득 찼습니다.");
             }
-            // 영속성 컨텍스트 새로고침 (중복 DB 쿼리 제거)
+            // [리팩토링] findById 2회 호출 제거 → entityManager.refresh()로 영속성 컨텍스트 동기화
             entityManager.refresh(meetup);
         }
 
@@ -342,14 +344,18 @@ public class MeetupService {
         );
     }
 
-    // 공통 메서드: Meetup 엔티티 리스트를 DTO 리스트로 변환
+    /**
+     * [리팩토링] Meetup 엔티티 리스트 → DTO 리스트 변환 공통화 (7개 메서드 중복 제거)
+     */
     private List<MeetupDTO> convertToDTOs(List<Meetup> meetups) {
         return meetups.stream()
                 .map(converter::toDTO)
                 .collect(Collectors.toList());
     }
 
-    // 공통 메서드: MeetupParticipants 엔티티 리스트를 DTO 리스트로 변환
+    /**
+     * [리팩토링] MeetupParticipants 엔티티 리스트 → DTO 리스트 변환 공통화
+     */
     private List<MeetupParticipantsDTO> convertToParticipantDTOs(List<MeetupParticipants> participants) {
         return participants.stream()
                 .map(participantsConverter::toDTO)

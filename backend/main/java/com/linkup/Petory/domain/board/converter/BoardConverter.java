@@ -15,7 +15,7 @@ import lombok.RequiredArgsConstructor;
 public class BoardConverter {
 
     // Entity → DTO
-    // commentCount만 사용 (board.getComments() 접근 시 Lazy Loading 트리거 → N+1 방지)
+    // [리팩토링] board.getComments() 접근 제거 → commentCount만 사용 (Lazy Loading N+1 방지)
     public BoardDTO toDTO(Board board) {
         Integer commentCount = board.getCommentCount() != null ? board.getCommentCount() : 0;
 
