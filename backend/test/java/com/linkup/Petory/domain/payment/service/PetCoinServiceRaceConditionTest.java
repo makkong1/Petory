@@ -179,7 +179,8 @@ class PetCoinServiceRaceConditionTest {
             executor.shutdownNow();
         }
 
-        Integer finalBalance = petCoinService.getBalance(testUser);
+        Users refreshedUser = usersRepository.findById(testUser.getIdx()).orElseThrow();
+        Integer finalBalance = petCoinService.getBalance(refreshedUser);
         List<PetCoinTransaction> allTx = transactionRepository.findByUserOrderByCreatedAtDesc(testUser);
 
         log.info("\n========== [문제 상황] 테스트 결과 ==========");
@@ -255,7 +256,8 @@ class PetCoinServiceRaceConditionTest {
         executor.shutdown();
         assertTrue(executor.awaitTermination(15, TimeUnit.SECONDS), "15초 내 완료");
 
-        Integer finalBalance = petCoinService.getBalance(testUser);
+        Users refreshedUser = usersRepository.findById(testUser.getIdx()).orElseThrow();
+        Integer finalBalance = petCoinService.getBalance(refreshedUser);
 
         log.info("\n========== [해결 후] 결과 ==========");
         log.info("성공: {}건, 최종 잔액: {} (예상: {})", successCount.get(), finalBalance, expectedFinalBalance);
@@ -310,7 +312,8 @@ class PetCoinServiceRaceConditionTest {
         executor.shutdown();
         assertTrue(executor.awaitTermination(15, TimeUnit.SECONDS));
 
-        Integer finalBalance = petCoinService.getBalance(testUser);
+        Users refreshedUser = usersRepository.findById(testUser.getIdx()).orElseThrow();
+        Integer finalBalance = petCoinService.getBalance(refreshedUser);
 
         log.info("\n========== [payoutCoins] 결과 ==========");
         log.info("성공: {}건, 최종: {} (예상: {})", successCount.get(), finalBalance, expectedFinalBalance);
@@ -366,7 +369,8 @@ class PetCoinServiceRaceConditionTest {
         executor.shutdown();
         assertTrue(executor.awaitTermination(15, TimeUnit.SECONDS));
 
-        Integer finalBalance = petCoinService.getBalance(testUser);
+        Users refreshedUser = usersRepository.findById(testUser.getIdx()).orElseThrow();
+        Integer finalBalance = petCoinService.getBalance(refreshedUser);
 
         log.info("\n========== [refundCoins] 결과 ==========");
         log.info("성공: {}건, 최종: {} (예상: {})", successCount.get(), finalBalance, expectedFinalBalance);

@@ -11,7 +11,7 @@ import com.linkup.Petory.domain.payment.dto.PetCoinBalanceResponse;
 import com.linkup.Petory.domain.payment.dto.PetCoinChargeRequest;
 import com.linkup.Petory.domain.payment.dto.PetCoinTransactionDTO;
 import com.linkup.Petory.domain.payment.entity.PetCoinTransaction;
-import com.linkup.Petory.domain.payment.repository.SpringDataJpaPetCoinTransactionRepository;
+import com.linkup.Petory.domain.payment.repository.PetCoinTransactionRepository;
 import com.linkup.Petory.domain.payment.service.PetCoinService;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
@@ -31,7 +31,7 @@ public class AdminPaymentController {
 
         private final PetCoinService petCoinService;
         private final UsersRepository usersRepository;
-        private final SpringDataJpaPetCoinTransactionRepository transactionRepository;
+        private final PetCoinTransactionRepository transactionRepository;
         private final com.linkup.Petory.domain.payment.converter.PetCoinTransactionConverter transactionConverter;
 
         /**

@@ -44,13 +44,9 @@ public class PetCoinController {
          */
         @GetMapping("/balance")
         public ResponseEntity<PetCoinBalanceResponse> getMyBalance() {
-                Long userId = getCurrentUserId();
-                Users user = usersRepository.findById(userId)
-                                .orElseThrow(() -> new RuntimeException("User not found"));
-
+                Users user = getCurrentUser();
                 Integer balance = petCoinService.getBalance(user);
-
-                return ResponseEntity.ok(new PetCoinBalanceResponse(userId, balance));
+                return ResponseEntity.ok(new PetCoinBalanceResponse(user.getIdx(), balance));
         }
 
         /**
@@ -59,13 +55,9 @@ public class PetCoinController {
         @GetMapping("/transactions")
         public ResponseEntity<Page<PetCoinTransactionDTO>> getMyTransactions(
                         @PageableDefault(size = 20) Pageable pageable) {
-                Long userId = getCurrentUserId();
-                Users user = usersRepository.findById(userId)
-                                .orElseThrow(() -> new RuntimeException("User not found"));
-
+                Users user = getCurrentUser();
                 Page<PetCoinTransaction> transactions = transactionRepository
                                 .findByUserOrderByCreatedAtDesc(user, pageable);
-
                 return ResponseEntity.ok(transactions.map(transactionConverter::toDTO));
         }
 
@@ -79,9 +71,7 @@ public class PetCoinController {
         @PostMapping("/charge")
         public ResponseEntity<PetCoinTransactionDTO> chargeCoins(
                         @RequestBody PetCoinChargeRequest request) {
-                Long userId = getCurrentUserId();
-                Users user = usersRepository.findById(userId)
-                                .orElseThrow(() -> new RuntimeException("User not found"));
+                Users user = getCurrentUser();
 
                 if (request.amount() == null || request.amount() <= 0) {
                         throw new IllegalArgumentException("충전 금액은 0보다 커야 합니다.");
@@ -92,25 +82,21 @@ public class PetCoinController {
                                 request.amount(),
                                 request.description() != null ? request.description() : "코인 충전");
 
-                log.info("코인 충전 완료: userId={}, amount={}", userId, request.amount());
+                log.info("코인 충전 완료: userId={}, amount={}", user.getIdx(), request.amount());
 
                 return ResponseEntity.ok(transactionConverter.toDTO(transaction));
         }
 
         /**
-         * 현재 로그인한 사용자 ID 조회
+         * 현재 로그인한 사용자 조회 (요청당 1회만 조회)
          */
-        private Long getCurrentUserId() {
+        private Users getCurrentUser() {
                 Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
                 if (authentication == null || authentication.getPrincipal() == null) {
                         throw new RuntimeException("인증이 필요합니다.");
                 }
-
-                // authentication.getName()은 userId (id 필드, String)를 반환
                 String userId = authentication.getName();
-                Users user = usersRepository.findByIdString(userId)
+                return usersRepository.findByIdString(userId)
                                 .orElseThrow(() -> new RuntimeException("User not found"));
-
-                return user.getIdx();
         }
 }

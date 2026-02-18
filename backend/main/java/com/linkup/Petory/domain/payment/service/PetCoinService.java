@@ -225,11 +225,10 @@ public class PetCoinService {
 
         /**
          * 사용자 코인 잔액 조회
+         * Controller에서 getCurrentUser()로 조회한 user 전달 시 추가 쿼리 없이 반환.
          */
         @Transactional(readOnly = true)
         public Integer getBalance(Users user) {
-                Users currentUser = usersRepository.findById(user.getIdx())
-                                .orElseThrow(() -> new RuntimeException("User not found"));
-                return currentUser.getPetCoinBalance();
+                return user.getPetCoinBalance();
         }
 }

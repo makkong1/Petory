@@ -16,7 +16,7 @@ Payment(PetCoin) 도메인의 백엔드 코드 분석을 통해 발견된 성능
 
 ```
 PetCoinController        → PetCoinService, PetCoinTransactionRepository, PetCoinTransactionConverter
-AdminPaymentController   → PetCoinService, SpringDataJpaPetCoinTransactionRepository (직접)
+AdminPaymentController   → PetCoinService, PetCoinTransactionRepository
 PetCoinEscrowService     → PetCoinService, PetCoinEscrowRepository
 CareRequestService       → PetCoinEscrowService (에스크로 지급/환불)
 ConversationService      → PetCoinEscrowService (에스크로 생성)
@@ -71,108 +71,61 @@ public ResponseEntity<Page<PetCoinTransactionDTO>> getMyTransactions(
 
 ---
 
-### 2. PetCoinService - chargeCoins/payoutCoins/refundCoins Race Condition
+### 2. PetCoinService - chargeCoins/payoutCoins/refundCoins Race Condition ✅
 
 **파일**: `PetCoinService.java` (Lines 36-223)
 
 **상세 문서**: [PetCoinService Race Condition 상세 분석](./petcoin-service-race-condition.md)
 
-**요약**:
-- `deductCoins`만 `findByIdForUpdate` (비관적 락) 사용 → Race Condition 방지
-- `chargeCoins`, `payoutCoins`, `refundCoins`는 `findById` 사용 → 동시 요청 시 잔액 불일치 가능
-- **해결** ✅: 세 메서드 모두 `findByIdForUpdate`로 변경 완료
+**기존 문제**: `chargeCoins`, `payoutCoins`, `refundCoins`는 `findById` 사용 → 동시 요청 시 Lost Update + Deadlock, 잔액 불일치.
+
+**해결 완료**: `chargeCoins`, `payoutCoins`, `refundCoins`에서 `findById` → `findByIdForUpdate`로 변경. `SELECT ... FOR UPDATE`로 해당 User 행 락 유지 → 순차 처리. `PetCoinServiceRaceConditionTest` 추가.
 
 ---
 
-### 3. PetCoinTransactionConverter - N+1 쿼리
+### 3. PetCoinTransactionConverter - N+1 쿼리 ✅
 
 **파일**: `PetCoinTransactionConverter.java` (Line 25), `PetCoinController.java`, `AdminPaymentController.java`
 
-**현재 문제**:
-- `toDTO()`: `transaction.getUser().getIdx()` 접근 시 **Lazy Loading** 트리거
-- 거래 내역 N건 조회 시: 1 (거래 목록) + **N** (User) = **N+1 쿼리**
-- PetCoinController, AdminPaymentController 모두 `map(transactionConverter::toDTO)` 사용
+**기존 문제**: `toDTO()`에서 `transaction.getUser().getIdx()` 접근 시 Lazy Loading → 거래 N건 조회 시 1 + N 쿼리.
 
-```java
-// PetCoinTransactionConverter.toDTO
-.userId(transaction.getUser() != null ? transaction.getUser().getIdx() : null)  // Lazy Load!
-```
-
-**해결 방안**:
-1. **@EntityGraph**: `findByUserOrderByCreatedAtDesc`에 `@EntityGraph(attributePaths = "user")` 추가 → JOIN FETCH
-2. 또는 Repository에 `findByUserOrderByCreatedAtDescWithUser` 별도 메서드 추가
-3. 또는 PetCoinTransaction에 `user_idx` 컬럼 직접 매핑 (userId만 필요 시) → DTO에 user_idx 프로젝션
-
-```java
-// SpringDataJpaPetCoinTransactionRepository
-@EntityGraph(attributePaths = "user")
-Page<PetCoinTransaction> findByUserOrderByCreatedAtDesc(Users user, Pageable pageable);
-```
+**해결 완료**: `SpringDataJpaPetCoinTransactionRepository.findByUserOrderByCreatedAtDesc`에 `@EntityGraph(attributePaths = "user")` 추가. JOIN FETCH로 User를 한 번에 로드 → N+1 제거.
 
 ---
 
 ## 🟠 High Priority - 리팩토링
 
-### 4. PetCoinController - User 중복 조회
+### 4. PetCoinController - User 중복 조회 ✅
 
 **파일**: `PetCoinController.java` (Lines 46-127)
 
-**현재 문제**:
-- `getCurrentUserId()`: `findByIdString(userId)` 1회 → `user.getIdx()` 반환
-- `getMyBalance()`, `getMyTransactions()`, `chargeCoins()`: 각각 `findById(userId)` 1회 추가
-- **동일 요청 내 User 2회 조회** (getCurrentUserId 1회 + 각 메서드 1회)
+**기존 문제**: `getCurrentUserId()` 1회 + 각 메서드에서 `findById` 1회 → 동일 요청 내 User 2회 조회.
 
-```java
-// getCurrentUserId - findByIdString 1회
-Users user = usersRepository.findByIdString(userId).orElseThrow(...);
-return user.getIdx();
-
-// getMyBalance - findById 1회 (또 조회!)
-Users user = usersRepository.findById(userId).orElseThrow(...);
-Integer balance = petCoinService.getBalance(user);  // getBalance 내부에서 또 findById!
-```
-
-**해결 방안**:
-1. `getCurrentUser()` 메서드로 변경 → User 엔티티 반환, 1회만 조회
-2. `getMyBalance(user)`, `getMyTransactions(user, pageable)`, `chargeCoins(user, ...)` 에 user 전달
-3. `PetCoinService.getBalance(Users user)`: user가 이미 로드된 경우 `user.getPetCoinBalance()` 직접 사용 가능
-   - 단, 잔액은 실시간성이 중요하므로 Service에서 `findByIdForUpdate` 또는 `findById`로 최신 조회 유지
-   - Controller에서 user 전달 시 Service에서 재조회 생략 가능 (같은 트랜잭션 내)
-4. **권장**: Controller에서 `getCurrentUser()` 1회 호출 → 반환된 user를 모든 하위 호출에 전달
+**해결 완료**: `getCurrentUserId()` → `getCurrentUser()`로 변경. User 엔티티를 1회만 조회하고 `getMyBalance()`, `getMyTransactions()`, `chargeCoins()`에 전달. 요청당 User 조회 2회 → 1회로 감소.
 
 ---
 
-### 5. AdminPaymentController - Repository 패턴 일관성
+### 5. AdminPaymentController - Repository 패턴 일관성 ✅
 
 **파일**: `AdminPaymentController.java` (Lines 14, 35, 83-85)
 
-**현재 문제**:
-- `SpringDataJpaPetCoinTransactionRepository` **직접 주입** (JPA 인터페이스)
-- PetCoinController는 `PetCoinTransactionRepository` (도메인 인터페이스) 사용
-- Repository 패턴/Adapter 패턴 일관성 깨짐
-- `findByUserOrderByCreatedAtDesc(user, pageable)` 가 도메인 Repository에 없어서 Admin만 JPA 직접 사용
+**기존 문제**: `SpringDataJpaPetCoinTransactionRepository` 직접 주입 → PetCoinController와 Repository 패턴 불일치.
 
-**해결 방안**:
-- Critical 1 적용 시 `PetCoinTransactionRepository`에 `findByUserOrderByCreatedAtDesc(user, pageable)` 추가
-- AdminPaymentController에서 `PetCoinTransactionRepository` 사용으로 변경
-- `SpringDataJpaPetCoinTransactionRepository` → Adapter 내부에서만 사용
+**해결 완료**: AdminPaymentController에서 `PetCoinTransactionRepository` (도메인 인터페이스) 사용으로 변경. JPA 인터페이스는 Adapter 내부에서만 사용.
+
+**N+1과의 차이**: 이 항목은 **쿼리 성능(N+1)** 이 아니라 **아키텍처 일관성** 이슈. N+1은 Lazy Loading으로 인한 1+N 쿼리 발생 → `@EntityGraph`, JOIN FETCH로 해결. 본 항목은 Controller가 JPA 구현체에 직접 의존하는 구조 문제 → 도메인 인터페이스로 추상화.
 
 ---
 
 ## 🟡 Medium Priority
 
-### 6. PetCoinService.getBalance - User 재조회
+### 6. PetCoinService.getBalance - User 재조회 ✅
 
 **파일**: `PetCoinService.java` (Lines 228-233)
 
-**현재 문제**:
-- `getBalance(Users user)`: `findById(user.getIdx())` 로 재조회
-- Controller에서 이미 user 조회 후 전달했는데 Service에서 또 조회 → 2회 쿼리
+**기존 문제**: `getBalance(Users user)`에서 `findById` 재조회 → Controller에서 user 전달해도 2회 쿼리.
 
-**개선 포인트**:
-- High 4 (getCurrentUser 통합) 적용 시, Controller에서 user 1회 조회 후 전달
-- Service `getBalance(user)` 에서 `user.getPetCoinBalance()` 직접 사용 시 0 추가 쿼리
-- 단, 잔액 실시간성이 중요하면 재조회 유지. (같은 요청 내 직전 조회 user라면 1차 캐시 hit 가능)
+**해결 완료**: `user.getPetCoinBalance()` 직접 반환. Controller의 `getCurrentUser()`로 조회한 user 전달 시 추가 쿼리 없음.
 
 ---
 
@@ -235,10 +188,10 @@ Integer balance = petCoinService.getBalance(user);  // getBalance 내부에서 �
 
 - [x] PetCoinController getMyTransactions → DB 페이징 (PetCoinTransactionRepository에 Page 메서드 추가)
 - [ ] PetCoinService chargeCoins/payoutCoins/refundCoins → findByIdForUpdate 적용
-- [ ] PetCoinTransactionConverter N+1 → @EntityGraph 또는 JOIN FETCH
-- [ ] PetCoinController getCurrentUser 통합, User 중복 조회 제거
-- [ ] AdminPaymentController → PetCoinTransactionRepository 사용 (SpringData JPA 직접 제거)
-- [ ] PetCoinService getBalance - user 전달 시 재조회 생략 검토
+- [x] PetCoinTransactionConverter N+1 → @EntityGraph 또는 JOIN FETCH
+- [x] PetCoinController getCurrentUser 통합, User 중복 조회 제거
+- [x] AdminPaymentController → PetCoinTransactionRepository 사용 (SpringData JPA 직접 제거)
+- [x] PetCoinService getBalance - user 전달 시 재조회 생략 검토
 - [ ] 도메인 예외 클래스 도입 (선택)
 
 ---
