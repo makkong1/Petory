@@ -4,6 +4,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import UserProfileModal from '../User/UserProfileModal';
 import PetCoinChargePage from '../Payment/PetCoinChargePage';
+import PetCoinTransactionListModal from '../Payment/PetCoinTransactionListModal';
 import { notificationApi } from '../../api/notificationApi';
 
 const Navigation = ({ activeTab, setActiveTab, user, onNavigateToBoard }) => {
@@ -13,6 +14,7 @@ const Navigation = ({ activeTab, setActiveTab, user, onNavigateToBoard }) => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [isChargePageOpen, setIsChargePageOpen] = useState(false);
+  const [isTransactionListOpen, setIsTransactionListOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
@@ -316,6 +318,9 @@ const Navigation = ({ activeTab, setActiveTab, user, onNavigateToBoard }) => {
                     </NotificationDropdown>
                   )}
                 </div>
+                <CoinChargeButton type="button" onClick={() => setIsTransactionListOpen(true)}>
+                  📋 거래 내역
+                </CoinChargeButton>
                 <CoinChargeButton type="button" onClick={() => setIsChargePageOpen(true)}>
                   💰 코인 충전
                 </CoinChargeButton>
@@ -354,6 +359,9 @@ const Navigation = ({ activeTab, setActiveTab, user, onNavigateToBoard }) => {
               updateUserProfile?.(updated);
             }}
           />
+          {isTransactionListOpen && (
+            <PetCoinTransactionListModal onClose={() => setIsTransactionListOpen(false)} />
+          )}
           {isChargePageOpen && (
             <PetCoinChargePage onClose={() => setIsChargePageOpen(false)} />
           )}

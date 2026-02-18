@@ -3,9 +3,14 @@ package com.linkup.Petory.domain.payment.service;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.linkup.Petory.domain.care.entity.CareRequest;
+import com.linkup.Petory.domain.care.repository.CareRequestRepository;
+import com.linkup.Petory.domain.payment.dto.PetCoinTransactionDetailDTO;
+import com.linkup.Petory.domain.payment.entity.PetCoinEscrow;
 import com.linkup.Petory.domain.payment.entity.PetCoinTransaction;
 import com.linkup.Petory.domain.payment.entity.TransactionStatus;
 import com.linkup.Petory.domain.payment.entity.TransactionType;
+import com.linkup.Petory.domain.payment.repository.PetCoinEscrowRepository;
 import com.linkup.Petory.domain.payment.repository.PetCoinTransactionRepository;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
@@ -24,6 +29,8 @@ public class PetCoinService {
 
         private final UsersRepository usersRepository;
         private final PetCoinTransactionRepository transactionRepository;
+        private final PetCoinEscrowRepository escrowRepository;
+        private final CareRequestRepository careRequestRepository;
 
         /**
          * 코인 충전 (관리자 지급 또는 테스트 충전)
@@ -230,5 +237,60 @@ public class PetCoinService {
         @Transactional(readOnly = true)
         public Integer getBalance(Users user) {
                 return user.getPetCoinBalance();
+        }
+
+        /**
+         * 거래 상세 조회 (상대방 정보 포함)
+         * - 본인 거래만 조회 가능
+         * - CARE_REQUEST 관련 거래 시 상대방(requester/provider) 정보 포함
+         */
+        @Transactional(readOnly = true)
+        public PetCoinTransactionDetailDTO getTransactionDetail(Long transactionIdx, Users currentUser) {
+                PetCoinTransaction transaction = transactionRepository.findById(transactionIdx)
+                                .orElseThrow(() -> new RuntimeException("거래 내역을 찾을 수 없습니다."));
+
+                if (!transaction.getUser().getIdx().equals(currentUser.getIdx())) {
+                        throw new RuntimeException("본인의 거래 내역만 조회할 수 있습니다.");
+                }
+
+                PetCoinTransactionDetailDTO dto = PetCoinTransactionDetailDTO.builder()
+                                .idx(transaction.getIdx())
+                                .userId(transaction.getUser().getIdx())
+                                .transactionType(transaction.getTransactionType())
+                                .amount(transaction.getAmount())
+                                .balanceBefore(transaction.getBalanceBefore())
+                                .balanceAfter(transaction.getBalanceAfter())
+                                .relatedType(transaction.getRelatedType())
+                                .relatedIdx(transaction.getRelatedIdx())
+                                .description(transaction.getDescription())
+                                .status(transaction.getStatus())
+                                .createdAt(transaction.getCreatedAt())
+                                .updatedAt(transaction.getUpdatedAt())
+                                .build();
+
+                // CARE_REQUEST 관련 거래: 에스크로에서 상대방 정보 조회
+                if ("CARE_REQUEST".equals(transaction.getRelatedType()) && transaction.getRelatedIdx() != null) {
+                        escrowRepository.findByCareRequestIdx(transaction.getRelatedIdx())
+                                        .ifPresent(escrow -> {
+                                                Users counterparty = null;
+                                                if (TransactionType.DEDUCT.equals(transaction.getTransactionType())
+                                                                || TransactionType.REFUND.equals(transaction.getTransactionType())) {
+                                                        counterparty = escrow.getProvider();
+                                                } else if (TransactionType.PAYOUT.equals(transaction.getTransactionType())) {
+                                                        counterparty = escrow.getRequester();
+                                                }
+                                                if (counterparty != null) {
+                                                        dto.setCounterpartyUserId(counterparty.getIdx());
+                                                        dto.setCounterpartyUsername(
+                                                                        counterparty.getNickname() != null ? counterparty.getNickname()
+                                                                                        : counterparty.getUsername());
+                                                }
+                                                careRequestRepository.findById(transaction.getRelatedIdx())
+                                                                .map(CareRequest::getTitle)
+                                                                .ifPresent(dto::setRelatedTitle);
+                                        });
+                }
+
+                return dto;
         }
 }

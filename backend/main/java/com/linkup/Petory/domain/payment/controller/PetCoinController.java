@@ -12,6 +12,7 @@ import com.linkup.Petory.domain.payment.converter.PetCoinTransactionConverter;
 import com.linkup.Petory.domain.payment.dto.PetCoinBalanceResponse;
 import com.linkup.Petory.domain.payment.dto.PetCoinChargeRequest;
 import com.linkup.Petory.domain.payment.dto.PetCoinTransactionDTO;
+import com.linkup.Petory.domain.payment.dto.PetCoinTransactionDetailDTO;
 import com.linkup.Petory.domain.payment.entity.PetCoinTransaction;
 import com.linkup.Petory.domain.payment.repository.PetCoinTransactionRepository;
 import com.linkup.Petory.domain.payment.service.PetCoinService;
@@ -60,6 +61,17 @@ public class PetCoinController {
                 Page<PetCoinTransaction> transactions = transactionRepository
                                 .findByUserOrderByCreatedAtDesc(user, pageable);
                 return ResponseEntity.ok(transactions.map(transactionConverter::toDTO));
+        }
+
+        /**
+         * 거래 상세 조회 (상대방 정보 포함)
+         * GET /api/payment/transactions/{id}
+         */
+        @GetMapping("/transactions/{id}")
+        public ResponseEntity<PetCoinTransactionDetailDTO> getTransactionDetail(@PathVariable Long id) {
+                Users user = getCurrentUser();
+                PetCoinTransactionDetailDTO detail = petCoinService.getTransactionDetail(id, user);
+                return ResponseEntity.ok(detail);
         }
 
         /**

@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 
 /**
  * PetCoinTransaction 엔티티와 DTO 간 변환을 담당하는 Converter입니다.
+ * [리팩토링] transaction.getUser() 접근 시 N+1 → Repository @EntityGraph로 user 미리 로드
  */
 @Component
 @RequiredArgsConstructor

@@ -29,6 +29,15 @@ export const paymentApi = {
     return response.data; // { content: [...], totalElements, totalPages, ... }
   },
 
+  // 거래 상세 조회 (상대방 정보 포함)
+  getTransactionDetail: async (transactionId) => {
+    const response = await axios.get(
+      `${API_BASE_URL}/payment/transactions/${transactionId}`,
+      { headers: getAuthHeaders() }
+    );
+    return response.data;
+  },
+
   // 코인 충전 (테스트용 - 개발 환경에서만)
   chargeCoins: async (amount, description) => {
     const response = await axios.post(
