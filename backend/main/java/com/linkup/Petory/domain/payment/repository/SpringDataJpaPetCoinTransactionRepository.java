@@ -34,7 +34,8 @@ public interface SpringDataJpaPetCoinTransactionRepository
             @Param("relatedIdx") Long relatedIdx);
 
     /**
-     * 사용자별 거래 내역 페이징 조회 (JOIN FETCH user로 N+1 방지)
+     * 사용자별 거래 내역 페이징 조회
+     * [리팩토링] @EntityGraph(attributePaths = "user")로 N+1 쿼리 제거
      */
     @EntityGraph(attributePaths = "user")
     Page<PetCoinTransaction> findByUserOrderByCreatedAtDesc(Users user, Pageable pageable);

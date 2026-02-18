@@ -40,6 +40,7 @@ public class JpaPetCoinTransactionAdapter implements PetCoinTransactionRepositor
         return jpaRepository.findByUserOrderByCreatedAtDesc(user);
     }
 
+    /** [리팩토링] DB 페이징 (메모리 페이징 대체), @EntityGraph로 N+1 방지 */
     @Override
     public Page<PetCoinTransaction> findByUserOrderByCreatedAtDesc(Users user, Pageable pageable) {
         return jpaRepository.findByUserOrderByCreatedAtDesc(user, pageable);

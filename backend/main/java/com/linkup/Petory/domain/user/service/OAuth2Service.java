@@ -209,6 +209,7 @@ public class OAuth2Service {
 
     /**
      * 신규 사용자 생성 (DataIntegrityViolationException 시 UUID 재생성 후 재시도)
+     * [리팩토링] while 루프 DB 조회 → UUID + DataIntegrityViolationException 시 최대 3회 재시도
      */
     private Users createNewUserWithRetry(Provider provider, String providerId, String email, String name,
             Map<String, Object> attributes) {
@@ -244,7 +245,7 @@ public class OAuth2Service {
 
     /**
      * 고유한 ID 생성 (provider_providerId_uuid 형식)
-     * UUID 8자리 추가로 충돌 확률 극히 낮음 → while 루프 DB 조회 제거
+     * [리팩토링] while 루프 DB 조회 제거 → UUID 8자리 추가 (DB 조회 0회)
      */
     private String generateUniqueId(Provider provider, String providerId) {
         String baseId = provider.name().toLowerCase() + "_" + providerId;
@@ -253,7 +254,7 @@ public class OAuth2Service {
 
     /**
      * 고유한 username 생성 (baseUsername_uuid 형식)
-     * UUID 8자리 추가로 충돌 확률 극히 낮음 → while 루프 DB 조회 제거
+     * [리팩토링] while 루프 DB 조회 제거 → UUID 8자리 추가 (DB 조회 0회)
      */
     private String generateUniqueUsername(String name, String email) {
         String baseUsername = name != null && !name.isEmpty() ? name : email.split("@")[0];

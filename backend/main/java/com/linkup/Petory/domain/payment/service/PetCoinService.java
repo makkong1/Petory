@@ -39,7 +39,7 @@ public class PetCoinService {
                         throw new IllegalArgumentException("충전 금액은 0보다 커야 합니다.");
                 }
 
-                // 사용자 최신 정보 조회 (비관적 락으로 Race Condition 방지)
+                // [리팩토링] findById → findByIdForUpdate (비관적 락, Race Condition 방지)
                 Users currentUser = usersRepository.findByIdForUpdate(user.getIdx())
                                 .orElseThrow(() -> new RuntimeException("User not found"));
 
@@ -86,7 +86,7 @@ public class PetCoinService {
                         throw new IllegalArgumentException("차감 금액은 0보다 커야 합니다.");
                 }
 
-                // 사용자 최신 정보 조회 (비관적 락으로 Race Condition 방지)
+                // [리팩토링] findById → findByIdForUpdate (비관적 락, Race Condition 방지)
                 Users currentUser = usersRepository.findByIdForUpdate(user.getIdx())
                                 .orElseThrow(() -> new RuntimeException("User not found"));
 
@@ -142,7 +142,7 @@ public class PetCoinService {
                         throw new IllegalArgumentException("지급 금액은 0보다 커야 합니다.");
                 }
 
-                // 사용자 최신 정보 조회 (비관적 락으로 Race Condition 방지)
+                // [리팩토링] findById → findByIdForUpdate (비관적 락, Race Condition 방지)
                 Users currentUser = usersRepository.findByIdForUpdate(user.getIdx())
                                 .orElseThrow(() -> new RuntimeException("User not found"));
 
@@ -191,7 +191,7 @@ public class PetCoinService {
                         throw new IllegalArgumentException("환불 금액은 0보다 커야 합니다.");
                 }
 
-                // 사용자 최신 정보 조회 (비관적 락으로 Race Condition 방지)
+                // [리팩토링] findById → findByIdForUpdate (비관적 락, Race Condition 방지)
                 Users currentUser = usersRepository.findByIdForUpdate(user.getIdx())
                                 .orElseThrow(() -> new RuntimeException("User not found"));
 
@@ -225,7 +225,7 @@ public class PetCoinService {
 
         /**
          * 사용자 코인 잔액 조회
-         * Controller에서 getCurrentUser()로 조회한 user 전달 시 추가 쿼리 없이 반환.
+         * [리팩토링] findById 재조회 제거 → user.getPetCoinBalance() 직접 반환 (Controller getCurrentUser 전달 시 추가 쿼리 없음)
          */
         @Transactional(readOnly = true)
         public Integer getBalance(Users user) {

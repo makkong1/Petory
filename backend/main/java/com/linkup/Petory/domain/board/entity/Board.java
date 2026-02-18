@@ -46,6 +46,7 @@ public class Board extends BaseTimeEntity {
     @Column(name = "like_count")
     private Integer likeCount = 0;
 
+    /** [리팩토링] buildBoardSummary count 쿼리 제거 - dislikeCount 엔티티 필드로 실시간 업데이트 */
     @Builder.Default
     @Column(name = "dislike_count")
     private Integer dislikeCount = 0;

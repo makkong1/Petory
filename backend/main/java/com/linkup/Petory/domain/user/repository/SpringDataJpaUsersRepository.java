@@ -46,6 +46,7 @@ public interface SpringDataJpaUsersRepository extends JpaRepository<Users, Long>
 
     /**
      * 닉네임/사용자명/이메일 중복 검사 (1회 쿼리로 통합)
+     * [리팩토링] findByNickname + findByUsername + findByEmail 3회 → 1회
      * 탈퇴하지 않은 사용자만 조회 (Soft Delete 필터링)
      */
     @Query("SELECT u FROM Users u WHERE (u.nickname = :nickname OR u.username = :username OR u.email = :email) AND (u.isDeleted = false OR u.isDeleted IS NULL)")
@@ -95,6 +96,7 @@ public interface SpringDataJpaUsersRepository extends JpaRepository<Users, Long>
 
     /**
      * 사용자 역할만 조회 (경량 조회용, 삭제 권한 검증 등)
+     * [리팩토링] getUser(User+Pet) 대체 - role 프로젝션만 SELECT
      */
     @Query("SELECT u.role FROM Users u WHERE u.idx = :idx")
     Optional<Role> findRoleByIdx(@Param("idx") Long idx);

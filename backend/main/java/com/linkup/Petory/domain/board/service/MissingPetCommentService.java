@@ -206,6 +206,7 @@ public class MissingPetCommentService {
 
     /**
      * 게시글의 댓글 수 조회 (COUNT 쿼리 사용 - N건 로드 방지)
+     * [리팩토링] N건 전체 조회 + size() → countByBoardAndIsDeletedFalse 1 COUNT 쿼리
      * @param board 게시글 엔티티
      * @return 댓글 수
      */

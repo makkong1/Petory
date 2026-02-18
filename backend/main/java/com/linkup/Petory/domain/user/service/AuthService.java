@@ -63,6 +63,7 @@ public class AuthService {
 
         log.info("로그인 성공: {}, Refresh Token 저장 완료", id);
 
+        // [리팩토링] getUserById(findByIdString 2회) → usersConverter.toDTO(user) (User 1회 조회)
         UsersDTO userDTO = usersConverter.toDTO(user);
 
         return new TokenResponse(accessToken, refreshToken, userDTO);
@@ -107,6 +108,7 @@ public class AuthService {
         log.info("✅ Access Token 재발급 성공: userId={}, 발급시간={}",
                 user.getId(), LocalDateTime.now());
 
+        // [리팩토링] getUserById(findByIdString 2회) → usersConverter.toDTO(user) (User 1회 조회)
         UsersDTO userDTO = usersConverter.toDTO(user);
 
         return new TokenResponse(newAccessToken, refreshToken, userDTO);  // 기존 Refresh Token 유지

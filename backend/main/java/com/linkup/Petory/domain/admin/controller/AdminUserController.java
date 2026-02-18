@@ -76,6 +76,7 @@ public class AdminUserController {
 
     /**
      * 사용자 삭제 (소프트 삭제)
+     * [리팩토링] getUser(User+Pet 2+ 쿼리) → getRoleById(role 프로젝션 1회)
      */
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteUser(@PathVariable Long id) {

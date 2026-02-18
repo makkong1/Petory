@@ -39,7 +39,7 @@ public class UsersService {
 
     /**
      * 전체 사용자 조회 (페이징 지원, 관리자용)
-     * - AdminUserController에서 사용
+     * [리팩토링] getAllUsers() 제거, 페이징만 사용 (GET /api/admin/users 엔드포인트 제거)
      */
     @Transactional(readOnly = true)
     public UserPageResponseDTO getAllUsersWithPaging(int page, int size) {
@@ -78,7 +78,7 @@ public class UsersService {
 
     /**
      * 사용자 역할만 조회 (경량 조회용)
-     * - Admin 삭제 권한 검증 등 전체 프로필이 불필요한 경우 사용
+     * [리팩토링] getUser(User+Pet) → findRoleByIdx(role 프로젝션만) - Admin 삭제 시 2+ 쿼리 → 1회
      */
     @Transactional(readOnly = true)
     public Optional<Role> getRoleById(Long idx) {
@@ -112,7 +112,7 @@ public class UsersService {
             throw new RuntimeException("닉네임은 50자 이하여야 합니다.");
         }
 
-        // 닉네임/사용자명/이메일 중복 검사 (1회 쿼리)
+        // [리팩토링] findByNickname + findByUsername + findByEmail 3회 → findByNicknameOrUsernameOrEmail 1회
         usersRepository.findByNicknameOrUsernameOrEmail(nickname, dto.getUsername(), dto.getEmail())
                 .ifPresent(existing -> {
                     if (Objects.equals(existing.getNickname(), nickname)) {
@@ -326,7 +326,7 @@ public class UsersService {
 
     /**
      * 자신의 프로필 수정 (닉네임, 이메일, 전화번호, 위치, 펫 정보 등)
-     * 역할, 상태 등은 수정 불가
+     * [리팩토링] getMyProfile(User+Pet) + findByIdString → findByIdString 1회 (idx 검증 내부 통합)
      */
     public UsersDTO updateMyProfile(String userId, UsersDTO dto) {
         Users user = usersRepository.findByIdString(userId)

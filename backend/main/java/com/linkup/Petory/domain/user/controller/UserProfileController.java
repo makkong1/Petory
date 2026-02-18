@@ -49,6 +49,7 @@ public class UserProfileController {
 
     /**
      * 자신의 프로필 조회 (리뷰 포함)
+     * [리팩토링] getReviewsByReviewee + getAverageRating 2회 → getReviewsWithAverage 1회
      */
     @GetMapping("/me")
     public ResponseEntity<UserProfileWithReviewsDTO> getMyProfile() {
@@ -266,6 +267,7 @@ public class UserProfileController {
 
     /**
      * 다른 사용자의 프로필 조회 (리뷰 포함)
+     * [리팩토링] getReviewsByReviewee + getAverageRating 2회 → getReviewsWithAverage 1회
      * - 인증된 사용자는 다른 사용자의 프로필을 조회할 수 있음
      */
     @GetMapping("/{userId}/profile")

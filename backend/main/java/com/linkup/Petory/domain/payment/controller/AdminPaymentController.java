@@ -22,6 +22,8 @@ import lombok.RequiredArgsConstructor;
  * 관리자용 펫코인 관리 컨트롤러
  * - ADMIN과 MASTER만 접근 가능
  * - 사용자에게 코인을 직접 지급할 수 있는 기능 제공
+ *
+ * [리팩토링] SpringDataJpaPetCoinTransactionRepository → PetCoinTransactionRepository (도메인 인터페이스) 사용
  */
 @RestController
 @RequestMapping("/api/admin/payment")

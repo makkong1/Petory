@@ -26,7 +26,9 @@ public class AdminBoardController {
     private final BoardService boardService;
     private final CommentService commentService;
 
-    // Boards moderation list with pagination (페이징 지원)
+    /**
+     * [리팩토링] listBoards(페이징 없음) 제거, listBoardsWithPaging → getAdminBoardsWithPagingOptimized (DB 레벨 필터링)
+     */
     @GetMapping("/paging")
     public ResponseEntity<BoardPageResponseDTO> listBoardsWithPaging(
             @RequestParam(value = "status", required = false, defaultValue = "ALL") String status,
@@ -40,6 +42,7 @@ public class AdminBoardController {
 
     /**
      * 관리자용 단일 게시글 조회 (조회수 증가 없음)
+     * [리팩토링] listBoards 전체 로드 제거 → getBoard(id) 단건 조회로 대체
      * GET /api/admin/boards/{id}
      * - 삭제된 게시글도 조회 가능
      */

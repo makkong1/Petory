@@ -185,6 +185,7 @@ public class AttachmentFileService {
 
     /**
      * 첨부파일 목록에서 첫 번째 파일의 다운로드 URL 추출
+     * [리팩토링] BoardService, CommentService, MissingPetBoardService, MissingPetCommentService 중복 제거 → 공통화
      * @param attachments 첨부파일 목록 (null/empty 허용)
      * @return downloadUrl이 있으면 반환, 없으면 filePath로 buildDownloadUrl 생성
      */

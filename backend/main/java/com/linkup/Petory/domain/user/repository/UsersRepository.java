@@ -51,6 +51,7 @@ public interface UsersRepository {
 
     /**
      * 닉네임/사용자명/이메일 중복 검사 (1회 쿼리로 통합)
+     * [리팩토링] 3회 쿼리 → 1회
      * 탈퇴하지 않은 사용자만 조회 (Soft Delete 필터링)
      */
     Optional<Users> findByNicknameOrUsernameOrEmail(String nickname, String username, String email);
@@ -90,6 +91,7 @@ public interface UsersRepository {
 
     /**
      * 사용자 역할만 조회 (경량 조회용, 삭제 권한 검증 등)
+     * [리팩토링] getUser 대체 - role 프로젝션만
      */
     Optional<Role> findRoleByIdx(Long idx);
 }
