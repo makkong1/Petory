@@ -3,6 +3,9 @@ package com.linkup.Petory.domain.payment.repository;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
 import com.linkup.Petory.domain.payment.entity.PetCoinTransaction;
 import com.linkup.Petory.domain.payment.entity.TransactionStatus;
 import com.linkup.Petory.domain.payment.entity.TransactionType;
@@ -23,6 +26,11 @@ public interface PetCoinTransactionRepository {
      * 사용자별 거래 내역 조회 (최신순)
      */
     List<PetCoinTransaction> findByUserOrderByCreatedAtDesc(Users user);
+
+    /**
+     * 사용자별 거래 내역 페이징 조회 (최신순)
+     */
+    Page<PetCoinTransaction> findByUserOrderByCreatedAtDesc(Users user, Pageable pageable);
 
     /**
      * 사용자별 거래 타입별 내역 조회

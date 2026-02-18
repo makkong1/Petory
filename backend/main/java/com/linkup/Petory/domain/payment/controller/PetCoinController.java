@@ -1,8 +1,8 @@
 package com.linkup.Petory.domain.payment.controller;
 
-import java.util.List;
-import java.util.stream.Collectors;
-
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -54,31 +54,19 @@ public class PetCoinController {
         }
 
         /**
-         * 현재 사용자 거래 내역 조회
+         * 현재 사용자 거래 내역 조회 (DB 페이징)
          */
         @GetMapping("/transactions")
-        public ResponseEntity<List<PetCoinTransactionDTO>> getMyTransactions(
-                        @RequestParam(defaultValue = "0") int page,
-                        @RequestParam(defaultValue = "20") int size) {
+        public ResponseEntity<Page<PetCoinTransactionDTO>> getMyTransactions(
+                        @PageableDefault(size = 20) Pageable pageable) {
                 Long userId = getCurrentUserId();
                 Users user = usersRepository.findById(userId)
                                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-                List<PetCoinTransaction> transactions = transactionRepository
-                                .findByUserOrderByCreatedAtDesc(user);
+                Page<PetCoinTransaction> transactions = transactionRepository
+                                .findByUserOrderByCreatedAtDesc(user, pageable);
 
-                // 페이징 처리 (간단한 방식)
-                int start = page * size;
-                int end = Math.min(start + size, transactions.size());
-                List<PetCoinTransaction> pagedTransactions = transactions.subList(
-                                Math.min(start, transactions.size()),
-                                end);
-
-                List<PetCoinTransactionDTO> dtos = pagedTransactions.stream()
-                                .map(transactionConverter::toDTO)
-                                .collect(Collectors.toList());
-
-                return ResponseEntity.ok(dtos);
+                return ResponseEntity.ok(transactions.map(transactionConverter::toDTO));
         }
 
         /**

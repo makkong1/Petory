@@ -3,6 +3,8 @@ package com.linkup.Petory.domain.payment.repository;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Repository;
 
@@ -36,6 +38,11 @@ public class JpaPetCoinTransactionAdapter implements PetCoinTransactionRepositor
     @Override
     public List<PetCoinTransaction> findByUserOrderByCreatedAtDesc(Users user) {
         return jpaRepository.findByUserOrderByCreatedAtDesc(user);
+    }
+
+    @Override
+    public Page<PetCoinTransaction> findByUserOrderByCreatedAtDesc(Users user, Pageable pageable) {
+        return jpaRepository.findByUserOrderByCreatedAtDesc(user, pageable);
     }
 
     @Override
