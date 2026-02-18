@@ -27,6 +27,7 @@ public interface MeetupParticipantsRepository {
 
     /**
      * 특정 사용자가 참여한 모임 목록
+     * [리팩토링] JOIN FETCH meetup, user - N+1 제거 (102개 → 2개 PrepareStatement)
      */
     List<MeetupParticipants> findByUserIdxOrderByJoinedAtDesc(Long userIdx);
 

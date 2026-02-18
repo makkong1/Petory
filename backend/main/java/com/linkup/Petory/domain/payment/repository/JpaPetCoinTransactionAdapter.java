@@ -3,6 +3,8 @@ package com.linkup.Petory.domain.payment.repository;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Repository;
 
@@ -36,6 +38,12 @@ public class JpaPetCoinTransactionAdapter implements PetCoinTransactionRepositor
     @Override
     public List<PetCoinTransaction> findByUserOrderByCreatedAtDesc(Users user) {
         return jpaRepository.findByUserOrderByCreatedAtDesc(user);
+    }
+
+    /** [리팩토링] DB 페이징 (메모리 페이징 대체), @EntityGraph로 N+1 방지 */
+    @Override
+    public Page<PetCoinTransaction> findByUserOrderByCreatedAtDesc(Users user, Pageable pageable) {
+        return jpaRepository.findByUserOrderByCreatedAtDesc(user, pageable);
     }
 
     @Override

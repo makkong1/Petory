@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -34,6 +35,8 @@ public interface SpringDataJpaPetCoinTransactionRepository
 
     /**
      * 사용자별 거래 내역 페이징 조회
+     * [리팩토링] @EntityGraph(attributePaths = "user")로 N+1 쿼리 제거
      */
+    @EntityGraph(attributePaths = "user")
     Page<PetCoinTransaction> findByUserOrderByCreatedAtDesc(Users user, Pageable pageable);
 }

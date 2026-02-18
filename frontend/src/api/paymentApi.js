@@ -20,12 +20,21 @@ export const paymentApi = {
     return response.data;
   },
 
-  // 거래 내역 조회
+  // 거래 내역 조회 (Page 응답: content, totalElements, totalPages 등)
   getTransactions: async (page = 0, size = 20) => {
     const response = await axios.get(`${API_BASE_URL}/payment/transactions`, {
       params: { page, size },
       headers: getAuthHeaders(),
     });
+    return response.data; // { content: [...], totalElements, totalPages, ... }
+  },
+
+  // 거래 상세 조회 (상대방 정보 포함)
+  getTransactionDetail: async (transactionId) => {
+    const response = await axios.get(
+      `${API_BASE_URL}/payment/transactions/${transactionId}`,
+      { headers: getAuthHeaders() }
+    );
     return response.data;
   },
 

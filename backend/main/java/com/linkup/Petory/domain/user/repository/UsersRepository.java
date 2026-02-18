@@ -7,6 +7,7 @@ import java.time.LocalDateTime;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import com.linkup.Petory.domain.user.entity.Role;
 import com.linkup.Petory.domain.user.entity.Users;
 
 /**
@@ -49,6 +50,13 @@ public interface UsersRepository {
     Optional<Users> findByEmail(String email);
 
     /**
+     * 닉네임/사용자명/이메일 중복 검사 (1회 쿼리로 통합)
+     * [리팩토링] 3회 쿼리 → 1회
+     * 탈퇴하지 않은 사용자만 조회 (Soft Delete 필터링)
+     */
+    Optional<Users> findByNicknameOrUsernameOrEmail(String nickname, String username, String email);
+
+    /**
      * 로그인용 아이디(String 타입 id 필드)로 조회
      */
     Optional<Users> findByIdString(String id);
@@ -80,4 +88,10 @@ public interface UsersRepository {
      * 코인 차감 시 Race Condition 방지를 위해 사용
      */
     Optional<Users> findByIdForUpdate(Long idx);
+
+    /**
+     * 사용자 역할만 조회 (경량 조회용, 삭제 권한 검증 등)
+     * [리팩토링] getUser 대체 - role 프로젝션만
+     */
+    Optional<Role> findRoleByIdx(Long idx);
 }

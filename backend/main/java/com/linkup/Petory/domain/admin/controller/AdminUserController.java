@@ -1,13 +1,12 @@
 package com.linkup.Petory.domain.admin.controller;
 
-import java.util.List;
-
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import com.linkup.Petory.domain.user.dto.UsersDTO;
 import com.linkup.Petory.domain.user.dto.UserPageResponseDTO;
+import com.linkup.Petory.domain.user.entity.Role;
 import com.linkup.Petory.domain.user.service.UsersService;
 
 import lombok.RequiredArgsConstructor;
@@ -25,16 +24,6 @@ import lombok.RequiredArgsConstructor;
 public class AdminUserController {
 
     private final UsersService usersService;
-
-    /**
-     * 일반 사용자 목록 조회 (USER, SERVICE_PROVIDER만) - 기존 API (하위 호환성 유지)
-     */
-    @GetMapping
-    public ResponseEntity<List<UsersDTO>> getAllUsers() {
-        List<UsersDTO> users = usersService.getAllUsers();
-        // ADMIN과 MASTER는 필터링하지 않고 전체 조회 가능
-        return ResponseEntity.ok(users);
-    }
 
     /**
      * 일반 사용자 목록 조회 (페이징 지원)
@@ -87,13 +76,13 @@ public class AdminUserController {
 
     /**
      * 사용자 삭제 (소프트 삭제)
+     * [리팩토링] getUser(User+Pet 2+ 쿼리) → getRoleById(role 프로젝션 1회)
      */
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
         // ADMIN 계정 삭제는 AdminUserManagementController에서만 가능
-        UsersDTO user = usersService.getUser(id);
-        if (user.getRole() != null &&
-                (user.getRole().equals("ADMIN") || user.getRole().equals("MASTER"))) {
+        var role = usersService.getRoleById(id);
+        if (role.isPresent() && (role.get() == Role.ADMIN || role.get() == Role.MASTER)) {
             throw new IllegalArgumentException("관리자 계정 삭제는 별도 엔드포인트를 사용해주세요.");
         }
         usersService.deleteUser(id);

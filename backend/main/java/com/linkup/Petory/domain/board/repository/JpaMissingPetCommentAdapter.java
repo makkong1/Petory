@@ -75,6 +75,11 @@ public class JpaMissingPetCommentAdapter implements MissingPetCommentRepository 
     }
 
     @Override
+    public long countByBoardAndIsDeletedFalse(MissingPetBoard board) {
+        return jpaRepository.countByBoardAndIsDeletedFalse(board);
+    }
+
+    @Override
     public List<MissingPetComment> findByUserAndIsDeletedFalseOrderByCreatedAtDesc(Users user) {
         return jpaRepository.findByUserAndIsDeletedFalseOrderByCreatedAtDesc(user);
     }

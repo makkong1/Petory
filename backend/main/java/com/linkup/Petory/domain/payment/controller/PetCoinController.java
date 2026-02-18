@@ -1,8 +1,8 @@
 package com.linkup.Petory.domain.payment.controller;
 
-import java.util.List;
-import java.util.stream.Collectors;
-
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -12,6 +12,7 @@ import com.linkup.Petory.domain.payment.converter.PetCoinTransactionConverter;
 import com.linkup.Petory.domain.payment.dto.PetCoinBalanceResponse;
 import com.linkup.Petory.domain.payment.dto.PetCoinChargeRequest;
 import com.linkup.Petory.domain.payment.dto.PetCoinTransactionDTO;
+import com.linkup.Petory.domain.payment.dto.PetCoinTransactionDetailDTO;
 import com.linkup.Petory.domain.payment.entity.PetCoinTransaction;
 import com.linkup.Petory.domain.payment.repository.PetCoinTransactionRepository;
 import com.linkup.Petory.domain.payment.service.PetCoinService;
@@ -44,41 +45,33 @@ public class PetCoinController {
          */
         @GetMapping("/balance")
         public ResponseEntity<PetCoinBalanceResponse> getMyBalance() {
-                Long userId = getCurrentUserId();
-                Users user = usersRepository.findById(userId)
-                                .orElseThrow(() -> new RuntimeException("User not found"));
-
+                Users user = getCurrentUser();
                 Integer balance = petCoinService.getBalance(user);
-
-                return ResponseEntity.ok(new PetCoinBalanceResponse(userId, balance));
+                return ResponseEntity.ok(new PetCoinBalanceResponse(user.getIdx(), balance));
         }
 
         /**
-         * 현재 사용자 거래 내역 조회
+         * 현재 사용자 거래 내역 조회 (DB 페이징)
+         * [리팩토링] 메모리 페이징 → DB 페이징, Page 응답 형식
          */
         @GetMapping("/transactions")
-        public ResponseEntity<List<PetCoinTransactionDTO>> getMyTransactions(
-                        @RequestParam(defaultValue = "0") int page,
-                        @RequestParam(defaultValue = "20") int size) {
-                Long userId = getCurrentUserId();
-                Users user = usersRepository.findById(userId)
-                                .orElseThrow(() -> new RuntimeException("User not found"));
+        public ResponseEntity<Page<PetCoinTransactionDTO>> getMyTransactions(
+                        @PageableDefault(size = 20) Pageable pageable) {
+                Users user = getCurrentUser();
+                Page<PetCoinTransaction> transactions = transactionRepository
+                                .findByUserOrderByCreatedAtDesc(user, pageable);
+                return ResponseEntity.ok(transactions.map(transactionConverter::toDTO));
+        }
 
-                List<PetCoinTransaction> transactions = transactionRepository
-                                .findByUserOrderByCreatedAtDesc(user);
-
-                // 페이징 처리 (간단한 방식)
-                int start = page * size;
-                int end = Math.min(start + size, transactions.size());
-                List<PetCoinTransaction> pagedTransactions = transactions.subList(
-                                Math.min(start, transactions.size()),
-                                end);
-
-                List<PetCoinTransactionDTO> dtos = pagedTransactions.stream()
-                                .map(transactionConverter::toDTO)
-                                .collect(Collectors.toList());
-
-                return ResponseEntity.ok(dtos);
+        /**
+         * 거래 상세 조회 (상대방 정보 포함)
+         * GET /api/payment/transactions/{id}
+         */
+        @GetMapping("/transactions/{id}")
+        public ResponseEntity<PetCoinTransactionDetailDTO> getTransactionDetail(@PathVariable Long id) {
+                Users user = getCurrentUser();
+                PetCoinTransactionDetailDTO detail = petCoinService.getTransactionDetail(id, user);
+                return ResponseEntity.ok(detail);
         }
 
         /**
@@ -91,9 +84,7 @@ public class PetCoinController {
         @PostMapping("/charge")
         public ResponseEntity<PetCoinTransactionDTO> chargeCoins(
                         @RequestBody PetCoinChargeRequest request) {
-                Long userId = getCurrentUserId();
-                Users user = usersRepository.findById(userId)
-                                .orElseThrow(() -> new RuntimeException("User not found"));
+                Users user = getCurrentUser();
 
                 if (request.amount() == null || request.amount() <= 0) {
                         throw new IllegalArgumentException("충전 금액은 0보다 커야 합니다.");
@@ -104,25 +95,22 @@ public class PetCoinController {
                                 request.amount(),
                                 request.description() != null ? request.description() : "코인 충전");
 
-                log.info("코인 충전 완료: userId={}, amount={}", userId, request.amount());
+                log.info("코인 충전 완료: userId={}, amount={}", user.getIdx(), request.amount());
 
                 return ResponseEntity.ok(transactionConverter.toDTO(transaction));
         }
 
         /**
-         * 현재 로그인한 사용자 ID 조회
+         * 현재 로그인한 사용자 조회 (요청당 1회만 조회)
+         * [리팩토링] getCurrentUserId + findById → getCurrentUser 1회 조회로 User 중복 조회 제거
          */
-        private Long getCurrentUserId() {
+        private Users getCurrentUser() {
                 Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
                 if (authentication == null || authentication.getPrincipal() == null) {
                         throw new RuntimeException("인증이 필요합니다.");
                 }
-
-                // authentication.getName()은 userId (id 필드, String)를 반환
                 String userId = authentication.getName();
-                Users user = usersRepository.findByIdString(userId)
+                return usersRepository.findByIdString(userId)
                                 .orElseThrow(() -> new RuntimeException("User not found"));
-
-                return user.getIdx();
         }
 }

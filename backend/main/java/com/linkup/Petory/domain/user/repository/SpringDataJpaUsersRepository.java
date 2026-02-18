@@ -1,14 +1,17 @@
 package com.linkup.Petory.domain.user.repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.time.LocalDateTime;
 
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import com.linkup.Petory.domain.user.entity.Role;
 import com.linkup.Petory.domain.user.entity.Users;
 
 import jakarta.persistence.LockModeType;
@@ -40,6 +43,18 @@ public interface SpringDataJpaUsersRepository extends JpaRepository<Users, Long>
      */
     @Query("SELECT u FROM Users u WHERE u.email = :email AND (u.isDeleted = false OR u.isDeleted IS NULL)")
     Optional<Users> findByEmail(@Param("email") String email);
+
+    /**
+     * 닉네임/사용자명/이메일 중복 검사 (1회 쿼리로 통합)
+     * [리팩토링] findByNickname + findByUsername + findByEmail 3회 → 1회
+     * 탈퇴하지 않은 사용자만 조회 (Soft Delete 필터링)
+     */
+    @Query("SELECT u FROM Users u WHERE (u.nickname = :nickname OR u.username = :username OR u.email = :email) AND (u.isDeleted = false OR u.isDeleted IS NULL)")
+    List<Users> findByNicknameOrUsernameOrEmail(
+            @Param("nickname") String nickname,
+            @Param("username") String username,
+            @Param("email") String email,
+            Pageable pageable);
 
     /**
      * 로그인용 아이디(String 타입 id 필드)로 조회
@@ -78,4 +93,11 @@ public interface SpringDataJpaUsersRepository extends JpaRepository<Users, Long>
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT u FROM Users u WHERE u.idx = :idx")
     Optional<Users> findByIdForUpdate(@Param("idx") Long idx);
+
+    /**
+     * 사용자 역할만 조회 (경량 조회용, 삭제 권한 검증 등)
+     * [리팩토링] getUser(User+Pet) 대체 - role 프로젝션만 SELECT
+     */
+    @Query("SELECT u.role FROM Users u WHERE u.idx = :idx")
+    Optional<Role> findRoleByIdx(@Param("idx") Long idx);
 }

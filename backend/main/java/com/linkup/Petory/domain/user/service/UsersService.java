@@ -1,6 +1,8 @@
 package com.linkup.Petory.domain.user.service;
 
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -15,6 +17,7 @@ import com.linkup.Petory.domain.user.dto.PetDTO;
 import com.linkup.Petory.domain.user.dto.UsersDTO;
 import com.linkup.Petory.domain.user.dto.UserPageResponseDTO;
 import com.linkup.Petory.domain.user.entity.EmailVerificationPurpose;
+import com.linkup.Petory.domain.user.entity.Role;
 import com.linkup.Petory.domain.user.entity.UserStatus;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
@@ -35,16 +38,8 @@ public class UsersService {
     private final EmailVerificationService emailVerificationService;
 
     /**
-     * 전체 사용자 조회 (관리자용)
-     * - AdminUserController에서 사용
-     */
-    public List<UsersDTO> getAllUsers() {
-        return usersConverter.toDTOList(usersRepository.findAll());
-    }
-
-    /**
      * 전체 사용자 조회 (페이징 지원, 관리자용)
-     * - AdminUserController에서 사용
+     * [리팩토링] getAllUsers() 제거, 페이징만 사용 (GET /api/admin/users 엔드포인트 제거)
      */
     @Transactional(readOnly = true)
     public UserPageResponseDTO getAllUsersWithPaging(int page, int size) {
@@ -81,6 +76,15 @@ public class UsersService {
         return getUserWithPets(idx);
     }
 
+    /**
+     * 사용자 역할만 조회 (경량 조회용)
+     * [리팩토링] getUser(User+Pet) → findRoleByIdx(role 프로젝션만) - Admin 삭제 시 2+ 쿼리 → 1회
+     */
+    @Transactional(readOnly = true)
+    public Optional<Role> getRoleById(Long idx) {
+        return usersRepository.findRoleByIdx(idx);
+    }
+
     // username으로 조회
     public UsersDTO getUserByUsername(String username) {
         Users user = usersRepository.findByUsername(username)
@@ -108,21 +112,15 @@ public class UsersService {
             throw new RuntimeException("닉네임은 50자 이하여야 합니다.");
         }
 
-        // 닉네임 중복 검사
-        usersRepository.findByNickname(nickname)
-                .ifPresent(existingUser -> {
-                    throw new RuntimeException("이미 사용 중인 닉네임입니다.");
-                });
-
-        // username 중복 검사
-        usersRepository.findByUsername(dto.getUsername())
-                .ifPresent(existingUser -> {
-                    throw new RuntimeException("이미 사용 중인 사용자명입니다.");
-                });
-
-        // email 중복 검사
-        usersRepository.findByEmail(dto.getEmail())
-                .ifPresent(existingUser -> {
+        // [리팩토링] findByNickname + findByUsername + findByEmail 3회 → findByNicknameOrUsernameOrEmail 1회
+        usersRepository.findByNicknameOrUsernameOrEmail(nickname, dto.getUsername(), dto.getEmail())
+                .ifPresent(existing -> {
+                    if (Objects.equals(existing.getNickname(), nickname)) {
+                        throw new RuntimeException("이미 사용 중인 닉네임입니다.");
+                    }
+                    if (Objects.equals(existing.getUsername(), dto.getUsername())) {
+                        throw new RuntimeException("이미 사용 중인 사용자명입니다.");
+                    }
                     throw new RuntimeException("이미 사용 중인 이메일입니다.");
                 });
 
@@ -328,11 +326,16 @@ public class UsersService {
 
     /**
      * 자신의 프로필 수정 (닉네임, 이메일, 전화번호, 위치, 펫 정보 등)
-     * 역할, 상태 등은 수정 불가
+     * [리팩토링] getMyProfile(User+Pet) + findByIdString → findByIdString 1회 (idx 검증 내부 통합)
      */
     public UsersDTO updateMyProfile(String userId, UsersDTO dto) {
         Users user = usersRepository.findByIdString(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // dto.idx가 있으면 본인 프로필인지 검증 (다른 사용자 idx로 수정 시도 방지)
+        if (dto.getIdx() != null && !dto.getIdx().equals(user.getIdx())) {
+            throw new RuntimeException("본인의 프로필만 수정할 수 있습니다.");
+        }
 
         // 일반 사용자가 수정 가능한 필드만 업데이트
         if (dto.getUsername() != null && !dto.getUsername().isEmpty()) {

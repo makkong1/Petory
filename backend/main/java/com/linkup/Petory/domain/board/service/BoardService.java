@@ -8,7 +8,6 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -33,7 +32,6 @@ import com.linkup.Petory.domain.board.entity.BoardViewLog;
 import com.linkup.Petory.domain.file.dto.FileDTO;
 import com.linkup.Petory.domain.file.entity.FileTargetType;
 import com.linkup.Petory.domain.file.service.AttachmentFileService;
-import org.springframework.util.StringUtils;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -199,8 +197,21 @@ public class BoardService {
                 boardPage.hasPrevious());
     }
 
+    /**
+     * 관리자용 단일 게시글 조회 (조회수 증가 없음)
+     * [리팩토링] listBoards 전체 로드 제거 → 단건 조회 API로 대체
+     * - AdminBoardController에서 사용
+     * - 삭제된 게시글도 조회 가능
+     */
+    @Transactional(readOnly = true)
+    public BoardDTO getBoardForAdmin(long idx) {
+        Board board = boardRepository.findById(idx)
+                .orElseThrow(() -> new RuntimeException("Board not found"));
+        return mapBoardWithDetails(board);
+    }
+
     // 단일 게시글 조회 + 조회수 증가
-    @Cacheable(value = "boardDetail", key = "#idx")
+    // [리팩토링] @Cacheable 제거: 조회수 실시간 반영 (캐시 시 incrementViewCount 미실행 문제)
     @Transactional
     public BoardDTO getBoard(long idx, Long viewerId) {
         Board board = boardRepository.findById(idx)
@@ -429,7 +440,7 @@ public class BoardService {
     private void applyAttachmentInfo(BoardDTO dto, Long boardId, Map<Long, List<FileDTO>> attachmentsMap) {
         List<FileDTO> attachments = attachmentsMap.getOrDefault(boardId, new ArrayList<>());
         dto.setAttachments(attachments);
-        dto.setBoardFilePath(extractPrimaryFileUrl(attachments));
+        dto.setBoardFilePath(attachmentFileService.extractPrimaryFileUrl(attachments));
     }
 
     /**
@@ -531,20 +542,6 @@ public class BoardService {
         return true;
     }
 
-    private String extractPrimaryFileUrl(List<? extends FileDTO> attachments) {
-        if (attachments == null || attachments.isEmpty()) {
-            return null;
-        }
-        FileDTO primary = attachments.get(0);
-        if (primary == null) {
-            return null;
-        }
-        if (StringUtils.hasText(primary.getDownloadUrl())) {
-            return primary.getDownloadUrl();
-        }
-        return attachmentFileService.buildDownloadUrl(primary.getFilePath());
-    }
-
     /**
      * 게시글 상태 변경 (관리자용)
      * - AdminBoardController에서 사용
@@ -584,6 +581,7 @@ public class BoardService {
 
     /**
      * 관리자용 게시글 조회 (페이징 + 필터링 지원) - DB 레벨 필터링 버전
+     * [리팩토링] getAdminBoardsWithPaging 메모리 필터링 → Specification + DB 페이징
      * 
      * 개선사항:
      * - 메모리 필터링 → DB 레벨 필터링 (Specification 패턴 사용)

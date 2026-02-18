@@ -18,9 +18,9 @@ api.interceptors.request.use((config) => {
 });
 
 export const communityAdminApi = {
-    // Boards (기존 API - 하위 호환성 유지)
-    listBoards: (params) => api.get('/boards', { params }),
-    
+    // Boards (단일 조회 - 관리자용, 조회수 증가 없음)
+    getBoard: (id) => api.get(`/boards/${id}`),
+
     // Boards (페이징 지원)
     listBoardsWithPaging: (params = {}) => {
         const { page = 0, size = 20, ...otherParams } = params;

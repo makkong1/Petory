@@ -7,9 +7,11 @@ import java.time.LocalDateTime;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Repository;
 
+import com.linkup.Petory.domain.user.entity.Role;
 import com.linkup.Petory.domain.user.entity.Users;
 
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import lombok.RequiredArgsConstructor;
 
@@ -78,6 +80,12 @@ public class JpaUsersAdapter implements UsersRepository {
     }
 
     @Override
+    public Optional<Users> findByNicknameOrUsernameOrEmail(String nickname, String username, String email) {
+        var list = jpaRepository.findByNicknameOrUsernameOrEmail(nickname, username, email, PageRequest.of(0, 1));
+        return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
+    }
+
+    @Override
     public Optional<Users> findByIdString(String id) {
         return jpaRepository.findByIdString(id);
     }
@@ -105,5 +113,10 @@ public class JpaUsersAdapter implements UsersRepository {
     @Override
     public Optional<Users> findByIdForUpdate(Long idx) {
         return jpaRepository.findByIdForUpdate(idx);
+    }
+
+    @Override
+    public Optional<Role> findRoleByIdx(Long idx) {
+        return jpaRepository.findRoleByIdx(idx);
     }
 }
