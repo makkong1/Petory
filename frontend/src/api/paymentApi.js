@@ -20,13 +20,13 @@ export const paymentApi = {
     return response.data;
   },
 
-  // 거래 내역 조회
+  // 거래 내역 조회 (Page 응답: content, totalElements, totalPages 등)
   getTransactions: async (page = 0, size = 20) => {
     const response = await axios.get(`${API_BASE_URL}/payment/transactions`, {
       params: { page, size },
       headers: getAuthHeaders(),
     });
-    return response.data;
+    return response.data; // { content: [...], totalElements, totalPages, ... }
   },
 
   // 코인 충전 (테스트용 - 개발 환경에서만)
