@@ -2537,9 +2537,7 @@ const LocationServiceMap = () => {
                 </EmptyStateMessage>
                 <EmptyStateActions>
                   <EmptyStateButton onClick={async () => {
-                    setSelectedSido('');
-                    setSelectedSigungu('');
-                    setSelectedEupmyeondong('');
+                    dispatchRegion({ type: 'RESET_REGION' });
                     setCurrentMapView('nation');
                     await fetchServices({
                       isInitialLoad: true,
