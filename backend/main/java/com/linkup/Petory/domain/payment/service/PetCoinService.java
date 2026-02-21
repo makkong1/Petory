@@ -6,7 +6,6 @@ import org.springframework.transaction.annotation.Transactional;
 import com.linkup.Petory.domain.care.entity.CareRequest;
 import com.linkup.Petory.domain.care.repository.CareRequestRepository;
 import com.linkup.Petory.domain.payment.dto.PetCoinTransactionDetailDTO;
-import com.linkup.Petory.domain.payment.entity.PetCoinEscrow;
 import com.linkup.Petory.domain.payment.entity.PetCoinTransaction;
 import com.linkup.Petory.domain.payment.entity.TransactionStatus;
 import com.linkup.Petory.domain.payment.entity.TransactionType;
@@ -232,7 +231,8 @@ public class PetCoinService {
 
         /**
          * 사용자 코인 잔액 조회
-         * [리팩토링] findById 재조회 제거 → user.getPetCoinBalance() 직접 반환 (Controller getCurrentUser 전달 시 추가 쿼리 없음)
+         * [리팩토링] findById 재조회 제거 → user.getPetCoinBalance() 직접 반환 (Controller
+         * getCurrentUser 전달 시 추가 쿼리 없음)
          */
         @Transactional(readOnly = true)
         public Integer getBalance(Users user) {
@@ -274,15 +274,18 @@ public class PetCoinService {
                                         .ifPresent(escrow -> {
                                                 Users counterparty = null;
                                                 if (TransactionType.DEDUCT.equals(transaction.getTransactionType())
-                                                                || TransactionType.REFUND.equals(transaction.getTransactionType())) {
+                                                                || TransactionType.REFUND.equals(
+                                                                                transaction.getTransactionType())) {
                                                         counterparty = escrow.getProvider();
-                                                } else if (TransactionType.PAYOUT.equals(transaction.getTransactionType())) {
+                                                } else if (TransactionType.PAYOUT
+                                                                .equals(transaction.getTransactionType())) {
                                                         counterparty = escrow.getRequester();
                                                 }
                                                 if (counterparty != null) {
                                                         dto.setCounterpartyUserId(counterparty.getIdx());
                                                         dto.setCounterpartyUsername(
-                                                                        counterparty.getNickname() != null ? counterparty.getNickname()
+                                                                        counterparty.getNickname() != null
+                                                                                        ? counterparty.getNickname()
                                                                                         : counterparty.getUsername());
                                                 }
                                                 careRequestRepository.findById(transaction.getRelatedIdx())

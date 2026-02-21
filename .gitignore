@@ -21,6 +21,7 @@ build/
 bin/
 !**/backend/src/main/**/bin/
 !**/backend/src/test/**/bin/
+docs/portfolio/ppt/
 
 ### IntelliJ IDEA ###
 .idea
