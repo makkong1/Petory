@@ -3,6 +3,25 @@ import styled from 'styled-components';
 import { reportApi } from '../../../api/reportApi';
 import { communityAdminApi } from '../../../api/communityAdminApi';
 
+// AI 보조 제안 표시용 한글 라벨
+const ACTION_LABELS = {
+  NONE: '조치 없음',
+  DELETE_CONTENT: '콘텐츠 삭제',
+  WARN_USER: '유저 경고',
+  SUSPEND_USER: '유저 정지',
+  OTHER: '기타 조치',
+};
+const VALID_ACTIONS = Object.keys(ACTION_LABELS);
+const SEVERITY_LABELS = { LOW: '낮음', MEDIUM: '중간', HIGH: '높음' };
+const labelForAction = (v) => (v && ACTION_LABELS[v] ? ACTION_LABELS[v] : v);
+const labelForSeverity = (v) => (v && SEVERITY_LABELS[v] ? SEVERITY_LABELS[v] : v);
+/** API에서 오는 값을 조치 셀렉트용 문자열로 정규화 */
+const normalizeAction = (v) => {
+  if (v == null || v === '') return 'NONE';
+  const upper = String(v).trim().toUpperCase();
+  return VALID_ACTIONS.includes(upper) ? upper : 'NONE';
+};
+
 const ReportDetailModal = ({ reportId, onClose, onHandled }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -15,6 +34,9 @@ const ReportDetailModal = ({ reportId, onClose, onHandled }) => {
   const [targetStatus, setTargetStatus] = useState(null);
   const [targetDeleted, setTargetDeleted] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [assist, setAssist] = useState(null);
+  const [assistLoading, setAssistLoading] = useState(false);
+  const [assistError, setAssistError] = useState(null);
 
   useEffect(() => {
     const fetchDetail = async () => {
@@ -55,6 +77,35 @@ const ReportDetailModal = ({ reportId, onClose, onHandled }) => {
     };
     if (reportId) fetchDetail();
   }, [reportId]);
+
+  const fetchAssist = async () => {
+    try {
+      setAssistLoading(true);
+      setAssistError(null);
+      setAssist(null);
+      const res = await reportApi.getAssist(reportId);
+      if (res.data) setAssist(res.data);
+      else setAssistError('AI 제안을 받지 못했습니다. 백엔드 콘솔(서버 로그)에서 [AI보조] 로그를 확인하세요.');
+    } catch (e) {
+      setAssistError('AI 보조를 불러오지 못했습니다. (Ollama 확인)');
+      setAssist(null);
+    } finally {
+      setAssistLoading(false);
+    }
+  };
+
+  const applyAssist = () => {
+    if (!assist) return;
+    const action = normalizeAction(assist.suggestedAction);
+    setActionTaken(action);
+    setStatus('RESOLVED');
+    // 관리자 메모에 AI 요약·이유 반영 (기존 메모가 있으면 앞에 붙임)
+    const parts = [];
+    if (assist.summary) parts.push(`[AI 요약] ${assist.summary}`);
+    if (assist.reasoning) parts.push(`[AI 제안 이유] ${assist.reasoning}`);
+    const aiMemo = parts.length ? parts.join('\n') : '';
+    setAdminNote((prev) => (prev.trim() ? `${aiMemo}\n\n${prev}` : aiMemo));
+  };
 
   const handleSubmit = async () => {
     try {
@@ -209,6 +260,28 @@ const ReportDetailModal = ({ reportId, onClose, onHandled }) => {
                     )}
                   </ActionButtons>
                 </BoardActions>
+              )}
+            </Section>
+            <Section>
+              <SectionTitle>AI 보조 (참고용)</SectionTitle>
+              <AssistRow>
+                <AssistButton type="button" onClick={fetchAssist} disabled={assistLoading}>
+                  {assistLoading ? 'AI 분석 중...' : 'AI 제안 불러오기'}
+                </AssistButton>
+              </AssistRow>
+              {assistError && <AssistError>{assistError}</AssistError>}
+              {assist && (
+                <AssistCard>
+                  {assist.summary && <AssistRow><AssistLabel>요약</AssistLabel><AssistValue>{assist.summary}</AssistValue></AssistRow>}
+                  {assist.suggestedSeverity && <AssistRow><AssistLabel>심각도 제안</AssistLabel><AssistValue>{labelForSeverity(assist.suggestedSeverity)}</AssistValue></AssistRow>}
+                  {assist.suggestedAction && <AssistRow><AssistLabel>조치 제안</AssistLabel><AssistValue>{labelForAction(assist.suggestedAction)}</AssistValue></AssistRow>}
+                  {assist.reasoning && <AssistRow><AssistLabel>이유</AssistLabel><AssistValue>{assist.reasoning}</AssistValue></AssistRow>}
+                  {!readOnly && (
+                    <ApplyAssistButton type="button" onClick={applyAssist}>
+                      제안 적용 (조치·상태 반영)
+                    </ApplyAssistButton>
+                  )}
+                </AssistCard>
               )}
             </Section>
             <Section>
@@ -447,6 +520,66 @@ const DangerButton = styled(ActionButton)`
   &:hover:not(:disabled) {
     background: ${props => props.theme.colors.error};
     color: white;
+  }
+`;
+
+const AssistRow = styled.div`
+  margin-bottom: ${props => props.theme.spacing.sm};
+`;
+
+const AssistButton = styled.button`
+  padding: 8px 14px;
+  border-radius: ${props => props.theme.borderRadius.md};
+  border: 1px solid ${props => props.theme.colors.primary};
+  background: transparent;
+  color: ${props => props.theme.colors.primary};
+  cursor: pointer;
+  font-size: 14px;
+  &:hover:not(:disabled) {
+    background: ${props => props.theme.colors.primary};
+    color: white;
+  }
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+`;
+
+const AssistError = styled.div`
+  color: ${props => props.theme.colors.error};
+  font-size: ${props => props.theme.typography.caption.fontSize};
+  margin-top: ${props => props.theme.spacing.xs};
+`;
+
+const AssistCard = styled.div`
+  margin-top: ${props => props.theme.spacing.sm};
+  padding: ${props => props.theme.spacing.md};
+  border: 1px solid ${props => props.theme.colors.border};
+  border-radius: ${props => props.theme.borderRadius.md};
+  background: ${props => props.theme.colors.surfaceSoft};
+`;
+
+const AssistLabel = styled.span`
+  color: ${props => props.theme.colors.textSecondary};
+  margin-right: 8px;
+  font-size: ${props => props.theme.typography.caption.fontSize};
+`;
+
+const AssistValue = styled.span`
+  font-size: 14px;
+`;
+
+const ApplyAssistButton = styled.button`
+  margin-top: ${props => props.theme.spacing.sm};
+  padding: 6px 12px;
+  border-radius: ${props => props.theme.borderRadius.sm};
+  border: 1px solid ${props => props.theme.colors.primary};
+  background: ${props => props.theme.colors.primary};
+  color: white;
+  cursor: pointer;
+  font-size: 13px;
+  &:hover {
+    opacity: 0.9;
   }
 `;
 

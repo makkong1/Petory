@@ -7,15 +7,18 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import com.linkup.Petory.domain.report.dto.ReportAssistSuggestion;
 import com.linkup.Petory.domain.report.dto.ReportDTO;
 import com.linkup.Petory.domain.report.dto.ReportDetailDTO;
 import com.linkup.Petory.domain.report.dto.ReportHandleRequest;
 import com.linkup.Petory.domain.report.entity.ReportStatus;
 import com.linkup.Petory.domain.report.entity.ReportTargetType;
+import com.linkup.Petory.domain.report.service.ReportAssistAgentService;
 import com.linkup.Petory.domain.report.service.ReportService;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * 신고 관리 컨트롤러 (관리자용)
@@ -23,6 +26,7 @@ import lombok.RequiredArgsConstructor;
  * - 신고 목록 조회, 상세 조회, 처리
  * - 일반 사용자 신고 생성은 ReportController에서 처리
  */
+@Slf4j
 @RestController
 @RequestMapping("/api/admin/reports")
 @RequiredArgsConstructor
@@ -30,6 +34,7 @@ import lombok.RequiredArgsConstructor;
 public class AdminReportController {
 
     private final ReportService reportService;
+    private final ReportAssistAgentService reportAssistAgentService;
     private final UsersRepository usersRepository;
 
     /**
@@ -38,6 +43,24 @@ public class AdminReportController {
     @GetMapping("/{id}")
     public ResponseEntity<ReportDetailDTO> getReportDetail(@PathVariable("id") Long id) {
         return ResponseEntity.ok(reportService.getReportDetail(id));
+    }
+
+    /**
+     * 신고 보조 에이전트: 요약·심각도·조치 제안 (참고용, 자동 처리 아님)
+     * Ollama 연동. 실패 시 null 반환.
+     */
+    @GetMapping("/{id}/assist")
+    public ResponseEntity<ReportAssistSuggestion> getReportAssist(@PathVariable("id") Long id) {
+        log.warn("[AI보조] API 진입 reportId={}", id);
+        try {
+            ReportDetailDTO detail = reportService.getReportDetail(id);
+            java.util.Optional<ReportAssistSuggestion> opt = reportAssistAgentService.getAssistSuggestions(detail);
+            log.warn("[AI보조] API 완료 reportId={} result={}", id, opt.isPresent() ? "있음" : "없음(null)");
+            return ResponseEntity.ok(opt.orElse(null));
+        } catch (Exception e) {
+            log.error("[AI보조] API 예외 reportId=" + id + " " + e.getClass().getSimpleName() + ": " + e.getMessage(), e);
+            throw e;
+        }
     }
 
     /**
@@ -63,11 +86,12 @@ public class AdminReportController {
             @PathVariable("id") Long id,
             @RequestBody ReportHandleRequest request,
             Authentication authentication) {
-        String username = authentication != null ? authentication.getName() : null;
-        if (username == null) {
+        // JWT principal은 로그인용 id (Users.id), username 아님
+        String loginId = authentication != null ? authentication.getName() : null;
+        if (loginId == null) {
             throw new IllegalArgumentException("관리자 식별자를 확인할 수 없습니다.");
         }
-        Long adminIdx = usersRepository.findByUsername(username)
+        Long adminIdx = usersRepository.findByIdString(loginId)
                 .map(u -> u.getIdx())
                 .orElseThrow(() -> new IllegalArgumentException("관리자 식별자를 확인할 수 없습니다."));
 
