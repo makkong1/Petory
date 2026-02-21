@@ -7,6 +7,7 @@
 3. [도메인별 상세 문서](#도메인별-상세-문서)
 4. [성능 최적화](./performance/query-optimization.md)
 5. [동시성 제어](./concurrency/control-strategies.md)
+6. [도메인별 백엔드 성능 최적화 리팩토링](#도메인별-백엔드-성능-최적화-리팩토링)
 
 ## 프로젝트 개요
 
@@ -18,9 +19,10 @@
 - **Language**: Java 17+
 - **ORM**: Spring Data JPA (Hibernate)
 - **Database**: MySQL
+- **Cache**: Redis (Spring Cache)
 - **Security**: Spring Security + JWT
-- **Cache**: Spring Cache
 - **Scheduling**: Spring Scheduler
+- **실시간**: WebSocket (STOMP)
 
 ### 핵심 기능
 
@@ -54,8 +56,6 @@
 
 | 도메인 | 설명 | 문서 링크 |
 |--------|------|----------|
-| **Notification** | 알림 시스템 | [상세보기](./domains/notification.md) |
-| **Report** | 신고 및 제재 시스템 | [상세보기](./domains/report.md) |
 | **File** | 파일 업로드/다운로드 | [상세보기](./domains/file.md) |
 | **Activity** | 사용자 활동 로그 | [상세보기](./domains/activity.md) |
 | **Statistics** | 일별 통계 수집 | [상세보기](./domains/statistics.md) |
@@ -128,6 +128,13 @@
 5. **펫코인 결제**
    - 문제: 잔액 차감·에스크로 상태 변경·중복 지급/환불 시 Race Condition
    - 해결: 비관적 락(`findByIdForUpdate`, `findByCareRequestForUpdate`), 지급/환불 실패 시 상태 변경 롤백  
+
+## 도메인별 백엔드 성능 최적화 리팩토링
+
+- [Board](./refactoring/board/board-backend-performance-optimization.md) - N+1, 메모리 페이징, Admin 필터링
+- [User](./refactoring/user/user-backend-performance-optimization.md) - Auth 중복 조회, Admin 삭제, SocialUsers N+1
+- [Payment](./refactoring/payment/payment-backend-performance-optimization.md) - 펫코인 Race Condition, DB 페이징, N+1
+- [Meetup](./refactoring/meetup/meetup-backend-performance-optimization.md) - 인근 모임 인메모리 필터링, 참여자 N+1
 
 ## 다이어그램
 

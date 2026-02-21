@@ -330,6 +330,12 @@ Petory/
 
 ## 📚 상세 문서
 
+### 도메인별 백엔드 성능 최적화 리팩토링
+- [Board](./docs/refactoring/board/board-backend-performance-optimization.md) - N+1, 메모리 페이징, Admin 필터링
+- [User](./docs/refactoring/user/user-backend-performance-optimization.md) - Auth 중복 조회, Admin 삭제, SocialUsers N+1
+- [Payment](./docs/refactoring/payment/payment-backend-performance-optimization.md) - 펫코인 Race Condition, DB 페이징, N+1
+- [Meetup](./docs/refactoring/meetup/meetup-backend-performance-optimization.md) - 인근 모임 인메모리 필터링, 참여자 N+1
+
 ### 백엔드 아키텍처
 - [전체 아키텍처 문서](./docs/architecture/전체%20아키텍처.md) - 시스템 전체 구조, 도메인 아키텍처, 공통 인프라
 - [트랜잭션 관리 & 동시성 제어 사례](./docs/concurrency/transaction-concurrency-cases.md) - 실제 코드 기반 사례
