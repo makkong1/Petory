@@ -26,6 +26,9 @@ public class EmailService {
     @Value("${app.frontend.url:http://localhost:3000}")
     private String frontendUrl;
 
+    @Value("${app.email-verification.skip-in-dev:false}")
+    private boolean skipInDev;
+
     /**
      * 이메일 인증 메일 발송 (비동기)
      * 
@@ -42,8 +45,13 @@ public class EmailService {
             message.setSubject(getEmailSubject(purpose));
             message.setText(getEmailContent(token, purpose));
 
-            mailSender.send(message);
-            log.info("이메일 인증 메일 발송 완료: email={}, purpose={}", email, purpose);
+            if (!skipInDev) {
+                mailSender.send(message);
+                log.info("이메일 인증 메일 발송 완료: email={}, purpose={}", email, purpose);
+            } else {
+                // mailSender.send(message); // 실제 이메일 발송 - 개발 모드에서 스킵
+                log.info("이메일 인증 메일 발송 스킵 (개발 모드): email={}, purpose={}", email, purpose);
+            }
         } catch (Exception e) {
             log.error("이메일 인증 메일 발송 실패: email={}, purpose={}, error={}", email, purpose, e.getMessage(), e);
         }

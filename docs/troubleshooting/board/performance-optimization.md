@@ -277,10 +277,6 @@ CREATE UNIQUE INDEX idx_board_view_log_unique ON board_view_log(board_idx, user_
 - 불필요한 테이블 스캔 방지
 - 정렬 및 필터링 성능 향상
 
-#### 📍 코드 위치
-
-- `docs/migration/db/indexes.sql`
-
 ---
 
 ## 🧪 실제 테스트 결과
