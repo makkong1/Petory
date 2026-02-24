@@ -6,6 +6,7 @@ import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -21,7 +22,8 @@ import com.linkup.Petory.domain.user.entity.Users;
  * 
  * JPA 특화 기능(쿼리 메서드, JPQL 등)은 이 인터페이스에 정의합니다.
  */
-public interface SpringDataJpaMissingPetBoardRepository extends JpaRepository<MissingPetBoard, Long> {
+// [리팩토링] Admin 페이징 DB 레벨 필터링을 위해 JpaSpecificationExecutor 추가
+public interface SpringDataJpaMissingPetBoardRepository extends JpaRepository<MissingPetBoard, Long>, JpaSpecificationExecutor<MissingPetBoard> {
 
     @Query("SELECT b FROM MissingPetBoard b JOIN FETCH b.user u WHERE b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY b.createdAt DESC")
     List<MissingPetBoard> findAllByOrderByCreatedAtDesc();

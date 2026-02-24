@@ -6,6 +6,7 @@ import java.util.Optional;
 import org.springframework.context.annotation.Primary;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Repository;
 
 import com.linkup.Petory.domain.board.entity.MissingPetBoard;
@@ -111,6 +112,12 @@ public class JpaMissingPetBoardAdapter implements MissingPetBoardRepository {
     @Override
     public Page<MissingPetBoard> findByStatusOrderByCreatedAtDesc(MissingPetStatus status, Pageable pageable) {
         return jpaRepository.findByStatusOrderByCreatedAtDesc(status, pageable);
+    }
+
+    // [리팩토링] Admin 페이징 - Specification 기반 DB 레벨 필터링
+    @Override
+    public Page<MissingPetBoard> findAll(Specification<MissingPetBoard> spec, Pageable pageable) {
+        return jpaRepository.findAll(spec, pageable);
     }
 }
 

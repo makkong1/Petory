@@ -5,6 +5,7 @@ import java.util.Optional;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 
 import com.linkup.Petory.domain.board.entity.MissingPetBoard;
 import com.linkup.Petory.domain.board.entity.MissingPetStatus;
@@ -71,4 +72,9 @@ public interface MissingPetBoardRepository {
      * 페이징 지원 - 상태별 조회
      */
     Page<MissingPetBoard> findByStatusOrderByCreatedAtDesc(MissingPetStatus status, Pageable pageable);
+
+    /**
+     * [리팩토링] Admin 페이징 - Specification 기반 DB 레벨 필터링 (status, deleted, q)
+     */
+    Page<MissingPetBoard> findAll(Specification<MissingPetBoard> spec, Pageable pageable);
 }

@@ -9,6 +9,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import com.linkup.Petory.domain.board.dto.MissingPetBoardDTO;
+import com.linkup.Petory.domain.board.dto.MissingPetBoardPageResponseDTO;
 import com.linkup.Petory.domain.board.dto.MissingPetCommentDTO;
 import com.linkup.Petory.domain.board.entity.MissingPetStatus;
 import com.linkup.Petory.domain.board.service.MissingPetBoardService;
@@ -32,36 +33,20 @@ public class AdminMissingPetController {
     private final MissingPetCommentService missingPetCommentService;
 
     /**
-     * 실종 제보 목록 조회 (필터링 지원)
+     * [리팩토링] 실종 제보 목록 조회 - DB 레벨 필터링 + 페이징
+     * - 기존: getBoards() 전체 메모리 로드 후 stream 필터 → OOM 위험
+     * - 변경: getAdminBoardsWithPaging() Specification + DB 페이징
+     * - deleted=true 시 삭제된 게시글도 조회 가능 (기존 getBoards는 isDeleted=false만 조회하여 불가했음)
      */
-    @GetMapping
-    public ResponseEntity<List<MissingPetBoardDTO>> listMissingPets(
+    @GetMapping("/paging")
+    public ResponseEntity<MissingPetBoardPageResponseDTO> listMissingPetsWithPaging(
             @RequestParam(value = "status", required = false) MissingPetStatus status,
             @RequestParam(value = "deleted", required = false) Boolean deleted,
-            @RequestParam(value = "q", required = false) String q) {
-
-        List<MissingPetBoardDTO> all = missingPetBoardService.getBoards(status);
-
-        // 삭제 여부 필터
-        if (deleted != null) {
-            final boolean wantDeleted = deleted.booleanValue();
-            all = all.stream()
-                    .filter(b -> Boolean.TRUE.equals(b.getDeleted()) == wantDeleted)
-                    .collect(Collectors.toList());
-        }
-
-        // 검색어 필터
-        if (q != null && !q.isBlank()) {
-            String keyword = q.toLowerCase();
-            all = all.stream()
-                    .filter(b -> (b.getTitle() != null && b.getTitle().toLowerCase().contains(keyword))
-                            || (b.getContent() != null && b.getContent().toLowerCase().contains(keyword))
-                            || (b.getPetName() != null && b.getPetName().toLowerCase().contains(keyword))
-                            || (b.getUsername() != null && b.getUsername().toLowerCase().contains(keyword)))
-                    .collect(Collectors.toList());
-        }
-
-        return ResponseEntity.ok(all);
+            @RequestParam(value = "q", required = false) String q,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "20") int size) {
+        return ResponseEntity.ok(
+                missingPetBoardService.getAdminBoardsWithPaging(status, deleted, q, page, size));
     }
 
     /**

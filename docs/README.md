@@ -132,6 +132,7 @@
 ## 도메인별 백엔드 성능 최적화 리팩토링
 
 - [Board](./refactoring/board/board-backend-performance-optimization.md) - N+1, 메모리 페이징, Admin 필터링
+- [Missing Pet](./refactoring/missing-pet/missing-pet-backend-performance-optimization.md) - Admin 메모리 로드, deleteAllComments 배치, start-chat 경량 조회
 - [User](./refactoring/user/user-backend-performance-optimization.md) - Auth 중복 조회, Admin 삭제, SocialUsers N+1
 - [Payment](./refactoring/payment/payment-backend-performance-optimization.md) - 펫코인 Race Condition, DB 페이징, N+1
 - [Meetup](./refactoring/meetup/meetup-backend-performance-optimization.md) - 인근 모임 인메모리 필터링, 참여자 N+1
