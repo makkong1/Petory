@@ -1,6 +1,7 @@
 package com.linkup.Petory.domain.location.controller;
 
 import com.linkup.Petory.domain.location.dto.LocationServiceDTO;
+import com.linkup.Petory.domain.location.service.LocationRecommendAgentService;
 import com.linkup.Petory.domain.location.service.LocationServiceService;
 
 import lombok.RequiredArgsConstructor;
@@ -25,6 +26,7 @@ import java.util.Map;
 public class LocationServiceController {
 
     private final LocationServiceService locationServiceService;
+    private final LocationRecommendAgentService locationRecommendAgentService;
 
     /**
      * DB에서 위치 서비스 검색
@@ -113,6 +115,62 @@ public class LocationServiceController {
             log.error("위치 서비스 검색 실패: {}", e.getMessage(), e);
             Map<String, Object> response = new HashMap<>();
             response.put("error", "위치 서비스 검색 중 오류가 발생했습니다.");
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    /**
+     * AI 추천 (에이전트 2)
+     * 검색 결과를 LLM에 넘겨 상위 10개 재순위화 + 각 1줄 추천 이유 추가.
+     * 권한: 로그인 필요.
+     *
+     * @param latitude     위도 (위치 기반 검색 시)
+     * @param longitude    경도 (위치 기반 검색 시)
+     * @param radius       반경 (미터, 기본 10000)
+     * @param sido         시도 (지역 검색 시)
+     * @param sigungu      시군구 (지역 검색 시)
+     * @param eupmyeondong 읍면동 (지역 검색 시)
+     * @param roadName     도로명 (지역 검색 시)
+     * @param category     카테고리 (선택)
+     * @param keyword      키워드 (선택)
+     * @return 상위 10개 + recommendationReason
+     */
+    @GetMapping("/recommend")
+    public ResponseEntity<Map<String, Object>> recommendLocationServices(
+            @RequestParam(required = false) Double latitude,
+            @RequestParam(required = false) Double longitude,
+            @RequestParam(required = false) Integer radius,
+            @RequestParam(required = false) String sido,
+            @RequestParam(required = false) String sigungu,
+            @RequestParam(required = false) String eupmyeondong,
+            @RequestParam(required = false) String roadName,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String keyword) {
+        try {
+            Integer effectiveSize = 30; // AI에 넘길 후보 수
+            List<LocationServiceDTO> services;
+            if (StringUtils.hasText(keyword)) {
+                services = locationServiceService.searchLocationServicesByKeyword(keyword, category, effectiveSize);
+            } else if (latitude != null && longitude != null && radius != null) {
+                int radiusInMeters = radius > 0 ? radius : 10000;
+                services = locationServiceService.searchLocationServicesByLocation(
+                        latitude, longitude, radiusInMeters, category, effectiveSize);
+            } else {
+                services = locationServiceService.searchLocationServicesByRegion(
+                        sido, sigungu, eupmyeondong, roadName, category, effectiveSize);
+            }
+
+            List<LocationServiceDTO> recommended = locationRecommendAgentService.enrichWithRecommendations(
+                    services, category);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("services", recommended);
+            response.put("count", recommended.size());
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("AI 추천 실패: {}", e.getMessage(), e);
+            Map<String, Object> response = new HashMap<>();
+            response.put("error", "AI 추천 중 오류가 발생했습니다.");
             return ResponseEntity.internalServerError().body(response);
         }
     }

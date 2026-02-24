@@ -76,6 +76,36 @@ export const locationServiceApi = {
       },
     }),
 
+  /**
+   * AI 추천 (에이전트 2)
+   * 검색 결과를 LLM에 넘겨 상위 10개 재순위화 + 각 1줄 추천 이유 추가.
+   * 권한: 로그인 필요.
+   */
+  recommendPlaces: ({
+    latitude,
+    longitude,
+    radius,
+    sido,
+    sigungu,
+    eupmyeondong,
+    roadName,
+    category,
+    keyword,
+  } = {}) =>
+    api.get('/recommend', {
+      params: {
+        ...(typeof latitude === 'number' && { latitude }),
+        ...(typeof longitude === 'number' && { longitude }),
+        ...(typeof radius === 'number' && { radius }),
+        ...(sido && { sido }),
+        ...(sigungu && { sigungu }),
+        ...(eupmyeondong && { eupmyeondong }),
+        ...(roadName && { roadName }),
+        ...(category && { category }),
+        ...(keyword && { keyword }),
+      },
+    }),
+
   // 관리자용 API
   listLocationServices: (params) => adminApi.get('', { params }),
   importPublicData: (file) => {

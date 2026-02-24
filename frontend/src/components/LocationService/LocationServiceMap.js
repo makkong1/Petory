@@ -398,6 +398,7 @@ const LocationServiceMap = () => {
   // "지도는 상태를 바꾸지 않는다" 원칙 적용
   const [pendingSearchLocation, setPendingSearchLocation] = useState(null); // 대기 중인 검색 위치
   const [showSearchButton, setShowSearchButton] = useState(false); // "이 지역 검색" 버튼 표시 여부
+  const [loadingRecommend, setLoadingRecommend] = useState(false); // AI 추천 로딩
 
   // 리뷰 조회
   const fetchReviews = useCallback(async (serviceIdx) => {
@@ -1667,6 +1668,77 @@ const LocationServiceMap = () => {
     handleServiceSelect(service);
   }, [handleServiceSelect]);
 
+  // AI 추천 버튼 클릭 핸들러
+  const handleRecommendClick = useCallback(async () => {
+    if (!user) {
+      alert('AI 추천을 이용하려면 로그인이 필요합니다.');
+      return;
+    }
+    if (loadingRecommend) return;
+
+    const effectiveCategory = categoryType !== CATEGORY_DEFAULT && categoryType !== CATEGORY_CUSTOM
+      ? categoryType
+      : (selectedKeywordCategory || undefined);
+    const effectiveKeyword = keyword?.trim() || undefined;
+
+    const buildParams = () => {
+      if (effectiveKeyword) {
+        return { keyword: effectiveKeyword, category: effectiveCategory };
+      }
+      const loc = userLocation || mapCenter;
+      if (loc && typeof loc.lat === 'number' && typeof loc.lng === 'number') {
+        return {
+          latitude: loc.lat,
+          longitude: loc.lng,
+          radius: 5000,
+          category: effectiveCategory,
+        };
+      }
+      if (selectedSido || selectedSigungu || selectedEupmyeondong) {
+        return {
+          sido: selectedSido || undefined,
+          sigungu: selectedSigungu || undefined,
+          eupmyeondong: selectedEupmyeondong || undefined,
+          category: effectiveCategory,
+        };
+      }
+      return null;
+    };
+
+    const params = buildParams();
+    if (!params) {
+      alert('AI 추천을 받으려면 먼저 지역을 선택하거나 키워드로 검색해주세요.');
+      return;
+    }
+
+    setLoadingRecommend(true);
+    dispatchUI({ type: 'SET_STATUS_MESSAGE', payload: 'AI가 추천 장소를 분석하는 중...' });
+    try {
+      const response = await locationServiceApi.recommendPlaces(params);
+      const recommended = response.data?.services || [];
+      setAllServices(recommended);
+      setServices(recommended);
+      dispatchRegion({ type: 'RESET_REGION' });
+      dispatchUI({ type: 'SET_STATUS_MESSAGE', payload: `AI가 추천한 ${recommended.length}개의 장소입니다.` });
+    } catch (err) {
+      const msg = err.response?.data?.error || err.message || 'AI 추천을 불러오지 못했습니다.';
+      dispatchUI({ type: 'SET_ERROR', payload: msg });
+    } finally {
+      setLoadingRecommend(false);
+    }
+  }, [
+    user,
+    loadingRecommend,
+    categoryType,
+    selectedKeywordCategory,
+    keyword,
+    userLocation,
+    mapCenter,
+    selectedSido,
+    selectedSigungu,
+    selectedEupmyeondong,
+  ]);
+
   // 지도 드래그 시작 핸들러 - 사용자가 지도를 드래그하기 시작할 때 플래그 리셋
   const handleMapDragStart = useCallback(() => {
     // 사용자가 지도를 드래그하기 시작하면 프로그래매틱 이동 플래그 리셋
@@ -2526,6 +2598,14 @@ const LocationServiceMap = () => {
             <ServiceListTitle>
               {userLocation ? '내 주변 장소' : '전체 장소'} ({servicesWithDisplay.length})
             </ServiceListTitle>
+            <RecommendButton
+              type="button"
+              onClick={handleRecommendClick}
+              disabled={loadingRecommend || !user}
+              title={!user ? '로그인 후 이용 가능' : 'AI가 반려동물과 함께 가기 좋은 장소를 추천해드립니다'}
+            >
+              {loadingRecommend ? '⏳ 분석 중...' : '✨ AI 추천'}
+            </RecommendButton>
           </ServiceListHeader>
           <ServiceListContent>
             {servicesWithDisplay.length === 0 ? (
@@ -2569,6 +2649,9 @@ const LocationServiceMap = () => {
                   )}
                   {service.address && (
                     <ServiceListItemAddress>{service.address}</ServiceListItemAddress>
+                  )}
+                  {service.recommendationReason && (
+                    <ServiceRecommendReason>💡 {service.recommendationReason}</ServiceRecommendReason>
                   )}
                   <ServiceActions>
                     {service.phone && <span>📞 {service.phone}</span>}
@@ -3050,6 +3133,10 @@ const ServiceListPanel = styled.div`
 `;
 
 const ServiceListHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
   padding: 1rem;
   border-bottom: 1px solid ${props => props.theme.colors.border};
   background: ${props => props.theme.colors.surface};
@@ -3060,6 +3147,29 @@ const ServiceListTitle = styled.h3`
   font-size: 1rem;
   font-weight: 600;
   color: ${props => props.theme.colors.text};
+  flex: 1;
+  min-width: 0;
+`;
+
+const RecommendButton = styled.button`
+  flex-shrink: 0;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: ${props => props.theme.colors.primary};
+  background: ${props => props.theme.colors.primary + '15'};
+  border: 1px solid ${props => props.theme.colors.primary};
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+
+  &:hover:not(:disabled) {
+    background: ${props => props.theme.colors.primary + '25'};
+  }
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 `;
 
 const ServiceListContent = styled.div`
@@ -3116,6 +3226,14 @@ const ServiceListItemAddress = styled.div`
   color: ${props => props.theme.colors.textSecondary};
   margin-bottom: 0.4rem;
   line-height: 1.4;
+`;
+
+const ServiceRecommendReason = styled.div`
+  font-size: 0.85rem;
+  color: ${props => props.theme.colors.primary};
+  margin-bottom: 0.4rem;
+  line-height: 1.4;
+  font-style: italic;
 `;
 
 const ServiceActions = styled.div`
