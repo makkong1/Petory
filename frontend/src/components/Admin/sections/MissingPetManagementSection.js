@@ -6,37 +6,52 @@ const MissingPetManagementSection = () => {
   const [status, setStatus] = useState('');
   const [deleted, setDeleted] = useState('');
   const [q, setQ] = useState('');
+  const [page, setPage] = useState(0);
+  const [pageSize] = useState(20);
+  const [totalCount, setTotalCount] = useState(0);
+  const [hasNext, setHasNext] = useState(false);
   const [missingPets, setMissingPets] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const fetchMissingPets = useCallback(async () => {
+  // [리팩토링] listMissingPets → listMissingPetsWithPaging (DB 레벨 필터링 + 페이징)
+  const fetchMissingPets = useCallback(async (pageNum = 0) => {
     try {
       setLoading(true);
       setError(null);
-      const params = {};
+      const params = { page: pageNum, size: pageSize };
       if (status) params.status = status;
       if (deleted !== '') params.deleted = deleted === 'true';
       if (q) params.q = q;
-      
-      const res = await missingPetAdminApi.listMissingPets(params);
-      setMissingPets(res.data || []);
+
+      const res = await missingPetAdminApi.listMissingPetsWithPaging(params);
+      const data = res.data || {};
+      setMissingPets(data.boards || []);
+      setTotalCount(data.totalCount || 0);
+      setHasNext(data.hasNext || false);
+      setPage(pageNum);
     } catch (e) {
       console.error('실종 제보 목록 조회 실패:', e);
       setError(e.response?.data?.message || '목록을 불러오지 못했습니다.');
     } finally {
       setLoading(false);
     }
-  }, [status, deleted, q]);
+  }, [status, deleted, q, pageSize]);
 
   useEffect(() => {
-    fetchMissingPets();
-  }, [fetchMissingPets]);
+    fetchMissingPets(0);
+  }, [status, deleted, q]);
+
+  const handlePageChange = (newPage) => {
+    if (newPage >= 0 && (newPage < page || hasNext)) {
+      fetchMissingPets(newPage);
+    }
+  };
 
   const handleStatusChange = async (id, newStatus) => {
     try {
       await missingPetAdminApi.updateStatus(id, newStatus);
-      fetchMissingPets();
+      fetchMissingPets(page);
     } catch (e) {
       alert(e.response?.data?.message || '상태 변경 실패');
     }
@@ -46,7 +61,7 @@ const MissingPetManagementSection = () => {
     if (!window.confirm('이 실종 제보를 삭제하시겠습니까?')) return;
     try {
       await missingPetAdminApi.deleteMissingPet(id);
-      fetchMissingPets();
+      fetchMissingPets(page);
     } catch (e) {
       alert(e.response?.data?.message || '삭제 실패');
     }
@@ -92,9 +107,25 @@ const MissingPetManagementSection = () => {
           />
         </Group>
         <Group>
-          <Refresh onClick={fetchMissingPets}>새로고침</Refresh>
+          <Refresh onClick={() => fetchMissingPets(page)}>새로고침</Refresh>
         </Group>
       </Filters>
+
+      {/* [리팩토링] 페이징 UI 추가 */}
+      {totalCount > 0 && (
+        <Pagination>
+          <span>총 {totalCount}건</span>
+          <PageNav>
+            <button type="button" onClick={() => handlePageChange(page - 1)} disabled={page === 0}>
+              이전
+            </button>
+            <span>페이지 {page + 1}</span>
+            <button type="button" onClick={() => handlePageChange(page + 1)} disabled={!hasNext}>
+              다음
+            </button>
+          </PageNav>
+        </Pagination>
+      )}
 
       <Card>
         {loading && missingPets.length === 0 ? (
@@ -205,6 +236,33 @@ const Input = styled.input`
   border-radius: ${props => props.theme.borderRadius.sm};
   background: ${props => props.theme.colors.surface};
   color: ${props => props.theme.colors.text};
+`;
+
+const Pagination = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: ${props => props.theme.spacing.sm};
+  font-size: ${props => props.theme.typography.caption.fontSize};
+  color: ${props => props.theme.colors.textSecondary};
+`;
+
+const PageNav = styled.div`
+  display: flex;
+  gap: ${props => props.theme.spacing.sm};
+  align-items: center;
+  button {
+    padding: 4px 8px;
+    border: 1px solid ${props => props.theme.colors.border};
+    background: ${props => props.theme.colors.surface};
+    color: ${props => props.theme.colors.text};
+    border-radius: 4px;
+    cursor: pointer;
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
 `;
 
 const Refresh = styled.button`
