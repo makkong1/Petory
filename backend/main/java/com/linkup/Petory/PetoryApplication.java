@@ -21,6 +21,9 @@ import org.springframework.web.filter.HiddenHttpMethodFilter;
 @EnableCaching
 @EnableJpaAuditing // JPA Auditing 활성화
 @EnableMethodSecurity(prePostEnabled = true) // @PreAuthorize 작동 활성화
+
+// cd backend
+// ./gradlew bootRun --args='--spring.profiles.active=dev' 해야 이메일 인증 넘어갈수있음
 public class PetoryApplication {
 
 	public static void main(String[] args) {
