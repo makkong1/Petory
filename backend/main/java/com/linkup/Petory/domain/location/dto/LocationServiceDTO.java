@@ -76,4 +76,7 @@ public class LocationServiceDTO {
     
     // 거리 정보 (내 위치 기반 검색 시 사용)
     private Double distance; // 미터 단위
+
+    // AI 추천 (에이전트 2)
+    private String recommendationReason; // 추천 이유 1줄
 }
