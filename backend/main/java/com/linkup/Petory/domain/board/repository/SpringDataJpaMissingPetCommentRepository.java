@@ -1,10 +1,12 @@
 package com.linkup.Petory.domain.board.repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -50,5 +52,14 @@ public interface SpringDataJpaMissingPetCommentRepository extends JpaRepository<
     @Query(value = "SELECT mc FROM MissingPetComment mc JOIN FETCH mc.user u WHERE mc.board.idx = :boardId AND mc.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY mc.createdAt ASC",
            countQuery = "SELECT COUNT(mc) FROM MissingPetComment mc JOIN mc.user u WHERE mc.board.idx = :boardId AND mc.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE'")
     Page<MissingPetComment> findByBoardIdAndIsDeletedFalseOrderByCreatedAtAsc(@Param("boardId") Long boardId, Pageable pageable);
+
+    /**
+     * 게시글의 모든 미삭제 댓글 일괄 소프트 삭제 (배치 UPDATE)
+     * [리팩토링] N건 루프 save → 1회 UPDATE 쿼리
+     * clearAutomatically = true: bulk update는 PC를 무시하므로, 실행 후 PC 초기화하여 정합성 유지
+     */
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE MissingPetComment mc SET mc.isDeleted = true, mc.deletedAt = :deletedAt WHERE mc.board.idx = :boardIdx AND mc.isDeleted = false")
+    int softDeleteAllByBoardIdx(@Param("boardIdx") Long boardIdx, @Param("deletedAt") LocalDateTime deletedAt);
 }
 
