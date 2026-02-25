@@ -234,16 +234,12 @@ public class MissingPetCommentService {
 
     /**
      * 게시글의 모든 댓글 소프트 삭제
+     * [리팩토링] N건 루프 save → 배치 UPDATE 1회 (1 SELECT + N UPDATE → 1 UPDATE)
      * @param board 게시글 엔티티
      */
     @Transactional
     public void deleteAllCommentsByBoard(MissingPetBoard board) {
-        List<MissingPetComment> comments = commentRepository.findByBoardAndIsDeletedFalseOrderByCreatedAtAsc(board);
-        for (MissingPetComment c : comments) {
-            c.setIsDeleted(true);
-            c.setDeletedAt(java.time.LocalDateTime.now());
-            commentRepository.save(c);
-        }
+        commentRepository.softDeleteAllByBoardIdx(board.getIdx(), java.time.LocalDateTime.now());
     }
 
     /**

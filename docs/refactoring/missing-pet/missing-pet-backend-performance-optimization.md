@@ -77,6 +77,8 @@ return ResponseEntity.ok(all);
 
 **파일**: `MissingPetCommentService.java` (Lines 241-247)
 
+**테스트**: `MissingPetCommentServiceDeleteAllCommentsTest.java` - `@Transactional`로 롤백되어 실 DB 영향 없음
+
 **현재 문제**:
 - `deleteAllCommentsByBoard(board)`: 댓글 **전체 조회** 후 루프마다 `save()` 호출
 - 댓글 1000개 시 → 1 (SELECT) + 1000 (UPDATE) = 1001 쿼리
@@ -95,11 +97,12 @@ public void deleteAllCommentsByBoard(MissingPetBoard board) {
 
 **해결 방안**:
 - `@Modifying` + `@Query`로 배치 업데이트
+- `clearAutomatically = true`: bulk update는 영속성 컨텍스트를 무시하고 DB만 수정하므로, PC와 DB 정합성 유지를 위해 실행 후 PC 초기화
 
 ```java
 // SpringDataJpaMissingPetCommentRepository 추가
-@Modifying
-@Query("UPDATE MissingPetComment mc SET mc.isDeleted = true, mc.deletedAt = :deletedAt WHERE mc.board.idx = :boardIdx")
+@Modifying(clearAutomatically = true)
+@Query("UPDATE MissingPetComment mc SET mc.isDeleted = true, mc.deletedAt = :deletedAt WHERE mc.board.idx = :boardIdx AND mc.isDeleted = false")
 int softDeleteAllByBoardIdx(@Param("boardIdx") Long boardIdx, @Param("deletedAt") LocalDateTime deletedAt);
 ```
 
@@ -220,7 +223,7 @@ Optional<Long> findUserIdByIdx(@Param("idx") Long idx);
 ## 체크리스트
 
 - [x] AdminMissingPetController `listMissingPets` → 페이징 API 추가, DB 레벨 필터링 ✅
-- [ ] MissingPetCommentService `deleteAllCommentsByBoard` → 배치 UPDATE 쿼리
+- [x] MissingPetCommentService `deleteAllCommentsByBoard` → 배치 UPDATE 쿼리 ✅
 - [ ] MissingPetBoardController `updateStatus` → valueOf 예외 처리
 - [ ] MissingPetBoardController `startMissingPetChat` → findUserIdByIdx 경량 조회
 - [ ] AdminMissingPetController `listComments` → 삭제된 댓글 조회 옵션
@@ -235,7 +238,7 @@ Optional<Long> findUserIdByIdx(@Param("idx") Long idx);
 | 항목 | Before | After |
 |------|--------|-------|
 | Admin listMissingPets | 전체 메모리 로드, 메모리 필터링 | DB 레벨 필터링 + 페이징 |
-| deleteAllCommentsByBoard (1000댓글) | 1001 쿼리 | 2 쿼리 (SELECT + UPDATE) |
+| deleteAllCommentsByBoard (1000댓글) | 1001 쿼리 | 1 쿼리 (배치 UPDATE) |
 | startMissingPetChat | getBoard 전체 조회 | userId 프로젝션 1 쿼리 |
 
 ---

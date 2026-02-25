@@ -1,5 +1,6 @@
 package com.linkup.Petory.domain.board.repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -60,4 +61,11 @@ public interface MissingPetCommentRepository {
      * 페이징 지원 - 게시글별 댓글 조회
      */
     Page<MissingPetComment> findByBoardIdAndIsDeletedFalseOrderByCreatedAtAsc(Long boardId, Pageable pageable);
+
+    /**
+     * 게시글의 모든 미삭제 댓글 일괄 소프트 삭제 (배치 UPDATE)
+     * [리팩토링] N건 루프 save → 1회 UPDATE 쿼리 (missing-pet-backend-performance-optimization.md)
+     * @return 업데이트된 행 수
+     */
+    int softDeleteAllByBoardIdx(Long boardIdx, LocalDateTime deletedAt);
 }
