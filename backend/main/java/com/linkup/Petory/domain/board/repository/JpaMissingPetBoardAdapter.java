@@ -119,5 +119,10 @@ public class JpaMissingPetBoardAdapter implements MissingPetBoardRepository {
     public Page<MissingPetBoard> findAll(Specification<MissingPetBoard> spec, Pageable pageable) {
         return jpaRepository.findAll(spec, pageable);
     }
+
+    @Override
+    public Optional<Long> findUserIdByIdx(Long idx) {
+        return jpaRepository.findUserIdByIdx(idx);
+    }
 }
 

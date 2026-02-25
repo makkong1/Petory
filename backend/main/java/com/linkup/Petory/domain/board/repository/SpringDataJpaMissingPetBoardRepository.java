@@ -76,5 +76,11 @@ public interface SpringDataJpaMissingPetBoardRepository extends JpaRepository<Mi
     @Query(value = "SELECT b FROM MissingPetBoard b JOIN FETCH b.user u WHERE b.status = :status AND b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY b.createdAt DESC",
            countQuery = "SELECT COUNT(b) FROM MissingPetBoard b JOIN b.user u WHERE b.status = :status AND b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE'")
     Page<MissingPetBoard> findByStatusOrderByCreatedAtDesc(@Param("status") MissingPetStatus status, Pageable pageable);
+
+    /**
+     * [리팩토링] 게시글 작성자 ID만 조회 (프로젝션) - startMissingPetChat 등 경량 조회용
+     */
+    @Query("SELECT b.user.idx FROM MissingPetBoard b WHERE b.idx = :idx AND b.isDeleted = false")
+    Optional<Long> findUserIdByIdx(@Param("idx") Long idx);
 }
 

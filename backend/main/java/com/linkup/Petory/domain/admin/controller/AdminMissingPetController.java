@@ -69,7 +69,14 @@ public class AdminMissingPetController {
         if (statusValue == null) {
             throw new IllegalArgumentException("status is required");
         }
-        MissingPetStatus status = MissingPetStatus.valueOf(statusValue);
+        // [리팩토링] valueOf 예외 처리 - 사용자 친화적 에러 메시지
+        MissingPetStatus status;
+        try {
+            status = MissingPetStatus.valueOf(statusValue);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException(
+                    "유효하지 않은 상태입니다. MISSING, FOUND, RESOLVED 중 하나를 선택해주세요.");
+        }
         return ResponseEntity.ok(missingPetBoardService.updateStatus(id, status));
     }
 
@@ -84,11 +91,11 @@ public class AdminMissingPetController {
 
     /**
      * 실종 제보 복구
+     * 서비스: MissingPetBoardService.restoreBoard()
      */
     @PostMapping("/{id}/restore")
     public ResponseEntity<MissingPetBoardDTO> restoreMissingPet(@PathVariable Long id) {
-        // TODO: 서비스에 복구 메서드 추가 필요
-        throw new UnsupportedOperationException("복구 기능은 아직 구현되지 않았습니다.");
+        return ResponseEntity.ok(missingPetBoardService.restoreBoard(id));
     }
 
     /**

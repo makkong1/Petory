@@ -73,18 +73,18 @@ return ResponseEntity.ok(all);
 
 ---
 
-### 2. MissingPetCommentService - deleteAllCommentsByBoard N건 루프 save
+### 2. MissingPetCommentService - deleteAllCommentsByBoard N건 루프 save ✅ **해결 완료**
 
 **파일**: `MissingPetCommentService.java` (Lines 241-247)
 
 **테스트**: `MissingPetCommentServiceDeleteAllCommentsTest.java` - `@Transactional`로 롤백되어 실 DB 영향 없음
 
-**현재 문제**:
+**이전 문제**:
 - `deleteAllCommentsByBoard(board)`: 댓글 **전체 조회** 후 루프마다 `save()` 호출
 - 댓글 1000개 시 → 1 (SELECT) + 1000 (UPDATE) = 1001 쿼리
 
 ```java
-// 현재 코드
+// 이전 코드 (N건 루프 save)
 public void deleteAllCommentsByBoard(MissingPetBoard board) {
     List<MissingPetComment> comments = commentRepository.findByBoardAndIsDeletedFalseOrderByCreatedAtAsc(board);
     for (MissingPetComment c : comments) {
@@ -106,15 +106,21 @@ public void deleteAllCommentsByBoard(MissingPetBoard board) {
 int softDeleteAllByBoardIdx(@Param("boardIdx") Long boardIdx, @Param("deletedAt") LocalDateTime deletedAt);
 ```
 
+**적용 결과** ✅:
+- ✅ `softDeleteAllByBoardIdx` 메서드 추가 (SpringDataJpaMissingPetCommentRepository)
+- ✅ `@Modifying(clearAutomatically = true)` 적용 (PC 정합성 유지)
+- ✅ `deleteAllCommentsByBoard` → 배치 UPDATE 1회 호출로 변경
+- ✅ 1001 쿼리 → 1 쿼리 (댓글 1000개 기준)
+
 ---
 
 ## 🟠 High Priority - 리팩토링
 
-### 3. MissingPetBoardController - updateStatus valueOf 예외 처리
+### 3. MissingPetBoardController - updateStatus valueOf 예외 처리 ✅ **해결 완료**
 
-**파일**: `MissingPetBoardController.java` (Lines 117-124), `AdminMissingPetController.java` (Lines 84-87)
+**파일**: `MissingPetBoardController.java` (Lines 117-124), `AdminMissingPetController.java` (Lines 68-73)
 
-**현재 문제**:
+**이전 문제**:
 - `MissingPetStatus.valueOf(statusValue)`: 잘못된 값 시 `IllegalArgumentException` 발생
 - 예외 메시지가 사용자 친화적이지 않음 (예: "No enum constant...")
 
@@ -124,28 +130,33 @@ try {
     status = MissingPetStatus.valueOf(statusValue);
 } catch (IllegalArgumentException e) {
     throw new IllegalArgumentException(
-        "유효하지 않은 상태입니다. MISSING, FOUND, CLOSED 중 하나를 선택해주세요.");
+        "유효하지 않은 상태입니다. MISSING, FOUND, RESOLVED 중 하나를 선택해주세요.");
 }
 ```
 
+**적용 결과** ✅:
+- ✅ MissingPetBoardController.updateStatus - valueOf 예외 처리 추가
+- ✅ AdminMissingPetController.updateStatus - valueOf 예외 처리 추가
+- ✅ 사용자 친화적 에러 메시지 (실제 enum: MISSING, FOUND, RESOLVED)
+
 ---
 
-### 4. MissingPetBoardController - startMissingPetChat 불필요한 전체 조회
+### 4. MissingPetBoardController - startMissingPetChat 불필요한 전체 조회 ✅ **해결 완료**
 
 **파일**: `MissingPetBoardController.java` (Lines 204-214)
 
-**현재 문제**:
+**이전 문제**:
 - `getBoard(boardIdx, null, null)` 호출 → 게시글 전체 조회 (파일, 댓글 수 등)
 - 필요한 것은 `reporterId`(userId)만
 
 **해결 방안**:
-- `MissingPetBoardRepository`에 `findUserIdByIdx(Long idx)` 또는 `Optional<Long> findUserIdByIdx(Long idx)` 추가
+- `MissingPetBoardRepository`에 `findUserIdByIdx(Long idx)` 추가
 - 프로젝션 쿼리로 userId만 조회
 
-```java
-@Query("SELECT b.user.idx FROM MissingPetBoard b WHERE b.idx = :idx AND b.isDeleted = false")
-Optional<Long> findUserIdByIdx(@Param("idx") Long idx);
-```
+**적용 결과** ✅:
+- ✅ `findUserIdByIdx` 메서드 추가 (SpringDataJpaMissingPetBoardRepository)
+- ✅ `MissingPetBoardService.getUserIdByBoardIdx()` 추가
+- ✅ `startMissingPetChat` → getBoard 전체 조회 대신 userId 프로젝션 1쿼리
 
 ---
 
@@ -163,45 +174,45 @@ Optional<Long> findUserIdByIdx(@Param("idx") Long idx);
 
 ---
 
-### 6. restoreMissingPet - 미구현
+### 6. restoreMissingPet - 미구현 ✅ **해결 완료**
 
 **파일**: `AdminMissingPetController.java` (Lines 104-107)
 
-**현재 문제**:
+**이전 문제**:
 - `POST /api/admin/missing-pets/{id}/restore` → `UnsupportedOperationException` 발생
 
-**해결 방안**:
-- `MissingPetBoardService.restoreBoard(Long id)` 메서드 추가
-- `isDeleted = false`, `deletedAt = null` 설정
+**적용 결과** ✅:
+- ✅ `MissingPetBoardService.restoreBoard(Long id)` 메서드 추가
+- ✅ `isDeleted = false`, `deletedAt = null` 설정
 
 ---
 
 ## 🟡 Medium Priority
 
-### 7. MissingPetConverter - toBoardDTOList Lazy Loading 위험
+### 7. MissingPetConverter - toBoardDTOList Lazy Loading 위험 ✅ **해결 완료**
 
-**파일**: `MissingPetConverter.java` (Lines 100-105)
+**파일**: `MissingPetConverter.java`
 
-**현재 문제**:
-- `toBoardDTOList()`는 `toBoardDTO()` 사용 → `board.getComments()` 접근 시 **Lazy Loading 트리거**
-- 현재 사용처 없음 (dead code 가능성)
+**이전 문제**:
+- `toBoardDTOList()`가 `toBoardDTO()` 사용 → `board.getComments()` 접근 시 Lazy Loading → N+1 위험
+- 사용처 없음 (dead code)
 
-**해결 방안**:
-- 사용하지 않으면 제거
-- 사용한다면 `toBoardDTOWithoutComments` 기반으로 변경
+**적용 결과** ✅:
+- ✅ `toBoardDTOList` 메서드 제거
+- ✅ 주석으로 대체: 목록 조회 시 `toBoardDTOWithoutComments` 사용 안내, N+1 위험 설명
 
 ---
 
-### 8. updateBoard - findById vs findByIdWithUser
+### 8. updateBoard - findById vs findByIdWithUser ✅ **해결 완료**
 
-**파일**: `MissingPetBoardService.java` (Line 256)
+**파일**: `MissingPetBoardService.java` (Line 261)
 
-**현재 문제**:
-- `boardRepository.findById(id)` 사용 → User 조인 없음
-- `board.getUser()` 호출 시 Lazy Loading 가능 (ManyToOne 기본 EAGER이지만 확인 필요)
+**이전 문제**:
+- `findById(id)` 사용 → User 조인 없음
+- `board.getUser()` 호출 시 Lazy Loading 가능
 
-**해결 방안**:
-- 이메일 인증 확인을 위해 User 필요 → `findByIdWithUser(id)` 사용으로 통일
+**적용 결과** ✅:
+- ✅ `findByIdWithUser(id)` 사용으로 통일 (deleteBoard와 동일)
 
 ---
 
@@ -209,14 +220,27 @@ Optional<Long> findUserIdByIdx(@Param("idx") Long idx);
 
 ### 9. 데이터베이스 인덱스
 
-**Entity 인덱스 검토**:
-- `missing_pet_board`: `user_idx`, `status`, `is_deleted`, `created_at`, `latitude`, `longitude`
-- `missing_pet_comment`: `board_idx`, `user_idx`, `is_deleted`, `created_at`
+**현재 DB 인덱스 (확인 완료)**:
 
-**활용 쿼리**:
-- `findAllByOrderByCreatedAtDesc`, `findByStatusOrderByCreatedAtDesc`: `is_deleted`, `created_at`
-- `findByBoardIdAndIsDeletedFalseOrderByCreatedAtAsc`: `board_idx`, `is_deleted`
-- 위치 기반 검색: `idx_missing_pet_location` (SPATIAL 또는 복합 인덱스)
+| 테이블 | 인덱스 | 컬럼 | 비고 |
+|--------|--------|------|------|
+| missing_pet_board | PRIMARY | idx | |
+| missing_pet_board | FK (user_idx) | user_idx | |
+| missing_pet_board | idx_missing_pet_status | status, is_deleted, created_at | 복합 |
+| missing_pet_board | idx_missing_pet_location | latitude, longitude | 복합 |
+| missing_pet_board | idx_missing_pet_user | user_idx, is_deleted, created_at | 복합 |
+| missing_pet_comment | PRIMARY | idx | |
+| missing_pet_comment | FK (board_idx) | board_idx | |
+| missing_pet_comment | FK (user_idx) | user_idx | |
+
+**활용 쿼리 매칭**:
+- `findAllByOrderByCreatedAtDesc`, `findByStatusOrderByCreatedAtDesc` → idx_missing_pet_status ✅
+- `findByBoardIdAndIsDeletedFalseOrderByCreatedAtAsc` → board_idx FK ✅
+- 위치 기반 검색 → idx_missing_pet_location ✅
+
+**추가 적용** ✅:
+- `idx_missing_pet_comment_board_is_deleted` (board_idx, is_deleted) 복합 인덱스
+- 마이그레이션: `docs/migration/db/indexes_missing_pet_comment.sql`
 
 ---
 
@@ -224,12 +248,12 @@ Optional<Long> findUserIdByIdx(@Param("idx") Long idx);
 
 - [x] AdminMissingPetController `listMissingPets` → 페이징 API 추가, DB 레벨 필터링 ✅
 - [x] MissingPetCommentService `deleteAllCommentsByBoard` → 배치 UPDATE 쿼리 ✅
-- [ ] MissingPetBoardController `updateStatus` → valueOf 예외 처리
-- [ ] MissingPetBoardController `startMissingPetChat` → findUserIdByIdx 경량 조회
+- [x] MissingPetBoardController `updateStatus` → valueOf 예외 처리 ✅
+- [x] MissingPetBoardController `startMissingPetChat` → findUserIdByIdx 경량 조회 ✅
 - [ ] AdminMissingPetController `listComments` → 삭제된 댓글 조회 옵션
-- [ ] AdminMissingPetController `restoreMissingPet` → restoreBoard 구현
-- [ ] MissingPetConverter `toBoardDTOList` → 사용처 확인 후 제거 또는 수정
-- [ ] MissingPetBoardService `updateBoard` → findByIdWithUser 사용
+- [x] AdminMissingPetController `restoreMissingPet` → restoreBoard 구현 ✅
+- [x] MissingPetConverter `toBoardDTOList` → 사용처 확인 후 제거 또는 수정
+- [x] MissingPetBoardService `updateBoard` → findByIdWithUser 사용 ✅
 
 ---
 
@@ -239,7 +263,7 @@ Optional<Long> findUserIdByIdx(@Param("idx") Long idx);
 |------|--------|-------|
 | Admin listMissingPets | 전체 메모리 로드, 메모리 필터링 | DB 레벨 필터링 + 페이징 |
 | deleteAllCommentsByBoard (1000댓글) | 1001 쿼리 | 1 쿼리 (배치 UPDATE) |
-| startMissingPetChat | getBoard 전체 조회 | userId 프로젝션 1 쿼리 |
+| startMissingPetChat | getBoard 전체 조회 | userId 프로젝션 1 쿼리 ✅ |
 
 ---
 
