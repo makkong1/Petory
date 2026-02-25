@@ -77,4 +77,9 @@ public interface MissingPetBoardRepository {
      * [리팩토링] Admin 페이징 - Specification 기반 DB 레벨 필터링 (status, deleted, q)
      */
     Page<MissingPetBoard> findAll(Specification<MissingPetBoard> spec, Pageable pageable);
+
+    /**
+     * [리팩토링] 게시글 작성자 ID만 조회 (프로젝션) - startMissingPetChat 등 경량 조회용
+     */
+    Optional<Long> findUserIdByIdx(Long idx);
 }

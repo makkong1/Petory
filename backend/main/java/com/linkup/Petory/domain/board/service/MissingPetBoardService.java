@@ -20,7 +20,9 @@ import com.linkup.Petory.domain.board.dto.MissingPetCommentDTO;
 import com.linkup.Petory.domain.board.dto.MissingPetCommentPageResponseDTO;
 import com.linkup.Petory.domain.board.entity.MissingPetBoard;
 import com.linkup.Petory.domain.board.entity.MissingPetStatus;
+import com.linkup.Petory.domain.user.entity.EmailVerificationPurpose;
 import com.linkup.Petory.domain.user.entity.Users;
+import com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException;
 
 import jakarta.persistence.criteria.Join;
 import com.linkup.Petory.domain.board.repository.MissingPetBoardRepository;
@@ -36,8 +38,8 @@ import lombok.RequiredArgsConstructor;
 @Transactional(readOnly = true)
 public class MissingPetBoardService {
 
-    private final MissingPetBoardRepository boardRepository;
-    private final MissingPetCommentService commentService;
+    private final MissingPetBoardRepository missingPetBoardRepository;
+    private final MissingPetCommentService missingPetCommentService;
     private final UsersRepository usersRepository;
     private final MissingPetConverter missingPetConverter;
     private final AttachmentFileService attachmentFileService;
@@ -57,8 +59,8 @@ public class MissingPetBoardService {
 
         // 게시글 + 작성자 페이징 조회 (댓글 제외 - 조인 폭발 방지)
         Page<MissingPetBoard> boardPage = status == null
-                ? boardRepository.findAllByOrderByCreatedAtDesc(pageable)
-                : boardRepository.findByStatusOrderByCreatedAtDesc(status, pageable);
+                ? missingPetBoardRepository.findAllByOrderByCreatedAtDesc(pageable)
+                : missingPetBoardRepository.findByStatusOrderByCreatedAtDesc(status, pageable);
 
         if (boardPage.isEmpty()) {
             return new MissingPetBoardPageResponseDTO(
@@ -83,7 +85,7 @@ public class MissingPetBoardService {
                 FileTargetType.MISSING_PET, boardIds);
 
         // 댓글 수 배치 조회 (N+1 문제 해결)
-        Map<Long, Integer> commentCountsByBoardId = commentService.getCommentCountsBatch(boardIds);
+        Map<Long, Integer> commentCountsByBoardId = missingPetCommentService.getCommentCountsBatch(boardIds);
 
         // DTO 변환 (파일 정보 포함, 댓글은 빈 리스트)
         // toBoardDTOWithoutComments 사용으로 N+1 문제 방지 (댓글 lazy loading 트리거 안함)
@@ -123,8 +125,8 @@ public class MissingPetBoardService {
     public List<MissingPetBoardDTO> getBoards(MissingPetStatus status) {
         // 게시글 + 작성자만 조회 (댓글 제외 - 조인 폭발 방지)
         List<MissingPetBoard> boards = status == null
-                ? boardRepository.findAllByOrderByCreatedAtDesc()
-                : boardRepository.findByStatusOrderByCreatedAtDesc(status);
+                ? missingPetBoardRepository.findAllByOrderByCreatedAtDesc()
+                : missingPetBoardRepository.findByStatusOrderByCreatedAtDesc(status);
 
         // 게시글 ID 목록 추출
         List<Long> boardIds = boards.stream()
@@ -136,7 +138,7 @@ public class MissingPetBoardService {
                 FileTargetType.MISSING_PET, boardIds);
 
         // 댓글 수 배치 조회 (N+1 문제 해결)
-        Map<Long, Integer> commentCountsByBoardId = commentService.getCommentCountsBatch(boardIds);
+        Map<Long, Integer> commentCountsByBoardId = missingPetCommentService.getCommentCountsBatch(boardIds);
 
         // DTO 변환 (파일 정보 포함, 댓글은 빈 리스트)
         // toBoardDTOWithoutComments 사용으로 N+1 문제 방지 (댓글 lazy loading 트리거 안함)
@@ -169,7 +171,7 @@ public class MissingPetBoardService {
      */
     public MissingPetBoardDTO getBoard(Long id, Integer commentPage, Integer commentSize) {
         // 게시글 + 작성자만 조회 (댓글 제외)
-        MissingPetBoard board = boardRepository.findByIdWithUser(id)
+        MissingPetBoard board = missingPetBoardRepository.findByIdWithUser(id)
                 .orElseThrow(() -> new IllegalArgumentException("Missing pet board not found"));
 
         // 삭제된 게시글인지 확인
@@ -182,12 +184,13 @@ public class MissingPetBoardService {
                 FileTargetType.MISSING_PET, board.getIdx());
 
         // 댓글 수 조회
-        int commentCount = commentService.getCommentCount(board);
+        int commentCount = missingPetCommentService.getCommentCount(board);
 
         // 댓글 페이징 조회 (파라미터가 제공된 경우)
         List<MissingPetCommentDTO> comments = List.of();
         if (commentPage != null && commentSize != null && commentSize > 0) {
-            MissingPetCommentPageResponseDTO commentPageResponse = commentService.getCommentsWithPaging(id, commentPage,
+            MissingPetCommentPageResponseDTO commentPageResponse = missingPetCommentService.getCommentsWithPaging(id,
+                    commentPage,
                     commentSize);
             comments = commentPageResponse.comments();
         }
@@ -216,9 +219,9 @@ public class MissingPetBoardService {
 
         // 이메일 인증 확인
         if (user.getEmailVerified() == null || !user.getEmailVerified()) {
-            throw new com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException(
+            throw new EmailVerificationRequiredException(
                     "실종 제보 작성을 위해 이메일 인증이 필요합니다.",
-                    com.linkup.Petory.domain.user.entity.EmailVerificationPurpose.MISSING_PET);
+                    EmailVerificationPurpose.MISSING_PET);
         }
 
         MissingPetBoard board = MissingPetBoard.builder()
@@ -238,7 +241,7 @@ public class MissingPetBoardService {
                 .status(dto.getStatus())
                 .build();
 
-        MissingPetBoard saved = boardRepository.save(board);
+        MissingPetBoard saved = missingPetBoardRepository.save(board);
         if (dto.getImageUrl() != null) {
             attachmentFileService.syncSingleAttachment(FileTargetType.MISSING_PET, saved.getIdx(), dto.getImageUrl(),
                     null);
@@ -254,7 +257,8 @@ public class MissingPetBoardService {
      */
     @Transactional
     public MissingPetBoardDTO updateBoard(Long id, MissingPetBoardDTO dto) {
-        MissingPetBoard board = boardRepository.findById(id)
+        // [리팩토링] findById → findByIdWithUser (이메일 인증 확인을 위해 User 필요)
+        MissingPetBoard board = missingPetBoardRepository.findByIdWithUser(id)
                 .orElseThrow(() -> new IllegalArgumentException("Missing pet board not found"));
 
         // 이메일 인증 확인
@@ -313,13 +317,22 @@ public class MissingPetBoardService {
     }
 
     /**
+     * [리팩토링] 게시글 작성자 ID만 조회 (경량) - startMissingPetChat 등
+     * getBoard 전체 조회 대신 프로젝션 쿼리 1회
+     */
+    public Long getUserIdByBoardIdx(Long boardIdx) {
+        return missingPetBoardRepository.findUserIdByIdx(boardIdx)
+                .orElseThrow(() -> new IllegalArgumentException("Missing pet board not found"));
+    }
+
+    /**
      * 실종 제보 상태 변경
      * 엔드포인트: PATCH /api/missing-pets/{id}/status
-     * - 상태: MISSING(실종), FOUND(발견), CLOSED(종료)
+     * - 상태: MISSING(실종), FOUND(발견), RESOLVED(종료)
      */
     @Transactional
     public MissingPetBoardDTO updateStatus(Long id, MissingPetStatus status) {
-        MissingPetBoard board = boardRepository.findById(id)
+        MissingPetBoard board = missingPetBoardRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Missing pet board not found"));
         board.setStatus(status);
         return mapBoardWithAttachments(board);
@@ -333,7 +346,7 @@ public class MissingPetBoardService {
      */
     @Transactional
     public void deleteBoard(Long id) {
-        MissingPetBoard board = boardRepository.findByIdWithUser(id)
+        MissingPetBoard board = missingPetBoardRepository.findByIdWithUser(id)
                 .orElseThrow(() -> new IllegalArgumentException("Missing pet board not found"));
 
         // 이메일 인증 확인
@@ -341,7 +354,7 @@ public class MissingPetBoardService {
         if (user.getEmailVerified() == null || !user.getEmailVerified()) {
             throw new com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException(
                     "실종 제보 삭제를 위해 이메일 인증이 필요합니다.",
-                    com.linkup.Petory.domain.user.entity.EmailVerificationPurpose.MISSING_PET);
+                    EmailVerificationPurpose.MISSING_PET);
         }
 
         // 게시글 소프트 삭제
@@ -349,9 +362,25 @@ public class MissingPetBoardService {
         board.setDeletedAt(java.time.LocalDateTime.now());
 
         // 관련 댓글 모두 소프트 삭제
-        commentService.deleteAllCommentsByBoard(board);
+        missingPetCommentService.deleteAllCommentsByBoard(board);
 
-        boardRepository.saveAndFlush(board);
+        missingPetBoardRepository.saveAndFlush(board);
+    }
+
+    /**
+     * [리팩토링] 실종 제보 복구 (관리자용)
+     * 엔드포인트: POST /api/admin/missing-pets/{id}/restore
+     * - isDeleted = false, deletedAt = null 설정
+     */
+    @Transactional
+    public MissingPetBoardDTO restoreBoard(Long id) {
+        MissingPetBoard board = missingPetBoardRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Missing pet board not found"));
+
+        board.setIsDeleted(false);
+        board.setDeletedAt(null);
+
+        return mapBoardWithAttachments(missingPetBoardRepository.save(board));
     }
 
     /**
@@ -392,9 +421,10 @@ public class MissingPetBoardService {
         }
 
         Pageable pageable = PageRequest.of(page, size,
-                org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "createdAt"));
+                org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC,
+                        "createdAt"));
 
-        Page<MissingPetBoard> boardPage = boardRepository.findAll(spec, pageable);
+        Page<MissingPetBoard> boardPage = missingPetBoardRepository.findAll(spec, pageable);
 
         if (boardPage.isEmpty()) {
             return new MissingPetBoardPageResponseDTO(
@@ -412,7 +442,7 @@ public class MissingPetBoardService {
 
         Map<Long, List<FileDTO>> filesByBoardId = attachmentFileService.getAttachmentsBatch(
                 FileTargetType.MISSING_PET, boardIds);
-        Map<Long, Integer> commentCountsByBoardId = commentService.getCommentCountsBatch(boardIds);
+        Map<Long, Integer> commentCountsByBoardId = missingPetCommentService.getCommentCountsBatch(boardIds);
 
         List<MissingPetBoardDTO> boardDTOs = boards.stream()
                 .map(board -> {

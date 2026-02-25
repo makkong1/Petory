@@ -97,11 +97,11 @@ public class MissingPetConverter {
                 .build();
     }
 
-    public List<MissingPetBoardDTO> toBoardDTOList(List<MissingPetBoard> boards) {
-        return boards.stream()
-                .map(this::toBoardDTO)
-                .collect(Collectors.toList());
-    }
+    /**
+     * 목록 조회 시 toBoardDTOList 대신 boards.stream().map(this::toBoardDTOWithoutComments).toList() 사용.
+     * toBoardDTO 사용 시 board.getComments() 호출로 Lazy Loading → N+1 쿼리 발생.
+     */
+    // toBoardDTOList 제거됨 (dead code, N+1 위험)
 
     public MissingPetCommentDTO toCommentDTO(MissingPetComment comment) {
         return MissingPetCommentDTO.builder()

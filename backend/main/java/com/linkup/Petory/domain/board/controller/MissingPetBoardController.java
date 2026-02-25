@@ -120,7 +120,14 @@ public class MissingPetBoardController {
             throw new IllegalArgumentException("status is required");
         }
 
-        MissingPetStatus status = MissingPetStatus.valueOf(statusValue);
+        // [리팩토링] valueOf 예외 처리 - 사용자 친화적 에러 메시지
+        MissingPetStatus status;
+        try {
+            status = MissingPetStatus.valueOf(statusValue);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException(
+                    "유효하지 않은 상태입니다. MISSING, FOUND, RESOLVED 중 하나를 선택해주세요.");
+        }
         MissingPetBoardDTO updated = missingPetBoardService.updateStatus(id, status);
         return ResponseEntity.ok(updated);
     }
@@ -139,8 +146,7 @@ public class MissingPetBoardController {
         return ResponseEntity.ok(response);
     }
 
-    // ==================== 댓글 관련 API (MissingPetCommentService)
-    // ====================
+    // ========== 댓글 관련 API (MissingPetCommentService) ==========
 
     /**
      * 댓글 목록 조회 (페이징 지원)
@@ -200,9 +206,8 @@ public class MissingPetBoardController {
     public ResponseEntity<ConversationDTO> startMissingPetChat(
             @PathVariable Long boardIdx,
             @RequestParam Long witnessId) {
-        // 실종제보 조회하여 제보자 ID 확인
-        MissingPetBoardDTO board = missingPetBoardService.getBoard(boardIdx, null, null);
-        Long reporterId = board.getUserId();
+        // [리팩토링] getBoard 전체 조회 → userId 프로젝션 1쿼리
+        Long reporterId = missingPetBoardService.getUserIdByBoardIdx(boardIdx);
 
         ConversationDTO conversation = conversationService.createMissingPetChat(
                 boardIdx, reporterId, witnessId);
