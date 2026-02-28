@@ -6,6 +6,7 @@ import { reportApi } from '../../api/reportApi';
 import { uploadApi } from '../../api/uploadApi';
 import { usePermission } from '../../hooks/usePermission';
 import { useAuth } from '../../contexts/AuthContext';
+import PageNavigation from '../Common/PageNavigation';
 import UserProfileModal from '../User/UserProfileModal';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -126,7 +127,7 @@ const CommunityDetailPage = ({
   }, [boardId, viewerId, onBoardViewUpdate]);
 
   // 댓글 페이징으로 가져오기
-  const fetchComments = useCallback(async (pageNum = 0, reset = false) => {
+  const fetchComments = useCallback(async (pageNum = 0) => {
     if (!boardId) {
       return;
     }
@@ -136,12 +137,7 @@ const CommunityDetailPage = ({
       const response = await commentApi.list(boardId, pageNum, commentPageSize);
       const pageData = response.data || {};
       const commentsData = pageData.comments || [];
-
-      if (reset) {
-        setComments(commentsData);
-      } else {
-        setComments(prevComments => [...prevComments, ...commentsData]);
-      }
+      setComments(commentsData);
 
       setCommentTotalCount(pageData.totalCount || 0);
       setCommentHasNext(pageData.hasNext || false);
@@ -154,12 +150,12 @@ const CommunityDetailPage = ({
     }
   }, [boardId, commentPageSize]);
 
-  // 댓글 더 보기
-  const handleLoadMoreComments = useCallback(() => {
-    if (!loadingComments && commentHasNext) {
-      fetchComments(commentPage + 1, false);
+  const handleCommentPageChange = useCallback((newPage) => {
+    const totalPages = Math.max(1, Math.ceil(commentTotalCount / commentPageSize));
+    if (newPage >= 0 && newPage < totalPages) {
+      fetchComments(newPage);
     }
-  }, [loadingComments, commentHasNext, commentPage, fetchComments]);
+  }, [commentTotalCount, commentPageSize, fetchComments]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -167,7 +163,7 @@ const CommunityDetailPage = ({
       return;
     }
     fetchBoard();
-    fetchComments(0, true);
+    fetchComments(0);
   }, [isOpen, boardId, fetchBoard, fetchComments, resetState]);
 
   const handleBoardReaction = useCallback(
@@ -347,7 +343,7 @@ const CommunityDetailPage = ({
       };
       await commentApi.create(boardId, payload);
       // 댓글 목록 새로고침
-      await fetchComments(0, true);
+      await fetchComments(0);
       setCommentContent('');
       setCommentFilePath('');
       setUploadError('');
@@ -435,7 +431,7 @@ const CommunityDetailPage = ({
       try {
         await commentApi.delete(boardId, commentId);
         // 댓글 목록 새로고침
-        await fetchComments(0, true);
+        await fetchComments(0);
         // 댓글 삭제 시 카운트 감소를 위해 boardId와 isDelete=true 전달
         onCommentAdded?.(boardId, true);
       } catch (err) {
@@ -617,15 +613,16 @@ const CommunityDetailPage = ({
               </CommentList>
             )}
 
-            {commentHasNext && (
-              <LoadMoreCommentsContainer>
-                <LoadMoreCommentsButton
-                  onClick={handleLoadMoreComments}
-                  disabled={loadingComments}
-                >
-                  {loadingComments ? '로딩 중...' : `댓글 더 보기 (${comments.length} / ${commentTotalCount})`}
-                </LoadMoreCommentsButton>
-              </LoadMoreCommentsContainer>
+            {commentTotalCount > 0 && (
+              <CommentPaginationWrapper>
+                <PageNavigation
+                  currentPage={commentPage}
+                  totalCount={commentTotalCount}
+                  pageSize={commentPageSize}
+                  onPageChange={handleCommentPageChange}
+                  loading={loadingComments}
+                />
+              </CommentPaginationWrapper>
             )}
 
             <CommentComposer>
@@ -1276,34 +1273,11 @@ const ErrorBanner = styled.div`
   font-size: 0.95rem;
 `;
 
-const LoadMoreCommentsContainer = styled.div`
+const CommentPaginationWrapper = styled.div`
   display: flex;
   justify-content: center;
   align-items: center;
   padding: ${props => props.theme.spacing.md} 0;
   margin-top: ${props => props.theme.spacing.sm};
-`;
-
-const LoadMoreCommentsButton = styled.button`
-  background: ${props => props.theme.colors.surface};
-  color: ${props => props.theme.colors.text};
-  border: 1px solid ${props => props.theme.colors.border};
-  border-radius: ${props => props.theme.borderRadius.md};
-  padding: ${props => props.theme.spacing.sm} ${props => props.theme.spacing.lg};
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  font-size: ${props => props.theme.typography.body2.fontSize};
-
-  &:hover:not(:disabled) {
-    background: ${props => props.theme.colors.surfaceHover};
-    border-color: ${props => props.theme.colors.primary};
-    color: ${props => props.theme.colors.primary};
-  }
-
-  &:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
 `;
 

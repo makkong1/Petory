@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import styled from 'styled-components';
 import { missingPetAdminApi } from '../../../api/missingPetAdminApi.js';
+import PageNavigation from '../../Common/PageNavigation';
 
 const MissingPetManagementSection = () => {
   const [status, setStatus] = useState('');
@@ -43,7 +44,8 @@ const MissingPetManagementSection = () => {
   }, [status, deleted, q]);
 
   const handlePageChange = (newPage) => {
-    if (newPage >= 0 && (newPage < page || hasNext)) {
+    const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+    if (newPage >= 0 && newPage < totalPages) {
       fetchMissingPets(newPage);
     }
   };
@@ -111,20 +113,16 @@ const MissingPetManagementSection = () => {
         </Group>
       </Filters>
 
-      {/* [리팩토링] 페이징 UI 추가 */}
       {totalCount > 0 && (
-        <Pagination>
-          <span>총 {totalCount}건</span>
-          <PageNav>
-            <button type="button" onClick={() => handlePageChange(page - 1)} disabled={page === 0}>
-              이전
-            </button>
-            <span>페이지 {page + 1}</span>
-            <button type="button" onClick={() => handlePageChange(page + 1)} disabled={!hasNext}>
-              다음
-            </button>
-          </PageNav>
-        </Pagination>
+        <PaginationWrapper>
+          <PageNavigation
+            currentPage={page}
+            totalCount={totalCount}
+            pageSize={pageSize}
+            onPageChange={handlePageChange}
+            loading={loading}
+          />
+        </PaginationWrapper>
       )}
 
       <Card>
@@ -238,31 +236,8 @@ const Input = styled.input`
   color: ${props => props.theme.colors.text};
 `;
 
-const Pagination = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+const PaginationWrapper = styled.div`
   margin-bottom: ${props => props.theme.spacing.sm};
-  font-size: ${props => props.theme.typography.caption.fontSize};
-  color: ${props => props.theme.colors.textSecondary};
-`;
-
-const PageNav = styled.div`
-  display: flex;
-  gap: ${props => props.theme.spacing.sm};
-  align-items: center;
-  button {
-    padding: 4px 8px;
-    border: 1px solid ${props => props.theme.colors.border};
-    background: ${props => props.theme.colors.surface};
-    color: ${props => props.theme.colors.text};
-    border-radius: 4px;
-    cursor: pointer;
-    &:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-  }
 `;
 
 const Refresh = styled.button`
