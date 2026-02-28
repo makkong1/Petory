@@ -1,5 +1,8 @@
 # 펫케어 요청 목록 조회 N+1 문제 분석
 
+> **참고**: 이 문서는 **비페이징** API (`findAllActiveRequests` 등)에 대한 분석입니다.  
+> **페이징** API (`findAllActiveRequestsWithPaging`, `searchWithPaging`)의 N+1 문제는 `care-request-paging-n-plus-one.md` 참조.
+
 ## 문제 상황
 
 `GET /api/care-requests` API 호출 시 다음과 같은 SQL 쿼리가 실행됩니다:

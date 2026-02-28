@@ -45,20 +45,20 @@
 
 **위치**: 
 - `CareRequestConverter.toDTO()` (라인 44-48)
-- `CareRequestRepository.findAllActiveRequests()` (라인 23)
+- `CareRequestRepository` (비페이징/페이징 쿼리)
 
 **현재 상태**:
-- `findAllActiveRequests()`는 `user`와 `pet`만 JOIN FETCH
-- `applications`는 JOIN FETCH하지 않음
-- `toDTO()`에서 `request.getApplications()` 호출 시 LAZY 로딩으로 추가 쿼리 발생 가능
+- **비페이징** (`findAllActiveRequests` 등): `user`, `pet`, `applications` JOIN FETCH 적용됨 ✅
+- **페이징** (`findAllActiveRequestsWithPaging`, `searchWithPaging` 등): `applications` JOIN FETCH **미적용** ❌
+- `toDTO()`에서 `request.getApplications()` 호출 시 LAZY 로딩으로 추가 쿼리 발생
 
 **실제 영향도**:
-- **중간** - 리스트 조회 시 각 요청마다 `applications` 조회 쿼리가 추가로 실행될 수 있음
-- 하지만 `applications`를 항상 조회하는 것은 아니므로, 실제 사용 패턴에 따라 다름
+- **페이징 API 사용 시**: 페이지당 N건 조회 시 careapplication 쿼리 N번 발생 (N+1)
+- **비페이징 API**: 이미 최적화됨
 
 **권장사항**:
-- `applications`를 자주 조회하는 경우 JOIN FETCH 추가
-- 필요 시에만 조회하도록 별도 메서드 제공
+- `CareRequest.applications`에 `@BatchSize(size=50)` 적용 (가장 단순)
+- 상세: `care-request-paging-n-plus-one.md` 참조
 
 ---
 
