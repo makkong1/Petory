@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { useTheme } from '../../contexts/ThemeContext';
 import { paymentApi } from '../../api/paymentApi';
+import PageNavigation from '../Common/PageNavigation';
 import PetCoinTransactionDetailModal from './PetCoinTransactionDetailModal';
 
 const TRANSACTION_TYPE_LABELS = {
@@ -15,8 +16,8 @@ const PetCoinTransactionListModal = ({ onClose }) => {
   const { theme } = useTheme();
   const [transactions, setTransactions] = useState([]);
   const [totalElements, setTotalElements] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
   const [page, setPage] = useState(0);
+  const pageSize = 20;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [selectedTransactionId, setSelectedTransactionId] = useState(null);
@@ -29,10 +30,9 @@ const PetCoinTransactionListModal = ({ onClose }) => {
     setLoading(true);
     setError('');
     try {
-      const data = await paymentApi.getTransactions(pageNum, 20);
+      const data = await paymentApi.getTransactions(pageNum, pageSize);
       setTransactions(data.content || []);
       setTotalElements(data.totalElements || 0);
-      setTotalPages(data.totalPages || 0);
     } catch (err) {
       console.error('거래 내역 조회 실패:', err);
       setError('거래 내역을 불러오는데 실패했습니다.');
@@ -106,25 +106,15 @@ const PetCoinTransactionListModal = ({ onClose }) => {
               ))}
             </TransactionList>
 
-            {totalPages > 1 && (
+            {totalElements > 0 && (
               <Pagination theme={theme}>
-                <PageButton
-                  onClick={() => setPage((p) => Math.max(0, p - 1))}
-                  disabled={page === 0}
-                  theme={theme}
-                >
-                  이전
-                </PageButton>
-                <PageInfo theme={theme}>
-                  {page + 1} / {totalPages} (총 {totalElements}건)
-                </PageInfo>
-                <PageButton
-                  onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-                  disabled={page >= totalPages - 1}
-                  theme={theme}
-                >
-                  다음
-                </PageButton>
+                <PageNavigation
+                  currentPage={page}
+                  totalCount={totalElements}
+                  pageSize={pageSize}
+                  onPageChange={setPage}
+                  loading={loading}
+                />
               </Pagination>
             )}
           </>
@@ -282,24 +272,6 @@ const Pagination = styled.div`
   gap: 16px;
   padding: 16px;
   border-top: 1px solid ${(props) => props.theme?.colors?.border || '#e0e0e0'};
-`;
-
-const PageButton = styled.button`
-  padding: 8px 16px;
-  border: 1px solid ${(props) => props.theme?.colors?.border || '#e0e0e0'};
-  border-radius: 8px;
-  background: ${(props) => props.theme?.colors?.surface || '#fff'};
-  color: ${(props) => props.theme?.colors?.text || '#333'};
-  cursor: pointer;
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-`;
-
-const PageInfo = styled.span`
-  font-size: 14px;
-  color: ${(props) => props.theme?.colors?.textSecondary || '#666'};
 `;
 
 const InfoSection = styled.div`

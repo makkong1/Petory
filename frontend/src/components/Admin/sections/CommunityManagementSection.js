@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import styled from 'styled-components';
 import { communityAdminApi } from '../../../api/communityAdminApi';
+import PageNavigation from '../../Common/PageNavigation';
 
 const CommunityManagementSection = () => {
   const [status, setStatus] = useState('ALL'); // ALL | ACTIVE | BLINDED | DELETED
@@ -205,12 +206,12 @@ const CommunityManagementSection = () => {
     }
   };
 
-  // 더 보기 버튼 클릭 핸들러
-  const handleLoadMore = useCallback(() => {
-    if (!loading && hasNext) {
-      fetchBoards(page + 1, false);
+  const handlePageChange = useCallback((newPage) => {
+    const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+    if (newPage >= 0 && newPage < totalPages) {
+      fetchBoards(newPage, true);
     }
-  }, [loading, hasNext, page, fetchBoards]);
+  }, [totalCount, pageSize, fetchBoards]);
 
   // 페이지 크기 변경 핸들러
   const handlePageSizeChange = (e) => {
@@ -278,6 +279,18 @@ const CommunityManagementSection = () => {
         </Group>
       </Filters>
 
+      {totalCount > 0 && (
+        <PaginationWrapper>
+          <PageNavigation
+            currentPage={page}
+            totalCount={totalCount}
+            pageSize={pageSize}
+            onPageChange={handlePageChange}
+            loading={loading}
+          />
+        </PaginationWrapper>
+      )}
+
       <Card>
         {loading && boardsData.order.length === 0 ? (
           <Info>로딩 중...</Info>
@@ -329,14 +342,6 @@ const CommunityManagementSection = () => {
                 ))}
               </tbody>
             </Table>
-            
-            {hasNext && (
-              <LoadMoreContainer>
-                <LoadMoreButton onClick={handleLoadMore} disabled={loading}>
-                  {loading ? '로딩 중...' : `더 보기 (${rows.length} / ${totalCount})`}
-                </LoadMoreButton>
-              </LoadMoreContainer>
-            )}
           </>
         )}
       </Card>
@@ -427,6 +432,10 @@ const Table = styled.table`
   td.ellipsis { max-width: 420px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 `;
 
+const PaginationWrapper = styled.div`
+  margin-bottom: ${props => props.theme.spacing.md};
+`;
+
 const Info = styled.div`
   padding: ${props => props.theme.spacing.lg};
   text-align: center;
@@ -460,39 +469,5 @@ const Danger = styled.button`
   cursor: pointer;
 `;
 
-const LoadMoreContainer = styled.div`
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: ${props => props.theme.spacing.xl} 0;
-  margin-top: ${props => props.theme.spacing.lg};
-`;
-
-const LoadMoreButton = styled.button`
-  background: ${props => props.theme.colors.gradient || props.theme.colors.primary};
-  color: white;
-  border: none;
-  padding: ${props => props.theme.spacing.md} ${props => props.theme.spacing.xl};
-  border-radius: ${props => props.theme.borderRadius.xl};
-  font-size: ${props => props.theme.typography.body1.fontSize};
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 12px rgba(255, 126, 54, 0.25);
-  
-  &:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(255, 126, 54, 0.35);
-  }
-  
-  &:active:not(:disabled) {
-    transform: translateY(0);
-  }
-  
-  &:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-`;
 
 

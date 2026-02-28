@@ -28,7 +28,6 @@ import com.linkup.Petory.domain.care.repository.CareRequestRepository;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 
-import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 
 @Service

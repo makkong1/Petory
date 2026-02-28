@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import styled from 'styled-components';
 import { userApi } from '../../api/userApi';
+import PageNavigation from '../Common/PageNavigation';
 import UserStatusModal from './UserStatusModal';
 
 const UserList = () => {
@@ -55,30 +56,23 @@ const UserList = () => {
   }, []);
 
   useEffect(() => {
-    fetchUsers(0, true);
+    fetchUsers(0);
   }, []);
 
-  const fetchUsers = useCallback(async (pageNum = 0, reset = false, size = pageSize) => {
+  const fetchUsers = useCallback(async (pageNum = 0, size = pageSize) => {
     try {
       setLoading(true);
       setError(null);
-      console.log('API 호출 시작: GET /api/admin/users/paging');
       
       const response = await userApi.getAllUsersWithPaging({
         page: pageNum,
         size: size
       });
       
-      console.log('API 응답:', response);
       const pageData = response.data || {};
       const users = pageData.users || [];
-
-      if (reset) {
-        const newData = convertToMapAndOrder(users);
-        setUsersData(newData);
-      } else {
-        setUsersData(prevData => addUsersToMap(prevData, users));
-      }
+      const newData = convertToMapAndOrder(users);
+      setUsersData(newData);
 
       setTotalCount(pageData.totalCount || 0);
       setHasNext(pageData.hasNext || false);
@@ -95,7 +89,7 @@ const UserList = () => {
     } finally {
       setLoading(false);
     }
-  }, [pageSize, convertToMapAndOrder, addUsersToMap]);
+  }, [pageSize, convertToMapAndOrder]);
 
   const handleAddUser = () => {
     setSelectedUser(null);
@@ -125,7 +119,7 @@ const UserList = () => {
           return prev;
         });
         // 첫 페이지부터 다시 로드
-        fetchUsers(0, true);
+        fetchUsers(0);
         alert('계정이 삭제되었습니다.');
       } catch (err) {
         alert('계정 삭제에 실패했습니다.');
@@ -152,7 +146,7 @@ const UserList = () => {
           return prev;
         });
         // 첫 페이지부터 다시 로드
-        fetchUsers(0, true);
+        fetchUsers(0);
         alert('계정이 복구되었습니다.');
       } catch (err) {
         alert('계정 복구에 실패했습니다.');
@@ -165,15 +159,15 @@ const UserList = () => {
     setModalOpen(false);
     setSelectedUser(null);
     // 첫 페이지부터 다시 로드
-    fetchUsers(0, true);
+    fetchUsers(0);
   };
 
-  // 더 보기 버튼 클릭 핸들러
-  const handleLoadMore = useCallback(() => {
-    if (!loading && hasNext) {
-      fetchUsers(page + 1, false);
+  const handlePageChange = useCallback((newPage) => {
+    const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+    if (newPage >= 0 && newPage < totalPages) {
+      fetchUsers(newPage);
     }
-  }, [loading, hasNext, page, fetchUsers]);
+  }, [totalCount, pageSize, fetchUsers]);
 
   // 서버에서 이미 필터링되어 오므로 그대로 사용
   const users = useMemo(() => {
@@ -184,7 +178,7 @@ const UserList = () => {
   const handlePageSizeChange = (e) => {
     const newSize = parseInt(e.target.value);
     setPageSize(newSize);
-    fetchUsers(0, true, newSize);
+    fetchUsers(0, newSize);
   };
 
   return (
@@ -211,7 +205,7 @@ const UserList = () => {
           <ErrorMessage>{error}</ErrorMessage>
           <div style={{ textAlign: 'center', marginTop: '20px' }}>
             <button
-              onClick={() => fetchUsers(0, true)}
+              onClick={() => fetchUsers(0)}
               style={{
                 padding: '10px 20px',
                 backgroundColor: '#4a90e2',
@@ -278,12 +272,16 @@ const UserList = () => {
             )}
           </UserGrid>
           
-          {hasNext && (
-            <LoadMoreContainer>
-              <LoadMoreButton onClick={handleLoadMore} disabled={loading}>
-                {loading ? '로딩 중...' : `더 보기 (${users.length} / ${totalCount})`}
-              </LoadMoreButton>
-            </LoadMoreContainer>
+          {totalCount > 0 && (
+            <PaginationWrapper>
+              <PageNavigation
+                currentPage={page}
+                totalCount={totalCount}
+                pageSize={pageSize}
+                onPageChange={handlePageChange}
+                loading={loading}
+              />
+            </PaginationWrapper>
           )}
         </>
       )}
@@ -477,37 +475,10 @@ const ErrorMessage = styled.div`
   border: 1px solid #fad5d5;
 `;
 
-const LoadMoreContainer = styled.div`
+const PaginationWrapper = styled.div`
   display: flex;
   justify-content: center;
   align-items: center;
   padding: ${props => props.theme.spacing.xl} 0;
   margin-top: ${props => props.theme.spacing.lg};
-`;
-
-const LoadMoreButton = styled.button`
-  background: ${props => props.theme.colors.gradient || props.theme.colors.primary};
-  color: white;
-  border: none;
-  padding: ${props => props.theme.spacing.md} ${props => props.theme.spacing.xl};
-  border-radius: ${props => props.theme.borderRadius.xl};
-  font-size: ${props => props.theme.typography.body1.fontSize};
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 12px rgba(255, 126, 54, 0.25);
-  
-  &:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(255, 126, 54, 0.35);
-  }
-  
-  &:active:not(:disabled) {
-    transform: translateY(0);
-  }
-  
-  &:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
 `;

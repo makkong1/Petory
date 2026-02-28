@@ -3,6 +3,7 @@ import styled from 'styled-components';
 import { missingPetApi } from '../../api/missingPetApi';
 import { useAuth } from '../../contexts/AuthContext';
 import { useEmailVerification } from '../../hooks/useEmailVerification';
+import PageNavigation from '../Common/PageNavigation';
 import MissingPetBoardForm from './MissingPetBoardForm';
 import MissingPetBoardDetail from './MissingPetBoardDetail';
 
@@ -41,7 +42,7 @@ const MissingPetBoardPage = () => {
   const [hasNext, setHasNext] = useState(false);
 
   // 서버 사이드 페이징으로 게시글 가져오기
-  const fetchBoards = useCallback(async (pageNum = 0, reset = false) => {
+  const fetchBoards = useCallback(async (pageNum = 0) => {
     try {
       setLoading(true);
       setError(null);
@@ -56,11 +57,7 @@ const MissingPetBoardPage = () => {
       const pageData = response.data || {};
       const boardsData = pageData.boards || [];
 
-      if (reset) {
-        setBoards(boardsData);
-      } else {
-        setBoards(prevBoards => [...prevBoards, ...boardsData]);
-      }
+      setBoards(boardsData);
 
       setTotalCount(pageData.totalCount || 0);
       setHasNext(pageData.hasNext || false);
@@ -74,9 +71,8 @@ const MissingPetBoardPage = () => {
     }
   }, [statusFilter, pageSize]);
 
-  // 카테고리나 페이지 크기 변경 시 게시글 다시 로드
   useEffect(() => {
-    fetchBoards(0, true);
+    fetchBoards(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter, pageSize]);
 
@@ -148,7 +144,7 @@ const MissingPetBoardPage = () => {
   }, [loadBoardDetail]);
 
   const refreshBoardDetail = useCallback(async () => {
-    await fetchBoards(0, true);
+    await fetchBoards(0);
     if (activeBoardId) {
       await loadBoardDetail(activeBoardId);
     }
@@ -197,7 +193,7 @@ const MissingPetBoardPage = () => {
 
       const response = await missingPetApi.create(payload);
       setIsFormOpen(false);
-      await fetchBoards(0, true);
+      await fetchBoards(0);
 
       if (response?.data?.idx) {
         const newId = response.data.idx;
@@ -219,12 +215,12 @@ const MissingPetBoardPage = () => {
     loadBoardDetail(board.idx);
   };
 
-  // 더 보기 버튼 클릭 핸들러
-  const handleLoadMore = useCallback(() => {
-    if (!loading && hasNext) {
-      fetchBoards(page + 1, false);
+  const handlePageChange = useCallback((newPage) => {
+    const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+    if (newPage >= 0 && newPage < totalPages) {
+      fetchBoards(newPage);
     }
-  }, [loading, hasNext, page, fetchBoards]);
+  }, [totalCount, pageSize, fetchBoards]);
 
   // 페이지 크기 변경 핸들러
   const handlePageSizeChange = useCallback((newSize) => {
@@ -241,7 +237,7 @@ const MissingPetBoardPage = () => {
   }, []);
 
   const handleBoardDeleted = useCallback(async () => {
-    await fetchBoards(0, true);
+    await fetchBoards(0);
     closeDrawer();
   }, [fetchBoards, closeDrawer]);
 
@@ -365,15 +361,16 @@ const MissingPetBoardPage = () => {
           </BoardGrid>
         )}
 
-        {hasNext && (
-          <LoadMoreContainer>
-            <LoadMoreButton
-              onClick={handleLoadMore}
-              disabled={loading}
-            >
-              {loading ? '로딩 중...' : `더 보기 (${boards.length} / ${totalCount})`}
-            </LoadMoreButton>
-          </LoadMoreContainer>
+        {totalCount > 0 && (
+          <PaginationWrapper>
+            <PageNavigation
+              currentPage={page}
+              totalCount={totalCount}
+              pageSize={pageSize}
+              onPageChange={handlePageChange}
+              loading={loading}
+            />
+          </PaginationWrapper>
         )}
       </Wrapper>
 
@@ -815,7 +812,7 @@ const PageSizeButton = styled.button`
   }
 `;
 
-const LoadMoreContainer = styled.div`
+const PaginationWrapper = styled.div`
   display: flex;
   justify-content: center;
   align-items: center;
@@ -823,30 +820,4 @@ const LoadMoreContainer = styled.div`
   margin-top: ${props => props.theme.spacing.lg};
 `;
 
-const LoadMoreButton = styled.button`
-  background: ${props => props.theme.colors.gradient};
-  color: white;
-  border: none;
-  padding: ${props => props.theme.spacing.md} ${props => props.theme.spacing.xl};
-  border-radius: ${props => props.theme.borderRadius.xl};
-  font-size: ${props => props.theme.typography.body1.fontSize};
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 12px rgba(255, 126, 54, 0.25);
-  
-  &:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(255, 126, 54, 0.35);
-  }
-  
-  &:active {
-    transform: translateY(0);
-  }
-
-  &:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-`;
 

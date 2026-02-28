@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import styled from 'styled-components';
 import { activityApi } from '../../api/activityApi';
 import { useAuth } from '../../contexts/AuthContext';
+import PageNavigation from '../Common/PageNavigation';
 
 const ActivityPage = () => {
   const { user } = useAuth();
@@ -68,11 +69,11 @@ const ActivityPage = () => {
   // 필터 변경 시 첫 페이지부터 다시 로드
   useEffect(() => {
     if (user && user.idx) {
-      fetchActivities(0, true);
+      fetchActivities(0);
     }
   }, [user, activeFilter]);
 
-  const fetchActivities = useCallback(async (pageNum = 0, reset = false) => {
+  const fetchActivities = useCallback(async (pageNum = 0) => {
     if (!user || !user.idx) {
       setError('로그인이 필요합니다.');
       setLoading(false);
@@ -92,13 +93,8 @@ const ActivityPage = () => {
       
       const pageData = response.data || {};
       const activities = pageData.activities || [];
-
-      if (reset) {
-        const newData = convertToMapAndOrder(activities);
-        setActivitiesData(newData);
-      } else {
-        setActivitiesData(prevData => addActivitiesToMap(prevData, activities));
-      }
+      const newData = convertToMapAndOrder(activities);
+      setActivitiesData(newData);
 
       setTotalCount(pageData.totalCount || 0);
       setHasNext(pageData.hasNext || false);
@@ -117,7 +113,7 @@ const ActivityPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [user, activeFilter, pageSize, convertToMapAndOrder, addActivitiesToMap]);
+  }, [user, activeFilter, pageSize, convertToMapAndOrder]);
 
   const getTypeLabel = (type) => {
     switch (type) {
@@ -189,12 +185,12 @@ const ActivityPage = () => {
     { key: 'REVIEWS', label: '리뷰', count: filterCounts.reviewsCount },
   ];
 
-  // 더 보기 버튼 클릭 핸들러
-  const handleLoadMore = useCallback(() => {
-    if (!loading && hasNext) {
-      fetchActivities(page + 1, false);
+  const handlePageChange = useCallback((newPage) => {
+    const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+    if (newPage >= 0 && newPage < totalPages) {
+      fetchActivities(newPage);
     }
-  }, [loading, hasNext, page, fetchActivities]);
+  }, [totalCount, pageSize, fetchActivities]);
 
   // 활동 카드 클릭 핸들러 - 해당 게시글로 이동
   const handleActivityClick = useCallback((activity) => {
@@ -371,12 +367,16 @@ const ActivityPage = () => {
               );
             })}
             
-            {hasNext && (
-              <LoadMoreContainer>
-                <LoadMoreButton onClick={handleLoadMore} disabled={loading}>
-                  {loading ? '로딩 중...' : `더 보기 (${filteredActivities.length} / ${totalCount})`}
-                </LoadMoreButton>
-              </LoadMoreContainer>
+            {totalCount > 0 && (
+              <PaginationWrapper>
+                <PageNavigation
+                  currentPage={page}
+                  totalCount={totalCount}
+                  pageSize={pageSize}
+                  onPageChange={handlePageChange}
+                  loading={loading}
+                />
+              </PaginationWrapper>
             )}
           </>
         )}
@@ -617,38 +617,11 @@ const EmptyMessage = styled.div`
   }
 `;
 
-const LoadMoreContainer = styled.div`
+const PaginationWrapper = styled.div`
   display: flex;
   justify-content: center;
   align-items: center;
   padding: ${props => props.theme.spacing.xl} 0;
   margin-top: ${props => props.theme.spacing.lg};
-`;
-
-const LoadMoreButton = styled.button`
-  background: ${props => props.theme.colors.gradient || props.theme.colors.primary};
-  color: white;
-  border: none;
-  padding: ${props => props.theme.spacing.md} ${props => props.theme.spacing.xl};
-  border-radius: ${props => props.theme.borderRadius.xl};
-  font-size: ${props => props.theme.typography.body1.fontSize};
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 12px rgba(255, 126, 54, 0.25);
-  
-  &:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(255, 126, 54, 0.35);
-  }
-  
-  &:active:not(:disabled) {
-    transform: translateY(0);
-  }
-  
-  &:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
 `;
 

@@ -4,6 +4,7 @@ import { boardApi } from '../../api/boardApi';
 import { reportApi } from '../../api/reportApi';
 import { usePermission } from '../../hooks/usePermission';
 import { useAuth } from '../../contexts/AuthContext';
+import PageNavigation from '../Common/PageNavigation';
 import CommunityPostModal from './CommunityPostModal';
 import CommunityDetailPage from './CommunityDetailPage';
 
@@ -145,7 +146,7 @@ const CommunityBoard = () => {
   }, []);
 
   // 서버 사이드 페이징으로 게시글 가져오기
-  const fetchBoards = useCallback(async (pageNum = 0, reset = false) => {
+  const fetchBoards = useCallback(async (pageNum = 0) => {
     try {
       setLoading(true);
       setError('');
@@ -160,13 +161,8 @@ const CommunityBoard = () => {
       const pageData = response.data || {};
 
       const boards = pageData.boards || [];
-
-      if (reset) {
-        const newData = convertToMapAndOrder(boards);
-        setPostsData(newData);
-      } else {
-        setPostsData(prevData => addPostsToMap(prevData, boards));
-      }
+      const newData = convertToMapAndOrder(boards);
+      setPostsData(newData);
 
       setTotalCount(pageData.totalCount || 0);
       setHasNext(pageData.hasNext || false);
@@ -180,7 +176,7 @@ const CommunityBoard = () => {
     } finally {
       setLoading(false);
     }
-  }, [activeCategory, pageSize, convertToMapAndOrder, addPostsToMap]);
+  }, [activeCategory, pageSize, convertToMapAndOrder]);
 
   const fetchPopularBoards = useCallback(async () => {
     // 자랑 카테고리일 때만 인기 게시글 조회
@@ -203,7 +199,7 @@ const CommunityBoard = () => {
 
   // 카테고리나 페이지 크기 변경 시 게시글 다시 로드
   useEffect(() => {
-    fetchBoards(0, true);
+    fetchBoards(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeCategory, pageSize]);
 
@@ -285,12 +281,12 @@ const CommunityBoard = () => {
   // 표시할 게시글 (이미 categorizedPosts에 있음)
   const displayedPosts = categorizedPosts;
 
-  // 더 보기 버튼 클릭 핸들러
-  const handleLoadMore = useCallback(() => {
-    if (!loading && hasNext) {
-      fetchBoards(page + 1, false);
+  const handlePageChange = useCallback((newPage) => {
+    const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+    if (newPage >= 0 && newPage < totalPages) {
+      fetchBoards(newPage);
     }
-  }, [loading, hasNext, page, fetchBoards]);
+  }, [totalCount, pageSize, fetchBoards]);
 
   // 페이지 크기 변경 핸들러
   const handlePageSizeChange = useCallback((newSize) => {
@@ -309,8 +305,7 @@ const CommunityBoard = () => {
     setSearchType(e.target.value);
   }, []);
 
-  // 검색 핸들러 (페이징 지원)
-  const handleSearch = useCallback(async (pageNum = 0, reset = false) => {
+  const handleSearch = useCallback(async (pageNum = 0) => {
     if (!searchKeyword.trim()) {
       alert('검색어를 입력하세요');
       return;
@@ -323,13 +318,8 @@ const CommunityBoard = () => {
       const response = await boardApi.searchBoards(searchKeyword.trim(), searchType, pageNum, pageSize);
       const pageData = response.data || {};
       const results = pageData.boards || [];
-
-      if (reset) {
-        const newData = convertToMapAndOrder(results);
-        setSearchPostsData(newData);
-      } else {
-        setSearchPostsData(prevData => addPostsToMap(prevData, results));
-      }
+      const newData = convertToMapAndOrder(results);
+      setSearchPostsData(newData);
 
       setSearchTotalCount(pageData.totalCount || 0);
       setSearchHasNext(pageData.hasNext || false);
@@ -341,7 +331,7 @@ const CommunityBoard = () => {
     } finally {
       setSearchLoading(false);
     }
-  }, [searchKeyword, searchType, pageSize, convertToMapAndOrder, addPostsToMap]);
+  }, [searchKeyword, searchType, pageSize, convertToMapAndOrder]);
 
   // 검색 취소 핸들러
   const handleCancelSearch = useCallback(() => {
@@ -354,17 +344,16 @@ const CommunityBoard = () => {
     setSearchHasNext(false);
   }, []);
 
-  // 검색 결과 더 보기
-  const handleSearchLoadMore = useCallback(() => {
-    if (!searchLoading && searchHasNext) {
-      handleSearch(searchPage + 1, false);
+  const handleSearchPageChange = useCallback((newPage) => {
+    const totalPages = Math.max(1, Math.ceil(searchTotalCount / pageSize));
+    if (newPage >= 0 && newPage < totalPages) {
+      handleSearch(newPage);
     }
-  }, [searchLoading, searchHasNext, searchPage, handleSearch]);
+  }, [searchTotalCount, pageSize, handleSearch]);
 
-  // Enter 키로 검색
   const handleSearchKeyPress = useCallback((e) => {
     if (e.key === 'Enter') {
-      handleSearch(0, true);
+      handleSearch(0);
     }
   }, [handleSearch]);
 
@@ -400,7 +389,7 @@ const CommunityBoard = () => {
       const response = await boardApi.createBoard(payload);
       setIsPostModalOpen(false);
       // 게시글 작성 후 첫 페이지부터 다시 로드
-      await fetchBoards(0, true);
+      await fetchBoards(0);
     } catch (err) {
       console.error('❌ 게시글 생성 실패:', err);
       const message = err.response?.data?.error || err.message;
@@ -523,7 +512,7 @@ const CommunityBoard = () => {
       if (selectedBoardId === postIdx) {
         handleDetailClose();
       }
-      fetchBoards(0, true);
+      fetchBoards(0);
     } catch (err) {
       const message = err.response?.data?.error || err.message;
       alert(`게시글을 삭제하지 못했습니다: ${message}`);
@@ -545,7 +534,7 @@ const CommunityBoard = () => {
       if (selectedBoardId === boardId) {
         handleDetailClose();
       }
-      fetchBoards(0, true);
+      fetchBoards(0);
     },
     [fetchBoards, selectedBoard, selectedBoardId]
   );
@@ -716,7 +705,7 @@ const CommunityBoard = () => {
             <option value="TITLE_CONTENT">제목+내용</option>
             <option value="NICKNAME">작성자</option>
           </SearchTypeSelect>
-          <SearchButton onClick={() => handleSearch(0, true)} disabled={searchLoading}>
+          <SearchButton onClick={() => handleSearch(0)} disabled={searchLoading}>
             {searchLoading ? '검색 중...' : '🔍 검색'}
           </SearchButton>
           {isSearchMode && (
@@ -1055,16 +1044,16 @@ const CommunityBoard = () => {
             })}
           </PostGrid>
 
-          {(isSearchMode ? searchHasNext : hasNext) && (
-            <LoadMoreContainer>
-              <LoadMoreButton
-                onClick={isSearchMode ? handleSearchLoadMore : handleLoadMore}
-                disabled={isSearchMode ? searchLoading : loading}
-              >
-                {(isSearchMode ? searchLoading : loading) ? '로딩 중...' :
-                  `더 보기 (${filteredPosts.length} / ${isSearchMode ? searchTotalCount : totalCount})`}
-              </LoadMoreButton>
-            </LoadMoreContainer>
+          {((isSearchMode ? searchTotalCount : totalCount) > 0) && (
+            <PaginationWrapper>
+              <PageNavigation
+                currentPage={isSearchMode ? searchPage : page}
+                totalCount={isSearchMode ? searchTotalCount : totalCount}
+                pageSize={pageSize}
+                onPageChange={isSearchMode ? handleSearchPageChange : handlePageChange}
+                loading={isSearchMode ? searchLoading : loading}
+              />
+            </PaginationWrapper>
           )}
         </>
       )}
@@ -1941,32 +1930,10 @@ const PageSizeButton = styled.button`
   }
 `;
 
-const LoadMoreContainer = styled.div`
+const PaginationWrapper = styled.div`
   display: flex;
   justify-content: center;
   align-items: center;
   padding: ${props => props.theme.spacing.xl} 0;
   margin-top: ${props => props.theme.spacing.lg};
-`;
-
-const LoadMoreButton = styled.button`
-  background: ${props => props.theme.colors.gradient};
-  color: white;
-  border: none;
-  padding: ${props => props.theme.spacing.md} ${props => props.theme.spacing.xl};
-  border-radius: ${props => props.theme.borderRadius.xl};
-  font-size: ${props => props.theme.typography.body1.fontSize};
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 12px rgba(255, 126, 54, 0.25);
-  
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(255, 126, 54, 0.35);
-  }
-  
-  &:active {
-    transform: translateY(0);
-  }
 `;
