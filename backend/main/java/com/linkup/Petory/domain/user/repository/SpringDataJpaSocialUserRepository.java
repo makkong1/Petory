@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import com.linkup.Petory.domain.user.entity.Provider;
 import com.linkup.Petory.domain.user.entity.SocialUser;
+import com.linkup.Petory.global.annotation.RepositoryMethod;
 
 /**
  * Spring Data JPA 전용 인터페이스입니다.
@@ -17,9 +18,7 @@ import com.linkup.Petory.domain.user.entity.SocialUser;
  */
 public interface SpringDataJpaSocialUserRepository extends JpaRepository<SocialUser, Long> {
 
-    /**
-     * Provider와 ProviderId로 소셜 사용자 조회
-     */
+    @RepositoryMethod("소셜 사용자: Provider+ProviderId로 조회")
     Optional<SocialUser> findByProviderAndProviderId(Provider provider, String providerId);
 }
 

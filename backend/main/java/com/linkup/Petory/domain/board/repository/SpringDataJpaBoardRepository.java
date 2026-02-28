@@ -12,6 +12,7 @@ import org.springframework.data.repository.query.Param;
 
 import com.linkup.Petory.domain.board.entity.Board;
 import com.linkup.Petory.domain.user.entity.Users;
+import com.linkup.Petory.global.annotation.RepositoryMethod;
 
 /**
  * Spring Data JPA 전용 인터페이스입니다.
@@ -23,32 +24,32 @@ import com.linkup.Petory.domain.user.entity.Users;
  */
 public interface SpringDataJpaBoardRepository extends JpaRepository<Board, Long>, JpaSpecificationExecutor<Board> {
 
-    // 전체 게시글 조회 (삭제되지 않은 것만, 최신순) - 작성자도 활성 상태여야 함
+    @RepositoryMethod("게시글: 전체 목록 조회")
     @Query("SELECT b FROM Board b JOIN FETCH b.user u WHERE b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY b.createdAt DESC")
     List<Board> findAllByIsDeletedFalseOrderByCreatedAtDesc();
 
-    // 전체 게시글 조회 (삭제되지 않은 것만, 최신순) - 페이징 - 작성자도 활성 상태여야 함
+    @RepositoryMethod("게시글: 전체 목록 페이징")
     @Query("SELECT b FROM Board b JOIN FETCH b.user u WHERE b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY b.createdAt DESC")
     Page<Board> findAllByIsDeletedFalseOrderByCreatedAtDesc(Pageable pageable);
 
-    // 카테고리별 삭제되지 않은 게시글 조회 (최신순) - 작성자도 활성 상태여야 함
+    @RepositoryMethod("게시글: 카테고리별 목록 조회")
     @Query("SELECT b FROM Board b JOIN FETCH b.user u WHERE b.category = :category AND b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY b.createdAt DESC")
     List<Board> findByCategoryAndIsDeletedFalseOrderByCreatedAtDesc(@Param("category") String category);
 
-    // 카테고리별 삭제되지 않은 게시글 조회 (최신순) - 페이징 - 작성자도 활성 상태여야 함
+    @RepositoryMethod("게시글: 카테고리별 목록 페이징")
     @Query("SELECT b FROM Board b JOIN FETCH b.user u WHERE b.category = :category AND b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY b.createdAt DESC")
     Page<Board> findByCategoryAndIsDeletedFalseOrderByCreatedAtDesc(@Param("category") String category,
             Pageable pageable);
 
-    // 사용자별 삭제되지 않은 게시글 조회 (최신순) - 작성자도 활성 상태여야 함
+    @RepositoryMethod("게시글: 사용자별 목록 조회")
     @Query("SELECT b FROM Board b JOIN FETCH b.user u WHERE b.user = :user AND b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY b.createdAt DESC")
     List<Board> findByUserAndIsDeletedFalseOrderByCreatedAtDesc(@Param("user") Users user);
 
-    // 작성자 닉네임으로 검색 (페이징) - JOIN 쿼리로 최적화
+    @RepositoryMethod("게시글: 작성자 닉네임 검색 페이징")
     @Query("SELECT b FROM Board b JOIN FETCH b.user u WHERE u.nickname LIKE :nickname% AND b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY b.createdAt DESC")
     Page<Board> searchByNicknameWithPaging(@Param("nickname") String nickname, Pageable pageable);
 
-    // FULLTEXT 인덱스 사용 쿼리 (제목+내용) - 페이징 - 작성자도 활성 상태여야 함
+    @RepositoryMethod("게시글: FULLTEXT 키워드 검색 페이징")
     @Query(value = "SELECT b.*, MATCH(b.title, b.content) AGAINST(:kw IN BOOLEAN MODE) AS relevance "
             + "FROM board b "
             + "INNER JOIN users u ON b.user_idx = u.idx "
@@ -64,17 +65,17 @@ public interface SpringDataJpaBoardRepository extends JpaRepository<Board, Long>
                     + "AND MATCH(b.title, b.content) AGAINST(:kw IN BOOLEAN MODE)", nativeQuery = true)
     Page<Board> searchByKeywordWithPaging(@Param("kw") String keyword, Pageable pageable);
 
-    // 카테고리 + 기간별 조회
+    @RepositoryMethod("게시글: 카테고리+기간별 조회")
     List<Board> findByCategoryAndCreatedAtBetween(String category, LocalDateTime start, LocalDateTime end);
 
-    // 통계용
+    @RepositoryMethod("게시글: 기간별 통계")
     long countByCreatedAtBetween(LocalDateTime start, LocalDateTime end);
 
-    // 관리자용: 작성자 상태 체크 없이 조회 (삭제된 사용자 콘텐츠도 포함) - 전체 조회
+    @RepositoryMethod("게시글: 관리자 전체 조회 (삭제 제외)")
     @Query("SELECT b FROM Board b JOIN FETCH b.user u WHERE b.isDeleted = false ORDER BY b.createdAt DESC")
     List<Board> findAllByIsDeletedFalseForAdmin();
 
-    // 관리자용: 전체 조회 (삭제 포함)
+    @RepositoryMethod("게시글: 관리자 전체 조회 (삭제 포함)")
     @Query("SELECT b FROM Board b JOIN FETCH b.user u ORDER BY b.createdAt DESC")
     List<Board> findAllForAdmin();
 }
