@@ -10,20 +10,17 @@ import org.springframework.data.repository.query.Param;
 import com.linkup.Petory.domain.care.entity.CareApplication;
 import com.linkup.Petory.domain.care.entity.CareApplicationStatus;
 import com.linkup.Petory.domain.care.entity.CareRequest;
+import com.linkup.Petory.global.annotation.RepositoryMethod;
 
 /**
  * Spring Data JPA 전용 인터페이스입니다.
  */
 public interface SpringDataJpaCareApplicationRepository extends JpaRepository<CareApplication, Long> {
 
-    /**
-     * 특정 CareRequest에 대한 지원 목록 조회
-     */
+    @RepositoryMethod("펫케어 지원: 요청별 목록 조회")
     List<CareApplication> findByCareRequest(CareRequest careRequest);
 
-    /**
-     * 특정 CareRequest와 Provider로 지원 조회
-     */
+    @RepositoryMethod("펫케어 지원: 요청+제공자로 조회")
     @Query("SELECT ca FROM CareApplication ca " +
                     "WHERE ca.careRequest.idx = :careRequestIdx " +
                     "  AND ca.provider.idx = :providerIdx")
@@ -31,9 +28,7 @@ public interface SpringDataJpaCareApplicationRepository extends JpaRepository<Ca
                     @Param("careRequestIdx") Long careRequestIdx,
                     @Param("providerIdx") Long providerIdx);
 
-    /**
-     * 특정 CareRequest의 ACCEPTED 상태 지원 조회
-     */
+    @RepositoryMethod("펫케어 지원: 요청+상태로 조회")
     @Query("SELECT ca FROM CareApplication ca " +
                     "WHERE ca.careRequest.idx = :careRequestIdx " +
                     "  AND ca.status = :status")
