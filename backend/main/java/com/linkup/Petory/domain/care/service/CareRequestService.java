@@ -3,6 +3,10 @@ package com.linkup.Petory.domain.care.service;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -11,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.linkup.Petory.domain.care.converter.CareRequestConverter;
 import com.linkup.Petory.domain.care.dto.CareRequestDTO;
+import com.linkup.Petory.domain.care.dto.CareRequestPageResponseDTO;
 import com.linkup.Petory.domain.care.entity.CareRequest;
 import com.linkup.Petory.domain.care.entity.CareRequestStatus;
 import com.linkup.Petory.domain.care.entity.CareApplicationStatus;
@@ -73,6 +78,54 @@ public class CareRequestService {
         }
 
         return careRequestConverter.toDTOList(requests);
+    }
+
+    /**
+     * 펫케어 요청 목록 조회 (페이징)
+     */
+    @Transactional(readOnly = true)
+    public CareRequestPageResponseDTO getCareRequestsWithPaging(String status, String location, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Page<CareRequest> requestPage;
+
+        if (status != null && !status.equals("ALL")) {
+            CareRequestStatus statusEnum = CareRequestStatus.valueOf(status);
+            requestPage = careRequestRepository.findByStatusAndIsDeletedFalseWithPaging(
+                    statusEnum, location, pageable);
+        } else {
+            requestPage = careRequestRepository.findAllActiveRequestsWithPaging(location, pageable);
+        }
+
+        List<CareRequestDTO> dtos = careRequestConverter.toDTOList(requestPage.getContent());
+        return new CareRequestPageResponseDTO(
+                dtos,
+                requestPage.getTotalElements(),
+                requestPage.getTotalPages(),
+                requestPage.getNumber(),
+                requestPage.getSize(),
+                requestPage.hasNext(),
+                requestPage.hasPrevious());
+    }
+
+    /**
+     * 펫케어 요청 검색 (페이징)
+     */
+    @Transactional(readOnly = true)
+    public CareRequestPageResponseDTO searchCareRequestsWithPaging(String keyword, int page, int size) {
+        if (keyword == null || keyword.trim().isEmpty()) {
+            return getCareRequestsWithPaging(null, null, page, size);
+        }
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Page<CareRequest> requestPage = careRequestRepository.searchWithPaging(keyword.trim(), pageable);
+        List<CareRequestDTO> dtos = careRequestConverter.toDTOList(requestPage.getContent());
+        return new CareRequestPageResponseDTO(
+                dtos,
+                requestPage.getTotalElements(),
+                requestPage.getTotalPages(),
+                requestPage.getNumber(),
+                requestPage.getSize(),
+                requestPage.hasNext(),
+                requestPage.hasPrevious());
     }
 
     // 단일 케어 요청 조회

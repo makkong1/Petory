@@ -4,6 +4,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -75,5 +77,20 @@ public interface SpringDataJpaCareRequestRepository extends JpaRepository<CareRe
     long countByCreatedAtBetween(LocalDateTime start, LocalDateTime end);
 
     long countByDateBetweenAndStatus(LocalDateTime start, LocalDateTime end, CareRequestStatus status);
+
+    // 페이징 - 전체 조회
+    @Query(value = "SELECT cr FROM CareRequest cr JOIN FETCH cr.user u LEFT JOIN FETCH cr.pet WHERE cr.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' AND (:location IS NULL OR :location = '' OR u.location LIKE CONCAT('%', :location, '%')) ORDER BY cr.createdAt DESC",
+           countQuery = "SELECT COUNT(cr) FROM CareRequest cr JOIN cr.user u WHERE cr.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' AND (:location IS NULL OR :location = '' OR u.location LIKE CONCAT('%', :location, '%'))")
+    Page<CareRequest> findAllActiveRequestsWithPaging(@Param("location") String location, Pageable pageable);
+
+    // 페이징 - 상태별 조회
+    @Query(value = "SELECT cr FROM CareRequest cr JOIN FETCH cr.user u LEFT JOIN FETCH cr.pet WHERE cr.status = :status AND cr.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' AND (:location IS NULL OR :location = '' OR u.location LIKE CONCAT('%', :location, '%')) ORDER BY cr.createdAt DESC",
+           countQuery = "SELECT COUNT(cr) FROM CareRequest cr JOIN cr.user u WHERE cr.status = :status AND cr.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' AND (:location IS NULL OR :location = '' OR u.location LIKE CONCAT('%', :location, '%'))")
+    Page<CareRequest> findByStatusAndIsDeletedFalseWithPaging(@Param("status") CareRequestStatus status, @Param("location") String location, Pageable pageable);
+
+    // 페이징 - 검색
+    @Query(value = "SELECT DISTINCT cr FROM CareRequest cr JOIN FETCH cr.user u LEFT JOIN FETCH cr.pet WHERE cr.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' AND (LOWER(cr.title) LIKE LOWER(CONCAT('%', :keyword, '%')) OR LOWER(CAST(cr.description AS string)) LIKE LOWER(CONCAT('%', :keyword, '%'))) ORDER BY cr.createdAt DESC",
+           countQuery = "SELECT COUNT(DISTINCT cr) FROM CareRequest cr JOIN cr.user u WHERE cr.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' AND (LOWER(cr.title) LIKE LOWER(CONCAT('%', :keyword, '%')) OR LOWER(CAST(cr.description AS string)) LIKE LOWER(CONCAT('%', :keyword, '%')))")
+    Page<CareRequest> searchWithPaging(@Param("keyword") String keyword, Pageable pageable);
 }
 

@@ -32,8 +32,11 @@ api.interceptors.request.use(
 // 401 에러는 전역 인터셉터에서 refresh token으로 자동 처리됨
 
 export const careRequestApi = {
-  // 전체 케어 요청 조회
-  getAllCareRequests: (params = {}) => api.get('', { params }),
+  // 전체 케어 요청 조회 (페이징 지원)
+  getAllCareRequests: (params = {}) => {
+    const { page = 0, size = 20, ...rest } = params;
+    return api.get('', { params: { page, size, ...rest } });
+  },
   
   // 단일 케어 요청 조회
   getCareRequest: (id) => api.get(`/${id}`),
@@ -58,6 +61,7 @@ export const careRequestApi = {
   createComment: (careRequestId, payload) => api.post(`/${careRequestId}/comments`, payload),
   deleteComment: (careRequestId, commentId) => api.delete(`/${careRequestId}/comments/${commentId}`),
 
-  // 검색
-  searchCareRequests: (keyword) => api.get('/search', { params: { keyword } }),
+  // 검색 (페이징 지원)
+  searchCareRequests: (keyword, page = 0, size = 20) =>
+    api.get('/search', { params: { keyword, page, size } }),
 };

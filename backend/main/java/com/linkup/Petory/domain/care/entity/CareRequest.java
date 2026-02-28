@@ -1,5 +1,7 @@
 package com.linkup.Petory.domain.care.entity;
 
+import org.hibernate.annotations.BatchSize;
+
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
@@ -61,6 +63,7 @@ public class CareRequest extends BaseTimeEntity {
     private LocalDateTime deletedAt;
 
     @OneToMany(mappedBy = "careRequest", cascade = CascadeType.ALL)
+    @BatchSize(size = 50)  // 페이징 목록 조회 시 CareApplication N+1 방지
     private List<CareApplication> applications;
 
     @OneToMany(mappedBy = "careRequest", cascade = CascadeType.ALL)
