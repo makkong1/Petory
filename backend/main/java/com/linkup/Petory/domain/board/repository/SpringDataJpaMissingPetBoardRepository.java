@@ -13,6 +13,7 @@ import org.springframework.data.repository.query.Param;
 import com.linkup.Petory.domain.board.entity.MissingPetBoard;
 import com.linkup.Petory.domain.board.entity.MissingPetStatus;
 import com.linkup.Petory.domain.user.entity.Users;
+import com.linkup.Petory.global.annotation.RepositoryMethod;
 
 /**
  * Spring Data JPA 전용 인터페이스입니다.
@@ -25,16 +26,19 @@ import com.linkup.Petory.domain.user.entity.Users;
 // [리팩토링] Admin 페이징 DB 레벨 필터링을 위해 JpaSpecificationExecutor 추가
 public interface SpringDataJpaMissingPetBoardRepository extends JpaRepository<MissingPetBoard, Long>, JpaSpecificationExecutor<MissingPetBoard> {
 
+    @RepositoryMethod("실종 제보: 전체 목록 조회")
     @Query("SELECT b FROM MissingPetBoard b JOIN FETCH b.user u WHERE b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY b.createdAt DESC")
     List<MissingPetBoard> findAllByOrderByCreatedAtDesc();
 
+    @RepositoryMethod("실종 제보: 상태별 목록 조회")
     @Query("SELECT b FROM MissingPetBoard b JOIN FETCH b.user u WHERE b.status = :status AND b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY b.createdAt DESC")
     List<MissingPetBoard> findByStatusOrderByCreatedAtDesc(@Param("status") MissingPetStatus status);
 
+    @RepositoryMethod("실종 제보: 단건 조회 (작성자 포함)")
     @Query("SELECT b FROM MissingPetBoard b JOIN FETCH b.user u WHERE b.idx = :id AND b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE'")
     Optional<MissingPetBoard> findByIdWithUser(@Param("id") Long id);
 
-    // 댓글 포함 조회 (N+1 문제 해결) - 전체 조회
+    @RepositoryMethod("실종 제보: 전체 목록 (댓글 포함)")
     @Query("SELECT DISTINCT b FROM MissingPetBoard b " +
             "JOIN FETCH b.user u " +
             "LEFT JOIN FETCH b.comments c " +
@@ -44,7 +48,7 @@ public interface SpringDataJpaMissingPetBoardRepository extends JpaRepository<Mi
             "ORDER BY b.createdAt DESC")
     List<MissingPetBoard> findAllWithCommentsByOrderByCreatedAtDesc();
 
-    // 댓글 포함 조회 (N+1 문제 해결) - 상태별 조회
+    @RepositoryMethod("실종 제보: 상태별 목록 (댓글 포함)")
     @Query("SELECT DISTINCT b FROM MissingPetBoard b " +
             "JOIN FETCH b.user u " +
             "LEFT JOIN FETCH b.comments c " +
@@ -54,7 +58,7 @@ public interface SpringDataJpaMissingPetBoardRepository extends JpaRepository<Mi
             "ORDER BY b.createdAt DESC")
     List<MissingPetBoard> findByStatusWithCommentsOrderByCreatedAtDesc(@Param("status") MissingPetStatus status);
 
-    // 댓글 포함 단건 조회 (N+1 문제 해결)
+    @RepositoryMethod("실종 제보: 단건 조회 (댓글 포함)")
     @Query("SELECT DISTINCT b FROM MissingPetBoard b " +
             "JOIN FETCH b.user u " +
             "LEFT JOIN FETCH b.comments c " +
@@ -63,23 +67,21 @@ public interface SpringDataJpaMissingPetBoardRepository extends JpaRepository<Mi
             "AND (c IS NULL OR (c.isDeleted = false AND cu.isDeleted = false AND cu.status = 'ACTIVE'))")
     Optional<MissingPetBoard> findByIdWithComments(@Param("id") Long id);
 
-    // 사용자별 게시글 조회 (삭제되지 않은 것만, 최신순) - 작성자도 활성 상태여야 함
+    @RepositoryMethod("실종 제보: 사용자별 목록 조회")
     @Query("SELECT b FROM MissingPetBoard b JOIN FETCH b.user u WHERE b.user = :user AND b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY b.createdAt DESC")
     List<MissingPetBoard> findByUserAndIsDeletedFalseOrderByCreatedAtDesc(@Param("user") Users user);
 
-    // 페이징 지원 - 전체 조회 (JOIN FETCH와 페이징 호환을 위해 COUNT 쿼리 별도 지정)
+    @RepositoryMethod("실종 제보: 전체 페이징")
     @Query(value = "SELECT b FROM MissingPetBoard b JOIN FETCH b.user u WHERE b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY b.createdAt DESC",
            countQuery = "SELECT COUNT(b) FROM MissingPetBoard b JOIN b.user u WHERE b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE'")
     Page<MissingPetBoard> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
-    // 페이징 지원 - 상태별 조회 (JOIN FETCH와 페이징 호환을 위해 COUNT 쿼리 별도 지정)
+    @RepositoryMethod("실종 제보: 상태별 페이징")
     @Query(value = "SELECT b FROM MissingPetBoard b JOIN FETCH b.user u WHERE b.status = :status AND b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY b.createdAt DESC",
            countQuery = "SELECT COUNT(b) FROM MissingPetBoard b JOIN b.user u WHERE b.status = :status AND b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE'")
     Page<MissingPetBoard> findByStatusOrderByCreatedAtDesc(@Param("status") MissingPetStatus status, Pageable pageable);
 
-    /**
-     * [리팩토링] 게시글 작성자 ID만 조회 (프로젝션) - startMissingPetChat 등 경량 조회용
-     */
+    @RepositoryMethod("실종 제보: 작성자 ID 조회 (경량)")
     @Query("SELECT b.user.idx FROM MissingPetBoard b WHERE b.idx = :idx AND b.isDeleted = false")
     Optional<Long> findUserIdByIdx(@Param("idx") Long idx);
 }

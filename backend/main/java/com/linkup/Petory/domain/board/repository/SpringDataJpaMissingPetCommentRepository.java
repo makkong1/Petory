@@ -13,32 +13,30 @@ import org.springframework.data.repository.query.Param;
 import com.linkup.Petory.domain.board.entity.MissingPetBoard;
 import com.linkup.Petory.domain.board.entity.MissingPetComment;
 import com.linkup.Petory.domain.user.entity.Users;
+import com.linkup.Petory.global.annotation.RepositoryMethod;
 
 /**
  * Spring Data JPA 전용 인터페이스입니다.
  */
 public interface SpringDataJpaMissingPetCommentRepository extends JpaRepository<MissingPetComment, Long> {
 
+    @RepositoryMethod("실종 댓글: 게시글별 목록 조회")
     List<MissingPetComment> findByBoardOrderByCreatedAtAsc(MissingPetBoard board);
 
-    // soft-deleted 제외 - 작성자도 활성 상태여야 함
+    @RepositoryMethod("실종 댓글: 게시글별 목록 (삭제 제외)")
     @Query("SELECT mc FROM MissingPetComment mc JOIN FETCH mc.user u WHERE mc.board = :board AND mc.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY mc.createdAt ASC")
     List<MissingPetComment> findByBoardAndIsDeletedFalseOrderByCreatedAtAsc(@Param("board") MissingPetBoard board);
 
-    /**
-     * 게시글의 댓글 수 조회 (COUNT 쿼리 - N건 로드 방지)
-     * [리팩토링] findByBoard + size() → COUNT 쿼리 1회
-     * soft-deleted 제외, 작성자도 활성 상태여야 함
-     */
+    @RepositoryMethod("실종 댓글: 게시글별 댓글 수")
     @Query("SELECT COUNT(mc) FROM MissingPetComment mc JOIN mc.user u " +
            "WHERE mc.board = :board AND mc.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE'")
     long countByBoardAndIsDeletedFalse(@Param("board") MissingPetBoard board);
 
-    // 사용자별 댓글 조회 (삭제되지 않은 것만, 최신순) - JOIN FETCH로 N+1 문제 해결 - 작성자도 활성 상태여야 함
+    @RepositoryMethod("실종 댓글: 사용자별 목록 조회")
     @Query("SELECT mc FROM MissingPetComment mc JOIN FETCH mc.board b JOIN FETCH b.user bu JOIN FETCH mc.user u WHERE mc.user = :user AND mc.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY mc.createdAt DESC")
     List<MissingPetComment> findByUserAndIsDeletedFalseOrderByCreatedAtDesc(@Param("user") Users user);
 
-    // 게시글별 댓글 수 배치 조회 (N+1 문제 해결)
+    @RepositoryMethod("실종 댓글: 게시글별 댓글 수 배치 조회")
     @Query("SELECT mc.board.idx, COUNT(mc) FROM MissingPetComment mc " +
            "JOIN mc.user u " +
            "WHERE mc.board.idx IN :boardIds " +
@@ -48,16 +46,12 @@ public interface SpringDataJpaMissingPetCommentRepository extends JpaRepository<
            "GROUP BY mc.board.idx")
     List<Object[]> countCommentsByBoardIds(@Param("boardIds") List<Long> boardIds);
 
-    // 페이징 지원 - 게시글별 댓글 조회 (JOIN FETCH와 페이징 호환을 위해 COUNT 쿼리 별도 지정)
+    @RepositoryMethod("실종 댓글: 게시글별 페이징 조회")
     @Query(value = "SELECT mc FROM MissingPetComment mc JOIN FETCH mc.user u WHERE mc.board.idx = :boardId AND mc.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY mc.createdAt ASC",
            countQuery = "SELECT COUNT(mc) FROM MissingPetComment mc JOIN mc.user u WHERE mc.board.idx = :boardId AND mc.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE'")
     Page<MissingPetComment> findByBoardIdAndIsDeletedFalseOrderByCreatedAtAsc(@Param("boardId") Long boardId, Pageable pageable);
 
-    /**
-     * 게시글의 모든 미삭제 댓글 일괄 소프트 삭제 (배치 UPDATE)
-     * [리팩토링] N건 루프 save → 1회 UPDATE 쿼리
-     * clearAutomatically = true: bulk update는 PC를 무시하므로, 실행 후 PC 초기화하여 정합성 유지
-     */
+    @RepositoryMethod("실종 댓글: 게시글별 일괄 소프트 삭제")
     @Modifying(clearAutomatically = true)
     @Query("UPDATE MissingPetComment mc SET mc.isDeleted = true, mc.deletedAt = :deletedAt WHERE mc.board.idx = :boardIdx AND mc.isDeleted = false")
     int softDeleteAllByBoardIdx(@Param("boardIdx") Long boardIdx, @Param("deletedAt") LocalDateTime deletedAt);

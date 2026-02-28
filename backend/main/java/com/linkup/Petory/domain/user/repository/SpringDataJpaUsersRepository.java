@@ -13,6 +13,7 @@ import org.springframework.data.repository.query.Param;
 
 import com.linkup.Petory.domain.user.entity.Role;
 import com.linkup.Petory.domain.user.entity.Users;
+import com.linkup.Petory.global.annotation.RepositoryMethod;
 
 import jakarta.persistence.LockModeType;
 
@@ -26,21 +27,15 @@ import jakarta.persistence.LockModeType;
  */
 public interface SpringDataJpaUsersRepository extends JpaRepository<Users, Long> {
 
-    /**
-     * 탈퇴하지 않은 사용자만 조회 (Soft Delete 필터링)
-     */
+    @RepositoryMethod("사용자: username으로 조회")
     @Query("SELECT u FROM Users u WHERE u.username = :username AND (u.isDeleted = false OR u.isDeleted IS NULL)")
     Optional<Users> findByUsername(@Param("username") String username);
 
-    /**
-     * 탈퇴하지 않은 사용자만 조회 (Soft Delete 필터링)
-     */
+    @RepositoryMethod("사용자: nickname으로 조회")
     @Query("SELECT u FROM Users u WHERE u.nickname = :nickname AND (u.isDeleted = false OR u.isDeleted IS NULL)")
     Optional<Users> findByNickname(@Param("nickname") String nickname);
 
-    /**
-     * 탈퇴하지 않은 사용자만 조회 (Soft Delete 필터링)
-     */
+    @RepositoryMethod("사용자: email으로 조회")
     @Query("SELECT u FROM Users u WHERE u.email = :email AND (u.isDeleted = false OR u.isDeleted IS NULL)")
     Optional<Users> findByEmail(@Param("email") String email);
 
@@ -49,6 +44,7 @@ public interface SpringDataJpaUsersRepository extends JpaRepository<Users, Long>
      * [리팩토링] findByNickname + findByUsername + findByEmail 3회 → 1회
      * 탈퇴하지 않은 사용자만 조회 (Soft Delete 필터링)
      */
+    @RepositoryMethod("사용자: 닉네임/username/email 중복 검사")
     @Query("SELECT u FROM Users u WHERE (u.nickname = :nickname OR u.username = :username OR u.email = :email) AND (u.isDeleted = false OR u.isDeleted IS NULL)")
     List<Users> findByNicknameOrUsernameOrEmail(
             @Param("nickname") String nickname,
@@ -56,25 +52,17 @@ public interface SpringDataJpaUsersRepository extends JpaRepository<Users, Long>
             @Param("email") String email,
             Pageable pageable);
 
-    /**
-     * 로그인용 아이디(String 타입 id 필드)로 조회
-     */
+    @RepositoryMethod("사용자: 로그인 ID(String)로 조회")
     @Query("SELECT u FROM Users u WHERE u.id = :id")
     Optional<Users> findByIdString(@Param("id") String id);
 
-    /**
-     * Refresh Token으로 사용자 조회
-     */
+    @RepositoryMethod("사용자: RefreshToken으로 조회")
     Optional<Users> findByRefreshToken(String refreshToken);
 
-    /**
-     * 통계용: 특정 기간 동안 생성된 사용자 수
-     */
+    @RepositoryMethod("사용자: 기간별 가입 수 통계")
     long countByCreatedAtBetween(LocalDateTime start, LocalDateTime end);
 
-    /**
-     * 통계용: 특정 기간 동안 로그인한 사용자 수
-     */
+    @RepositoryMethod("사용자: 기간별 로그인 수 통계")
     long countByLastLoginAtBetween(LocalDateTime start, LocalDateTime end);
 
     /**
@@ -82,6 +70,7 @@ public interface SpringDataJpaUsersRepository extends JpaRepository<Users, Long>
      * 
      * @return 업데이트된 행 수
      */
+    @RepositoryMethod("사용자: 경고 횟수 증가")
     @Modifying
     @Query("UPDATE Users u SET u.warningCount = u.warningCount + 1 WHERE u.idx = :userId")
     int incrementWarningCount(@Param("userId") Long userId);
@@ -90,6 +79,7 @@ public interface SpringDataJpaUsersRepository extends JpaRepository<Users, Long>
      * 비관적 락을 사용한 사용자 조회 (동시성 제어용)
      * 코인 차감 시 Race Condition 방지를 위해 사용
      */
+    @RepositoryMethod("사용자: 비관적 락 조회 (동시성 제어)")
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT u FROM Users u WHERE u.idx = :idx")
     Optional<Users> findByIdForUpdate(@Param("idx") Long idx);
@@ -98,6 +88,7 @@ public interface SpringDataJpaUsersRepository extends JpaRepository<Users, Long>
      * 사용자 역할만 조회 (경량 조회용, 삭제 권한 검증 등)
      * [리팩토링] getUser(User+Pet) 대체 - role 프로젝션만 SELECT
      */
+    @RepositoryMethod("사용자: 역할만 조회 (경량)")
     @Query("SELECT u.role FROM Users u WHERE u.idx = :idx")
     Optional<Role> findRoleByIdx(@Param("idx") Long idx);
 }

@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 
 import com.linkup.Petory.domain.user.entity.Pet;
 import com.linkup.Petory.domain.user.entity.PetType;
+import com.linkup.Petory.global.annotation.RepositoryMethod;
 
 /**
  * Spring Data JPA 전용 인터페이스입니다.
@@ -19,32 +20,22 @@ import com.linkup.Petory.domain.user.entity.PetType;
  */
 public interface SpringDataJpaPetRepository extends JpaRepository<Pet, Long> {
 
-    /**
-     * 사용자 ID로 펫 목록 조회 (삭제되지 않은 것만)
-     */
+    @RepositoryMethod("펫: 사용자 ID로 목록 조회 (삭제 제외)")
     @Query("SELECT p FROM Pet p WHERE p.user.id = :userId AND p.isDeleted = false")
     List<Pet> findByUserIdAndNotDeleted(@Param("userId") String userId);
 
-    /**
-     * 사용자 ID로 펫 목록 조회 (모든 것)
-     */
+    @RepositoryMethod("펫: 사용자 ID로 목록 조회 (전체)")
     @Query("SELECT p FROM Pet p WHERE p.user.id = :userId")
     List<Pet> findByUserId(@Param("userId") String userId);
 
-    /**
-     * 사용자 idx로 펫 목록 조회 (삭제되지 않은 것만)
-     */
+    @RepositoryMethod("펫: 사용자 idx로 목록 조회 (삭제 제외)")
     @Query("SELECT p FROM Pet p WHERE p.user.idx = :userIdx AND p.isDeleted = false")
     List<Pet> findByUserIdxAndNotDeleted(@Param("userIdx") Long userIdx);
 
-    /**
-     * 펫 타입으로 조회 (삭제되지 않은 것만)
-     */
+    @RepositoryMethod("펫: 타입별 조회")
     List<Pet> findByPetTypeAndIsDeletedFalse(PetType petType);
 
-    /**
-     * 펫 이름으로 조회 (삭제되지 않은 것만)
-     */
+    @RepositoryMethod("펫: 이름 검색")
     List<Pet> findByPetNameContainingAndIsDeletedFalse(String petName);
 }
 
