@@ -36,6 +36,11 @@ public class JpaPetCoinTransactionAdapter implements PetCoinTransactionRepositor
     }
 
     @Override
+    public Optional<PetCoinTransaction> findByIdWithUser(Long idx) {
+        return jpaRepository.findByIdWithUser(idx);
+    }
+
+    @Override
     public List<PetCoinTransaction> findByUserOrderByCreatedAtDesc(Users user) {
         return jpaRepository.findByUserOrderByCreatedAtDesc(user);
     }

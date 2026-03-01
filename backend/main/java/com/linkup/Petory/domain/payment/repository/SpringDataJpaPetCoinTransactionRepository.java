@@ -1,6 +1,7 @@
 package com.linkup.Petory.domain.payment.repository;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -36,6 +37,10 @@ public interface SpringDataJpaPetCoinTransactionRepository
     List<PetCoinTransaction> findByRelatedTypeAndRelatedIdx(
             @Param("relatedType") String relatedType,
             @Param("relatedIdx") Long relatedIdx);
+
+    @RepositoryMethod("펫코인 거래: 단건 조회 (user 포함)")
+    @Query("SELECT t FROM PetCoinTransaction t JOIN FETCH t.user WHERE t.idx = :idx")
+    Optional<PetCoinTransaction> findByIdWithUser(@Param("idx") Long idx);
 
     @RepositoryMethod("펫코인 거래: 사용자별 페이징 조회")
     @EntityGraph(attributePaths = "user")
