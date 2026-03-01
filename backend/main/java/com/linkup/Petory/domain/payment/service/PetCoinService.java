@@ -3,8 +3,6 @@ package com.linkup.Petory.domain.payment.service;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.linkup.Petory.domain.care.entity.CareRequest;
-import com.linkup.Petory.domain.care.repository.CareRequestRepository;
 import com.linkup.Petory.domain.payment.dto.PetCoinTransactionDetailDTO;
 import com.linkup.Petory.domain.payment.entity.PetCoinTransaction;
 import com.linkup.Petory.domain.payment.entity.TransactionStatus;
@@ -29,7 +27,6 @@ public class PetCoinService {
         private final UsersRepository usersRepository;
         private final PetCoinTransactionRepository transactionRepository;
         private final PetCoinEscrowRepository escrowRepository;
-        private final CareRequestRepository careRequestRepository;
 
         /**
          * 코인 충전 (관리자 지급 또는 테스트 충전)
@@ -246,7 +243,7 @@ public class PetCoinService {
          */
         @Transactional(readOnly = true)
         public PetCoinTransactionDetailDTO getTransactionDetail(Long transactionIdx, Users currentUser) {
-                PetCoinTransaction transaction = transactionRepository.findById(transactionIdx)
+                PetCoinTransaction transaction = transactionRepository.findByIdWithUser(transactionIdx)
                                 .orElseThrow(() -> new RuntimeException("거래 내역을 찾을 수 없습니다."));
 
                 if (!transaction.getUser().getIdx().equals(currentUser.getIdx())) {
@@ -270,7 +267,7 @@ public class PetCoinService {
 
                 // CARE_REQUEST 관련 거래: 에스크로에서 상대방 정보 조회
                 if ("CARE_REQUEST".equals(transaction.getRelatedType()) && transaction.getRelatedIdx() != null) {
-                        escrowRepository.findByCareRequestIdx(transaction.getRelatedIdx())
+                        escrowRepository.findByCareRequestIdxWithDetails(transaction.getRelatedIdx())
                                         .ifPresent(escrow -> {
                                                 Users counterparty = null;
                                                 if (TransactionType.DEDUCT.equals(transaction.getTransactionType())
@@ -288,9 +285,9 @@ public class PetCoinService {
                                                                                         ? counterparty.getNickname()
                                                                                         : counterparty.getUsername());
                                                 }
-                                                careRequestRepository.findById(transaction.getRelatedIdx())
-                                                                .map(CareRequest::getTitle)
-                                                                .ifPresent(dto::setRelatedTitle);
+                                                if (escrow.getCareRequest() != null) {
+                                                        dto.setRelatedTitle(escrow.getCareRequest().getTitle());
+                                                }
                                         });
                 }
 

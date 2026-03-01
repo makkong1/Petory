@@ -43,3 +43,4 @@
 - [care/](./care/) - Care 도메인 (펫케어 요청, 지원, 댓글, 리뷰)
 - [location/](./location/) - Location 도메인 (장소 서비스, 장소 리뷰)
 - [meetup/](./meetup/) - Meetup 도메인 (모임, 모임 참여자)
+- [payment/](./payment/) - Payment 도메인 (펫코인 거래, 에스크로)
