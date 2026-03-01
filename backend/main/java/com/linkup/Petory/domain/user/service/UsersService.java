@@ -3,6 +3,7 @@ package com.linkup.Petory.domain.user.service;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -13,6 +14,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.linkup.Petory.domain.user.converter.PetConverter;
 import com.linkup.Petory.domain.user.converter.UsersConverter;
 import com.linkup.Petory.domain.user.dto.PetDTO;
 import com.linkup.Petory.domain.user.dto.UsersDTO;
@@ -20,6 +22,7 @@ import com.linkup.Petory.domain.user.dto.UserPageResponseDTO;
 import com.linkup.Petory.domain.user.entity.EmailVerificationPurpose;
 import com.linkup.Petory.domain.user.entity.Role;
 import com.linkup.Petory.domain.user.entity.UserStatus;
+import com.linkup.Petory.domain.user.entity.Pet;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 
@@ -34,8 +37,9 @@ public class UsersService {
 
     private final UsersRepository usersRepository;
     private final UsersConverter usersConverter;
+    private final PetConverter petConverter;
     private final PasswordEncoder passwordEncoder;
-    private final PetService petService;
+    // private final PetService petService;
     private final EmailVerificationService emailVerificationService;
 
     @Value("${app.email-verification.skip-in-dev:false}")
@@ -116,7 +120,8 @@ public class UsersService {
             throw new RuntimeException("닉네임은 50자 이하여야 합니다.");
         }
 
-        // [리팩토링] findByNickname + findByUsername + findByEmail 3회 → findByNicknameOrUsernameOrEmail 1회
+        // [리팩토링] findByNickname + findByUsername + findByEmail 3회 →
+        // findByNicknameOrUsernameOrEmail 1회
         usersRepository.findByNicknameOrUsernameOrEmail(nickname, dto.getUsername(), dto.getEmail())
                 .ifPresent(existing -> {
                     if (Objects.equals(existing.getNickname(), nickname)) {
@@ -286,51 +291,53 @@ public class UsersService {
 
     /**
      * 자신의 프로필 조회 (펫 정보 포함)
+     * [리팩토링] Fetch Join - User + Pet 1회 쿼리
      */
     @Transactional(readOnly = true)
     public UsersDTO getMyProfile(String userId) {
-        Users user = usersRepository.findByIdString(userId)
+        Users user = usersRepository.findByIdStringWithPets(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
         UsersDTO userDTO = usersConverter.toDTO(user);
-
-        // 펫 정보 추가
-        try {
-            List<PetDTO> pets = petService.getPetsByUserId(userId);
-            userDTO.setPets(pets);
-        } catch (Exception e) {
-            // 펫 정보 조회 실패해도 사용자 정보는 반환
-            log.warn("펫 정보 조회 실패: {}", e.getMessage());
-            userDTO.setPets(List.of());
-        }
-
+        userDTO.setPets(toPetDTOList(user.getPets()));
         return userDTO;
     }
 
     /**
      * 사용자 프로필 조회 (펫 정보 포함, 관리자용)
+     * [리팩토링] Fetch Join - User + Pet 1회 쿼리
      * - AdminUserController에서 사용
      */
     @Transactional(readOnly = true)
     public UsersDTO getUserWithPets(Long userIdx) {
-        Users user = usersRepository.findById(userIdx)
+        Users user = usersRepository.findByIdWithPets(userIdx)
                 .orElseThrow(() -> new RuntimeException("User not found"));
         UsersDTO userDTO = usersConverter.toDTO(user);
-
-        // 펫 정보 추가
-        try {
-            List<PetDTO> pets = petService.getPetsByUserIdx(userIdx);
-            userDTO.setPets(pets);
-        } catch (Exception e) {
-            log.warn("펫 정보 조회 실패: {}", e.getMessage());
-            userDTO.setPets(List.of());
-        }
-
+        userDTO.setPets(toPetDTOList(user.getPets()));
         return userDTO;
     }
 
     /**
+     * User.pets → PetDTO 리스트 (삭제된 펫 제외, Fetch Join 결과 변환용)
+     */
+    private List<PetDTO> toPetDTOList(List<Pet> pets) {
+        if (pets == null || pets.isEmpty()) {
+            return List.of();
+        }
+        List<Pet> notDeleted = pets.stream()
+                .filter(p -> !Boolean.TRUE.equals(p.getIsDeleted()))
+                .collect(Collectors.toList());
+        try {
+            return petConverter.toDTOList(notDeleted);
+        } catch (Exception e) {
+            log.warn("펫 정보 변환 실패: {}", e.getMessage());
+            return List.of();
+        }
+    }
+
+    /**
      * 자신의 프로필 수정 (닉네임, 이메일, 전화번호, 위치, 펫 정보 등)
-     * [리팩토링] getMyProfile(User+Pet) + findByIdString → findByIdString 1회 (idx 검증 내부 통합)
+     * [리팩토링] getMyProfile(User+Pet) + findByIdString → findByIdString 1회 (idx 검증 내부
+     * 통합)
      */
     public UsersDTO updateMyProfile(String userId, UsersDTO dto) {
         Users user = usersRepository.findByIdString(userId)
@@ -352,6 +359,7 @@ public class UsersService {
                     });
             user.setUsername(dto.getUsername());
         }
+
         if (dto.getEmail() != null && !dto.getEmail().isEmpty()) {
             // 이메일 중복 확인
             usersRepository.findByEmail(dto.getEmail())
