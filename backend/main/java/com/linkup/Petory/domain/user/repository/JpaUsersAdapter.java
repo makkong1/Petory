@@ -119,4 +119,14 @@ public class JpaUsersAdapter implements UsersRepository {
     public Optional<Role> findRoleByIdx(Long idx) {
         return jpaRepository.findRoleByIdx(idx);
     }
+
+    @Override
+    public Optional<Users> findByIdWithPets(Long idx) {
+        return jpaRepository.findByIdWithPets(idx);
+    }
+
+    @Override
+    public Optional<Users> findByIdStringWithPets(String userId) {
+        return jpaRepository.findByIdStringWithPets(userId);
+    }
 }

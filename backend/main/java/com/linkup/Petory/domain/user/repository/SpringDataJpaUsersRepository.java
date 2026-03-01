@@ -91,4 +91,20 @@ public interface SpringDataJpaUsersRepository extends JpaRepository<Users, Long>
     @RepositoryMethod("사용자: 역할만 조회 (경량)")
     @Query("SELECT u.role FROM Users u WHERE u.idx = :idx")
     Optional<Role> findRoleByIdx(@Param("idx") Long idx);
+
+    /**
+     * 사용자 단건 조회 (펫 포함, Fetch Join)
+     * [리팩토링] getUserWithPets - User + Pet 1회 쿼리
+     */
+    @RepositoryMethod("사용자: idx로 조회 (펫 포함)")
+    @Query("SELECT DISTINCT u FROM Users u LEFT JOIN FETCH u.pets WHERE u.idx = :idx")
+    Optional<Users> findByIdWithPets(@Param("idx") Long idx);
+
+    /**
+     * 사용자 단건 조회 (펫 포함, Fetch Join)
+     * [리팩토링] getMyProfile - User + Pet 1회 쿼리
+     */
+    @RepositoryMethod("사용자: id(String)로 조회 (펫 포함)")
+    @Query("SELECT DISTINCT u FROM Users u LEFT JOIN FETCH u.pets WHERE u.id = :userId")
+    Optional<Users> findByIdStringWithPets(@Param("userId") String userId);
 }

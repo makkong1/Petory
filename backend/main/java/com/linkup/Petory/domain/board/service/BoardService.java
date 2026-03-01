@@ -203,18 +203,21 @@ public class BoardService {
      * - AdminBoardController에서 사용
      * - 삭제된 게시글도 조회 가능
      */
+    /**
+     * [리팩토링] Fetch Join - Board + User 1회 쿼리
+     */
     @Transactional(readOnly = true)
     public BoardDTO getBoardForAdmin(long idx) {
-        Board board = boardRepository.findById(idx)
+        Board board = boardRepository.findByIdWithUser(idx)
                 .orElseThrow(() -> new RuntimeException("Board not found"));
         return mapBoardWithDetails(board);
     }
 
     // 단일 게시글 조회 + 조회수 증가
-    // [리팩토링] @Cacheable 제거: 조회수 실시간 반영 (캐시 시 incrementViewCount 미실행 문제)
+    // [리팩토링] Fetch Join - Board + User 1회 쿼리 / @Cacheable 제거: 조회수 실시간 반영
     @Transactional
     public BoardDTO getBoard(long idx, Long viewerId) {
-        Board board = boardRepository.findById(idx)
+        Board board = boardRepository.findByIdWithUser(idx)
                 .orElseThrow(() -> new RuntimeException("Board not found"));
 
         if (shouldIncrementView(board, viewerId)) {
@@ -256,7 +259,7 @@ public class BoardService {
     })
     @Transactional
     public BoardDTO updateBoard(long idx, BoardDTO dto) {
-        Board board = boardRepository.findById(idx)
+        Board board = boardRepository.findByIdWithUser(idx)
                 .orElseThrow(() -> new RuntimeException("Board not found"));
 
         // 이메일 인증 확인
@@ -288,7 +291,7 @@ public class BoardService {
     })
     @Transactional
     public void deleteBoard(long idx) {
-        Board board = boardRepository.findById(idx)
+        Board board = boardRepository.findByIdWithUser(idx)
                 .orElseThrow(() -> new RuntimeException("Board not found"));
 
         // 이메일 인증 확인
@@ -552,7 +555,7 @@ public class BoardService {
     })
     @Transactional
     public BoardDTO updateBoardStatus(long id, com.linkup.Petory.domain.common.ContentStatus status) {
-        Board board = boardRepository.findById(id).orElseThrow(() -> new RuntimeException("Board not found"));
+        Board board = boardRepository.findByIdWithUser(id).orElseThrow(() -> new RuntimeException("Board not found"));
         // do not change isDeleted here
         board.setStatus(status);
         Board saved = boardRepository.save(board);
@@ -569,7 +572,7 @@ public class BoardService {
     })
     @Transactional
     public BoardDTO restoreBoard(long id) {
-        Board board = boardRepository.findById(id).orElseThrow(() -> new RuntimeException("Board not found"));
+        Board board = boardRepository.findByIdWithUser(id).orElseThrow(() -> new RuntimeException("Board not found"));
         board.setIsDeleted(false);
         board.setDeletedAt(null);
         if (board.getStatus() == com.linkup.Petory.domain.common.ContentStatus.DELETED) {
@@ -619,13 +622,11 @@ public class BoardService {
             }
         }
 
-        // 검색어 필터 (제목, 내용, 작성자명)
+        // 검색어 필터 (제목, 내용, 작성자명) - join으로 user 조인
         if (q != null && !q.isBlank()) {
             String keyword = "%" + q.toLowerCase() + "%";
             Specification<Board> searchSpec = (root, query, cb) -> {
-                // JOIN FETCH를 사용하기 위해 join 사용
-                jakarta.persistence.criteria.Join<Board, Users> userJoin = root.join("user");
-
+                jakarta.persistence.criteria.Join<Board, Users> userJoin = root.join("user", jakarta.persistence.criteria.JoinType.LEFT);
                 return cb.or(
                         cb.like(cb.lower(root.get("title")), keyword),
                         cb.like(cb.lower(root.get("content")), keyword),
@@ -633,6 +634,15 @@ public class BoardService {
             };
             spec = spec == null ? searchSpec : spec.and(searchSpec);
         }
+
+        // [리팩토링] user fetch - boardConverter.toDTO() N+1 방지
+        Specification<Board> userFetchSpec = (root, query, cb) -> {
+            if (Long.class != query.getResultType()) {
+                root.fetch("user", jakarta.persistence.criteria.JoinType.LEFT);
+            }
+            return cb.conjunction();
+        };
+        spec = spec == null ? userFetchSpec : spec.and(userFetchSpec);
 
         // 최신순 정렬 추가
         Pageable pageable = PageRequest.of(page, size,

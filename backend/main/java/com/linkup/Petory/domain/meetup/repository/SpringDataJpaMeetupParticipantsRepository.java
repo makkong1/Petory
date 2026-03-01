@@ -9,20 +9,18 @@ import org.springframework.data.repository.query.Param;
 
 import com.linkup.Petory.domain.meetup.entity.MeetupParticipants;
 import com.linkup.Petory.domain.meetup.entity.MeetupParticipantsId;
+import com.linkup.Petory.global.annotation.RepositoryMethod;
 
 /**
  * Spring Data JPA 전용 인터페이스입니다.
  */
 public interface SpringDataJpaMeetupParticipantsRepository extends JpaRepository<MeetupParticipants, MeetupParticipantsId> {
 
-    // 특정 모임의 참여자 목록
+    @RepositoryMethod("모임 참여자: 모임별 목록 조회")
     @Query("SELECT mp FROM MeetupParticipants mp WHERE mp.meetup.idx = :meetupIdx ORDER BY mp.joinedAt ASC")
     List<MeetupParticipants> findByMeetupIdxOrderByJoinedAtAsc(@Param("meetupIdx") Long meetupIdx);
 
-    /**
-     * 특정 사용자가 참여한 모임 목록
-     * [리팩토링] JOIN FETCH (meetup, user) - 102개 PrepareStatement → 2개 (N+1 제거)
-     */
+    @RepositoryMethod("모임 참여자: 사용자별 참여 모임 목록")
     @Query("SELECT mp FROM MeetupParticipants mp " +
            "JOIN FETCH mp.meetup m " +
            "JOIN FETCH mp.user u " +
@@ -30,16 +28,16 @@ public interface SpringDataJpaMeetupParticipantsRepository extends JpaRepository
            "ORDER BY mp.joinedAt DESC")
     List<MeetupParticipants> findByUserIdxOrderByJoinedAtDesc(@Param("userIdx") Long userIdx);
 
-    // 특정 모임의 참여자 수
+    @RepositoryMethod("모임 참여자: 모임별 참여자 수")
     Long countByMeetupIdx(Long meetupIdx);
 
-    // 특정 사용자가 특정 모임에 참여했는지 확인
+    @RepositoryMethod("모임 참여자: 참여 여부 확인")
     boolean existsByMeetupIdxAndUserIdx(Long meetupIdx, Long userIdx);
 
-    // 특정 모임의 참여자 조회
+    @RepositoryMethod("모임 참여자: 모임+사용자로 조회")
     Optional<MeetupParticipants> findByMeetupIdxAndUserIdx(Long meetupIdx, Long userIdx);
 
-    // 특정 사용자가 참여한 모임 중 진행 예정인 모임들
+    @RepositoryMethod("모임 참여자: 사용자별 예정 모임 목록")
     @Query("SELECT mp FROM MeetupParticipants mp " +
             "JOIN mp.meetup m " +
             "WHERE mp.user.idx = :userIdx AND m.date > CURRENT_TIMESTAMP " +

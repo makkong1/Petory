@@ -51,5 +51,11 @@ export const adminApi = {
     const response = await api.get('/statistics/daily', { params });
     return response.data;
   },
+
+  // 통계 수동 집계 (MASTER 전용)
+  initStatistics: async (days = 30) => {
+    const response = await api.post(`/statistics/init?days=${days}`);
+    return response.data;
+  },
 };
 

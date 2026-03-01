@@ -94,4 +94,14 @@ public interface UsersRepository {
      * [리팩토링] getUser 대체 - role 프로젝션만
      */
     Optional<Role> findRoleByIdx(Long idx);
+
+    /**
+     * 사용자 단건 조회 (펫 포함, Fetch Join)
+     */
+    Optional<Users> findByIdWithPets(Long idx);
+
+    /**
+     * 사용자 단건 조회 (펫 포함, Fetch Join)
+     */
+    Optional<Users> findByIdStringWithPets(String userId);
 }
