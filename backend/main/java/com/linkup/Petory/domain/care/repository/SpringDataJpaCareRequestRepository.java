@@ -70,10 +70,15 @@ public interface SpringDataJpaCareRequestRepository extends JpaRepository<CareRe
     @Query("SELECT cr FROM CareRequest cr LEFT JOIN FETCH cr.pet LEFT JOIN FETCH cr.user WHERE cr.idx = :idx")
     Optional<CareRequest> findByIdWithPet(@Param("idx") Long idx);
 
-    // 단일 케어 요청 조회 (펫 정보 및 지원 정보 포함)
+    // 단일 케어 요청 조회 (작성자 포함) - 수정/삭제 시 권한 확인용
+    @RepositoryMethod("펫케어 요청: 단건 조회 (작성자 포함)")
+    @Query("SELECT cr FROM CareRequest cr JOIN FETCH cr.user WHERE cr.idx = :idx")
+    Optional<CareRequest> findByIdWithUser(@Param("idx") Long idx);
+
+    // 단일 케어 요청 조회 (펫 정보 및 지원 정보 포함, provider N+1 방지)
     // [3단계 최적화] PetVaccination N+1 문제 해결: @BatchSize 사용 (Hibernate 중첩 컬렉션 제한으로 인해 FETCH JOIN 제거)
     @RepositoryMethod("펫케어 요청: 단건 조회 (지원 목록 포함)")
-    @Query("SELECT cr FROM CareRequest cr LEFT JOIN FETCH cr.pet LEFT JOIN FETCH cr.user LEFT JOIN FETCH cr.applications WHERE cr.idx = :idx")
+    @Query("SELECT cr FROM CareRequest cr LEFT JOIN FETCH cr.pet LEFT JOIN FETCH cr.user LEFT JOIN FETCH cr.applications a LEFT JOIN FETCH a.provider WHERE cr.idx = :idx")
     Optional<CareRequest> findByIdWithApplications(@Param("idx") Long idx);
 
     // 통계용

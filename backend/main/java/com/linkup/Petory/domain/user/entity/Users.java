@@ -16,6 +16,7 @@ import com.linkup.Petory.domain.common.BaseTimeEntity;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@BatchSize(size = 50)  // ManyToOne proxy 배치 로드 (Meetup.organizer, MeetupParticipants.user 등)
 public class Users extends BaseTimeEntity {
 
     @Id

@@ -21,11 +21,11 @@ import jakarta.persistence.LockModeType;
 public interface SpringDataJpaMeetupRepository extends JpaRepository<Meetup, Long> {
 
     @RepositoryMethod("모임: 주최자별 목록 조회")
-    @Query("SELECT m FROM Meetup m WHERE m.organizer.idx = :organizerIdx AND (m.isDeleted = false OR m.isDeleted IS NULL) ORDER BY m.createdAt DESC")
+    @Query("SELECT m FROM Meetup m JOIN FETCH m.organizer WHERE m.organizer.idx = :organizerIdx AND (m.isDeleted = false OR m.isDeleted IS NULL) ORDER BY m.createdAt DESC")
     List<Meetup> findByOrganizerIdxOrderByCreatedAtDesc(@Param("organizerIdx") Long organizerIdx);
 
     @RepositoryMethod("모임: 지역 범위별 조회")
-    @Query("SELECT m FROM Meetup m WHERE " +
+    @Query("SELECT m FROM Meetup m JOIN FETCH m.organizer WHERE " +
                     "m.latitude BETWEEN :minLat AND :maxLat AND " +
                     "m.longitude BETWEEN :minLng AND :maxLng AND " +
                     "(m.isDeleted = false OR m.isDeleted IS NULL) " +
@@ -36,21 +36,21 @@ public interface SpringDataJpaMeetupRepository extends JpaRepository<Meetup, Lon
                     @Param("maxLng") Double maxLng);
 
     @RepositoryMethod("모임: 날짜 범위별 조회")
-    @Query("SELECT m FROM Meetup m WHERE " +
+    @Query("SELECT m FROM Meetup m JOIN FETCH m.organizer WHERE " +
                     "m.date BETWEEN :startDate AND :endDate AND " +
                     "(m.isDeleted = false OR m.isDeleted IS NULL) " +
                     "ORDER BY m.date ASC")
     List<Meetup> findByDateBetweenOrderByDateAsc(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
 
     @RepositoryMethod("모임: 키워드 검색")
-    @Query("SELECT m FROM Meetup m WHERE " +
+    @Query("SELECT m FROM Meetup m JOIN FETCH m.organizer WHERE " +
                     "(m.title LIKE %:keyword% OR m.description LIKE %:keyword%) AND " +
                     "(m.isDeleted = false OR m.isDeleted IS NULL) " +
                     "ORDER BY m.date ASC")
     List<Meetup> findByKeyword(@Param("keyword") String keyword);
 
     @RepositoryMethod("모임: 참여 가능 목록 조회")
-    @Query("SELECT m FROM Meetup m " +
+    @Query("SELECT DISTINCT m FROM Meetup m JOIN FETCH m.organizer " +
                     "LEFT JOIN m.participants p " +
                     "WHERE m.date > :currentDate " +
                     "AND (m.isDeleted = false OR m.isDeleted IS NULL) " +
@@ -58,6 +58,10 @@ public interface SpringDataJpaMeetupRepository extends JpaRepository<Meetup, Lon
                     "HAVING COUNT(p) < m.maxParticipants " +
                     "ORDER BY m.date ASC")
     List<Meetup> findAvailableMeetups(@Param("currentDate") LocalDateTime currentDate);
+
+    @RepositoryMethod("모임: 단건 조회 (주최자 포함)")
+    @Query("SELECT m FROM Meetup m JOIN FETCH m.organizer WHERE m.idx = :idx")
+    Optional<Meetup> findByIdWithOrganizer(@Param("idx") Long idx);
 
     @RepositoryMethod("모임: 반경 기반 근처 모임 조회")
     @Query(value = "SELECT m.* FROM meetup m " +

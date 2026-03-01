@@ -131,7 +131,7 @@ public class CareRequestService {
     // 단일 케어 요청 조회
     @Transactional(readOnly = true)
     public CareRequestDTO getCareRequest(Long idx) {
-        CareRequest request = careRequestRepository.findByIdWithPet(idx)
+        CareRequest request = careRequestRepository.findByIdWithApplications(idx)
                 .orElseThrow(() -> new RuntimeException("CareRequest not found"));
         if (Boolean.TRUE.equals(request.getIsDeleted())) {
             throw new RuntimeException("CareRequest not found");
@@ -191,7 +191,7 @@ public class CareRequestService {
     // 케어 요청 수정
     @Transactional
     public CareRequestDTO updateCareRequest(Long idx, CareRequestDTO dto, Long currentUserId) {
-        CareRequest request = careRequestRepository.findById(idx)
+        CareRequest request = careRequestRepository.findByIdWithApplications(idx)
                 .orElseThrow(() -> new RuntimeException("CareRequest not found"));
 
         // 작성자 확인 (관리자는 우회)
@@ -227,7 +227,7 @@ public class CareRequestService {
     // 케어 요청 삭제
     @Transactional
     public void deleteCareRequest(Long idx, Long currentUserId) {
-        CareRequest request = careRequestRepository.findById(idx)
+        CareRequest request = careRequestRepository.findByIdWithUser(idx)
                 .orElseThrow(() -> new RuntimeException("CareRequest not found"));
 
         // 작성자 확인 (관리자는 우회)

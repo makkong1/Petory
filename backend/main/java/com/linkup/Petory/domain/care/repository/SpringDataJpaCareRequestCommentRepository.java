@@ -20,7 +20,8 @@ public interface SpringDataJpaCareRequestCommentRepository extends JpaRepository
     List<CareRequestComment> findByCareRequestOrderByCreatedAtAsc(CareRequest careRequest);
 
     @RepositoryMethod("펫케어 댓글: 요청별 목록 (삭제 제외)")
-    List<CareRequestComment> findByCareRequestAndIsDeletedFalseOrderByCreatedAtAsc(CareRequest careRequest);
+    @Query("SELECT cc FROM CareRequestComment cc JOIN FETCH cc.user WHERE cc.careRequest = :careRequest AND cc.isDeleted = false ORDER BY cc.createdAt ASC")
+    List<CareRequestComment> findByCareRequestAndIsDeletedFalseOrderByCreatedAtAsc(@Param("careRequest") CareRequest careRequest);
 
     @RepositoryMethod("펫케어 댓글: 사용자별 목록 조회")
     @Query("SELECT cc FROM CareRequestComment cc JOIN FETCH cc.careRequest WHERE cc.user = :user AND cc.isDeleted = false ORDER BY cc.createdAt DESC")
