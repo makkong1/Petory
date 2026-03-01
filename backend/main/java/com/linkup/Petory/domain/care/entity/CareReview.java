@@ -26,21 +26,26 @@ public class CareReview extends BaseTimeEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long idx;
 
+    /** 리뷰 대상 케어 지원 (ACCEPTED 상태여야 함) */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "care_application_idx", nullable = false)
     private CareApplication careApplication;
 
+    /** 리뷰 작성자 (요청자) - 리뷰를 쓴 사람 */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "reviewer_idx", nullable = false)
     private Users reviewer;
 
+    /** 리뷰 대상자 (서비스 제공자) - 리뷰를 받는 사람 */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "reviewee_idx", nullable = false)
     private Users reviewee;
 
+    /** 평점 (1~5) */
     @Column(nullable = false)
     private int rating;
 
+    /** 리뷰 내용 */
     @Lob
     private String comment;
 

@@ -62,10 +62,12 @@ public class CareRequest extends BaseTimeEntity {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
+    /** 펫케어 지원 목록 (서비스 제공자들의 지원) */
     @OneToMany(mappedBy = "careRequest", cascade = CascadeType.ALL)
     @BatchSize(size = 50)  // 페이징 목록 조회 시 CareApplication N+1 방지
     private List<CareApplication> applications;
 
+    /** 펫케어 요청 댓글 목록 */
     @OneToMany(mappedBy = "careRequest", cascade = CascadeType.ALL)
     private List<CareRequestComment> comments;
 

@@ -105,6 +105,11 @@ public class JpaCareRequestAdapter implements CareRequestRepository {
     }
 
     @Override
+    public Optional<CareRequest> findByIdWithUser(Long idx) {
+        return jpaRepository.findByIdWithUser(idx);
+    }
+
+    @Override
     public Optional<CareRequest> findByIdWithApplications(Long idx) {
         return jpaRepository.findByIdWithApplications(idx);
     }

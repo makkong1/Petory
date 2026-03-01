@@ -79,6 +79,11 @@ public interface CareRequestRepository {
         Optional<CareRequest> findByIdWithPet(Long idx);
 
         /**
+         * 단일 케어 요청 조회 (작성자 포함) - 수정/삭제 시 권한 확인용
+         */
+        Optional<CareRequest> findByIdWithUser(Long idx);
+
+        /**
          * 단일 케어 요청 조회 (펫 정보 및 지원 정보 포함)
          */
         Optional<CareRequest> findByIdWithApplications(Long idx);

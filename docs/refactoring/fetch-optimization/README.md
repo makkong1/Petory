@@ -40,3 +40,4 @@
 
 - [user/](./user/) - User 도메인
 - [board/](./board/) - Board 도메인 (일반 게시글, Comment, 실종 제보)
+- [care/](./care/) - Care 도메인 (펫케어 요청, 지원, 댓글, 리뷰)
