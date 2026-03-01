@@ -2,6 +2,7 @@ package com.linkup.Petory.domain.board.repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -78,4 +79,12 @@ public interface SpringDataJpaBoardRepository extends JpaRepository<Board, Long>
     @RepositoryMethod("게시글: 관리자 전체 조회 (삭제 포함)")
     @Query("SELECT b FROM Board b JOIN FETCH b.user u ORDER BY b.createdAt DESC")
     List<Board> findAllForAdmin();
+
+    /**
+     * 게시글 단건 조회 (작성자 포함, Fetch Join)
+     * [리팩토링] getBoard, getBoardForAdmin - Board + User 1회 쿼리
+     */
+    @RepositoryMethod("게시글: idx로 조회 (작성자 포함)")
+    @Query("SELECT b FROM Board b JOIN FETCH b.user u WHERE b.idx = :idx")
+    Optional<Board> findByIdWithUser(@Param("idx") Long idx);
 }

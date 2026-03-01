@@ -406,11 +406,11 @@ public class MissingPetBoardService {
             spec = spec == null ? statusSpec : spec.and(statusSpec);
         }
 
-        // [리팩토링] 검색어 필터 (제목, 내용, 반려동물 이름, 작성자명) - DB 레벨
+        // [리팩토링] 검색어 필터 (제목, 내용, 반려동물 이름, 작성자명) - join으로 user 조인
         if (q != null && !q.isBlank()) {
             String keyword = "%" + q.toLowerCase() + "%";
             Specification<MissingPetBoard> searchSpec = (root, query, cb) -> {
-                Join<MissingPetBoard, Users> userJoin = root.join("user");
+                Join<MissingPetBoard, Users> userJoin = root.join("user", jakarta.persistence.criteria.JoinType.LEFT);
                 return cb.or(
                         cb.like(cb.lower(root.get("title")), keyword),
                         cb.like(cb.lower(root.get("content")), keyword),
@@ -419,6 +419,15 @@ public class MissingPetBoardService {
             };
             spec = spec == null ? searchSpec : spec.and(searchSpec);
         }
+
+        // [리팩토링] user fetch - toBoardDTOWithoutComments N+1 방지
+        Specification<MissingPetBoard> userFetchSpec = (root, query, cb) -> {
+            if (Long.class != query.getResultType()) {
+                root.fetch("user", jakarta.persistence.criteria.JoinType.LEFT);
+            }
+            return cb.conjunction();
+        };
+        spec = spec == null ? userFetchSpec : spec.and(userFetchSpec);
 
         Pageable pageable = PageRequest.of(page, size,
                 org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC,

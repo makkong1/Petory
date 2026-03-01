@@ -55,6 +55,11 @@ public class JpaBoardAdapter implements BoardRepository {
     }
 
     @Override
+    public Optional<Board> findByIdWithUser(Long id) {
+        return jpaRepository.findByIdWithUser(id);
+    }
+
+    @Override
     public boolean existsById(Long id) {
         return jpaRepository.existsById(id);
     }

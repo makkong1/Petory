@@ -32,6 +32,11 @@ public interface BoardRepository {
 
     Optional<Board> findById(Long id);
 
+    /**
+     * 게시글 단건 조회 (작성자 포함, Fetch Join)
+     */
+    Optional<Board> findByIdWithUser(Long id);
+
     boolean existsById(Long id);
 
     List<Board> findAll();
