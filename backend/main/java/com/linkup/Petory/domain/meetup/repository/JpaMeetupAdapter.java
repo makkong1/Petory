@@ -76,6 +76,11 @@ public class JpaMeetupAdapter implements MeetupRepository {
     }
 
     @Override
+    public Optional<Meetup> findByIdWithOrganizer(Long idx) {
+        return jpaRepository.findByIdWithOrganizer(idx);
+    }
+
+    @Override
     public Optional<Meetup> findByIdWithLock(Long idx) {
         return jpaRepository.findByIdWithLock(idx);
     }

@@ -16,18 +16,22 @@ import com.linkup.Petory.global.annotation.RepositoryMethod;
 public interface SpringDataJpaLocationServiceReviewRepository extends JpaRepository<LocationServiceReview, Long> {
 
     @RepositoryMethod("장소 리뷰: 서비스별 목록 조회")
-    @Query("SELECT r FROM LocationServiceReview r WHERE " +
+    @Query("SELECT r FROM LocationServiceReview r JOIN FETCH r.user WHERE " +
             "r.service.idx = :serviceIdx AND " +
             "(r.isDeleted IS NULL OR r.isDeleted = false) " +
             "ORDER BY r.createdAt DESC")
     List<LocationServiceReview> findByServiceIdxOrderByCreatedAtDesc(@Param("serviceIdx") Long serviceIdx);
 
     @RepositoryMethod("장소 리뷰: 사용자별 목록 조회")
-    @Query("SELECT r FROM LocationServiceReview r WHERE " +
+    @Query("SELECT r FROM LocationServiceReview r JOIN FETCH r.service WHERE " +
             "r.user.idx = :userIdx AND " +
             "(r.isDeleted IS NULL OR r.isDeleted = false) " +
             "ORDER BY r.createdAt DESC")
     List<LocationServiceReview> findByUserIdxOrderByCreatedAtDesc(@Param("userIdx") Long userIdx);
+
+    @RepositoryMethod("장소 리뷰: 단건 조회 (user, service 포함)")
+    @Query("SELECT r FROM LocationServiceReview r JOIN FETCH r.user JOIN FETCH r.service WHERE r.idx = :idx")
+    Optional<LocationServiceReview> findByIdWithUserAndService(@Param("idx") Long idx);
 
     @RepositoryMethod("장소 리뷰: 서비스별 평균 평점")
     @Query("SELECT AVG(r.rating) FROM LocationServiceReview r WHERE " +

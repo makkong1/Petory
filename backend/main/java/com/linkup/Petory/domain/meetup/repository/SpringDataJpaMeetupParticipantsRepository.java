@@ -17,7 +17,7 @@ import com.linkup.Petory.global.annotation.RepositoryMethod;
 public interface SpringDataJpaMeetupParticipantsRepository extends JpaRepository<MeetupParticipants, MeetupParticipantsId> {
 
     @RepositoryMethod("모임 참여자: 모임별 목록 조회")
-    @Query("SELECT mp FROM MeetupParticipants mp WHERE mp.meetup.idx = :meetupIdx ORDER BY mp.joinedAt ASC")
+    @Query("SELECT mp FROM MeetupParticipants mp JOIN FETCH mp.user WHERE mp.meetup.idx = :meetupIdx ORDER BY mp.joinedAt ASC")
     List<MeetupParticipants> findByMeetupIdxOrderByJoinedAtAsc(@Param("meetupIdx") Long meetupIdx);
 
     @RepositoryMethod("모임 참여자: 사용자별 참여 모임 목록")

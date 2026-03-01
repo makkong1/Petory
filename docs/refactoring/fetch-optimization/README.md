@@ -41,3 +41,5 @@
 - [user/](./user/) - User 도메인
 - [board/](./board/) - Board 도메인 (일반 게시글, Comment, 실종 제보)
 - [care/](./care/) - Care 도메인 (펫케어 요청, 지원, 댓글, 리뷰)
+- [location/](./location/) - Location 도메인 (장소 서비스, 장소 리뷰)
+- [meetup/](./meetup/) - Meetup 도메인 (모임, 모임 참여자)

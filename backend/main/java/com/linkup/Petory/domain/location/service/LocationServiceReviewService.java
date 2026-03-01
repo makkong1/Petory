@@ -68,7 +68,7 @@ public class LocationServiceReviewService {
     // 리뷰 수정
     @Transactional
     public LocationServiceReviewDTO updateReview(Long reviewIdx, LocationServiceReviewDTO reviewDTO) {
-        LocationServiceReview review = reviewRepository.findById(reviewIdx)
+        LocationServiceReview review = reviewRepository.findByIdWithUserAndService(reviewIdx)
                 .orElseThrow(() -> new RuntimeException("리뷰를 찾을 수 없습니다."));
 
         // 이메일 인증 확인
@@ -93,7 +93,7 @@ public class LocationServiceReviewService {
     // 리뷰 삭제 (Soft Delete)
     @Transactional
     public void deleteReview(Long reviewIdx) {
-        LocationServiceReview review = reviewRepository.findById(reviewIdx)
+        LocationServiceReview review = reviewRepository.findByIdWithUserAndService(reviewIdx)
                 .orElseThrow(() -> new RuntimeException("리뷰를 찾을 수 없습니다."));
 
         // 이미 삭제된 리뷰인지 확인

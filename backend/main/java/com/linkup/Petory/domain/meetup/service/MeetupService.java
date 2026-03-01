@@ -113,7 +113,7 @@ public class MeetupService {
     // 모임 수정
     @Transactional
     public MeetupDTO updateMeetup(Long meetupIdx, MeetupDTO meetupDTO) {
-        Meetup meetup = meetupRepository.findById(meetupIdx)
+        Meetup meetup = meetupRepository.findByIdWithDetails(meetupIdx)
                 .orElseThrow(() -> new RuntimeException("모임을 찾을 수 없습니다."));
 
         if (meetupDTO.getTitle() != null) {
@@ -206,8 +206,8 @@ public class MeetupService {
     // 모임 참가 (원자적 UPDATE 쿼리 방식 - 권장)
     @Transactional
     public MeetupParticipantsDTO joinMeetup(Long meetupIdx, String userId) {
-        // 모임 조회 (Lock 없이)
-        Meetup meetup = meetupRepository.findById(meetupIdx)
+        // 모임 조회 (organizer fetch로 N+1 방지)
+        Meetup meetup = meetupRepository.findByIdWithOrganizer(meetupIdx)
                 .orElseThrow(() -> {
                     log.error("모임을 찾을 수 없습니다. meetupIdx={}, userId={}", meetupIdx, userId);
                     return new RuntimeException("모임을 찾을 수 없습니다.");
@@ -267,8 +267,8 @@ public class MeetupService {
     // 모임 참가 취소
     @Transactional
     public void cancelMeetupParticipation(Long meetupIdx, String userId) {
-        // 모임 존재 확인
-        Meetup meetup = meetupRepository.findById(meetupIdx)
+        // 모임 존재 확인 (organizer fetch로 N+1 방지)
+        Meetup meetup = meetupRepository.findByIdWithOrganizer(meetupIdx)
                 .orElseThrow(() -> new RuntimeException("모임을 찾을 수 없습니다."));
 
         // 사용자 확인 (userId는 Users의 id 필드, 문자열)
