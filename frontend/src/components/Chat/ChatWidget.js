@@ -27,7 +27,9 @@ const ChatWidget = () => {
       const totalUnread = (data || []).reduce((sum, conv) => sum + (conv.unreadCount || 0), 0);
       setTotalUnreadCount(totalUnread);
     } catch (error) {
-      console.error('채팅방 목록 조회 실패:', error);
+      if (error.response?.status !== 401) {
+        console.error('채팅방 목록 조회 실패:', error);
+      }
     } finally {
       setLoading(false);
     }
