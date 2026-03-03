@@ -9,6 +9,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import com.linkup.Petory.domain.user.dto.PetDTO;
+import com.linkup.Petory.domain.user.exception.UnauthenticatedException;
 import com.linkup.Petory.domain.user.service.PetService;
 
 import lombok.RequiredArgsConstructor;
@@ -32,7 +33,7 @@ public class PetController {
     private String getCurrentUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || authentication.getPrincipal() == null) {
-            throw new RuntimeException("인증되지 않은 사용자입니다.");
+            throw new UnauthenticatedException();
         }
         return authentication.getName();
     }

@@ -3,6 +3,7 @@ package com.linkup.Petory.domain.user.controller;
 import com.linkup.Petory.domain.user.dto.LoginRequest;
 import com.linkup.Petory.domain.user.dto.TokenResponse;
 import com.linkup.Petory.domain.user.dto.UsersDTO;
+import com.linkup.Petory.domain.user.exception.UserValidationException;
 import com.linkup.Petory.domain.user.service.AuthService;
 import com.linkup.Petory.domain.user.service.EmailVerificationService;
 import com.linkup.Petory.domain.user.service.UsersService;
@@ -12,7 +13,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -33,93 +33,70 @@ public class AuthController {
     /**
      * 로그인 API - Access Token과 Refresh Token 발급
      */
+    /**
+     * [리팩토링] try-catch 제거 → GlobalExceptionHandler로 예외 위임
+     */
     @PostMapping("/login")
     public ResponseEntity<Map<String, Object>> login(@RequestBody LoginRequest loginRequest) {
-        try {
-            // Spring Security 인증 처리 (id로 인증)
-            authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(
-                            loginRequest.id(),
-                            loginRequest.password()));
+        // Spring Security 인증 처리 (id로 인증)
+        authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(
+                        loginRequest.id(),
+                        loginRequest.password()));
 
-            // AuthService를 통해 로그인 처리 (Access Token + Refresh Token 발급)
-            // 내부에서 제재 체크도 수행
-            TokenResponse tokenResponse = authService.login(loginRequest.id(), loginRequest.password());
+        // AuthService를 통해 로그인 처리 (Access Token + Refresh Token 발급)
+        TokenResponse tokenResponse = authService.login(loginRequest.id(), loginRequest.password());
 
-            Map<String, Object> response = new HashMap<>();
-            response.put("accessToken", tokenResponse.accessToken());
-            response.put("refreshToken", tokenResponse.refreshToken());
-            response.put("user", tokenResponse.user());
-            response.put("message", "로그인 성공");
+        Map<String, Object> response = new HashMap<>();
+        response.put("accessToken", tokenResponse.accessToken());
+        response.put("refreshToken", tokenResponse.refreshToken());
+        response.put("user", tokenResponse.user());
+        response.put("message", "로그인 성공");
 
-            log.info("tokenResponse: {}", response);
-
-            log.info("로그인 성공: {}", loginRequest.id());
-            return ResponseEntity.ok(response);
-
-        } catch (AuthenticationException e) {
-            log.error("로그인 실패: {}", e.getMessage());
-            Map<String, Object> response = new HashMap<>();
-            response.put("error", "아이디 또는 비밀번호가 올바르지 않습니다.");
-            return ResponseEntity.badRequest().body(response);
-        } catch (RuntimeException e) {
-            log.error("로그인 처리 실패: {}", e.getMessage());
-            Map<String, Object> response = new HashMap<>();
-            response.put("error", e.getMessage());
-            return ResponseEntity.badRequest().body(response);
-        }
+        log.info("로그인 성공: {}", loginRequest.id());
+        return ResponseEntity.ok(response);
     }
 
     /**
      * 회원가입 API
      */
+    /**
+     * [리팩토링] try-catch 제거 → GlobalExceptionHandler로 예외 위임
+     */
     @PostMapping("/register")
     public ResponseEntity<Map<String, Object>> register(@RequestBody UsersDTO userDTO) {
-        try {
-            UsersDTO createdUser = usersService.createUser(userDTO);
+        UsersDTO createdUser = usersService.createUser(userDTO);
 
-            Map<String, Object> response = new HashMap<>();
-            response.put("user", createdUser);
-            response.put("message", "회원가입 성공");
+        Map<String, Object> response = new HashMap<>();
+        response.put("user", createdUser);
+        response.put("message", "회원가입 성공");
 
-            log.info("회원가입 성공: {}", createdUser.getUsername());
-            return ResponseEntity.ok(response);
-
-        } catch (Exception e) {
-            log.error("회원가입 실패: {}", e.getMessage());
-            Map<String, Object> response = new HashMap<>();
-            response.put("error", "회원가입 중 오류가 발생했습니다: " + e.getMessage());
-            return ResponseEntity.badRequest().body(response);
-        }
+        log.info("회원가입 성공: {}", createdUser.getUsername());
+        return ResponseEntity.ok(response);
     }
 
     /**
      * Access Token 검증 API
      */
+    /**
+     * [리팩토링] try-catch 제거 → GlobalExceptionHandler로 예외 위임
+     */
     @PostMapping("/validate")
     public ResponseEntity<Map<String, Object>> validateToken(@RequestHeader("Authorization") String authHeader) {
-        try {
-            String token = jwtUtil.extractTokenFromHeader(authHeader);
+        String token = jwtUtil.extractTokenFromHeader(authHeader);
 
-            if (token != null && jwtUtil.validateToken(token)) {
-                String id = jwtUtil.getIdFromToken(token);
-                UsersDTO user = usersService.getUserById(id);
+        if (token != null && jwtUtil.validateToken(token)) {
+            String id = jwtUtil.getIdFromToken(token);
+            UsersDTO user = usersService.getUserById(id);
 
-                Map<String, Object> response = new HashMap<>();
-                response.put("valid", true);
-                response.put("user", user);
-                return ResponseEntity.ok(response);
-            } else {
-                Map<String, Object> response = new HashMap<>();
-                response.put("valid", false);
-                response.put("error", "유효하지 않은 토큰입니다.");
-                return ResponseEntity.badRequest().body(response);
-            }
-        } catch (Exception e) {
-            log.error("토큰 검증 실패: {}", e.getMessage());
+            Map<String, Object> response = new HashMap<>();
+            response.put("valid", true);
+            response.put("user", user);
+            return ResponseEntity.ok(response);
+        } else {
             Map<String, Object> response = new HashMap<>();
             response.put("valid", false);
-            response.put("error", "토큰 검증 중 오류가 발생했습니다.");
+            response.put("error", "유효하지 않은 토큰입니다.");
             return ResponseEntity.badRequest().body(response);
         }
     }
@@ -127,107 +104,69 @@ public class AuthController {
     /**
      * Refresh Token으로 Access Token 갱신 API
      */
+    /**
+     * [리팩토링] try-catch 제거 → GlobalExceptionHandler로 예외 위임
+     */
     @PostMapping("/refresh")
     public ResponseEntity<Map<String, Object>> refreshToken(@RequestBody Map<String, String> request) {
-        try {
-            String refreshToken = request.get("refreshToken");
+        String refreshToken = request.get("refreshToken");
 
-            if (refreshToken == null || refreshToken.isEmpty()) {
-                Map<String, Object> response = new HashMap<>();
-                response.put("error", "Refresh Token이 필요합니다.");
-                return ResponseEntity.badRequest().body(response);
-            }
-
-            // Refresh Token으로 Access Token 갱신
-            TokenResponse tokenResponse = authService.refreshAccessToken(refreshToken);
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("accessToken", tokenResponse.accessToken());
-            response.put("refreshToken", tokenResponse.refreshToken());
-            response.put("user", tokenResponse.user());
-            response.put("message", "토큰 갱신 성공");
-
-            log.info("Access Token 갱신 성공");
-            return ResponseEntity.ok(response);
-
-        } catch (RuntimeException e) {
-            log.error("토큰 갱신 실패: {}", e.getMessage());
-            Map<String, Object> response = new HashMap<>();
-            response.put("error", e.getMessage());
-            return ResponseEntity.badRequest().body(response);
-        } catch (Exception e) {
-            log.error("토큰 갱신 중 오류 발생: {}", e.getMessage());
-            Map<String, Object> response = new HashMap<>();
-            response.put("error", "토큰 갱신 중 오류가 발생했습니다.");
-            return ResponseEntity.badRequest().body(response);
+        if (refreshToken == null || refreshToken.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Refresh Token이 필요합니다."));
         }
+
+        TokenResponse tokenResponse = authService.refreshAccessToken(refreshToken);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("accessToken", tokenResponse.accessToken());
+        response.put("refreshToken", tokenResponse.refreshToken());
+        response.put("user", tokenResponse.user());
+        response.put("message", "토큰 갱신 성공");
+
+        log.info("Access Token 갱신 성공");
+        return ResponseEntity.ok(response);
     }
 
     /**
      * 로그아웃 API - Refresh Token 제거
      */
+    /**
+     * [리팩토링] try-catch 제거 → GlobalExceptionHandler로 예외 위임
+     */
     @PostMapping("/logout")
     public ResponseEntity<Map<String, Object>> logout(@RequestHeader("Authorization") String authHeader) {
-        try {
-            String token = jwtUtil.extractTokenFromHeader(authHeader);
+        String token = jwtUtil.extractTokenFromHeader(authHeader);
 
-            if (token != null && jwtUtil.validateToken(token)) {
-                String id = jwtUtil.getIdFromToken(token);
-                authService.logout(id);
+        if (token != null && jwtUtil.validateToken(token)) {
+            String id = jwtUtil.getIdFromToken(token);
+            authService.logout(id);
 
-                Map<String, Object> response = new HashMap<>();
-                response.put("message", "로그아웃 성공");
-                log.info("로그아웃 성공: {}", id);
-                return ResponseEntity.ok(response);
-            } else {
-                Map<String, Object> response = new HashMap<>();
-                response.put("error", "유효하지 않은 토큰입니다.");
-                return ResponseEntity.badRequest().body(response);
-            }
-        } catch (Exception e) {
-            log.error("로그아웃 실패: {}", e.getMessage());
-            Map<String, Object> response = new HashMap<>();
-            response.put("error", "로그아웃 중 오류가 발생했습니다.");
-            return ResponseEntity.badRequest().body(response);
+            log.info("로그아웃 성공: {}", id);
+            return ResponseEntity.ok(Map.of("message", "로그아웃 성공"));
+        } else {
+            return ResponseEntity.badRequest().body(Map.of("error", "유효하지 않은 토큰입니다."));
         }
     }
 
     /**
      * 비밀번호 찾기 - 비밀번호 재설정 이메일 발송 (인증 불필요)
      */
+    /**
+     * [리팩토링] try-catch 제거 → GlobalExceptionHandler로 예외 위임
+     */
     @PostMapping("/forgot-password")
     public ResponseEntity<Map<String, Object>> forgotPassword(@RequestBody Map<String, String> request) {
-        try {
-            String email = request.get("email");
+        String email = request.get("email");
 
-            if (email == null || email.isEmpty()) {
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", false);
-                response.put("message", "이메일을 입력해주세요.");
-                return ResponseEntity.badRequest().body(response);
-            }
-
-            emailVerificationService.sendPasswordResetEmail(email);
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("message", "비밀번호 재설정 링크가 이메일로 발송되었습니다. 이메일을 확인해주세요.");
-
-            log.info("비밀번호 찾기 이메일 발송 성공: email={}", email);
-            return ResponseEntity.ok(response);
-
-        } catch (RuntimeException e) {
-            log.error("비밀번호 찾기 실패: {}", e.getMessage());
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", false);
-            response.put("message", e.getMessage());
-            return ResponseEntity.badRequest().body(response);
-        } catch (Exception e) {
-            log.error("비밀번호 찾기 중 오류 발생: {}", e.getMessage());
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", false);
-            response.put("message", "비밀번호 재설정 이메일 발송 중 오류가 발생했습니다.");
-            return ResponseEntity.badRequest().body(response);
+        if (email == null || email.isEmpty()) {
+            throw UserValidationException.emailRequired();
         }
+
+        emailVerificationService.sendPasswordResetEmail(email);
+
+        log.info("비밀번호 찾기 이메일 발송 성공: email={}", email);
+        return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "비밀번호 재설정 링크가 이메일로 발송되었습니다. 이메일을 확인해주세요."));
     }
 }

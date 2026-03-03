@@ -10,6 +10,7 @@ import com.linkup.Petory.domain.report.entity.ReportActionType;
 import com.linkup.Petory.domain.user.entity.UserSanction;
 import com.linkup.Petory.domain.user.entity.UserStatus;
 import com.linkup.Petory.domain.user.entity.Users;
+import com.linkup.Petory.domain.user.exception.UserNotFoundException;
 import com.linkup.Petory.domain.user.repository.UserSanctionRepository;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 
@@ -35,7 +36,7 @@ public class UserSanctionService {
     @Transactional
     public UserSanction addWarning(Long userId, String reason, Long adminId, Long reportId) {
         Users user = usersRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("유저를 찾을 수 없습니다."));
+                .orElseThrow(UserNotFoundException::new);
 
         Users admin = adminId != null ? usersRepository.findById(adminId).orElse(null) : null;
 
@@ -58,7 +59,7 @@ public class UserSanctionService {
 
         // 업데이트된 사용자 정보 다시 조회
         user = usersRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("유저를 찾을 수 없습니다."));
+                .orElseThrow(UserNotFoundException::new);
 
         // 경고 3회 이상이면 자동 이용제한
         if (user.getWarningCount() >= WARNING_THRESHOLD) {
@@ -79,7 +80,7 @@ public class UserSanctionService {
     @Transactional
     public UserSanction addSuspension(Long userId, String reason, Long adminId, Long reportId, int days) {
         Users user = usersRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("유저를 찾을 수 없습니다."));
+                .orElseThrow(UserNotFoundException::new);
 
         Users admin = adminId != null ? usersRepository.findById(adminId).orElse(null) : null;
 
@@ -113,7 +114,7 @@ public class UserSanctionService {
     @Transactional
     public UserSanction addBan(Long userId, String reason, Long adminId, Long reportId) {
         Users user = usersRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("유저를 찾을 수 없습니다."));
+                .orElseThrow(UserNotFoundException::new);
 
         Users admin = adminId != null ? usersRepository.findById(adminId).orElse(null) : null;
 
@@ -144,7 +145,7 @@ public class UserSanctionService {
     @Transactional
     public void releaseSanction(Long userId) {
         Users user = usersRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("유저를 찾을 수 없습니다."));
+                .orElseThrow(UserNotFoundException::new);
 
         user.setStatus(UserStatus.ACTIVE);
         user.setSuspendedUntil(null);
@@ -191,7 +192,7 @@ public class UserSanctionService {
      */
     public List<UserSanction> getUserSanctions(Long userId) {
         Users user = usersRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("유저를 찾을 수 없습니다."));
+                .orElseThrow(UserNotFoundException::new);
         return sanctionRepository.findByUserOrderByCreatedAtDesc(user);
     }
 

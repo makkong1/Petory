@@ -2,6 +2,7 @@ package com.linkup.Petory.global.exception;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -13,6 +14,11 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.util.HashMap;
 import java.util.Map;
+
+/**
+ * 전역 예외 처리.
+ * ApiException 상속 예외는 일관된 형식으로 응답 (status, errorCode, message).
+ */
 
 @Slf4j
 @RestControllerAdvice
@@ -75,6 +81,39 @@ public class GlobalExceptionHandler {
         response.put("status", HttpStatus.CONFLICT.value());
         
         return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+    }
+
+    /**
+     * 인증 실패 (로그인 실패 - 아이디/비밀번호 불일치)
+     */
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<Map<String, Object>> handleAuthenticationException(AuthenticationException e) {
+        log.warn("인증 실패: {}", e.getMessage());
+        Map<String, Object> response = new HashMap<>();
+        response.put("error", "아이디 또는 비밀번호가 올바르지 않습니다.");
+        response.put("message", "아이디 또는 비밀번호가 올바르지 않습니다.");
+        response.put("status", HttpStatus.BAD_REQUEST.value());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    /**
+     * ApiException 및 하위 예외 처리 (User 도메인 등)
+     * HTTP status, errorCode, message를 일관된 형식으로 반환
+     */
+    @ExceptionHandler(ApiException.class)
+    public ResponseEntity<Map<String, Object>> handleApiException(ApiException e) {
+        HttpStatus status = e.getHttpStatus();
+        log.warn("API 예외: {} [{}] - {}", e.getErrorCode(), status, e.getMessage());
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("error", e.getMessage());
+        response.put("message", e.getMessage());
+        response.put("status", status.value());
+        if (e.getErrorCode() != null) {
+            response.put("errorCode", e.getErrorCode());
+        }
+
+        return ResponseEntity.status(status).body(response);
     }
 
     /**
