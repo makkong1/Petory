@@ -14,6 +14,9 @@ import com.linkup.Petory.domain.user.repository.UsersRepository;
 import com.linkup.Petory.domain.board.repository.BoardRepository;
 import com.linkup.Petory.domain.care.repository.CareRequestRepository;
 import com.linkup.Petory.domain.care.entity.CareRequestStatus;
+import com.linkup.Petory.domain.meetup.repository.MeetupParticipantsRepository;
+import com.linkup.Petory.domain.meetup.repository.MeetupRepository;
+import com.linkup.Petory.domain.report.repository.ReportRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -26,6 +29,9 @@ public class StatisticsService {
     private final UsersRepository usersRepository;
     private final BoardRepository boardRepository;
     private final CareRequestRepository careRequestRepository;
+    private final MeetupRepository meetupRepository;
+    private final MeetupParticipantsRepository meetupParticipantsRepository;
+    private final ReportRepository reportRepository;
     private final StatisticsScheduler statisticsScheduler;
 
     /**
@@ -76,6 +82,9 @@ public class StatisticsService {
         long completedCares = careRequestRepository.countByDateBetweenAndStatus(startOfDay, endOfDay,
                 CareRequestStatus.COMPLETED);
         long activeUsers = usersRepository.countByLastLoginAtBetween(startOfDay, endOfDay);
+        long newMeetups = meetupRepository.countByCreatedAtBetween(startOfDay, endOfDay);
+        long meetupParticipants = meetupParticipantsRepository.countByJoinedAtBetween(startOfDay, endOfDay);
+        long newReports = reportRepository.countByCreatedAtBetween(startOfDay, endOfDay);
 
         return DailyStatistics.builder()
                 .statDate(today)
@@ -85,6 +94,9 @@ public class StatisticsService {
                 .completedCares((int) completedCares)
                 .totalRevenue(BigDecimal.ZERO)
                 .activeUsers((int) activeUsers)
+                .newMeetups((int) newMeetups)
+                .meetupParticipants((int) meetupParticipants)
+                .newReports((int) newReports)
                 .build();
     }
 }

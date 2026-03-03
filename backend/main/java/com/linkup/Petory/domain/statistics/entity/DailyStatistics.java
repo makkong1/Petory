@@ -58,6 +58,18 @@ public class DailyStatistics {
     @Column(name = "active_users")
     private Integer activeUsers = 0;
 
+    @Builder.Default
+    @Column(name = "new_meetups")
+    private Integer newMeetups = 0;
+
+    @Builder.Default
+    @Column(name = "meetup_participants")
+    private Integer meetupParticipants = 0;
+
+    @Builder.Default
+    @Column(name = "new_reports")
+    private Integer newReports = 0;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 

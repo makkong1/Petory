@@ -99,5 +99,10 @@ public class JpaMeetupAdapter implements MeetupRepository {
     public Optional<Meetup> findByIdWithDetails(Long idx) {
         return jpaRepository.findByIdWithDetails(idx);
     }
+
+    @Override
+    public long countByCreatedAtBetween(LocalDateTime start, LocalDateTime end) {
+        return jpaRepository.countByCreatedAtBetween(start, end);
+    }
 }
 

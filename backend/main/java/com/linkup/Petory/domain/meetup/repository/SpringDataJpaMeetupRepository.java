@@ -104,5 +104,8 @@ public interface SpringDataJpaMeetupRepository extends JpaRepository<Meetup, Lon
             "LEFT JOIN FETCH p.user " +
             "WHERE m.idx = :idx")
     Optional<Meetup> findByIdWithDetails(@Param("idx") Long idx);
+
+    @RepositoryMethod("모임: 기간별 통계")
+    long countByCreatedAtBetween(LocalDateTime start, LocalDateTime end);
 }
 

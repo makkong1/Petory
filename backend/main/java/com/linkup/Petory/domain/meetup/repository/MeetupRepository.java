@@ -87,4 +87,9 @@ public interface MeetupRepository {
      * 특정 모임 조회 (organizer와 participants 포함) - JOIN FETCH로 N+1 문제 해결
      */
     Optional<Meetup> findByIdWithDetails(Long idx);
+
+    /**
+     * 통계용: 특정 기간 동안 생성된 모임 수
+     */
+    long countByCreatedAtBetween(LocalDateTime start, LocalDateTime end);
 }

@@ -27,6 +27,9 @@ const SystemDashboardSection = () => {
     newUsers: 0,
     newPosts: 0,
     newCareRequests: 0,
+    newMeetups: 0,
+    meetupParticipants: 0,
+    newReports: 0,
     activeUsers: 0,
     totalRevenue: 0
   });
@@ -49,6 +52,9 @@ const SystemDashboardSection = () => {
           newUsers: latest.newUsers,
           newPosts: latest.newPosts,
           newCareRequests: latest.newCareRequests,
+          newMeetups: latest.newMeetups ?? 0,
+          meetupParticipants: latest.meetupParticipants ?? 0,
+          newReports: latest.newReports ?? 0,
           activeUsers: latest.activeUsers,
           totalRevenue: latest.totalRevenue
         });
@@ -123,8 +129,20 @@ const SystemDashboardSection = () => {
           <MetricValue>{summary.newCareRequests}건</MetricValue>
         </MetricCard>
         <MetricCard>
+          <MetricLabel>새 모임</MetricLabel>
+          <MetricValue>{summary.newMeetups}개</MetricValue>
+        </MetricCard>
+        <MetricCard>
+          <MetricLabel>모임 참여</MetricLabel>
+          <MetricValue>{summary.meetupParticipants}명</MetricValue>
+        </MetricCard>
+        <MetricCard>
+          <MetricLabel>신규 신고</MetricLabel>
+          <MetricValue>{summary.newReports}건</MetricValue>
+        </MetricCard>
+        <MetricCard>
           <MetricLabel>오늘 매출 (예상)</MetricLabel>
-          <MetricValue>₩ {summary.totalRevenue.toLocaleString()}</MetricValue>
+          <MetricValue>₩ {(summary.totalRevenue ?? 0).toLocaleString()}</MetricValue>
         </MetricCard>
       </Grid>
 
@@ -141,7 +159,10 @@ const SystemDashboardSection = () => {
               <Tooltip />
               <Legend />
               <Line yAxisId="left" type="monotone" dataKey="newUsers" name="신규 가입" stroke="#8884d8" activeDot={{ r: 8 }} />
+              <Line yAxisId="left" type="monotone" dataKey="newMeetups" name="새 모임" stroke="#ffc658" />
+
               <Line yAxisId="right" type="monotone" dataKey="activeUsers" name="활성 유저" stroke="#82ca9d" />
+              <Line yAxisId="right" type="monotone" dataKey="newReports" name="신고" stroke="#ff7c7c" />
             </LineChart>
           </ResponsiveContainer>
         </ChartContainer>
@@ -157,6 +178,8 @@ const SystemDashboardSection = () => {
               <Legend />
               <Bar dataKey="newPosts" name="게시글" stackId="a" fill="#8884d8" />
               <Bar dataKey="newCareRequests" name="케어 요청" stackId="a" fill="#ffc658" />
+              <Bar dataKey="newMeetups" name="모임" stackId="a" fill="#82ca9d" />
+              <Bar dataKey="newReports" name="신고" stackId="a" fill="#ff7c7c" />
             </BarChart>
           </ResponsiveContainer>
         </ChartContainer>

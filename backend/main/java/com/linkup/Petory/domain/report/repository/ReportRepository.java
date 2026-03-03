@@ -1,5 +1,6 @@
 package com.linkup.Petory.domain.report.repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -50,5 +51,10 @@ public interface ReportRepository {
      * 필터 조건에 맞는 신고 목록 조회
      */
     List<Report> findReportsWithFilters(ReportTargetType targetType, ReportStatus status);
+
+    /**
+     * 통계용: 특정 기간 동안 접수된 신고 수
+     */
+    long countByCreatedAtBetween(LocalDateTime start, LocalDateTime end);
 }
 

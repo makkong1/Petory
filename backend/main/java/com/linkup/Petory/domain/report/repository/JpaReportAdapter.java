@@ -1,5 +1,6 @@
 package com.linkup.Petory.domain.report.repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -70,6 +71,11 @@ public class JpaReportAdapter implements ReportRepository {
     @Override
     public List<Report> findReportsWithFilters(ReportTargetType targetType, ReportStatus status) {
         return jpaRepository.findReportsWithFilters(targetType, status);
+    }
+
+    @Override
+    public long countByCreatedAtBetween(LocalDateTime start, LocalDateTime end) {
+        return jpaRepository.countByCreatedAtBetween(start, end);
     }
 }
 

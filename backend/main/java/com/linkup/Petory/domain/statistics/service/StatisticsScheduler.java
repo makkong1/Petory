@@ -3,6 +3,9 @@ package com.linkup.Petory.domain.statistics.service;
 import com.linkup.Petory.domain.board.repository.BoardRepository;
 import com.linkup.Petory.domain.care.entity.CareRequestStatus;
 import com.linkup.Petory.domain.care.repository.CareRequestRepository;
+import com.linkup.Petory.domain.meetup.repository.MeetupParticipantsRepository;
+import com.linkup.Petory.domain.meetup.repository.MeetupRepository;
+import com.linkup.Petory.domain.report.repository.ReportRepository;
 import com.linkup.Petory.domain.statistics.entity.DailyStatistics;
 import com.linkup.Petory.domain.statistics.repository.DailyStatisticsRepository;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
@@ -27,6 +30,9 @@ public class StatisticsScheduler {
     private final UsersRepository usersRepository;
     private final BoardRepository boardRepository;
     private final CareRequestRepository careRequestRepository;
+    private final MeetupRepository meetupRepository;
+    private final MeetupParticipantsRepository meetupParticipantsRepository;
+    private final ReportRepository reportRepository;
 
     // application.properties에서 스케줄러 시간 읽기 (기본값: 18:30)
     @Value("${statistics.scheduler.hour:18}")
@@ -90,6 +96,15 @@ public class StatisticsScheduler {
         // 6. DAU
         long activeUsers = usersRepository.countByLastLoginAtBetween(startOfDay, endOfDay);
 
+        // 7. 새 모임
+        long newMeetups = meetupRepository.countByCreatedAtBetween(startOfDay, endOfDay);
+
+        // 8. 모임 참여
+        long meetupParticipants = meetupParticipantsRepository.countByJoinedAtBetween(startOfDay, endOfDay);
+
+        // 9. 신고 접수
+        long newReports = reportRepository.countByCreatedAtBetween(startOfDay, endOfDay);
+
         DailyStatistics stats = DailyStatistics.builder()
                 .statDate(date)
                 .newUsers((int) newUsers)
@@ -98,6 +113,9 @@ public class StatisticsScheduler {
                 .completedCares((int) completedCares)
                 .totalRevenue(totalRevenue)
                 .activeUsers((int) activeUsers)
+                .newMeetups((int) newMeetups)
+                .meetupParticipants((int) meetupParticipants)
+                .newReports((int) newReports)
                 .build();
 
         dailyStatisticsRepository.save(stats);
