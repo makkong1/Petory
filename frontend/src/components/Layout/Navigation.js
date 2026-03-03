@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import styled from 'styled-components';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import styled, { keyframes } from 'styled-components';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import UserProfileModal from '../User/UserProfileModal';
@@ -11,6 +11,7 @@ const Navigation = ({ activeTab, setActiveTab, user, onNavigateToBoard }) => {
   const { isDarkMode, toggleTheme } = useTheme();
   const { logout, updateUserProfile } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [isChargePageOpen, setIsChargePageOpen] = useState(false);
@@ -20,6 +21,20 @@ const Navigation = ({ activeTab, setActiveTab, user, onNavigateToBoard }) => {
   const [loadingNotifications, setLoadingNotifications] = useState(false);
 
   const isAdmin = user && (user.role === 'ADMIN' || user.role === 'MASTER');
+  const profileRef = useRef(null);
+
+  // 프로필 드롭다운 외부 클릭 시 닫기
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (profileRef.current && !profileRef.current.contains(e.target)) {
+        setIsProfileDropdownOpen(false);
+      }
+    };
+    if (isProfileDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isProfileDropdownOpen]);
 
   // 알림 조회
   const fetchNotifications = useCallback(async () => {
@@ -37,13 +52,15 @@ const Navigation = ({ activeTab, setActiveTab, user, onNavigateToBoard }) => {
       setNotifications(notificationsRes.data || []);
       setUnreadCount(countRes.data || 0);
     } catch (err) {
-      console.error('알림 조회 실패:', {
-        error: err,
-        message: err.message,
-        response: err.response?.data,
-        status: err.response?.status,
-        url: err.config?.url
-      });
+      if (err.response?.status !== 401) {
+        console.error('알림 조회 실패:', {
+          error: err,
+          message: err.message,
+          response: err.response?.data,
+          status: err.response?.status,
+          url: err.config?.url
+        });
+      }
     } finally {
       setLoadingNotifications(false);
     }
@@ -64,7 +81,9 @@ const Navigation = ({ activeTab, setActiveTab, user, onNavigateToBoard }) => {
       const res = await notificationApi.getUnreadCount(userId);
       setUnreadCount(res.data || 0);
     } catch (err) {
-      console.error('알림 개수 조회 실패:', err);
+      if (err.response?.status !== 401) {
+        console.error('알림 개수 조회 실패:', err);
+      }
     }
   }, [user]);
 
@@ -204,9 +223,6 @@ const Navigation = ({ activeTab, setActiveTab, user, onNavigateToBoard }) => {
     { id: 'missing-pets', label: '실종 제보', icon: '🚨' },
     { id: 'meetup', label: '산책 모임', icon: '🐾' },
     { id: 'community', label: '커뮤니티', icon: '💬' },
-    ...(user ? [
-      { id: 'activity', label: '내 활동', icon: '📋' },
-    ] : []),
     ...(isAdmin ? [
       { id: 'admin', label: '관리자', icon: '🔧' },
     ] : []),
@@ -318,18 +334,63 @@ const Navigation = ({ activeTab, setActiveTab, user, onNavigateToBoard }) => {
                     </NotificationDropdown>
                   )}
                 </div>
-                <CoinChargeButton type="button" onClick={() => setIsTransactionListOpen(true)}>
-                  📋 거래 내역
-                </CoinChargeButton>
-                <CoinChargeButton type="button" onClick={() => setIsChargePageOpen(true)}>
-                  💰 코인 충전
-                </CoinChargeButton>
-                <UserInfo type="button" onClick={() => setIsProfileOpen(true)}>
-                  <span role="img" aria-label="user">
-                    👤
-                  </span>
-                  {user.nickname || '내 정보'}
-                </UserInfo>
+                <ProfileWrapper ref={profileRef}>
+                  <UserInfo
+                    type="button"
+                    onClick={() => {
+                      setIsProfileDropdownOpen(prev => !prev);
+                      setIsNotificationOpen(false);
+                    }}
+                    $active={isProfileDropdownOpen}
+                  >
+                    <span role="img" aria-label="user">👤</span>
+                    {user.nickname || '내 정보'}
+                  </UserInfo>
+                  {isProfileDropdownOpen && (
+                    <ProfileDropdown>
+                      <ProfileDropdownHeader>
+                        <ProfileNickname>{user.nickname || user.username || '내 정보'}</ProfileNickname>
+                        <ProfileCoinBalance>
+                          💰 {(user.petCoinBalance ?? 0).toLocaleString()} 코인
+                        </ProfileCoinBalance>
+                      </ProfileDropdownHeader>
+                      <ProfileDropdownMenu>
+                        <ProfileMenuItem
+                          onClick={() => {
+                            setIsProfileDropdownOpen(false);
+                            setIsProfileOpen(true);
+                          }}
+                        >
+                          👤 프로필보기
+                        </ProfileMenuItem>
+                        <ProfileMenuItem
+                          onClick={() => {
+                            setIsProfileDropdownOpen(false);
+                            setIsChargePageOpen(true);
+                          }}
+                        >
+                          💰 코인충전
+                        </ProfileMenuItem>
+                        <ProfileMenuItem
+                          onClick={() => {
+                            setIsProfileDropdownOpen(false);
+                            setIsTransactionListOpen(true);
+                          }}
+                        >
+                          📋 거래내역
+                        </ProfileMenuItem>
+                        <ProfileMenuItem
+                          onClick={() => {
+                            setIsProfileDropdownOpen(false);
+                            setActiveTab('activity');
+                          }}
+                        >
+                          📌 내활동보기
+                        </ProfileMenuItem>
+                      </ProfileDropdownMenu>
+                    </ProfileDropdown>
+                  )}
+                </ProfileWrapper>
               </>
             )}
 
@@ -363,7 +424,10 @@ const Navigation = ({ activeTab, setActiveTab, user, onNavigateToBoard }) => {
             <PetCoinTransactionListModal onClose={() => setIsTransactionListOpen(false)} />
           )}
           {isChargePageOpen && (
-            <PetCoinChargePage onClose={() => setIsChargePageOpen(false)} />
+            <PetCoinChargePage
+              onClose={() => setIsChargePageOpen(false)}
+              onChargeSuccess={(newBalance) => updateUserProfile?.({ petCoinBalance: newBalance })}
+            />
           )}
         </>
       )}
@@ -517,17 +581,90 @@ const CoinChargeButton = styled.button`
   }
 `;
 
+const ProfileWrapper = styled.div`
+  position: relative;
+`;
+
 const UserInfo = styled.button`
   display: inline-flex;
   align-items: center;
   gap: ${props => props.theme.spacing.xs};
   color: ${props => props.theme.colors.text};
   font-size: ${props => props.theme.typography.body2.fontSize};
-  background: ${props => props.theme.colors.surface};
+  background: ${props => props.$active ? props.theme.colors.surfaceHover : props.theme.colors.surface};
   border: 1px solid ${props => props.theme.colors.border};
   padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.sm};
   border-radius: ${props => props.theme.borderRadius.sm};
   cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: ${props => props.theme.colors.surfaceHover};
+    color: ${props => props.theme.colors.primary};
+  }
+`;
+
+const slideDownAnimation = keyframes`
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+`;
+
+const ProfileDropdown = styled.div`
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 220px;
+  background: ${props => props.theme.colors.surface || '#ffffff'};
+  border: 1px solid ${props => props.theme.colors.border || '#e0e0e0'};
+  border-radius: ${props => props.theme.borderRadius?.lg || '12px'};
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  z-index: 1001;
+  overflow: hidden;
+  animation: ${slideDownAnimation} 0.25s ease-out;
+`;
+
+const ProfileDropdownHeader = styled.div`
+  padding: ${props => props.theme.spacing.md};
+  border-bottom: 1px solid ${props => props.theme.colors.border};
+  background: ${props => props.theme.colors.surfaceElevated || props.theme.colors.surface};
+`;
+
+const ProfileNickname = styled.div`
+  font-weight: 600;
+  font-size: ${props => props.theme.typography.body1.fontSize};
+  color: ${props => props.theme.colors.text};
+  margin-bottom: ${props => props.theme.spacing.xs};
+`;
+
+const ProfileCoinBalance = styled.div`
+  font-size: ${props => props.theme.typography.body2.fontSize};
+  color: ${props => props.theme.colors.primary};
+  font-weight: 500;
+`;
+
+const ProfileDropdownMenu = styled.div`
+  padding: ${props => props.theme.spacing.xs};
+`;
+
+const ProfileMenuItem = styled.button`
+  display: flex;
+  align-items: center;
+  gap: ${props => props.theme.spacing.sm};
+  width: 100%;
+  padding: ${props => props.theme.spacing.sm} ${props => props.theme.spacing.md};
+  border: none;
+  background: none;
+  color: ${props => props.theme.colors.text};
+  font-size: ${props => props.theme.typography.body2.fontSize};
+  text-align: left;
+  cursor: pointer;
+  border-radius: ${props => props.theme.borderRadius.sm};
   transition: all 0.2s ease;
 
   &:hover {

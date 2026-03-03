@@ -3,7 +3,7 @@ import styled from 'styled-components';
 import { useTheme } from '../../contexts/ThemeContext';
 import { paymentApi } from '../../api/paymentApi';
 
-const PetCoinChargePage = ({ onClose }) => {
+const PetCoinChargePage = ({ onClose, onChargeSuccess }) => {
   const { theme } = useTheme();
   const [balance, setBalance] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -30,10 +30,13 @@ const PetCoinChargePage = ({ onClose }) => {
   const fetchBalance = async () => {
     try {
       const data = await paymentApi.getBalance();
-      setBalance(data.balance || 0);
+      const newBalance = data.balance || 0;
+      setBalance(newBalance);
+      return newBalance;
     } catch (err) {
       console.error('잔액 조회 실패:', err);
       setError('잔액을 불러오는데 실패했습니다.');
+      return null;
     }
   };
 
@@ -52,7 +55,10 @@ const PetCoinChargePage = ({ onClose }) => {
       setSuccess(`${coins}코인이 충전되었습니다!`);
       setSelectedAmount(null);
       setCustomAmount('');
-      await fetchBalance();
+      const newBalance = await fetchBalance();
+      if (newBalance != null && onChargeSuccess) {
+        onChargeSuccess(newBalance);
+      }
 
       // 2초 후 성공 메시지 제거
       setTimeout(() => {
