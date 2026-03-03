@@ -80,6 +80,8 @@
 3. Care 도메인
 4. Payment 도메인
 5. Meetup, Location 등
+6. Admin, File 도메인
+7. Statistics 도메인 (현재 예외 없음, 추후 확장 시 참고)
 
 ---
 
