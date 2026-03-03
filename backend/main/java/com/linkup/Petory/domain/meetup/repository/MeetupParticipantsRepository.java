@@ -1,5 +1,6 @@
 package com.linkup.Petory.domain.meetup.repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -50,4 +51,9 @@ public interface MeetupParticipantsRepository {
      * 특정 사용자가 참여한 모임 중 진행 예정인 모임들
      */
     List<MeetupParticipants> findUpcomingMeetupsByUser(Long userIdx);
+
+    /**
+     * 통계용: 특정 기간 동안 참여한 인원 수
+     */
+    long countByJoinedAtBetween(LocalDateTime start, LocalDateTime end);
 }

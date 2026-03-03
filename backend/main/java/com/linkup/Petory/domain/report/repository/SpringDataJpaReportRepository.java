@@ -1,5 +1,6 @@
 package com.linkup.Petory.domain.report.repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -39,5 +40,8 @@ public interface SpringDataJpaReportRepository extends JpaRepository<Report, Lon
     List<Report> findReportsWithFilters(
             @Param("targetType") ReportTargetType targetType,
             @Param("status") ReportStatus status);
+
+    @RepositoryMethod("신고: 기간별 통계")
+    long countByCreatedAtBetween(LocalDateTime start, LocalDateTime end);
 }
 

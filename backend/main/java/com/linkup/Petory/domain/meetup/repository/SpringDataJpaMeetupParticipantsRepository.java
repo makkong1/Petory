@@ -1,5 +1,6 @@
 package com.linkup.Petory.domain.meetup.repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -43,5 +44,8 @@ public interface SpringDataJpaMeetupParticipantsRepository extends JpaRepository
             "WHERE mp.user.idx = :userIdx AND m.date > CURRENT_TIMESTAMP " +
             "ORDER BY m.date ASC")
     List<MeetupParticipants> findUpcomingMeetupsByUser(@Param("userIdx") Long userIdx);
+
+    @RepositoryMethod("모임 참여자: 기간별 참여 수 통계")
+    long countByJoinedAtBetween(LocalDateTime start, LocalDateTime end);
 }
 

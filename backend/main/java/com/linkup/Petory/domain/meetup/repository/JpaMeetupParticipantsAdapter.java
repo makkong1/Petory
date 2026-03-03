@@ -1,5 +1,6 @@
 package com.linkup.Petory.domain.meetup.repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -69,6 +70,11 @@ public class JpaMeetupParticipantsAdapter implements MeetupParticipantsRepositor
     @Override
     public List<MeetupParticipants> findUpcomingMeetupsByUser(Long userIdx) {
         return jpaRepository.findUpcomingMeetupsByUser(userIdx);
+    }
+
+    @Override
+    public long countByJoinedAtBetween(LocalDateTime start, LocalDateTime end) {
+        return jpaRepository.countByJoinedAtBetween(start, end);
     }
 }
 
