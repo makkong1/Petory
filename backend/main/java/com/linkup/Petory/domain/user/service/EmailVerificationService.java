@@ -2,7 +2,11 @@ package com.linkup.Petory.domain.user.service;
 
 import com.linkup.Petory.domain.user.entity.EmailVerificationPurpose;
 import com.linkup.Petory.domain.user.entity.Users;
+import com.linkup.Petory.domain.user.exception.DuplicateUserFieldException;
 import com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException;
+import com.linkup.Petory.domain.user.exception.InvalidEmailVerificationTokenException;
+import com.linkup.Petory.domain.user.exception.UserNotFoundException;
+import com.linkup.Petory.domain.user.exception.UserValidationException;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 import com.linkup.Petory.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
@@ -43,10 +47,10 @@ public class EmailVerificationService {
      */
     public void sendVerificationEmail(String userId, EmailVerificationPurpose purpose) {
         Users user = usersRepository.findByIdString(userId)
-                .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
+                .orElseThrow(UserNotFoundException::new);
 
         if (user.getEmail() == null || user.getEmail().isEmpty()) {
-            throw new RuntimeException("이메일이 등록되지 않았습니다.");
+            throw UserValidationException.emailNotRegistered();
         }
 
         // 이미 인증된 경우 스킵 (선택적)
@@ -71,13 +75,13 @@ public class EmailVerificationService {
      */
     public void sendPreRegistrationVerificationEmail(String email) {
         if (email == null || email.isEmpty()) {
-            throw new RuntimeException("이메일을 입력해주세요.");
+            throw UserValidationException.emailRequired();
         }
 
         // 이미 해당 이메일로 가입된 사용자가 있는지 확인
         usersRepository.findByEmail(email)
                 .ifPresent(existingUser -> {
-                    throw new RuntimeException("이미 사용 중인 이메일입니다.");
+                    throw new DuplicateUserFieldException(DuplicateUserFieldException.Field.EMAIL);
                 });
 
         if (skipInDev) {
@@ -108,12 +112,12 @@ public class EmailVerificationService {
      */
     public void sendPasswordResetEmail(String email) {
         if (email == null || email.isEmpty()) {
-            throw new RuntimeException("이메일을 입력해주세요.");
+            throw UserValidationException.emailRequired();
         }
 
         // 해당 이메일로 가입된 사용자가 있는지 확인
         Users user = usersRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("해당 이메일로 가입된 사용자를 찾을 수 없습니다."));
+                .orElseThrow(() -> new UserNotFoundException("해당 이메일로 가입된 사용자를 찾을 수 없습니다."));
 
         // 인증 토큰 생성 (이메일 기반)
         String token = jwtUtil.createEmailVerificationTokenByEmail(email, EmailVerificationPurpose.PASSWORD_RESET);
@@ -133,7 +137,7 @@ public class EmailVerificationService {
     public String verifyPreRegistrationEmail(String token) {
         // 토큰 유효성 검증
         if (!jwtUtil.validateEmailVerificationToken(token)) {
-            throw new RuntimeException("유효하지 않거나 만료된 인증 토큰입니다.");
+            throw InvalidEmailVerificationTokenException.invalidOrExpired();
         }
 
         // 토큰에서 이메일 추출
@@ -144,12 +148,12 @@ public class EmailVerificationService {
             EmailVerificationPurpose purpose = jwtUtil.extractPurposeFromEmailToken(token);
 
             if (userId == null || purpose == null) {
-                throw new RuntimeException("토큰에서 정보를 추출할 수 없습니다.");
+                throw InvalidEmailVerificationTokenException.cannotExtract();
             }
 
             // 기존 사용자 인증 처리
             Users user = usersRepository.findByIdString(userId)
-                    .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
+                    .orElseThrow(UserNotFoundException::new);
 
             user.setEmailVerified(true);
             usersRepository.save(user);
@@ -202,7 +206,7 @@ public class EmailVerificationService {
     public EmailVerificationPurpose verifyEmail(String token) {
         // 토큰 유효성 검증
         if (!jwtUtil.validateEmailVerificationToken(token)) {
-            throw new RuntimeException("유효하지 않거나 만료된 인증 토큰입니다.");
+            throw InvalidEmailVerificationTokenException.invalidOrExpired();
         }
 
         // 회원가입 전 인증인지 확인
@@ -218,12 +222,12 @@ public class EmailVerificationService {
         EmailVerificationPurpose purpose = jwtUtil.extractPurposeFromEmailToken(token);
 
         if (userId == null || purpose == null) {
-            throw new RuntimeException("토큰에서 정보를 추출할 수 없습니다.");
+            throw InvalidEmailVerificationTokenException.cannotExtract();
         }
 
         // 사용자 조회
         Users user = usersRepository.findByIdString(userId)
-                .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
+                .orElseThrow(UserNotFoundException::new);
 
         // 이메일 인증 완료 (용도 무관, 단일 인증 상태로 업데이트)
         user.setEmailVerified(true);
@@ -247,7 +251,7 @@ public class EmailVerificationService {
         }
 
         Users user = usersRepository.findByIdString(userId)
-                .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
+                .orElseThrow(UserNotFoundException::new);
 
         if (user.getEmailVerified() == null || !user.getEmailVerified()) {
             throw new EmailVerificationRequiredException("이메일 인증이 필요합니다.");
@@ -266,7 +270,7 @@ public class EmailVerificationService {
             return true;
         }
         Users user = usersRepository.findByIdString(userId)
-                .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
+                .orElseThrow(UserNotFoundException::new);
 
         return user.getEmailVerified() != null && user.getEmailVerified();
     }

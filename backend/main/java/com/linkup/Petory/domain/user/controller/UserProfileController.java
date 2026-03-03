@@ -10,6 +10,9 @@ import com.linkup.Petory.domain.care.service.CareReviewService;
 import com.linkup.Petory.domain.user.dto.UsersDTO;
 import com.linkup.Petory.domain.user.dto.UserProfileWithReviewsDTO;
 import com.linkup.Petory.domain.user.entity.EmailVerificationPurpose;
+import com.linkup.Petory.domain.user.exception.InvalidPasswordException;
+import com.linkup.Petory.domain.user.exception.UnauthenticatedException;
+import com.linkup.Petory.domain.user.exception.UserValidationException;
 import com.linkup.Petory.domain.user.service.EmailVerificationService;
 import com.linkup.Petory.domain.user.service.UsersService;
 import com.linkup.Petory.util.JwtUtil;
@@ -41,7 +44,7 @@ public class UserProfileController {
     private String getCurrentUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || authentication.getPrincipal() == null) {
-            throw new RuntimeException("인증되지 않은 사용자입니다.");
+            throw new UnauthenticatedException();
         }
         // UserDetails의 username이 실제로는 userId (id 필드)
         return authentication.getName();
@@ -91,7 +94,7 @@ public class UserProfileController {
         String newPassword = request.get("newPassword");
 
         if (currentPassword == null || newPassword == null) {
-            throw new IllegalArgumentException("현재 비밀번호와 새 비밀번호를 모두 입력해주세요.");
+            throw InvalidPasswordException.bothRequired();
         }
 
         usersService.changePassword(userId, currentPassword, newPassword);
@@ -107,7 +110,7 @@ public class UserProfileController {
         String newUsername = request.get("username");
 
         if (newUsername == null || newUsername.isEmpty()) {
-            throw new IllegalArgumentException("닉네임을 입력해주세요.");
+            throw UserValidationException.nicknameRequired();
         }
 
         UsersDTO updated = usersService.updateMyUsername(userId, newUsername);
@@ -123,7 +126,7 @@ public class UserProfileController {
         String nickname = request.get("nickname");
 
         if (nickname == null || nickname.trim().isEmpty()) {
-            throw new IllegalArgumentException("닉네임을 입력해주세요.");
+            throw UserValidationException.nicknameRequired();
         }
 
         UsersDTO updated = usersService.setNickname(userId, nickname);
@@ -161,19 +164,20 @@ public class UserProfileController {
         String purposeStr = request.get("purpose");
 
         if (purposeStr == null || purposeStr.isEmpty()) {
-            throw new IllegalArgumentException("인증 용도(purpose)를 지정해주세요.");
+            throw UserValidationException.purposeRequired();
         }
 
+        EmailVerificationPurpose purpose;
         try {
-            EmailVerificationPurpose purpose = EmailVerificationPurpose.valueOf(purposeStr.toUpperCase());
-            emailVerificationService.sendVerificationEmail(userId, purpose);
-
-            return ResponseEntity.ok(Map.of(
-                    "success", true,
-                    "message", "이메일 인증 메일이 발송되었습니다."));
+            purpose = EmailVerificationPurpose.valueOf(purposeStr.toUpperCase());
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("유효하지 않은 인증 용도입니다: " + purposeStr);
+            throw UserValidationException.invalidPurpose(purposeStr);
         }
+        emailVerificationService.sendVerificationEmail(userId, purpose);
+
+        return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "이메일 인증 메일이 발송되었습니다."));
     }
 
     /**
@@ -185,20 +189,14 @@ public class UserProfileController {
         String email = request.get("email");
 
         if (email == null || email.isEmpty()) {
-            throw new IllegalArgumentException("이메일을 입력해주세요.");
+            throw UserValidationException.emailRequired();
         }
 
-        try {
-            emailVerificationService.sendPreRegistrationVerificationEmail(email);
+        emailVerificationService.sendPreRegistrationVerificationEmail(email);
 
-            return ResponseEntity.ok(Map.of(
-                    "success", true,
-                    "message", "이메일 인증 메일이 발송되었습니다. 이메일을 확인해주세요."));
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "success", false,
-                    "message", e.getMessage()));
-        }
+        return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "이메일 인증 메일이 발송되었습니다. 이메일을 확인해주세요."));
     }
 
     /**
@@ -218,35 +216,29 @@ public class UserProfileController {
      */
     @GetMapping("/email/verify/{token}")
     public ResponseEntity<Map<String, Object>> verifyEmail(@PathVariable String token) {
-        try {
-            EmailVerificationPurpose purpose = emailVerificationService.verifyEmail(token);
+        EmailVerificationPurpose purpose = emailVerificationService.verifyEmail(token);
 
-            // 회원가입 전 인증인 경우 이메일 추출
-            String email = jwtUtil.extractEmailFromEmailToken(token);
-            if (email != null && purpose == EmailVerificationPurpose.REGISTRATION) {
-                // 회원가입 페이지로 리다이렉트 (이메일 인증 완료 상태로)
-                String redirectUrl = "/register?emailVerified=true&email=" + email;
-                return ResponseEntity.ok(Map.of(
-                        "success", true,
-                        "message", "이메일 인증이 완료되었습니다. 회원가입을 진행해주세요.",
-                        "purpose", purpose.name(),
-                        "email", email,
-                        "redirectUrl", redirectUrl));
-            }
-
-            // 용도에 따른 리다이렉트 URL 생성
-            String redirectUrl = getRedirectUrl(purpose);
-
+        // 회원가입 전 인증인 경우 이메일 추출
+        String email = jwtUtil.extractEmailFromEmailToken(token);
+        if (email != null && purpose == EmailVerificationPurpose.REGISTRATION) {
+            // 회원가입 페이지로 리다이렉트 (이메일 인증 완료 상태로)
+            String redirectUrl = "/register?emailVerified=true&email=" + email;
             return ResponseEntity.ok(Map.of(
                     "success", true,
-                    "message", "이메일 인증이 완료되었습니다.",
+                    "message", "이메일 인증이 완료되었습니다. 회원가입을 진행해주세요.",
                     "purpose", purpose.name(),
+                    "email", email,
                     "redirectUrl", redirectUrl));
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "success", false,
-                    "message", e.getMessage()));
         }
+
+        // 용도에 따른 리다이렉트 URL 생성
+        String redirectUrl = getRedirectUrl(purpose);
+
+        return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "이메일 인증이 완료되었습니다.",
+                "purpose", purpose.name(),
+                "redirectUrl", redirectUrl));
     }
 
     /**
