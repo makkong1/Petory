@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import com.linkup.Petory.domain.board.converter.MissingPetConverter;
+import com.linkup.Petory.domain.board.exception.MissingPetBoardNotFoundException;
 import com.linkup.Petory.domain.board.dto.MissingPetBoardDTO;
 import com.linkup.Petory.domain.board.dto.MissingPetBoardPageResponseDTO;
 import com.linkup.Petory.domain.board.dto.MissingPetCommentDTO;
@@ -23,6 +24,7 @@ import com.linkup.Petory.domain.board.entity.MissingPetStatus;
 import com.linkup.Petory.domain.user.entity.EmailVerificationPurpose;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException;
+import com.linkup.Petory.domain.user.exception.UserNotFoundException;
 
 import jakarta.persistence.criteria.Join;
 import com.linkup.Petory.domain.board.repository.MissingPetBoardRepository;
@@ -172,11 +174,11 @@ public class MissingPetBoardService {
     public MissingPetBoardDTO getBoard(Long id, Integer commentPage, Integer commentSize) {
         // 게시글 + 작성자만 조회 (댓글 제외)
         MissingPetBoard board = missingPetBoardRepository.findByIdWithUser(id)
-                .orElseThrow(() -> new IllegalArgumentException("Missing pet board not found"));
+                .orElseThrow(() -> new MissingPetBoardNotFoundException());
 
         // 삭제된 게시글인지 확인
         if (board.getIsDeleted()) {
-            throw new IllegalArgumentException("Missing pet board not found");
+            throw new MissingPetBoardNotFoundException();
         }
 
         // 게시글 파일 조회
@@ -215,7 +217,7 @@ public class MissingPetBoardService {
     @Transactional
     public MissingPetBoardDTO createBoard(MissingPetBoardDTO dto) {
         Users user = usersRepository.findById(dto.getUserId())
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new UserNotFoundException());
 
         // 이메일 인증 확인
         if (user.getEmailVerified() == null || !user.getEmailVerified()) {
@@ -259,7 +261,7 @@ public class MissingPetBoardService {
     public MissingPetBoardDTO updateBoard(Long id, MissingPetBoardDTO dto) {
         // [리팩토링] findById → findByIdWithUser (이메일 인증 확인을 위해 User 필요)
         MissingPetBoard board = missingPetBoardRepository.findByIdWithUser(id)
-                .orElseThrow(() -> new IllegalArgumentException("Missing pet board not found"));
+                .orElseThrow(() -> new MissingPetBoardNotFoundException());
 
         // 이메일 인증 확인
         Users user = board.getUser();
@@ -322,7 +324,7 @@ public class MissingPetBoardService {
      */
     public Long getUserIdByBoardIdx(Long boardIdx) {
         return missingPetBoardRepository.findUserIdByIdx(boardIdx)
-                .orElseThrow(() -> new IllegalArgumentException("Missing pet board not found"));
+                .orElseThrow(() -> new MissingPetBoardNotFoundException());
     }
 
     /**
@@ -333,7 +335,7 @@ public class MissingPetBoardService {
     @Transactional
     public MissingPetBoardDTO updateStatus(Long id, MissingPetStatus status) {
         MissingPetBoard board = missingPetBoardRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Missing pet board not found"));
+                .orElseThrow(() -> new MissingPetBoardNotFoundException());
         board.setStatus(status);
         return mapBoardWithAttachments(board);
     }
@@ -347,7 +349,7 @@ public class MissingPetBoardService {
     @Transactional
     public void deleteBoard(Long id) {
         MissingPetBoard board = missingPetBoardRepository.findByIdWithUser(id)
-                .orElseThrow(() -> new IllegalArgumentException("Missing pet board not found"));
+                .orElseThrow(() -> new MissingPetBoardNotFoundException());
 
         // 이메일 인증 확인
         Users user = board.getUser();
@@ -375,7 +377,7 @@ public class MissingPetBoardService {
     @Transactional
     public MissingPetBoardDTO restoreBoard(Long id) {
         MissingPetBoard board = missingPetBoardRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Missing pet board not found"));
+                .orElseThrow(() -> new MissingPetBoardNotFoundException());
 
         board.setIsDeleted(false);
         board.setDeletedAt(null);

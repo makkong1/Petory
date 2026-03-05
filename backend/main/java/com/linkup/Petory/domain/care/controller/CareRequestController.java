@@ -8,6 +8,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import com.linkup.Petory.domain.care.dto.CareRequestDTO;
+import com.linkup.Petory.domain.care.exception.CareValidationException;
+import com.linkup.Petory.domain.user.exception.UnauthenticatedException;
 import com.linkup.Petory.domain.care.dto.CareRequestPageResponseDTO;
 import com.linkup.Petory.domain.care.service.CareRequestService;
 
@@ -28,14 +30,14 @@ public class CareRequestController {
     private Long getCurrentUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || authentication.getPrincipal() == null) {
-            throw new RuntimeException("인증되지 않은 사용자입니다.");
+            throw new UnauthenticatedException("인증되지 않은 사용자입니다.");
         }
         // UserDetails의 username이 실제로는 userId (id 필드)
         String userIdString = authentication.getName();
         try {
             return Long.parseLong(userIdString);
         } catch (NumberFormatException e) {
-            throw new RuntimeException("유효하지 않은 사용자 ID입니다.");
+            throw CareValidationException.invalidUserId();
         }
     }
 

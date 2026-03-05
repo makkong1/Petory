@@ -18,10 +18,14 @@ import com.linkup.Petory.domain.chat.entity.Conversation;
 import com.linkup.Petory.domain.chat.entity.ConversationParticipant;
 import com.linkup.Petory.domain.chat.entity.MessageType;
 import com.linkup.Petory.domain.chat.entity.ParticipantStatus;
+import com.linkup.Petory.domain.chat.exception.ChatForbiddenException;
+import com.linkup.Petory.domain.chat.exception.ChatMessageNotFoundException;
+import com.linkup.Petory.domain.chat.exception.ConversationNotFoundException;
 import com.linkup.Petory.domain.chat.repository.ChatMessageRepository;
 import com.linkup.Petory.domain.chat.repository.ConversationParticipantRepository;
 import com.linkup.Petory.domain.chat.repository.ConversationRepository;
 import com.linkup.Petory.domain.user.entity.Users;
+import com.linkup.Petory.domain.user.exception.UserNotFoundException;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -44,23 +48,23 @@ public class ChatMessageService {
     public ChatMessageDTO sendMessage(Long conversationIdx, Long senderIdx, String content, MessageType messageType) {
         // 1. 전송자 확인
         Users sender = usersRepository.findById(senderIdx)
-                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+                .orElseThrow(UserNotFoundException::new);
 
         if (Boolean.TRUE.equals(sender.getIsDeleted())) {
-            throw new IllegalStateException("탈퇴한 사용자는 메시지를 보낼 수 없습니다.");
+            throw ChatForbiddenException.deletedUserCannotSend();
         }
 
         // 2. 채팅방 확인
         Conversation conversation = conversationRepository.findById(conversationIdx)
-                .orElseThrow(() -> new IllegalArgumentException("채팅방을 찾을 수 없습니다."));
+                .orElseThrow(ConversationNotFoundException::new);
 
         // 3. 참여자인지 확인
         ConversationParticipant senderParticipant = participantRepository
                 .findByConversationIdxAndUserIdx(conversationIdx, senderIdx)
-                .orElseThrow(() -> new IllegalArgumentException("채팅방 참여자가 아닙니다."));
+                .orElseThrow(ChatForbiddenException::notParticipant);
 
         if (senderParticipant.getStatus() != ParticipantStatus.ACTIVE) {
-            throw new IllegalStateException("채팅방에 참여 중이 아닙니다.");
+            throw ChatForbiddenException.notActiveParticipant();
         }
 
         // 4. 메시지 저장
@@ -149,7 +153,7 @@ public class ChatMessageService {
         // 참여자 확인
         ConversationParticipant participant = participantRepository
                 .findByConversationIdxAndUserIdx(conversationIdx, userId)
-                .orElseThrow(() -> new IllegalArgumentException("채팅방 참여자가 아닙니다."));
+                .orElseThrow(ChatForbiddenException::notParticipant);
 
         // 읽지 않은 메시지 수 초기화
         participant.setUnreadCount(0);
@@ -175,11 +179,11 @@ public class ChatMessageService {
     @Transactional
     public void deleteMessage(Long messageIdx, Long userId) {
         ChatMessage message = chatMessageRepository.findById(messageIdx)
-                .orElseThrow(() -> new IllegalArgumentException("메시지를 찾을 수 없습니다."));
+                .orElseThrow(ChatMessageNotFoundException::new);
 
         // 본인 메시지만 삭제 가능
         if (!message.getSender().getIdx().equals(userId)) {
-            throw new IllegalArgumentException("본인 메시지만 삭제할 수 있습니다.");
+            throw ChatForbiddenException.ownMessageOnly();
         }
 
         message.setIsDeleted(true);

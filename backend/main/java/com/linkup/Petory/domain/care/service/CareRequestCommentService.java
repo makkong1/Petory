@@ -7,6 +7,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.linkup.Petory.domain.care.converter.CareRequestCommentConverter;
+import com.linkup.Petory.domain.care.exception.CareCommentNotBelongException;
+import com.linkup.Petory.domain.care.exception.CareCommentNotFoundException;
+import com.linkup.Petory.domain.care.exception.CareForbiddenException;
+import com.linkup.Petory.domain.care.exception.CareRequestNotFoundException;
 import com.linkup.Petory.domain.care.dto.CareRequestCommentDTO;
 import com.linkup.Petory.domain.care.entity.CareRequest;
 import com.linkup.Petory.domain.care.entity.CareRequestComment;
@@ -15,6 +19,7 @@ import com.linkup.Petory.domain.care.repository.CareRequestRepository;
 import com.linkup.Petory.domain.user.entity.Role;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.file.dto.FileDTO;
+import com.linkup.Petory.domain.user.exception.UserNotFoundException;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 import com.linkup.Petory.domain.file.entity.FileTargetType;
 import com.linkup.Petory.domain.file.service.AttachmentFileService;
@@ -37,7 +42,7 @@ public class CareRequestCommentService {
 
         public List<CareRequestCommentDTO> getComments(Long careRequestId) {
                 CareRequest careRequest = careRequestRepository.findById(careRequestId)
-                                .orElseThrow(() -> new IllegalArgumentException("CareRequest not found"));
+                                .orElseThrow(() -> new CareRequestNotFoundException());
                 List<CareRequestComment> comments = commentRepository
                                 .findByCareRequestAndIsDeletedFalseOrderByCreatedAtAsc(careRequest);
                 return comments.stream()
@@ -53,13 +58,13 @@ public class CareRequestCommentService {
         @Transactional
         public CareRequestCommentDTO addComment(Long careRequestId, CareRequestCommentDTO dto) {
                 CareRequest careRequest = careRequestRepository.findById(careRequestId)
-                                .orElseThrow(() -> new IllegalArgumentException("CareRequest not found"));
+                                .orElseThrow(() -> new CareRequestNotFoundException());
                 Users user = usersRepository.findById(dto.getUserId())
-                                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                                .orElseThrow(() -> new UserNotFoundException());
 
                 // SERVICE_PROVIDER만 댓글 작성 가능
                 if (user.getRole() != Role.SERVICE_PROVIDER) {
-                        throw new IllegalStateException("당신은 댓글 작성 불가입니다.");
+                        throw CareForbiddenException.commentNotAllowed();
                 }
 
                 CareRequestComment comment = CareRequestComment.builder()
@@ -101,12 +106,12 @@ public class CareRequestCommentService {
         @Transactional
         public void deleteComment(Long careRequestId, Long commentId) {
                 CareRequest careRequest = careRequestRepository.findById(careRequestId)
-                                .orElseThrow(() -> new IllegalArgumentException("CareRequest not found"));
+                                .orElseThrow(() -> new CareRequestNotFoundException());
                 CareRequestComment comment = commentRepository.findById(commentId)
-                                .orElseThrow(() -> new IllegalArgumentException("Comment not found"));
+                                .orElseThrow(() -> new CareCommentNotFoundException());
 
                 if (!comment.getCareRequest().getIdx().equals(careRequest.getIdx())) {
-                        throw new IllegalArgumentException("Comment does not belong to the specified care request");
+                        throw new CareCommentNotBelongException();
                 }
 
                 // soft delete instead of physical delete

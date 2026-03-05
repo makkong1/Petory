@@ -7,9 +7,14 @@ import com.linkup.Petory.domain.payment.dto.PetCoinTransactionDetailDTO;
 import com.linkup.Petory.domain.payment.entity.PetCoinTransaction;
 import com.linkup.Petory.domain.payment.entity.TransactionStatus;
 import com.linkup.Petory.domain.payment.entity.TransactionType;
+import com.linkup.Petory.domain.payment.exception.InsufficientBalanceException;
+import com.linkup.Petory.domain.payment.exception.PaymentForbiddenException;
+import com.linkup.Petory.domain.payment.exception.PaymentValidationException;
+import com.linkup.Petory.domain.payment.exception.PetCoinTransactionNotFoundException;
 import com.linkup.Petory.domain.payment.repository.PetCoinEscrowRepository;
 import com.linkup.Petory.domain.payment.repository.PetCoinTransactionRepository;
 import com.linkup.Petory.domain.user.entity.Users;
+import com.linkup.Petory.domain.user.exception.UserNotFoundException;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -39,12 +44,12 @@ public class PetCoinService {
         @Transactional
         public PetCoinTransaction chargeCoins(Users user, Integer amount, String description) {
                 if (amount <= 0) {
-                        throw new IllegalArgumentException("충전 금액은 0보다 커야 합니다.");
+                        throw PaymentValidationException.chargeAmountInvalid();
                 }
 
                 // [리팩토링] findById → findByIdForUpdate (비관적 락, Race Condition 방지)
                 Users currentUser = usersRepository.findByIdForUpdate(user.getIdx())
-                                .orElseThrow(() -> new RuntimeException("User not found"));
+                                .orElseThrow(() -> new UserNotFoundException());
 
                 Integer balanceBefore = currentUser.getPetCoinBalance();
                 Integer balanceAfter = balanceBefore + amount;
@@ -86,12 +91,12 @@ public class PetCoinService {
         public PetCoinTransaction deductCoins(Users user, Integer amount, String relatedType,
                         Long relatedIdx, String description) {
                 if (amount <= 0) {
-                        throw new IllegalArgumentException("차감 금액은 0보다 커야 합니다.");
+                        throw PaymentValidationException.deductAmountInvalid();
                 }
 
                 // [리팩토링] findById → findByIdForUpdate (비관적 락, Race Condition 방지)
                 Users currentUser = usersRepository.findByIdForUpdate(user.getIdx())
-                                .orElseThrow(() -> new RuntimeException("User not found"));
+                                .orElseThrow(() -> new UserNotFoundException());
 
                 Integer balanceBefore = currentUser.getPetCoinBalance();
 
@@ -142,12 +147,12 @@ public class PetCoinService {
         public PetCoinTransaction payoutCoins(Users user, Integer amount, String relatedType,
                         Long relatedIdx, String description) {
                 if (amount <= 0) {
-                        throw new IllegalArgumentException("지급 금액은 0보다 커야 합니다.");
+                        throw PaymentValidationException.payoutAmountInvalid();
                 }
 
                 // [리팩토링] findById → findByIdForUpdate (비관적 락, Race Condition 방지)
                 Users currentUser = usersRepository.findByIdForUpdate(user.getIdx())
-                                .orElseThrow(() -> new RuntimeException("User not found"));
+                                .orElseThrow(() -> new UserNotFoundException());
 
                 Integer balanceBefore = currentUser.getPetCoinBalance();
                 Integer balanceAfter = balanceBefore + amount;
@@ -191,12 +196,12 @@ public class PetCoinService {
         public PetCoinTransaction refundCoins(Users user, Integer amount, String relatedType,
                         Long relatedIdx, String description) {
                 if (amount <= 0) {
-                        throw new IllegalArgumentException("환불 금액은 0보다 커야 합니다.");
+                        throw PaymentValidationException.refundAmountInvalid();
                 }
 
                 // [리팩토링] findById → findByIdForUpdate (비관적 락, Race Condition 방지)
                 Users currentUser = usersRepository.findByIdForUpdate(user.getIdx())
-                                .orElseThrow(() -> new RuntimeException("User not found"));
+                                .orElseThrow(() -> new UserNotFoundException());
 
                 Integer balanceBefore = currentUser.getPetCoinBalance();
                 Integer balanceAfter = balanceBefore + amount;
@@ -244,10 +249,10 @@ public class PetCoinService {
         @Transactional(readOnly = true)
         public PetCoinTransactionDetailDTO getTransactionDetail(Long transactionIdx, Users currentUser) {
                 PetCoinTransaction transaction = transactionRepository.findByIdWithUser(transactionIdx)
-                                .orElseThrow(() -> new RuntimeException("거래 내역을 찾을 수 없습니다."));
+                                .orElseThrow(() -> new PetCoinTransactionNotFoundException());
 
                 if (!transaction.getUser().getIdx().equals(currentUser.getIdx())) {
-                        throw new RuntimeException("본인의 거래 내역만 조회할 수 있습니다.");
+                        throw PaymentForbiddenException.ownTransactionOnly();
                 }
 
                 PetCoinTransactionDetailDTO dto = PetCoinTransactionDetailDTO.builder()

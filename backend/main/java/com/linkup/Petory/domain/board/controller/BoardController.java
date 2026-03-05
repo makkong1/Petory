@@ -19,6 +19,7 @@ import com.linkup.Petory.domain.board.dto.BoardPageResponseDTO;
 import com.linkup.Petory.domain.board.dto.CommentDTO;
 import com.linkup.Petory.domain.board.dto.CommentPageResponseDTO;
 import com.linkup.Petory.domain.board.dto.ReactionRequest;
+import com.linkup.Petory.domain.board.exception.BoardValidationException;
 import com.linkup.Petory.domain.board.dto.ReactionSummaryDTO;
 import com.linkup.Petory.domain.board.dto.BoardPopularitySnapshotDTO;
 import com.linkup.Petory.domain.board.service.ReactionService;
@@ -140,7 +141,7 @@ public class BoardController {
             @PathVariable Long boardId,
             @RequestBody ReactionRequest request) {
         if (request.userId() == null || request.reactionType() == null) {
-            throw new IllegalArgumentException("userId and reactionType are required");
+            throw BoardValidationException.reactionParamsRequired();
         }
         ReactionSummaryDTO summary = reactionService.reactToBoard(boardId, request.userId(),
                 request.reactionType());
@@ -154,7 +155,7 @@ public class BoardController {
             @PathVariable Long commentId,
             @RequestBody ReactionRequest request) {
         if (request.userId() == null || request.reactionType() == null) {
-            throw new IllegalArgumentException("userId and reactionType are required");
+            throw BoardValidationException.reactionParamsRequired();
         }
         ReactionSummaryDTO summary = reactionService.reactToComment(commentId, request.userId(),
                 request.reactionType());

@@ -1,22 +1,30 @@
 # 백엔드 예외처리 분석 및 리팩토링 계획
 
+> **구조 정리**: [01-exception-handling-structure.md](./01-exception-handling-structure.md) — 전역 vs 도메인 전용, 공통 재사용 예외 정리
+
 ## 1. 현재 상태 요약
 
 ### 1.1 예외 처리 인프라
 - **GlobalExceptionHandler**: `@RestControllerAdvice`로 전역 예외 처리
-- 처리 중인 예외: `AuthorizationDeniedException`, `AsyncRequestTimeoutException`, `IllegalArgumentException`, `IllegalStateException`, `EmailVerificationRequiredException`, `Exception`
-- **도메인 전용 예외**: `EmailVerificationRequiredException` (user 도메인)만 존재
+- **ApiException**: 모든 도메인 전용 예외의 베이스 → `@ExceptionHandler(ApiException.class)`로 통합 처리
+- **특수 핸들러**: `EmailVerificationRequiredException` (redirectUrl, purpose), `AuthorizationDeniedException`, `AsyncRequestTimeoutException`, `AuthenticationException`
+- **Fallback**: `IllegalArgumentException`(400), `IllegalStateException`(409), `Exception`(500)
 
-### 1.2 도메인별 예외 사용 현황
+### 1.2 도메인별 예외 리팩토링 현황
 
-| 도메인 | RuntimeException | IllegalArgumentException | IllegalStateException | 기타 |
-|--------|------------------|---------------------------|------------------------|------|
-| user | 다수 (유저 없음, 중복, 토큰 등) | 일부 (유저 찾을 수 없음) | - | EmailVerificationRequiredException |
-| board | Board not found, User not found | - | - | - |
-| care | CareApplication not found 등 | CareApplication ID 필요 등 | 리뷰 작성 조건 | - |
-| payment | Escrow not found | 에스크로 금액 | HOLD 상태 아님 | - |
-| meetup | 인증된 사용자 정보 없음 | - | - | - |
-| location | - | - | - | catch(Exception) 다수 |
+| 도메인 | 상태 | 도메인 전용 예외 |
+|--------|------|------------------|
+| **user** | ✅ 완료 | UserNotFoundException, DuplicateUserFieldException, EmailVerificationRequiredException, UnauthenticatedException, UserForbiddenException, UserBannedException, UserSuspendedException, PetNotFoundException, UserValidationException 등 |
+| **board** | ✅ 완료 | BoardNotFoundException, MissingPetBoardNotFoundException, CommentNotFoundException, CommentNotBelongToBoardException, BoardValidationException |
+| care | ✅ 완료 | CareRequestNotFoundException, CareApplicationNotFoundException, CareCommentNotFoundException 등 |
+| payment | ✅ 완료 | PetCoinTransactionNotFoundException, PetCoinEscrowNotFoundException, InsufficientBalanceException 등 |
+| meetup | ✅ 완료 | MeetupNotFoundException, MeetupParticipantNotFoundException, MeetupValidationException 등 |
+| chat | ✅ 완료 | ConversationNotFoundException, ChatMessageNotFoundException, ChatForbiddenException 등 |
+| location | ✅ 완료 | LocationServiceNotFoundException, LocationServiceReviewNotFoundException, LocationReviewDuplicateException 등 |
+| report | ✅ 완료 | ReportNotFoundException, ReportTargetNotFoundException, ReportValidationException 등 |
+| file | ✅ 완료 | FileNotFoundException, FileStorageException, FileValidationException, FileUploadValidationException |
+| notification | ✅ 완료 | NotificationNotFoundException, NotificationForbiddenException |
+| statistics | - | 예외 없음 |
 
 ---
 

@@ -21,6 +21,7 @@ import com.linkup.Petory.domain.board.dto.MissingPetBoardPageResponseDTO;
 import com.linkup.Petory.domain.board.dto.MissingPetCommentDTO;
 import com.linkup.Petory.domain.board.dto.MissingPetCommentPageResponseDTO;
 import com.linkup.Petory.domain.board.entity.MissingPetStatus;
+import com.linkup.Petory.domain.board.exception.BoardValidationException;
 import com.linkup.Petory.domain.board.service.MissingPetBoardService;
 import com.linkup.Petory.domain.board.service.MissingPetCommentService;
 import com.linkup.Petory.domain.chat.dto.ConversationDTO;
@@ -117,7 +118,7 @@ public class MissingPetBoardController {
             @RequestBody Map<String, String> body) {
         String statusValue = body.get("status");
         if (statusValue == null) {
-            throw new IllegalArgumentException("status is required");
+            throw BoardValidationException.statusRequired();
         }
 
         // [리팩토링] valueOf 예외 처리 - 사용자 친화적 에러 메시지
@@ -125,8 +126,7 @@ public class MissingPetBoardController {
         try {
             status = MissingPetStatus.valueOf(statusValue);
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException(
-                    "유효하지 않은 상태입니다. MISSING, FOUND, RESOLVED 중 하나를 선택해주세요.");
+            throw BoardValidationException.invalidStatus("MISSING, FOUND, RESOLVED");
         }
         MissingPetBoardDTO updated = missingPetBoardService.updateStatus(id, status);
         return ResponseEntity.ok(updated);

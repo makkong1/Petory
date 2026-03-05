@@ -17,6 +17,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.linkup.Petory.domain.file.exception.FileNotFoundException;
+import com.linkup.Petory.domain.file.exception.FileStorageException;
+import com.linkup.Petory.domain.file.exception.FileUploadValidationException;
+import com.linkup.Petory.domain.file.exception.FileValidationException;
+
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -43,13 +48,13 @@ public class FileStorageService {
         try {
             Files.createDirectories(this.uploadLocation);
         } catch (IOException ex) {
-            throw new IllegalStateException("업로드 디렉터리를 초기화할 수 없습니다.", ex);
+            throw FileStorageException.initFailed(ex);
         }
     }
 
     public String storeImage(MultipartFile file, String... pathSegments) {
         if (file == null || file.isEmpty()) {
-            throw new IllegalArgumentException("File must not be empty");
+            throw FileValidationException.emptyFile();
         }
 
         String rawFilename = file.getOriginalFilename();
@@ -64,7 +69,7 @@ public class FileStorageService {
             targetDirectory = resolveTargetDirectory(pathSegments);
         } catch (IOException ex) {
             log.error("업로드 경로 디렉터리 생성에 실패했습니다.", ex);
-            throw new RuntimeException("업로드 디렉터리를 준비하지 못했습니다.", ex);
+            throw FileStorageException.prepareFailed(ex);
         }
         String filename = generateFileName(extension);
         Path targetLocation = targetDirectory.resolve(filename);
@@ -75,7 +80,7 @@ public class FileStorageService {
             return normalizeRelativePath(relativePath);
         } catch (IOException ex) {
             log.error("파일 저장에 실패했습니다. filename={}", originalFilename, ex);
-            throw new RuntimeException("파일 저장에 실패했습니다. 잠시 후 다시 시도해주세요.", ex);
+            throw FileStorageException.saveFailed(ex);
         }
     }
 
@@ -89,16 +94,16 @@ public class FileStorageService {
         } catch (MalformedURLException ex) {
             log.error("파일 로드에 실패했습니다. path={}", relativePath, ex);
         }
-        throw new IllegalArgumentException("요청한 파일을 찾을 수 없습니다: " + relativePath);
+        throw FileNotFoundException.forPath(relativePath);
     }
 
     public Path resolveStoragePath(String relativePath) {
         if (!StringUtils.hasText(relativePath)) {
-            throw new IllegalArgumentException("파일 경로가 비어 있습니다.");
+            throw FileValidationException.emptyPath();
         }
         Path filePath = uploadLocation.resolve(relativePath).normalize();
         if (!filePath.startsWith(uploadLocation)) {
-            throw new IllegalArgumentException("잘못된 파일 경로 요청입니다.");
+            throw FileValidationException.invalidPath(relativePath);
         }
         return filePath;
     }
@@ -149,14 +154,14 @@ public class FileStorageService {
 
     private void validateFile(MultipartFile file, String extension) {
         if (file.getSize() > MAX_FILE_SIZE_BYTES) {
-            throw new IllegalArgumentException("파일은 최대 5MB까지 업로드할 수 있습니다.");
+            throw FileUploadValidationException.sizeExceeded();
         }
         String contentType = file.getContentType();
         if (contentType == null || !ALLOWED_CONTENT_TYPES.contains(contentType.toLowerCase())) {
-            throw new IllegalArgumentException("이미지 파일(jpg, png, gif, webp)만 업로드할 수 있습니다.");
+            throw FileUploadValidationException.invalidContentType();
         }
         if (!StringUtils.hasText(extension) || !ALLOWED_EXTENSIONS.contains(extension.toLowerCase())) {
-            throw new IllegalArgumentException("허용되지 않은 이미지 확장자입니다.");
+            throw FileUploadValidationException.invalidExtension();
         }
     }
 }

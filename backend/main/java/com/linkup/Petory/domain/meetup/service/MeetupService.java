@@ -11,9 +11,15 @@ import com.linkup.Petory.domain.meetup.repository.MeetupRepository;
 import com.linkup.Petory.domain.meetup.repository.MeetupParticipantsRepository;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException;
+import com.linkup.Petory.domain.user.exception.UserNotFoundException;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 
 import com.linkup.Petory.domain.meetup.annotation.Timed;
+import com.linkup.Petory.domain.meetup.exception.MeetupConflictException;
+import com.linkup.Petory.domain.meetup.exception.MeetupForbiddenException;
+import com.linkup.Petory.domain.meetup.exception.MeetupNotFoundException;
+import com.linkup.Petory.domain.meetup.exception.MeetupParticipantNotFoundException;
+import com.linkup.Petory.domain.meetup.exception.MeetupValidationException;
 import com.linkup.Petory.domain.meetup.event.MeetupCreatedEvent;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -51,7 +57,7 @@ public class MeetupService {
     public MeetupDTO createMeetup(MeetupDTO meetupDTO, String userId) {
         // userId로 사용자 찾기 (id 필드 사용)
         Users organizer = usersRepository.findByIdString(userId)
-                .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
+                .orElseThrow(UserNotFoundException::new);
 
         // 이메일 인증 확인
         if (organizer.getEmailVerified() == null || !organizer.getEmailVerified()) {
@@ -62,7 +68,7 @@ public class MeetupService {
 
         // 날짜 검증
         if (meetupDTO.getDate() != null && meetupDTO.getDate().isBefore(LocalDateTime.now())) {
-            throw new RuntimeException("모임 일시는 현재 시간 이후여야 합니다.");
+            throw MeetupValidationException.dateMustBeFuture();
         }
 
         Meetup meetup = Meetup.builder()
@@ -114,7 +120,7 @@ public class MeetupService {
     @Transactional
     public MeetupDTO updateMeetup(Long meetupIdx, MeetupDTO meetupDTO) {
         Meetup meetup = meetupRepository.findByIdWithDetails(meetupIdx)
-                .orElseThrow(() -> new RuntimeException("모임을 찾을 수 없습니다."));
+                .orElseThrow(MeetupNotFoundException::new);
 
         if (meetupDTO.getTitle() != null) {
             meetup.setTitle(meetupDTO.getTitle());
@@ -147,7 +153,7 @@ public class MeetupService {
     @Transactional
     public void deleteMeetup(Long meetupIdx) {
         Meetup meetup = meetupRepository.findById(meetupIdx)
-                .orElseThrow(() -> new RuntimeException("모임을 찾을 수 없습니다."));
+                .orElseThrow(MeetupNotFoundException::new);
 
         meetup.setIsDeleted(true);
         meetup.setDeletedAt(LocalDateTime.now());
@@ -166,7 +172,7 @@ public class MeetupService {
     // 특정 모임 조회 (참가자 목록 포함) - JOIN FETCH로 N+1 문제 해결
     public MeetupDTO getMeetupById(Long meetupIdx) {
         Meetup meetup = meetupRepository.findByIdWithDetails(meetupIdx)
-                .orElseThrow(() -> new RuntimeException("모임을 찾을 수 없습니다."));
+                .orElseThrow(MeetupNotFoundException::new);
         return converter.toDTO(meetup);
     }
 
@@ -208,17 +214,11 @@ public class MeetupService {
     public MeetupParticipantsDTO joinMeetup(Long meetupIdx, String userId) {
         // 모임 조회 (organizer fetch로 N+1 방지)
         Meetup meetup = meetupRepository.findByIdWithOrganizer(meetupIdx)
-                .orElseThrow(() -> {
-                    log.error("모임을 찾을 수 없습니다. meetupIdx={}, userId={}", meetupIdx, userId);
-                    return new RuntimeException("모임을 찾을 수 없습니다.");
-                });
+                .orElseThrow(MeetupNotFoundException::new);
 
         // 사용자 확인
         Users user = usersRepository.findByIdString(userId)
-                .orElseThrow(() -> {
-                    log.error("사용자를 찾을 수 없습니다. meetupIdx={}, userId={}", meetupIdx, userId);
-                    return new RuntimeException("사용자를 찾을 수 없습니다.");
-                });
+                .orElseThrow(UserNotFoundException::new);
 
         // 이메일 인증 확인
         if (user.getEmailVerified() == null || !user.getEmailVerified()) {
@@ -233,7 +233,7 @@ public class MeetupService {
         // 이미 참가했는지 확인
         if (meetupParticipantsRepository.existsByMeetupIdxAndUserIdx(meetupIdx, userIdx)) {
             log.warn("이미 참가한 모임입니다. meetupIdx={}, userId={}", meetupIdx, userId);
-            throw new RuntimeException("이미 참가한 모임입니다.");
+            throw MeetupConflictException.alreadyJoined();
         }
 
         // 주최자가 아닌 경우에만 인원 증가 (원자적 UPDATE 쿼리)
@@ -243,7 +243,7 @@ public class MeetupService {
             if (updated == 0) {
                 log.warn("모임 인원이 가득 찼습니다. meetupIdx={}, userId={}, 현재인원={}, 최대인원={}",
                         meetupIdx, userId, meetup.getCurrentParticipants(), meetup.getMaxParticipants());
-                throw new RuntimeException("모임 인원이 가득 찼습니다.");
+                throw MeetupConflictException.fullCapacity();
             }
             // [리팩토링] findById 2회 호출 제거 → entityManager.refresh()로 영속성 컨텍스트 동기화
             entityManager.refresh(meetup);
@@ -269,23 +269,23 @@ public class MeetupService {
     public void cancelMeetupParticipation(Long meetupIdx, String userId) {
         // 모임 존재 확인 (organizer fetch로 N+1 방지)
         Meetup meetup = meetupRepository.findByIdWithOrganizer(meetupIdx)
-                .orElseThrow(() -> new RuntimeException("모임을 찾을 수 없습니다."));
+                .orElseThrow(MeetupNotFoundException::new);
 
         // 사용자 확인 (userId는 Users의 id 필드, 문자열)
         Users user = usersRepository.findByIdString(userId)
-                .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
+                .orElseThrow(UserNotFoundException::new);
 
         Long userIdx = user.getIdx(); // Users의 idx 필드 (Long)
 
         // 주최자는 참가 취소 불가
         if (meetup.getOrganizer().getIdx().equals(userIdx)) {
-            throw new RuntimeException("주최자는 참가 취소할 수 없습니다.");
+            throw MeetupForbiddenException.organizerCannotCancel();
         }
 
         // 참가자 확인
         MeetupParticipants participant = meetupParticipantsRepository
                 .findByMeetupIdxAndUserIdx(meetupIdx, userIdx)
-                .orElseThrow(() -> new RuntimeException("참가 정보를 찾을 수 없습니다."));
+                .orElseThrow(MeetupParticipantNotFoundException::new);
 
         // 참가자 삭제
         meetupParticipantsRepository.delete(participant);
@@ -310,7 +310,7 @@ public class MeetupService {
     public boolean isUserParticipating(Long meetupIdx, String userId) {
         // 사용자 확인 (userId는 Users의 id 필드, 문자열)
         Users user = usersRepository.findByIdString(userId)
-                .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
+                .orElseThrow(UserNotFoundException::new);
 
         Long userIdx = user.getIdx(); // Users의 idx 필드 (Long)
         return meetupParticipantsRepository.existsByMeetupIdxAndUserIdx(meetupIdx, userIdx);
