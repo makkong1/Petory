@@ -7,7 +7,10 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.linkup.Petory.domain.board.exception.BoardNotFoundException;
+import com.linkup.Petory.domain.board.exception.CommentNotFoundException;
 import com.linkup.Petory.domain.user.entity.Users;
+import com.linkup.Petory.domain.user.exception.UserNotFoundException;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 import com.linkup.Petory.domain.board.dto.ReactionSummaryDTO;
 import com.linkup.Petory.domain.board.entity.Board;
@@ -36,9 +39,9 @@ public class ReactionService {
     @CacheEvict(value = "boardDetail", key = "#boardId")
     public ReactionSummaryDTO reactToBoard(Long boardId, Long userId, ReactionType reactionType) {
         Board board = boardRepository.findById(boardId)
-                .orElseThrow(() -> new IllegalArgumentException("Board not found"));
+                .orElseThrow(() -> new BoardNotFoundException());
         Users user = usersRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new UserNotFoundException());
 
         Optional<BoardReaction> existing = boardReactionRepository.findByBoardAndUser(board, user);
         ReactionType previousReactionType = null;
@@ -85,7 +88,7 @@ public class ReactionService {
     @Transactional(readOnly = true)
     public ReactionSummaryDTO getBoardSummary(Long boardId, Long userId) {
         Board board = boardRepository.findById(boardId)
-                .orElseThrow(() -> new IllegalArgumentException("Board not found"));
+                .orElseThrow(() -> new BoardNotFoundException());
         Users user = userId != null
                 ? usersRepository.findById(userId).orElse(null)
                 : null;
@@ -94,9 +97,9 @@ public class ReactionService {
 
     public ReactionSummaryDTO reactToComment(Long commentId, Long userId, ReactionType reactionType) {
         Comment comment = commentRepository.findById(commentId)
-                .orElseThrow(() -> new IllegalArgumentException("Comment not found"));
+                .orElseThrow(() -> new CommentNotFoundException());
         Users user = usersRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new UserNotFoundException());
 
         Optional<CommentReaction> existing = commentReactionRepository.findByCommentAndUser(comment, user);
         if (existing.isPresent() && existing.get().getReactionType() == reactionType) {
@@ -123,7 +126,7 @@ public class ReactionService {
     @Transactional(readOnly = true)
     public ReactionSummaryDTO getCommentSummary(Long commentId, Long userId) {
         Comment comment = commentRepository.findById(commentId)
-                .orElseThrow(() -> new IllegalArgumentException("Comment not found"));
+                .orElseThrow(() -> new CommentNotFoundException());
         Users user = userId != null
                 ? usersRepository.findById(userId).orElse(null)
                 : null;

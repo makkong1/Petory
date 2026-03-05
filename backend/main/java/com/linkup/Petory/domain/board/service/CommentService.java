@@ -15,8 +15,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.linkup.Petory.domain.board.converter.CommentConverter;
+import com.linkup.Petory.domain.board.exception.BoardNotFoundException;
+import com.linkup.Petory.domain.board.exception.CommentNotBelongToBoardException;
+import com.linkup.Petory.domain.board.exception.CommentNotFoundException;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException;
+import com.linkup.Petory.domain.user.exception.UserNotFoundException;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 import com.linkup.Petory.domain.board.dto.CommentDTO;
 import com.linkup.Petory.domain.board.dto.CommentPageResponseDTO;
@@ -59,7 +63,7 @@ public class CommentService {
     public CommentPageResponseDTO getCommentsWithPaging(Long boardId, int page, int size) {
         // 게시글 존재 확인
         boardRepository.findById(boardId)
-                .orElseThrow(() -> new IllegalArgumentException("Board not found"));
+                .orElseThrow(() -> new BoardNotFoundException());
 
         Pageable pageable = PageRequest.of(page, size);
         Page<Comment> commentPage = commentRepository.findByBoardIdAndIsDeletedFalseOrderByCreatedAtAsc(boardId,
@@ -113,7 +117,7 @@ public class CommentService {
      */
     public List<CommentDTO> getComments(Long boardId) {
         Board board = boardRepository.findById(boardId)
-                .orElseThrow(() -> new IllegalArgumentException("Board not found"));
+                .orElseThrow(() -> new BoardNotFoundException());
         // 일반 사용자용: 작성자도 활성 상태여야 함
         List<Comment> comments = commentRepository.findByBoardAndIsDeletedFalseOrderByCreatedAtAsc(board);
         if (comments.isEmpty()) {
@@ -133,7 +137,7 @@ public class CommentService {
      */
     public List<CommentDTO> getCommentsForAdmin(Long boardId) {
         Board board = boardRepository.findById(boardId)
-                .orElseThrow(() -> new IllegalArgumentException("Board not found"));
+                .orElseThrow(() -> new BoardNotFoundException());
         List<Comment> comments = commentRepository.findByBoardAndIsDeletedFalseForAdmin(board);
         if (comments.isEmpty()) {
             return new ArrayList<>();
@@ -149,9 +153,9 @@ public class CommentService {
     @Transactional
     public CommentDTO addComment(Long boardId, CommentDTO dto) {
         Board board = boardRepository.findById(boardId)
-                .orElseThrow(() -> new IllegalArgumentException("Board not found"));
+                .orElseThrow(() -> new BoardNotFoundException());
         Users user = usersRepository.findById(dto.getUserId())
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new UserNotFoundException());
 
         Comment comment = Comment.builder()
                 .board(board)
@@ -191,12 +195,12 @@ public class CommentService {
     @Transactional
     public CommentDTO updateComment(Long boardId, Long commentId, CommentDTO dto) {
         Board board = boardRepository.findById(boardId)
-                .orElseThrow(() -> new IllegalArgumentException("Board not found"));
+                .orElseThrow(() -> new BoardNotFoundException());
         Comment comment = commentRepository.findById(commentId)
-                .orElseThrow(() -> new IllegalArgumentException("Comment not found"));
+                .orElseThrow(() -> new CommentNotFoundException());
 
         if (!comment.getBoard().getIdx().equals(board.getIdx())) {
-            throw new IllegalArgumentException("Comment does not belong to the specified board");
+            throw new CommentNotBelongToBoardException();
         }
 
         // 이메일 인증 확인
@@ -227,12 +231,12 @@ public class CommentService {
     @Transactional
     public void deleteComment(Long boardId, Long commentId) {
         Board board = boardRepository.findById(boardId)
-                .orElseThrow(() -> new IllegalArgumentException("Board not found"));
+                .orElseThrow(() -> new BoardNotFoundException());
         Comment comment = commentRepository.findById(commentId)
-                .orElseThrow(() -> new IllegalArgumentException("Comment not found"));
+                .orElseThrow(() -> new CommentNotFoundException());
 
         if (!comment.getBoard().getIdx().equals(board.getIdx())) {
-            throw new IllegalArgumentException("Comment does not belong to the specified board");
+            throw new CommentNotBelongToBoardException();
         }
 
         // 이메일 인증 확인
@@ -324,11 +328,11 @@ public class CommentService {
     public CommentDTO updateCommentStatus(Long boardId, Long commentId,
             com.linkup.Petory.domain.common.ContentStatus status) {
         Board board = boardRepository.findById(boardId)
-                .orElseThrow(() -> new IllegalArgumentException("Board not found"));
+                .orElseThrow(() -> new BoardNotFoundException());
         Comment comment = commentRepository.findById(commentId)
-                .orElseThrow(() -> new IllegalArgumentException("Comment not found"));
+                .orElseThrow(() -> new CommentNotFoundException());
         if (!comment.getBoard().getIdx().equals(board.getIdx())) {
-            throw new IllegalArgumentException("Comment does not belong to the specified board");
+            throw new CommentNotBelongToBoardException();
         }
         if (!Boolean.TRUE.equals(comment.getIsDeleted())) {
             comment.setStatus(status);
@@ -345,11 +349,11 @@ public class CommentService {
     @Transactional
     public CommentDTO restoreComment(Long boardId, Long commentId) {
         Board board = boardRepository.findById(boardId)
-                .orElseThrow(() -> new IllegalArgumentException("Board not found"));
+                .orElseThrow(() -> new BoardNotFoundException());
         Comment comment = commentRepository.findById(commentId)
-                .orElseThrow(() -> new IllegalArgumentException("Comment not found"));
+                .orElseThrow(() -> new CommentNotFoundException());
         if (!comment.getBoard().getIdx().equals(board.getIdx())) {
-            throw new IllegalArgumentException("Comment does not belong to the specified board");
+            throw new CommentNotBelongToBoardException();
         }
         comment.setIsDeleted(false);
         comment.setDeletedAt(null);

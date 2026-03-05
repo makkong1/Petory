@@ -10,6 +10,7 @@ import org.springframework.stereotype.Controller;
 import com.linkup.Petory.domain.chat.dto.ChatMessageDTO;
 import com.linkup.Petory.domain.chat.entity.MessageType;
 import com.linkup.Petory.domain.chat.service.ChatMessageService;
+import com.linkup.Petory.domain.user.exception.UserNotFoundException;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -93,7 +94,7 @@ public class ChatWebSocketController {
             // 사용자 ID 추출
             String loginId = principal.getName();
             Long userId = usersRepository.findByIdString(loginId)
-                    .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다: " + loginId))
+                    .orElseThrow(() -> new UserNotFoundException("사용자를 찾을 수 없습니다: " + loginId))
                     .getIdx();
 
             log.info("WebSocket 읽음 처리: conversationIdx={}, userId={}",
@@ -128,7 +129,7 @@ public class ChatWebSocketController {
             // 사용자 ID 추출
             String loginId = principal.getName();
             Long userId = usersRepository.findByIdString(loginId)
-                    .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다: " + loginId))
+                    .orElseThrow(() -> new UserNotFoundException("사용자를 찾을 수 없습니다: " + loginId))
                     .getIdx();
 
             log.debug("WebSocket 타이핑: conversationIdx={}, userId={}, isTyping={}",

@@ -10,6 +10,8 @@ import org.springframework.util.StringUtils;
 import com.linkup.Petory.domain.location.converter.LocationServiceConverter;
 import com.linkup.Petory.domain.location.dto.LocationServiceDTO;
 import com.linkup.Petory.domain.location.entity.LocationService;
+import com.linkup.Petory.domain.location.exception.LocationServiceAlreadyDeletedException;
+import com.linkup.Petory.domain.location.exception.LocationServiceNotFoundException;
 import com.linkup.Petory.domain.location.repository.LocationServiceRepository;
 
 import java.util.List;
@@ -348,11 +350,11 @@ public class LocationServiceService {
     @Transactional
     public void deleteService(Long serviceIdx) {
         LocationService service = locationServiceRepository.findById(serviceIdx)
-                .orElseThrow(() -> new RuntimeException("서비스를 찾을 수 없습니다."));
+                .orElseThrow(LocationServiceNotFoundException::new);
 
         // 이미 삭제된 서비스인지 확인
         if (service.getIsDeleted() != null && service.getIsDeleted()) {
-            throw new RuntimeException("이미 삭제된 서비스입니다.");
+            throw new LocationServiceAlreadyDeletedException();
         }
 
         // Soft Delete 처리

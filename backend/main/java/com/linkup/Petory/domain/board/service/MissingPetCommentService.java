@@ -13,6 +13,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.linkup.Petory.domain.board.converter.MissingPetConverter;
+import com.linkup.Petory.domain.board.exception.CommentNotBelongToBoardException;
+import com.linkup.Petory.domain.board.exception.CommentNotFoundException;
+import com.linkup.Petory.domain.board.exception.MissingPetBoardNotFoundException;
 import com.linkup.Petory.domain.board.dto.MissingPetCommentDTO;
 import com.linkup.Petory.domain.board.dto.MissingPetCommentPageResponseDTO;
 import com.linkup.Petory.domain.board.entity.MissingPetBoard;
@@ -25,6 +28,7 @@ import com.linkup.Petory.domain.file.service.AttachmentFileService;
 import com.linkup.Petory.domain.notification.entity.NotificationType;
 import com.linkup.Petory.domain.notification.service.NotificationService;
 import com.linkup.Petory.domain.user.entity.Users;
+import com.linkup.Petory.domain.user.exception.UserNotFoundException;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -54,7 +58,7 @@ public class MissingPetCommentService {
     public MissingPetCommentPageResponseDTO getCommentsWithPaging(Long boardId, int page, int size) {
         // 게시글 존재 확인
         boardRepository.findById(boardId)
-                .orElseThrow(() -> new IllegalArgumentException("Missing pet board not found"));
+                .orElseThrow(() -> new MissingPetBoardNotFoundException());
 
         Pageable pageable = PageRequest.of(page, size);
         Page<MissingPetComment> commentPage = commentRepository.findByBoardIdAndIsDeletedFalseOrderByCreatedAtAsc(boardId, pageable);
@@ -112,7 +116,7 @@ public class MissingPetCommentService {
      */
     public List<MissingPetCommentDTO> getComments(Long boardId) {
         MissingPetBoard board = boardRepository.findById(boardId)
-                .orElseThrow(() -> new IllegalArgumentException("Missing pet board not found"));
+                .orElseThrow(() -> new MissingPetBoardNotFoundException());
         List<MissingPetComment> comments = commentRepository.findByBoardAndIsDeletedFalseOrderByCreatedAtAsc(board);
 
         // 댓글 ID 리스트 추출
@@ -148,9 +152,9 @@ public class MissingPetCommentService {
     @Transactional
     public MissingPetCommentDTO addComment(Long boardId, MissingPetCommentDTO dto) {
         MissingPetBoard board = boardRepository.findById(boardId)
-                .orElseThrow(() -> new IllegalArgumentException("Missing pet board not found"));
+                .orElseThrow(() -> new MissingPetBoardNotFoundException());
         Users user = usersRepository.findById(dto.getUserId())
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new UserNotFoundException());
 
         MissingPetComment comment = MissingPetComment.builder()
                 .board(board)
@@ -191,12 +195,12 @@ public class MissingPetCommentService {
     @Transactional
     public void deleteComment(Long boardId, Long commentId) {
         MissingPetBoard board = boardRepository.findById(boardId)
-                .orElseThrow(() -> new IllegalArgumentException("Missing pet board not found"));
+                .orElseThrow(() -> new MissingPetBoardNotFoundException());
         MissingPetComment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new IllegalArgumentException("Comment not found"));
 
         if (!comment.getBoard().getIdx().equals(board.getIdx())) {
-            throw new IllegalArgumentException("Comment does not belong to the specified board");
+            throw new CommentNotBelongToBoardException();
         }
         // soft delete comment
         comment.setIsDeleted(true);
