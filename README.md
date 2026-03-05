@@ -340,6 +340,14 @@ Petory/
 - [전체 아키텍처 문서](./docs/architecture/전체%20아키텍처.md) - 시스템 전체 구조, 도메인 아키텍처, 공통 인프라
 - [트랜잭션 관리 & 동시성 제어 사례](./docs/concurrency/transaction-concurrency-cases.md) - 실제 코드 기반 사례
 
+### 도메인별 알고리즘 (핵심 비즈니스 로직)
+- [알고리즘 개요](./docs/algorithm/00-algorithm-overview.md) - 계산·검색·상태 전이·규칙 기반 로직 정리
+- [위치](./docs/algorithm/location/위치-알고리즘.md) - Haversine, 지역 계층 검색, ST_Distance_Sphere
+- [케어](./docs/algorithm/care/케어-알고리즘.md), [펫코인](./docs/algorithm/payment/펫코인-알고리즘.md) - 에스크로, 상태 전이
+- [모임](./docs/algorithm/meetup/모임-알고리즘.md) - 반경 검색, 인원 원자적 증가
+- [커뮤니티](./docs/algorithm/board/커뮤니티-알고리즘.md) - 인기 게시글 점수
+- [제재](./docs/algorithm/user/제재-알고리즘.md), [통계](./docs/algorithm/statistics/통계-알고리즘.md), [알림](./docs/algorithm/notification/알림-알고리즘.md)
+
 ### 도메인별 아키텍처 문서
 각 도메인별 상세 아키텍처, **비즈니스 로직 흐름**, API 엔드포인트를 포함합니다.
 
