@@ -47,11 +47,12 @@
 - **스크린샷/영상**: 
 
 #### 주요 기능 3: 사용자 제재 시스템
-- **설명**: 관리자가 사용자에게 경고, 이용제한, 영구 차단을 부여할 수 있습니다.
+- **설명**: 관리자가 신고 처리 시 사용자에게 경고, 이용제한, 영구 차단을 부여할 수 있습니다. 제재는 `/api/admin/reports/{id}/handle` API의 `actionTaken` (WARN_USER, SUSPEND_USER)으로 적용됩니다.
 - **사용자 시나리오**:
   1. 경고 3회 누적 시 자동 이용제한 3일 적용
   2. 이용제한 기간 만료 시 자동 해제 (스케줄러)
   3. 영구 차단 시 로그인 불가
+  4. **참고**: Report의 SUSPEND_USER는 현재 영구 차단(ban)으로 처리됨
 - **스크린샷/영상**: 
 
 #### 주요 기능 4: 이메일 인증 시스템
@@ -119,18 +120,18 @@
 // AuthService.java
 @Transactional
 public TokenResponse login(String id, String password) {
-    Users user = usersRepository.findByIdString(id)
-        .orElseThrow(() -> new RuntimeException("유저 없음"));
+        Users user = usersRepository.findByIdString(id)
+                .orElseThrow(UserNotFoundException::new);
     
     // 제재 상태 확인
     if (user.getStatus() == UserStatus.BANNED) {
-        throw new RuntimeException("영구 차단된 계정입니다.");
+        throw new UserBannedException();
     }
     
     if (user.getStatus() == UserStatus.SUSPENDED) {
         if (user.getSuspendedUntil() != null && 
             user.getSuspendedUntil().isAfter(LocalDateTime.now())) {
-            throw new RuntimeException("이용제한 중인 계정입니다.");
+            throw new UserSuspendedException(user.getSuspendedUntil());
         } else {
             // 만료된 이용제한 자동 해제
             user.setStatus(UserStatus.ACTIVE);
@@ -258,7 +259,7 @@ public UserSanction addWarning(Long userId, String reason, Long adminId, Long re
     // 경고 추가
     UserSanction warning = UserSanction.builder()
         .user(user)
-        .sanctionType(SanctionType.WARNING)
+        .sanctionType(UserSanction.SanctionType.WARNING)
         .reason(reason)
         .startsAt(LocalDateTime.now())
         .admin(admin)
@@ -389,11 +390,11 @@ public UsersDTO updateMyProfile(String userId, UsersDTO dto) {
     Users user = usersRepository.findByIdString(userId).orElseThrow();
     
     if (dto.getUsername() != null && !dto.getUsername().isEmpty()) {
-        // 닉네임 중복 확인
+        // 사용자명(username) 중복 확인
         usersRepository.findByUsername(dto.getUsername())
             .ifPresent(existingUser -> {
                 if (!existingUser.getId().equals(userId)) {
-                    throw new RuntimeException("이미 사용 중인 닉네임입니다.");
+                    throw new DuplicateUserFieldException(DuplicateUserFieldException.Field.USERNAME);
                 }
             });
         user.setUsername(dto.getUsername());
@@ -404,12 +405,12 @@ public UsersDTO updateMyProfile(String userId, UsersDTO dto) {
         usersRepository.findByEmail(dto.getEmail())
             .ifPresent(existingUser -> {
                 if (!existingUser.getId().equals(userId)) {
-                    throw new RuntimeException("이미 사용 중인 이메일입니다.");
+                    throw new DuplicateUserFieldException(DuplicateUserFieldException.Field.EMAIL);
                 }
             });
         user.setEmail(dto.getEmail());
     }
-    
+    // nickname은 setNickname() 별도 API로 처리
     Users updated = usersRepository.save(user);
     return usersConverter.toDTO(updated);
 }
@@ -418,6 +419,7 @@ public UsersDTO updateMyProfile(String userId, UsersDTO dto) {
 **설명**:
 - **처리 흐름**: 사용자 조회 → 중복 체크 → 필드 업데이트
 - **주요 판단 기준**: 다른 사용자가 이미 사용 중인지 확인
+- **username vs nickname**: username(사용자명)과 nickname(닉네임)은 별도 필드. nickname은 `setNickname()` API로 설정
 
 ### 2.2 서비스 메서드 구조
 
@@ -455,8 +457,9 @@ public UsersDTO updateMyProfile(String userId, UsersDTO dto) {
 | `sendVerificationEmail()` | 인증 메일 발송 | 인증 토큰 생성, 이메일 발송 (비동기) |
 | `sendPreRegistrationVerificationEmail()` | 회원가입 전 인증 메일 발송 | 이메일 기반 토큰 생성, 이메일 발송 |
 | `verifyEmail()` | 이메일 인증 처리 | 토큰 검증, `emailVerified = true` 업데이트 또는 Redis 저장 |
-| `verifyPreRegistrationEmail()` | 회원가입 전 인증 처리 | 토큰 검증, Redis에 인증 상태 저장 |
-| `checkEmailVerification()` | 인증 상태 확인 | 사용자의 이메일 인증 여부 확인 |
+| `isPreRegistrationEmailVerified()` | 회원가입 전 인증 완료 여부 확인 | Redis에서 이메일 인증 상태 조회 |
+| `removePreRegistrationVerification()` | 회원가입 완료 후 Redis 인증 상태 삭제 | 회원가입 시 호출 |
+| `checkEmailVerification()` | 인증 상태 확인 | 사용자의 이메일 인증 여부 확인 (비밀번호 변경 등) |
 
 #### PetService
 | 메서드 | 설명 | 주요 로직 |
@@ -473,6 +476,7 @@ public UsersDTO updateMyProfile(String userId, UsersDTO dto) {
 | `addSuspension()` | 이용제한 부여 | 이용제한 추가, 상태 변경 |
 | `addBan()` | 영구 차단 | 영구 차단 추가, 상태 변경 |
 | `releaseExpiredSuspensions()` | 만료된 이용제한 해제 | 스케줄러로 자동 실행 |
+| `applySanctionFromReport()` | 신고 처리 시 제재 적용 | ReportService에서 호출. WARN_USER→경고, SUSPEND_USER→영구 차단 |
 
 ### 2.3 트랜잭션 처리
 - **트랜잭션 범위**: 
@@ -483,12 +487,17 @@ public UsersDTO updateMyProfile(String userId, UsersDTO dto) {
 
 ### 2.4 예외 처리
 - **처리하는 예외**: 
-  - `RuntimeException`: 사용자를 찾을 수 없는 경우, 중복 체크 실패
-  - `IllegalArgumentException`: 잘못된 파라미터
+  - `UserNotFoundException`: 사용자를 찾을 수 없는 경우
+  - `UserBannedException`: 영구 차단된 계정 로그인 시도
+  - `UserSuspendedException`: 이용제한 중인 계정 로그인 시도
+  - `DuplicateUserFieldException`: 닉네임/이메일/사용자명/아이디 중복
   - `EmailVerificationRequiredException`: 이메일 인증이 필요한 경우
+  - `InvalidPasswordException`: 비밀번호 불일치/필수
+  - `InvalidRefreshTokenException`: Refresh Token 유효성 실패
+  - `UserValidationException`: 유효성 검증 실패
 - **예외 처리 전략**: 
   - Service 레이어에서 예외 발생 시 Controller로 전파
-  - GlobalExceptionHandler에서 통합 처리
+  - GlobalExceptionHandler에서 통합 처리 (ApiException 상속)
 
 ---
 
@@ -498,11 +507,9 @@ public UsersDTO updateMyProfile(String userId, UsersDTO dto) {
 ```
 domain/user/
   ├── controller/
-  │   ├── AuthController.java          # 인증 API
-  │   ├── UsersController.java          # 사용자 API
-  │   ├── UserProfileController.java    # 사용자 프로필 API
-  │   ├── PetController.java            # 반려동물 API
-  │   └── AdminUserManagementController.java  # 관리자 사용자 관리 API
+  │   ├── AuthController.java          # 인증 API (/api/auth)
+  │   ├── UserProfileController.java   # 사용자 프로필 API (/api/users)
+  │   └── PetController.java          # 반려동물 API (/api/pets)
   ├── service/
   │   ├── AuthService.java             # 인증 비즈니스 로직
   │   ├── UsersService.java            # 사용자 비즈니스 로직
@@ -515,8 +522,8 @@ domain/user/
   │   ├── NaverOAuth2UserService.java  # Naver OAuth2 사용자 서비스
   │   ├── OAuth2UserProviderRouter.java # Provider별 라우터
   │   ├── NaverOAuth2TokenResponseClient.java # Naver 토큰 응답 클라이언트
-  │   ├── ConditionalOAuth2TokenResponseClient.java # 조건부 토큰 응답 클라이언트
-  │   └── OAuth2DataCollector.java     # OAuth2 데이터 수집기
+  │   ├── ConditionalOAuth2TokenResponseClient.java # 조건부 토큰 응답 클라이언트 (Naver/Google 분기)
+  │   └── OAuth2DataCollector.java     # OAuth2 데이터 수집기 (디버깅용)
   ├── handler/
   │   ├── OAuth2SuccessHandler.java    # 소셜 로그인 성공 핸들러
   │   └── OAuth2FailureHandler.java    # 소셜 로그인 실패 핸들러
@@ -532,9 +539,9 @@ domain/user/
   │   ├── PetVaccination.java
   │   ├── UserSanction.java
   │   ├── SocialUser.java
-  │   ├── Provider.java               # 소셜 로그인 제공자 (GOOGLE, NAVER)
+  │   ├── Provider.java               # 소셜 로그인 제공자 (GOOGLE, NAVER, KAKAO)
   │   ├── UserStatus.java             # 사용자 상태 (ACTIVE, SUSPENDED, BANNED)
-  │   ├── Role.java                   # 역할 (USER, ADMIN, MASTER)
+  │   ├── Role.java                   # 역할 (USER, SERVICE_PROVIDER, ADMIN, MASTER)
   │   └── EmailVerificationPurpose.java # 이메일 인증 용도
   ├── converter/
   │   ├── UsersConverter.java
@@ -560,7 +567,7 @@ domain/user/
 ```java
 @Entity
 @Table(name = "users")
-public class Users {
+public class Users extends BaseTimeEntity {
     private Long idx;
     private String id;                     // 로그인용 아이디 (UNIQUE)
     private String username;                // 사용자명 (UNIQUE)
@@ -580,6 +587,7 @@ public class Users {
     private LocalDateTime lastLoginAt;     // 마지막 로그인 시간
     private UserStatus status;             // 상태 (ACTIVE, SUSPENDED, BANNED)
     private Integer warningCount;           // 경고 횟수
+    private Integer petCoinBalance;         // 펫코인 잔액
     private LocalDateTime suspendedUntil;  // 이용제한 종료일
     private Boolean isDeleted;             // 삭제 여부
     private LocalDateTime deletedAt;       // 삭제 시간
@@ -595,11 +603,11 @@ public class Users {
 ```java
 @Entity
 @Table(name = "pets")
-public class Pet {
+public class Pet extends BaseTimeEntity {
     private Long idx;
     private Users user;                    // 소유자
     private String petName;                // 반려동물 이름
-    private PetType petType;               // 종류 (DOG, CAT, ETC)
+    private PetType petType;               // 종류 (DOG, CAT, BIRD, RABBIT, HAMSTER, ETC)
     private String breed;                  // 품종
     private PetGender gender;              // 성별 (M, F, UNKNOWN)
     private String age;                    // 나이
@@ -688,14 +696,14 @@ erDiagram
 | `/api/users/me` | GET | 내 프로필 조회 (리뷰 포함) | - → `UserProfileWithReviewsDTO` |
 | `/api/users/me` | PUT | 프로필 수정 | `UsersDTO` → `UsersDTO` |
 | `/api/users/me/password` | PATCH | 비밀번호 변경 | `{currentPassword, newPassword}` → `{message: string}` |
-| `/api/users/me/username` | PATCH | 닉네임 변경 | `{username}` → `UsersDTO` |
+| `/api/users/me/username` | PATCH | 사용자명 변경 | `{username}` → `UsersDTO` |
 | `/api/users/me/nickname` | POST | 닉네임 설정 (소셜 로그인 사용자용) | `{nickname}` → `UsersDTO` |
-| `/api/users/{userId}/profile` | GET | 다른 사용자 프로필 조회 (리뷰 포함) | - → `UserProfileWithReviewsDTO` |
+| `/api/users/{userId}/profile` | GET | 다른 사용자 프로필 조회 (리뷰 포함, userId=idx) | - → `UserProfileWithReviewsDTO` |
 | `/api/users/{userId}/reviews` | GET | 특정 사용자의 리뷰 목록 조회 | - → `List<CareReviewDTO>` |
-| `/api/users/pets` | GET | 내 반려동물 목록 | - → `List<PetDTO>` |
-| `/api/users/pets` | POST | 반려동물 등록 | `PetDTO` → `PetDTO` |
-| `/api/users/pets/{petIdx}` | PUT | 반려동물 수정 | `PetDTO` → `PetDTO` |
-| `/api/users/pets/{petIdx}` | DELETE | 반려동물 삭제 | - → `204 No Content` |
+| `/api/pets` | GET | 내 반려동물 목록 | - → `List<PetDTO>` |
+| `/api/pets` | POST | 반려동물 등록 | `PetDTO` → `PetDTO` |
+| `/api/pets/{petIdx}` | PUT | 반려동물 수정 | `PetDTO` → `PetDTO` |
+| `/api/pets/{petIdx}` | DELETE | 반려동물 삭제 | - → `204 No Content` |
 | `/api/users/id/check` | GET | 아이디 중복 검사 | `id` → `{available: boolean}` |
 | `/api/users/nickname/check` | GET | 닉네임 중복 검사 | `nickname` → `{available: boolean}` |
 | `/api/users/email/verify` | POST | 이메일 인증 메일 발송 | `{purpose}` → `{success: boolean, message: string}` |
@@ -703,10 +711,14 @@ erDiagram
 | `/api/users/email/verify/pre-registration/check` | GET | 회원가입 전 이메일 인증 완료 여부 확인 | `email` → `{verified: boolean, message: string}` |
 | `/api/users/email/verify/{token}` | GET | 이메일 인증 처리 | - → `{success: boolean, purpose: string, redirectUrl: string}` |
 | `/api/auth/forgot-password` | POST | 비밀번호 찾기 (비밀번호 재설정 이메일 발송) | `{email}` → `{success: boolean, message: string}` |
-| `/api/admin/users` | GET | 사용자 목록 (관리자) | `page`, `size` → `UserPageResponseDTO` |
-| `/api/admin/users/{id}/warn` | POST | 경고 부여 | `reason` → `UserSanction` |
-| `/api/admin/users/{id}/suspend` | POST | 이용제한 부여 | `days`, `reason` → `UserSanction` |
-| `/api/admin/users/{id}/ban` | POST | 영구 차단 | `reason` → `UserSanction` |
+| `/api/admin/users/paging` | GET | 사용자 목록 (관리자, 페이징) | `page`, `size` → `UserPageResponseDTO` |
+| `/api/admin/users/{id}` | GET | 사용자 상세 조회 (관리자) | - → `UsersDTO` |
+| `/api/admin/users/{id}` | PUT | 사용자 정보 수정 (관리자) | `UsersDTO` → `UsersDTO` |
+| `/api/admin/users/{id}` | DELETE | 사용자 삭제/탈퇴 (관리자, 소프트 삭제) | - → `204 No Content` |
+| `/api/admin/users/{id}/restore` | POST | 계정 복구 (관리자) | - → `UsersDTO` |
+| `/api/admin/users/{id}/status` | PATCH | 상태 관리 (관리자) | `UsersDTO` (status, warningCount, suspendedUntil) → `UsersDTO` |
+| `/api/admin/reports/{id}/handle` | POST | 신고 처리 (경고/이용제한 포함) | `ReportHandleRequest` (actionTaken: WARN_USER, SUSPEND_USER) → `ReportDTO` |
+| `/api/master/admin-users` | * | ADMIN 계정 관리 (MASTER 전용) | ADMIN 생성/삭제/승격 등 |
 
 **소셜 로그인 플로우**:
 1. 사용자가 `/oauth2/authorization/{provider}` 접근
@@ -717,14 +729,19 @@ erDiagram
 6. JWT 토큰 발급 후 프론트엔드로 리다이렉트 (쿼리 파라미터로 토큰 전달)
 7. 닉네임이 없으면 `needsNickname=true` 파라미터와 함께 리다이렉트
 
-### 3.5 다른 도메인과의 연관관계
+### 3.5 관리자 도메인과의 연계
+- **AdminUserController** (`domain/admin`): 일반 사용자 목록/상세/수정/삭제/복구/상태관리 (`/api/admin/users`)
+- **AdminUserManagementController** (`domain/admin`): MASTER 전용, ADMIN 계정 생성/삭제/승격 (`/api/master/admin-users`)
+- **AdminReportController** (`domain/admin`): 신고 처리 시 UserSanctionService를 통해 제재 적용
+
+### 3.6 다른 도메인과의 연관관계
 - **Board 도메인**: Users가 게시글/댓글 작성
 - **Care 도메인**: Users가 펫케어 요청 생성/지원 (이메일 인증 필수)
 - **Report 도메인**: Users가 신고 접수, 제재 부여
 - **Notification 도메인**: Users에게 알림 전송
 - **File 도메인**: Users 프로필 이미지, Pet 프로필 이미지
 
-### 3.6 데이터 흐름
+### 3.7 데이터 흐름
 ```
 [사용자 요청] 
   → [AuthController/UsersController] 

@@ -135,7 +135,7 @@ public CareRequestDTO updateCareRequest(Long idx, CareRequestDTO dto, Long curre
     
     // 작성자 확인 (관리자는 우회)
     if (!isAdmin() && !request.getUser().getIdx().equals(currentUserId)) {
-        throw new RuntimeException("본인의 케어 요청만 수정할 수 있습니다.");
+        throw CareForbiddenException.ownRequestOnly();
     }
     
     // 펫 정보 업데이트 (연결 해제도 가능)
@@ -170,11 +170,10 @@ public CareRequestDTO updateCareRequest(Long idx, CareRequestDTO dto, Long curre
 1. 권한 확인 (작성자 또는 승인된 제공자만 가능)
 2. 상태 변경
 3. **펫코인 지급 처리** (상태가 `COMPLETED`로 변경될 때):
-   - 에스크로 조회 (`PetCoinEscrowService.findByCareRequest`)
-   - 에스크로 상태가 `HOLD`인 경우:
-     - 제공자에게 코인 지급 (`PetCoinEscrowService.releaseToProvider`)
-     - 에스크로 상태를 `RELEASED`로 변경
+   - 에스크로 조회 (`findByCareRequestForUpdate` - 비관적 락)
+   - 에스크로 상태가 `HOLD`인 경우: 제공자에게 코인 지급
    - 상세 내용은 [Payment 도메인 문서](../domains/payment.md) 참조
+4. **펫코인 환불 처리** (상태가 `CANCELLED`로 변경될 때): 요청자에게 환불
 
 #### 로직 4-1: 상태 변경 권한 체크
 ```java
@@ -193,7 +192,7 @@ public CareRequestDTO updateStatus(Long idx, String status, Long currentUserId) 
                                 && app.getProvider().getIdx().equals(currentUserId));
         
         if (!isRequester && !isAcceptedProvider) {
-            throw new RuntimeException("작성자 또는 승인된 제공자만 상태를 변경할 수 있습니다.");
+            throw CareForbiddenException.ownerOrApprovedProvider();
         }
     }
     
@@ -202,14 +201,19 @@ public CareRequestDTO updateStatus(Long idx, String status, Long currentUserId) 
     request.setStatus(newStatus);
     CareRequest updated = careRequestRepository.save(request);
     
-    // 상태가 COMPLETED로 변경될 때 펫코인 지급
+        // 상태가 COMPLETED로 변경될 때 펫코인 지급
     if (oldStatus != CareRequestStatus.COMPLETED && newStatus == CareRequestStatus.COMPLETED) {
-        PetCoinEscrow escrow = petCoinEscrowService.findByCareRequest(request);
+        PetCoinEscrow escrow = petCoinEscrowService.findByCareRequestForUpdate(request);
         if (escrow != null && escrow.getStatus() == EscrowStatus.HOLD) {
             petCoinEscrowService.releaseToProvider(escrow);
         }
     }
-    
+    if (newStatus == CareRequestStatus.CANCELLED) {
+        PetCoinEscrow escrow = petCoinEscrowService.findByCareRequestForUpdate(request);
+        if (escrow != null && escrow.getStatus() == EscrowStatus.HOLD) {
+            petCoinEscrowService.refundToRequester(escrow);
+        }
+    }
     return careRequestConverter.toDTO(updated);
 }
 ```
@@ -285,14 +289,15 @@ public CareRequestCommentDTO addComment(Long careRequestId, CareRequestCommentDT
 #### CareRequestService
 | 메서드 | 설명 | 주요 로직 |
 |--------|------|-----------|
-| `createCareRequest()` | 펫케어 요청 생성 | 이메일 인증 확인, 펫 소유자 확인, 상태 OPEN |
-| `getAllCareRequests()` | 요청 목록 조회 | 상태 필터링, 위치 필터링, 작성자 활성 상태 확인 |
+| `createCareRequest()` | 펫케어 요청 생성 | 이메일 인증 확인, offeredCoins 유효성(>0), 잔액 확인, 펫 소유자 확인 |
+| `getCareRequestsWithPaging()` | 요청 목록 조회 (페이징) | 상태/위치 필터링, 작성자 활성 상태 확인 |
+| `getAllCareRequests()` | 요청 목록 조회 (관리자용) | 페이징 없음 |
 | `getCareRequest()` | 단일 요청 조회 | 펫 정보 포함 조회 |
 | `updateCareRequest()` | 요청 수정 | 작성자 확인 (관리자 우회), 펫 정보 업데이트/연결 해제 지원, 펫 소유자 확인 |
 | `deleteCareRequest()` | 요청 삭제 | 작성자 확인 (관리자 우회), Soft Delete |
 | `getMyCareRequests()` | 내 요청 목록 | 사용자별 요청 조회 |
-| `updateStatus()` | 상태 변경 | 작성자 또는 승인된 제공자 확인 (관리자 우회), OPEN → IN_PROGRESS → COMPLETED |
-| `searchCareRequests()` | 요청 검색 | 제목과 내용 모두 검색 (대소문자 구분 없음, `findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCaseAndIsDeletedFalse`) |
+| `updateStatus()` | 상태 변경 | 작성자 또는 승인된 제공자 확인 (관리자 우회), OPEN → IN_PROGRESS → COMPLETED, CANCELLED 시 환불 |
+| `searchCareRequestsWithPaging()` | 요청 검색 (페이징) | 제목과 내용 검색, `searchWithPaging` |
 
 #### CareRequestCommentService
 | 메서드 | 설명 | 주요 로직 |
@@ -308,6 +313,7 @@ public CareRequestCommentDTO addComment(Long careRequestId, CareRequestCommentDT
 | `getReviewsByReviewee()` | 리뷰 대상별 리뷰 목록 조회 | 특정 사용자(제공자)에 대한 리뷰 목록 |
 | `getReviewsByReviewer()` | 리뷰 작성자별 리뷰 목록 조회 | 특정 사용자가 작성한 리뷰 목록 |
 | `getAverageRating()` | 평균 평점 조회 | 리뷰 목록에서 평균 계산 (캐싱 없음) |
+| `getReviewsWithAverage()` | 리뷰+평균+개수 1회 조회 | UserProfileController용, 2쿼리 → 1쿼리 |
 
 ### 2.3 트랜잭션 처리
 - **트랜잭션 범위**: 
@@ -323,6 +329,16 @@ public CareRequestCommentDTO addComment(Long careRequestId, CareRequestCommentDT
   - 상태 변경: 작성자 또는 승인된 제공자만 가능 (관리자는 우회) (`CareRequestService.updateStatus()`)
   - 댓글 작성: `SERVICE_PROVIDER` 역할만 가능 (`CareRequestCommentService.addComment()`)
   - 리뷰 작성: 요청자만 가능 (`CareReviewService.createReview()`)
+
+### 2.4 예외 처리
+- **처리하는 예외**: 
+  - `CareRequestNotFoundException`: 요청을 찾을 수 없는 경우
+  - `CareForbiddenException`: 권한 없음 (ownRequestOnly, petOwnerOnly, ownerOrApprovedProvider, commentNotAllowed, requesterOnly)
+  - `CareValidationException`: offeredCoins 유효성, careApplicationId 필수 등
+  - `CareConflictException`: 이미 리뷰 작성함 (alreadyReviewed)
+  - `CarePaymentException`: 코인 지급/환불 실패
+  - `CareApplicationNotFoundException`, `CareCommentNotFoundException`, `CareCommentNotBelongException`
+  - `EmailVerificationRequiredException`: 이메일 인증 필요
 
 ---
 
@@ -357,14 +373,27 @@ domain/care/
   │   ├── CareApplicationConverter.java
   │   ├── CareReviewConverter.java
   │   └── CareRequestCommentConverter.java
-  └── dto/
-      ├── CareRequestDTO.java
-      ├── CareApplicationDTO.java
-      ├── CareReviewDTO.java
-      └── CareRequestCommentDTO.java
+  ├── dto/
+  │   ├── CareRequestDTO.java
+  │   ├── CareRequestPageResponseDTO.java
+  │   ├── CareApplicationDTO.java
+  │   ├── CareReviewDTO.java
+  │   ├── ReviewSummaryDTO.java
+  │   └── CareRequestCommentDTO.java
+  └── exception/
+      ├── CareRequestNotFoundException.java
+      ├── CareForbiddenException.java
+      ├── CareValidationException.java
+      ├── CareConflictException.java
+      ├── CarePaymentException.java
+      ├── CareApplicationNotFoundException.java
+      ├── CareCommentNotFoundException.java
+      └── CareCommentNotBelongException.java
 ```
 
-**참고**: `CareApplication` 생성/관리는 채팅 도메인(`domain/chat/service/ConversationService`)에서 처리됩니다.
+**참고**: 
+- `CareApplication` 생성/관리는 채팅 도메인(`domain/chat/service/ConversationService`)에서 처리
+- `AdminCareRequestController`는 `domain/admin/controller`에 위치
 
 ### 3.2 엔티티 구조
 
@@ -382,8 +411,10 @@ public class CareRequest extends BaseTimeEntity {
     @Lob
     private String description;            // 설명
     private LocalDateTime date;            // 날짜
+    @Column(name = "offered_coins")
+    private Integer offeredCoins;           // 제시한 코인 가격 (요청자가 설정)
     @Builder.Default
-    private CareRequestStatus status = CareRequestStatus.OPEN;  // 상태 (OPEN, IN_PROGRESS, COMPLETED)
+    private CareRequestStatus status = CareRequestStatus.OPEN;  // 상태 (OPEN, IN_PROGRESS, COMPLETED, CANCELLED)
     @Builder.Default
     private Boolean isDeleted = false;
     private LocalDateTime deletedAt;
@@ -472,14 +503,14 @@ erDiagram
 ### 3.4 API 설계
 | 엔드포인트 | Method | 설명 |
 |-----------|--------|------|
-| `/api/care-requests` | GET | 요청 목록 (status, location 파라미터 지원) |
+| `/api/care-requests` | GET | 요청 목록 (페이징, status, location 파라미터) → `CareRequestPageResponseDTO` |
 | `/api/care-requests/{id}` | GET | 단일 요청 조회 |
 | `/api/care-requests` | POST | 요청 생성 (이메일 인증 필요) |
 | `/api/care-requests/{id}` | PUT | 요청 수정 (작성자만 가능, 관리자 우회, currentUserId 자동 추출) |
 | `/api/care-requests/{id}` | DELETE | 요청 삭제 (작성자만 가능, 관리자 우회, currentUserId 자동 추출) |
 | `/api/care-requests/my-requests` | GET | 내 요청 목록 (userId 파라미터) |
 | `/api/care-requests/{id}/status` | PATCH | 상태 변경 (작성자 또는 승인된 제공자만 가능, 관리자 우회, status 파라미터, currentUserId 자동 추출) |
-| `/api/care-requests/search` | GET | 요청 검색 (keyword 파라미터, 제목과 내용 모두 검색, 대소문자 구분 없음) |
+| `/api/care-requests/search` | GET | 요청 검색 (페이징, keyword, page, size) → `CareRequestPageResponseDTO` |
 | `/api/care-requests/{careRequestId}/comments` | GET | 댓글 목록 조회 |
 | `/api/care-requests/{careRequestId}/comments` | POST | 댓글 작성 (SERVICE_PROVIDER만 가능, 파일 첨부 지원 - 첫 번째 파일만 저장, 작성자가 요청자가 아닌 경우에만 알림 발송) |
 | `/api/care-requests/{careRequestId}/comments/{commentId}` | DELETE | 댓글 삭제 (Soft Delete) |
@@ -488,6 +519,15 @@ erDiagram
 | `/api/care-reviews/reviewee/{revieweeIdx}` | GET | 특정 사용자(제공자)에 대한 리뷰 목록 |
 | `/api/care-reviews/reviewer/{reviewerIdx}` | GET | 특정 사용자가 작성한 리뷰 목록 |
 | `/api/care-reviews/average-rating/{revieweeIdx}` | GET | 특정 사용자의 평균 평점 조회 |
+
+### 관리자 (Admin) - domain/admin/controller/AdminCareRequestController
+| 엔드포인트 | Method | 설명 |
+|-----------|--------|------|
+| `/api/admin/care-requests` | GET | 요청 목록 (status, location, deleted, q 필터) |
+| `/api/admin/care-requests/{id}` | GET | 단일 요청 조회 |
+| `/api/admin/care-requests/{id}/status` | PATCH | 상태 변경 (관리자 우회) |
+| `/api/admin/care-requests/{id}/delete` | POST | 요청 삭제 (소프트 삭제) |
+| `/api/admin/care-requests/{id}/restore` | POST | 요청 복구 (미구현) |
 
 ---
 
@@ -568,12 +608,13 @@ List<CareRequest> findAllWithUserAndPet();
 
 ### 기술적 하이라이트
 1. **거래 확정 동시성 제어**: 트랜잭션으로 안전성 보장, 양쪽 모두 확인 시 자동 승인 (`ConversationService`)
-2. **자동 완료 스케줄러**: 날짜 지난 요청 자동 완료 (매 시간 정각 + 매일 자정)
+2. **자동 완료 스케줄러**: 날짜 지난 요청 자동 완료 (매 시간 정각 + 매일 자정, `CareRequestService.updateStatus` 호출)
 3. **이메일 인증**: 요청 생성 시 이메일 인증 확인
 4. **Soft Delete**: 요청 및 댓글 삭제 시 Soft Delete 적용
 5. **N+1 문제 해결**: Fetch Join 사용 (`findByIdWithPet`, `findAllActiveRequests`)
 6. **리뷰 중복 방지**: `CareApplication`당 1개의 리뷰만 작성 가능
 7. **권한 기반 댓글**: `SERVICE_PROVIDER` 역할만 댓글 작성 가능
 8. **알림 연동**: 댓글 작성 시 요청자에게 알림 자동 발송
-9. **파일 첨부 지원**: 댓글에 파일 첨부 가능 (`FileTargetType.CARE_COMMENT`)
+9. **파일 첨부 지원**: 댓글에 파일 첨부 가능 (`FileTargetType.CARE_COMMENT`, dto.attachments 첫 번째만)
+10. **CANCELLED 상태**: 거래 취소 시 에스크로에서 요청자에게 코인 환불
 

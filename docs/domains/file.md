@@ -124,34 +124,35 @@ public Map<Long, List<FileDTO>> getAttachmentsBatch(FileTargetType targetType, L
 **구현 위치**: `FileStorageService.storeImage()` 
 
 **핵심 로직**:
-- **파일 검증**: 최대 5MB, 이미지 파일만 허용 (jpg, png, gif, webp)
-- **경로 생성**: 카테고리, 소유자 타입, 소유자 ID, 엔티티 ID를 기반으로 디렉터리 구조 생성
+- **파일 검증**: 빈 파일 시 `FileValidationException.emptyFile()`, 용량/타입/확장자 검증 시 `FileUploadValidationException` 발생
+- **경로 생성**: 카테고리, 소유자 타입, 소유자 ID, 엔티티 ID를 기반으로 디렉터리 구조 생성 (실패 시 `FileStorageException.prepareFailed()`)
 - **파일명 생성**: 날짜 접두사 + UUID로 고유 파일명 생성 (예: `20240101_abc123def456.jpg`)
 - **보안**: 경로 정규화 및 상대 경로 검증으로 디렉터리 탐색 공격 방지
+- **저장 실패**: IO 오류 시 `FileStorageException.saveFailed()` 발생
 
 **파일 검증 로직** (`validateFile()`):
 ```java
 private void validateFile(MultipartFile file, String extension) {
     // 1. 파일 크기 검증 (최대 5MB)
     if (file.getSize() > MAX_FILE_SIZE_BYTES) {
-        throw new IllegalArgumentException("파일은 최대 5MB까지 업로드할 수 있습니다.");
+        throw FileUploadValidationException.sizeExceeded();
     }
     
     // 2. MIME 타입 검증
     String contentType = file.getContentType();
     if (contentType == null || !ALLOWED_CONTENT_TYPES.contains(contentType.toLowerCase())) {
-        throw new IllegalArgumentException("이미지 파일(jpg, png, gif, webp)만 업로드할 수 있습니다.");
+        throw FileUploadValidationException.invalidContentType();
     }
     
     // 3. 확장자 검증
     if (!StringUtils.hasText(extension) || !ALLOWED_EXTENSIONS.contains(extension.toLowerCase())) {
-        throw new IllegalArgumentException("허용되지 않은 이미지 확장자입니다.");
+        throw FileUploadValidationException.invalidExtension();
     }
 }
 ```
 
 #### 로직 4: 파일 경로 정규화
-**구현 위치**: `AttachmentFileService.normalizeFilePath()` (Lines 93-104)
+**구현 위치**: `AttachmentFileService.normalizeFilePath()`
 
 **핵심 로직**:
 - **상대 경로 추출**: URI에서 `/uploads/` 마커 이후 경로 추출 또는 쿼리 파라미터에서 `path` 추출
@@ -226,12 +227,21 @@ domain/file/
   │   ├── AttachmentFile.java
   │   └── FileTargetType.java
   ├── repository/
-  │   └── AttachmentFileRepository.java
+  │   ├── AttachmentFileRepository.java
+  │   ├── JpaAttachmentFileAdapter.java
+  │   └── SpringDataJpaAttachmentFileRepository.java
+  ├── exception/
+  │   ├── FileValidationException.java
+  │   ├── FileUploadValidationException.java
+  │   ├── FileNotFoundException.java
+  │   └── FileStorageException.java
   ├── dto/
   │   └── FileDTO.java
   └── converter/
       └── FileConverter.java
 ```
+
+**참고**: `AdminFileController`는 `domain/admin/controller/`에 위치하며, ADMIN/MASTER 권한으로 파일 관리 API를 제공합니다.
 
 ### 4.3 엔티티 관계도 (ERD)
 ```mermaid
@@ -257,19 +267,37 @@ erDiagram
 | `buildDownloadUrl()` | 다운로드 URL 생성 | `/api/uploads/file?path={상대경로}` 형식으로 생성 |
 
 #### FileStorageService
-| 메서드 | 설명 | 주요 로직 |
-|--------|------|-----------|
-| `storeImage()` | 이미지 파일 저장 | 파일 검증, 디렉터리 생성, 고유 파일명 생성, 파일 저장 |
-| `loadAsResource()` | 파일 리소스 로드 | 경로 검증, 파일 리소스 반환 |
-| `resolveStoragePath()` | 저장 경로 해석 | 상대 경로를 절대 경로로 변환, 보안 검증 |
+| 메서드 | 설명 | 주요 로직 | 예외 |
+|--------|------|-----------|------|
+| `storeImage()` | 이미지 파일 저장 | 파일 검증, 디렉터리 생성, 고유 파일명 생성, 파일 저장 | `FileValidationException`, `FileUploadValidationException`, `FileStorageException` |
+| `loadAsResource()` | 파일 리소스 로드 | 경로 검증, 파일 리소스 반환 | `FileNotFoundException` |
+| `resolveStoragePath()` | 저장 경로 해석 | 상대 경로를 절대 경로로 변환, 보안 검증 | `FileValidationException` |
 
-### 4.5 API 설계
+### 4.5 예외 처리
 
-#### REST API
-| 엔드포인트 | Method | 설명 |
-|-----------|--------|------|
-| `/api/uploads/images` | POST | 이미지 파일 업로드 (file, category, ownerType, ownerId, entityId 파라미터) |
-| `/api/uploads/file` | GET | 파일 다운로드 (path 파라미터) |
+| 예외 | HTTP 상태 | 발생 시점 |
+|------|----------|----------|
+| `FileValidationException` | 400 Bad Request | 빈 파일 업로드(`emptyFile`), 빈 경로(`emptyPath`), 경로 탈취 시도(`invalidPath`) |
+| `FileUploadValidationException` | 400 Bad Request | 용량 초과(`sizeExceeded`), 허용되지 않은 MIME 타입(`invalidContentType`), 허용되지 않은 확장자(`invalidExtension`) |
+| `FileNotFoundException` | 404 Not Found | `loadAsResource()`에서 파일 미존재 또는 읽기 불가 |
+| `FileStorageException` | 500 Internal Server Error | 업로드 디렉터리 초기화 실패(`initFailed`), 디렉터리 준비 실패(`prepareFailed`), 파일 저장 실패(`saveFailed`) |
+
+### 4.6 API 설계
+
+#### REST API (FileUploadController)
+| 엔드포인트 | Method | 설명 | 예외 |
+|-----------|--------|------|------|
+| `/api/uploads/images` | POST | 이미지 파일 업로드 (file, category, ownerType, ownerId, entityId 파라미터) | `FileValidationException`, `FileUploadValidationException`, `FileStorageException` |
+| `/api/uploads/file` | GET | 파일 다운로드 (path 파라미터) | `FileNotFoundException` (404) |
+
+#### REST API (AdminFileController, ADMIN/MASTER 권한)
+| 엔드포인트 | Method | 설명 | 예외 |
+|-----------|--------|------|------|
+| `/api/admin/files` | GET | 파일 목록 조회 (targetType, targetIdx, q 파라미터) | - |
+| `/api/admin/files/target` | GET | 특정 타겟의 파일 조회 (targetType, targetIdx) | `IllegalArgumentException` → 400 |
+| `/api/admin/files/{id}` | DELETE | 파일 삭제 | - |
+| `/api/admin/files/target` | DELETE | 타겟의 모든 파일 삭제 (targetType, targetIdx) | `IllegalArgumentException` → 400 |
+| `/api/admin/files/statistics` | GET | 파일 통계 조회 | - |
 
 **파일 업로드 요청 예시**:
 ```http
@@ -369,7 +397,7 @@ Map<Long, List<FileDTO>> filesMap = attachmentFileService.getAttachmentsBatch(Fi
 ```
 
 #### 파일 검증 및 보안
-**구현 위치**: `FileStorageService.validateFile()` (Lines 150-161)
+**구현 위치**: `FileStorageService.validateFile()`
 
 **최적화 사항**:
 - 파일 크기 제한: 최대 5MB
@@ -377,16 +405,16 @@ Map<Long, List<FileDTO>> filesMap = attachmentFileService.getAttachmentsBatch(Fi
 - MIME 타입 검증: `image/jpeg`, `image/png`, `image/gif`, `image/webp`
 - 경로 정규화: 디렉터리 탐색 공격 방지 (`../` 제거)
 
-**보안 검증 로직** (`resolveStoragePath()`, Lines 95-104):
+**보안 검증 로직** (`resolveStoragePath()`):
 ```java
 public Path resolveStoragePath(String relativePath) {
     if (!StringUtils.hasText(relativePath)) {
-        throw new IllegalArgumentException("파일 경로가 비어 있습니다.");
+        throw FileValidationException.emptyPath();
     }
     Path filePath = uploadLocation.resolve(relativePath).normalize();
     // 상대 경로가 업로드 디렉터리를 벗어나지 않도록 검증
     if (!filePath.startsWith(uploadLocation)) {
-        throw new IllegalArgumentException("잘못된 파일 경로 요청입니다.");
+        throw FileValidationException.invalidPath(relativePath);
     }
     return filePath;
 }

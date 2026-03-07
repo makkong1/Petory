@@ -409,7 +409,8 @@ public Double calculateDistance(Double lat1, Double lng1, Double lat2, Double ln
 **구현 위치**: `LocationServiceReviewService.createReview()`
 
 **핵심 로직**:
-- **중복 리뷰 체크**: `existsByServiceIdxAndUserIdx()`로 중복 방지
+- **중복 리뷰 체크**: `existsByServiceIdxAndUserIdx()`로 중복 방지 (중복 시 `RuntimeException`)
+- **서비스/사용자 조회**: 없을 시 `RuntimeException` (추후 `LocationReviewDuplicateException`, `LocationServiceNotFoundException`, `UserNotFoundException` 등 구체 예외로 개선 권장)
 - **이메일 인증 확인**: 리뷰 작성 시 이메일 인증 필요 (`EmailVerificationRequiredException`, `EmailVerificationPurpose.LOCATION_REVIEW`)
 - **리뷰 저장**: `LocationServiceReview` 엔티티 생성 및 저장
 - **평점 업데이트**: `updateServiceRating()`로 서비스 평균 평점 자동 계산 및 업데이트
@@ -420,12 +421,12 @@ public Double calculateDistance(Double lat1, Double lng1, Double lat2, Double ln
 ```java
 @Transactional
 public void deleteReview(Long reviewIdx) {
-    LocationServiceReview review = reviewRepository.findById(reviewIdx)
-            .orElseThrow(() -> new RuntimeException("리뷰를 찾을 수 없습니다."));
+    LocationServiceReview review = reviewRepository.findByIdWithUserAndService(reviewIdx)
+            .orElseThrow(LocationServiceReviewNotFoundException::new);
     
     // 이미 삭제된 리뷰인지 확인
     if (review.getIsDeleted() != null && review.getIsDeleted()) {
-        throw new RuntimeException("이미 삭제된 리뷰입니다.");
+        throw new LocationReviewAlreadyDeletedException();
     }
     
     // 이메일 인증 확인
@@ -461,7 +462,7 @@ public void updateServiceRating(Long serviceIdx) {
     
     if (averageRating.isPresent()) {
         LocationService service = serviceRepository.findById(serviceIdx)
-                .orElseThrow(() -> new RuntimeException("서비스를 찾을 수 없습니다."));
+                .orElseThrow(LocationServiceNotFoundException::new);
         
         service.setRating(averageRating.get());
         serviceRepository.save(service);
@@ -480,11 +481,11 @@ public void updateServiceRating(Long serviceIdx) {
 @Transactional
 public void deleteService(Long serviceIdx) {
     LocationService service = locationServiceRepository.findById(serviceIdx)
-            .orElseThrow(() -> new RuntimeException("서비스를 찾을 수 없습니다."));
+            .orElseThrow(LocationServiceNotFoundException::new);
     
     // 이미 삭제된 서비스인지 확인
     if (service.getIsDeleted() != null && service.getIsDeleted()) {
-        throw new RuntimeException("이미 삭제된 서비스입니다.");
+        throw new LocationServiceAlreadyDeletedException();
     }
     
     // Soft Delete 처리
@@ -512,8 +513,13 @@ public void deleteService(Long serviceIdx) {
 | `searchLocationServicesByLocation()` | 위치 기반 반경 검색 | ST_Distance_Sphere 사용, 카테고리 필터링, 거리 계산 및 DTO 포함 ✅, 최대 결과 수 제한, 성능 측정 로깅, Soft Delete 제외 |
 | `searchLocationServicesByKeyword()` | 키워드 검색 | FULLTEXT 인덱스 활용 (ft_search), name/description/category1-3 검색, 카테고리 필터링, 최대 결과 수 제한, 성능 측정 로깅, Soft Delete 제외 |
 | `calculateDistance()` | 거리 계산 | Haversine 공식 (미터 단위) |
-| `getPopularLocationServices()` | 인기 서비스 조회 | 카테고리별 상위 10개, `@Cacheable` 적용, Soft Delete 제외 (컨트롤러 엔드포인트 없음) |
+| `getPopularLocationServices()` | 인기 서비스 조회 | `findTop10ByCategoryOrderByRatingDesc(category)`, category1/2/3 매칭, `@Cacheable` 적용, Soft Delete 제외 (컨트롤러 엔드포인트 없음) |
 | `deleteService()` | 서비스 삭제 | Soft Delete 처리 (`isDeleted = true`, `deletedAt` 설정) |
+
+#### LocationRecommendAgentService
+| 메서드 | 설명 | 주요 로직 |
+|--------|------|-----------|
+| `enrichWithRecommendations()` | AI 추천 적용 | 검색 결과 상위 30개를 LLM에 전달, 상위 10개 재순위화 + 1줄 추천 이유 추가, 실패 시 원본 반환, 타임아웃 설정 |
 
 #### NaverMapService
 | 메서드 | 설명 | 주요 로직 |
@@ -545,6 +551,16 @@ public void deleteService(Long serviceIdx) {
   - **리뷰 삭제**: `isDeleted = true`, `deletedAt` 설정
   - **조회 제외**: 모든 조회 쿼리에서 `(isDeleted IS NULL OR isDeleted = false)` 조건 자동 적용
   - **평점 계산**: 삭제된 리뷰는 평점 계산에서 제외
+
+### 3.4 예외 처리
+| 예외 | 발생 시점 |
+|------|-----------|
+| `LocationServiceNotFoundException` | 서비스 조회 실패, deleteService, updateServiceRating |
+| `LocationServiceAlreadyDeletedException` | 이미 삭제된 서비스 재삭제 시도 |
+| `LocationServiceReviewNotFoundException` | 리뷰 조회 실패, updateReview, deleteReview |
+| `LocationReviewDuplicateException` | (예외 클래스 존재, createReview는 아직 RuntimeException 사용) |
+| `LocationReviewAlreadyDeletedException` | 이미 삭제된 리뷰 재삭제 시도 |
+| `EmailVerificationRequiredException` | 리뷰 작성/수정/삭제 시 이메일 미인증 |
 
 ---
 
@@ -717,6 +733,7 @@ domain/location/
   ├── service/
   │   ├── LocationServiceService.java
   │   ├── LocationServiceReviewService.java
+  │   ├── LocationRecommendAgentService.java   # AI 추천 (LLM 기반)
   │   ├── PublicDataLocationService.java
   │   ├── LocationServiceAdminService.java
   │   └── NaverMapService.java
@@ -732,7 +749,14 @@ domain/location/
   ├── dto/
   │   ├── LocationServiceDTO.java
   │   ├── LocationServiceReviewDTO.java
+  │   ├── LocationServiceLoadResponse.java
   │   └── PublicDataLocationDTO.java
+  ├── exception/
+  │   ├── LocationServiceNotFoundException.java
+  │   ├── LocationServiceAlreadyDeletedException.java
+  │   ├── LocationServiceReviewNotFoundException.java
+  │   ├── LocationReviewDuplicateException.java
+  │   └── LocationReviewAlreadyDeletedException.java
   └── util/
       └── OperatingHoursParser.java
 ```
@@ -751,11 +775,12 @@ erDiagram
 
 | 엔드포인트 | Method | 설명 |
 |-----------|--------|------|
-| `/api/location-services/search` | GET | 위치 기반 검색 또는 지역 계층별 서비스 검색 (하이브리드 전략: latitude/longitude/radius 있으면 위치 기반, 없으면 지역 계층별, keyword 있으면 키워드 검색 우선, radius 기본값 10000m, size 기본값 100, 거리 정보 포함 ✅, Soft Delete 제외, 응답: `{"services": [...], "count": N}`) |
-| `/api/location-services/{serviceIdx}` | DELETE | 위치 서비스 삭제 (Soft Delete, 응답: `{"message": "..."}`) |
+| `/api/location-services/search` | GET | 위치 기반 검색 또는 지역 계층별 서비스 검색 (하이브리드: keyword 우선 → 위치 기반 → 지역 계층별, radius 기본값 10000m, size 기본값 100, 거리 정보 포함, 응답: `{"services": [...], "count": N}`) |
+| `/api/location-services/recommend` | GET | AI 추천 (인증 필요, 검색 후 LLM 상위 10개 재순위화 + 추천 이유, effectiveSize 30) |
+| `/api/location-services/{serviceIdx}` | DELETE | 위치 서비스 삭제 (Soft Delete, LocationServiceNotFoundException, LocationServiceAlreadyDeletedException) |
 | `/api/location-service-reviews` | POST | 리뷰 작성 (인증 필요, 클래스 레벨 `@PreAuthorize`, 응답: `{"review": {...}, "message": "..."}`) |
 | `/api/location-service-reviews/{reviewIdx}` | PUT | 리뷰 수정 (인증 필요, 클래스 레벨 `@PreAuthorize`, 응답: `{"review": {...}, "message": "..."}`) |
-| `/api/location-service-reviews/{reviewIdx}` | DELETE | 리뷰 삭제 (인증 필요, 클래스 레벨 `@PreAuthorize`, Soft Delete, 응답: `{"message": "..."}`) |
+| `/api/location-service-reviews/{reviewIdx}` | DELETE | 리뷰 삭제 (인증 필요, Soft Delete, LocationServiceReviewNotFoundException, LocationReviewAlreadyDeletedException) |
 | `/api/location-service-reviews/service/{serviceIdx}` | GET | 서비스별 리뷰 목록 조회 (Soft Delete 제외, 응답: `{"reviews": [...], "count": N}`) |
 | `/api/location-service-reviews/user/{userIdx}` | GET | 사용자별 리뷰 목록 조회 (Soft Delete 제외, 응답: `{"reviews": [...], "count": N}`) |
 | `/api/geocoding/address` | GET | 주소→좌표 변환 (address 파라미터, 컨트롤러에서 명시적 URL 디코딩 처리, 응답: `{"latitude": ..., "longitude": ..., "success": true}`) |
@@ -773,6 +798,12 @@ GET /api/location-services/search?latitude=37.5665&longitude=126.9780&radius=100
 # radius 파라미터 생략 시 기본값 10000m (10km)
 # size 파라미터 생략 시 기본값 100
 GET /api/location-services/search?latitude=37.5665&longitude=126.9780
+```
+
+**AI 추천 요청 예시** (인증 필요):
+```http
+GET /api/location-services/recommend?latitude=37.5665&longitude=126.9780&radius=10000&category=동물병원
+# search 파라미터와 동일, effectiveSize 30으로 검색 후 LLM 상위 10개 재순위화 + 추천 이유 반환
 ```
 
 **지역 계층별 검색 응답 예시**:
