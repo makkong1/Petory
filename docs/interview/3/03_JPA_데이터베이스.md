@@ -52,6 +52,8 @@ JOIN FETCH로 작성자 정보 함께 조회
 List<Board> findAllByIsDeletedFalseOrderByCreatedAtDesc();
 ```
 
+**Repository 패턴**: `BoardRepository` → `JpaBoardAdapter` → `SpringDataJpaBoardRepository`
+
 **시각적 설명**:
 
 ```
@@ -227,7 +229,7 @@ List<Board> findAllByIsDeletedFalseOrderByCreatedAtDesc();
 ```
 
 #### 3. 다중 Fetch Join
-**위치**: `domain/board/repository/SpringDataJpaMissingPetBoardRepository.java`
+**위치**: `domain/board/repository/SpringDataJpaMissingPetBoardRepository.java` (다중 Fetch Join 시)
 
 **코드 예시**:
 ```java
@@ -238,6 +240,8 @@ List<Board> findAllByIsDeletedFalseOrderByCreatedAtDesc();
        "WHERE b.isDeleted = false")
 List<MissingPetBoard> findByIdWithComments(Long id);
 ```
+
+**참고**: `AttachmentFileService.getAttachmentsBatch()`로 `findByTargetTypeAndTargetIdxIn()` 배치 조회
 
 **주의사항**:
 - `DISTINCT` 사용 필요 (중복 데이터 방지)
