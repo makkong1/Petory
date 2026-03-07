@@ -63,7 +63,7 @@ public NotificationDTO createNotification(Long userId, NotificationType type, St
         Long relatedId, String relatedType) {
     // 1. 사용자 확인
     Users user = usersRepository.findById(userId)
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            .orElseThrow(UserNotFoundException::new);
     
     // 2. 알림 생성
     Notification notification = Notification.builder()
@@ -93,7 +93,7 @@ public NotificationDTO createNotification(Long userId, NotificationType type, St
 - **알림 생성**: `Notification` 엔티티 생성 및 DB 저장
 - **Redis 저장**: `saveToRedis()`로 최신 알림 목록 관리 (최대 50개, 24시간 TTL)
 - **SSE 발송**: `sseService.sendNotification()`로 실시간 알림 전송 (연결된 경우)
-- **트랜잭션 보장**: `@Transactional`로 알림 생성과 Redis 저장을 원자적으로 처리
+- **트랜잭션 보장**: `@Transactional`로 알림 생성 (Redis는 트랜잭션 외부)
 
 #### 로직 2: Redis에 알림 저장
 **구현 위치**: `NotificationService.saveToRedis()`
@@ -134,7 +134,7 @@ private void saveToRedis(Long userId, NotificationDTO notification) {
 ```java
 public List<NotificationDTO> getUserNotifications(Long userId) {
     Users user = usersRepository.findById(userId)
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            .orElseThrow(UserNotFoundException::new);
     
     // Redis에서 먼저 조회 시도
     List<NotificationDTO> redisNotifications = getFromRedis(userId);
@@ -215,24 +215,25 @@ public SseEmitter createConnection(Long userId) {
 **구현 위치**: `NotificationService.markAsRead()`
 
 **핵심 로직**:
-- **본인 확인**: 본인의 알림만 읽음 처리 가능
+- **알림 조회**: `NotificationNotFoundException`
+- **본인 확인**: 본인의 알림만 읽음 처리 가능 (`NotificationForbiddenException.ownNotificationOnly()`)
 - **DB 업데이트**: `isRead` 필드를 `true`로 설정
-- **Redis 제거**: Redis에서 해당 알림 제거
+- **Redis 제거**: `removeFromRedis(userId, notificationId)`로 해당 알림 제거
 
 ### 3.2 서비스 메서드 구조
 
 #### NotificationService
 | 메서드 | 설명 | 주요 로직 |
 |--------|------|-----------|
-| `createNotification()` | 알림 생성 및 발송 | 알림 생성, Redis 저장, SSE 전송 |
-| `getUserNotifications()` | 사용자 알림 목록 조회 | Redis 우선 조회, DB 병합, 중복 제거 |
-| `getUnreadNotifications()` | 읽지 않은 알림 목록 조회 | `findByUserAndIsReadFalseOrderByCreatedAtDesc()` |
-| `getUnreadCount()` | 읽지 않은 알림 개수 조회 | `countUnreadByUser()` |
-| `markAsRead()` | 알림 읽음 처리 | 본인 확인, DB 업데이트, Redis 제거 |
-| `markAllAsRead()` | 모든 알림 읽음 처리 | 일괄 읽음 처리, Redis 전체 제거 |
+| `createNotification()` | 알림 생성 및 발송 | UserNotFoundException, 알림 생성, saveToRedis, sseService.sendNotification |
+| `getUserNotifications()` | 사용자 알림 목록 조회 | UserNotFoundException, Redis 우선 조회, mergeNotifications |
+| `getUnreadNotifications()` | 읽지 않은 알림 목록 조회 | UserNotFoundException, `findByUserAndIsReadFalseOrderByCreatedAtDesc()` |
+| `getUnreadCount()` | 읽지 않은 알림 개수 조회 | `@Transactional(NOT_SUPPORTED)` (SSE 등 장시간 연결용), `countUnreadByUser()`, UserNotFoundException |
+| `markAsRead()` | 알림 읽음 처리 | NotificationNotFoundException, NotificationForbiddenException.ownNotificationOnly(), DB 업데이트, removeFromRedis |
+| `markAllAsRead()` | 모든 알림 읽음 처리 | UserNotFoundException, saveAll, Redis delete |
 | `saveToRedis()` | Redis에 알림 저장 | 최신 알림 추가, 최대 50개 유지, 24시간 TTL |
 | `getFromRedis()` | Redis에서 알림 조회 | 사용자별 최신 알림 목록 조회 |
-| `removeFromRedis()` | Redis에서 알림 제거 | 읽음 처리 시 Redis에서 제거 |
+| `removeFromRedis()` | Redis에서 알림 제거 | `removeFromRedis(userId, notificationId)` 단건, markAllAsRead 시 delete(redisKey) |
 | `mergeNotifications()` | Redis-DB 알림 병합 | 중복 제거, 최신순 정렬 |
 
 #### NotificationSseService
@@ -326,11 +327,16 @@ domain/notification/
   │   ├── Notification.java
   │   └── NotificationType.java (enum)
   ├── repository/
-  │   └── NotificationRepository.java
+  │   ├── NotificationRepository.java
+  │   ├── JpaNotificationAdapter.java
+  │   └── SpringDataJpaNotificationRepository.java
   ├── converter/
   │   └── NotificationConverter.java
-  └── dto/
-      └── NotificationDTO.java
+  ├── dto/
+  │   └── NotificationDTO.java
+  └── exception/
+      ├── NotificationNotFoundException.java
+      └── NotificationForbiddenException.java
 ```
 
 ### 4.3 엔티티 관계도 (ERD)
@@ -339,21 +345,30 @@ erDiagram
     Users ||--o{ Notification : "수신"
 ```
 
-### 4.4 API 설계
+### 4.4 예외 처리
+| 예외 | 발생 시점 |
+|------|-----------|
+| `NotificationNotFoundException` | 알림 조회 실패 (markAsRead) |
+| `NotificationForbiddenException` | ownNotificationOnly (본인 알림 아님) |
+| `UserNotFoundException` | 사용자 조회 실패 (createNotification, getUserNotifications, getUnreadNotifications, getUnreadCount, markAllAsRead) |
+
+### 4.5 API 설계
 
 #### REST API
+**참고**: 모든 엔드포인트 `@PreAuthorize("isAuthenticated()")` (stream 제외)
+
 | 엔드포인트 | Method | 설명 |
 |-----------|--------|------|
-| `/api/notifications` | GET | 사용자 알림 목록 조회 (userId 파라미터, 인증 필요) |
-| `/api/notifications/unread` | GET | 읽지 않은 알림 목록 조회 (userId 파라미터, 인증 필요) |
-| `/api/notifications/unread/count` | GET | 읽지 않은 알림 개수 조회 (userId 파라미터, 인증 필요) |
-| `/api/notifications/{notificationId}/read` | PUT | 알림 읽음 처리 (userId 파라미터, 인증 필요) |
-| `/api/notifications/read-all` | PUT | 모든 알림 읽음 처리 (userId 파라미터, 인증 필요) |
+| `/api/notifications` | GET | 사용자 알림 목록 조회 (userId 파라미터, UserNotFoundException) |
+| `/api/notifications/unread` | GET | 읽지 않은 알림 목록 조회 (userId 파라미터) |
+| `/api/notifications/unread/count` | GET | 읽지 않은 알림 개수 조회 (userId 파라미터) |
+| `/api/notifications/{notificationId}/read` | PUT | 알림 읽음 처리 (NotificationNotFoundException, NotificationForbiddenException.ownNotificationOnly) |
+| `/api/notifications/read-all` | PUT | 모든 알림 읽음 처리 (userId 파라미터) |
 
 #### SSE API
 | 엔드포인트 | Method | 설명 |
 |-----------|--------|------|
-| `/api/notifications/stream` | GET | SSE 연결 생성 (userId 파라미터, `text/event-stream`) |
+| `/api/notifications/stream` | GET | SSE 연결 생성 (userId 파라미터, `text/event-stream`, SecurityConfig에서 쿼리 파라미터 토큰으로 인증) |
 
 **알림 목록 조회 요청 예시**:
 ```http

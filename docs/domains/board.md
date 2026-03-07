@@ -54,10 +54,8 @@
   3. 페이징 지원 (기본 20개씩)
   4. 검색 결과는 최신순으로 정렬
 - **검색 타입**:
-  - `TITLE`: 제목만 검색
-  - `CONTENT`: 내용만 검색
-  - `TITLE_CONTENT`: 제목과 내용 모두 검색 (기본값)
-  - `ID`: 작성자 ID로 검색 (활성 상태 사용자만)
+  - `TITLE_CONTENT`: 제목과 내용 통합 검색 (FULLTEXT 인덱스, 기본값)
+  - `NICKNAME`: 작성자 닉네임으로 검색 (JOIN 쿼리 최적화)
 - **스크린샷/영상**: 
 
 ---
@@ -199,11 +197,11 @@ public ReactionSummaryDTO reactToBoard(Long boardId, Long userId, ReactionType r
         board.setLastReactionAt(LocalDateTime.now());
     }
     
-    // likeCount 실시간 업데이트
-    updateBoardLikeCount(board, previousReactionType, reactionType);
+    // likeCount, dislikeCount 실시간 업데이트
+    updateBoardReactionCounts(board, previousReactionType, reactionType);
     boardRepository.save(board);
     
-    return buildBoardSummary(board, user);
+    return buildBoardSummaryFromCounts(board.getLikeCount(), board.getDislikeCount(), userReaction);
 }
 ```
 
@@ -214,7 +212,7 @@ public ReactionSummaryDTO reactToBoard(Long boardId, Long userId, ReactionType r
   3. 다른 반응이면 타입 변경 - lastReactionAt 업데이트
   4. 없으면 새로 추가 - lastReactionAt 업데이트
 - **주요 판단 기준**: Unique 제약조건 (board_idx, user_idx)으로 중복 방지
-- **실시간 업데이트**: likeCount 필드를 실시간으로 업데이트하여 조회 성능 향상
+- **실시간 업데이트**: likeCount, dislikeCount 필드를 실시간으로 업데이트하여 조회 성능 향상
 - **lastReactionAt 관리**: 반응 추가/변경 시에만 업데이트, 삭제 시에는 유지
 
 #### 로직 4: 댓글 작성 시 알림 발송
@@ -397,28 +395,14 @@ public CommentDTO restoreComment(Long boardId, Long commentId) {
 ```java
 // BoardService.java
 public BoardPageResponseDTO searchBoardsWithPaging(String keyword, String searchType, int page, int size) {
-    // 검색 타입에 따라 다른 쿼리 실행
     switch (searchType != null ? searchType.toUpperCase() : "TITLE_CONTENT") {
-        case "ID":
-            // 작성자 ID로 검색 (활성 상태 사용자만)
-            Optional<Users> userOpt = usersRepository.findByIdString(trimmedKeyword);
-            if (userOpt.isPresent()) {
-                Users user = userOpt.get();
-                if (!Boolean.TRUE.equals(user.getIsDeleted())
-                        && user.getStatus() == UserStatus.ACTIVE) {
-                    List<Board> userBoards = boardRepository.findByUserAndIsDeletedFalseOrderByCreatedAtDesc(user);
-                    // 페이징 처리
-                }
-            }
-            break;
-        case "TITLE":
-            boardPage = boardRepository.findByTitleContainingAndIsDeletedFalseOrderByCreatedAtDesc(trimmedKeyword, pageable);
-            break;
-        case "CONTENT":
-            boardPage = boardRepository.findByContentContainingAndIsDeletedFalseOrderByCreatedAtDesc(trimmedKeyword, pageable);
+        case "NICKNAME":
+            // 작성자 닉네임으로 검색 - JOIN 쿼리로 최적화 (2 Query → 1 Query)
+            boardPage = boardRepository.searchByNicknameWithPaging(trimmedKeyword, pageable);
             break;
         case "TITLE_CONTENT":
         default:
+            // 제목+내용 통합 검색 (FULLTEXT 인덱스 활용)
             boardPage = boardRepository.searchByKeywordWithPaging(trimmedKeyword, pageable);
             break;
     }
@@ -428,12 +412,12 @@ public BoardPageResponseDTO searchBoardsWithPaging(String keyword, String search
 **설명**:
 - **처리 흐름**: 검색 타입 확인 → 타입별 쿼리 실행 → 페이징 처리 → 배치 조회로 N+1 문제 해결
 - **주요 판단 기준**: 
-  - 검색 타입 (TITLE, CONTENT, TITLE_CONTENT, ID)
-  - ID 검색 시 사용자 활성 상태 확인
+  - 검색 타입 (TITLE_CONTENT, NICKNAME)
+  - NICKNAME: Users.nickname JOIN으로 작성자 닉네임 검색
 - **특징**: 
-  - 검색 타입별로 최적화된 쿼리 사용
-  - ID 검색은 활성 상태 사용자만 대상
-  - 기본값: TITLE_CONTENT (제목과 내용 모두 검색)
+  - TITLE_CONTENT: FULLTEXT 인덱스 활용
+  - NICKNAME: DB 레벨 JOIN으로 1회 쿼리
+  - 기본값: TITLE_CONTENT
 
 ### 2.2 서비스 메서드 구조
 
@@ -442,15 +426,15 @@ public BoardPageResponseDTO searchBoardsWithPaging(String keyword, String search
 |--------|------|-----------|
 | `getAllBoards()` | 게시글 목록 조회 | 배치 조회로 N+1 문제 해결 |
 | `getAllBoardsWithPaging()` | 게시글 목록 조회 (페이징) | 배치 조회로 N+1 문제 해결 |
-| `getAdminBoardsWithPaging()` | 게시글 목록 조회 (관리자용) | 작성자 상태 체크 없이 조회, 필터링 지원 |
+| `getAdminBoardsWithPagingOptimized()` | 게시글 목록 조회 (관리자용) | Specification + DB 페이징, status/deleted/category/q 필터 |
 | `getBoard()` | 게시글 상세 조회 | 조회수 증가 (중복 방지), 캐싱 |
 | `getMyBoards()` | 내 게시글 조회 | 사용자별 게시글 조회 |
 | `createBoard()` | 게시글 생성 | 파일 첨부 처리, 캐시 무효화 |
 | `updateBoard()` | 게시글 수정 | 이메일 인증 확인, 파일 동기화, 캐시 무효화 |
 | `deleteBoard()` | 게시글 삭제 (소프트 삭제) | 이메일 인증 확인, 연관 댓글도 소프트 삭제 |
 | `restoreBoard()` | 게시글 복구 | 소프트 삭제 해제, 상태 복구 |
-| `updateBoardStatus()` | 게시글 상태 변경 | 관리자용 상태 변경 (BLINDED, ACTIVE 등) |
-| `searchBoardsWithPaging()` | 게시글 검색 | 제목/내용/작성자 ID 검색, 검색 타입별 분기 처리 (TITLE/CONTENT/TITLE_CONTENT/ID), 페이징 지원 |
+| `updateBoardStatus()` | 게시글 상태 변경 | 관리자용 (ContentStatus.BLINDED, ACTIVE) |
+| `searchBoardsWithPaging()` | 게시글 검색 | 제목+내용(TITLE_CONTENT) 또는 닉네임(NICKNAME) 검색, 페이징 지원 |
 
 #### ReactionService
 | 메서드 | 설명 | 주요 로직 |
@@ -462,7 +446,8 @@ public BoardPageResponseDTO searchBoardsWithPaging(String keyword, String search
 #### CommentService
 | 메서드 | 설명 | 주요 로직 |
 |--------|------|-----------|
-| `getComments()` | 댓글 목록 조회 | 반응 수 포함 |
+| `getCommentsWithPaging()` | 댓글 목록 조회 (페이징) | 반응 수, 파일 배치 조회 포함 |
+| `getComments()` | 댓글 목록 조회 (페이징 없음) | 하위 호환용 |
 | `getCommentsForAdmin()` | 댓글 목록 조회 (관리자용) | 작성자 상태 체크 없이 조회 |
 | `addComment()` | 댓글 작성 | commentCount 증가, 파일 첨부, 알림 발송 |
 | `updateComment()` | 댓글 수정 | 이메일 인증 확인, 내용/파일 업데이트 (참고: 현재 컨트롤러 엔드포인트 미제공) |
@@ -487,9 +472,12 @@ public BoardPageResponseDTO searchBoardsWithPaging(String keyword, String search
 
 ### 2.4 예외 처리
 - **처리하는 예외**: 
-  - `IllegalArgumentException`: 잘못된 파라미터
-  - `RuntimeException`: 엔티티를 찾을 수 없는 경우
+  - `BoardNotFoundException`: 게시글을 찾을 수 없는 경우
+  - `CommentNotFoundException`: 댓글을 찾을 수 없는 경우
+  - `CommentNotBelongToBoardException`: 댓글이 해당 게시글에 속하지 않는 경우
+  - `BoardValidationException`: 반응 파라미터(userId, reactionType) 누락 등
   - `EmailVerificationRequiredException`: 이메일 인증이 필요한 경우 (게시글/댓글 수정/삭제)
+  - `UserNotFoundException`: 사용자를 찾을 수 없는 경우
 - **예외 처리 전략**: 
   - Service 레이어에서 예외 발생 시 Controller로 전파
   - GlobalExceptionHandler에서 통합 처리
@@ -506,36 +494,56 @@ public BoardPageResponseDTO searchBoardsWithPaging(String keyword, String search
 ```
 domain/board/
   ├── controller/
-  │   ├── BoardController.java          # 게시글 API
-  │   └── AdminBoardController.java     # 관리자 게시글 API
+  │   ├── BoardController.java          # 게시글 API (/api/boards)
+  │   └── MissingPetBoardController.java # 실종 제보 API (/api/missing-pets) — 상세: [missingpet.md](missingpet.md)
+  # AdminBoardController는 domain/admin/controller에 위치 (/api/admin/boards)
   ├── service/
-  │   ├── BoardService.java             # 게시글 비즈니스 로직
-  │   ├── CommentService.java           # 댓글 비즈니스 로직
-  │   ├── ReactionService.java          # 반응 비즈니스 로직
-  │   ├── BoardPopularityService.java   # 인기글 비즈니스 로직
-  │   └── BoardPopularityScheduler.java # 인기글 스케줄러
+  │   ├── BoardService.java
+  │   ├── CommentService.java
+  │   ├── ReactionService.java
+  │   ├── BoardPopularityService.java
+  │   ├── BoardPopularityScheduler.java
+  │   ├── MissingPetBoardService.java      # 실종 제보 게시글
+  │   └── MissingPetCommentService.java    # 실종 제보 댓글
   ├── repository/
   │   ├── BoardRepository.java
   │   ├── CommentRepository.java
   │   ├── BoardReactionRepository.java
   │   ├── CommentReactionRepository.java
   │   ├── BoardViewLogRepository.java
-  │   └── BoardPopularitySnapshotRepository.java
+  │   ├── BoardPopularitySnapshotRepository.java
+  │   ├── MissingPetBoardRepository.java
+  │   └── MissingPetCommentRepository.java
   ├── entity/
   │   ├── Board.java
   │   ├── Comment.java
   │   ├── BoardReaction.java
   │   ├── CommentReaction.java
   │   ├── BoardViewLog.java
-  │   └── BoardPopularitySnapshot.java
+  │   ├── BoardPopularitySnapshot.java
+  │   ├── MissingPetBoard.java
+  │   ├── MissingPetComment.java
+  │   ├── MissingPetStatus.java
+  │   └── MissingPetGender.java
   ├── dto/
   │   ├── BoardDTO.java
   │   ├── BoardPageResponseDTO.java
   │   ├── CommentDTO.java
-  │   └── ReactionSummaryDTO.java
-  └── converter/
-      ├── BoardConverter.java
-      └── CommentConverter.java
+  │   ├── ReactionSummaryDTO.java
+  │   ├── MissingPetBoardDTO.java
+  │   ├── MissingPetBoardPageResponseDTO.java
+  │   ├── MissingPetCommentDTO.java
+  │   └── MissingPetCommentPageResponseDTO.java
+  ├── converter/
+  │   ├── BoardConverter.java
+  │   ├── CommentConverter.java
+  │   └── MissingPetConverter.java
+  └── exception/
+      ├── BoardNotFoundException.java
+      ├── BoardValidationException.java
+      ├── CommentNotFoundException.java
+      ├── CommentNotBelongToBoardException.java
+      └── MissingPetBoardNotFoundException.java
 ```
 
 ### 3.2 엔티티 구조
@@ -544,19 +552,18 @@ domain/board/
 ```java
 @Entity
 @Table(name = "board")
-public class Board {
+public class Board extends BaseTimeEntity {
     private Long idx;
     private Users user;                    // 작성자
     private String title;                  // 제목
     private String content;                // 내용
     private String category;               // 카테고리
-    private ContentStatus status;          // 상태 (ACTIVE, HIDDEN, DELETED)
+    private ContentStatus status;          // 상태 (ACTIVE, BLINDED, DELETED)
     private Integer viewCount;             // 조회수
     private Integer likeCount;             // 좋아요 수 (실시간 업데이트)
+    private Integer dislikeCount;           // 싫어요 수 (실시간 업데이트)
     private Integer commentCount;          // 댓글 수 (실시간 업데이트)
     private LocalDateTime lastReactionAt;  // 마지막 반응 시간
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
     private Boolean isDeleted;
     private LocalDateTime deletedAt;
     private List<Comment> comments;        // 연관된 댓글 목록
@@ -567,12 +574,12 @@ public class Board {
 ```java
 @Entity
 @Table(name = "comment")
-public class Comment {
+public class Comment extends BaseTimeEntity {
     private Long idx;
     private Board board;                   // 게시글
     private Users user;                    // 작성자
     private String content;                // 내용
-    private ContentStatus status;          // 상태 (ACTIVE, HIDDEN, DELETED)
+    private ContentStatus status;          // 상태 (ACTIVE, BLINDED, DELETED)
     private LocalDateTime createdAt;
     private Boolean isDeleted;
     private LocalDateTime deletedAt;
@@ -582,8 +589,9 @@ public class Comment {
 #### BoardReaction (게시글 반응)
 ```java
 @Entity
-@Table(name = "board_reaction", 
-       uniqueConstraints = @UniqueConstraint(columnNames = {"board_idx", "user_idx"}))
+@Table(name = "board_reaction", uniqueConstraints = {
+        @UniqueConstraint(columnNames = { "board_idx", "user_idx" })
+})
 public class BoardReaction {
     private Long idx;
     private Board board;                   // 게시글
@@ -625,48 +633,10 @@ public class BoardPopularitySnapshot {
 }
 ```
 
-#### MissingPetBoard (실종 동물 게시글)
-```java
-@Entity
-@Table(name = "MissingPetBoard")
-public class MissingPetBoard {
-    private Long idx;
-    private Users user;                    // 작성자
-    private String title;                  // 제목
-    private String content;                // 내용
-    private String petName;                // 반려동물 이름
-    private String species;                // 종류
-    private String breed;                  // 품종
-    private MissingPetGender gender;       // 성별
-    private String age;                    // 나이
-    private String color;                   // 색상
-    private LocalDate lostDate;            // 실종일
-    private String lostLocation;            // 실종 위치
-    private BigDecimal latitude;            // 위도
-    private BigDecimal longitude;           // 경도
-    private MissingPetStatus status;        // 상태 (MISSING, FOUND)
-    private LocalDateTime createdAt;
-    private Boolean isDeleted;
-    private List<MissingPetComment> comments;
-}
-```
-
-#### MissingPetComment (실종 동물 댓글)
-```java
-@Entity
-@Table(name = "MissingPetComment")
-public class MissingPetComment {
-    private Long idx;
-    private MissingPetBoard board;         // 실종 동물 게시글
-    private Users user;                    // 작성자
-    private String content;                // 내용
-    private String address;                 // 목격 위치 주소
-    private Double latitude;                // 목격 위치 위도
-    private Double longitude;               // 목격 위치 경도
-    private LocalDateTime createdAt;
-    private Boolean isDeleted;
-}
-```
+#### MissingPetBoard / MissingPetComment (실종 제보)
+- **상세 문서**: [missingpet.md](missingpet.md)
+- **엔티티**: MissingPetBoard (BaseTimeEntity 상속, status: MISSING/FOUND/RESOLVED), MissingPetComment
+- **API**: `/api/missing-pets`, Admin: `/api/admin/missing-pets`
 
 ### 3.3 엔티티 관계도 (ERD)
 ```mermaid
@@ -694,21 +664,21 @@ erDiagram
 | `/api/boards` | POST | 게시글 작성 | `BoardDTO` → `BoardDTO` |
 | `/api/boards/{id}` | PUT | 게시글 수정 | `BoardDTO` → `BoardDTO` |
 | `/api/boards/{id}` | DELETE | 게시글 삭제 | - → `204 No Content` |
-| `/api/boards/search` | GET | 게시글 검색 | `keyword`, `searchType` (TITLE/CONTENT/TITLE_CONTENT/ID, 기본값: TITLE_CONTENT), `page`, `size` → `BoardPageResponseDTO` |
+| `/api/boards/search` | GET | 게시글 검색 | `keyword`, `searchType` (TITLE_CONTENT/NICKNAME, 기본값: TITLE_CONTENT), `page`, `size` → `BoardPageResponseDTO` |
 | `/api/boards/popular` | GET | 인기글 조회 | `period` (WEEKLY/MONTHLY, 기본값: WEEKLY) → `List<BoardPopularitySnapshotDTO>` |
 | `/api/boards/my-posts` | GET | 내 게시글 조회 | `userId` (필수) → `List<BoardDTO>` |
-| `/api/boards/{boardId}/comments` | GET | 댓글 목록 | - → `List<CommentDTO>` |
+| `/api/boards/{boardId}/comments` | GET | 댓글 목록 (페이징) | `page`, `size` → `CommentPageResponseDTO` |
 | `/api/boards/{boardId}/comments` | POST | 댓글 작성 | `CommentDTO` → `CommentDTO` |
 | `/api/boards/{boardId}/comments/{commentId}` | DELETE | 댓글 삭제 | - → `204 No Content` |
 | **참고**: 댓글 수정 기능은 서비스 레벨(`CommentService.updateComment()`)에서 구현되어 있으나, 현재 컨트롤러 엔드포인트는 제공되지 않습니다. |
-| `/api/boards/{boardId}/reactions` | POST | 게시글 반응 | `ReactionRequest` → `ReactionSummaryDTO` |
-| `/api/boards/{boardId}/comments/{commentId}/reactions` | POST | 댓글 반응 | `ReactionRequest` → `ReactionSummaryDTO` |
+| `/api/boards/{boardId}/reactions` | POST | 게시글 반응 | `ReactionRequest` (userId, reactionType 필수) → `ReactionSummaryDTO` |
+| `/api/boards/{boardId}/comments/{commentId}/reactions` | POST | 댓글 반응 | `ReactionRequest` (userId, reactionType 필수) → `ReactionSummaryDTO` |
 
-### 관리자 (Admin)
+### 관리자 (Admin) - domain/admin/controller/AdminBoardController
 | 엔드포인트 | Method | 설명 | 요청/응답 |
 |-----------|--------|------|----------|
-| `/api/admin/boards/{id}` | GET | 단일 게시글 조회 (조회수 증가 없음) | - → `BoardDTO` |
-| `/api/admin/boards/paging` | GET | 게시글 목록 조회 (페이징) | `status`, `deleted`, `category`, `q`, `page`, `size` → `BoardPageResponseDTO` |
+| `/api/admin/boards/{id}` | GET | 단일 게시글 조회 (조회수 증가 없음, 삭제된 글 포함) | - → `BoardDTO` |
+| `/api/admin/boards/paging` | GET | 게시글 목록 조회 (페이징, DB 레벨 필터링) | `status`, `deleted`, `category`, `q`, `page`, `size` → `BoardPageResponseDTO` |
 | `/api/admin/boards/{id}/blind` | PATCH | 게시글 블라인드 처리 | - → `BoardDTO` |
 | `/api/admin/boards/{id}/unblind` | PATCH | 게시글 블라인드 해제 | - → `BoardDTO` |
 | `/api/admin/boards/{id}/delete` | POST | 게시글 삭제 | - → `204 No Content` |
@@ -719,7 +689,10 @@ erDiagram
 | `/api/admin/boards/{boardId}/comments/{commentId}/delete` | POST | 댓글 삭제 | - → `204 No Content` |
 | `/api/admin/boards/{boardId}/comments/{commentId}/restore` | POST | 댓글 복구 | - → `CommentDTO` |
 
-### 3.5 다른 도메인과의 연관관계
+### 3.5 관리자 도메인과의 연계
+- **AdminBoardController** (`domain/admin`): 게시글/댓글 관리 (블라인드, 삭제, 복구) - `getAdminBoardsWithPagingOptimized` 사용
+
+### 3.6 다른 도메인과의 연관관계
 - **User 도메인**: 
   - Users가 게시글/댓글 작성
   - Users가 반응 추가
@@ -733,9 +706,9 @@ erDiagram
   - 반응 추가 시 알림 (선택적)
 - **Report 도메인**: 
   - 게시글/댓글 신고
-  - 신고 처리 결과로 상태 변경 (HIDDEN, DELETED)
+  - 신고 처리 결과로 상태 변경 (BLINDED, DELETED)
 
-### 3.6 데이터 흐름
+### 3.7 데이터 흐름
 ```
 [사용자 요청] 
   → [BoardController] 
@@ -923,11 +896,11 @@ Map<Long, Map<ReactionType, Long>> reactionCountsMap = getReactionCountsBatch(bo
 
 #### 캐싱 전략
 ```java
-// 게시글 상세 캐싱
-@Cacheable(value = "boardDetail", key = "#idx")
-public BoardDTO getBoard(long idx, Long viewerId) {
-    // ...
-}
+// 게시글 상세 캐싱 - @Cacheable 제거됨 (조회수 실시간 반영을 위해)
+// public BoardDTO getBoard(long idx, Long viewerId) { ... }
+
+// boardList 캐시 - getAllBoards에서 비활성화 (개발 중 데이터 동기화)
+// @Cacheable(value = "boardList", key = "#category")
 
 // 캐시 무효화
 @Caching(evict = {
@@ -940,8 +913,8 @@ public BoardDTO updateBoard(long idx, BoardDTO dto) {
 ```
 
 **캐시 적용 대상**:
-- 게시글 상세: 조회 빈도 높음
-- 인기글 목록: 계산 비용 높음 (스냅샷으로 대체)
+- boardDetail: 수정/삭제/댓글/반응 시 @CacheEvict로 무효화
+- boardList: 생성/수정/삭제 시 전체 무효화 (현재 getAllBoards에서는 비활성화)
 
 **캐시 무효화 전략**:
 - 게시글 수정/삭제 시 상세 캐시 무효화
@@ -976,7 +949,7 @@ for (int i = 0; i < boardIds.size(); i += BATCH_SIZE) {
 ```
 
 **배치 처리 구현**:
-- **반응 수 배치 조회**: `BoardService.getReactionCountsBatch()` 메서드 (479-507줄)
+- **반응 수 배치 조회**: `BoardService.getReactionCountsBatch()` 메서드
   - 500개 단위로 분할하여 IN 절 크기 제한 고려
   - `boardReactionRepository.countByBoardsGroupByReactionType()` 사용
 - **인기글 스냅샷 생성**: `BoardPopularityService`의 배치 조회 메서드들
