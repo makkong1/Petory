@@ -3,11 +3,15 @@
 ## Q3-1. N+1 문제가 무엇이고, 어떻게 해결했나요?
 
 ### 답변 포인트
-- **문제**: 연관 엔티티를 개별 쿼리로 조회하는 문제
+- **문제**: 연관 엔티티를 개별 쿼리로 조회하는 문제 (1 + N개 쿼리 발생)
 - **해결 방법**:
-  - Fetch Join 활용: `JOIN FETCH`로 한 번에 조회
-  - 배치 조회: IN 절을 활용한 집계 쿼리
+  - **Fetch Join**: `JOIN FETCH`로 연관 엔티티를 한 번에 조회 (Board + User 등)
+  - **배치 조회**: IN 절을 활용한 일괄 조회 (반응, 첨부파일 등)
   - 예시: Board 도메인에서 301개 쿼리 → 3개 쿼리로 감소
+
+**프로젝트 적용 기준**:
+- **단일 쿼리** → Fetch Join: 부모와 직접 연관된 엔티티(User, organizer 등)를 한 쿼리로 조회
+- **복합·대량** → 배치 조회: 여러 부모 ID에 대한 종속 데이터(반응 카운트, 첨부파일)를 IN 절로 일괄 조회 (500개 단위 배치)
 
 ### 상세 답변
 
@@ -149,38 +153,28 @@ List<Board> findAllByIsDeletedFalseOrderByCreatedAtDesc();
 
 **전체 흐름**:
 ```
-게시글 목록 조회 (Fetch Join)
+게시글 목록 조회 (Fetch Join - 단일 쿼리)
   ↓
 게시글 ID 리스트 추출
   ↓
-IN 절로 반응 정보 배치 조회
+IN 절로 반응 카운트 배치 조회 (500개 단위)
   ↓
-IN 절로 첨부파일 정보 배치 조회
+IN 절로 첨부파일 배치 조회 (findByTargetTypeAndTargetIdxIn)
 ```
 
 **코드 예시**:
 ```java
-// domain/board/service/BoardService.java
-private List<BoardDTO> mapBoardsWithReactionsBatch(List<Board> boards) {
-    List<Long> boardIds = boards.stream()
-        .map(Board::getIdx)
-        .collect(Collectors.toList());
-    
-    // 배치 조회: 반응 정보
-    Map<Long, List<BoardReaction>> reactionsMap = 
-        boardReactionRepository.findByBoardIdxIn(boardIds)
-            .stream()
-            .collect(Collectors.groupingBy(BoardReaction::getBoardIdx));
-    
-    // 배치 조회: 첨부파일 정보
-    Map<Long, List<FileDTO>> filesMap = 
-        attachmentFileService.getFilesByTargetIds(boardIds, FileTargetType.BOARD);
-    
-    // 매핑
-    return boards.stream()
-        .map(board -> boardConverter.toDTO(board, reactionsMap, filesMap))
-        .collect(Collectors.toList());
-}
+// domain/board/service/BoardService.java - mapBoardsWithReactionsBatch()
+List<Long> boardIds = boards.stream().map(Board::getIdx).collect(Collectors.toList());
+
+// 배치 조회: 반응 카운트 (IN 절, 500개 단위)
+Map<Long, Map<ReactionType, Long>> reactionCountsMap = getReactionCountsBatch(boardIds);
+// → boardReactionRepository.countByBoardsGroupByReactionType(batch)
+
+// 배치 조회: 첨부파일 (IN 절)
+Map<Long, List<FileDTO>> attachmentsMap = attachmentFileService.getAttachmentsBatch(
+    FileTargetType.BOARD, boardIds);
+// → findByTargetTypeAndTargetIdxIn(FileTargetType.BOARD, boardIds)
 ```
 
 ---
