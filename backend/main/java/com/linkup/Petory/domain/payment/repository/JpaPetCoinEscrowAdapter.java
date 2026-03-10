@@ -44,6 +44,11 @@ public class JpaPetCoinEscrowAdapter implements PetCoinEscrowRepository {
     }
 
     @Override
+    public Optional<PetCoinEscrow> findByCareRequestIdxWithDetails(Long careRequestIdx) {
+        return jpaRepository.findByCareRequestIdxWithDetails(careRequestIdx);
+    }
+
+    @Override
     public Optional<PetCoinEscrow> findByCareRequestForUpdate(CareRequest careRequest) {
         return jpaRepository.findByCareRequestForUpdate(careRequest);
     }

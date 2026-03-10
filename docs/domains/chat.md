@@ -94,23 +94,23 @@ Chat 도메인은 실시간 채팅 기능을 제공하는 도메인입니다. We
 public ChatMessageDTO sendMessage(Long conversationIdx, Long senderIdx, String content, MessageType messageType) {
     // 1. 전송자 확인
     Users sender = usersRepository.findById(senderIdx)
-            .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+            .orElseThrow(UserNotFoundException::new);
     
     if (Boolean.TRUE.equals(sender.getIsDeleted())) {
-        throw new IllegalStateException("탈퇴한 사용자는 메시지를 보낼 수 없습니다.");
+        throw ChatForbiddenException.deletedUserCannotSend();
     }
     
     // 2. 채팅방 확인
     Conversation conversation = conversationRepository.findById(conversationIdx)
-            .orElseThrow(() -> new IllegalArgumentException("채팅방을 찾을 수 없습니다."));
+            .orElseThrow(ConversationNotFoundException::new);
     
     // 3. 참여자인지 확인
     ConversationParticipant senderParticipant = participantRepository
             .findByConversationIdxAndUserIdx(conversationIdx, senderIdx)
-            .orElseThrow(() -> new IllegalArgumentException("채팅방 참여자가 아닙니다."));
+            .orElseThrow(ChatForbiddenException::notParticipant);
     
     if (senderParticipant.getStatus() != ParticipantStatus.ACTIVE) {
-        throw new IllegalStateException("채팅방에 참여 중이 아닙니다.");
+        throw ChatForbiddenException.notActiveParticipant();
     }
     
     // 4. 메시지 저장
@@ -157,7 +157,7 @@ public void markAsRead(Long conversationIdx, Long userId, Long lastMessageIdx) {
     // 참여자 확인
     ConversationParticipant participant = participantRepository
             .findByConversationIdxAndUserIdx(conversationIdx, userId)
-            .orElseThrow(() -> new IllegalArgumentException("채팅방 참여자가 아닙니다."));
+            .orElseThrow(ChatForbiddenException::notParticipant);
     
     // 읽지 않은 메시지 수 초기화
     participant.setUnreadCount(0);
@@ -307,21 +307,7 @@ public class ChatMessage extends BaseTimeEntity {
 **특징**:
 - `BaseTimeEntity`를 상속받음 (`createdAt`, `updatedAt` 자동 관리)
 
-#### MessageReadStatus (메시지 읽음 상태)
-```java
-@Entity
-@Table(name = "messagereadstatus")
-public class MessageReadStatus {
-    private Long idx;
-    private ChatMessage message;
-    private Users user;
-    @Column(nullable = false)
-    private LocalDateTime readAt;  // @PrePersist로 자동 설정
-}
-```
-**특징**:
-- 선택사항으로 사용됨 (현재는 `markAsRead()`에서 필요시에만 생성)
-- `readAt`은 `@PrePersist`에서 자동 설정
+**참고**: MessageReadStatus 엔티티는 제거됨 (성능 문제, unreadCount/lastReadMessage만 사용)
 
 ### 4.2 도메인 구조
 ```
@@ -337,7 +323,6 @@ domain/chat/
   │   ├── Conversation.java
   │   ├── ConversationParticipant.java
   │   ├── ChatMessage.java
-  │   ├── MessageReadStatus.java
   │   ├── ConversationType.java (enum)
   │   ├── ConversationStatus.java (enum)
   │   ├── RelatedType.java (enum)
@@ -348,22 +333,43 @@ domain/chat/
   │   ├── ConversationRepository.java
   │   ├── ConversationParticipantRepository.java
   │   ├── ChatMessageRepository.java
-  │   └── MessageReadStatusRepository.java
+  │   ├── JpaConversationAdapter.java
+  │   ├── JpaConversationParticipantAdapter.java
+  │   ├── JpaChatMessageAdapter.java
+  │   ├── SpringDataJpaConversationRepository.java
+  │   ├── SpringDataJpaConversationParticipantRepository.java
+  │   └── SpringDataJpaChatMessageRepository.java
   ├── converter/
   │   ├── ConversationConverter.java
   │   ├── ConversationParticipantConverter.java
-  │   ├── ChatMessageConverter.java
-  │   └── MessageReadStatusConverter.java
-  └── dto/
-      ├── ConversationDTO.java
-      ├── ConversationParticipantDTO.java
-      ├── ChatMessageDTO.java
-      ├── MessageReadStatusDTO.java
-      ├── CreateConversationRequest.java
-      └── SendMessageRequest.java
+  │   └── ChatMessageConverter.java
+  ├── dto/
+  │   ├── ConversationDTO.java
+  │   ├── ConversationParticipantDTO.java
+  │   ├── ChatMessageDTO.java
+  │   ├── CreateConversationRequest.java
+  │   └── SendMessageRequest.java
+  └── exception/
+      ├── ConversationNotFoundException.java
+      ├── ConversationParticipantNotFoundException.java
+      ├── ChatMessageNotFoundException.java
+      ├── ChatForbiddenException.java
+      ├── ChatConflictException.java
+      └── ChatValidationException.java
 ```
 
-### 4.3 도메인 연관관계
+### 4.3 예외 처리
+| 예외 | 발생 시점 |
+|------|-----------|
+| `ConversationNotFoundException` | 채팅방 조회 실패 |
+| `ConversationParticipantNotFoundException` | 참여자 조회 실패 |
+| `ChatMessageNotFoundException` | 메시지 조회 실패 (deleteMessage) |
+| `ChatForbiddenException` | notParticipant, notActiveParticipant, ownMessageOnly, deletedUserCannotSend |
+| `ChatConflictException` | 채팅방 중복 등 충돌 |
+| `ChatValidationException` | invalidConversation, minParticipantsRequired, ownReportCannotChat, notCareConversation |
+| `UserNotFoundException` | 사용자 조회 실패 |
+
+### 4.4 도메인 연관관계
 
 ```mermaid
 graph TD
@@ -371,15 +377,13 @@ graph TD
     A --> C[ChatMessage]
     B --> D[Users]
     C --> D
-    C --> E[MessageReadStatus]
-    E --> D
     C --> C
     A --> F[CareApplication]
     A --> G[MissingPetBoard]
     A --> H[Meetup]
 ```
 
-### 4.4 서비스 메서드 구조
+### 4.5 서비스 메서드 구조
 
 #### ConversationService
 | 메서드 | 설명 | 주요 로직 |
@@ -402,15 +406,15 @@ graph TD
 #### ChatMessageService
 | 메서드 | 설명 | 주요 로직 |
 |--------|------|-----------|
-| `sendMessage()` | 메시지 전송 | 참여자 검증, 원자적 증가로 unreadCount 증가, 메타데이터 업데이트 |
+| `sendMessage()` | 메시지 전송 | UserNotFoundException, ConversationNotFoundException, ChatForbiddenException(notParticipant, notActiveParticipant, deletedUserCannotSend), incrementUnreadCount |
 | `getMessages()` | 메시지 목록 조회 (페이징) | 재참여 시 joinedAt 이후 메시지만 조회 |
 | `getMessagesBefore()` | 메시지 목록 조회 (커서 기반) | 특정 날짜 이전 메시지 조회 |
-| `markAsRead()` | 메시지 읽음 처리 | unreadCount 초기화, lastReadMessage 저장 |
-| `deleteMessage()` | 메시지 삭제 | 본인 메시지만 삭제 가능, Soft Delete |
+| `markAsRead()` | 메시지 읽음 처리 | ChatForbiddenException.notParticipant, unreadCount 초기화, lastReadMessage 저장 |
+| `deleteMessage()` | 메시지 삭제 | ChatMessageNotFoundException, ChatForbiddenException.ownMessageOnly, 본인 메시지만, Soft Delete |
 | `searchMessages()` | 메시지 검색 | 키워드로 메시지 검색 |
 | `getUnreadCount()` | 읽지 않은 메시지 수 조회 | 참여자의 unreadCount 반환 (Long 타입) |
 
-### 4.5 API 설계
+### 4.6 API 설계
 
 #### REST API
 | 엔드포인트 | Method | 설명 |
@@ -422,13 +426,13 @@ graph TD
 | `/api/chat/conversations/direct` | POST | 1:1 채팅방 생성/조회 (user1Id, user2Id 파라미터) |
 | `/api/chat/conversations/{conversationIdx}/leave` | POST | 채팅방 나가기 (userId 파라미터, 응답: 204 No Content) |
 | `/api/chat/conversations/{conversationIdx}` | DELETE | 채팅방 삭제 (userId 파라미터, 응답: 204 No Content) |
-| `/api/chat/conversations/{conversationIdx}/status` | PATCH | 채팅방 상태 변경 (status 파라미터) |
+| `/api/chat/conversations/{conversationIdx}/status` | PATCH | 채팅방 상태 변경 (status 파라미터, ConversationStatus.valueOf - 잘못된 값 시 IllegalArgumentException) |
 | `/api/chat/conversations/meetup/{meetupIdx}/join` | POST | 산책모임 채팅방 참여 (userId 파라미터) |
 | `/api/chat/conversations/meetup/{meetupIdx}/participant-count` | GET | 산책모임 채팅방 참여 인원 수 조회 (응답: Integer) |
 | `/api/chat/conversations/{conversationIdx}/confirm-deal` | POST | 펫케어 거래 확정 (userId 파라미터, 양쪽 모두 확정 시 자동 승인, 응답: 204 No Content) |
 | `/api/chat/messages` | POST | 메시지 전송 (senderIdx 파라미터, RequestBody: SendMessageRequest) |
 | `/api/chat/messages/conversation/{conversationIdx}` | GET | 메시지 목록 조회 (페이징, userId 파라미터, page 기본값 0, size 기본값 50) |
-| `/api/chat/messages/conversation/{conversationIdx}/before` | GET | 메시지 목록 조회 (커서 기반, beforeDate 파라미터 ISO 형식, size 기본값 50) |
+| `/api/chat/messages/conversation/{conversationIdx}/before` | GET | 메시지 목록 조회 (커서 기반, beforeDate 파라미터 ISO 형식, size 기본값 50, userId 없음) |
 | `/api/chat/messages/conversation/{conversationIdx}/read` | POST | 메시지 읽음 처리 (userId, lastMessageIdx 파라미터, 응답: 204 No Content) |
 | `/api/chat/messages/{messageIdx}` | DELETE | 메시지 삭제 (userId 파라미터, 응답: 204 No Content) |
 | `/api/chat/messages/conversation/{conversationIdx}/search` | GET | 메시지 검색 (keyword 파라미터) |
@@ -443,7 +447,7 @@ graph TD
 | `/topic/conversation/{conversationIdx}` | WebSocket | 채팅방 메시지 구독 |
 | `/user/{userId}/queue/errors` | WebSocket | 에러 메시지 수신 |
 
-### 4.6 WebSocket 구조
+### 4.7 WebSocket 구조
 
 **구현 위치**: `ChatWebSocketController`
 

@@ -134,7 +134,7 @@ if (offeredCoins != null && offeredCoins > 0) {
 
 **주의사항**:
 - `offeredCoins`가 null이거나 0이면 거래 확정 불가
-- 이미 에스크로가 있으면 `IllegalStateException` 발생
+- 이미 에스크로가 있으면 `PaymentConflictException.escrowAlreadyExists` 발생
 
 ### 4.2 거래 완료 시 (`CareRequestService.updateStatus()`)
 
@@ -228,13 +228,14 @@ careRequestService.updateStatus(
 **역할**: 코인 충전, 차감, 지급, 환불 등 모든 코인 거래 처리
 
 **주요 메서드**:
-- `chargeCoins()`: 코인 충전
+- `chargeCoins()`: 코인 충전 (findByIdForUpdate 비관적 락, PaymentValidationException.chargeAmountInvalid)
 - `deductCoins()`: 코인 차감 (에스크로로 이동)
-  - **비관적 락 사용**: `findByIdForUpdate()`로 Race Condition 방지
-  - 잔액 부족 시 `IllegalStateException` 발생
+  - **비관적 락 사용**: `UsersRepository.findByIdForUpdate()`로 Race Condition 방지
+  - 잔액 부족 시 `IllegalStateException` 발생 (InsufficientBalanceException 클래스 존재, 추후 교체 권장)
 - `payoutCoins()`: 코인 지급 (에스크로에서 제공자에게)
 - `refundCoins()`: 코인 환불 (에스크로에서 요청자에게)
-- `getBalance()`: 잔액 조회
+- `getBalance()`: 잔액 조회 (user.getPetCoinBalance() 직접 반환, 추가 쿼리 없음)
+- `getTransactionDetail()`: 거래 상세 조회 (본인 거래만, CARE_REQUEST 시 상대방 정보 포함, PetCoinTransactionNotFoundException, PaymentForbiddenException.ownTransactionOnly)
 
 **트랜잭션 관리**:
 - 모든 메서드에 `@Transactional` 적용
@@ -249,14 +250,17 @@ careRequestService.updateStatus(
 
 **주요 메서드**:
 - `createEscrow()`: 에스크로 생성 (거래 확정 시)
-  - 중복 에스크로 생성 방지 (`findByCareRequest()`로 확인)
-  - 요청자 코인 차감 후 에스크로 생성
+  - 중복 에스크로 생성 방지 (`findByCareRequest()` → PaymentConflictException.escrowAlreadyExists)
+  - PaymentValidationException.escrowAmountInvalid
+  - 요청자 코인 차감 후 에스크로 생성 (deductCoins 호출)
 - `releaseToProvider()`: 제공자에게 지급 (거래 완료 시)
   - **비관적 락 사용**: `findByIdForUpdate()`로 중복 지급 방지
-  - `HOLD` 상태만 지급 가능
+  - `HOLD` 상태만 지급 가능 (아닐 시 IllegalStateException)
+  - PetCoinEscrowNotFoundException
 - `refundToRequester()`: 요청자에게 환불 (거래 취소 시)
   - **비관적 락 사용**: `findByIdForUpdate()`로 중복 환불 방지
-  - `HOLD` 상태만 환불 가능
+  - `HOLD` 상태만 환불 가능 (아닐 시 PaymentConflictException.holdStatusRequiredForRefund)
+  - PetCoinEscrowNotFoundException
 - `findByCareRequest()`: CareRequest로 에스크로 조회 (읽기 전용)
 - `findByCareRequestForUpdate()`: **비관적 락을 사용한 조회** (동시성 제어용)
 
@@ -351,17 +355,74 @@ careRequestService.updateStatus(
 - `CareRequestService.updateStatus()`에서 예외 발생
 - 전체 트랜잭션 롤백 (`CareRequest` 상태 변경 롤백)
 
-## 8. API 엔드포인트
+## 8. 도메인 구조 및 API
 
-### 8.1 사용자용 API (`PetCoinController`)
-- `GET /api/payment/balance`: 코인 잔액 조회
-- `GET /api/payment/transactions`: 거래 내역 조회 (페이징)
-- `POST /api/payment/charge`: 코인 충전 (시뮬레이션)
+### 8.1 도메인 구조
+```
+domain/payment/
+  ├── controller/
+  │   ├── PetCoinController.java
+  │   └── AdminPaymentController.java
+  ├── service/
+  │   ├── PetCoinService.java
+  │   └── PetCoinEscrowService.java
+  ├── entity/
+  │   ├── PetCoinTransaction.java
+  │   ├── PetCoinEscrow.java
+  │   ├── TransactionType.java (CHARGE, DEDUCT, PAYOUT, REFUND)
+  │   ├── TransactionStatus.java (PENDING, COMPLETED, FAILED, CANCELLED)
+  │   └── EscrowStatus.java (HOLD, RELEASED, REFUNDED)
+  ├── repository/
+  │   ├── PetCoinTransactionRepository.java
+  │   ├── PetCoinEscrowRepository.java
+  │   ├── JpaPetCoinTransactionAdapter.java
+  │   ├── JpaPetCoinEscrowAdapter.java
+  │   ├── SpringDataJpaPetCoinTransactionRepository.java
+  │   └── SpringDataJpaPetCoinEscrowRepository.java
+  ├── dto/
+  │   ├── PetCoinBalanceResponse.java
+  │   ├── PetCoinChargeRequest.java
+  │   ├── PetCoinTransactionDTO.java
+  │   └── PetCoinTransactionDetailDTO.java
+  ├── converter/
+  │   └── PetCoinTransactionConverter.java
+  └── exception/
+      ├── PaymentValidationException.java
+      ├── PaymentConflictException.java
+      ├── PaymentForbiddenException.java
+      ├── InsufficientBalanceException.java
+      ├── PetCoinTransactionNotFoundException.java
+      └── PetCoinEscrowNotFoundException.java
+```
 
-### 8.2 관리자용 API (`AdminPaymentController`)
-- `POST /api/admin/payment/charge`: 관리자 코인 지급
-- `GET /api/admin/payment/balance/{userId}`: 특정 사용자 잔액 조회
-- `GET /api/admin/payment/transactions/{userId}`: 특정 사용자 거래 내역 조회 (페이징)
+### 8.2 예외 처리
+| 예외 | 발생 시점 |
+|------|-----------|
+| `PaymentValidationException` | chargeAmountInvalid, deductAmountInvalid, payoutAmountInvalid, refundAmountInvalid, escrowAmountInvalid, userIdRequired |
+| `PaymentConflictException` | escrowAlreadyExists, holdStatusRequiredForRefund |
+| `PaymentForbiddenException` | ownTransactionOnly (거래 상세 조회 시 본인 거래 아님) |
+| `PetCoinTransactionNotFoundException` | 거래 조회 실패 (getTransactionDetail) |
+| `PetCoinEscrowNotFoundException` | 에스크로 조회 실패 (releaseToProvider, refundToRequester) |
+| `UserNotFoundException` | 사용자 조회 실패 |
+| `UnauthenticatedException` | 인증 정보 없음 (PetCoinController) |
+| `IllegalStateException` | deductCoins 잔액 부족, releaseToProvider HOLD 상태 아님 |
+
+### 8.3 사용자용 API (`PetCoinController`)
+**참고**: 인증 필요, `getCurrentUser()` → `UnauthenticatedException`, `UserNotFoundException`
+
+| 엔드포인트 | Method | 설명 |
+|-----------|--------|------|
+| `GET /api/payment/balance` | GET | 코인 잔액 조회 |
+| `GET /api/payment/transactions` | GET | 거래 내역 조회 (페이징, PageableDefault size=20) |
+| `GET /api/payment/transactions/{id}` | GET | 거래 상세 조회 (상대방 정보 포함, 본인 거래만 조회 가능) |
+| `POST /api/payment/charge` | POST | 코인 충전 (PaymentValidationException.chargeAmountInvalid) |
+
+### 8.4 관리자용 API (`AdminPaymentController`, ADMIN/MASTER)
+| 엔드포인트 | Method | 설명 |
+|-----------|--------|------|
+| `POST /api/admin/payment/charge` | POST | 관리자 코인 지급 (userId, amount 필수) |
+| `GET /api/admin/payment/balance/{userId}` | GET | 특정 사용자 잔액 조회 |
+| `GET /api/admin/payment/transactions/{userId}` | GET | 특정 사용자 거래 내역 조회 (페이징) |
 
 ## 9. 실제 결제 연동 시 확장 방안
 

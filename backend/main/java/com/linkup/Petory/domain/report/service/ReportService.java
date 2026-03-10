@@ -14,6 +14,11 @@ import com.linkup.Petory.domain.board.repository.MissingPetBoardRepository;
 import com.linkup.Petory.domain.board.repository.MissingPetCommentRepository;
 import com.linkup.Petory.domain.report.converter.ReportConverter;
 import com.linkup.Petory.domain.report.dto.ReportDTO;
+import com.linkup.Petory.domain.report.exception.ReportConflictException;
+import com.linkup.Petory.domain.report.exception.ReportForbiddenException;
+import com.linkup.Petory.domain.report.exception.ReportNotFoundException;
+import com.linkup.Petory.domain.report.exception.ReportTargetNotFoundException;
+import com.linkup.Petory.domain.report.exception.ReportValidationException;
 import com.linkup.Petory.domain.report.dto.ReportDetailDTO;
 import com.linkup.Petory.domain.report.dto.ReportHandleRequest;
 import com.linkup.Petory.domain.report.dto.ReportRequestDTO;
@@ -24,6 +29,7 @@ import com.linkup.Petory.domain.report.entity.ReportTargetType;
 import com.linkup.Petory.domain.report.repository.ReportRepository;
 import com.linkup.Petory.domain.user.entity.Role;
 import com.linkup.Petory.domain.user.entity.Users;
+import com.linkup.Petory.domain.user.exception.UserNotFoundException;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 import com.linkup.Petory.domain.user.service.UserSanctionService;
 
@@ -46,20 +52,20 @@ public class ReportService {
     @Transactional
     public ReportDTO createReport(ReportRequestDTO request) {
         if (request.targetType() == null) {
-            throw new IllegalArgumentException("신고 대상 종류를 선택해주세요.");
+            throw ReportValidationException.targetTypeRequired();
         }
         if (request.targetIdx() == null) {
-            throw new IllegalArgumentException("신고 대상 ID가 필요합니다.");
+            throw ReportValidationException.targetIdxRequired();
         }
         if (request.reporterId() == null) {
-            throw new IllegalArgumentException("신고자 정보가 필요합니다.");
+            throw ReportValidationException.reporterRequired();
         }
         if (!StringUtils.hasText(request.reason())) {
-            throw new IllegalArgumentException("신고 사유를 입력해주세요.");
+            throw ReportValidationException.reasonRequired();
         }
 
         Users reporter = usersRepository.findById(request.reporterId())
-                .orElseThrow(() -> new IllegalArgumentException("신고자 정보를 찾을 수 없습니다."));
+                .orElseThrow(UserNotFoundException::new);
 
         validateTarget(request.targetType(), request.targetIdx());
 
@@ -67,7 +73,7 @@ public class ReportService {
                 request.targetType(),
                 request.targetIdx(),
                 reporter.getIdx())) {
-            throw new IllegalStateException("이미 해당 대상을 신고하셨습니다.");
+            throw ReportConflictException.alreadyReported();
         }
 
         Report report = Report.builder()
@@ -149,7 +155,7 @@ public class ReportService {
      */
     public ReportDetailDTO getReportDetail(Long reportId) {
         Report report = reportRepository.findById(reportId)
-                .orElseThrow(() -> new IllegalArgumentException("신고 정보를 찾을 수 없습니다."));
+                .orElseThrow(ReportNotFoundException::new);
 
         ReportDetailDTO.TargetPreview preview = buildTargetPreview(report);
 
@@ -166,12 +172,12 @@ public class ReportService {
     @Transactional
     public ReportDTO handleReport(Long reportId, Long adminUserId, ReportHandleRequest req) {
         if (req.getStatus() == null) {
-            throw new IllegalArgumentException("처리 상태를 선택해주세요.");
+            throw ReportValidationException.statusRequired();
         }
         Report report = reportRepository.findById(reportId)
-                .orElseThrow(() -> new IllegalArgumentException("신고 정보를 찾을 수 없습니다."));
+                .orElseThrow(ReportNotFoundException::new);
         Users admin = usersRepository.findById(adminUserId)
-                .orElseThrow(() -> new IllegalArgumentException("관리자 정보를 찾을 수 없습니다."));
+                .orElseThrow(UserNotFoundException::new);
 
         report.setStatus(req.getStatus());
         report.setHandledBy(admin);
@@ -266,7 +272,7 @@ public class ReportService {
             case BOARD: {
                 exists = boardRepository.existsById(targetIdx);
                 if (!exists) {
-                    throw new IllegalArgumentException("신고 대상 게시글을 찾을 수 없습니다.");
+                    throw ReportTargetNotFoundException.board();
                 }
                 break;
             }
@@ -276,27 +282,27 @@ public class ReportService {
                     exists = missingPetCommentRepository.existsById(targetIdx);
                 }
                 if (!exists) {
-                    throw new IllegalArgumentException("신고 대상 댓글을 찾을 수 없습니다.");
+                    throw ReportTargetNotFoundException.comment();
                 }
                 break;
             }
             case MISSING_PET: {
                 exists = missingPetBoardRepository.existsById(targetIdx);
                 if (!exists) {
-                    throw new IllegalArgumentException("신고 대상 실종 제보를 찾을 수 없습니다.");
+                    throw ReportTargetNotFoundException.missingPet();
                 }
                 break;
             }
             case PET_CARE_PROVIDER: {
                 Users provider = usersRepository.findById(targetIdx)
-                        .orElseThrow(() -> new IllegalArgumentException("해당 서비스 제공자를 찾을 수 없습니다."));
+                        .orElseThrow(ReportTargetNotFoundException::provider);
                 if (provider.getRole() != Role.SERVICE_PROVIDER) {
-                    throw new IllegalArgumentException("서비스 제공자만 신고할 수 있습니다.");
+                    throw ReportForbiddenException.providerOnly();
                 }
                 break;
             }
             default:
-                throw new IllegalArgumentException("지원하지 않는 신고 대상입니다.");
+                throw ReportValidationException.unsupportedTarget();
         }
     }
 }

@@ -56,7 +56,10 @@ export const reportApi = {
   
   // 관리자용: 신고 상세 조회
   getDetail: (id) => adminApi.get(`/${id}`),
-  
+
+  // 관리자용: AI 보조 제안 (Ollama 연동, 참고용)
+  getAssist: (id) => adminApi.get(`/${id}/assist`),
+
   // 관리자용: 신고 처리
   handle: (id, { status, actionTaken, adminNote }) =>
     adminApi.post(`/${id}/handle`, { status, actionTaken, adminNote }),

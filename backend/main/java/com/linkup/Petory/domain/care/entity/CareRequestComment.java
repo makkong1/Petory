@@ -25,14 +25,17 @@ public class CareRequestComment {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long idx;
 
+    /** 댓글이 달린 펫케어 요청 */
     @ManyToOne
     @JoinColumn(name = "care_request_idx", nullable = false)
     private CareRequest careRequest;
 
+    /** 댓글 작성자 (SERVICE_PROVIDER만 작성 가능) */
     @ManyToOne
     @JoinColumn(name = "user_idx", nullable = false)
     private Users user;
 
+    /** 댓글 내용 */
     @Lob
     private String content;
 

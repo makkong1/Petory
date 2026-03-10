@@ -1,6 +1,7 @@
 package com.linkup.Petory.domain.payment.repository;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -13,6 +14,7 @@ import com.linkup.Petory.domain.payment.entity.PetCoinTransaction;
 import com.linkup.Petory.domain.payment.entity.TransactionStatus;
 import com.linkup.Petory.domain.payment.entity.TransactionType;
 import com.linkup.Petory.domain.user.entity.Users;
+import com.linkup.Petory.global.annotation.RepositoryMethod;
 
 /**
  * Spring Data JPA 전용 인터페이스입니다.
@@ -20,11 +22,14 @@ import com.linkup.Petory.domain.user.entity.Users;
 public interface SpringDataJpaPetCoinTransactionRepository
         extends JpaRepository<PetCoinTransaction, Long> {
 
+    @RepositoryMethod("펫코인 거래: 사용자별 목록 조회")
     List<PetCoinTransaction> findByUserOrderByCreatedAtDesc(Users user);
 
+    @RepositoryMethod("펫코인 거래: 사용자+거래 유형별 목록 조회")
     List<PetCoinTransaction> findByUserAndTransactionTypeOrderByCreatedAtDesc(
             Users user, TransactionType transactionType);
 
+    @RepositoryMethod("펫코인 거래: 사용자+상태별 목록 조회")
     List<PetCoinTransaction> findByUserAndStatusOrderByCreatedAtDesc(
             Users user, TransactionStatus status);
 
@@ -33,10 +38,11 @@ public interface SpringDataJpaPetCoinTransactionRepository
             @Param("relatedType") String relatedType,
             @Param("relatedIdx") Long relatedIdx);
 
-    /**
-     * 사용자별 거래 내역 페이징 조회
-     * [리팩토링] @EntityGraph(attributePaths = "user")로 N+1 쿼리 제거
-     */
+    @RepositoryMethod("펫코인 거래: 단건 조회 (user 포함)")
+    @Query("SELECT t FROM PetCoinTransaction t JOIN FETCH t.user WHERE t.idx = :idx")
+    Optional<PetCoinTransaction> findByIdWithUser(@Param("idx") Long idx);
+
+    @RepositoryMethod("펫코인 거래: 사용자별 페이징 조회")
     @EntityGraph(attributePaths = "user")
     Page<PetCoinTransaction> findByUserOrderByCreatedAtDesc(Users user, Pageable pageable);
 }

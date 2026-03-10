@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.linkup.Petory.domain.meetup.entity.Meetup;
+import com.linkup.Petory.global.annotation.RepositoryMethod;
 
 import jakarta.persistence.LockModeType;
 
@@ -19,12 +20,12 @@ import jakarta.persistence.LockModeType;
  */
 public interface SpringDataJpaMeetupRepository extends JpaRepository<Meetup, Long> {
 
-    // 주최자별 모임 조회 (소프트 삭제 제외)
-    @Query("SELECT m FROM Meetup m WHERE m.organizer.idx = :organizerIdx AND (m.isDeleted = false OR m.isDeleted IS NULL) ORDER BY m.createdAt DESC")
+    @RepositoryMethod("모임: 주최자별 목록 조회")
+    @Query("SELECT m FROM Meetup m JOIN FETCH m.organizer WHERE m.organizer.idx = :organizerIdx AND (m.isDeleted = false OR m.isDeleted IS NULL) ORDER BY m.createdAt DESC")
     List<Meetup> findByOrganizerIdxOrderByCreatedAtDesc(@Param("organizerIdx") Long organizerIdx);
 
-    // 지역별 모임 조회 (위도/경도 범위, 소프트 삭제 제외)
-    @Query("SELECT m FROM Meetup m WHERE " +
+    @RepositoryMethod("모임: 지역 범위별 조회")
+    @Query("SELECT m FROM Meetup m JOIN FETCH m.organizer WHERE " +
                     "m.latitude BETWEEN :minLat AND :maxLat AND " +
                     "m.longitude BETWEEN :minLng AND :maxLng AND " +
                     "(m.isDeleted = false OR m.isDeleted IS NULL) " +
@@ -34,25 +35,22 @@ public interface SpringDataJpaMeetupRepository extends JpaRepository<Meetup, Lon
                     @Param("minLng") Double minLng,
                     @Param("maxLng") Double maxLng);
 
-    // 날짜별 모임 조회 (소프트 삭제 제외)
-    @Query("SELECT m FROM Meetup m WHERE " +
+    @RepositoryMethod("모임: 날짜 범위별 조회")
+    @Query("SELECT m FROM Meetup m JOIN FETCH m.organizer WHERE " +
                     "m.date BETWEEN :startDate AND :endDate AND " +
                     "(m.isDeleted = false OR m.isDeleted IS NULL) " +
                     "ORDER BY m.date ASC")
     List<Meetup> findByDateBetweenOrderByDateAsc(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
 
-    // 카테고리별 모임 조회 (제목이나 설명에 키워드 포함, 소프트 삭제 제외)
-    @Query("SELECT m FROM Meetup m WHERE " +
+    @RepositoryMethod("모임: 키워드 검색")
+    @Query("SELECT m FROM Meetup m JOIN FETCH m.organizer WHERE " +
                     "(m.title LIKE %:keyword% OR m.description LIKE %:keyword%) AND " +
                     "(m.isDeleted = false OR m.isDeleted IS NULL) " +
                     "ORDER BY m.date ASC")
     List<Meetup> findByKeyword(@Param("keyword") String keyword);
 
-    /**
-     * 참여 가능한 모임 조회 (최대 인원 미만, 소프트 삭제 제외)
-     * [리팩토링] 서브쿼리 (COUNT) → LEFT JOIN + GROUP BY + HAVING (실행 시간 63.5% 감소)
-     */
-    @Query("SELECT m FROM Meetup m " +
+    @RepositoryMethod("모임: 참여 가능 목록 조회")
+    @Query("SELECT DISTINCT m FROM Meetup m JOIN FETCH m.organizer " +
                     "LEFT JOIN m.participants p " +
                     "WHERE m.date > :currentDate " +
                     "AND (m.isDeleted = false OR m.isDeleted IS NULL) " +
@@ -61,11 +59,11 @@ public interface SpringDataJpaMeetupRepository extends JpaRepository<Meetup, Lon
                     "ORDER BY m.date ASC")
     List<Meetup> findAvailableMeetups(@Param("currentDate") LocalDateTime currentDate);
 
-    /**
-     * 반경 기반 모임 조회 (Haversine 공식 사용, 소프트 삭제 제외)
-     * [리팩토링] 인메모리 필터링 제거 → DB 쿼리, Bounding Box로 idx_meetup_location 인덱스 활용 (스캔 행 96% 감소)
-     */
-    // 위도 1도 ≈ 111km, 경도 1도 ≈ 111km * cos(위도)
+    @RepositoryMethod("모임: 단건 조회 (주최자 포함)")
+    @Query("SELECT m FROM Meetup m JOIN FETCH m.organizer WHERE m.idx = :idx")
+    Optional<Meetup> findByIdWithOrganizer(@Param("idx") Long idx);
+
+    @RepositoryMethod("모임: 반경 기반 근처 모임 조회")
     @Query(value = "SELECT m.* FROM meetup m " +
                     "WHERE m.date > :currentDate " +
                     "AND (m.status IS NULL OR m.status != 'COMPLETED') " +
@@ -83,28 +81,31 @@ public interface SpringDataJpaMeetupRepository extends JpaRepository<Meetup, Lon
                     @Param("radius") Double radius,
                     @Param("currentDate") LocalDateTime currentDate);
 
-    // Pessimistic Lock으로 동시 접근 방지
+    @RepositoryMethod("모임: 비관적 락 조회 (동시성 제어)")
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT m FROM Meetup m WHERE m.idx = :idx")
     Optional<Meetup> findByIdWithLock(@Param("idx") Long idx);
 
-    // 원자적 UPDATE 쿼리로 동시 접근 방지
+    @RepositoryMethod("모임: 참여자 수 원자적 증가")
     @Modifying
     @Query("UPDATE Meetup m SET m.currentParticipants = m.currentParticipants + 1 " +
                     "WHERE m.idx = :meetupIdx " +
                     "  AND m.currentParticipants < m.maxParticipants")
     int incrementParticipantsIfAvailable(@Param("meetupIdx") Long meetupIdx);
 
-    /** [리팩토링] JOIN FETCH organizer - N+1 문제 해결 */
+    @RepositoryMethod("모임: 전체 목록 조회 (삭제 제외)")
     @Query("SELECT m FROM Meetup m JOIN FETCH m.organizer WHERE m.isDeleted = false OR m.isDeleted IS NULL")
     List<Meetup> findAllNotDeleted();
 
-    /** [리팩토링] JOIN FETCH organizer, participants, user - N+1 문제 해결 */
+    @RepositoryMethod("모임: 단건 상세 조회 (참여자 포함)")
     @Query("SELECT DISTINCT m FROM Meetup m " +
             "LEFT JOIN FETCH m.organizer " +
             "LEFT JOIN FETCH m.participants p " +
             "LEFT JOIN FETCH p.user " +
             "WHERE m.idx = :idx")
     Optional<Meetup> findByIdWithDetails(@Param("idx") Long idx);
+
+    @RepositoryMethod("모임: 기간별 통계")
+    long countByCreatedAtBetween(LocalDateTime start, LocalDateTime end);
 }
 

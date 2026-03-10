@@ -16,6 +16,11 @@ import com.linkup.Petory.domain.chat.converter.ConversationConverter;
 import com.linkup.Petory.domain.chat.converter.ConversationParticipantConverter;
 import com.linkup.Petory.domain.chat.converter.ChatMessageConverter;
 import com.linkup.Petory.domain.chat.dto.ConversationDTO;
+import com.linkup.Petory.domain.chat.exception.ChatConflictException;
+import com.linkup.Petory.domain.chat.exception.ChatForbiddenException;
+import com.linkup.Petory.domain.chat.exception.ChatValidationException;
+import com.linkup.Petory.domain.chat.exception.ConversationNotFoundException;
+import com.linkup.Petory.domain.chat.exception.ConversationParticipantNotFoundException;
 import com.linkup.Petory.domain.chat.entity.ChatMessage;
 import com.linkup.Petory.domain.chat.entity.Conversation;
 import com.linkup.Petory.domain.chat.entity.ConversationParticipant;
@@ -28,9 +33,11 @@ import com.linkup.Petory.domain.chat.repository.ChatMessageRepository;
 import com.linkup.Petory.domain.chat.repository.ConversationParticipantRepository;
 import com.linkup.Petory.domain.chat.repository.ConversationRepository;
 import com.linkup.Petory.domain.user.entity.Users;
+import com.linkup.Petory.domain.user.exception.UserNotFoundException;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 import com.linkup.Petory.domain.care.entity.CareRequest;
 import com.linkup.Petory.domain.care.entity.CareApplication;
+import com.linkup.Petory.domain.care.exception.CareRequestNotFoundException;
 import com.linkup.Petory.domain.care.entity.CareApplicationStatus;
 import com.linkup.Petory.domain.care.entity.CareRequestStatus;
 import com.linkup.Petory.domain.care.repository.CareRequestRepository;
@@ -134,12 +141,12 @@ public class ConversationService {
          */
         public ConversationDTO getConversation(Long conversationIdx, Long userId) {
                 Conversation conversation = conversationRepository.findById(conversationIdx)
-                                .orElseThrow(() -> new IllegalArgumentException("채팅방을 찾을 수 없습니다."));
+                                .orElseThrow(ConversationNotFoundException::new);
 
                 // 참여자인지 확인
                 ConversationParticipant participant = participantRepository
                                 .findByConversationIdxAndUserIdx(conversationIdx, userId)
-                                .orElseThrow(() -> new IllegalArgumentException("채팅방 참여자가 아닙니다."));
+                                .orElseThrow(ChatForbiddenException::notParticipant);
 
                 // 탈퇴한 사용자가 포함된 채팅방인지 확인
                 List<ConversationParticipant> participants = participantRepository
@@ -149,7 +156,7 @@ public class ConversationService {
                                 .anyMatch(p -> Boolean.TRUE.equals(p.getUser().getIsDeleted()));
 
                 if (hasDeletedUser) {
-                        throw new IllegalArgumentException("유효하지 않은 채팅방입니다.");
+                        throw ChatValidationException.invalidConversation();
                 }
 
                 ConversationDTO dto = conversationConverter.toDTO(conversation);
@@ -174,8 +181,7 @@ public class ConversationService {
                 // 참여자 유효성 검증
                 List<Users> participants = participantUserIds.stream()
                                 .map(userId -> usersRepository.findById(userId)
-                                                .orElseThrow(() -> new IllegalArgumentException(
-                                                                "사용자를 찾을 수 없습니다: " + userId)))
+                                                .orElseThrow(UserNotFoundException::new))
                                 .collect(Collectors.toList());
 
                 // 탈퇴한 사용자 제외
@@ -186,11 +192,11 @@ public class ConversationService {
                 // 그룹 채팅(MEETUP)의 경우 최소 1명도 허용, 1:1 채팅은 최소 2명 필요
                 if (conversationType == ConversationType.MEETUP) {
                         if (participants.size() < 1) {
-                                throw new IllegalArgumentException("최소 1명의 참여자가 필요합니다.");
+                                throw ChatValidationException.minParticipantsRequired(1);
                         }
                 } else {
                         if (participants.size() < 2) {
-                                throw new IllegalArgumentException("최소 2명의 참여자가 필요합니다.");
+                                throw ChatValidationException.minParticipantsRequired(2);
                         }
                 }
 
@@ -362,11 +368,11 @@ public class ConversationService {
         @Transactional
         public void deleteConversation(Long conversationIdx, Long userId) {
                 Conversation conversation = conversationRepository.findById(conversationIdx)
-                                .orElseThrow(() -> new IllegalArgumentException("채팅방을 찾을 수 없습니다."));
+                                .orElseThrow(ConversationNotFoundException::new);
 
                 // 참여자인지 확인
                 participantRepository.findByConversationIdxAndUserIdx(conversationIdx, userId)
-                                .orElseThrow(() -> new IllegalArgumentException("채팅방 참여자가 아닙니다."));
+                                .orElseThrow(ChatForbiddenException::notParticipant);
 
                 conversation.setIsDeleted(true);
                 conversation.setDeletedAt(LocalDateTime.now());
@@ -379,7 +385,7 @@ public class ConversationService {
         @Transactional
         public ConversationDTO updateConversationStatus(Long conversationIdx, ConversationStatus status) {
                 Conversation conversation = conversationRepository.findById(conversationIdx)
-                                .orElseThrow(() -> new IllegalArgumentException("채팅방을 찾을 수 없습니다."));
+                                .orElseThrow(ConversationNotFoundException::new);
 
                 conversation.setStatus(status);
                 conversation = conversationRepository.save(conversation);
@@ -418,7 +424,7 @@ public class ConversationService {
 
                 // 새로 참여
                 Users user = usersRepository.findById(userId)
-                                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+                                .orElseThrow(UserNotFoundException::new);
 
                 ConversationParticipant participant = ConversationParticipant.builder()
                                 .conversation(conversation)
@@ -505,7 +511,7 @@ public class ConversationService {
         public ConversationDTO createMissingPetChat(Long boardIdx, Long reporterId, Long witnessId) {
                 // 목격자가 제보자와 같은 경우 체크
                 if (reporterId.equals(witnessId)) {
-                        throw new IllegalArgumentException("본인의 제보에는 채팅을 시작할 수 없습니다.");
+                        throw ChatValidationException.ownReportCannotChat();
                 }
 
                 // 같은 제보(boardIdx)에 대한 모든 채팅방 조회
@@ -588,8 +594,7 @@ public class ConversationService {
                                 // CARE_REQUEST 타입인 경우
                                 if (conversation.getRelatedType() == RelatedType.CARE_REQUEST) {
                                         CareRequest careRequest = careRequestRepository.findById(relatedIdx)
-                                                        .orElseThrow(() -> new RuntimeException(
-                                                                        "CareRequest not found"));
+                                                        .orElseThrow(CareRequestNotFoundException::new);
 
                                         // 요청 상태가 OPEN인 경우에만 처리
                                         if (careRequest.getStatus() == CareRequestStatus.OPEN) {
@@ -602,8 +607,7 @@ public class ConversationService {
                                                 Long providerId = participantIds.stream()
                                                                 .filter(id -> !id.equals(requesterId))
                                                                 .findFirst()
-                                                                .orElseThrow(() -> new RuntimeException(
-                                                                                "Provider not found"));
+                                                                .orElseThrow(UserNotFoundException::new);
 
                                                 // CareApplication 찾기 (이미 지원한 경우)
                                                 CareApplication existingApplication = careRequest
@@ -620,8 +624,7 @@ public class ConversationService {
                                                 // 요청자와 제공자 정보 가져오기
                                                 Users requester = careRequest.getUser();
                                                 Users provider = usersRepository.findById(providerId)
-                                                                .orElseThrow(() -> new RuntimeException(
-                                                                                "Provider not found"));
+                                                                .orElseThrow(UserNotFoundException::new);
 
                                                 CareApplication finalApplication;
                                                 if (existingApplication == null) {

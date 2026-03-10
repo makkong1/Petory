@@ -12,6 +12,9 @@ import com.linkup.Petory.domain.user.dto.PetDTO;
 import com.linkup.Petory.domain.user.entity.Pet;
 import com.linkup.Petory.domain.user.entity.PetType;
 import com.linkup.Petory.domain.user.entity.Users;
+import com.linkup.Petory.domain.user.exception.PetNotFoundException;
+import com.linkup.Petory.domain.user.exception.UserNotFoundException;
+import com.linkup.Petory.domain.user.exception.UserValidationException;
 import com.linkup.Petory.domain.user.repository.PetRepository;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 
@@ -53,10 +56,10 @@ public class PetService {
     @Transactional(readOnly = true)
     public PetDTO getPet(Long petIdx) {
         Pet pet = petRepository.findById(petIdx)
-                .orElseThrow(() -> new RuntimeException("Pet not found"));
+                .orElseThrow(PetNotFoundException::new);
         
         if (pet.getIsDeleted()) {
-            throw new RuntimeException("Pet is deleted");
+            throw new PetNotFoundException("삭제된 반려동물입니다.");
         }
         
         return petConverter.toDTO(pet);
@@ -68,12 +71,12 @@ public class PetService {
     public PetDTO createPet(String userId, PetDTO dto) {
         // 사용자 조회
         Users user = usersRepository.findByIdString(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(UserNotFoundException::new);
 
         // ETC 타입일 때 breed 필수 검증
         if (dto.getPetType() != null && PetType.valueOf(dto.getPetType()) == PetType.ETC) {
             if (dto.getBreed() == null || dto.getBreed().trim().isEmpty()) {
-                throw new RuntimeException("기타 종류를 선택한 경우, 구체적인 종류를 입력해주세요.");
+                throw UserValidationException.petBreedRequired();
             }
         }
 
@@ -102,10 +105,10 @@ public class PetService {
      */
     public PetDTO updatePet(Long petIdx, PetDTO dto) {
         Pet pet = petRepository.findById(petIdx)
-                .orElseThrow(() -> new RuntimeException("Pet not found"));
+                .orElseThrow(PetNotFoundException::new);
 
         if (pet.getIsDeleted()) {
-            throw new RuntimeException("Pet is deleted");
+            throw new PetNotFoundException("삭제된 반려동물입니다.");
         }
 
         // 필드 업데이트
@@ -120,7 +123,7 @@ public class PetService {
             if (newPetType == PetType.ETC) {
                 String breed = dto.getBreed() != null ? dto.getBreed() : pet.getBreed();
                 if (breed == null || breed.trim().isEmpty()) {
-                    throw new RuntimeException("기타 종류를 선택한 경우, 구체적인 종류를 입력해주세요.");
+                    throw UserValidationException.petBreedRequired();
                 }
             }
         }
@@ -130,7 +133,7 @@ public class PetService {
         
         // ETC 타입인데 breed가 비어있는 경우 재검증
         if (pet.getPetType() == PetType.ETC && (pet.getBreed() == null || pet.getBreed().trim().isEmpty())) {
-            throw new RuntimeException("기타 종류를 선택한 경우, 구체적인 종류를 입력해주세요.");
+            throw UserValidationException.petBreedRequired();
         }
         if (dto.getGender() != null) {
             pet.setGender(com.linkup.Petory.domain.user.entity.PetGender.valueOf(dto.getGender()));
@@ -189,7 +192,7 @@ public class PetService {
      */
     public void deletePet(Long petIdx) {
         Pet pet = petRepository.findById(petIdx)
-                .orElseThrow(() -> new RuntimeException("Pet not found"));
+                .orElseThrow(PetNotFoundException::new);
 
         pet.setIsDeleted(true);
         pet.setDeletedAt(java.time.LocalDateTime.now());
@@ -204,7 +207,7 @@ public class PetService {
      */
     public PetDTO restorePet(Long petIdx) {
         Pet pet = petRepository.findById(petIdx)
-                .orElseThrow(() -> new RuntimeException("Pet not found"));
+                .orElseThrow(PetNotFoundException::new);
 
         pet.setIsDeleted(false);
         pet.setDeletedAt(null);

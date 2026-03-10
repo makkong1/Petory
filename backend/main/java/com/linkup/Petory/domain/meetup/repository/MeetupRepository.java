@@ -63,6 +63,11 @@ public interface MeetupRepository {
     List<Meetup> findNearbyMeetups(Double lat, Double lng, Double radius, LocalDateTime currentDate);
 
     /**
+     * 단건 조회 (주최자 포함) - 참가/취소 시 권한 확인용
+     */
+    Optional<Meetup> findByIdWithOrganizer(Long idx);
+
+    /**
      * Pessimistic Lock으로 동시 접근 방지
      */
     Optional<Meetup> findByIdWithLock(Long idx);
@@ -82,4 +87,9 @@ public interface MeetupRepository {
      * 특정 모임 조회 (organizer와 participants 포함) - JOIN FETCH로 N+1 문제 해결
      */
     Optional<Meetup> findByIdWithDetails(Long idx);
+
+    /**
+     * 통계용: 특정 기간 동안 생성된 모임 수
+     */
+    long countByCreatedAtBetween(LocalDateTime start, LocalDateTime end);
 }

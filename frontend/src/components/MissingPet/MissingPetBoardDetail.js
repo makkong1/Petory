@@ -3,6 +3,7 @@ import styled from 'styled-components';
 import { missingPetApi } from '../../api/missingPetApi';
 import { reportApi } from '../../api/reportApi';
 import { startMissingPetChat } from '../../api/chatApi';
+import PageNavigation from '../Common/PageNavigation';
 import AddressMapSelector from './AddressMapSelector';
 import MapContainer from '../LocationService/MapContainer';
 import UserProfileModal from '../User/UserProfileModal';
@@ -45,7 +46,7 @@ const MissingPetBoardDetail = ({
   };
 
   // 댓글 페이징으로 가져오기
-  const fetchComments = useCallback(async (pageNum = 0, reset = false) => {
+  const fetchComments = useCallback(async (pageNum = 0) => {
     if (!board?.idx) return;
     
     try {
@@ -53,12 +54,7 @@ const MissingPetBoardDetail = ({
       const response = await missingPetApi.getComments(board.idx, pageNum, commentPageSize);
       const pageData = response.data || {};
       const commentsData = pageData.comments || [];
-
-      if (reset) {
-        setComments(commentsData);
-      } else {
-        setComments(prevComments => [...prevComments, ...commentsData]);
-      }
+      setComments(commentsData);
 
       setCommentTotalCount(pageData.totalCount || 0);
       setCommentHasNext(pageData.hasNext || false);
@@ -70,12 +66,12 @@ const MissingPetBoardDetail = ({
     }
   }, [board?.idx, commentPageSize]);
 
-  // 댓글 더 보기
-  const handleLoadMoreComments = useCallback(() => {
-    if (!loadingComments && commentHasNext) {
-      fetchComments(commentPage + 1, false);
+  const handleCommentPageChange = useCallback((newPage) => {
+    const totalPages = Math.max(1, Math.ceil(commentTotalCount / commentPageSize));
+    if (newPage >= 0 && newPage < totalPages) {
+      fetchComments(newPage);
     }
-  }, [loadingComments, commentHasNext, commentPage, fetchComments]);
+  }, [commentTotalCount, commentPageSize, fetchComments]);
 
   // 게시글 변경 시 댓글 초기화 및 로드
   useEffect(() => {
@@ -87,7 +83,7 @@ const MissingPetBoardDetail = ({
         setCommentHasNext((board.commentCount || 0) > (board.comments.length || 0));
       } else {
         // board.comments가 없으면 별도 API로 로드
-        fetchComments(0, true);
+        fetchComments(0);
       }
     }
   }, [board?.idx, board?.comments, board?.commentCount, fetchComments]);
@@ -125,7 +121,7 @@ const MissingPetBoardDetail = ({
       setCommentLng(null);
       setShowAddressMap(false);
       // 댓글 목록 새로고침
-      await fetchComments(0, true);
+      await fetchComments(0);
       onRefresh();
       // 알림 개수 즉시 업데이트 (다른 사용자에게 알림이 갔을 수 있음)
       window.dispatchEvent(new Event('notificationUpdate'));
@@ -163,7 +159,7 @@ const MissingPetBoardDetail = ({
       await missingPetApi.deleteComment(board.idx, commentId);
       onDeleteComment?.(commentId);
       // 댓글 목록 새로고침
-      await fetchComments(0, true);
+      await fetchComments(0);
       onRefresh();
     } catch (err) {
       alert(err.response?.data?.error || err.message);
@@ -488,15 +484,16 @@ const MissingPetBoardDetail = ({
                 <EmptyComments>아직 제보가 없습니다. 가장 먼저 댓글을 남겨보세요!</EmptyComments>
               )}
 
-              {commentHasNext && (
-                <LoadMoreCommentsContainer>
-                  <LoadMoreCommentsButton
-                    onClick={handleLoadMoreComments}
-                    disabled={loadingComments}
-                  >
-                    {loadingComments ? '로딩 중...' : `댓글 더 보기 (${comments.length} / ${commentTotalCount})`}
-                  </LoadMoreCommentsButton>
-                </LoadMoreCommentsContainer>
+              {commentTotalCount > 0 && (
+                <CommentPaginationWrapper>
+                  <PageNavigation
+                    currentPage={commentPage}
+                    totalCount={commentTotalCount}
+                    pageSize={commentPageSize}
+                    onPageChange={handleCommentPageChange}
+                    loading={loadingComments}
+                  />
+                </CommentPaginationWrapper>
               )}
 
               <CommentForm onSubmit={handleAddComment}>
@@ -1135,34 +1132,11 @@ const CommentSubmit = styled.button`
   }
 `;
 
-const LoadMoreCommentsContainer = styled.div`
+const CommentPaginationWrapper = styled.div`
   display: flex;
   justify-content: center;
   align-items: center;
   padding: ${props => props.theme.spacing.md} 0;
   margin-top: ${props => props.theme.spacing.sm};
-`;
-
-const LoadMoreCommentsButton = styled.button`
-  background: ${props => props.theme.colors.surface};
-  color: ${props => props.theme.colors.text};
-  border: 1px solid ${props => props.theme.colors.border};
-  border-radius: ${props => props.theme.borderRadius.md};
-  padding: ${props => props.theme.spacing.sm} ${props => props.theme.spacing.lg};
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  font-size: ${props => props.theme.typography.body2.fontSize};
-
-  &:hover:not(:disabled) {
-    background: ${props => props.theme.colors.surfaceHover};
-    border-color: ${props => props.theme.colors.primary};
-    color: ${props => props.theme.colors.primary};
-  }
-
-  &:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
 `;
 

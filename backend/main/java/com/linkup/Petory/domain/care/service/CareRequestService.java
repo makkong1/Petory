@@ -3,6 +3,10 @@ package com.linkup.Petory.domain.care.service;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -11,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.linkup.Petory.domain.care.converter.CareRequestConverter;
 import com.linkup.Petory.domain.care.dto.CareRequestDTO;
+import com.linkup.Petory.domain.care.dto.CareRequestPageResponseDTO;
 import com.linkup.Petory.domain.care.entity.CareRequest;
 import com.linkup.Petory.domain.care.entity.CareRequestStatus;
 import com.linkup.Petory.domain.care.entity.CareApplicationStatus;
@@ -18,7 +23,13 @@ import com.linkup.Petory.domain.care.repository.CareRequestRepository;
 import com.linkup.Petory.domain.user.entity.EmailVerificationPurpose;
 import com.linkup.Petory.domain.user.entity.Pet;
 import com.linkup.Petory.domain.user.entity.Users;
+import com.linkup.Petory.domain.care.exception.CareForbiddenException;
+import com.linkup.Petory.domain.care.exception.CarePaymentException;
+import com.linkup.Petory.domain.care.exception.CareRequestNotFoundException;
+import com.linkup.Petory.domain.care.exception.CareValidationException;
 import com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException;
+import com.linkup.Petory.domain.user.exception.PetNotFoundException;
+import com.linkup.Petory.domain.user.exception.UserNotFoundException;
 import com.linkup.Petory.domain.user.repository.PetRepository;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 import com.linkup.Petory.domain.payment.service.PetCoinEscrowService;
@@ -75,13 +86,61 @@ public class CareRequestService {
         return careRequestConverter.toDTOList(requests);
     }
 
+    /**
+     * 펫케어 요청 목록 조회 (페이징)
+     */
+    @Transactional(readOnly = true)
+    public CareRequestPageResponseDTO getCareRequestsWithPaging(String status, String location, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Page<CareRequest> requestPage;
+
+        if (status != null && !status.equals("ALL")) {
+            CareRequestStatus statusEnum = CareRequestStatus.valueOf(status);
+            requestPage = careRequestRepository.findByStatusAndIsDeletedFalseWithPaging(
+                    statusEnum, location, pageable);
+        } else {
+            requestPage = careRequestRepository.findAllActiveRequestsWithPaging(location, pageable);
+        }
+
+        List<CareRequestDTO> dtos = careRequestConverter.toDTOList(requestPage.getContent());
+        return new CareRequestPageResponseDTO(
+                dtos,
+                requestPage.getTotalElements(),
+                requestPage.getTotalPages(),
+                requestPage.getNumber(),
+                requestPage.getSize(),
+                requestPage.hasNext(),
+                requestPage.hasPrevious());
+    }
+
+    /**
+     * 펫케어 요청 검색 (페이징)
+     */
+    @Transactional(readOnly = true)
+    public CareRequestPageResponseDTO searchCareRequestsWithPaging(String keyword, int page, int size) {
+        if (keyword == null || keyword.trim().isEmpty()) {
+            return getCareRequestsWithPaging(null, null, page, size);
+        }
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Page<CareRequest> requestPage = careRequestRepository.searchWithPaging(keyword.trim(), pageable);
+        List<CareRequestDTO> dtos = careRequestConverter.toDTOList(requestPage.getContent());
+        return new CareRequestPageResponseDTO(
+                dtos,
+                requestPage.getTotalElements(),
+                requestPage.getTotalPages(),
+                requestPage.getNumber(),
+                requestPage.getSize(),
+                requestPage.hasNext(),
+                requestPage.hasPrevious());
+    }
+
     // 단일 케어 요청 조회
     @Transactional(readOnly = true)
     public CareRequestDTO getCareRequest(Long idx) {
-        CareRequest request = careRequestRepository.findByIdWithPet(idx)
-                .orElseThrow(() -> new RuntimeException("CareRequest not found"));
+        CareRequest request = careRequestRepository.findByIdWithApplications(idx)
+                .orElseThrow(() -> new CareRequestNotFoundException());
         if (Boolean.TRUE.equals(request.getIsDeleted())) {
-            throw new RuntimeException("CareRequest not found");
+            throw new CareRequestNotFoundException();
         }
 
         return careRequestConverter.toDTO(request);
@@ -92,7 +151,7 @@ public class CareRequestService {
     public CareRequestDTO createCareRequest(CareRequestDTO dto) {
         // 사용자 조회 (1회만)
         Users user = usersRepository.findById(dto.getUserId())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new UserNotFoundException());
 
         // 이메일 인증 확인
         if (!Boolean.TRUE.equals(user.getEmailVerified())) {
@@ -104,12 +163,12 @@ public class CareRequestService {
 
         // 제공 코인 유효성 검증
         if (dto.getOfferedCoins() == null || dto.getOfferedCoins() <= 0) {
-            throw new RuntimeException("제공 코인은 0보다 커야 합니다.");
+            throw CareValidationException.coinMustBePositive();
         }
 
         // 사용자 잔액 확인
         if (user.getPetCoinBalance() < dto.getOfferedCoins()) {
-            throw new RuntimeException("펫코인 잔액이 부족합니다.");
+            throw CareValidationException.insufficientBalance();
         }
 
         CareRequest.CareRequestBuilder builder = CareRequest.builder()
@@ -123,10 +182,10 @@ public class CareRequestService {
         // 펫 정보 설정 (선택사항)
         if (dto.getPetIdx() != null) {
             Pet pet = petRepository.findById(dto.getPetIdx())
-                    .orElseThrow(() -> new RuntimeException("Pet not found"));
+                    .orElseThrow(() -> new PetNotFoundException());
             // 펫 소유자 확인
             if (!pet.getUser().getIdx().equals(user.getIdx())) {
-                throw new RuntimeException("펫 소유자만 펫 정보를 연결할 수 있습니다.");
+                throw CareForbiddenException.petOwnerOnly();
             }
             builder.pet(pet);
         }
@@ -138,12 +197,12 @@ public class CareRequestService {
     // 케어 요청 수정
     @Transactional
     public CareRequestDTO updateCareRequest(Long idx, CareRequestDTO dto, Long currentUserId) {
-        CareRequest request = careRequestRepository.findById(idx)
-                .orElseThrow(() -> new RuntimeException("CareRequest not found"));
+        CareRequest request = careRequestRepository.findByIdWithApplications(idx)
+                .orElseThrow(() -> new CareRequestNotFoundException());
 
         // 작성자 확인 (관리자는 우회)
         if (!isAdmin() && !request.getUser().getIdx().equals(currentUserId)) {
-            throw new RuntimeException("본인의 케어 요청만 수정할 수 있습니다.");
+            throw CareForbiddenException.ownRequestOnly();
         }
 
         if (dto.getTitle() != null)
@@ -156,10 +215,10 @@ public class CareRequestService {
         // 펫 정보 업데이트 (선택사항)
         if (dto.getPetIdx() != null) {
             Pet pet = petRepository.findById(dto.getPetIdx())
-                    .orElseThrow(() -> new RuntimeException("Pet not found"));
+                    .orElseThrow(() -> new PetNotFoundException());
             // 펫 소유자 확인
             if (!pet.getUser().getIdx().equals(request.getUser().getIdx())) {
-                throw new RuntimeException("펫 소유자만 펫 정보를 연결할 수 있습니다.");
+                throw CareForbiddenException.petOwnerOnly();
             }
             request.setPet(pet);
         } else if (dto.getPetIdx() == null && request.getPet() != null) {
@@ -174,12 +233,12 @@ public class CareRequestService {
     // 케어 요청 삭제
     @Transactional
     public void deleteCareRequest(Long idx, Long currentUserId) {
-        CareRequest request = careRequestRepository.findById(idx)
-                .orElseThrow(() -> new RuntimeException("CareRequest not found"));
+        CareRequest request = careRequestRepository.findByIdWithUser(idx)
+                .orElseThrow(() -> new CareRequestNotFoundException());
 
         // 작성자 확인 (관리자는 우회)
         if (!isAdmin() && !request.getUser().getIdx().equals(currentUserId)) {
-            throw new RuntimeException("본인의 케어 요청만 삭제할 수 있습니다.");
+            throw CareForbiddenException.ownRequestOnly();
         }
 
         request.setIsDeleted(true);
@@ -191,7 +250,7 @@ public class CareRequestService {
     @Transactional(readOnly = true)
     public List<CareRequestDTO> getMyCareRequests(Long userId) {
         Users user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new UserNotFoundException());
 
         List<CareRequest> requests = careRequestRepository.findByUserAndIsDeletedFalseOrderByCreatedAtDesc(user);
         return careRequestConverter.toDTOList(requests);
@@ -201,7 +260,7 @@ public class CareRequestService {
     @Transactional
     public CareRequestDTO updateStatus(Long idx, String status, Long currentUserId) {
         CareRequest request = careRequestRepository.findByIdWithApplications(idx)
-                .orElseThrow(() -> new RuntimeException("CareRequest not found"));
+                .orElseThrow(() -> new CareRequestNotFoundException());
 
         // 관리자는 권한 검증 우회
         if (!isAdmin()) {
@@ -213,7 +272,7 @@ public class CareRequestService {
                                     && app.getProvider().getIdx().equals(currentUserId));
 
             if (!isRequester && !isAcceptedProvider) {
-                throw new RuntimeException("작성자 또는 승인된 제공자만 상태를 변경할 수 있습니다.");
+                throw CareForbiddenException.ownerOrApprovedProvider();
             }
         }
 
@@ -236,7 +295,7 @@ public class CareRequestService {
                     log.error("거래 완료 시 제공자에게 코인 지급 실패: careRequestIdx={}, error={}",
                             request.getIdx(), e.getMessage(), e);
                     // 코인 지급 실패 시 상태 변경 롤백
-                    throw new RuntimeException("코인 지급 처리 중 오류가 발생했습니다.", e);
+                    throw CarePaymentException.paymentFailed(e);
                 }
             } else {
                 log.warn("에스크로를 찾을 수 없거나 이미 처리됨: careRequestIdx={}", request.getIdx());
@@ -256,7 +315,7 @@ public class CareRequestService {
                     log.error("거래 취소 시 요청자에게 코인 환불 실패: careRequestIdx={}, error={}",
                             request.getIdx(), e.getMessage(), e);
                     // 환불 실패 시 상태 변경 롤백
-                    throw new RuntimeException("환불 처리 중 오류가 발생했습니다.", e);
+                    throw CarePaymentException.refundFailed(e);
                 }
             } else {
                 log.warn("에스크로를 찾을 수 없거나 이미 처리됨: careRequestIdx={}", request.getIdx());

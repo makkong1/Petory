@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import styled from 'styled-components';
 import { careRequestApi } from '../../api/careRequestApi';
 import { geocodingApi } from '../../api/geocodingApi';
+import PageNavigation from '../Common/PageNavigation';
 import CareRequestForm from './CareRequestForm';
 import CareRequestDetailPage from './CareRequestDetailPage';
 import { useAuth } from '../../contexts/AuthContext';
@@ -17,18 +18,22 @@ const CareRequestList = () => {
   const [selectedCareRequestId, setSelectedCareRequestId] = useState(null);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [isSearching, setIsSearching] = useState(false);
+
+  // 페이징 상태
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(20);
+  const [totalCount, setTotalCount] = useState(0);
   
   // 위치 필터링 관련 State
-  const [filterLocation, setFilterLocation] = useState(null); // 예: '강남구'
+  const [filterLocation, setFilterLocation] = useState(null);
   const [locationLoading, setLocationLoading] = useState(false);
 
-  // API에서 케어 요청 데이터 가져오기
-  const fetchCareRequests = async () => {
+  const fetchCareRequests = useCallback(async (pageNum = 0) => {
     try {
       setLoading(true);
       setError(null);
       
-      const params = {};
+      const params = { page: pageNum, size: pageSize };
       if (activeFilter !== 'ALL') {
         params.status = activeFilter;
       }
@@ -37,19 +42,42 @@ const CareRequestList = () => {
       }
       
       const response = await careRequestApi.getAllCareRequests(params);
-      setCareRequests(response.data || []);
-    } catch (error) {
-      console.error('케어 요청 데이터 로딩 실패:', error);
+      const data = response.data || {};
+      setCareRequests(data.careRequests || []);
+      setTotalCount(data.totalCount || 0);
+      setPage(pageNum);
+    } catch (err) {
+      console.error('케어 요청 데이터 로딩 실패:', err);
       setError('데이터를 불러오는데 실패했습니다.');
       setCareRequests([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeFilter, filterLocation, pageSize]);
 
   useEffect(() => {
-    fetchCareRequests();
-  }, [filterLocation]); // filterLocation 변경 시 재요청 (activeFilter는 handleFilterChange에서 처리)
+    fetchCareRequests(0);
+  }, [activeFilter, filterLocation]);
+
+  const handlePageSizeChange = useCallback((newSize) => {
+    setPageSize(newSize);
+    setPage(0);
+  }, []);
+
+  const isInitialMount = useRef(true);
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    if (isSearching && searchKeyword.trim()) {
+      handleSearchWithPage(0);
+    } else {
+      fetchCareRequests(0);
+    }
+    // pageSize 변경 시에만 재조회
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pageSize]);
 
   // 전역 이벤트 리스너: 알림에서 펫케어 요청글로 이동할 때 사용
   useEffect(() => {
@@ -68,10 +96,10 @@ const CareRequestList = () => {
   }, []);
 
   const filters = [
-    { key: 'ALL', label: '전체', count: careRequests.length },
-    { key: 'OPEN', label: '모집중', count: careRequests.filter(c => c.status === 'OPEN').length },
-    { key: 'IN_PROGRESS', label: '진행중', count: careRequests.filter(c => c.status === 'IN_PROGRESS').length },
-    { key: 'COMPLETED', label: '완료', count: careRequests.filter(c => c.status === 'COMPLETED').length }
+    { key: 'ALL', label: '전체' },
+    { key: 'OPEN', label: '모집중' },
+    { key: 'IN_PROGRESS', label: '진행중' },
+    { key: 'COMPLETED', label: '완료' }
   ];
 
   // 작성일 기준 최신순으로 정렬
@@ -85,6 +113,38 @@ const CareRequestList = () => {
     ? sortedRequests
     : sortedRequests.filter(request => request.status === activeFilter);
 
+  const handleSearchWithPage = useCallback(async (pageNum = 0) => {
+    if (!searchKeyword.trim()) {
+      fetchCareRequests(pageNum);
+      return;
+    }
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await careRequestApi.searchCareRequests(searchKeyword.trim(), pageNum, pageSize);
+      const data = response.data || {};
+      setCareRequests(data.careRequests || []);
+      setTotalCount(data.totalCount || 0);
+      setPage(pageNum);
+    } catch (err) {
+      console.error('검색 실패:', err);
+      setError('검색 중 오류가 발생했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  }, [searchKeyword, pageSize, fetchCareRequests]);
+
+  const handlePageChange = useCallback((newPage) => {
+    const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+    if (newPage >= 0 && newPage < totalPages) {
+      if (isSearching) {
+        handleSearchWithPage(newPage);
+      } else {
+        fetchCareRequests(newPage);
+      }
+    }
+  }, [totalCount, pageSize, isSearching, fetchCareRequests, handleSearchWithPage]);
+
   const handleAddButtonClick = () => {
     if (!user) {
       window.dispatchEvent(new Event('showPermissionModal'));
@@ -94,11 +154,12 @@ const CareRequestList = () => {
     setSuccessMessage('');
   };
 
-  const handleCareRequestCreated = (createdRequest) => {
-    setCareRequests((prev) => [createdRequest, ...prev]);
+  const handleCareRequestCreated = () => {
     setActiveFilter('ALL');
     setIsCreating(false);
     setSuccessMessage('새 펫케어 요청이 등록되었습니다.');
+    setPage(0);
+    fetchCareRequests(0);
   };
 
   const handleDeleteRequest = async (requestId) => {
@@ -118,32 +179,11 @@ const CareRequestList = () => {
     }
   };
 
-  // 필터 변경 시 API 재호출
-  const handleFilterChange = async (filterKey) => {
+  const handleFilterChange = (filterKey) => {
     setActiveFilter(filterKey);
-    setSearchKeyword(''); // 검색어 초기화
+    setSearchKeyword('');
     setIsSearching(false);
-    
-    // fetchCareRequests 함수 사용 (중복 로직 제거 효과)
-    // 단, state update가 비동기라 여기서 호출하면 이전 state를 쓸 수 있음.
-    // 하지만 setActiveFilter 직후라 useEffect 의존성을 쓰는게 나을수도 있으나
-    // 기존 로직 유지를 위해 직접 호출하되 params 구성
-    
-    try {
-      setLoading(true);
-      setError(null);
-      const params = filterKey === 'ALL' ? {} : { status: filterKey };
-      if (filterLocation) {
-        params.location = filterLocation;
-      }
-      const response = await careRequestApi.getAllCareRequests(params);
-      setCareRequests(response.data || []);
-    } catch (error) {
-      console.error('필터링된 데이터 로딩 실패:', error);
-      setError('필터링된 데이터를 불러오는데 실패했습니다.');
-    } finally {
-      setLoading(false);
-    }
+    setPage(0);
   };
 
   // 내 동네 필터 토글
@@ -226,35 +266,23 @@ const CareRequestList = () => {
     );
   };
 
-  // 검색 기능
   const handleSearch = async (e) => {
     e.preventDefault();
     if (!searchKeyword.trim()) {
       setIsSearching(false);
-      fetchCareRequests();
+      setPage(0);
+      fetchCareRequests(0);
       return;
     }
-
-    try {
-      setLoading(true);
-      setError(null);
-      setIsSearching(true);
-      const response = await careRequestApi.searchCareRequests(searchKeyword.trim());
-      setCareRequests(response.data || []);
-      setActiveFilter('ALL'); // 검색 시 필터 초기화
-    } catch (error) {
-      console.error('검색 실패:', error);
-      setError('검색 중 오류가 발생했습니다.');
-    } finally {
-      setLoading(false);
-    }
+    setIsSearching(true);
+    setPage(0);
+    handleSearchWithPage(0);
   };
 
-  // 검색어 초기화
   const handleClearSearch = () => {
     setSearchKeyword('');
     setIsSearching(false);
-    fetchCareRequests();
+    setPage(0);
     setActiveFilter('ALL');
   };
 
@@ -340,7 +368,7 @@ const CareRequestList = () => {
         </SearchForm>
         {isSearching && (
           <SearchResultInfo>
-            "{searchKeyword}" 검색 결과: {careRequests.length}개
+            "{searchKeyword}" 검색 결과: {totalCount}개
           </SearchResultInfo>
         )}
       </SearchSection>
@@ -352,7 +380,7 @@ const CareRequestList = () => {
             active={activeFilter === filter.key}
             onClick={() => handleFilterChange(filter.key)}
           >
-            {filter.label} ({filter.count})
+            {filter.label}
           </FilterButton>
         ))}
         <LocationFilterButton
@@ -363,6 +391,21 @@ const CareRequestList = () => {
           {locationLoading ? '위치 확인 중...' : filterLocation ? `📍 ${filterLocation}만 보기` : '📍 내 동네만 보기'}
         </LocationFilterButton>
       </FilterSection>
+
+      <PageSizeSelector>
+        <PageSizeLabel>페이지당 게시글 수:</PageSizeLabel>
+        <PageSizeButtons>
+          <PageSizeButton active={pageSize === 20} onClick={() => handlePageSizeChange(20)}>
+            20
+          </PageSizeButton>
+          <PageSizeButton active={pageSize === 50} onClick={() => handlePageSizeChange(50)}>
+            50
+          </PageSizeButton>
+          <PageSizeButton active={pageSize === 100} onClick={() => handlePageSizeChange(100)}>
+            100
+          </PageSizeButton>
+        </PageSizeButtons>
+      </PageSizeSelector>
 
       <CareGrid>
         {loading ? (
@@ -448,12 +491,24 @@ const CareRequestList = () => {
         )}
       </CareGrid>
 
+      {totalCount > 0 && (
+        <PaginationWrapper>
+          <PageNavigation
+            currentPage={page}
+            totalCount={totalCount}
+            pageSize={pageSize}
+            onPageChange={handlePageChange}
+            loading={loading}
+          />
+        </PaginationWrapper>
+      )}
+
       <CareRequestDetailPage
         isOpen={selectedCareRequestId !== null}
         careRequestId={selectedCareRequestId}
         onClose={() => setSelectedCareRequestId(null)}
         onCommentAdded={() => {
-          fetchCareRequests();
+          fetchCareRequests(page);
         }}
         currentUser={user}
         onCareRequestDeleted={(deletedId) => {
@@ -958,4 +1013,53 @@ const SearchResultInfo = styled.div`
   border-radius: ${props => props.theme.borderRadius.md};
   color: ${props => props.theme.colors.textSecondary};
   font-size: ${props => props.theme.typography.body2.fontSize};
+`;
+
+const PaginationWrapper = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: ${props => props.theme.spacing.md};
+  padding: ${props => props.theme.spacing.xl} 0;
+  margin-top: ${props => props.theme.spacing.lg};
+`;
+
+const PageSizeSelector = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${props => props.theme.spacing.sm};
+  margin-bottom: ${props => props.theme.spacing.lg};
+`;
+
+const PageSizeLabel = styled.span`
+  font-size: ${props => props.theme.typography.body2.fontSize};
+  color: ${props => props.theme.colors.textSecondary};
+  font-weight: 500;
+`;
+
+const PageSizeButtons = styled.div`
+  display: flex;
+  gap: ${props => props.theme.spacing.xs};
+`;
+
+const PageSizeButton = styled.button`
+  padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.md};
+  border: 1px solid ${props => props.theme.colors.border};
+  border-radius: ${props => props.theme.borderRadius.md};
+  background: ${props => props.active ? props.theme.colors.primary : 'transparent'};
+  color: ${props => props.active ? 'white' : props.theme.colors.text};
+  font-size: ${props => props.theme.typography.body2.fontSize};
+  font-weight: ${props => props.active ? 600 : 400};
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: ${props => props.active ? props.theme.colors.primary : props.theme.colors.background};
+    border-color: ${props => props.theme.colors.primary};
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 `;

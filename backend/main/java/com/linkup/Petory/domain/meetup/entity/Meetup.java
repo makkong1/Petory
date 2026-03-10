@@ -3,6 +3,7 @@ package com.linkup.Petory.domain.meetup.entity;
 import com.linkup.Petory.domain.common.BaseTimeEntity;
 import com.linkup.Petory.domain.user.entity.Users;
 import jakarta.persistence.*;
+import org.hibernate.annotations.BatchSize;
 import lombok.*;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -60,6 +61,7 @@ public class Meetup extends BaseTimeEntity {
     private LocalDateTime deletedAt;
 
     @OneToMany(mappedBy = "meetup", cascade = CascadeType.ALL)
+    @BatchSize(size = 50)  // 목록 조회 시 participants N+1 방지
     private List<MeetupParticipants> participants;
 
     @PrePersist

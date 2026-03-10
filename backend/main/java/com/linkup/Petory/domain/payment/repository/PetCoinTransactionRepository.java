@@ -23,6 +23,11 @@ public interface PetCoinTransactionRepository {
     Optional<PetCoinTransaction> findById(Long id);
 
     /**
+     * 단건 조회 (user 포함) - 상세 조회 시 권한 확인용
+     */
+    Optional<PetCoinTransaction> findByIdWithUser(Long idx);
+
+    /**
      * 사용자별 거래 내역 조회 (최신순)
      */
     List<PetCoinTransaction> findByUserOrderByCreatedAtDesc(Users user);

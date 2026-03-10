@@ -2,12 +2,17 @@ package com.linkup.Petory.domain.location.service;
 
 import com.linkup.Petory.domain.location.converter.LocationServiceReviewConverter;
 import com.linkup.Petory.domain.location.dto.LocationServiceReviewDTO;
+import com.linkup.Petory.domain.location.exception.LocationReviewAlreadyDeletedException;
+import com.linkup.Petory.domain.location.exception.LocationReviewDuplicateException;
+import com.linkup.Petory.domain.location.exception.LocationServiceNotFoundException;
+import com.linkup.Petory.domain.location.exception.LocationServiceReviewNotFoundException;
 import com.linkup.Petory.domain.location.entity.LocationService;
 import com.linkup.Petory.domain.location.entity.LocationServiceReview;
 import com.linkup.Petory.domain.location.repository.LocationServiceRepository;
 import com.linkup.Petory.domain.location.repository.LocationServiceReviewRepository;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException;
+import com.linkup.Petory.domain.user.exception.UserNotFoundException;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -68,8 +73,8 @@ public class LocationServiceReviewService {
     // 리뷰 수정
     @Transactional
     public LocationServiceReviewDTO updateReview(Long reviewIdx, LocationServiceReviewDTO reviewDTO) {
-        LocationServiceReview review = reviewRepository.findById(reviewIdx)
-                .orElseThrow(() -> new RuntimeException("리뷰를 찾을 수 없습니다."));
+        LocationServiceReview review = reviewRepository.findByIdWithUserAndService(reviewIdx)
+                .orElseThrow(LocationServiceReviewNotFoundException::new);
 
         // 이메일 인증 확인
         Users user = review.getUser();
@@ -93,12 +98,12 @@ public class LocationServiceReviewService {
     // 리뷰 삭제 (Soft Delete)
     @Transactional
     public void deleteReview(Long reviewIdx) {
-        LocationServiceReview review = reviewRepository.findById(reviewIdx)
-                .orElseThrow(() -> new RuntimeException("리뷰를 찾을 수 없습니다."));
+        LocationServiceReview review = reviewRepository.findByIdWithUserAndService(reviewIdx)
+                .orElseThrow(LocationServiceReviewNotFoundException::new);
 
         // 이미 삭제된 리뷰인지 확인
         if (review.getIsDeleted() != null && review.getIsDeleted()) {
-            throw new RuntimeException("이미 삭제된 리뷰입니다.");
+            throw new LocationReviewAlreadyDeletedException();
         }
 
         // 이메일 인증 확인
@@ -142,7 +147,7 @@ public class LocationServiceReviewService {
 
         if (averageRating.isPresent()) {
             LocationService service = serviceRepository.findById(serviceIdx)
-                    .orElseThrow(() -> new RuntimeException("서비스를 찾을 수 없습니다."));
+                    .orElseThrow(LocationServiceNotFoundException::new);
 
             service.setRating(averageRating.get());
             serviceRepository.save(service);

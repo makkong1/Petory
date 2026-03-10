@@ -11,23 +11,23 @@ import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.board.entity.Comment;
 import com.linkup.Petory.domain.board.entity.CommentReaction;
 import com.linkup.Petory.domain.board.entity.ReactionType;
+import com.linkup.Petory.global.annotation.RepositoryMethod;
 
 /**
  * Spring Data JPA 전용 인터페이스입니다.
  */
 public interface SpringDataJpaCommentReactionRepository extends JpaRepository<CommentReaction, Long> {
 
+    @RepositoryMethod("댓글 반응: 반응 타입별 카운트")
     long countByCommentAndReactionType(Comment comment, ReactionType reactionType);
 
+    @RepositoryMethod("댓글 반응: 사용자별 조회")
     Optional<CommentReaction> findByCommentAndUser(Comment comment, Users user);
 
+    @RepositoryMethod("댓글 반응: 댓글별 삭제")
     void deleteByComment(Comment comment);
 
-    /**
-     * 여러 댓글의 좋아요/싫어요 카운트를 한 번에 조회 (배치 조회)
-     * [리팩토링] N개 댓글 시 2N 쿼리 → 1 쿼리 (N+1 제거)
-     * 반환값: List<Object[]> [commentId, reactionType, count]
-     */
+    @RepositoryMethod("댓글 반응: 배치 카운트 조회")
     @Query("SELECT cr.comment.idx as commentId, cr.reactionType as reactionType, COUNT(cr) as count " +
            "FROM CommentReaction cr " +
            "WHERE cr.comment.idx IN :commentIds " +

@@ -8,12 +8,14 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import com.linkup.Petory.domain.payment.dto.PetCoinBalanceResponse;
+import com.linkup.Petory.domain.payment.exception.PaymentValidationException;
 import com.linkup.Petory.domain.payment.dto.PetCoinChargeRequest;
 import com.linkup.Petory.domain.payment.dto.PetCoinTransactionDTO;
 import com.linkup.Petory.domain.payment.entity.PetCoinTransaction;
 import com.linkup.Petory.domain.payment.repository.PetCoinTransactionRepository;
 import com.linkup.Petory.domain.payment.service.PetCoinService;
 import com.linkup.Petory.domain.user.entity.Users;
+import com.linkup.Petory.domain.user.exception.UserNotFoundException;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -43,14 +45,14 @@ public class AdminPaymentController {
         public ResponseEntity<PetCoinTransactionDTO> chargeCoins(
                         @RequestBody PetCoinChargeRequest request) {
                 if (request.userId() == null) {
-                        throw new IllegalArgumentException("사용자 ID가 필요합니다.");
+                        throw PaymentValidationException.userIdRequired();
                 }
                 if (request.amount() == null || request.amount() <= 0) {
-                        throw new IllegalArgumentException("충전 금액은 0보다 커야 합니다.");
+                        throw PaymentValidationException.chargeAmountInvalid();
                 }
 
                 Users user = usersRepository.findById(request.userId())
-                                .orElseThrow(() -> new RuntimeException("User not found"));
+                                .orElseThrow(() -> new UserNotFoundException());
 
                 PetCoinTransaction transaction = petCoinService.chargeCoins(
                                 user,
@@ -66,7 +68,7 @@ public class AdminPaymentController {
         @GetMapping("/balance/{userId}")
         public ResponseEntity<PetCoinBalanceResponse> getUserBalance(@PathVariable Long userId) {
                 Users user = usersRepository.findById(userId)
-                                .orElseThrow(() -> new RuntimeException("User not found"));
+                                .orElseThrow(() -> new UserNotFoundException());
 
                 Integer balance = petCoinService.getBalance(user);
 
@@ -81,7 +83,7 @@ public class AdminPaymentController {
                         @PathVariable Long userId,
                         @PageableDefault(size = 20) Pageable pageable) {
                 Users user = usersRepository.findById(userId)
-                                .orElseThrow(() -> new RuntimeException("User not found"));
+                                .orElseThrow(() -> new UserNotFoundException());
 
                 Page<PetCoinTransaction> transactions = transactionRepository
                                 .findByUserOrderByCreatedAtDesc(user, pageable);

@@ -27,19 +27,23 @@ public class CareApplication extends BaseTimeEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long idx;
 
+    /** 지원한 펫케어 요청 */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "care_request_idx", nullable = false)
     private CareRequest careRequest;
 
+    /** 케어 제공자 (서비스 제공자, SERVICE_PROVIDER) */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "provider_idx", nullable = false)
-    private Users provider; // 케어 제공자
+    private Users provider;
 
+    /** 지원 상태 (PENDING → ACCEPTED/REJECTED) */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default
     private CareApplicationStatus status = CareApplicationStatus.PENDING;
 
+    /** 지원 메시지 */
     @Lob
     private String message;
 

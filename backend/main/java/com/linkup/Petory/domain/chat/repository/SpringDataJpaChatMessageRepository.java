@@ -13,13 +13,14 @@ import com.linkup.Petory.domain.chat.entity.ChatMessage;
 import com.linkup.Petory.domain.chat.entity.Conversation;
 import com.linkup.Petory.domain.chat.entity.MessageType;
 import com.linkup.Petory.domain.user.entity.Users;
+import com.linkup.Petory.global.annotation.RepositoryMethod;
 
 /**
  * Spring Data JPA 전용 인터페이스입니다.
  */
 public interface SpringDataJpaChatMessageRepository extends JpaRepository<ChatMessage, Long> {
 
-    // 채팅방별 메시지 조회 (페이징, 최신순)
+    @RepositoryMethod("채팅 메시지: 채팅방별 페이징 조회")
     @Query("SELECT m FROM ChatMessage m " +
            "JOIN FETCH m.sender s " +
            "LEFT JOIN FETCH m.replyToMessage " +
@@ -31,7 +32,7 @@ public interface SpringDataJpaChatMessageRepository extends JpaRepository<ChatMe
         @Param("conversationIdx") Long conversationIdx,
         Pageable pageable);
 
-    // 채팅방별 메시지 조회 (커서 기반 페이징, 최신순)
+    @RepositoryMethod("채팅 메시지: 채팅방별 커서 페이징 조회")
     @Query("SELECT m FROM ChatMessage m " +
            "JOIN FETCH m.sender s " +
            "LEFT JOIN FETCH m.replyToMessage " +
@@ -45,7 +46,7 @@ public interface SpringDataJpaChatMessageRepository extends JpaRepository<ChatMe
         @Param("beforeDate") LocalDateTime beforeDate,
         Pageable pageable);
 
-    // 채팅방별 메시지 조회 (특정 시점 이후, 페이징, 최신순) - 재참여 시 사용
+    @RepositoryMethod("채팅 메시지: 채팅방별 시점 이후 페이징 (재참여)")
     @Query("SELECT m FROM ChatMessage m " +
            "JOIN FETCH m.sender s " +
            "LEFT JOIN FETCH m.replyToMessage " +
@@ -59,7 +60,7 @@ public interface SpringDataJpaChatMessageRepository extends JpaRepository<ChatMe
         @Param("afterDate") LocalDateTime afterDate,
         Pageable pageable);
 
-    // 채팅방별 메시지 조회 (전체, 최신순)
+    @RepositoryMethod("채팅 메시지: 채팅방별 전체 조회")
     @Query("SELECT m FROM ChatMessage m " +
            "JOIN FETCH m.sender s " +
            "LEFT JOIN FETCH m.replyToMessage " +
@@ -69,7 +70,7 @@ public interface SpringDataJpaChatMessageRepository extends JpaRepository<ChatMe
            "ORDER BY m.createdAt DESC")
     List<ChatMessage> findByConversationIdxOrderByCreatedAtDesc(@Param("conversationIdx") Long conversationIdx);
 
-    // 채팅방의 가장 최신 메시지 조회
+    @RepositoryMethod("채팅 메시지: 채팅방별 최신 메시지 조회")
     @Query("SELECT m FROM ChatMessage m " +
            "JOIN FETCH m.sender s " +
            "WHERE m.conversation.idx = :conversationIdx " +
@@ -78,22 +79,22 @@ public interface SpringDataJpaChatMessageRepository extends JpaRepository<ChatMe
            "ORDER BY m.createdAt DESC")
     ChatMessage findTopByConversationIdxOrderByCreatedAtDesc(@Param("conversationIdx") Long conversationIdx);
 
-    // 사용자별 메시지 조회
+    @RepositoryMethod("채팅 메시지: 발신자별 조회")
     List<ChatMessage> findBySenderAndIsDeletedFalseOrderByCreatedAtDesc(Users sender);
 
-    // 메시지 타입별 조회
+    @RepositoryMethod("채팅 메시지: 채팅방+타입별 조회")
     List<ChatMessage> findByConversationAndMessageTypeAndIsDeletedFalse(
         Conversation conversation,
         MessageType messageType);
 
-    // 채팅방별 읽지 않은 메시지 수 조회
+    @RepositoryMethod("채팅 메시지: 채팅방별 읽지 않은 메시지 수")
     @Query("SELECT COUNT(m) FROM ChatMessage m " +
            "WHERE m.conversation.idx = :conversationIdx " +
            "  AND m.sender.idx != :userId " +
            "  AND m.isDeleted = false")
     Long countUnreadMessages(@Param("conversationIdx") Long conversationIdx, @Param("userId") Long userId);
 
-    // 여러 채팅방의 최신 메시지 조회 (배치) - Sender 포함
+    @RepositoryMethod("채팅 메시지: 채팅방별 최신 메시지 배치 조회")
     @Query("SELECT m FROM ChatMessage m " +
            "JOIN FETCH m.sender s " +
            "WHERE m.conversation.idx IN :conversationIdxs " +
@@ -106,7 +107,7 @@ public interface SpringDataJpaChatMessageRepository extends JpaRepository<ChatMe
            "  )")
     List<ChatMessage> findLatestMessagesByConversationIdxs(@Param("conversationIdxs") List<Long> conversationIdxs);
 
-    // 메시지 검색 (Full-Text Search)
+    @RepositoryMethod("채팅 메시지: 키워드 검색")
     @Query("SELECT m FROM ChatMessage m " +
            "JOIN FETCH m.sender s " +
            "JOIN FETCH m.conversation c " +

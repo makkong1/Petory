@@ -6,6 +6,9 @@ import org.springframework.transaction.annotation.Transactional;
 import com.linkup.Petory.domain.care.entity.CareApplication;
 import com.linkup.Petory.domain.care.entity.CareRequest;
 import com.linkup.Petory.domain.payment.entity.EscrowStatus;
+import com.linkup.Petory.domain.payment.exception.PaymentConflictException;
+import com.linkup.Petory.domain.payment.exception.PaymentValidationException;
+import com.linkup.Petory.domain.payment.exception.PetCoinEscrowNotFoundException;
 import com.linkup.Petory.domain.payment.entity.PetCoinEscrow;
 import com.linkup.Petory.domain.payment.repository.PetCoinEscrowRepository;
 import com.linkup.Petory.domain.user.entity.Users;
@@ -41,13 +44,13 @@ public class PetCoinEscrowService {
         public PetCoinEscrow createEscrow(CareRequest careRequest, CareApplication careApplication,
                         Users requester, Users provider, Integer amount) {
                 if (amount == null || amount <= 0) {
-                        throw new IllegalArgumentException("에스크로 금액은 0보다 커야 합니다.");
+                        throw PaymentValidationException.escrowAmountInvalid();
                 }
 
                 // 이미 에스크로가 있는지 확인
                 escrowRepository.findByCareRequest(careRequest)
                                 .ifPresent(existing -> {
-                                        throw new IllegalStateException("이미 에스크로가 생성되어 있습니다.");
+                                        throw PaymentConflictException.escrowAlreadyExists();
                                 });
 
                 // 요청자 코인 차감
@@ -86,7 +89,7 @@ public class PetCoinEscrowService {
         public PetCoinEscrow releaseToProvider(PetCoinEscrow escrow) {
                 // 비관적 락으로 에스크로 조회 (Race Condition 방지)
                 PetCoinEscrow lockedEscrow = escrowRepository.findByIdForUpdate(escrow.getIdx())
-                                .orElseThrow(() -> new RuntimeException("Escrow not found"));
+                                .orElseThrow(() -> new PetCoinEscrowNotFoundException());
 
                 if (lockedEscrow.getStatus() != EscrowStatus.HOLD) {
                         throw new IllegalStateException("HOLD 상태의 에스크로만 지급할 수 있습니다.");
@@ -126,10 +129,10 @@ public class PetCoinEscrowService {
         public PetCoinEscrow refundToRequester(PetCoinEscrow escrow) {
                 // 비관적 락으로 에스크로 조회 (Race Condition 방지)
                 PetCoinEscrow lockedEscrow = escrowRepository.findByIdForUpdate(escrow.getIdx())
-                                .orElseThrow(() -> new RuntimeException("Escrow not found"));
+                                .orElseThrow(() -> new PetCoinEscrowNotFoundException());
 
                 if (lockedEscrow.getStatus() != EscrowStatus.HOLD) {
-                        throw new IllegalStateException("HOLD 상태의 에스크로만 환불할 수 있습니다.");
+                        throw PaymentConflictException.holdStatusRequiredForRefund();
                 }
 
                 // 락으로 조회한 에스크로 사용

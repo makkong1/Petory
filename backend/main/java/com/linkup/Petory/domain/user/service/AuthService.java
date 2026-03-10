@@ -5,6 +5,10 @@ import com.linkup.Petory.domain.user.dto.TokenResponse;
 import com.linkup.Petory.domain.user.dto.UsersDTO;
 import com.linkup.Petory.domain.user.entity.UserStatus;
 import com.linkup.Petory.domain.user.entity.Users;
+import com.linkup.Petory.domain.user.exception.InvalidRefreshTokenException;
+import com.linkup.Petory.domain.user.exception.UserBannedException;
+import com.linkup.Petory.domain.user.exception.UserNotFoundException;
+import com.linkup.Petory.domain.user.exception.UserSuspendedException;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 import com.linkup.Petory.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
@@ -29,17 +33,16 @@ public class AuthService {
     @Transactional
     public TokenResponse login(String id, String password) {
         Users user = usersRepository.findByIdString(id)
-                .orElseThrow(() -> new RuntimeException("유저 없음"));
+                .orElseThrow(UserNotFoundException::new);
 
         // 제재 상태 확인
         if (user.getStatus() == UserStatus.BANNED) {
-            throw new RuntimeException("영구 차단된 계정입니다. 웹사이트 이용이 불가능합니다.");
+            throw new UserBannedException();
         }
 
         if (user.getStatus() == UserStatus.SUSPENDED) {
             if (user.getSuspendedUntil() != null && user.getSuspendedUntil().isAfter(LocalDateTime.now())) {
-                throw new RuntimeException(String.format("이용제한 중인 계정입니다. 해제일: %s",
-                        user.getSuspendedUntil().toString()));
+                throw new UserSuspendedException(user.getSuspendedUntil());
             } else {
                 // 만료된 이용제한 자동 해제
                 user.setStatus(UserStatus.ACTIVE);
@@ -79,14 +82,14 @@ public class AuthService {
         // Refresh Token 유효성 검증
         if (!jwtUtil.validateToken(refreshToken)) {
             log.warn("❌ Refresh Token 유효성 검증 실패");
-            throw new RuntimeException("유효하지 않은 Refresh Token");
+            throw InvalidRefreshTokenException.invalid();
         }
 
         // DB에서 Refresh Token 확인
         Users user = usersRepository.findByRefreshToken(refreshToken)
                 .orElseThrow(() -> {
                     log.warn("❌ Refresh Token을 DB에서 찾을 수 없음");
-                    return new RuntimeException("Refresh Token을 찾을 수 없습니다");
+                    return InvalidRefreshTokenException.notFound();
                 });
 
         // 만료 시간 확인
@@ -99,7 +102,7 @@ public class AuthService {
             user.setRefreshExpiration(null);
             usersRepository.save(user);
             log.info("🗑️ 만료된 Refresh Token 삭제 완료: userId={}", user.getId());
-            throw new RuntimeException("Refresh Token이 만료되었습니다");
+            throw InvalidRefreshTokenException.expired();
         }
 
         // 새로운 Access Token 생성
@@ -120,7 +123,7 @@ public class AuthService {
     @Transactional
     public void logout(String userId) {
         Users user = usersRepository.findByIdString(userId)
-                .orElseThrow(() -> new RuntimeException("유저 없음"));
+                .orElseThrow(UserNotFoundException::new);
 
         // DB에서 Refresh Token 제거
         user.setRefreshToken(null);

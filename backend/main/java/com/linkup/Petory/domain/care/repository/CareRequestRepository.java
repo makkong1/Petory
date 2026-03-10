@@ -4,6 +4,9 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
 import com.linkup.Petory.domain.care.entity.CareRequest;
 import com.linkup.Petory.domain.care.entity.CareRequestStatus;
 import com.linkup.Petory.domain.user.entity.Users;
@@ -76,6 +79,11 @@ public interface CareRequestRepository {
         Optional<CareRequest> findByIdWithPet(Long idx);
 
         /**
+         * 단일 케어 요청 조회 (작성자 포함) - 수정/삭제 시 권한 확인용
+         */
+        Optional<CareRequest> findByIdWithUser(Long idx);
+
+        /**
          * 단일 케어 요청 조회 (펫 정보 및 지원 정보 포함)
          */
         Optional<CareRequest> findByIdWithApplications(Long idx);
@@ -89,4 +97,19 @@ public interface CareRequestRepository {
          * 통계용: 특정 기간과 상태별 케어 요청 수
          */
         long countByDateBetweenAndStatus(LocalDateTime start, LocalDateTime end, CareRequestStatus status);
+
+        /**
+         * 페이징 - 전체 조회 (location optional)
+         */
+        Page<CareRequest> findAllActiveRequestsWithPaging(String location, Pageable pageable);
+
+        /**
+         * 페이징 - 상태별 조회 (location optional)
+         */
+        Page<CareRequest> findByStatusAndIsDeletedFalseWithPaging(CareRequestStatus status, String location, Pageable pageable);
+
+        /**
+         * 페이징 - 검색
+         */
+        Page<CareRequest> searchWithPaging(String keyword, Pageable pageable);
 }

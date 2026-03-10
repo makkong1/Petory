@@ -54,6 +54,8 @@ domain/
 ├── user/           # 사용자 및 반려동물 관리
 ├── board/          # 커뮤니티 게시판
 ├── care/           # 펫케어 요청/지원
+├── payment/        # 펫코인 결제, 에스크로
+├── chat/           # 실시간 채팅 (Conversation, ChatMessage)
 ├── location/       # 위치 기반 서비스
 ├── meetup/         # 오프라인 모임
 ├── report/         # 신고 및 제재
@@ -66,7 +68,8 @@ domain/
 domain/
 ├── file/           # 파일 관리
 ├── activity/       # 활동 로그
-└── statistics/     # 통계
+├── statistics/     # 통계
+└── admin/          # 관리자 API (Admin* Controller)
 ```
 
 ### 각 도메인의 표준 구조
@@ -136,7 +139,7 @@ domain/[domain-name]/
 ## 크로스 커팅 관심사 (Cross-Cutting Concerns)
 
 ### 1. 보안 (Security)
-- **위치**: `global/auth/`, `global/security/`
+- **위치**: `global/security/`, `filter/`
 - **기능**:
   - JWT 인증/인가
   - Spring Security 설정
@@ -151,7 +154,7 @@ domain/[domain-name]/
   - 일관된 에러 응답
 
 ### 3. 설정 (Configuration)
-- **위치**: `global/config/`
+- **위치**: `global/security/` (RedisConfig, SecurityConfig 등), `application.properties`
 - **기능**:
   - JPA 설정
   - 캐시 설정

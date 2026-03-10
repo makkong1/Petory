@@ -7,6 +7,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.linkup.Petory.domain.care.converter.CareReviewConverter;
+import com.linkup.Petory.domain.care.exception.CareApplicationNotFoundException;
+import com.linkup.Petory.domain.care.exception.CareConflictException;
+import com.linkup.Petory.domain.care.exception.CareForbiddenException;
+import com.linkup.Petory.domain.care.exception.CareValidationException;
 import com.linkup.Petory.domain.care.dto.CareReviewDTO;
 import com.linkup.Petory.domain.care.dto.ReviewSummaryDTO;
 import com.linkup.Petory.domain.care.entity.CareApplication;
@@ -15,6 +19,7 @@ import com.linkup.Petory.domain.care.entity.CareReview;
 import com.linkup.Petory.domain.care.repository.CareApplicationRepository;
 import com.linkup.Petory.domain.care.repository.CareReviewRepository;
 import com.linkup.Petory.domain.user.entity.Users;
+import com.linkup.Petory.domain.user.exception.UserNotFoundException;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -91,12 +96,12 @@ public class CareReviewService {
     @Transactional
     public CareReviewDTO createReview(CareReviewDTO dto) {
         if (dto.getCareApplicationId() == null) {
-            throw new IllegalArgumentException("CareApplication ID가 필요합니다.");
+            throw CareValidationException.careApplicationIdRequired();
         }
 
         // CareApplication 조회
         CareApplication careApplication = careApplicationRepository.findById(dto.getCareApplicationId())
-                .orElseThrow(() -> new RuntimeException("CareApplication not found"));
+                .orElseThrow(() -> new CareApplicationNotFoundException());
 
         // 상태 확인 (ACCEPTED 상태여야 함)
         if (careApplication.getStatus() != CareApplicationStatus.ACCEPTED) {
@@ -107,7 +112,7 @@ public class CareReviewService {
         boolean alreadyReviewed = reviewRepository.existsByCareApplicationIdxAndReviewerIdx(
                 dto.getCareApplicationId(), dto.getReviewerId());
         if (alreadyReviewed) {
-            throw new IllegalStateException("이미 해당 서비스에 리뷰를 작성하셨습니다.");
+            throw CareConflictException.alreadyReviewed();
         }
 
         // 요청자와 제공자 확인
@@ -115,7 +120,7 @@ public class CareReviewService {
         Long providerId = careApplication.getProvider().getIdx();
 
         if (!dto.getReviewerId().equals(requesterId)) {
-            throw new IllegalArgumentException("요청자만 리뷰를 작성할 수 있습니다.");
+            throw CareForbiddenException.requesterOnly();
         }
 
         if (!dto.getRevieweeId().equals(providerId)) {
@@ -124,9 +129,9 @@ public class CareReviewService {
 
         // 사용자 조회
         Users reviewer = usersRepository.findById(dto.getReviewerId())
-                .orElseThrow(() -> new RuntimeException("Reviewer not found"));
+                .orElseThrow(() -> new UserNotFoundException("리뷰 작성자를 찾을 수 없습니다."));
         Users reviewee = usersRepository.findById(dto.getRevieweeId())
-                .orElseThrow(() -> new RuntimeException("Reviewee not found"));
+                .orElseThrow(() -> new UserNotFoundException("리뷰 대상자를 찾을 수 없습니다."));
 
         // 리뷰 생성
         CareReview review = CareReview.builder()

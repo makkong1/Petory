@@ -1,5 +1,6 @@
 package com.linkup.Petory.domain.board.repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -92,6 +93,12 @@ public class JpaMissingPetCommentAdapter implements MissingPetCommentRepository 
     @Override
     public Page<MissingPetComment> findByBoardIdAndIsDeletedFalseOrderByCreatedAtAsc(Long boardId, Pageable pageable) {
         return jpaRepository.findByBoardIdAndIsDeletedFalseOrderByCreatedAtAsc(boardId, pageable);
+    }
+
+    @Override
+    public int softDeleteAllByBoardIdx(Long boardIdx, LocalDateTime deletedAt) {
+        // [리팩토링] 배치 UPDATE - N건 루프 save 대체
+        return jpaRepository.softDeleteAllByBoardIdx(boardIdx, deletedAt);
     }
 }
 

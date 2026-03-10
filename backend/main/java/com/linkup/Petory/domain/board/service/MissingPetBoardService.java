@@ -8,22 +8,29 @@ import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import com.linkup.Petory.domain.board.converter.MissingPetConverter;
+import com.linkup.Petory.domain.board.exception.MissingPetBoardNotFoundException;
 import com.linkup.Petory.domain.board.dto.MissingPetBoardDTO;
 import com.linkup.Petory.domain.board.dto.MissingPetBoardPageResponseDTO;
 import com.linkup.Petory.domain.board.dto.MissingPetCommentDTO;
 import com.linkup.Petory.domain.board.dto.MissingPetCommentPageResponseDTO;
 import com.linkup.Petory.domain.board.entity.MissingPetBoard;
 import com.linkup.Petory.domain.board.entity.MissingPetStatus;
+import com.linkup.Petory.domain.user.entity.EmailVerificationPurpose;
+import com.linkup.Petory.domain.user.entity.Users;
+import com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException;
+import com.linkup.Petory.domain.user.exception.UserNotFoundException;
+
+import jakarta.persistence.criteria.Join;
 import com.linkup.Petory.domain.board.repository.MissingPetBoardRepository;
 import com.linkup.Petory.domain.file.dto.FileDTO;
 import com.linkup.Petory.domain.file.entity.FileTargetType;
 import com.linkup.Petory.domain.file.service.AttachmentFileService;
-import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -33,8 +40,8 @@ import lombok.RequiredArgsConstructor;
 @Transactional(readOnly = true)
 public class MissingPetBoardService {
 
-    private final MissingPetBoardRepository boardRepository;
-    private final MissingPetCommentService commentService;
+    private final MissingPetBoardRepository missingPetBoardRepository;
+    private final MissingPetCommentService missingPetCommentService;
     private final UsersRepository usersRepository;
     private final MissingPetConverter missingPetConverter;
     private final AttachmentFileService attachmentFileService;
@@ -54,8 +61,8 @@ public class MissingPetBoardService {
 
         // 게시글 + 작성자 페이징 조회 (댓글 제외 - 조인 폭발 방지)
         Page<MissingPetBoard> boardPage = status == null
-                ? boardRepository.findAllByOrderByCreatedAtDesc(pageable)
-                : boardRepository.findByStatusOrderByCreatedAtDesc(status, pageable);
+                ? missingPetBoardRepository.findAllByOrderByCreatedAtDesc(pageable)
+                : missingPetBoardRepository.findByStatusOrderByCreatedAtDesc(status, pageable);
 
         if (boardPage.isEmpty()) {
             return new MissingPetBoardPageResponseDTO(
@@ -80,7 +87,7 @@ public class MissingPetBoardService {
                 FileTargetType.MISSING_PET, boardIds);
 
         // 댓글 수 배치 조회 (N+1 문제 해결)
-        Map<Long, Integer> commentCountsByBoardId = commentService.getCommentCountsBatch(boardIds);
+        Map<Long, Integer> commentCountsByBoardId = missingPetCommentService.getCommentCountsBatch(boardIds);
 
         // DTO 변환 (파일 정보 포함, 댓글은 빈 리스트)
         // toBoardDTOWithoutComments 사용으로 N+1 문제 방지 (댓글 lazy loading 트리거 안함)
@@ -120,8 +127,8 @@ public class MissingPetBoardService {
     public List<MissingPetBoardDTO> getBoards(MissingPetStatus status) {
         // 게시글 + 작성자만 조회 (댓글 제외 - 조인 폭발 방지)
         List<MissingPetBoard> boards = status == null
-                ? boardRepository.findAllByOrderByCreatedAtDesc()
-                : boardRepository.findByStatusOrderByCreatedAtDesc(status);
+                ? missingPetBoardRepository.findAllByOrderByCreatedAtDesc()
+                : missingPetBoardRepository.findByStatusOrderByCreatedAtDesc(status);
 
         // 게시글 ID 목록 추출
         List<Long> boardIds = boards.stream()
@@ -133,7 +140,7 @@ public class MissingPetBoardService {
                 FileTargetType.MISSING_PET, boardIds);
 
         // 댓글 수 배치 조회 (N+1 문제 해결)
-        Map<Long, Integer> commentCountsByBoardId = commentService.getCommentCountsBatch(boardIds);
+        Map<Long, Integer> commentCountsByBoardId = missingPetCommentService.getCommentCountsBatch(boardIds);
 
         // DTO 변환 (파일 정보 포함, 댓글은 빈 리스트)
         // toBoardDTOWithoutComments 사용으로 N+1 문제 방지 (댓글 lazy loading 트리거 안함)
@@ -166,12 +173,12 @@ public class MissingPetBoardService {
      */
     public MissingPetBoardDTO getBoard(Long id, Integer commentPage, Integer commentSize) {
         // 게시글 + 작성자만 조회 (댓글 제외)
-        MissingPetBoard board = boardRepository.findByIdWithUser(id)
-                .orElseThrow(() -> new IllegalArgumentException("Missing pet board not found"));
+        MissingPetBoard board = missingPetBoardRepository.findByIdWithUser(id)
+                .orElseThrow(() -> new MissingPetBoardNotFoundException());
 
         // 삭제된 게시글인지 확인
         if (board.getIsDeleted()) {
-            throw new IllegalArgumentException("Missing pet board not found");
+            throw new MissingPetBoardNotFoundException();
         }
 
         // 게시글 파일 조회
@@ -179,12 +186,13 @@ public class MissingPetBoardService {
                 FileTargetType.MISSING_PET, board.getIdx());
 
         // 댓글 수 조회
-        int commentCount = commentService.getCommentCount(board);
+        int commentCount = missingPetCommentService.getCommentCount(board);
 
         // 댓글 페이징 조회 (파라미터가 제공된 경우)
         List<MissingPetCommentDTO> comments = List.of();
         if (commentPage != null && commentSize != null && commentSize > 0) {
-            MissingPetCommentPageResponseDTO commentPageResponse = commentService.getCommentsWithPaging(id, commentPage,
+            MissingPetCommentPageResponseDTO commentPageResponse = missingPetCommentService.getCommentsWithPaging(id,
+                    commentPage,
                     commentSize);
             comments = commentPageResponse.comments();
         }
@@ -209,13 +217,13 @@ public class MissingPetBoardService {
     @Transactional
     public MissingPetBoardDTO createBoard(MissingPetBoardDTO dto) {
         Users user = usersRepository.findById(dto.getUserId())
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new UserNotFoundException());
 
         // 이메일 인증 확인
         if (user.getEmailVerified() == null || !user.getEmailVerified()) {
-            throw new com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException(
+            throw new EmailVerificationRequiredException(
                     "실종 제보 작성을 위해 이메일 인증이 필요합니다.",
-                    com.linkup.Petory.domain.user.entity.EmailVerificationPurpose.MISSING_PET);
+                    EmailVerificationPurpose.MISSING_PET);
         }
 
         MissingPetBoard board = MissingPetBoard.builder()
@@ -235,7 +243,7 @@ public class MissingPetBoardService {
                 .status(dto.getStatus())
                 .build();
 
-        MissingPetBoard saved = boardRepository.save(board);
+        MissingPetBoard saved = missingPetBoardRepository.save(board);
         if (dto.getImageUrl() != null) {
             attachmentFileService.syncSingleAttachment(FileTargetType.MISSING_PET, saved.getIdx(), dto.getImageUrl(),
                     null);
@@ -251,8 +259,9 @@ public class MissingPetBoardService {
      */
     @Transactional
     public MissingPetBoardDTO updateBoard(Long id, MissingPetBoardDTO dto) {
-        MissingPetBoard board = boardRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Missing pet board not found"));
+        // [리팩토링] findById → findByIdWithUser (이메일 인증 확인을 위해 User 필요)
+        MissingPetBoard board = missingPetBoardRepository.findByIdWithUser(id)
+                .orElseThrow(() -> new MissingPetBoardNotFoundException());
 
         // 이메일 인증 확인
         Users user = board.getUser();
@@ -310,14 +319,23 @@ public class MissingPetBoardService {
     }
 
     /**
+     * [리팩토링] 게시글 작성자 ID만 조회 (경량) - startMissingPetChat 등
+     * getBoard 전체 조회 대신 프로젝션 쿼리 1회
+     */
+    public Long getUserIdByBoardIdx(Long boardIdx) {
+        return missingPetBoardRepository.findUserIdByIdx(boardIdx)
+                .orElseThrow(() -> new MissingPetBoardNotFoundException());
+    }
+
+    /**
      * 실종 제보 상태 변경
      * 엔드포인트: PATCH /api/missing-pets/{id}/status
-     * - 상태: MISSING(실종), FOUND(발견), CLOSED(종료)
+     * - 상태: MISSING(실종), FOUND(발견), RESOLVED(종료)
      */
     @Transactional
     public MissingPetBoardDTO updateStatus(Long id, MissingPetStatus status) {
-        MissingPetBoard board = boardRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Missing pet board not found"));
+        MissingPetBoard board = missingPetBoardRepository.findById(id)
+                .orElseThrow(() -> new MissingPetBoardNotFoundException());
         board.setStatus(status);
         return mapBoardWithAttachments(board);
     }
@@ -330,15 +348,15 @@ public class MissingPetBoardService {
      */
     @Transactional
     public void deleteBoard(Long id) {
-        MissingPetBoard board = boardRepository.findByIdWithUser(id)
-                .orElseThrow(() -> new IllegalArgumentException("Missing pet board not found"));
+        MissingPetBoard board = missingPetBoardRepository.findByIdWithUser(id)
+                .orElseThrow(() -> new MissingPetBoardNotFoundException());
 
         // 이메일 인증 확인
         Users user = board.getUser();
         if (user.getEmailVerified() == null || !user.getEmailVerified()) {
             throw new com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException(
                     "실종 제보 삭제를 위해 이메일 인증이 필요합니다.",
-                    com.linkup.Petory.domain.user.entity.EmailVerificationPurpose.MISSING_PET);
+                    EmailVerificationPurpose.MISSING_PET);
         }
 
         // 게시글 소프트 삭제
@@ -346,9 +364,116 @@ public class MissingPetBoardService {
         board.setDeletedAt(java.time.LocalDateTime.now());
 
         // 관련 댓글 모두 소프트 삭제
-        commentService.deleteAllCommentsByBoard(board);
+        missingPetCommentService.deleteAllCommentsByBoard(board);
 
-        boardRepository.saveAndFlush(board);
+        missingPetBoardRepository.saveAndFlush(board);
+    }
+
+    /**
+     * [리팩토링] 실종 제보 복구 (관리자용)
+     * 엔드포인트: POST /api/admin/missing-pets/{id}/restore
+     * - isDeleted = false, deletedAt = null 설정
+     */
+    @Transactional
+    public MissingPetBoardDTO restoreBoard(Long id) {
+        MissingPetBoard board = missingPetBoardRepository.findById(id)
+                .orElseThrow(() -> new MissingPetBoardNotFoundException());
+
+        board.setIsDeleted(false);
+        board.setDeletedAt(null);
+
+        return mapBoardWithAttachments(missingPetBoardRepository.save(board));
+    }
+
+    /**
+     * [리팩토링] 관리자용 실종 제보 조회 (페이징 + DB 레벨 필터링)
+     * - 메모리 필터링 제거 → Specification + DB 페이징
+     * - status, deleted, q 필터 지원
+     * - 삭제된 게시글/작성자 비활성 사용자 게시글도 조회 가능
+     */
+    public MissingPetBoardPageResponseDTO getAdminBoardsWithPaging(
+            MissingPetStatus status, Boolean deleted, String q, int page, int size) {
+
+        Specification<MissingPetBoard> spec = null;
+
+        // [리팩토링] 삭제 여부 필터 - DB 레벨
+        if (deleted != null) {
+            Specification<MissingPetBoard> deletedSpec = (root, query, cb) -> cb.equal(root.get("isDeleted"), deleted);
+            spec = spec == null ? deletedSpec : spec.and(deletedSpec);
+        }
+
+        // [리팩토링] 상태 필터 - DB 레벨
+        if (status != null) {
+            Specification<MissingPetBoard> statusSpec = (root, query, cb) -> cb.equal(root.get("status"), status);
+            spec = spec == null ? statusSpec : spec.and(statusSpec);
+        }
+
+        // [리팩토링] 검색어 필터 (제목, 내용, 반려동물 이름, 작성자명) - join으로 user 조인
+        if (q != null && !q.isBlank()) {
+            String keyword = "%" + q.toLowerCase() + "%";
+            Specification<MissingPetBoard> searchSpec = (root, query, cb) -> {
+                Join<MissingPetBoard, Users> userJoin = root.join("user", jakarta.persistence.criteria.JoinType.LEFT);
+                return cb.or(
+                        cb.like(cb.lower(root.get("title")), keyword),
+                        cb.like(cb.lower(root.get("content")), keyword),
+                        cb.like(cb.lower(root.get("petName")), keyword),
+                        cb.like(cb.lower(userJoin.get("username")), keyword));
+            };
+            spec = spec == null ? searchSpec : spec.and(searchSpec);
+        }
+
+        // [리팩토링] user fetch - toBoardDTOWithoutComments N+1 방지
+        Specification<MissingPetBoard> userFetchSpec = (root, query, cb) -> {
+            if (Long.class != query.getResultType()) {
+                root.fetch("user", jakarta.persistence.criteria.JoinType.LEFT);
+            }
+            return cb.conjunction();
+        };
+        spec = spec == null ? userFetchSpec : spec.and(userFetchSpec);
+
+        Pageable pageable = PageRequest.of(page, size,
+                org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC,
+                        "createdAt"));
+
+        Page<MissingPetBoard> boardPage = missingPetBoardRepository.findAll(spec, pageable);
+
+        if (boardPage.isEmpty()) {
+            return new MissingPetBoardPageResponseDTO(
+                    new ArrayList<>(),
+                    0,
+                    0,
+                    page,
+                    size,
+                    false,
+                    false);
+        }
+
+        List<MissingPetBoard> boards = boardPage.getContent();
+        List<Long> boardIds = boards.stream().map(MissingPetBoard::getIdx).collect(Collectors.toList());
+
+        Map<Long, List<FileDTO>> filesByBoardId = attachmentFileService.getAttachmentsBatch(
+                FileTargetType.MISSING_PET, boardIds);
+        Map<Long, Integer> commentCountsByBoardId = missingPetCommentService.getCommentCountsBatch(boardIds);
+
+        List<MissingPetBoardDTO> boardDTOs = boards.stream()
+                .map(board -> {
+                    MissingPetBoardDTO dto = missingPetConverter.toBoardDTOWithoutComments(board);
+                    List<FileDTO> attachments = filesByBoardId.getOrDefault(board.getIdx(), List.of());
+                    dto.setAttachments(attachments);
+                    dto.setImageUrl(attachmentFileService.extractPrimaryFileUrl(attachments));
+                    dto.setCommentCount(commentCountsByBoardId.getOrDefault(board.getIdx(), 0));
+                    return dto;
+                })
+                .collect(Collectors.toList());
+
+        return new MissingPetBoardPageResponseDTO(
+                boardDTOs,
+                boardPage.getTotalElements(),
+                boardPage.getTotalPages(),
+                page,
+                size,
+                boardPage.hasNext(),
+                boardPage.hasPrevious());
     }
 
     /**

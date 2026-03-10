@@ -76,6 +76,11 @@ public class JpaMeetupAdapter implements MeetupRepository {
     }
 
     @Override
+    public Optional<Meetup> findByIdWithOrganizer(Long idx) {
+        return jpaRepository.findByIdWithOrganizer(idx);
+    }
+
+    @Override
     public Optional<Meetup> findByIdWithLock(Long idx) {
         return jpaRepository.findByIdWithLock(idx);
     }
@@ -93,6 +98,11 @@ public class JpaMeetupAdapter implements MeetupRepository {
     @Override
     public Optional<Meetup> findByIdWithDetails(Long idx) {
         return jpaRepository.findByIdWithDetails(idx);
+    }
+
+    @Override
+    public long countByCreatedAtBetween(LocalDateTime start, LocalDateTime end) {
+        return jpaRepository.countByCreatedAtBetween(start, end);
     }
 }
 

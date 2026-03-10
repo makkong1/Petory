@@ -16,7 +16,10 @@ import com.linkup.Petory.domain.payment.dto.PetCoinTransactionDetailDTO;
 import com.linkup.Petory.domain.payment.entity.PetCoinTransaction;
 import com.linkup.Petory.domain.payment.repository.PetCoinTransactionRepository;
 import com.linkup.Petory.domain.payment.service.PetCoinService;
+import com.linkup.Petory.domain.payment.exception.PaymentValidationException;
 import com.linkup.Petory.domain.user.entity.Users;
+import com.linkup.Petory.domain.user.exception.UnauthenticatedException;
+import com.linkup.Petory.domain.user.exception.UserNotFoundException;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -87,7 +90,7 @@ public class PetCoinController {
                 Users user = getCurrentUser();
 
                 if (request.amount() == null || request.amount() <= 0) {
-                        throw new IllegalArgumentException("충전 금액은 0보다 커야 합니다.");
+                        throw PaymentValidationException.chargeAmountInvalid();
                 }
 
                 PetCoinTransaction transaction = petCoinService.chargeCoins(
@@ -107,10 +110,10 @@ public class PetCoinController {
         private Users getCurrentUser() {
                 Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
                 if (authentication == null || authentication.getPrincipal() == null) {
-                        throw new RuntimeException("인증이 필요합니다.");
+                        throw new UnauthenticatedException("인증이 필요합니다.");
                 }
                 String userId = authentication.getName();
                 return usersRepository.findByIdString(userId)
-                                .orElseThrow(() -> new RuntimeException("User not found"));
+                                .orElseThrow(() -> new UserNotFoundException());
         }
 }

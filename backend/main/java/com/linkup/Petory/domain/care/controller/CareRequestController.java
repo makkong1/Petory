@@ -8,6 +8,9 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import com.linkup.Petory.domain.care.dto.CareRequestDTO;
+import com.linkup.Petory.domain.care.exception.CareValidationException;
+import com.linkup.Petory.domain.user.exception.UnauthenticatedException;
+import com.linkup.Petory.domain.care.dto.CareRequestPageResponseDTO;
 import com.linkup.Petory.domain.care.service.CareRequestService;
 
 import lombok.RequiredArgsConstructor;
@@ -27,23 +30,25 @@ public class CareRequestController {
     private Long getCurrentUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || authentication.getPrincipal() == null) {
-            throw new RuntimeException("인증되지 않은 사용자입니다.");
+            throw new UnauthenticatedException("인증되지 않은 사용자입니다.");
         }
         // UserDetails의 username이 실제로는 userId (id 필드)
         String userIdString = authentication.getName();
         try {
             return Long.parseLong(userIdString);
         } catch (NumberFormatException e) {
-            throw new RuntimeException("유효하지 않은 사용자 ID입니다.");
+            throw CareValidationException.invalidUserId();
         }
     }
 
-    // 전체 케어 요청 조회
+    // 전체 케어 요청 조회 (페이징 지원)
     @GetMapping
-    public ResponseEntity<List<CareRequestDTO>> getAllCareRequests(
+    public ResponseEntity<CareRequestPageResponseDTO> getAllCareRequests(
             @RequestParam(required = false) String status,
-            @RequestParam(required = false) String location) {
-        return ResponseEntity.ok(careRequestService.getAllCareRequests(status, location));
+            @RequestParam(required = false) String location,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(careRequestService.getCareRequestsWithPaging(status, location, page, size));
     }
 
     // 단일 케어 요청 조회
@@ -88,9 +93,12 @@ public class CareRequestController {
         return ResponseEntity.ok(careRequestService.updateStatus(id, status, currentUserId));
     }
 
-    // 케어 요청 검색
+    // 케어 요청 검색 (페이징 지원)
     @GetMapping("/search")
-    public ResponseEntity<List<CareRequestDTO>> searchCareRequests(@RequestParam String keyword) {
-        return ResponseEntity.ok(careRequestService.searchCareRequests(keyword));
+    public ResponseEntity<CareRequestPageResponseDTO> searchCareRequests(
+            @RequestParam String keyword,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(careRequestService.searchCareRequestsWithPaging(keyword, page, size));
     }
 }

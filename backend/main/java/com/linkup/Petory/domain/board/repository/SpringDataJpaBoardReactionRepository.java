@@ -11,32 +11,30 @@ import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.board.entity.Board;
 import com.linkup.Petory.domain.board.entity.BoardReaction;
 import com.linkup.Petory.domain.board.entity.ReactionType;
+import com.linkup.Petory.global.annotation.RepositoryMethod;
 
 /**
  * Spring Data JPA 전용 인터페이스입니다.
  */
 public interface SpringDataJpaBoardReactionRepository extends JpaRepository<BoardReaction, Long> {
 
+    @RepositoryMethod("게시글 반응: 좋아요/싫어요 카운트")
     long countByBoardAndReactionType(Board board, ReactionType reactionType);
 
+    @RepositoryMethod("게시글 반응: 사용자별 조회")
     Optional<BoardReaction> findByBoardAndUser(Board board, Users user);
 
+    @RepositoryMethod("게시글 반응: 게시글별 삭제")
     void deleteByBoard(Board board);
 
-    /**
-     * 여러 게시글의 좋아요/싫어요 카운트를 한 번에 조회 (배치 조회)
-     * 반환값: Map<BoardId, Map<ReactionType, Count>>
-     */
+    @RepositoryMethod("게시글 반응: 배치 카운트 조회")
     @Query("SELECT br.board.idx as boardId, br.reactionType as reactionType, COUNT(br) as count " +
            "FROM BoardReaction br " +
            "WHERE br.board.idx IN :boardIds " +
            "GROUP BY br.board.idx, br.reactionType")
     List<Object[]> countByBoardsGroupByReactionType(@Param("boardIds") List<Long> boardIds);
 
-    /**
-     * 단일 게시글의 좋아요/싫어요 카운트를 한 번에 조회
-     * 반환값: [boardId, reactionType, count] 형태의 Object[] 리스트
-     */
+    @RepositoryMethod("게시글 반응: 단건 카운트 조회")
     @Query("SELECT br.board.idx as boardId, br.reactionType as reactionType, COUNT(br) as count " +
            "FROM BoardReaction br " +
            "WHERE br.board.idx = :boardId " +

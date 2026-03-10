@@ -31,6 +31,11 @@ public class JpaLocationServiceReviewAdapter implements LocationServiceReviewRep
     }
 
     @Override
+    public Optional<LocationServiceReview> findByIdWithUserAndService(Long idx) {
+        return jpaRepository.findByIdWithUserAndService(idx);
+    }
+
+    @Override
     public void delete(LocationServiceReview review) {
         jpaRepository.delete(review);
     }

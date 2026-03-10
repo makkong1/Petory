@@ -26,9 +26,9 @@ import com.linkup.Petory.domain.care.entity.CareRequestComment;
 import com.linkup.Petory.domain.care.repository.CareRequestCommentRepository;
 import com.linkup.Petory.domain.care.repository.CareRequestRepository;
 import com.linkup.Petory.domain.user.entity.Users;
+import com.linkup.Petory.domain.user.exception.UserNotFoundException;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 
-import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -47,7 +47,7 @@ public class ActivityService {
         public List<ActivityDTO> getUserActivities(long userId) {
                 System.out.println("=== [ActivityService] getUserActivities 호출됨 - userId: " + userId + " ===");
                 Users user = usersRepository.findById(userId)
-                                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                                .orElseThrow(UserNotFoundException::new);
 
                 List<ActivityDTO> activities = new ArrayList<>();
 

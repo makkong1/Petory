@@ -39,7 +39,7 @@
 ### 2.1 핵심 비즈니스 로직
 
 #### 로직 1: 사용자 활동 통합 조회
-**구현 위치**: `ActivityService.getUserActivities()` (Lines 46-251)
+**구현 위치**: `ActivityService.getUserActivities()`
 
 **핵심 로직**:
 - **다양한 도메인에서 활동 수집**:
@@ -63,7 +63,7 @@
 ```java
 public List<ActivityDTO> getUserActivities(long userId) {
     Users user = usersRepository.findById(userId)
-        .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        .orElseThrow(UserNotFoundException::new);
     
     List<ActivityDTO> activities = new ArrayList<>();
     
@@ -140,7 +140,7 @@ public List<ActivityDTO> getUserActivities(long userId) {
 ```
 
 #### 로직 2: 활동 조회 (페이징 및 필터링)
-**구현 위치**: `ActivityService.getUserActivitiesWithPaging()` (Lines 254-297)
+**구현 위치**: `ActivityService.getUserActivitiesWithPaging()`
 
 **핵심 로직**:
 - **전체 활동 조회**: `getUserActivities()` 호출하여 모든 활동 수집
@@ -256,7 +256,15 @@ domain/activity/
       └── ActivityPageResponseDTO.java
 ```
 
-### 3.2 ActivityDTO 구조
+**의존성**: `UserNotFoundException`은 `domain/user/exception/`에서 제공됩니다.
+
+### 3.2 예외 처리
+
+| 예외 | HTTP 상태 | 발생 시점 |
+|------|----------|----------|
+| `UserNotFoundException` | 404 Not Found | `getUserActivities()`, `getUserActivitiesWithPaging()`에서 사용자 미존재 시 |
+
+### 3.3 ActivityDTO 구조
 ```java
 public class ActivityDTO {
     private Long idx;                    // 활동 ID
@@ -274,7 +282,7 @@ public class ActivityDTO {
 }
 ```
 
-### 3.3 ActivityPageResponseDTO 구조
+### 3.4 ActivityPageResponseDTO 구조
 ```java
 public class ActivityPageResponseDTO {
     private List<ActivityDTO> activities;  // 활동 목록
@@ -293,7 +301,7 @@ public class ActivityPageResponseDTO {
 }
 ```
 
-### 3.4 활동 타입 분류
+### 3.5 활동 타입 분류
 
 #### 게시글 타입 (`isPostType()`)
 - `CARE_REQUEST`: 펫케어 요청
@@ -405,5 +413,8 @@ ON missing_pet_comment(user_idx, is_deleted, created_at DESC);
 - **리뷰**: `LOCATION_REVIEW` (현재 미구현)
 
 ### API 엔드포인트
-- `GET /api/activities/my?userId={userId}`: 사용자 활동 목록 조회 (하위 호환성 유지)
-- `GET /api/activities/my/paging?userId={userId}&filter={filter}&page={page}&size={size}`: 페이징 지원 활동 목록 조회
+
+| 엔드포인트 | Method | 설명 | 예외 |
+|-----------|--------|------|------|
+| `/api/activities/my` | GET | 사용자 활동 목록 조회 (userId 파라미터) | `UserNotFoundException` (404) |
+| `/api/activities/my/paging` | GET | 페이징 지원 활동 목록 조회 (userId, filter, page, size) | `UserNotFoundException` (404) |

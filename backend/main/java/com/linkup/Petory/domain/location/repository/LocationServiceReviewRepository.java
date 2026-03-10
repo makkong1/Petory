@@ -15,6 +15,11 @@ public interface LocationServiceReviewRepository {
 
     Optional<LocationServiceReview> findById(Long id);
 
+    /**
+     * 단건 조회 (user, service 포함) - 수정/삭제 시 권한 확인용
+     */
+    Optional<LocationServiceReview> findByIdWithUserAndService(Long idx);
+
     void delete(LocationServiceReview review);
 
     void deleteById(Long id);

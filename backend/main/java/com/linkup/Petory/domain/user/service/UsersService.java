@@ -3,15 +3,18 @@ package com.linkup.Petory.domain.user.service;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.linkup.Petory.domain.user.converter.PetConverter;
 import com.linkup.Petory.domain.user.converter.UsersConverter;
 import com.linkup.Petory.domain.user.dto.PetDTO;
 import com.linkup.Petory.domain.user.dto.UsersDTO;
@@ -19,7 +22,13 @@ import com.linkup.Petory.domain.user.dto.UserPageResponseDTO;
 import com.linkup.Petory.domain.user.entity.EmailVerificationPurpose;
 import com.linkup.Petory.domain.user.entity.Role;
 import com.linkup.Petory.domain.user.entity.UserStatus;
+import com.linkup.Petory.domain.user.entity.Pet;
 import com.linkup.Petory.domain.user.entity.Users;
+import com.linkup.Petory.domain.user.exception.DuplicateUserFieldException;
+import com.linkup.Petory.domain.user.exception.InvalidPasswordException;
+import com.linkup.Petory.domain.user.exception.UserForbiddenException;
+import com.linkup.Petory.domain.user.exception.UserNotFoundException;
+import com.linkup.Petory.domain.user.exception.UserValidationException;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -33,9 +42,13 @@ public class UsersService {
 
     private final UsersRepository usersRepository;
     private final UsersConverter usersConverter;
+    private final PetConverter petConverter;
     private final PasswordEncoder passwordEncoder;
-    private final PetService petService;
+    // private final PetService petService;
     private final EmailVerificationService emailVerificationService;
+
+    @Value("${app.email-verification.skip-in-dev:false}")
+    private boolean skipInDev;
 
     /**
      * 전체 사용자 조회 (페이징 지원, 관리자용)
@@ -88,14 +101,14 @@ public class UsersService {
     // username으로 조회
     public UsersDTO getUserByUsername(String username) {
         Users user = usersRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("User not found with username: " + username));
+                .orElseThrow(UserNotFoundException::new);
         return usersConverter.toDTO(user);
     }
 
     // id로 조회 (로그인용)
     public UsersDTO getUserById(String id) {
         Users user = usersRepository.findByIdString(id)
-                .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
+                .orElseThrow(UserNotFoundException::new);
         return usersConverter.toDTO(user);
     }
 
@@ -105,23 +118,24 @@ public class UsersService {
         // 닉네임 필수 검증
         String nickname = dto.getNickname();
         if (nickname == null || nickname.trim().isEmpty()) {
-            throw new RuntimeException("닉네임은 필수입니다.");
+            throw UserValidationException.nicknameRequired();
         }
 
         if (nickname.length() > 50) {
-            throw new RuntimeException("닉네임은 50자 이하여야 합니다.");
+            throw UserValidationException.nicknameMaxLength();
         }
 
-        // [리팩토링] findByNickname + findByUsername + findByEmail 3회 → findByNicknameOrUsernameOrEmail 1회
+        // [리팩토링] findByNickname + findByUsername + findByEmail 3회 →
+        // findByNicknameOrUsernameOrEmail 1회
         usersRepository.findByNicknameOrUsernameOrEmail(nickname, dto.getUsername(), dto.getEmail())
                 .ifPresent(existing -> {
                     if (Objects.equals(existing.getNickname(), nickname)) {
-                        throw new RuntimeException("이미 사용 중인 닉네임입니다.");
+                        throw new DuplicateUserFieldException(DuplicateUserFieldException.Field.NICKNAME);
                     }
                     if (Objects.equals(existing.getUsername(), dto.getUsername())) {
-                        throw new RuntimeException("이미 사용 중인 사용자명입니다.");
+                        throw new DuplicateUserFieldException(DuplicateUserFieldException.Field.USERNAME);
                     }
-                    throw new RuntimeException("이미 사용 중인 이메일입니다.");
+                    throw new DuplicateUserFieldException(DuplicateUserFieldException.Field.EMAIL);
                 });
 
         Users user = usersConverter.toEntity(dto);
@@ -130,7 +144,7 @@ public class UsersService {
         if (dto.getPassword() != null && !dto.getPassword().isEmpty()) {
             user.setPassword(passwordEncoder.encode(dto.getPassword()));
         } else {
-            throw new RuntimeException("비밀번호는 필수입니다.");
+            throw InvalidPasswordException.required();
         }
 
         // 일반 회원가입은 소셜 로그인 필드들은 null로 유지
@@ -138,9 +152,9 @@ public class UsersService {
         user.setBirthDate(null);
         user.setGender(null);
 
-        // 회원가입 전 이메일 인증 완료 여부 확인
+        // 회원가입 전 이메일 인증 완료 여부 확인 (개발 모드에서는 자동 인증)
         boolean preVerified = emailVerificationService.isPreRegistrationEmailVerified(dto.getEmail());
-        user.setEmailVerified(preVerified); // 회원가입 전 인증 완료했으면 true, 아니면 false
+        user.setEmailVerified(skipInDev || preVerified);
 
         Users saved;
         try {
@@ -150,25 +164,25 @@ public class UsersService {
             String errorMessage = e.getMessage();
             if (errorMessage != null) {
                 if (errorMessage.contains("nickname") || errorMessage.contains("nick_name")) {
-                    throw new RuntimeException("이미 사용 중인 닉네임입니다.");
+                    throw new DuplicateUserFieldException(DuplicateUserFieldException.Field.NICKNAME);
                 } else if (errorMessage.contains("username") || errorMessage.contains("user_name")) {
-                    throw new RuntimeException("이미 사용 중인 사용자명입니다.");
+                    throw new DuplicateUserFieldException(DuplicateUserFieldException.Field.USERNAME);
                 } else if (errorMessage.contains("email")) {
-                    throw new RuntimeException("이미 사용 중인 이메일입니다.");
+                    throw new DuplicateUserFieldException(DuplicateUserFieldException.Field.EMAIL);
                 } else if (errorMessage.contains("id")) {
-                    throw new RuntimeException("이미 사용 중인 아이디입니다.");
+                    throw new DuplicateUserFieldException(DuplicateUserFieldException.Field.ID);
                 }
             }
             // 알 수 없는 제약조건 위반
-            throw new RuntimeException("이미 사용 중인 정보가 있습니다. 다른 값을 사용해주세요.", e);
+            throw new DuplicateUserFieldException("이미 사용 중인 정보가 있습니다. 다른 값을 사용해주세요.");
         }
 
         // 회원가입 전 이메일 인증을 완료한 경우 Redis에서 인증 상태 삭제
         if (preVerified) {
             emailVerificationService.removePreRegistrationVerification(dto.getEmail());
             log.info("회원가입 완료 및 이메일 인증 상태 적용: userId={}, email={}", saved.getId(), saved.getEmail());
-        } else {
-            // 이메일 인증 안 했으면 회원가입 후 인증 메일 발송
+        } else if (!skipInDev) {
+            // 이메일 인증 안 했으면 회원가입 후 인증 메일 발송 (개발 모드에서는 스킵)
             try {
                 emailVerificationService.sendVerificationEmail(saved.getId(), EmailVerificationPurpose.REGISTRATION);
                 log.info("회원가입 후 이메일 인증 메일 발송: userId={}, email={}", saved.getId(), saved.getEmail());
@@ -184,7 +198,7 @@ public class UsersService {
     // 수정
     public UsersDTO updateUser(long idx, UsersDTO dto) {
         Users user = usersRepository.findById(idx)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(UserNotFoundException::new);
 
         // 기본 정보 업데이트
         if (dto.getId() != null)
@@ -196,7 +210,7 @@ public class UsersService {
             usersRepository.findByNickname(dto.getNickname())
                     .ifPresent(existingUser -> {
                         if (!existingUser.getId().equals(user.getId())) {
-                            throw new RuntimeException("이미 사용 중인 닉네임입니다.");
+                            throw new DuplicateUserFieldException(DuplicateUserFieldException.Field.NICKNAME);
                         }
                     });
             user.setNickname(dto.getNickname());
@@ -223,7 +237,7 @@ public class UsersService {
     // 탈퇴 (소프트 삭제)
     public void deleteUser(long idx) {
         Users user = usersRepository.findById(idx)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(UserNotFoundException::new);
         user.setIsDeleted(true);
         user.setDeletedAt(java.time.LocalDateTime.now());
         usersRepository.save(user);
@@ -235,7 +249,7 @@ public class UsersService {
      */
     public UsersDTO restoreUser(long idx) {
         Users user = usersRepository.findById(idx)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(UserNotFoundException::new);
         user.setIsDeleted(false);
         user.setDeletedAt(null);
         Users restored = usersRepository.save(user);
@@ -249,7 +263,7 @@ public class UsersService {
      */
     public UsersDTO updateUserStatus(long idx, UsersDTO dto) {
         Users user = usersRepository.findById(idx)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(UserNotFoundException::new);
 
         // 상태 업데이트
         if (dto.getStatus() != null) {
@@ -282,59 +296,61 @@ public class UsersService {
 
     /**
      * 자신의 프로필 조회 (펫 정보 포함)
+     * [리팩토링] Fetch Join - User + Pet 1회 쿼리
      */
     @Transactional(readOnly = true)
     public UsersDTO getMyProfile(String userId) {
-        Users user = usersRepository.findByIdString(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+        Users user = usersRepository.findByIdStringWithPets(userId)
+                .orElseThrow(UserNotFoundException::new);
         UsersDTO userDTO = usersConverter.toDTO(user);
-
-        // 펫 정보 추가
-        try {
-            List<PetDTO> pets = petService.getPetsByUserId(userId);
-            userDTO.setPets(pets);
-        } catch (Exception e) {
-            // 펫 정보 조회 실패해도 사용자 정보는 반환
-            log.warn("펫 정보 조회 실패: {}", e.getMessage());
-            userDTO.setPets(List.of());
-        }
-
+        userDTO.setPets(toPetDTOList(user.getPets()));
         return userDTO;
     }
 
     /**
      * 사용자 프로필 조회 (펫 정보 포함, 관리자용)
+     * [리팩토링] Fetch Join - User + Pet 1회 쿼리
      * - AdminUserController에서 사용
      */
     @Transactional(readOnly = true)
     public UsersDTO getUserWithPets(Long userIdx) {
-        Users user = usersRepository.findById(userIdx)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+        Users user = usersRepository.findByIdWithPets(userIdx)
+                .orElseThrow(UserNotFoundException::new);
         UsersDTO userDTO = usersConverter.toDTO(user);
-
-        // 펫 정보 추가
-        try {
-            List<PetDTO> pets = petService.getPetsByUserIdx(userIdx);
-            userDTO.setPets(pets);
-        } catch (Exception e) {
-            log.warn("펫 정보 조회 실패: {}", e.getMessage());
-            userDTO.setPets(List.of());
-        }
-
+        userDTO.setPets(toPetDTOList(user.getPets()));
         return userDTO;
     }
 
     /**
+     * User.pets → PetDTO 리스트 (삭제된 펫 제외, Fetch Join 결과 변환용)
+     */
+    private List<PetDTO> toPetDTOList(List<Pet> pets) {
+        if (pets == null || pets.isEmpty()) {
+            return List.of();
+        }
+        List<Pet> notDeleted = pets.stream()
+                .filter(p -> !Boolean.TRUE.equals(p.getIsDeleted()))
+                .collect(Collectors.toList());
+        try {
+            return petConverter.toDTOList(notDeleted);
+        } catch (Exception e) {
+            log.warn("펫 정보 변환 실패: {}", e.getMessage());
+            return List.of();
+        }
+    }
+
+    /**
      * 자신의 프로필 수정 (닉네임, 이메일, 전화번호, 위치, 펫 정보 등)
-     * [리팩토링] getMyProfile(User+Pet) + findByIdString → findByIdString 1회 (idx 검증 내부 통합)
+     * [리팩토링] getMyProfile(User+Pet) + findByIdString → findByIdString 1회 (idx 검증 내부
+     * 통합)
      */
     public UsersDTO updateMyProfile(String userId, UsersDTO dto) {
         Users user = usersRepository.findByIdString(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(UserNotFoundException::new);
 
         // dto.idx가 있으면 본인 프로필인지 검증 (다른 사용자 idx로 수정 시도 방지)
         if (dto.getIdx() != null && !dto.getIdx().equals(user.getIdx())) {
-            throw new RuntimeException("본인의 프로필만 수정할 수 있습니다.");
+            throw UserForbiddenException.ownProfileOnly();
         }
 
         // 일반 사용자가 수정 가능한 필드만 업데이트
@@ -343,17 +359,18 @@ public class UsersService {
             usersRepository.findByUsername(dto.getUsername())
                     .ifPresent(existingUser -> {
                         if (!existingUser.getId().equals(userId)) {
-                            throw new RuntimeException("이미 사용 중인 닉네임입니다.");
+                            throw new DuplicateUserFieldException(DuplicateUserFieldException.Field.USERNAME);
                         }
                     });
             user.setUsername(dto.getUsername());
         }
+
         if (dto.getEmail() != null && !dto.getEmail().isEmpty()) {
             // 이메일 중복 확인
             usersRepository.findByEmail(dto.getEmail())
                     .ifPresent(existingUser -> {
                         if (!existingUser.getId().equals(userId)) {
-                            throw new RuntimeException("이미 사용 중인 이메일입니다.");
+                            throw new DuplicateUserFieldException(DuplicateUserFieldException.Field.EMAIL);
                         }
                     });
             user.setEmail(dto.getEmail());
@@ -380,11 +397,11 @@ public class UsersService {
         emailVerificationService.checkEmailVerification(userId);
 
         Users user = usersRepository.findByIdString(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(UserNotFoundException::new);
 
         // 현재 비밀번호 확인
         if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
-            throw new RuntimeException("현재 비밀번호가 일치하지 않습니다.");
+            throw InvalidPasswordException.mismatch();
         }
 
         // 새 비밀번호 설정
@@ -397,13 +414,13 @@ public class UsersService {
      */
     public UsersDTO updateMyUsername(String userId, String newUsername) {
         Users user = usersRepository.findByIdString(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(UserNotFoundException::new);
 
         // 닉네임 중복 확인
         usersRepository.findByUsername(newUsername)
                 .ifPresent(existingUser -> {
                     if (!existingUser.getId().equals(userId)) {
-                        throw new RuntimeException("이미 사용 중인 닉네임입니다.");
+                        throw new DuplicateUserFieldException(DuplicateUserFieldException.Field.USERNAME);
                     }
                 });
 
@@ -418,21 +435,21 @@ public class UsersService {
     @Transactional
     public UsersDTO setNickname(String userId, String nickname) {
         if (nickname == null || nickname.trim().isEmpty()) {
-            throw new IllegalArgumentException("닉네임을 입력해주세요.");
+            throw UserValidationException.nicknameRequired();
         }
 
         if (nickname.length() > 50) {
-            throw new IllegalArgumentException("닉네임은 50자 이하여야 합니다.");
+            throw UserValidationException.nicknameMaxLength();
         }
 
         Users user = usersRepository.findByIdString(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(UserNotFoundException::new);
 
         // 닉네임 중복 확인
         usersRepository.findByNickname(nickname)
                 .ifPresent(existingUser -> {
                     if (!existingUser.getId().equals(userId)) {
-                        throw new RuntimeException("이미 사용 중인 닉네임입니다.");
+                        throw new DuplicateUserFieldException(DuplicateUserFieldException.Field.NICKNAME);
                     }
                 });
 

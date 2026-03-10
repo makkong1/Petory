@@ -10,10 +10,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.linkup.Petory.domain.notification.converter.NotificationConverter;
 import com.linkup.Petory.domain.notification.dto.NotificationDTO;
+import com.linkup.Petory.domain.notification.exception.NotificationForbiddenException;
+import com.linkup.Petory.domain.notification.exception.NotificationNotFoundException;
 import com.linkup.Petory.domain.notification.entity.Notification;
 import com.linkup.Petory.domain.notification.entity.NotificationType;
 import com.linkup.Petory.domain.notification.repository.NotificationRepository;
 import com.linkup.Petory.domain.user.entity.Users;
+import com.linkup.Petory.domain.user.exception.UserNotFoundException;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -46,7 +49,7 @@ public class NotificationService {
     public NotificationDTO createNotification(Long userId, NotificationType type, String title, String content,
             Long relatedId, String relatedType) {
         Users user = usersRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(UserNotFoundException::new);
 
         Notification notification = Notification.builder()
                 .user(user)
@@ -75,7 +78,7 @@ public class NotificationService {
      */
     public List<NotificationDTO> getUserNotifications(Long userId) {
         Users user = usersRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(UserNotFoundException::new);
 
         // Redis에서 먼저 조회 시도
         List<NotificationDTO> redisNotifications = getFromRedis(userId);
@@ -102,7 +105,7 @@ public class NotificationService {
      */
     public List<NotificationDTO> getUnreadNotifications(Long userId) {
         Users user = usersRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(UserNotFoundException::new);
 
         return notificationRepository.findByUserAndIsReadFalseOrderByCreatedAtDesc(user)
                 .stream()
@@ -117,7 +120,7 @@ public class NotificationService {
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public Long getUnreadCount(Long userId) {
         Users user = usersRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(UserNotFoundException::new);
 
         return notificationRepository.countUnreadByUser(user);
     }
@@ -128,11 +131,11 @@ public class NotificationService {
     @Transactional
     public void markAsRead(Long notificationId, Long userId) {
         Notification notification = notificationRepository.findById(notificationId)
-                .orElseThrow(() -> new IllegalArgumentException("Notification not found"));
+                .orElseThrow(NotificationNotFoundException::new);
 
         // 본인의 알림만 읽음 처리 가능
         if (!notification.getUser().getIdx().equals(userId)) {
-            throw new IllegalStateException("본인의 알림만 읽음 처리할 수 있습니다.");
+            throw NotificationForbiddenException.ownNotificationOnly();
         }
 
         notification.setIsRead(true);
@@ -148,7 +151,7 @@ public class NotificationService {
     @Transactional
     public void markAllAsRead(Long userId) {
         Users user = usersRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(UserNotFoundException::new);
 
         List<Notification> unreadNotifications = notificationRepository
                 .findByUserAndIsReadFalseOrderByCreatedAtDesc(user);

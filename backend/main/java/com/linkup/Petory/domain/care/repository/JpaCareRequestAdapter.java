@@ -4,6 +4,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Repository;
 
@@ -103,6 +105,11 @@ public class JpaCareRequestAdapter implements CareRequestRepository {
     }
 
     @Override
+    public Optional<CareRequest> findByIdWithUser(Long idx) {
+        return jpaRepository.findByIdWithUser(idx);
+    }
+
+    @Override
     public Optional<CareRequest> findByIdWithApplications(Long idx) {
         return jpaRepository.findByIdWithApplications(idx);
     }
@@ -115,6 +122,21 @@ public class JpaCareRequestAdapter implements CareRequestRepository {
     @Override
     public long countByDateBetweenAndStatus(LocalDateTime start, LocalDateTime end, CareRequestStatus status) {
         return jpaRepository.countByDateBetweenAndStatus(start, end, status);
+    }
+
+    @Override
+    public Page<CareRequest> findAllActiveRequestsWithPaging(String location, Pageable pageable) {
+        return jpaRepository.findAllActiveRequestsWithPaging(location, pageable);
+    }
+
+    @Override
+    public Page<CareRequest> findByStatusAndIsDeletedFalseWithPaging(CareRequestStatus status, String location, Pageable pageable) {
+        return jpaRepository.findByStatusAndIsDeletedFalseWithPaging(status, location, pageable);
+    }
+
+    @Override
+    public Page<CareRequest> searchWithPaging(String keyword, Pageable pageable) {
+        return jpaRepository.searchWithPaging(keyword, pageable);
     }
 }
 

@@ -16,6 +16,10 @@ graph TB
     Report[Report<br/>신고]
     Notification[Notification<br/>알림]
     File[AttachmentFile<br/>파일]
+    PetCoin[PetCoinTransaction<br/>펫코인거래]
+    Escrow[PetCoinEscrow<br/>에스크로]
+    Conversation[Conversation<br/>채팅방]
+    ChatMessage[ChatMessage<br/>채팅메시지]
     
     Users -->|소유| Pet
     Users -->|작성| Board
@@ -28,6 +32,7 @@ graph TB
     Users -->|리뷰| LocationService
     Users -->|신고| Report
     Users -->|수신| Notification
+    Users -->|잔액| PetCoin
     
     Board -->|댓글| Comment
     Board -->|첨부| File
@@ -35,6 +40,17 @@ graph TB
     CareRequest -->|지원| CareApplication
     CareRequest -->|관련| Pet
     CareRequest -->|첨부| File
+    CareRequest -->|에스크로| Escrow
+    
+    Escrow -->|요청자/제공자| Users
+    Escrow -->|연관| CareRequest
+    PetCoin -->|거래자| Users
+    
+    Conversation -->|참여자| Users
+    ChatMessage -->|작성자| Users
+    ChatMessage -->|소속| Conversation
+    CareRequest -.->|채팅| Conversation
+    Meetup -.->|채팅| Conversation
     
     MissingPet -->|첨부| File
     
@@ -66,6 +82,10 @@ Users는 시스템의 중심으로, 거의 모든 도메인과 연관됩니다.
 | Report | OneToMany (2개) | 신고자/처리자 | 신고 접수 및 처리 |
 | UserSanction | OneToMany | 제재 대상 | 제재 이력 |
 | Notification | OneToMany | 수신자 | 알림 받음 |
+| PetCoinTransaction | OneToMany | 거래자 | 펫코인 충전/차감/지급/환불 |
+| PetCoinEscrow | OneToMany (2개) | 요청자/제공자 | 에스크로 |
+| ConversationParticipant | OneToMany | 참여자 | 채팅방 참여 |
+| ChatMessage | OneToMany | 작성자 | 채팅 메시지 |
 
 ### 2. Board (게시판) 중심 관계
 
