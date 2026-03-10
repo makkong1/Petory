@@ -1,9 +1,13 @@
 # 3. JPA & 데이터베이스
 
+## jpa란??
+
+### jpa는 자바에서 rm기술의 표준이고 구현체는 hibernate이다. ORM은 객체와 RDBMS 데이터를 매핑하기 위한 기술이고, 자바에서는 JPA가 ORM 표준이며 Hibernate가 대표적인 구현체이다.
+
 ## Q3-1. N+1 문제가 무엇이고, 어떻게 해결했나요?
 
 ### 답변 포인트
-- **문제**: 연관 엔티티를 개별 쿼리로 조회하는 문제 (1 + N개 쿼리 발생)
+- **문제**: N+1 문제는 연관 엔티티를 지연 로딩(LAZY)으로 조회할 때 각 엔티티마다 추가 쿼리가 발생하여 1 + N개의 쿼리가 실행되는 문제이다.
 - **해결 방법**:
   - **Fetch Join**: `JOIN FETCH`로 연관 엔티티를 한 번에 조회 (Board + User 등)
   - **배치 조회**: IN 절을 활용한 일괄 조회 (반응, 첨부파일 등)
@@ -131,9 +135,9 @@ List<Board> findAllByIsDeletedFalseOrderByCreatedAtDesc();
 │  ┌─────┬─────────────┬──────────┬──────────┬──────────────┐     │
 │  │ idx │    title    │  user    │  status  │  created_at  │     │
 │  ├─────┼─────────────┼──────────┼──────────┼──────────────┤     │
-│  │  3  │ "게시글 3"  │ "홍길동" │ "ACTIVE" │ 2024-01-15     │     │
-│  │  2  │ "게시글 2"  │ "김철수" │ "ACTIVE" │ 2024-01-14     │     │
-│  │  1  │ "게시글 1"  │ "이영희" │ "ACTIVE" │ 2024-01-13     │     │
+│  │  3  │ "게시글 3"   │ "홍길동"  │ "ACTIVE" │ 2024-01-15   │     │
+│  │  2  │ "게시글 2"   │ "김철수"  │ "ACTIVE" │ 2024-01-14   │     │
+│  │  1  │ "게시글 1"   │ "이영희"  │ "ACTIVE" │ 2024-01-1    │     │
 │  └─────┴─────────────┴──────────┴──────────┴──────────────┘     │
 │                                                                 │
 │  ※ JOIN FETCH로 인해 각 Board 객체에 User 정보가                   │
@@ -177,6 +181,24 @@ Map<Long, List<FileDTO>> attachmentsMap = attachmentFileService.getAttachmentsBa
 // → findByTargetTypeAndTargetIdxIn(FileTargetType.BOARD, boardIds)
 ```
 
+**시각적 예시** (게시글 4개, boardIds = [1, 2, 3, 4]):
+```
+boardIds: [1, 2, 3, 4]
+
+attachmentsMap (게시글 ID → 해당 게시글의 첨부파일 목록):
+┌─────────────┬──────────────────────────────────────────────┐
+│ boardIdx    │ List<FileDTO>                                │
+├─────────────┼──────────────────────────────────────────────┤
+│ 1           │ [파일A.jpg, 파일B.png]                        │  ← 게시글 1에 2개 첨부
+│ 2           │ [파일C.png]                                   │  ← 게시글 2에 1개 첨부
+│ 3           │ []                                            │  ← 게시글 3엔 첨부 없음
+│ 4           │ [파일D.pdf, 파일E.jpg]                         │  ← 게시글 4에 2개 첨부
+└─────────────┴──────────────────────────────────────────────┘
+
+// DTO 변환 시 사용
+board.getIdx() → attachmentsMap.get(board.getIdx()) → 해당 게시글의 첨부파일 리스트
+```
+
 ---
 
 ## Q3-2. Fetch Join과 일반 Join의 차이를 설명해주세요.
@@ -185,6 +207,19 @@ Map<Long, List<FileDTO>> attachmentsMap = attachmentFileService.getAttachmentsBa
 - **Fetch Join**: 연관 엔티티를 즉시 로딩하여 N+1 문제 해결
 - **일반 Join**: 연관 엔티티를 조회하지 않음 (지연 로딩)
 - Fetch Join은 SELECT 절에 연관 엔티티를 포함
+
+**우리 엔티티 기준 SQL 예시** (Board ↔ Users):
+```sql
+-- 일반 Join: board만 SELECT → board.getUser() 시 추가 쿼리 / 0.031sec
+SELECT b.* FROM board b
+INNER JOIN users u ON b.user_idx = u.idx
+WHERE b.is_deleted = false;
+
+-- Fetch Join: board + users 함께 SELECT → 추가 쿼리 없음 / 0.156sec이거내 
+SELECT b.*, u.* FROM board b
+INNER JOIN users u ON b.user_idx = u.idx
+WHERE b.is_deleted = false;
+```
 
 ### 상세 답변
 
@@ -463,9 +498,9 @@ List<Board> findAllByIsDeletedFalseOrderByCreatedAtDesc();
 ## Q3-6. MySQL의 ST_Distance_Sphere 함수를 어떻게 활용했나요?
 
 ### 답변 포인트
-- 위치 기반 거리 계산
+- **2단계 전략**: 1차 Bounding Box(MBR)로 후보 축소 → 2차 ST_Distance_Sphere로 정확한 거리 계산
 - 사용자 위치 기준 10km 반경 검색
-- Location 도메인에서 초기 로드 성능 개선 (95.5% 데이터 감소)
+- Location 도메인 초기 로드 성능 개선 (95.5% 데이터 감소)
 
 ### 상세 답변
 
@@ -473,15 +508,36 @@ List<Board> findAllByIsDeletedFalseOrderByCreatedAtDesc();
 **위치**: `domain/location/repository/SpringDataJpaLocationServiceRepository.java`
 **메서드**: `findByRadius()`
 
+**2단계 전략** (실제 구현):
+| 단계 | 방식 | 역할 |
+|------|------|------|
+| **1차** | Bounding Box (MBR) | `ST_Within(location, POLYGON)` — 위도/경도 범위로 사각형 필터링, 공간 인덱스 활용 |
+| **2차** | Distance 계산 | `ST_Distance_Sphere(...) <= radius` — 정확한 거리로 반경 내만 선택 |
+
+- **이유**: `ST_Distance_Sphere`만 쓰면 인덱스 미활용 → 전체 스캔. 1차 Bounding Box로 후보를 줄인 뒤 2차에서 정확한 거리 계산.
+
+**바로 실행해볼 SQL** (서울 시청 기준 10km 반경, 거리(m) 함께 조회):
+```sql
+-- 서울 시청: 위도 37.5665, 경도 126.9780 / 반경 10000m(10km)
+SELECT idx, name, latitude, longitude,
+       ROUND(ST_Distance_Sphere(POINT(longitude, latitude), POINT(126.9780, 37.5665))) AS distance_m
+FROM locationservice
+WHERE latitude IS NOT NULL AND longitude IS NOT NULL
+  AND (is_deleted IS NULL OR is_deleted = 0)
+  AND ST_Distance_Sphere(POINT(longitude, latitude), POINT(126.9780, 37.5665)) <= 10000
+ORDER BY distance_m ASC
+LIMIT 20;
+```
+
 **전체 흐름**:
 ```
-사용자 위치 (위도, 경도) 입력
+사용자 위치 (위도, 경도) + 반경 입력
   ↓
-반경 (미터 단위) 설정
+1차: Bounding Box (POLYGON)로 후보 축소
   ↓
-ST_Distance_Sphere로 거리 계산
+2차: ST_Distance_Sphere로 정확한 거리 계산
   ↓
-반경 내 위치 서비스만 조회
+반경 내 위치 서비스만 반환
 ```
 
 **코드 예시**:
