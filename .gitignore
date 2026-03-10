@@ -22,6 +22,7 @@ bin/
 !**/backend/src/main/**/bin/
 !**/backend/src/test/**/bin/
 docs/portfolio/ppt/
+docs/interview/
 
 ### IntelliJ IDEA ###
 .idea
