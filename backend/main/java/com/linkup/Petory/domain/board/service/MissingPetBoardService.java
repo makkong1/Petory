@@ -8,6 +8,7 @@ import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort.Direction;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +28,8 @@ import com.linkup.Petory.domain.user.exception.EmailVerificationRequiredExceptio
 import com.linkup.Petory.domain.user.exception.UserNotFoundException;
 
 import jakarta.persistence.criteria.Join;
+import jakarta.persistence.criteria.JoinType;
+
 import com.linkup.Petory.domain.board.repository.MissingPetBoardRepository;
 import com.linkup.Petory.domain.file.dto.FileDTO;
 import com.linkup.Petory.domain.file.entity.FileTargetType;
@@ -268,7 +271,7 @@ public class MissingPetBoardService {
         if (user.getEmailVerified() == null || !user.getEmailVerified()) {
             throw new com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException(
                     "실종 제보 수정을 위해 이메일 인증이 필요합니다.",
-                    com.linkup.Petory.domain.user.entity.EmailVerificationPurpose.MISSING_PET);
+                    EmailVerificationPurpose.MISSING_PET);
         }
 
         if (StringUtils.hasText(dto.getTitle())) {
@@ -412,7 +415,7 @@ public class MissingPetBoardService {
         if (q != null && !q.isBlank()) {
             String keyword = "%" + q.toLowerCase() + "%";
             Specification<MissingPetBoard> searchSpec = (root, query, cb) -> {
-                Join<MissingPetBoard, Users> userJoin = root.join("user", jakarta.persistence.criteria.JoinType.LEFT);
+                Join<MissingPetBoard, Users> userJoin = root.join("user", JoinType.LEFT);
                 return cb.or(
                         cb.like(cb.lower(root.get("title")), keyword),
                         cb.like(cb.lower(root.get("content")), keyword),
@@ -432,7 +435,7 @@ public class MissingPetBoardService {
         spec = spec == null ? userFetchSpec : spec.and(userFetchSpec);
 
         Pageable pageable = PageRequest.of(page, size,
-                org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC,
+                org.springframework.data.domain.Sort.by(Direction.DESC,
                         "createdAt"));
 
         Page<MissingPetBoard> boardPage = missingPetBoardRepository.findAll(spec, pageable);

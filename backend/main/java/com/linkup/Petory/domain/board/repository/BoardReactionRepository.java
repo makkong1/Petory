@@ -34,6 +34,12 @@ public interface BoardReactionRepository {
     List<Object[]> countByBoardsGroupByReactionType(List<Long> boardIds);
 
     /**
+     * [리팩토링] 여러 게시글의 특정 반응 타입(LIKE 등) 카운트만 배치 조회
+     * 반환값: List<Object[]> [boardId, count]
+     */
+    List<Object[]> countByBoardsAndReactionType(List<Long> boardIds, ReactionType reactionType);
+
+    /**
      * 단일 게시글의 좋아요/싫어요 카운트를 한 번에 조회
      * 반환값: List<Object[]> [boardId, reactionType, count]
      */

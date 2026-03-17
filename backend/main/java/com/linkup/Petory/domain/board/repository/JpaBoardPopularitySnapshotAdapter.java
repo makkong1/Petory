@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.context.annotation.Primary;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Repository;
 
 import com.linkup.Petory.domain.board.entity.BoardPopularitySnapshot;
@@ -57,12 +59,8 @@ public class JpaBoardPopularitySnapshotAdapter implements BoardPopularitySnapsho
     }
 
     @Override
-    public List<BoardPopularitySnapshot> findByPeriodTypeAndPeriodStartDateLessThanEqualAndPeriodEndDateGreaterThanEqualOrderByRankingAsc(
-            PopularityPeriodType periodType,
-            LocalDate periodStartDate,
-            LocalDate periodEndDate) {
-        return jpaRepository.findByPeriodTypeAndPeriodStartDateLessThanEqualAndPeriodEndDateGreaterThanEqualOrderByRankingAsc(
-                periodType, periodStartDate, periodEndDate);
+    public List<BoardPopularitySnapshot> findAll(Specification<BoardPopularitySnapshot> spec, Sort sort) {
+        return jpaRepository.findAll(spec, sort);
     }
 
     @Override

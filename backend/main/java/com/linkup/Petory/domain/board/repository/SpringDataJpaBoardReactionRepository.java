@@ -34,6 +34,13 @@ public interface SpringDataJpaBoardReactionRepository extends JpaRepository<Boar
            "GROUP BY br.board.idx, br.reactionType")
     List<Object[]> countByBoardsGroupByReactionType(@Param("boardIds") List<Long> boardIds);
 
+    @RepositoryMethod("[리팩토링] 게시글 반응: 특정 타입(LIKE)만 배치 카운트 조회")
+    @Query("SELECT br.board.idx, COUNT(br) " +
+           "FROM BoardReaction br " +
+           "WHERE br.board.idx IN :boardIds AND br.reactionType = :reactionType " +
+           "GROUP BY br.board.idx")
+    List<Object[]> countByBoardsAndReactionType(@Param("boardIds") List<Long> boardIds, @Param("reactionType") ReactionType reactionType);
+
     @RepositoryMethod("게시글 반응: 단건 카운트 조회")
     @Query("SELECT br.board.idx as boardId, br.reactionType as reactionType, COUNT(br) as count " +
            "FROM BoardReaction br " +
