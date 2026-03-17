@@ -64,6 +64,12 @@ public class JpaBoardReactionAdapter implements BoardReactionRepository {
     }
 
     @Override
+    // [리팩토링] BoardPopularityService 배치 집계용 LIKE 전용 조회
+    public List<Object[]> countByBoardsAndReactionType(List<Long> boardIds, ReactionType reactionType) {
+        return jpaRepository.countByBoardsAndReactionType(boardIds, reactionType);
+    }
+
+    @Override
     public List<Object[]> countByBoardGroupByReactionType(Long boardId) {
         return jpaRepository.countByBoardGroupByReactionType(boardId);
     }

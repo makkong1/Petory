@@ -7,11 +7,13 @@ import com.linkup.Petory.domain.board.entity.BoardPopularitySnapshot;
 import com.linkup.Petory.domain.board.entity.PopularityPeriodType;
 import com.linkup.Petory.domain.board.entity.ReactionType;
 import com.linkup.Petory.domain.board.repository.BoardPopularitySnapshotRepository;
+import com.linkup.Petory.domain.board.repository.BoardPopularitySnapshotSpecs;
 import com.linkup.Petory.domain.board.repository.BoardReactionRepository;
 import com.linkup.Petory.domain.board.repository.BoardRepository;
 import com.linkup.Petory.domain.board.repository.BoardViewLogRepository;
 import com.linkup.Petory.domain.board.repository.CommentRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,6 +23,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 import lombok.extern.slf4j.Slf4j;
@@ -51,14 +54,11 @@ public class BoardPopularityService {
                         range.periodStart(),
                         range.periodEnd());
 
-        // 2. 정확한 매칭이 없으면 기간이 겹치는 스냅샷 조회 시도
-        // 기간이 겹치는 조건: 스냅샷 시작일 <= 조회 종료일 AND 스냅샷 종료일 >= 조회 시작일
+        // 2. 정확한 매칭이 없으면 기간이 겹치는 스냅샷 조회 시도 (Specification 사용)
         if (snapshots.isEmpty()) {
-            snapshots = snapshotRepository
-                    .findByPeriodTypeAndPeriodStartDateLessThanEqualAndPeriodEndDateGreaterThanEqualOrderByRankingAsc(
-                            periodType,
-                            range.periodEnd(), // periodStartDate <= 이 값 (조회 종료일)
-                            range.periodStart()); // periodEndDate >= 이 값 (조회 시작일)
+            snapshots = snapshotRepository.findAll(
+                    BoardPopularitySnapshotSpecs.periodOverlaps(periodType, range.periodStart(), range.periodEnd()),
+                    Sort.by("ranking").ascending());
         }
 
         // 3. 그래도 없으면 가장 최근 스냅샷 조회 시도
@@ -115,18 +115,15 @@ public class BoardPopularityService {
                 .map(Board::getIdx)
                 .collect(Collectors.toList());
 
-        // 배치 조회로 실시간 집계 (동시성 문제 해결)
-        Map<Long, Integer> likeCountsMap = getLikeCountsBatch(boardIds);
-        Map<Long, Integer> commentCountsMap = getCommentCountsBatch(boardIds);
-        Map<Long, Integer> viewCountsMap = getViewCountsBatch(boardIds);
+        // [리팩토링] 배치 조회를 병렬 실행 (독립적인 3개 쿼리 → 응답 시간 단축)
+        Map<Long, BoardCounts> countsMap = fetchBoardCountsInParallel(boardIds);
 
+        // [리팩토링] BoardCounts 통합 DTO로 점수 계산
         List<BoardScore> rankedBoards = prideBoards.stream()
                 .map(board -> {
-                    int likes = likeCountsMap.getOrDefault(board.getIdx(), 0);
-                    int comments = commentCountsMap.getOrDefault(board.getIdx(), 0);
-                    int views = viewCountsMap.getOrDefault(board.getIdx(), 0);
-                    int score = calculatePopularityScore(likes, comments, views);
-                    return new BoardScore(board, score, likes, comments, views);
+                    BoardCounts counts = countsMap.getOrDefault(board.getIdx(), BoardCounts.ZERO);
+                    int score = calculatePopularityScore(counts.likes(), counts.comments(), counts.views());
+                    return new BoardScore(board, score, counts.likes(), counts.comments(), counts.views());
                 })
                 .sorted(Comparator.comparingInt(BoardScore::score).reversed()
                         .thenComparing(bs -> bs.board().getCreatedAt(), Comparator.reverseOrder()))
@@ -179,7 +176,38 @@ public class BoardPopularityService {
     }
 
     /**
-     * 여러 게시글의 좋아요 카운트를 배치로 조회 (실시간 집계)
+     * [리팩토링] 3개 배치 조회를 병렬 실행 후 Map<Long, BoardCounts>로 통합
+     */
+    private Map<Long, BoardCounts> fetchBoardCountsInParallel(List<Long> boardIds) {
+        if (boardIds.isEmpty()) {
+            return Map.of();
+        }
+
+        CompletableFuture<Map<Long, Integer>> likesFuture = CompletableFuture.supplyAsync(() -> getLikeCountsBatch(boardIds));
+        CompletableFuture<Map<Long, Integer>> commentsFuture = CompletableFuture.supplyAsync(() -> getCommentCountsBatch(boardIds));
+        CompletableFuture<Map<Long, Integer>> viewsFuture = CompletableFuture.supplyAsync(() -> getViewCountsBatch(boardIds));
+
+        CompletableFuture<Map<Long, BoardCounts>> combined = CompletableFuture.allOf(likesFuture, commentsFuture, viewsFuture)
+                .thenApply(v -> {
+                    Map<Long, Integer> likes = likesFuture.join();
+                    Map<Long, Integer> comments = commentsFuture.join();
+                    Map<Long, Integer> views = viewsFuture.join();
+
+                    Map<Long, BoardCounts> result = new HashMap<>();
+                    for (Long boardId : boardIds) {
+                        result.put(boardId, new BoardCounts(
+                                likes.getOrDefault(boardId, 0),
+                                comments.getOrDefault(boardId, 0),
+                                views.getOrDefault(boardId, 0)));
+                    }
+                    return result;
+                });
+
+        return combined.join();
+    }
+
+    /**
+     * [리팩토링] 여러 게시글의 좋아요 카운트를 배치로 조회 (실시간 집계, LIKE만 DB 조회)
      * IN 절 크기 제한을 위해 배치 단위로 나누어 조회
      */
     private Map<Long, Integer> getLikeCountsBatch(List<Long> boardIds) {
@@ -187,31 +215,23 @@ public class BoardPopularityService {
             return new HashMap<>();
         }
 
-        // IN 절 크기 제한 (일반적으로 1000개 이하 권장)
         final int BATCH_SIZE = 1000;
         Map<Long, Integer> countsMap = new HashMap<>();
 
-        // boardIds를 배치 단위로 나누어 처리
         for (int i = 0; i < boardIds.size(); i += BATCH_SIZE) {
             int end = Math.min(i + BATCH_SIZE, boardIds.size());
             List<Long> batch = boardIds.subList(i, end);
 
-            List<Object[]> results = boardReactionRepository.countByBoardsGroupByReactionType(batch);
+            List<Object[]> results = boardReactionRepository.countByBoardsAndReactionType(batch, ReactionType.LIKE);
 
             for (Object[] result : results) {
                 Long boardId = ((Number) result[0]).longValue();
-                ReactionType reactionType = (ReactionType) result[1];
-                Long count = ((Number) result[2]).longValue();
-
-                if (reactionType == ReactionType.LIKE) {
-                    countsMap.put(boardId, count.intValue());
-                }
+                Long count = ((Number) result[1]).longValue();
+                countsMap.put(boardId, count.intValue());
             }
         }
 
-        // 좋아요가 없는 게시글은 0으로 초기화
         boardIds.forEach(id -> countsMap.putIfAbsent(id, 0));
-
         return countsMap;
     }
 
@@ -292,16 +312,19 @@ public class BoardPopularityService {
     }
 
     /**
-     * record타입은 Java 16+ 불변 데이터 캐리어. 생성자/Getter/equals/hashCode/toString 자동 생성.
-     */
-
-    /**
      * 인기글 집계 기간 범위
      * 
      * @param periodStart 집계 시작일 (포함)
      * @param periodEnd   집계 종료일 (포함)
      */
     private record PeriodRange(LocalDate periodStart, LocalDate periodEnd) {
+    }
+
+    /**
+     * [리팩토링] 게시글별 좋아요/댓글/조회수 통합 DTO
+     */
+    private record BoardCounts(int likes, int comments, int views) {
+        static final BoardCounts ZERO = new BoardCounts(0, 0, 0);
     }
 
     /**

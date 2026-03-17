@@ -628,7 +628,8 @@ public class BoardService {
         if (q != null && !q.isBlank()) {
             String keyword = "%" + q.toLowerCase() + "%";
             Specification<Board> searchSpec = (root, query, cb) -> {
-                jakarta.persistence.criteria.Join<Board, Users> userJoin = root.join("user", jakarta.persistence.criteria.JoinType.LEFT);
+                jakarta.persistence.criteria.Join<Board, Users> userJoin = root.join("user",
+                        jakarta.persistence.criteria.JoinType.LEFT);
                 return cb.or(
                         cb.like(cb.lower(root.get("title")), keyword),
                         cb.like(cb.lower(root.get("content")), keyword),

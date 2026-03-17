@@ -4,6 +4,9 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
+
 import com.linkup.Petory.domain.board.entity.BoardPopularitySnapshot;
 import com.linkup.Petory.domain.board.entity.PopularityPeriodType;
 
@@ -28,13 +31,9 @@ public interface BoardPopularitySnapshotRepository {
             LocalDate periodEndDate);
 
     /**
-     * 기간 범위 내의 스냅샷 조회 (기간이 겹치는 경우)
-     * 조건: 스냅샷 시작일 <= 조회 종료일 AND 스냅샷 종료일 >= 조회 시작일
+     * Specification 기반 조회 (기간 겹침 등 동적 조건)
      */
-    List<BoardPopularitySnapshot> findByPeriodTypeAndPeriodStartDateLessThanEqualAndPeriodEndDateGreaterThanEqualOrderByRankingAsc(
-            PopularityPeriodType periodType,
-            LocalDate periodStartDate, // 스냅샷 시작일 <= 이 값 (조회 종료일)
-            LocalDate periodEndDate); // 스냅샷 종료일 >= 이 값 (조회 시작일)
+    List<BoardPopularitySnapshot> findAll(Specification<BoardPopularitySnapshot> spec, Sort sort);
 
     /**
      * 가장 최근 스냅샷 조회
