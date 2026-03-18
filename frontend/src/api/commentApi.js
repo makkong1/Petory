@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { isDemoMode } from '../mock/isDemoMode';
 
 const BASE_URL = 'http://localhost:8080/api/boards';
 
@@ -24,9 +25,22 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+const mockResolve = (data) => Promise.resolve({ data });
+
 export const commentApi = {
-  list: (boardId, page = 0, size = 20) => api.get(`/${boardId}/comments`, { params: { page, size } }),
-  create: (boardId, payload) => api.post(`/${boardId}/comments`, payload),
-  delete: (boardId, commentId) => api.delete(`/${boardId}/comments/${commentId}`),
+  list: (boardId, page = 0, size = 20) => {
+    if (isDemoMode()) {
+      return mockResolve({
+        comments: [],
+        totalCount: 0,
+        hasNext: false,
+      });
+    }
+    return api.get(`/${boardId}/comments`, { params: { page, size } });
+  },
+  create: (boardId, payload) =>
+    isDemoMode() ? mockResolve({ idx: 1, ...payload }) : api.post(`/${boardId}/comments`, payload),
+  delete: (boardId, commentId) =>
+    isDemoMode() ? mockResolve({}) : api.delete(`/${boardId}/comments/${commentId}`),
 };
 

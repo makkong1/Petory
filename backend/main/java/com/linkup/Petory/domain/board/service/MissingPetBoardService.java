@@ -119,52 +119,6 @@ public class MissingPetBoardService {
     }
 
     /**
-     * 실종 제보 목록 조회 (페이징 없음 - 하위 호환성)
-     * 엔드포인트: GET /api/missing-pets
-     * - 상태별 필터링 지원 (status 파라미터)
-     * - 최신순 정렬
-     * - 게시글 파일 배치 조회 (N+1 문제 해결)
-     * - 댓글 수 배치 조회 (N+1 문제 해결)
-     * - 댓글은 포함하지 않음 (조인 폭발 방지)
-     */
-    public List<MissingPetBoardDTO> getBoards(MissingPetStatus status) {
-        // 게시글 + 작성자만 조회 (댓글 제외 - 조인 폭발 방지)
-        List<MissingPetBoard> boards = status == null
-                ? missingPetBoardRepository.findAllByOrderByCreatedAtDesc()
-                : missingPetBoardRepository.findByStatusOrderByCreatedAtDesc(status);
-
-        // 게시글 ID 목록 추출
-        List<Long> boardIds = boards.stream()
-                .map(MissingPetBoard::getIdx)
-                .collect(Collectors.toList());
-
-        // 파일 배치 조회 (N+1 문제 해결)
-        Map<Long, List<FileDTO>> filesByBoardId = attachmentFileService.getAttachmentsBatch(
-                FileTargetType.MISSING_PET, boardIds);
-
-        // 댓글 수 배치 조회 (N+1 문제 해결)
-        Map<Long, Integer> commentCountsByBoardId = missingPetCommentService.getCommentCountsBatch(boardIds);
-
-        // DTO 변환 (파일 정보 포함, 댓글은 빈 리스트)
-        // toBoardDTOWithoutComments 사용으로 N+1 문제 방지 (댓글 lazy loading 트리거 안함)
-        List<MissingPetBoardDTO> result = boards.stream()
-                .map(board -> {
-                    MissingPetBoardDTO dto = missingPetConverter.toBoardDTOWithoutComments(board);
-                    // 파일 정보 추가
-                    List<FileDTO> attachments = filesByBoardId.getOrDefault(board.getIdx(), List.of());
-                    dto.setAttachments(attachments);
-                    dto.setImageUrl(attachmentFileService.extractPrimaryFileUrl(attachments));
-                    // 댓글 수 추가
-                    int commentCount = commentCountsByBoardId.getOrDefault(board.getIdx(), 0);
-                    dto.setCommentCount(commentCount);
-                    return dto;
-                })
-                .collect(Collectors.toList());
-
-        return result;
-    }
-
-    /**
      * 실종 제보 상세 조회 (댓글 페이징 지원)
      * 엔드포인트: GET
      * /api/missing-pets/{id}?commentPage={commentPage}&commentSize={commentSize}
@@ -428,7 +382,7 @@ public class MissingPetBoardService {
         // [리팩토링] user fetch - toBoardDTOWithoutComments N+1 방지
         Specification<MissingPetBoard> userFetchSpec = (root, query, cb) -> {
             if (Long.class != query.getResultType()) {
-                root.fetch("user", jakarta.persistence.criteria.JoinType.LEFT);
+                root.fetch("user", JoinType.LEFT);
             }
             return cb.conjunction();
         };

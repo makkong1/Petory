@@ -1,8 +1,9 @@
 import axios from 'axios';
+import { isDemoMode } from '../mock/isDemoMode';
+import { DEMO_USERS } from '../mock/demoData';
 
 const BASE_URL = 'http://localhost:8080/api/admin/users';
 
-// 토큰을 가져오는 함수
 const getToken = () => {
   return localStorage.getItem('accessToken') || localStorage.getItem('token');
 };
@@ -14,7 +15,6 @@ const api = axios.create({
   },
 });
 
-// 요청 인터셉터 - 모든 요청에 토큰 자동 추가 (전역 인터셉터와 중복되지만 안전을 위해 유지)
 api.interceptors.request.use(
   (config) => {
     const token = getToken();
@@ -23,17 +23,24 @@ api.interceptors.request.use(
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// 응답 인터셉터 제거 - 전역 인터셉터가 처리 (setupApiInterceptors)
-// 401 에러는 전역 인터셉터에서 refresh token으로 자동 처리됨
+const mockResolve = (data) => Promise.resolve({ data });
 
 export const userApi = {
   // 전체 유저 조회 (페이징 지원)
   getAllUsersWithPaging: (params = {}) => {
+    if (isDemoMode()) {
+      const { page = 0, size = 20 } = params;
+      const start = page * size;
+      const users = DEMO_USERS.slice(start, start + size);
+      return mockResolve({
+        users,
+        totalCount: DEMO_USERS.length,
+        hasNext: start + users.length < DEMO_USERS.length,
+      });
+    }
     const { page = 0, size = 20, ...otherParams } = params;
     const requestParams = {
       page,
@@ -48,22 +55,31 @@ export const userApi = {
   },
 
   // 단일 유저 조회
-  getUser: (id) => api.get(`/${id}`),
+  getUser: (id) => {
+    if (isDemoMode()) {
+      const user = DEMO_USERS.find((u) => u.idx === Number(id));
+      return mockResolve(user || DEMO_USERS[0]);
+    }
+    return api.get(`/${id}`);
+  },
 
   // 유저 생성
-  createUser: (userData) => api.post('', userData),
+  createUser: (userData) =>
+    isDemoMode() ? mockResolve({ idx: 99, ...userData }) : api.post('', userData),
 
   // 유저 수정
-  updateUser: (id, userData) => api.put(`/${id}`, userData),
+  updateUser: (id, userData) =>
+    isDemoMode() ? mockResolve({ idx: id, ...userData }) : api.put(`/${id}`, userData),
 
   // 유저 삭제 (소프트 삭제)
-  deleteUser: (id) => api.delete(`/${id}`),
+  deleteUser: (id) => (isDemoMode() ? mockResolve({}) : api.delete(`/${id}`)),
 
   // 계정 복구
-  restoreUser: (id) => api.post(`/${id}/restore`),
+  restoreUser: (id) => (isDemoMode() ? mockResolve({}) : api.post(`/${id}/restore`)),
 
   // 상태 관리 (상태, 경고 횟수, 정지 기간만 업데이트)
-  updateUserStatus: (id, userData) => api.patch(`/${id}/status`, userData),
+  updateUserStatus: (id, userData) =>
+    isDemoMode() ? mockResolve({}) : api.patch(`/${id}/status`, userData),
 };
 
 // MASTER 전용: ADMIN 계정 관리 API

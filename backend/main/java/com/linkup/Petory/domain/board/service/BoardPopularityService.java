@@ -177,17 +177,24 @@ public class BoardPopularityService {
 
     /**
      * [리팩토링] 3개 배치 조회를 병렬 실행 후 Map<Long, BoardCounts>로 통합
+     *
+     * <p>
+     * 동작: 좋아요/댓글/조회수 3개 쿼리를 supplyAsync로 동시 실행 → allOf로 대기 → 결과를 BoardCounts로 합침
      */
     private Map<Long, BoardCounts> fetchBoardCountsInParallel(List<Long> boardIds) {
         if (boardIds.isEmpty()) {
             return Map.of();
         }
 
-        CompletableFuture<Map<Long, Integer>> likesFuture = CompletableFuture.supplyAsync(() -> getLikeCountsBatch(boardIds));
-        CompletableFuture<Map<Long, Integer>> commentsFuture = CompletableFuture.supplyAsync(() -> getCommentCountsBatch(boardIds));
-        CompletableFuture<Map<Long, Integer>> viewsFuture = CompletableFuture.supplyAsync(() -> getViewCountsBatch(boardIds));
+        CompletableFuture<Map<Long, Integer>> likesFuture = CompletableFuture
+                .supplyAsync(() -> getLikeCountsBatch(boardIds));
+        CompletableFuture<Map<Long, Integer>> commentsFuture = CompletableFuture
+                .supplyAsync(() -> getCommentCountsBatch(boardIds));
+        CompletableFuture<Map<Long, Integer>> viewsFuture = CompletableFuture
+                .supplyAsync(() -> getViewCountsBatch(boardIds));
 
-        CompletableFuture<Map<Long, BoardCounts>> combined = CompletableFuture.allOf(likesFuture, commentsFuture, viewsFuture)
+        CompletableFuture<Map<Long, BoardCounts>> combined = CompletableFuture
+                .allOf(likesFuture, commentsFuture, viewsFuture)
                 .thenApply(v -> {
                     Map<Long, Integer> likes = likesFuture.join();
                     Map<Long, Integer> comments = commentsFuture.join();

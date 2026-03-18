@@ -1,8 +1,9 @@
 import axios from 'axios';
+import { isDemoMode } from '../mock/isDemoMode';
+import { DEMO_ACTIVITIES } from '../mock/demoData';
 
 const BASE_URL = 'http://localhost:8080/api/activities';
 
-// 토큰을 가져오는 함수
 const getToken = () => {
   return localStorage.getItem('accessToken') || localStorage.getItem('token');
 };
@@ -14,7 +15,6 @@ const api = axios.create({
   },
 });
 
-// 요청 인터셉터 - 모든 요청에 토큰 자동 추가
 api.interceptors.request.use(
   (config) => {
     const token = getToken();
@@ -23,17 +23,28 @@ api.interceptors.request.use(
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
+
+const mockResolve = (data) => Promise.resolve({ data });
 
 export const activityApi = {
   // 내 활동 조회 (기존 API - 하위 호환성 유지)
-  getMyActivities: (userId) => api.get('/my', { params: { userId } }),
-  
+  getMyActivities: (userId) =>
+    isDemoMode() ? mockResolve(DEMO_ACTIVITIES) : api.get('/my', { params: { userId } }),
+
   // 내 활동 조회 (페이징 지원)
   getMyActivitiesWithPaging: (params = {}) => {
+    if (isDemoMode()) {
+      const { page = 0, size = 20 } = params;
+      const start = page * size;
+      const activities = DEMO_ACTIVITIES.slice(start, start + size);
+      return mockResolve({
+        activities,
+        totalCount: DEMO_ACTIVITIES.length,
+        hasNext: start + activities.length < DEMO_ACTIVITIES.length,
+      });
+    }
     const { userId, filter = 'ALL', page = 0, size = 20, ...otherParams } = params;
     const requestParams = {
       userId,

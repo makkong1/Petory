@@ -1,8 +1,8 @@
 import axios from 'axios';
+import { isDemoMode } from '../mock/isDemoMode';
 
 const BASE_URL = 'http://localhost:8080/api';
 
-// Access Token 가져오기 (전역 인터셉터에서 처리되지만 호환성을 위해)
 const getToken = () => {
   return localStorage.getItem('accessToken') || localStorage.getItem('token');
 };
@@ -14,7 +14,6 @@ const api = axios.create({
   },
 });
 
-// 요청 인터셉터 - 모든 요청에 토큰 자동 추가 (전역 인터셉터와 중복되지만 안전을 위해 유지)
 api.interceptors.request.use(
   (config) => {
     const token = getToken();
@@ -23,29 +22,42 @@ api.interceptors.request.use(
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// 응답 인터셉터 제거 - 전역 인터셉터가 처리 (setupApiInterceptors)
-// 401 에러는 전역 인터셉터에서 refresh token으로 자동 처리됨
+const DEMO_LAT = 37.5665;
+const DEMO_LNG = 126.978;
+const DEMO_ADDRESS = '서울특별시 중구 세종대로 110';
 
 export const geocodingApi = {
   // 주소를 위도/경도로 변환
   addressToCoordinates: async (address) => {
+    if (isDemoMode()) {
+      return {
+        success: true,
+        latitude: DEMO_LAT,
+        longitude: DEMO_LNG,
+        address: address || DEMO_ADDRESS,
+      };
+    }
     const response = await api.get('/geocoding/address', { params: { address } });
-    return response.data; // response.data에 실제 데이터가 있음
+    return response.data;
   },
-  
+
   // 위도/경도를 주소로 변환 (역지오코딩)
   coordinatesToAddress: async (lat, lng) => {
+    if (isDemoMode()) {
+      return { success: true, address: DEMO_ADDRESS, roadAddress: DEMO_ADDRESS };
+    }
     const response = await api.get('/geocoding/coordinates', { params: { lat, lng } });
     return response.data;
   },
-  
+
   // 네이버맵 길찾기 (Directions API)
   getDirections: async (startLat, startLng, endLat, endLng, option = 'traoptimal') => {
+    if (isDemoMode()) {
+      return { success: true, data: null };
+    }
     const response = await api.get('/geocoding/directions', {
       params: {
         start: `${startLng},${startLat}`, // 경도,위도 순서
