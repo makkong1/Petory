@@ -1,8 +1,9 @@
 import axios from 'axios';
+import { isDemoMode } from '../mock/isDemoMode';
+import { DEMO_LOCATION_SERVICES } from '../mock/demoData';
 
 const BASE_URL = 'http://localhost:8080/api/location-services';
 
-// Access Token 가져오기
 const getToken = () => {
   return localStorage.getItem('accessToken') || localStorage.getItem('token');
 };
@@ -30,6 +31,8 @@ const adminApi = axios.create({
 });
 
 adminApi.interceptors.request.use(addAuthToken, (error) => Promise.reject(error));
+
+const mockResolve = (data) => Promise.resolve({ data });
 
 export const locationServiceApi = {
   /**
@@ -60,8 +63,11 @@ export const locationServiceApi = {
     category,
     keyword,
     size
-  } = {}) =>
-    api.get('/search', {
+  } = {}) => {
+    if (isDemoMode()) {
+      return mockResolve({ services: DEMO_LOCATION_SERVICES });
+    }
+    return api.get('/search', {
       params: {
         ...(typeof latitude === 'number' && { latitude }),
         ...(typeof longitude === 'number' && { longitude }),
@@ -74,7 +80,8 @@ export const locationServiceApi = {
         ...(keyword && { keyword }),
         ...(typeof size === 'number' && { size }),
       },
-    }),
+    });
+  },
 
   /**
    * AI 추천 (에이전트 2)
@@ -91,8 +98,11 @@ export const locationServiceApi = {
     roadName,
     category,
     keyword,
-  } = {}) =>
-    api.get('/recommend', {
+  } = {}) => {
+    if (isDemoMode()) {
+      return mockResolve({ services: DEMO_LOCATION_SERVICES });
+    }
+    return api.get('/recommend', {
       params: {
         ...(typeof latitude === 'number' && { latitude }),
         ...(typeof longitude === 'number' && { longitude }),
@@ -104,10 +114,12 @@ export const locationServiceApi = {
         ...(category && { category }),
         ...(keyword && { keyword }),
       },
-    }),
+    });
+  },
 
   // 관리자용 API
-  listLocationServices: (params) => adminApi.get('', { params }),
+  listLocationServices: (params) =>
+    isDemoMode() ? mockResolve({ services: DEMO_LOCATION_SERVICES }) : adminApi.get('', { params }),
   importPublicData: (file) => {
     const formData = new FormData();
     formData.append('file', file);

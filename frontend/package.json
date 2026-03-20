@@ -19,10 +19,14 @@
     "styled-components": "^6.1.19",
     "web-vitals": "^2.1.4"
   },
+  "devDependencies": {
+    "cross-env": "^7.0.3"
+  },
   "proxy": "http://localhost:8080",
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
+    "build:demo": "cross-env REACT_APP_DEMO_MODE=true react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },

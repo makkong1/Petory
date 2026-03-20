@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import styled from 'styled-components';
 import { useAuth } from '../../contexts/AuthContext';
 import { authApi } from '../../api/authApi';
+import { isDemoMode } from '../../mock/isDemoMode';
 
 const LoginForm = ({ onSwitchToRegister }) => {
   const { login } = useAuth();
@@ -84,7 +85,9 @@ const LoginForm = ({ onSwitchToRegister }) => {
   return (
     <LoginContainer>
       <Title>로그인</Title>
-      
+      {isDemoMode() && (
+        <DemoHint>데모 모드: 아무 아이디/비밀번호로 로그인 가능</DemoHint>
+      )}
       <Form onSubmit={handleSubmit}>
         <InputGroup>
           <Label htmlFor="id">아이디</Label>
@@ -129,31 +132,35 @@ const LoginForm = ({ onSwitchToRegister }) => {
         </Button>
       </Form>
 
-      <Divider>
-        <DividerLine />
-        <DividerText>또는</DividerText>
-        <DividerLine />
-      </Divider>
+      {!isDemoMode() && (
+        <>
+          <Divider>
+            <DividerLine />
+            <DividerText>또는</DividerText>
+            <DividerLine />
+          </Divider>
 
-      <SocialLoginContainer>
-        <SocialButton 
-          type="button"
-          onClick={() => handleSocialLogin('google')}
-          google
-        >
-          <SocialIcon>G</SocialIcon>
-          Google로 로그인
-        </SocialButton>
-        
-        <SocialButton 
-          type="button"
-          onClick={() => handleSocialLogin('naver')}
-          naver
-        >
-          <SocialIcon>N</SocialIcon>
-          Naver로 로그인
-        </SocialButton>
-      </SocialLoginContainer>
+          <SocialLoginContainer>
+            <SocialButton 
+              type="button"
+              onClick={() => handleSocialLogin('google')}
+              google
+            >
+              <SocialIcon>G</SocialIcon>
+              Google로 로그인
+            </SocialButton>
+            
+            <SocialButton 
+              type="button"
+              onClick={() => handleSocialLogin('naver')}
+              naver
+            >
+              <SocialIcon>N</SocialIcon>
+              Naver로 로그인
+            </SocialButton>
+          </SocialLoginContainer>
+        </>
+      )}
 
       <LinkText>
         계정이 없으신가요?{' '}
@@ -235,6 +242,16 @@ const Title = styled.h2`
   text-align: center;
   margin-bottom: 2rem;
   color: #333;
+`;
+
+const DemoHint = styled.div`
+  text-align: center;
+  margin-bottom: 1rem;
+  padding: 0.5rem;
+  background: #e8f5e9;
+  color: #2e7d32;
+  border-radius: 6px;
+  font-size: 0.875rem;
 `;
 
 const Form = styled.form`

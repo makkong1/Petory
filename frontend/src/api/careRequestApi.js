@@ -1,8 +1,9 @@
 import axios from 'axios';
+import { isDemoMode } from '../mock/isDemoMode';
+import { DEMO_CARE_REQUESTS } from '../mock/demoData';
 
 const BASE_URL = 'http://localhost:8080/api/care-requests';
 
-// 토큰을 가져오는 함수
 const getToken = () => {
   return localStorage.getItem('accessToken') || localStorage.getItem('token');
 };
@@ -14,7 +15,6 @@ const api = axios.create({
   },
 });
 
-// 요청 인터셉터 - 모든 요청에 토큰 자동 추가 (전역 인터셉터와 중복되지만 안전을 위해 유지)
 api.interceptors.request.use(
   (config) => {
     const token = getToken();
@@ -23,45 +23,89 @@ api.interceptors.request.use(
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// 응답 인터셉터 제거 - 전역 인터셉터가 처리 (setupApiInterceptors)
-// 401 에러는 전역 인터셉터에서 refresh token으로 자동 처리됨
+const mockResolve = (data) => Promise.resolve({ data });
 
 export const careRequestApi = {
   // 전체 케어 요청 조회 (페이징 지원)
   getAllCareRequests: (params = {}) => {
+    if (isDemoMode()) {
+      const { page = 0, size = 20, status } = params;
+      let filtered = [...DEMO_CARE_REQUESTS];
+      if (status && status !== 'ALL') {
+        filtered = filtered.filter((c) => c.status === status);
+      }
+      const start = page * size;
+      const careRequests = filtered.slice(start, start + size);
+      return mockResolve({
+        careRequests,
+        totalCount: filtered.length,
+      });
+    }
     const { page = 0, size = 20, ...rest } = params;
     return api.get('', { params: { page, size, ...rest } });
   },
-  
+
   // 단일 케어 요청 조회
-  getCareRequest: (id) => api.get(`/${id}`),
+  getCareRequest: (id) => {
+    if (isDemoMode()) {
+      const cr = DEMO_CARE_REQUESTS.find((c) => c.idx === Number(id));
+      return mockResolve(cr || DEMO_CARE_REQUESTS[0]);
+    }
+    return api.get(`/${id}`);
+  },
   
   // 케어 요청 생성
-  createCareRequest: (data) => api.post('', data),
-  
+  createCareRequest: (data) =>
+    isDemoMode() ? mockResolve({ idx: 99, ...data }) : api.post('', data),
+
   // 케어 요청 수정
-  updateCareRequest: (id, data) => api.put(`/${id}`, data),
-  
+  updateCareRequest: (id, data) =>
+    isDemoMode() ? mockResolve({ idx: id, ...data }) : api.put(`/${id}`, data),
+
   // 케어 요청 삭제
-  deleteCareRequest: (id) => api.delete(`/${id}`),
-  
+  deleteCareRequest: (id) => (isDemoMode() ? mockResolve({}) : api.delete(`/${id}`)),
+
   // 내 케어 요청 조회
-  getMyCareRequests: (userId) => api.get('/my-requests', { params: { userId } }),
-  
+  getMyCareRequests: (userId) =>
+    isDemoMode()
+      ? mockResolve({ careRequests: DEMO_CARE_REQUESTS.filter((c) => c.userId === 1), totalCount: 1 })
+      : api.get('/my-requests', { params: { userId } }),
+
   // 상태 변경
-  updateStatus: (id, status) => api.patch(`/${id}/status`, null, { params: { status } }),
+  updateStatus: (id, status) =>
+    isDemoMode()
+      ? mockResolve({})
+      : api.patch(`/${id}/status`, null, { params: { status } }),
 
   // 댓글 관련
-  getComments: (careRequestId) => api.get(`/${careRequestId}/comments`),
-  createComment: (careRequestId, payload) => api.post(`/${careRequestId}/comments`, payload),
-  deleteComment: (careRequestId, commentId) => api.delete(`/${careRequestId}/comments/${commentId}`),
+  getComments: (careRequestId) =>
+    isDemoMode()
+      ? mockResolve([])
+      : api.get(`/${careRequestId}/comments`),
+  createComment: (careRequestId, payload) =>
+    isDemoMode()
+      ? mockResolve({ idx: 1, ...payload })
+      : api.post(`/${careRequestId}/comments`, payload),
+  deleteComment: (careRequestId, commentId) =>
+    isDemoMode()
+      ? mockResolve({})
+      : api.delete(`/${careRequestId}/comments/${commentId}`),
 
   // 검색 (페이징 지원)
   searchCareRequests: (keyword, page = 0, size = 20) =>
-    api.get('/search', { params: { keyword, page, size } }),
+    isDemoMode()
+      ? mockResolve({
+          careRequests: keyword
+            ? DEMO_CARE_REQUESTS.filter(
+                (c) =>
+                  (c.title && c.title.includes(keyword)) ||
+                  (c.description && c.description.includes(keyword))
+              )
+            : DEMO_CARE_REQUESTS,
+          totalCount: DEMO_CARE_REQUESTS.length,
+        })
+      : api.get('/search', { params: { keyword, page, size } }),
 };
