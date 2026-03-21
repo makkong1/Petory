@@ -1,6 +1,5 @@
 package com.linkup.Petory.domain.payment.repository;
 
-import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.domain.Page;
@@ -9,8 +8,6 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Repository;
 
 import com.linkup.Petory.domain.payment.entity.PetCoinTransaction;
-import com.linkup.Petory.domain.payment.entity.TransactionStatus;
-import com.linkup.Petory.domain.payment.entity.TransactionType;
 import com.linkup.Petory.domain.user.entity.Users;
 
 import lombok.RequiredArgsConstructor;
@@ -31,41 +28,12 @@ public class JpaPetCoinTransactionAdapter implements PetCoinTransactionRepositor
     }
 
     @Override
-    public Optional<PetCoinTransaction> findById(Long id) {
-        return jpaRepository.findById(id);
-    }
-
-    @Override
     public Optional<PetCoinTransaction> findByIdWithUser(Long idx) {
         return jpaRepository.findByIdWithUser(idx);
     }
 
     @Override
-    public List<PetCoinTransaction> findByUserOrderByCreatedAtDesc(Users user) {
-        return jpaRepository.findByUserOrderByCreatedAtDesc(user);
-    }
-
-    /** [리팩토링] DB 페이징 (메모리 페이징 대체), @EntityGraph로 N+1 방지 */
-    @Override
     public Page<PetCoinTransaction> findByUserOrderByCreatedAtDesc(Users user, Pageable pageable) {
         return jpaRepository.findByUserOrderByCreatedAtDesc(user, pageable);
-    }
-
-    @Override
-    public List<PetCoinTransaction> findByUserAndTransactionTypeOrderByCreatedAtDesc(
-            Users user, TransactionType transactionType) {
-        return jpaRepository.findByUserAndTransactionTypeOrderByCreatedAtDesc(user, transactionType);
-    }
-
-    @Override
-    public List<PetCoinTransaction> findByUserAndStatusOrderByCreatedAtDesc(
-            Users user, TransactionStatus status) {
-        return jpaRepository.findByUserAndStatusOrderByCreatedAtDesc(user, status);
-    }
-
-    @Override
-    public List<PetCoinTransaction> findByRelatedTypeAndRelatedIdx(
-            String relatedType, Long relatedIdx) {
-        return jpaRepository.findByRelatedTypeAndRelatedIdx(relatedType, relatedIdx);
     }
 }

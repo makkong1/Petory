@@ -1,15 +1,12 @@
 package com.linkup.Petory.domain.payment.repository;
 
-import java.util.List;
 import java.util.Optional;
 
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Repository;
 
 import com.linkup.Petory.domain.care.entity.CareRequest;
-import com.linkup.Petory.domain.payment.entity.EscrowStatus;
 import com.linkup.Petory.domain.payment.entity.PetCoinEscrow;
-import com.linkup.Petory.domain.user.entity.Users;
 
 import lombok.RequiredArgsConstructor;
 
@@ -29,18 +26,8 @@ public class JpaPetCoinEscrowAdapter implements PetCoinEscrowRepository {
     }
 
     @Override
-    public Optional<PetCoinEscrow> findById(Long id) {
-        return jpaRepository.findById(id);
-    }
-
-    @Override
     public Optional<PetCoinEscrow> findByCareRequest(CareRequest careRequest) {
         return jpaRepository.findByCareRequest(careRequest);
-    }
-
-    @Override
-    public Optional<PetCoinEscrow> findByCareRequestIdx(Long careRequestIdx) {
-        return jpaRepository.findByCareRequestIdx(careRequestIdx);
     }
 
     @Override
@@ -51,16 +38,6 @@ public class JpaPetCoinEscrowAdapter implements PetCoinEscrowRepository {
     @Override
     public Optional<PetCoinEscrow> findByCareRequestForUpdate(CareRequest careRequest) {
         return jpaRepository.findByCareRequestForUpdate(careRequest);
-    }
-
-    @Override
-    public List<PetCoinEscrow> findByRequesterOrProvider(Users user) {
-        return jpaRepository.findByRequesterOrProvider(user);
-    }
-
-    @Override
-    public List<PetCoinEscrow> findByStatus(EscrowStatus status) {
-        return jpaRepository.findByStatus(status);
     }
 
     @Override
