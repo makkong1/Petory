@@ -35,13 +35,6 @@ public interface SpringDataJpaMeetupRepository extends JpaRepository<Meetup, Lon
                     @Param("minLng") Double minLng,
                     @Param("maxLng") Double maxLng);
 
-    @RepositoryMethod("모임: 날짜 범위별 조회")
-    @Query("SELECT m FROM Meetup m JOIN FETCH m.organizer WHERE " +
-                    "m.date BETWEEN :startDate AND :endDate AND " +
-                    "(m.isDeleted = false OR m.isDeleted IS NULL) " +
-                    "ORDER BY m.date ASC")
-    List<Meetup> findByDateBetweenOrderByDateAsc(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
-
     @RepositoryMethod("모임: 키워드 검색")
     @Query("SELECT m FROM Meetup m JOIN FETCH m.organizer WHERE " +
                     "(m.title LIKE %:keyword% OR m.description LIKE %:keyword%) AND " +

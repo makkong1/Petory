@@ -29,18 +29,8 @@ public class JpaBoardReactionAdapter implements BoardReactionRepository {
     }
 
     @Override
-    public Optional<BoardReaction> findById(Long id) {
-        return jpaRepository.findById(id);
-    }
-
-    @Override
     public void delete(BoardReaction reaction) {
         jpaRepository.delete(reaction);
-    }
-
-    @Override
-    public void deleteById(Long id) {
-        jpaRepository.deleteById(id);
     }
 
     @Override
@@ -54,11 +44,6 @@ public class JpaBoardReactionAdapter implements BoardReactionRepository {
     }
 
     @Override
-    public void deleteByBoard(Board board) {
-        jpaRepository.deleteByBoard(board);
-    }
-
-    @Override
     public List<Object[]> countByBoardsGroupByReactionType(List<Long> boardIds) {
         return jpaRepository.countByBoardsGroupByReactionType(boardIds);
     }
@@ -67,11 +52,6 @@ public class JpaBoardReactionAdapter implements BoardReactionRepository {
     // [리팩토링] BoardPopularityService 배치 집계용 LIKE 전용 조회
     public List<Object[]> countByBoardsAndReactionType(List<Long> boardIds, ReactionType reactionType) {
         return jpaRepository.countByBoardsAndReactionType(boardIds, reactionType);
-    }
-
-    @Override
-    public List<Object[]> countByBoardGroupByReactionType(Long boardId) {
-        return jpaRepository.countByBoardGroupByReactionType(boardId);
     }
 }
 

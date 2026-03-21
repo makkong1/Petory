@@ -32,16 +32,6 @@ public class JpaMeetupAdapter implements MeetupRepository {
     }
 
     @Override
-    public void delete(Meetup meetup) {
-        jpaRepository.delete(meetup);
-    }
-
-    @Override
-    public void deleteById(Long id) {
-        jpaRepository.deleteById(id);
-    }
-
-    @Override
     public List<Meetup> findByOrganizerIdxOrderByCreatedAtDesc(Long organizerIdx) {
         return jpaRepository.findByOrganizerIdxOrderByCreatedAtDesc(organizerIdx);
     }
@@ -53,11 +43,6 @@ public class JpaMeetupAdapter implements MeetupRepository {
             Double minLng,
             Double maxLng) {
         return jpaRepository.findByLocationRange(minLat, maxLat, minLng, maxLng);
-    }
-
-    @Override
-    public List<Meetup> findByDateBetweenOrderByDateAsc(LocalDateTime startDate, LocalDateTime endDate) {
-        return jpaRepository.findByDateBetweenOrderByDateAsc(startDate, endDate);
     }
 
     @Override

@@ -22,19 +22,10 @@ public interface PetRepository {
 
     Optional<Pet> findById(Long id);
 
-    void delete(Pet pet);
-
-    void deleteById(Long id);
-
     /**
      * 사용자 ID로 펫 목록 조회 (삭제되지 않은 것만)
      */
     List<Pet> findByUserIdAndNotDeleted(String userId);
-
-    /**
-     * 사용자 ID로 펫 목록 조회 (모든 것)
-     */
-    List<Pet> findByUserId(String userId);
 
     /**
      * 사용자 idx로 펫 목록 조회 (삭제되지 않은 것만)
@@ -45,10 +36,4 @@ public interface PetRepository {
      * 펫 타입으로 조회 (삭제되지 않은 것만)
      */
     List<Pet> findByPetTypeAndIsDeletedFalse(PetType petType);
-
-    /**
-     * 펫 이름으로 조회 (삭제되지 않은 것만)
-     */
-    List<Pet> findByPetNameContainingAndIsDeletedFalse(String petName);
 }
-

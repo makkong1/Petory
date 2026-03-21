@@ -38,35 +38,6 @@ public interface SpringDataJpaMissingPetBoardRepository extends JpaRepository<Mi
     @Query("SELECT b FROM MissingPetBoard b JOIN FETCH b.user u WHERE b.idx = :id AND b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE'")
     Optional<MissingPetBoard> findByIdWithUser(@Param("id") Long id);
 
-    @RepositoryMethod("실종 제보: 전체 목록 (댓글 포함)")
-    @Query("SELECT DISTINCT b FROM MissingPetBoard b " +
-            "JOIN FETCH b.user u " +
-            "LEFT JOIN FETCH b.comments c " +
-            "LEFT JOIN FETCH c.user cu " +
-            "WHERE b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' " +
-            "AND (c IS NULL OR (c.isDeleted = false AND cu.isDeleted = false AND cu.status = 'ACTIVE')) " +
-            "ORDER BY b.createdAt DESC")
-    List<MissingPetBoard> findAllWithCommentsByOrderByCreatedAtDesc();
-
-    @RepositoryMethod("실종 제보: 상태별 목록 (댓글 포함)")
-    @Query("SELECT DISTINCT b FROM MissingPetBoard b " +
-            "JOIN FETCH b.user u " +
-            "LEFT JOIN FETCH b.comments c " +
-            "LEFT JOIN FETCH c.user cu " +
-            "WHERE b.status = :status AND b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' " +
-            "AND (c IS NULL OR (c.isDeleted = false AND cu.isDeleted = false AND cu.status = 'ACTIVE')) " +
-            "ORDER BY b.createdAt DESC")
-    List<MissingPetBoard> findByStatusWithCommentsOrderByCreatedAtDesc(@Param("status") MissingPetStatus status);
-
-    @RepositoryMethod("실종 제보: 단건 조회 (댓글 포함)")
-    @Query("SELECT DISTINCT b FROM MissingPetBoard b " +
-            "JOIN FETCH b.user u " +
-            "LEFT JOIN FETCH b.comments c " +
-            "LEFT JOIN FETCH c.user cu " +
-            "WHERE b.idx = :id AND b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' " +
-            "AND (c IS NULL OR (c.isDeleted = false AND cu.isDeleted = false AND cu.status = 'ACTIVE'))")
-    Optional<MissingPetBoard> findByIdWithComments(@Param("id") Long id);
-
     @RepositoryMethod("실종 제보: 사용자별 목록 조회")
     @Query("SELECT b FROM MissingPetBoard b JOIN FETCH b.user u WHERE b.user = :user AND b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY b.createdAt DESC")
     List<MissingPetBoard> findByUserAndIsDeletedFalseOrderByCreatedAtDesc(@Param("user") Users user);

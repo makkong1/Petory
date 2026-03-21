@@ -39,15 +39,11 @@ public interface BoardRepository {
 
     boolean existsById(Long id);
 
-    List<Board> findAll();
-
     void delete(Board board);
 
     void deleteById(Long id);
 
-        // Specification을 사용한 동적 쿼리 (JPA 구현체에서 사용)
-        List<Board> findAll(Specification<Board> spec);
-
+        // Specification + 페이징 (관리자 등)
         Page<Board> findAll(Specification<Board> spec, Pageable pageable);
 
         // 전체 게시글 조회 (삭제되지 않은 것만, 최신순) - 작성자도 활성 상태여야 함

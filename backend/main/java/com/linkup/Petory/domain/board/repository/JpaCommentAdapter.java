@@ -59,11 +59,6 @@ public class JpaCommentAdapter implements CommentRepository {
     }
 
     @Override
-    public List<Comment> findByBoardOrderByCreatedAtAsc(Board board) {
-        return jpaRepository.findByBoardOrderByCreatedAtAsc(board);
-    }
-
-    @Override
     public List<Comment> findByBoardAndIsDeletedFalseOrderByCreatedAtAsc(Board board) {
         return jpaRepository.findByBoardAndIsDeletedFalseOrderByCreatedAtAsc(board);
     }

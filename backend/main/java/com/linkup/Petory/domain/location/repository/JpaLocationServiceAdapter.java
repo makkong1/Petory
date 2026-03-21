@@ -36,32 +36,8 @@ public class JpaLocationServiceAdapter implements LocationServiceRepository {
     }
 
     @Override
-    public void delete(LocationService locationService) {
-        jpaRepository.delete(locationService);
-    }
-
-    @Override
-    public void deleteById(Long id) {
-        jpaRepository.deleteById(id);
-    }
-
-    @Override
-    public List<LocationService> findByLocationRange(
-            Double minLat,
-            Double maxLat,
-            Double minLng,
-            Double maxLng) {
-        return jpaRepository.findByLocationRange(minLat, maxLat, minLng, maxLng);
-    }
-
-    @Override
     public List<LocationService> findByOrderByRatingDesc() {
         return jpaRepository.findByOrderByRatingDesc();
-    }
-
-    @Override
-    public List<LocationService> findByCategoryOrderByRatingDesc(String category) {
-        return jpaRepository.findByCategoryOrderByRatingDesc(category);
     }
 
     @Override
@@ -75,43 +51,13 @@ public class JpaLocationServiceAdapter implements LocationServiceRepository {
     }
 
     @Override
-    public List<LocationService> findByRatingGreaterThanEqualOrderByRatingDesc(Double minRating) {
-        return jpaRepository.findByRatingGreaterThanEqualOrderByRatingDesc(minRating);
-    }
-
-    @Override
-    public List<LocationService> findByNameAndAddress(String name, String address) {
-        return jpaRepository.findByNameAndAddress(name, address);
-    }
-
-    @Override
     public boolean existsByNameAndAddress(String name, String address) {
         return jpaRepository.existsByNameAndAddress(name, address);
     }
 
     @Override
-    public List<LocationService> findByAddress(String address) {
-        return jpaRepository.findByAddress(address);
-    }
-
-    @Override
-    public List<LocationService> findByAddressContaining(String address) {
-        return jpaRepository.findByAddressContaining(address);
-    }
-
-    @Override
     public List<LocationService> findByRadius(Double latitude, Double longitude, Double radiusInMeters) {
         return jpaRepository.findByRadius(latitude, longitude, radiusInMeters);
-    }
-
-    @Override
-    public List<LocationService> findBySeoulGuAndDong(String gu, String dong) {
-        return jpaRepository.findBySeoulGuAndDong(gu, dong);
-    }
-
-    @Override
-    public List<LocationService> findByRegion(String sido, String sigungu, String dong) {
-        return jpaRepository.findByRegion(sido, sigungu, dong);
     }
 
     @Override
@@ -133,18 +79,4 @@ public class JpaLocationServiceAdapter implements LocationServiceRepository {
     public List<LocationService> findByRoadName(String roadName) {
         return jpaRepository.findByRoadName(roadName);
     }
-
-    @Override
-    public List<LocationService> findByUserLocation(String sigungu, String eupmyeondong) {
-        return jpaRepository.findByUserLocation(sigungu, eupmyeondong);
-    }
-
-    @Override
-    public List<LocationService> findByRadiusOrderByDistance(
-            Double latitude,
-            Double longitude,
-            Double radiusInMeters) {
-        return jpaRepository.findByRadiusOrderByDistance(latitude, longitude, radiusInMeters);
-    }
 }
-

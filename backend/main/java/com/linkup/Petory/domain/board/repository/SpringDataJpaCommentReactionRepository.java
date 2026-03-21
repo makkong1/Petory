@@ -24,9 +24,6 @@ public interface SpringDataJpaCommentReactionRepository extends JpaRepository<Co
     @RepositoryMethod("댓글 반응: 사용자별 조회")
     Optional<CommentReaction> findByCommentAndUser(Comment comment, Users user);
 
-    @RepositoryMethod("댓글 반응: 댓글별 삭제")
-    void deleteByComment(Comment comment);
-
     @RepositoryMethod("댓글 반응: 배치 카운트 조회")
     @Query("SELECT cr.comment.idx as commentId, cr.reactionType as reactionType, COUNT(cr) as count " +
            "FROM CommentReaction cr " +

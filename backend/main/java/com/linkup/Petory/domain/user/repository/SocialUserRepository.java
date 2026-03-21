@@ -20,11 +20,7 @@ public interface SocialUserRepository {
 
     SocialUser save(SocialUser socialUser);
 
-    Optional<SocialUser> findById(Long id);
-
     List<SocialUser> findAll();
-
-    void delete(SocialUser socialUser);
 
     void deleteById(Long id);
 

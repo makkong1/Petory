@@ -10,19 +10,12 @@ import com.linkup.Petory.domain.location.entity.LocationServiceReview;
  */
 public interface LocationServiceReviewRepository {
 
-    // 기본 CRUD 메서드
     LocationServiceReview save(LocationServiceReview review);
-
-    Optional<LocationServiceReview> findById(Long id);
 
     /**
      * 단건 조회 (user, service 포함) - 수정/삭제 시 권한 확인용
      */
     Optional<LocationServiceReview> findByIdWithUserAndService(Long idx);
-
-    void delete(LocationServiceReview review);
-
-    void deleteById(Long id);
 
     /**
      * 특정 서비스의 모든 리뷰 조회
@@ -38,11 +31,6 @@ public interface LocationServiceReviewRepository {
      * 특정 서비스의 평균 평점 계산
      */
     Optional<Double> findAverageRatingByServiceIdx(Long serviceIdx);
-
-    /**
-     * 특정 서비스의 리뷰 개수
-     */
-    Long countByServiceIdx(Long serviceIdx);
 
     /**
      * 특정 사용자가 특정 서비스에 리뷰를 작성했는지 확인

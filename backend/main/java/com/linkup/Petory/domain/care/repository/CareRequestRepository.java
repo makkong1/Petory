@@ -26,16 +26,12 @@ public interface CareRequestRepository {
     // 기본 CRUD 메서드
     CareRequest save(CareRequest careRequest);
 
-    List<CareRequest> saveAll(List<CareRequest> careRequests);
-
     Optional<CareRequest> findById(Long id);
 
     /**
      * ID로 엔티티 참조 조회 (프록시 객체 반환, 실제 조회는 지연됨)
      */
     CareRequest getReferenceById(Long id);
-
-    void delete(CareRequest careRequest);
 
     void deleteById(Long id);
 
@@ -55,11 +51,6 @@ public interface CareRequestRepository {
         List<CareRequest> findByStatusAndIsDeletedFalse(CareRequestStatus status);
 
         /**
-         * 위치별 케어 요청 조회 (사용자 위치 기반)
-         */
-        List<CareRequest> findByUser_LocationContaining(String location);
-
-        /**
          * 제목이나 설명에 키워드 포함된 케어 요청 검색 - 작성자도 활성 상태여야 함
          */
         List<CareRequest> findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCaseAndIsDeletedFalse(
@@ -72,11 +63,6 @@ public interface CareRequestRepository {
         List<CareRequest> findByDateBeforeAndStatusIn(
                         LocalDateTime now,
                         List<CareRequestStatus> statuses);
-
-        /**
-         * 단일 케어 요청 조회 (펫 정보 포함)
-         */
-        Optional<CareRequest> findByIdWithPet(Long idx);
 
         /**
          * 단일 케어 요청 조회 (작성자 포함) - 수정/삭제 시 권한 확인용

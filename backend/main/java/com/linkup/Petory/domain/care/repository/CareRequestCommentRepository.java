@@ -16,12 +16,6 @@ public interface CareRequestCommentRepository {
 
     Optional<CareRequestComment> findById(Long id);
 
-    void delete(CareRequestComment comment);
-
-    void deleteById(Long id);
-
-    List<CareRequestComment> findByCareRequestOrderByCreatedAtAsc(CareRequest careRequest);
-
     /**
      * soft-deleted 제외
      */

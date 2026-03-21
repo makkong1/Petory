@@ -18,6 +18,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.test.context.ActiveProfiles;
 
 import com.linkup.Petory.domain.payment.entity.PetCoinTransaction;
@@ -98,7 +99,9 @@ class PetCoinServiceRaceConditionTest {
 
         if (testUser != null) {
             try {
-                List<PetCoinTransaction> transactions = transactionRepository.findByUserOrderByCreatedAtDesc(testUser);
+                List<PetCoinTransaction> transactions = transactionRepository
+                                .findByUserOrderByCreatedAtDesc(testUser, Pageable.unpaged())
+                                .getContent();
                 if (!transactions.isEmpty()) {
                     jpaTransactionRepository.deleteAll(transactions);
                     log.info("[tearDown] 거래 내역 {}건 삭제 완료 (user_idx={})", transactions.size(), testUser.getIdx());
@@ -181,7 +184,9 @@ class PetCoinServiceRaceConditionTest {
 
         Users refreshedUser = usersRepository.findById(testUser.getIdx()).orElseThrow();
         Integer finalBalance = petCoinService.getBalance(refreshedUser);
-        List<PetCoinTransaction> allTx = transactionRepository.findByUserOrderByCreatedAtDesc(testUser);
+        List<PetCoinTransaction> allTx = transactionRepository
+                        .findByUserOrderByCreatedAtDesc(testUser, Pageable.unpaged())
+                        .getContent();
 
         log.info("\n========== [문제 상황] 테스트 결과 ==========");
         log.info("성공: {}건, 실패: {}건", successCount.get(), failureCount.get());

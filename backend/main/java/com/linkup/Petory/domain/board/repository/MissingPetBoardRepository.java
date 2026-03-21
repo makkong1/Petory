@@ -44,21 +44,6 @@ public interface MissingPetBoardRepository {
     Optional<MissingPetBoard> findByIdWithUser(Long id);
 
     /**
-     * 댓글 포함 조회 (N+1 문제 해결) - 전체 조회
-     */
-    List<MissingPetBoard> findAllWithCommentsByOrderByCreatedAtDesc();
-
-    /**
-     * 댓글 포함 조회 (N+1 문제 해결) - 상태별 조회
-     */
-    List<MissingPetBoard> findByStatusWithCommentsOrderByCreatedAtDesc(MissingPetStatus status);
-
-    /**
-     * 댓글 포함 단건 조회 (N+1 문제 해결)
-     */
-    Optional<MissingPetBoard> findByIdWithComments(Long id);
-
-    /**
      * 사용자별 게시글 조회 (삭제되지 않은 것만, 최신순) - 작성자도 활성 상태여야 함
      */
     List<MissingPetBoard> findByUserAndIsDeletedFalseOrderByCreatedAtDesc(Users user);

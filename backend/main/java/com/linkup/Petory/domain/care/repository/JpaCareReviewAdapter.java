@@ -1,7 +1,6 @@
 package com.linkup.Petory.domain.care.repository;
 
 import java.util.List;
-import java.util.Optional;
 
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Repository;
@@ -26,21 +25,6 @@ public class JpaCareReviewAdapter implements CareReviewRepository {
     }
 
     @Override
-    public Optional<CareReview> findById(Long id) {
-        return jpaRepository.findById(id);
-    }
-
-    @Override
-    public void delete(CareReview careReview) {
-        jpaRepository.delete(careReview);
-    }
-
-    @Override
-    public void deleteById(Long id) {
-        jpaRepository.deleteById(id);
-    }
-
-    @Override
     public List<CareReview> findByRevieweeIdxOrderByCreatedAtDesc(Long revieweeIdx) {
         return jpaRepository.findByRevieweeIdxOrderByCreatedAtDesc(revieweeIdx);
     }
@@ -51,13 +35,7 @@ public class JpaCareReviewAdapter implements CareReviewRepository {
     }
 
     @Override
-    public List<CareReview> findByCareApplicationIdx(Long careApplicationIdx) {
-        return jpaRepository.findByCareApplicationIdx(careApplicationIdx);
-    }
-
-    @Override
     public boolean existsByCareApplicationIdxAndReviewerIdx(Long careApplicationIdx, Long reviewerIdx) {
         return jpaRepository.existsByCareApplicationIdxAndReviewerIdx(careApplicationIdx, reviewerIdx);
     }
 }
-

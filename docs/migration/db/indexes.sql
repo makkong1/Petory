@@ -166,8 +166,8 @@ CREATE INDEX idx_carerequest_user_idx_created_at ON carerequest(user_idx, create
 -- 상태별 케어 요청 조회 (findByStatus)
 CREATE INDEX idx_carerequest_status ON carerequest(status);
 
--- 위치별 케어 요청 조회 (findByUser_LocationContaining)
--- users 테이블의 location 인덱스로 커버 가능
+-- 위치 필터: 서비스에서 user.location 문자열 포함 여부로 필터 (전용 레포 메서드 없음)
+-- 필요 시 users.location 인덱스·조인 전략 검토
 
 -- 제목이나 설명에 키워드 포함된 케어 요청 검색 (findByTitleContainingOrDescriptionContaining)
 CREATE FULLTEXT INDEX idx_carerequest_title_description ON carerequest(title, description);

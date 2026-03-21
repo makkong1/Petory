@@ -16,9 +16,6 @@ import com.linkup.Petory.global.annotation.RepositoryMethod;
  */
 public interface SpringDataJpaCareRequestCommentRepository extends JpaRepository<CareRequestComment, Long> {
 
-    @RepositoryMethod("펫케어 댓글: 요청별 목록 조회")
-    List<CareRequestComment> findByCareRequestOrderByCreatedAtAsc(CareRequest careRequest);
-
     @RepositoryMethod("펫케어 댓글: 요청별 목록 (삭제 제외)")
     @Query("SELECT cc FROM CareRequestComment cc JOIN FETCH cc.user WHERE cc.careRequest = :careRequest AND cc.isDeleted = false ORDER BY cc.createdAt ASC")
     List<CareRequestComment> findByCareRequestAndIsDeletedFalseOrderByCreatedAtAsc(@Param("careRequest") CareRequest careRequest);

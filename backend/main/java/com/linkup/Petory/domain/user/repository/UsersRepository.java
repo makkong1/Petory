@@ -26,8 +26,6 @@ public interface UsersRepository {
 
     Optional<Users> findById(Long id);
 
-    void delete(Users user);
-
     List<Users> findAll();
 
     Page<Users> findAll(Pageable pageable);

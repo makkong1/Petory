@@ -65,11 +65,6 @@ public class JpaBoardAdapter implements BoardRepository {
     }
 
     @Override
-    public List<Board> findAll() {
-        return jpaRepository.findAll();
-    }
-
-    @Override
     public void delete(Board board) {
         jpaRepository.delete(board);
     }
@@ -77,11 +72,6 @@ public class JpaBoardAdapter implements BoardRepository {
     @Override
     public void deleteById(Long id) {
         jpaRepository.deleteById(id);
-    }
-
-    @Override
-    public List<Board> findAll(Specification<Board> spec) {
-        return jpaRepository.findAll(spec);
     }
 
     @Override

@@ -24,9 +24,6 @@ public interface SpringDataJpaBoardReactionRepository extends JpaRepository<Boar
     @RepositoryMethod("게시글 반응: 사용자별 조회")
     Optional<BoardReaction> findByBoardAndUser(Board board, Users user);
 
-    @RepositoryMethod("게시글 반응: 게시글별 삭제")
-    void deleteByBoard(Board board);
-
     @RepositoryMethod("게시글 반응: 배치 카운트 조회")
     @Query("SELECT br.board.idx as boardId, br.reactionType as reactionType, COUNT(br) as count " +
            "FROM BoardReaction br " +
@@ -40,12 +37,5 @@ public interface SpringDataJpaBoardReactionRepository extends JpaRepository<Boar
            "WHERE br.board.idx IN :boardIds AND br.reactionType = :reactionType " +
            "GROUP BY br.board.idx")
     List<Object[]> countByBoardsAndReactionType(@Param("boardIds") List<Long> boardIds, @Param("reactionType") ReactionType reactionType);
-
-    @RepositoryMethod("게시글 반응: 단건 카운트 조회")
-    @Query("SELECT br.board.idx as boardId, br.reactionType as reactionType, COUNT(br) as count " +
-           "FROM BoardReaction br " +
-           "WHERE br.board.idx = :boardId " +
-           "GROUP BY br.board.idx, br.reactionType")
-    List<Object[]> countByBoardGroupByReactionType(@Param("boardId") Long boardId);
 }
 

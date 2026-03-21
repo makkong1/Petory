@@ -1,7 +1,6 @@
 package com.linkup.Petory.domain.board.repository;
 
 import java.util.List;
-import java.util.Optional;
 
 import com.linkup.Petory.domain.board.entity.Board;
 import com.linkup.Petory.domain.board.entity.BoardViewLog;
@@ -13,12 +12,6 @@ import com.linkup.Petory.domain.user.entity.Users;
 public interface BoardViewLogRepository {
 
     BoardViewLog save(BoardViewLog viewLog);
-
-    Optional<BoardViewLog> findById(Long id);
-
-    void delete(BoardViewLog viewLog);
-
-    void deleteById(Long id);
 
     boolean existsByBoardAndUser(Board board, Users user);
 

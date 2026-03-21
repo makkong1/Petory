@@ -33,21 +33,6 @@ public class JpaCareRequestCommentAdapter implements CareRequestCommentRepositor
     }
 
     @Override
-    public void delete(CareRequestComment comment) {
-        jpaRepository.delete(comment);
-    }
-
-    @Override
-    public void deleteById(Long id) {
-        jpaRepository.deleteById(id);
-    }
-
-    @Override
-    public List<CareRequestComment> findByCareRequestOrderByCreatedAtAsc(CareRequest careRequest) {
-        return jpaRepository.findByCareRequestOrderByCreatedAtAsc(careRequest);
-    }
-
-    @Override
     public List<CareRequestComment> findByCareRequestAndIsDeletedFalseOrderByCreatedAtAsc(CareRequest careRequest) {
         return jpaRepository.findByCareRequestAndIsDeletedFalseOrderByCreatedAtAsc(careRequest);
     }
@@ -57,4 +42,3 @@ public class JpaCareRequestCommentAdapter implements CareRequestCommentRepositor
         return jpaRepository.findByUserAndIsDeletedFalseOrderByCreatedAtDesc(user);
     }
 }
-

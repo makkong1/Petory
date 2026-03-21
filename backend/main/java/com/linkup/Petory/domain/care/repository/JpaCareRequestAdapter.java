@@ -40,11 +40,6 @@ public class JpaCareRequestAdapter implements CareRequestRepository {
     }
 
     @Override
-    public List<CareRequest> saveAll(List<CareRequest> careRequests) {
-        return jpaRepository.saveAll(careRequests);
-    }
-
-    @Override
     public Optional<CareRequest> findById(Long id) {
         return jpaRepository.findById(id);
     }
@@ -52,11 +47,6 @@ public class JpaCareRequestAdapter implements CareRequestRepository {
     @Override
     public CareRequest getReferenceById(Long id) {
         return jpaRepository.getReferenceById(id);
-    }
-
-    @Override
-    public void delete(CareRequest careRequest) {
-        jpaRepository.delete(careRequest);
     }
 
     @Override
@@ -80,11 +70,6 @@ public class JpaCareRequestAdapter implements CareRequestRepository {
     }
 
     @Override
-    public List<CareRequest> findByUser_LocationContaining(String location) {
-        return jpaRepository.findByUser_LocationContaining(location);
-    }
-
-    @Override
     public List<CareRequest> findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCaseAndIsDeletedFalse(
             String titleKeyword,
             String descKeyword) {
@@ -97,11 +82,6 @@ public class JpaCareRequestAdapter implements CareRequestRepository {
             LocalDateTime now,
             List<CareRequestStatus> statuses) {
         return jpaRepository.findByDateBeforeAndStatusIn(now, statuses);
-    }
-
-    @Override
-    public Optional<CareRequest> findByIdWithPet(Long idx) {
-        return jpaRepository.findByIdWithPet(idx);
     }
 
     @Override

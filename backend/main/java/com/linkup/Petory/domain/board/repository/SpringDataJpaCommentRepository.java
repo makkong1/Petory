@@ -23,9 +23,6 @@ import com.linkup.Petory.global.annotation.RepositoryMethod;
  */
 public interface SpringDataJpaCommentRepository extends JpaRepository<Comment, Long> {
 
-    @RepositoryMethod("댓글: 게시글별 목록 조회")
-    List<Comment> findByBoardOrderByCreatedAtAsc(Board board);
-
     @RepositoryMethod("댓글: 게시글별 목록 조회 (삭제 제외)")
     @Query("SELECT c FROM Comment c JOIN FETCH c.user u WHERE c.board = :board AND c.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY c.createdAt ASC")
     List<Comment> findByBoardAndIsDeletedFalseOrderByCreatedAtAsc(@Param("board") Board board);

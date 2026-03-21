@@ -36,6 +36,12 @@
 
 ---
 
+## 카타시안 곱 점검
+
+- [카타시안 곱(Fetch Join 행 폭증) 발생 확인](./cartesian-product-verification.md) — 어떤 조회에서 SQL 행이 불어나는지 코드 기준 정리
+
+---
+
 ## 도메인별 문서
 
 - [user/](./user/) - User 도메인

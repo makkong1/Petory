@@ -24,18 +24,11 @@ public interface SpringDataJpaPetRepository extends JpaRepository<Pet, Long> {
     @Query("SELECT p FROM Pet p WHERE p.user.id = :userId AND p.isDeleted = false")
     List<Pet> findByUserIdAndNotDeleted(@Param("userId") String userId);
 
-    @RepositoryMethod("펫: 사용자 ID로 목록 조회 (전체)")
-    @Query("SELECT p FROM Pet p WHERE p.user.id = :userId")
-    List<Pet> findByUserId(@Param("userId") String userId);
-
     @RepositoryMethod("펫: 사용자 idx로 목록 조회 (삭제 제외)")
     @Query("SELECT p FROM Pet p WHERE p.user.idx = :userIdx AND p.isDeleted = false")
     List<Pet> findByUserIdxAndNotDeleted(@Param("userIdx") Long userIdx);
 
     @RepositoryMethod("펫: 타입별 조회")
     List<Pet> findByPetTypeAndIsDeletedFalse(PetType petType);
-
-    @RepositoryMethod("펫: 이름 검색")
-    List<Pet> findByPetNameContainingAndIsDeletedFalse(String petName);
 }
 
