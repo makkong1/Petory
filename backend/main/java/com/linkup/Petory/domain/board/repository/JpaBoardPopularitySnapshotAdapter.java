@@ -2,7 +2,6 @@ package com.linkup.Petory.domain.board.repository;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Optional;
 
 import org.springframework.context.annotation.Primary;
 import org.springframework.data.domain.Sort;
@@ -25,28 +24,8 @@ public class JpaBoardPopularitySnapshotAdapter implements BoardPopularitySnapsho
     private final SpringDataJpaBoardPopularitySnapshotRepository jpaRepository;
 
     @Override
-    public BoardPopularitySnapshot save(BoardPopularitySnapshot snapshot) {
-        return jpaRepository.save(snapshot);
-    }
-
-    @Override
     public List<BoardPopularitySnapshot> saveAll(List<BoardPopularitySnapshot> snapshots) {
         return jpaRepository.saveAll(snapshots);
-    }
-
-    @Override
-    public Optional<BoardPopularitySnapshot> findById(Long id) {
-        return jpaRepository.findById(id);
-    }
-
-    @Override
-    public void delete(BoardPopularitySnapshot snapshot) {
-        jpaRepository.delete(snapshot);
-    }
-
-    @Override
-    public void deleteById(Long id) {
-        jpaRepository.deleteById(id);
     }
 
     @Override

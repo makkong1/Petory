@@ -85,21 +85,6 @@ public class JpaMissingPetBoardAdapter implements MissingPetBoardRepository {
     }
 
     @Override
-    public List<MissingPetBoard> findAllWithCommentsByOrderByCreatedAtDesc() {
-        return jpaRepository.findAllWithCommentsByOrderByCreatedAtDesc();
-    }
-
-    @Override
-    public List<MissingPetBoard> findByStatusWithCommentsOrderByCreatedAtDesc(MissingPetStatus status) {
-        return jpaRepository.findByStatusWithCommentsOrderByCreatedAtDesc(status);
-    }
-
-    @Override
-    public Optional<MissingPetBoard> findByIdWithComments(Long id) {
-        return jpaRepository.findByIdWithComments(id);
-    }
-
-    @Override
     public List<MissingPetBoard> findByUserAndIsDeletedFalseOrderByCreatedAtDesc(Users user) {
         return jpaRepository.findByUserAndIsDeletedFalseOrderByCreatedAtDesc(user);
     }

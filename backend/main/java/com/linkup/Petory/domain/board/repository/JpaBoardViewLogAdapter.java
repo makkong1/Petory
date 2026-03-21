@@ -1,7 +1,6 @@
 package com.linkup.Petory.domain.board.repository;
 
 import java.util.List;
-import java.util.Optional;
 
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Repository;
@@ -25,21 +24,6 @@ public class JpaBoardViewLogAdapter implements BoardViewLogRepository {
     @Override
     public BoardViewLog save(BoardViewLog viewLog) {
         return jpaRepository.save(viewLog);
-    }
-
-    @Override
-    public Optional<BoardViewLog> findById(Long id) {
-        return jpaRepository.findById(id);
-    }
-
-    @Override
-    public void delete(BoardViewLog viewLog) {
-        jpaRepository.delete(viewLog);
-    }
-
-    @Override
-    public void deleteById(Long id) {
-        jpaRepository.deleteById(id);
     }
 
     @Override

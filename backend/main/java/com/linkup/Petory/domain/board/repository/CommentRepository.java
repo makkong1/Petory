@@ -32,8 +32,6 @@ public interface CommentRepository {
 
     void deleteById(Long id);
 
-    List<Comment> findByBoardOrderByCreatedAtAsc(Board board);
-
     /**
      * 삭제되지 않은 댓글만 조회 - 작성자도 활성 상태여야 함
      */

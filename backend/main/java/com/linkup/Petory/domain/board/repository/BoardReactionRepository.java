@@ -15,17 +15,11 @@ public interface BoardReactionRepository {
 
     BoardReaction save(BoardReaction reaction);
 
-    Optional<BoardReaction> findById(Long id);
-
     void delete(BoardReaction reaction);
-
-    void deleteById(Long id);
 
     long countByBoardAndReactionType(Board board, ReactionType reactionType);
 
     Optional<BoardReaction> findByBoardAndUser(Board board, Users user);
-
-    void deleteByBoard(Board board);
 
     /**
      * 여러 게시글의 좋아요/싫어요 카운트를 한 번에 조회 (배치 조회)
@@ -38,10 +32,4 @@ public interface BoardReactionRepository {
      * 반환값: List<Object[]> [boardId, count]
      */
     List<Object[]> countByBoardsAndReactionType(List<Long> boardIds, ReactionType reactionType);
-
-    /**
-     * 단일 게시글의 좋아요/싫어요 카운트를 한 번에 조회
-     * 반환값: List<Object[]> [boardId, reactionType, count]
-     */
-    List<Object[]> countByBoardGroupByReactionType(Long boardId);
 }

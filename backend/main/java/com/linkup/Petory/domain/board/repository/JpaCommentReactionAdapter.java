@@ -29,18 +29,8 @@ public class JpaCommentReactionAdapter implements CommentReactionRepository {
     }
 
     @Override
-    public Optional<CommentReaction> findById(Long id) {
-        return jpaRepository.findById(id);
-    }
-
-    @Override
     public void delete(CommentReaction reaction) {
         jpaRepository.delete(reaction);
-    }
-
-    @Override
-    public void deleteById(Long id) {
-        jpaRepository.deleteById(id);
     }
 
     @Override
@@ -51,11 +41,6 @@ public class JpaCommentReactionAdapter implements CommentReactionRepository {
     @Override
     public Optional<CommentReaction> findByCommentAndUser(Comment comment, Users user) {
         return jpaRepository.findByCommentAndUser(comment, user);
-    }
-
-    @Override
-    public void deleteByComment(Comment comment) {
-        jpaRepository.deleteByComment(comment);
     }
 
     @Override

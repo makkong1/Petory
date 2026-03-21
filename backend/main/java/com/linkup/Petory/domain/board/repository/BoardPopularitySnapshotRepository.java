@@ -2,7 +2,6 @@ package com.linkup.Petory.domain.board.repository;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Optional;
 
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
@@ -15,15 +14,7 @@ import com.linkup.Petory.domain.board.entity.PopularityPeriodType;
  */
 public interface BoardPopularitySnapshotRepository {
 
-    BoardPopularitySnapshot save(BoardPopularitySnapshot snapshot);
-
     List<BoardPopularitySnapshot> saveAll(List<BoardPopularitySnapshot> snapshots);
-
-    Optional<BoardPopularitySnapshot> findById(Long id);
-
-    void delete(BoardPopularitySnapshot snapshot);
-
-    void deleteById(Long id);
 
     List<BoardPopularitySnapshot> findByPeriodTypeAndPeriodStartDateAndPeriodEndDateOrderByRankingAsc(
             PopularityPeriodType periodType,
