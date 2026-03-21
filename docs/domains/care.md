@@ -611,7 +611,7 @@ List<CareRequest> findAllWithUserAndPet();
 2. **자동 완료 스케줄러**: 날짜 지난 요청 자동 완료 (매 시간 정각 + 매일 자정, `CareRequestService.updateStatus` 호출)
 3. **이메일 인증**: 요청 생성 시 이메일 인증 확인
 4. **Soft Delete**: 요청 및 댓글 삭제 시 Soft Delete 적용
-5. **N+1 문제 해결**: Fetch Join 사용 (`findByIdWithPet`, `findAllActiveRequests`)
+5. **N+1 문제 해결**: Fetch Join 사용 (`findByIdWithApplications` / `findByIdWithUser`, `findAllActiveRequests` 등)
 6. **리뷰 중복 방지**: `CareApplication`당 1개의 리뷰만 작성 가능
 7. **권한 기반 댓글**: `SERVICE_PROVIDER` 역할만 댓글 작성 가능
 8. **알림 연동**: 댓글 작성 시 요청자에게 알림 자동 발송

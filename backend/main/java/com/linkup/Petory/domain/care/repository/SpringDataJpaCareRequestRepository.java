@@ -41,9 +41,6 @@ public interface SpringDataJpaCareRequestRepository extends JpaRepository<CareRe
     @Query("SELECT DISTINCT cr FROM CareRequest cr JOIN FETCH cr.user u LEFT JOIN FETCH cr.pet LEFT JOIN FETCH cr.applications WHERE cr.status = :status AND cr.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY cr.createdAt DESC")
     List<CareRequest> findByStatusAndIsDeletedFalse(@Param("status") CareRequestStatus status);
 
-    // 위치별 케어 요청 조회 (사용자 위치 기반)
-    List<CareRequest> findByUser_LocationContaining(String location);
-
     // 제목이나 설명에 키워드 포함된 케어 요청 검색 - 작성자도 활성 상태여야 함
     // [1단계 최적화] CareApplication N+1 문제 해결: LEFT JOIN FETCH cr.applications 추가
     // [3단계 최적화] PetVaccination N+1 문제 해결: @BatchSize 사용 (Hibernate 중첩 컬렉션 제한으로 인해 FETCH JOIN 제거)
@@ -63,12 +60,6 @@ public interface SpringDataJpaCareRequestRepository extends JpaRepository<CareRe
     List<CareRequest> findByDateBeforeAndStatusIn(
                     @Param("now") LocalDateTime now,
                     @Param("statuses") List<CareRequestStatus> statuses);
-
-    // 단일 케어 요청 조회 (펫 정보 포함)
-    // [3단계 최적화] PetVaccination N+1 문제 해결: @BatchSize 사용 (Hibernate 중첩 컬렉션 제한으로 인해 FETCH JOIN 제거)
-    @RepositoryMethod("펫케어 요청: 단건 조회 (펫 포함)")
-    @Query("SELECT cr FROM CareRequest cr LEFT JOIN FETCH cr.pet LEFT JOIN FETCH cr.user WHERE cr.idx = :idx")
-    Optional<CareRequest> findByIdWithPet(@Param("idx") Long idx);
 
     // 단일 케어 요청 조회 (작성자 포함) - 수정/삭제 시 권한 확인용
     @RepositoryMethod("펫케어 요청: 단건 조회 (작성자 포함)")

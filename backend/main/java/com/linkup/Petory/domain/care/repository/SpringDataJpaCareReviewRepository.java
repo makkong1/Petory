@@ -18,9 +18,6 @@ public interface SpringDataJpaCareReviewRepository extends JpaRepository<CareRev
     @RepositoryMethod("펫케어 리뷰: 리뷰어별 목록 조회")
     List<CareReview> findByReviewerIdxOrderByCreatedAtDesc(Long reviewerIdx);
 
-    @RepositoryMethod("펫케어 리뷰: 지원별 리뷰 조회")
-    List<CareReview> findByCareApplicationIdx(Long careApplicationIdx);
-
     @RepositoryMethod("펫케어 리뷰: 작성 여부 확인")
     boolean existsByCareApplicationIdxAndReviewerIdx(Long careApplicationIdx, Long reviewerIdx);
 }
