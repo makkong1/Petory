@@ -39,12 +39,6 @@ public interface SpringDataJpaLocationServiceReviewRepository extends JpaReposit
             "(r.isDeleted IS NULL OR r.isDeleted = false)")
     Optional<Double> findAverageRatingByServiceIdx(@Param("serviceIdx") Long serviceIdx);
 
-    @RepositoryMethod("장소 리뷰: 서비스별 리뷰 개수")
-    @Query("SELECT COUNT(r) FROM LocationServiceReview r WHERE " +
-            "r.service.idx = :serviceIdx AND " +
-            "(r.isDeleted IS NULL OR r.isDeleted = false)")
-    Long countByServiceIdx(@Param("serviceIdx") Long serviceIdx);
-
     @RepositoryMethod("장소 리뷰: 서비스+사용자 리뷰 작성 여부")
     @Query("SELECT COUNT(r) > 0 FROM LocationServiceReview r WHERE " +
             "r.service.idx = :serviceIdx AND " +
@@ -52,4 +46,3 @@ public interface SpringDataJpaLocationServiceReviewRepository extends JpaReposit
             "(r.isDeleted IS NULL OR r.isDeleted = false)")
     boolean existsByServiceIdxAndUserIdx(@Param("serviceIdx") Long serviceIdx, @Param("userIdx") Long userIdx);
 }
-

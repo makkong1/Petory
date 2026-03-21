@@ -26,23 +26,8 @@ public class JpaLocationServiceReviewAdapter implements LocationServiceReviewRep
     }
 
     @Override
-    public Optional<LocationServiceReview> findById(Long id) {
-        return jpaRepository.findById(id);
-    }
-
-    @Override
     public Optional<LocationServiceReview> findByIdWithUserAndService(Long idx) {
         return jpaRepository.findByIdWithUserAndService(idx);
-    }
-
-    @Override
-    public void delete(LocationServiceReview review) {
-        jpaRepository.delete(review);
-    }
-
-    @Override
-    public void deleteById(Long id) {
-        jpaRepository.deleteById(id);
     }
 
     @Override
@@ -61,13 +46,7 @@ public class JpaLocationServiceReviewAdapter implements LocationServiceReviewRep
     }
 
     @Override
-    public Long countByServiceIdx(Long serviceIdx) {
-        return jpaRepository.countByServiceIdx(serviceIdx);
-    }
-
-    @Override
     public boolean existsByServiceIdxAndUserIdx(Long serviceIdx, Long userIdx) {
         return jpaRepository.existsByServiceIdxAndUserIdx(serviceIdx, userIdx);
     }
 }
-

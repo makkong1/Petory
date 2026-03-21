@@ -23,10 +23,6 @@ public interface MeetupRepository {
 
     Optional<Meetup> findById(Long id);
 
-    void delete(Meetup meetup);
-
-    void deleteById(Long id);
-
     /**
      * 주최자별 모임 조회 (소프트 삭제 제외)
      */
@@ -40,11 +36,6 @@ public interface MeetupRepository {
             Double maxLat,
             Double minLng,
             Double maxLng);
-
-    /**
-     * 날짜별 모임 조회 (소프트 삭제 제외)
-     */
-    List<Meetup> findByDateBetweenOrderByDateAsc(LocalDateTime startDate, LocalDateTime endDate);
 
     /**
      * 카테고리별 모임 조회 (제목이나 설명에 키워드 포함, 소프트 삭제 제외)
