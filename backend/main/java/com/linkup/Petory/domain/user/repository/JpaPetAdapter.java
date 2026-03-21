@@ -41,23 +41,8 @@ public class JpaPetAdapter implements PetRepository {
     }
 
     @Override
-    public void delete(Pet pet) {
-        jpaRepository.delete(pet);
-    }
-
-    @Override
-    public void deleteById(Long id) {
-        jpaRepository.deleteById(id);
-    }
-
-    @Override
     public List<Pet> findByUserIdAndNotDeleted(String userId) {
         return jpaRepository.findByUserIdAndNotDeleted(userId);
-    }
-
-    @Override
-    public List<Pet> findByUserId(String userId) {
-        return jpaRepository.findByUserId(userId);
     }
 
     @Override
@@ -69,10 +54,4 @@ public class JpaPetAdapter implements PetRepository {
     public List<Pet> findByPetTypeAndIsDeletedFalse(PetType petType) {
         return jpaRepository.findByPetTypeAndIsDeletedFalse(petType);
     }
-
-    @Override
-    public List<Pet> findByPetNameContainingAndIsDeletedFalse(String petName) {
-        return jpaRepository.findByPetNameContainingAndIsDeletedFalse(petName);
-    }
 }
-

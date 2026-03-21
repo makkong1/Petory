@@ -57,11 +57,11 @@ class OAuth2ServiceConcurrencyTest {
         testProvider = Provider.GOOGLE;
 
         // 기존 데이터 정리
-        usersRepository.findByEmail(testEmail).ifPresent(usersRepository::delete);
+        usersRepository.findByEmail(testEmail).ifPresent(u -> usersRepository.deleteById(u.getIdx()));
         socialUserRepository.findAll().stream()
                 .filter(su -> testProvider.equals(su.getProvider()) &&
                         testProviderId.equals(su.getProviderId()))
-                .forEach(socialUserRepository::delete);
+                .forEach(su -> socialUserRepository.deleteById(su.getIdx()));
     }
 
     private OAuth2User createMockOAuth2User(String providerId, String email, String name) {

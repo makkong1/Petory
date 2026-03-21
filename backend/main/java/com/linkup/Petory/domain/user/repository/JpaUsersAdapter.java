@@ -45,11 +45,6 @@ public class JpaUsersAdapter implements UsersRepository {
     }
 
     @Override
-    public void delete(Users user) {
-        jpaRepository.delete(user);
-    }
-
-    @Override
     public List<Users> findAll() {
         return jpaRepository.findAll();
     }

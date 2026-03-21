@@ -36,18 +36,8 @@ public class JpaSocialUserAdapter implements SocialUserRepository {
     }
 
     @Override
-    public Optional<SocialUser> findById(Long id) {
-        return jpaRepository.findById(id);
-    }
-
-    @Override
     public List<SocialUser> findAll() {
         return jpaRepository.findAll();
-    }
-
-    @Override
-    public void delete(SocialUser socialUser) {
-        jpaRepository.delete(socialUser);
     }
 
     @Override
