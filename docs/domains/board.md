@@ -11,7 +11,7 @@
   - 좋아요/싫어요 반응 시스템
   - 조회수 관리 (중복 방지)
   - 인기글 스냅샷 (주간/월간)
-  - 게시글 검색 (제목, 내용, 작성자)
+  - 게시글 검색 (제목·내용 통합, 작성자 닉네임)
 
 ### 1.2 기능 시연
 > **스크린샷/영상 링크**: [기능 작동 영상 또는 스크린샷 추가]
@@ -47,10 +47,10 @@
 - **스크린샷/영상**: 
 
 #### 주요 기능 4: 게시글 검색
-- **설명**: 제목, 내용, 작성자 ID로 게시글을 검색할 수 있습니다. 검색 타입을 지정하여 원하는 범위로 검색 가능합니다.
+- **설명**: 제목·내용 통합 검색 또는 작성자 닉네임으로 검색할 수 있습니다. `searchType`으로 검색 방식을 선택합니다.
 - **사용자 시나리오**:
   1. 검색어 입력
-  2. 검색 타입 선택 (제목만, 내용만, 제목+내용, 작성자 ID)
+  2. 검색 타입 선택 (`TITLE_CONTENT`: 제목+내용, `NICKNAME`: 작성자 닉네임)
   3. 페이징 지원 (기본 20개씩)
   4. 검색 결과는 최신순으로 정렬
 - **검색 타입**:
@@ -267,15 +267,17 @@ public CommentDTO addComment(Long boardId, CommentDTO dto) {
 
 #### 로직 5: 게시글/댓글 수정/삭제 시 이메일 인증 체크
 ```java
-// BoardService.java
+// BoardService.java (요약 — 실제는 findByIdWithUser, BoardNotFoundException 등 사용)
 @Transactional
 public BoardDTO updateBoard(long idx, BoardDTO dto) {
-    Board board = boardRepository.findById(idx).orElseThrow();
+    Board board = boardRepository.findByIdWithUser(idx).orElseThrow(() -> new BoardNotFoundException());
     
     // 이메일 인증 확인
     Users user = board.getUser();
     if (user.getEmailVerified() == null || !user.getEmailVerified()) {
-        throw new EmailVerificationRequiredException("게시글 수정을 위해 이메일 인증이 필요합니다.");
+        throw new EmailVerificationRequiredException(
+                "게시글 수정을 위해 이메일 인증이 필요합니다.",
+                EmailVerificationPurpose.BOARD_EDIT);
     }
     
     // 게시글 수정 로직...
@@ -283,12 +285,14 @@ public BoardDTO updateBoard(long idx, BoardDTO dto) {
 
 @Transactional
 public void deleteBoard(long idx) {
-    Board board = boardRepository.findById(idx).orElseThrow();
+    Board board = boardRepository.findByIdWithUser(idx).orElseThrow(() -> new BoardNotFoundException());
     
     // 이메일 인증 확인
     Users user = board.getUser();
     if (user.getEmailVerified() == null || !user.getEmailVerified()) {
-        throw new EmailVerificationRequiredException("게시글 삭제를 위해 이메일 인증이 필요합니다.");
+        throw new EmailVerificationRequiredException(
+                "게시글 삭제를 위해 이메일 인증이 필요합니다.",
+                EmailVerificationPurpose.BOARD_EDIT);
     }
     
     // 게시글 소프트 삭제
@@ -310,7 +314,7 @@ public void deleteBoard(long idx) {
 
 **설명**:
 - **처리 흐름**: 이메일 인증 확인 → 수정/삭제 처리
-- **주요 판단 기준**: `emailVerified` 필드 확인
+- **주요 판단 기준**: `emailVerified` 필드 확인, 예외에 `EmailVerificationPurpose.BOARD_EDIT` 전달(클라이언트가 재인증 플로우 구분에 활용)
 - **특징**: 
   - 게시글 삭제 시 연관된 댓글도 소프트 삭제
   - 이메일 인증이 필요한 이유: 책임 있는 행동 (수정/삭제)을 위해
@@ -325,7 +329,9 @@ public CommentDTO updateComment(Long boardId, Long commentId, CommentDTO dto) {
     // 이메일 인증 확인
     Users user = comment.getUser();
     if (user.getEmailVerified() == null || !user.getEmailVerified()) {
-        throw new EmailVerificationRequiredException("댓글 수정을 위해 이메일 인증이 필요합니다.");
+        throw new EmailVerificationRequiredException(
+                "댓글 수정을 위해 이메일 인증이 필요합니다.",
+                EmailVerificationPurpose.COMMENT_EDIT);
     }
     
     // 댓글 내용 업데이트
@@ -349,7 +355,9 @@ public void deleteComment(Long boardId, Long commentId) {
     // 이메일 인증 확인
     Users user = comment.getUser();
     if (user.getEmailVerified() == null || !user.getEmailVerified()) {
-        throw new EmailVerificationRequiredException("댓글 삭제를 위해 이메일 인증이 필요합니다.");
+        throw new EmailVerificationRequiredException(
+                "댓글 삭제를 위해 이메일 인증이 필요합니다.",
+                EmailVerificationPurpose.COMMENT_EDIT);
     }
     
     // 소프트 삭제
@@ -427,7 +435,7 @@ public BoardPageResponseDTO searchBoardsWithPaging(String keyword, String search
 | `getAllBoards()` | 게시글 목록 조회 | 배치 조회로 N+1 문제 해결 |
 | `getAllBoardsWithPaging()` | 게시글 목록 조회 (페이징) | 배치 조회로 N+1 문제 해결 |
 | `getAdminBoardsWithPagingOptimized()` | 게시글 목록 조회 (관리자용) | Specification + DB 페이징, status/deleted/category/q 필터 |
-| `getBoard()` | 게시글 상세 조회 | 조회수 증가 (중복 방지), 캐싱 |
+| `getBoard()` | 게시글 상세 조회 | 조회수 증가 (중복 방지), 상세는 `@Cacheable` 미사용(조회수 실시간 반영) |
 | `getMyBoards()` | 내 게시글 조회 | 사용자별 게시글 조회 |
 | `createBoard()` | 게시글 생성 | 파일 첨부 처리, 캐시 무효화 |
 | `updateBoard()` | 게시글 수정 | 이메일 인증 확인, 파일 동기화, 캐시 무효화 |
@@ -481,10 +489,10 @@ public BoardPageResponseDTO searchBoardsWithPaging(String keyword, String search
 - **예외 처리 전략**: 
   - Service 레이어에서 예외 발생 시 Controller로 전파
   - GlobalExceptionHandler에서 통합 처리
-- **이메일 인증 필수 작업**:
-  - 게시글 수정/삭제
-  - 댓글 수정/삭제
-  - 실종 제보 작성/수정/삭제
+- **이메일 인증 필수 작업 (Board 도메인)**:
+  - 게시글 수정/삭제 (`EmailVerificationPurpose.BOARD_EDIT`)
+  - 댓글 수정/삭제 (`EmailVerificationPurpose.COMMENT_EDIT`)
+- **참고**: 실종 제보 게시글의 이메일 인증 규칙은 [missingpet.md](missingpet.md)를 따릅니다.
 
 ---
 
@@ -674,6 +682,8 @@ erDiagram
 | `/api/boards/{boardId}/reactions` | POST | 게시글 반응 | `ReactionRequest` (userId, reactionType 필수) → `ReactionSummaryDTO` |
 | `/api/boards/{boardId}/comments/{commentId}/reactions` | POST | 댓글 반응 | `ReactionRequest` (userId, reactionType 필수) → `ReactionSummaryDTO` |
 
+**보안 참고**: `BoardController`의 일부 GET에 `@PreAuthorize("permitAll()")`가 있어도, `SecurityConfig`에서 `/api/**`는 기본적으로 인증이 필요합니다. 따라서 게시판 공개 조회도 로그인한 사용자만 호출할 수 있는 구성입니다(예외 경로를 추가하지 않은 한).
+
 ### 관리자 (Admin) - domain/admin/controller/AdminBoardController
 | 엔드포인트 | Method | 설명 | 요청/응답 |
 |-----------|--------|------|----------|
@@ -689,6 +699,8 @@ erDiagram
 | `/api/admin/boards/{boardId}/comments/{commentId}/delete` | POST | 댓글 삭제 | - → `204 No Content` |
 | `/api/admin/boards/{boardId}/comments/{commentId}/restore` | POST | 댓글 복구 | - → `CommentDTO` |
 
+**구현 참고**: 위 삭제/복구는 각각 `BoardService.deleteBoard`, `CommentService.deleteComment` 등을 그대로 호출합니다. 따라서 서비스 구현상 작성자의 이메일 인증 검사가 적용되는 경우, 관리자 API에서도 동일하게 적용됩니다(정책 변경 시 서비스 분기 검토).
+
 ### 3.5 관리자 도메인과의 연계
 - **AdminBoardController** (`domain/admin`): 게시글/댓글 관리 (블라인드, 삭제, 복구) - `getAdminBoardsWithPagingOptimized` 사용
 
@@ -702,8 +714,8 @@ erDiagram
   - 게시글에 이미지 첨부 (AttachmentFile, targetType: BOARD)
   - 댓글에 이미지 첨부 (targetType: COMMENT)
 - **Notification 도메인**: 
-  - 댓글 작성 시 게시글 작성자에게 알림
-  - 반응 추가 시 알림 (선택적)
+  - 댓글 작성 시 게시글 작성자에게 `BOARD_COMMENT` 알림 (`CommentService`)
+  - 게시글/댓글 반응(`ReactionService`)은 현재 알림을 발송하지 않음
 - **Report 도메인**: 
   - 게시글/댓글 신고
   - 신고 처리 결과로 상태 변경 (BLINDED, DELETED)
@@ -978,7 +990,7 @@ for (int i = 0; i < boardIds.size(); i += BATCH_SIZE) {
 2. **조회수 중복 방지**: BoardViewLog로 정확한 조회 수 추적
 3. **인기글 스냅샷**: 미리 계산하여 조회 성능 향상, 다단계 조회 전략으로 안정성 확보
 4. **실시간 카운트 업데이트**: likeCount, commentCount 필드로 조회 성능 향상
-5. **캐싱 전략**: Redis 캐싱으로 응답 시간 향상
+5. **캐싱 전략**: Spring Cache(`boardList` 등)로 목록 등 일부 경로에 캐시 적용 가능(설정에 따라 Redis 백엔드)
 6. **이메일 인증 통합**: 게시글/댓글 수정/삭제 시 이메일 인증 필수
 7. **댓글 기능 확장**: 댓글 수정, 복구 기능 추가
 8. **파일 첨부 지원**: 댓글에도 이미지 첨부 가능

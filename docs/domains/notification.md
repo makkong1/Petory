@@ -10,7 +10,7 @@ Notification 도메인은 사용자 알림 시스템으로, 다양한 이벤트 
 - 알림 타입별 관리 (댓글, 펫케어, 실종제보 등)
 - Redis를 활용한 최신 알림 목록 관리 (최대 50개, 24시간 TTL)
 - Redis-DB 병합 조회 (중복 제거)
-- 읽은 알림 자동 정리
+- 읽음 처리 시 DB 업데이트 및 Redis 목록에서 제거(단건·전체)
 
 ---
 
@@ -19,11 +19,12 @@ Notification 도메인은 사용자 알림 시스템으로, 다양한 이벤트 
 ### 2.1 실시간 알림 (SSE)
 
 **SSE 연결 프로세스**:
-1. 클라이언트에서 SSE 연결 요청 (`GET /api/notifications/stream?userId={userId}`)
-2. 서버에서 `SseEmitter` 생성 및 연결 저장
-3. 연결 즉시 읽지 않은 알림 개수 전송
-4. 이벤트 발생 시 실시간으로 알림 전송
-5. 연결 종료 시 자동 정리
+1. 클라이언트에서 SSE 연결 요청 (`GET /api/notifications/stream?userId={userId}&token={JWT}` — `EventSource`는 헤더에 `Authorization`을 붙이기 어려워 **`token` 쿼리로 JWT 전달**, `JwtAuthenticationFilter`가 처리)
+2. `SecurityConfig`에서 `/api/**`는 인증 필요 → 스트림도 **로그인(JWT 유효)** 없이는 401
+3. 서버에서 `SseEmitter` 생성 및 연결 저장
+4. 연결 즉시 읽지 않은 알림 개수 전송 (`event: unreadCount`)
+5. 이벤트 발생 시 실시간으로 알림 전송 (`event: notification`)
+6. 연결 종료 시 자동 정리
 
 **알림 발송 프로세스**:
 1. 이벤트 발생 (댓글 작성, 좋아요 등)
@@ -93,7 +94,7 @@ public NotificationDTO createNotification(Long userId, NotificationType type, St
 - **알림 생성**: `Notification` 엔티티 생성 및 DB 저장
 - **Redis 저장**: `saveToRedis()`로 최신 알림 목록 관리 (최대 50개, 24시간 TTL)
 - **SSE 발송**: `sseService.sendNotification()`로 실시간 알림 전송 (연결된 경우)
-- **트랜잭션 보장**: `@Transactional`로 알림 생성 (Redis는 트랜잭션 외부)
+- **트랜잭션**: `@Transactional`로 **JPA 저장**은 트랜잭션 경계 안. Redis·SSE는 DB 트랜잭션에 참여하지 않음(아래 §3.3·§5.1)
 
 #### 로직 2: Redis에 알림 저장
 **구현 위치**: `NotificationService.saveToRedis()`
@@ -245,12 +246,13 @@ public SseEmitter createConnection(Long userId) {
 | `getConnectedUserCount()` | 연결된 사용자 수 조회 | 현재 연결 수 반환 |
 
 ### 3.3 트랜잭션 처리
-- **트랜잭션 범위**: 
-  - 알림 생성: `@Transactional` - 알림 생성과 Redis 저장을 원자적으로 처리
-  - 읽음 처리: `@Transactional` - DB 업데이트와 Redis 제거를 원자적으로 처리
-  - 조회 메서드: `@Transactional(readOnly = true)` - 읽기 전용 최적화 (클래스 레벨)
+- **클래스 기본**: `NotificationService`에 `@Transactional(readOnly = true)` — 쓰기 메서드만 `@Transactional`로 덮어씀
+- **알림 생성** (`createNotification`): `@Transactional` — `save` → `saveToRedis` → `sendNotification` 순. 이후 단계에서 예외 시 **DB는 롤백**되나, **Redis는 2PC가 아니므로** Redis 쓰기 성공 후 이후 단계에서 실패하면 **DB만 롤백되고 Redis에 잔존**할 수 있음
+- **읽음 처리** (`markAsRead`, `markAllAsRead`): `@Transactional` — DB 반영 후 Redis 갱신/삭제. Redis 단계 예외 시 DB 롤백 가능(동일하게 Redis 단독 잔존 가능성은 원칙적으로 존재)
+- **읽지 않은 개수** (`getUnreadCount`): `@Transactional(propagation = NOT_SUPPORTED)` — SSE 등 장시간 호출에서 트랜잭션 보유 방지
+- **조회**(목록·미읽음 목록): 클래스 기본 `readOnly` 트랜잭션
 - **격리 수준**: 기본값 (READ_COMMITTED)
-- **Redis 작업**: 트랜잭션 외부에서 처리 (Redis는 트랜잭션 미지원)
+- **Redis**: DB와의 분산 트랜잭션 아님
 
 ---
 
@@ -355,20 +357,22 @@ erDiagram
 ### 4.5 API 설계
 
 #### REST API
-**참고**: 모든 엔드포인트 `@PreAuthorize("isAuthenticated()")` (stream 제외)
+**인증**: 목록·읽음 등은 메서드 단 `@PreAuthorize("isAuthenticated()")`. `GET /stream`은 어노테이션은 없지만 **`SecurityConfig`의 `/api/**` → `authenticated()`**로 동일하게 JWT 필요. `JwtAuthenticationFilter`: 헤더 `Authorization: Bearer` 또는 쿼리 `token`.
+
+**쿼리 `userId`**: 구현상 **`SecurityContext`의 로그인 사용자와 `userId` 일치 여부는 검증하지 않음**. 다만 `PUT .../read`는 서비스에서 `notification.getUser().getIdx()`와 `userId`를 비교해 본인만 처리(`NotificationForbiddenException`).
 
 | 엔드포인트 | Method | 설명 |
 |-----------|--------|------|
-| `/api/notifications` | GET | 사용자 알림 목록 조회 (userId 파라미터, UserNotFoundException) |
-| `/api/notifications/unread` | GET | 읽지 않은 알림 목록 조회 (userId 파라미터) |
-| `/api/notifications/unread/count` | GET | 읽지 않은 알림 개수 조회 (userId 파라미터) |
-| `/api/notifications/{notificationId}/read` | PUT | 알림 읽음 처리 (NotificationNotFoundException, NotificationForbiddenException.ownNotificationOnly) |
-| `/api/notifications/read-all` | PUT | 모든 알림 읽음 처리 (userId 파라미터) |
+| `/api/notifications` | GET | 알림 목록 (`userId` 필수). `UserNotFoundException` |
+| `/api/notifications/unread` | GET | 읽지 않은 알림 목록 (`userId` 필수) |
+| `/api/notifications/unread/count` | GET | 읽지 않은 개수 (`userId` 필수), 응답 `Long` |
+| `/api/notifications/{notificationId}/read` | PUT | 읽음 처리 (`userId` 필수). `NotificationNotFoundException`, 본인 아님 시 `NotificationForbiddenException.ownNotificationOnly` |
+| `/api/notifications/read-all` | PUT | 전체 읽음 (`userId` 필수) |
 
 #### SSE API
 | 엔드포인트 | Method | 설명 |
 |-----------|--------|------|
-| `/api/notifications/stream` | GET | SSE 연결 생성 (userId 파라미터, `text/event-stream`, SecurityConfig에서 쿼리 파라미터 토큰으로 인증) |
+| `/api/notifications/stream` | GET | SSE (`text/event-stream`). `@PreAuthorize` 없음. **`/api/**` 인증 규칙 + `JwtAuthenticationFilter`가 쿼리 `token`(JWT) 또는 헤더 Bearer로 인증**. `userId`로 `NotificationSseService`에 연결 등록(로그인 주체와 `userId` 일치 검증 없음 — 클라이언트는 본인 `userId`로 호출해야 함) |
 
 **알림 목록 조회 요청 예시**:
 ```http
@@ -404,7 +408,7 @@ GET /api/notifications/unread/count?userId=1
 
 **SSE 연결 요청 예시**:
 ```http
-GET /api/notifications/stream?userId=1
+GET /api/notifications/stream?userId=1&token=eyJhbGciOi...
 Accept: text/event-stream
 ```
 
@@ -506,7 +510,7 @@ CREATE INDEX fk_notifications_user ON notifications(user_idx);
 
 ### 8.4 성능 최적화
 - **Redis 캐싱**: 최신 알림 조회 시 DB 쿼리 감소
-- **인덱스 전략**: 사용자별, 읽음 여부별 인덱스로 조회 성능 향상
+- **인덱스**: 문서 §7.1 참고(`user_idx` 등). 엔티티에 복합 인덱스 선언은 없으며, 부하에 따라 `(user_idx, is_read)` 등은 별도 검토
 - **중복 제거**: Set을 활용한 효율적인 중복 제거
 
 ### 8.5 엔티티 설계 특징

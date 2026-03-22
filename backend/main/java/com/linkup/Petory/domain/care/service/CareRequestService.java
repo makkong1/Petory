@@ -264,15 +264,17 @@ public class CareRequestService {
 
         // 관리자는 권한 검증 우회
         if (!isAdmin()) {
-            // 작성자 또는 승인된 제공자만 상태 변경 가능
-            boolean isRequester = request.getUser().getIdx().equals(currentUserId);
-            boolean isAcceptedProvider = request.getApplications() != null &&
-                    request.getApplications().stream()
-                            .anyMatch(app -> app.getStatus() == CareApplicationStatus.ACCEPTED
-                                    && app.getProvider().getIdx().equals(currentUserId));
+            // 스케줄러 등 시스템 작업(CareRequestScheduler에서 currentUserId == null)은 검증 생략
+            if (currentUserId != null) {
+                boolean isRequester = request.getUser().getIdx().equals(currentUserId);
+                boolean isAcceptedProvider = request.getApplications() != null &&
+                        request.getApplications().stream()
+                                .anyMatch(app -> app.getStatus() == CareApplicationStatus.ACCEPTED
+                                        && app.getProvider().getIdx().equals(currentUserId));
 
-            if (!isRequester && !isAcceptedProvider) {
-                throw CareForbiddenException.ownerOrApprovedProvider();
+                if (!isRequester && !isAcceptedProvider) {
+                    throw CareForbiddenException.ownerOrApprovedProvider();
+                }
             }
         }
 

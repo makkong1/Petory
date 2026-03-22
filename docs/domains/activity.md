@@ -29,7 +29,7 @@
   1. "전체" 필터: 모든 활동 표시
   2. "게시글" 필터: 펫케어 요청, 커뮤니티 게시글, 실종 제보만 표시
   3. "댓글" 필터: 펫케어 댓글, 커뮤니티 댓글, 실종 제보 댓글만 표시
-  4. "리뷰" 필터: 위치 서비스 리뷰만 표시 (현재 미구현)
+  4. "리뷰"(`REVIEWS`) 필터: `LOCATION_REVIEW` 타입만 남기나, **수집 로직이 없어** 실질적으로 빈 목록에 가깝다(§3.5)
 - **스크린샷/영상**: 
 
 ---
@@ -37,6 +37,10 @@
 ## 2. 서비스 로직 설명
 
 ### 2.1 핵심 비즈니스 로직
+
+**트랜잭션**: `ActivityService`에 `@Transactional(readOnly = true)`(클래스 레벨).
+
+**구현 참고**: 코드에 `System.out.println` 디버그 출력이 다수 포함되어 있음(운영 전 제거·로거 전환 권장).
 
 #### 로직 1: 사용자 활동 통합 조회
 **구현 위치**: `ActivityService.getUserActivities()`
@@ -262,7 +266,11 @@ domain/activity/
 
 | 예외 | HTTP 상태 | 발생 시점 |
 |------|----------|----------|
-| `UserNotFoundException` | 404 Not Found | `getUserActivities()`, `getUserActivitiesWithPaging()`에서 사용자 미존재 시 |
+| `UserNotFoundException` | 404 Not Found | `usersRepository.findById(userId)` 실패 시 (`userId`는 **Long `idx`**) |
+| (인증) | 401 | `SecurityConfig`의 `/api/**` — 클래스 단 `@PreAuthorize` 없음, 미로그인 시 |
+| (페이징) | 500 등 | 필터 결과보다 큰 `page`로 `subList` 시 **범위 초과 예외 가능**(현재 구현 한계) |
+
+**보안**: `userId`는 쿼리 파라미터로만 받으며 **JWT 주체와 일치 여부는 검증하지 않음** — 클라이언트는 본인 `idx`로 호출해야 함.
 
 ### 3.3 ActivityDTO 구조
 ```java
@@ -314,7 +322,11 @@ public class ActivityPageResponseDTO {
 - `MISSING_COMMENT`: 실종 제보 게시글 댓글
 
 #### 리뷰 타입
-- `LOCATION_REVIEW`: 위치 서비스 리뷰 (현재 미구현)
+- `LOCATION_REVIEW`: 필터·`reviewsCount`용 문자열만 존재 — **`getUserActivities()`에서 수집하지 않아** 목록에 나타나지 않음(항상 0에 가깝게 동작)
+
+### 3.6 댓글 `status` 문자열 (구현 차이)
+- **`CARE_COMMENT`**, **`MISSING_COMMENT`**: `isDeleted`에 따라 `"DELETED"` / `"ACTIVE"` (enum이 아님)
+- **`COMMENT`**: `Comment` 엔티티 `status` enum 이름 문자열(또는 예외 시 `null`)
 
 ---
 
@@ -339,6 +351,8 @@ public class ActivityPageResponseDTO {
 - 현재는 메모리 기반 필터링 및 페이징 사용
 - 향후 개선: DB 레벨에서 필터링 및 페이징 처리 (각 도메인별 쿼리 최적화)
 
+**페이징 경계**: `filteredActivities.subList(start, end)` 사용 — **요청 `page`가 결과 길이를 넘으면 예외**가 날 수 있음(클라이언트에서 페이지 범위 제어 또는 서버 가드 필요).
+
 **효과**: 
 - 구현 단순성 유지
 - 향후 확장 가능
@@ -350,38 +364,15 @@ public class ActivityPageResponseDTO {
 ### 5.1 DB 최적화
 
 #### 인덱스 전략
-각 도메인별로 사용자별 조회를 위한 인덱스가 필요합니다:
+각 도메인 엔티티·실제 스키마 기준으로 `(user, is_deleted, created_at)` 조합 인덱스를 검토할 수 있음. **Activity 도메인은 전용 테이블이 없으므로** 아래 SQL은 참고용이며, 마이그레이션에 반영 여부는 별도 확인.
 
 ```sql
--- 펫케어 요청 조회
-CREATE INDEX idx_care_request_user_deleted_created 
-ON care_request(user_idx, is_deleted, created_at DESC);
-
--- 커뮤니티 게시글 조회
-CREATE INDEX idx_board_user_deleted_created 
-ON board(user_idx, is_deleted, created_at DESC);
-
--- 실종 제보 게시글 조회
-CREATE INDEX idx_missing_pet_board_user_deleted_created 
-ON missing_pet_board(user_idx, is_deleted, created_at DESC);
-
--- 펫케어 댓글 조회
-CREATE INDEX idx_care_request_comment_user_deleted_created 
-ON care_request_comment(user_idx, is_deleted, created_at DESC);
-
--- 커뮤니티 댓글 조회
-CREATE INDEX idx_comment_user_deleted_created 
-ON comment(user_idx, is_deleted, created_at DESC);
-
--- 실종 제보 댓글 조회
-CREATE INDEX idx_missing_pet_comment_user_deleted_created 
-ON missing_pet_comment(user_idx, is_deleted, created_at DESC);
+-- 예시(도메인별 테이블명·컬럼은 스키마에 맞출 것)
+-- care_request, board, missing_pet_board, care_request_comment, comment, missing_pet_comment 등
 ```
 
 **선정 이유**:
-- 사용자별 활동 조회가 빈번함
-- Soft Delete 필터링 최적화
-- 최신순 정렬 최적화
+- `findByUserAndIsDeletedFalseOrderByCreatedAtDesc` 패턴에 맞는 조회·정렬 부하 완화
 
 ### 5.2 애플리케이션 레벨 최적화
 
@@ -416,5 +407,7 @@ ON missing_pet_comment(user_idx, is_deleted, created_at DESC);
 
 | 엔드포인트 | Method | 설명 | 예외 |
 |-----------|--------|------|------|
-| `/api/activities/my` | GET | 사용자 활동 목록 조회 (userId 파라미터) | `UserNotFoundException` (404) |
-| `/api/activities/my/paging` | GET | 페이징 지원 활동 목록 조회 (userId, filter, page, size) | `UserNotFoundException` (404) |
+| `/api/activities/my` | GET | `userId`(필수, Long `idx`) | `UserNotFoundException` (404) |
+| `/api/activities/my/paging` | GET | `userId`(필수), `filter`(기본 `ALL`: `ALL` \| `POSTS` \| `COMMENTS` \| `REVIEWS`), `page`(기본 `0`), `size`(기본 `20`) | 동일 + 페이징 범위 주의(§3.2) |
+
+**인증**: `ActivityController`에 메서드 단 보안 어노테이션 없음 → **`/api/**` 인증 규칙** 적용(로그인 필요).

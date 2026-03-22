@@ -6,7 +6,7 @@ Chat 도메인은 실시간 채팅 기능을 제공하는 도메인입니다. We
 
 **주요 기능**:
 - 실시간 채팅 (WebSocket 기반)
-- 채팅방 생성 및 관리 (1:1, 그룹, 펫케어, 실종제보, 산책모임)
+- 채팅방 생성 및 관리 (1:1, 그룹, 펫케어, 실종제보, 산책모임; `ADMIN_SUPPORT`는 enum만 존재)
 - 메시지 전송/조회/삭제/검색
 - 읽지 않은 메시지 수 관리 (원자적 증가)
 - 메시지 읽음 처리
@@ -26,15 +26,16 @@ Chat 도메인은 실시간 채팅 기능을 제공하는 도메인입니다. We
 - 펫케어, 실종제보 등과 연동 가능
 
 #### 펫케어 요청 채팅 (CARE_REQUEST)
-- 펫케어 요청 관련 채팅방
-- `RelatedType.CARE_REQUEST` 또는 `RelatedType.CARE_APPLICATION` 사용
-- 요청자와 제공자 간 소통
-- 거래 확정 기능 지원 (`confirmCareDeal()`)
+- `ConversationType.CARE_REQUEST`로 생성
+- **채팅방 생성 API** `createCareRequestConversation()`은 `RelatedType.CARE_APPLICATION`, `relatedIdx = careApplicationIdx`로 조회/생성
+- 기존 1:1 `DIRECT` 채팅방은 `relatedType`/`relatedIdx`만 채워 **펫케어 채팅으로 승격** 가능 (`createConversation` 로직)
+- `RelatedType.CARE_REQUEST`는 **거래 확정** 등 다른 흐름에서 연결 (`confirmCareDeal()` 참고)
+- 요청자와 제공자 간 소통, 거래 확정 (`confirmCareDeal()`)
 
 #### 실종제보 채팅 (MISSING_PET)
 - 실종 동물 제보자와 목격자 간 소통
 - 같은 제보에 대해 여러 목격자와 개별 채팅방 생성
-- `MissingPetBoard`와 연동
+- `RelatedType.MISSING_PET_BOARD` + `relatedIdx`(게시글 ID)로 `MissingPetBoard`와 연동
 
 #### 산책모임 채팅 (MEETUP)
 - 산책모임 참여자들의 그룹 채팅
@@ -43,7 +44,7 @@ Chat 도메인은 실시간 채팅 기능을 제공하는 도메인입니다. We
 
 #### 그룹 채팅 (GROUP)
 - 여러 사용자가 참여하는 그룹 채팅
-- 관리자 지정 가능
+- 참여자 역할(`ParticipantRole`)은 `ConversationService.setParticipantRole()` 등으로 조정 가능
 
 ### 2.2 실시간 메시지 전송
 
@@ -186,13 +187,14 @@ public void markAsRead(Long conversationIdx, Long userId, Long lastMessageIdx) {
 
 ### 3.4 재참여 시 메시지 조회
 
-**구현 위치**: `ChatMessageService.getMessages()` (Lines 104-130)
+**구현 위치**: `ChatMessageService.getMessages()`
 
 **핵심 로직**:
 - **재참여 감지**: `lastReadMessage`가 null이고 `joinedAt`이 있으면 재참여로 간주
 - **메시지 필터링**: 재참여한 경우 `joinedAt` 이후 메시지만 조회 (`findByConversationIdxAndCreatedAtAfterOrderByCreatedAtDesc`)
 - **페이징**: 기본값 page=0, size=50, 최신순 정렬 (DESC)
 - **재참여 처리**: `joinMeetupChat()`에서 LEFT 상태였던 참여자가 재참여 시 `lastReadMessage`, `lastReadAt`, `unreadCount` 초기화
+- **참고**: `getMessagesBefore()`(커서 API)는 참여자 `joinedAt` 기준 필터를 적용하지 않음 — 재참여 사용자도 과거 시점 이전 메시지를 커서로 조회할 수 있음(클라이언트 정책 또는 추후 서버 필터 검토)
 
 ### 3.5 실종제보 채팅방 생성
 
@@ -227,9 +229,9 @@ public void markAsRead(Long conversationIdx, Long userId, Long lastMessageIdx) {
 @Table(name = "conversation")
 public class Conversation {
     private Long idx;
-    private ConversationType conversationType;  // DIRECT, GROUP, CARE_REQUEST, MISSING_PET, MEETUP
+    private ConversationType conversationType;  // DIRECT, GROUP, CARE_REQUEST, MISSING_PET, MEETUP, ADMIN_SUPPORT
     private String title;
-    private RelatedType relatedType;  // CARE_REQUEST, CARE_APPLICATION, MISSING_PET_BOARD, MEETUP
+    private RelatedType relatedType;  // CARE_REQUEST, CARE_APPLICATION, MISSING_PET_BOARD, MEETUP, USER
     private Long relatedIdx;  // 연관 엔티티 ID
     private ConversationStatus status;  // ACTIVE, CLOSED
     private LocalDateTime lastMessageAt;
@@ -435,8 +437,10 @@ graph TD
 | `/api/chat/messages/conversation/{conversationIdx}/before` | GET | 메시지 목록 조회 (커서 기반, beforeDate 파라미터 ISO 형식, size 기본값 50, userId 없음) |
 | `/api/chat/messages/conversation/{conversationIdx}/read` | POST | 메시지 읽음 처리 (userId, lastMessageIdx 파라미터, 응답: 204 No Content) |
 | `/api/chat/messages/{messageIdx}` | DELETE | 메시지 삭제 (userId 파라미터, 응답: 204 No Content) |
-| `/api/chat/messages/conversation/{conversationIdx}/search` | GET | 메시지 검색 (keyword 파라미터) |
+| `/api/chat/messages/conversation/{conversationIdx}/search` | GET | 메시지 검색 (`keyword` 필수) |
 | `/api/chat/messages/conversation/{conversationIdx}/unread-count` | GET | 읽지 않은 메시지 수 조회 (userId 파라미터, 응답: Long) |
+
+**보안 참고**: `SecurityConfig`에서 `/api/**`는 인증 필요. 채팅 REST API는 컨트롤러에 `@PreAuthorize("isAuthenticated()")`가 붙어 있습니다. WebSocket 엔드포인트(`/ws/**` 등)는 핸드셰이크는 허용되나, **JWT는 인터셉터에서 검증**합니다(프로젝트 설정과 동일 전제).
 
 #### WebSocket API
 | 엔드포인트 | Method | 설명 |
@@ -445,7 +449,7 @@ graph TD
 | `/app/chat.read` | WebSocket | 실시간 읽음 처리 |
 | `/app/chat.typing` | WebSocket | 타이핑 표시 |
 | `/topic/conversation/{conversationIdx}` | WebSocket | 채팅방 메시지 구독 |
-| `/user/{userId}/queue/errors` | WebSocket | 에러 메시지 수신 |
+| `/user/{loginId}/queue/errors` | WebSocket | 전송 실패 시 에러 페이로드(구현상 `Principal#getName()` = **로그인 ID 문자열**, 숫자 userId 아님) |
 
 ### 4.7 WebSocket 구조
 
@@ -459,7 +463,7 @@ graph TD
 - **서버 → 클라이언트**: 
   - `/topic/conversation/{conversationIdx}` - 채팅방 메시지 브로드캐스트
   - `/topic/conversation/{conversationIdx}/typing` - 타이핑 상태 브로드캐스트
-- **에러 전송**: `/user/{userId}/queue/errors`
+- **에러 전송**: `/user/{loginId}/queue/errors` (`ChatWebSocketController` — `principal.getName()` 기준)
 
 **인증**:
 - WebSocket 연결 시 JWT 토큰 검증 (WebSocket 인증 인터셉터에서 처리)
@@ -494,7 +498,7 @@ graph TD
 
 ## 7. 성능 최적화
 
-### 6.1 DB 최적화
+### 7.1 DB 최적화
 
 #### 인덱스 전략
 
@@ -557,13 +561,13 @@ CREATE INDEX reply_to_message_idx ON chatmessage(reply_to_message_idx);
 - 중복 방지를 위한 Unique 제약조건 (conversationparticipant)
 - 메시지 검색을 위한 인덱스 (content)
 
-### 6.2 캐싱 전략
+### 7.2 캐싱 전략
 
 - 현재 채팅방 목록 조회에는 캐싱이 적용되지 않음
 - N+1 문제는 배치 조회로 해결 (`findParticipantsByConversationIdxsAndUserIdx`, `findParticipantsByConversationIdxsAndStatus`, `findLatestMessagesByConversationIdxs`)
 - 필요 시 `@Cacheable` 어노테이션을 추가하여 성능 최적화 가능
 
-### 6.3 동시성 제어
+### 7.3 동시성 제어
 
 #### 읽지 않은 메시지 수 증가
 - **방법**: `@Modifying @Query`로 DB 레벨 원자적 증가
@@ -592,8 +596,8 @@ CREATE INDEX reply_to_message_idx ON chatmessage(reply_to_message_idx);
 ### 8.3 채팅방 타입별 특화
 - **1:1 채팅**: 기존 채팅방 재사용, relatedType/relatedIdx 업데이트 지원 (기존 일반 채팅방을 펫케어 채팅방으로 변환 가능)
 - **펫케어 채팅**: 
-  - `CareApplication` 관련 채팅방 생성 (`createCareRequestConversation()`, `RelatedType.CARE_APPLICATION` 사용)
-  - 거래 확정 기능 (`confirmCareDeal()`) - 양쪽 모두 확정 시 `CareApplication` 생성/승인 및 `CareRequest` 상태 변경
+  - `createCareRequestConversation()`은 `ConversationType.CARE_REQUEST` + `RelatedType.CARE_APPLICATION` + `careApplicationIdx`
+  - 거래 확정 (`confirmCareDeal()`): 채팅 `RelatedType`이 `CARE_REQUEST` 또는 `CARE_APPLICATION`일 때 처리 — `CARE_APPLICATION` 분기는 일부 로그 수준(care 도메인 문서 참고)
 - **실종제보 채팅**: 제보자-목격자 조합별 개별 채팅방 (`createMissingPetChat()`), 본인 제보에는 채팅 불가
 - **산책모임 채팅**: 
   - 모임 생성 시 자동 생성

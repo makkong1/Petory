@@ -41,7 +41,7 @@ public class LocationServiceController {
      * @param roadName     도로명 (선택, 예: "상계로", "동세로")
      * @param category     카테고리 (선택, 예: "동물약국", "미술관")
      * @param keyword      키워드 (선택, 이름/설명/카테고리 검색, 예: "동물병원", "카페")
-     * @param size         최대 결과 수 (선택, 기본값: 500)
+     * @param size         최대 결과 수 (선택, 기본값: 100, 0 이하이면 전체)
      * @return 검색 결과
      */
     @GetMapping("/search")
