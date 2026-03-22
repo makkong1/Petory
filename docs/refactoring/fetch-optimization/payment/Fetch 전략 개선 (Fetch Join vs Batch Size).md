@@ -35,8 +35,7 @@
 
 ### 1.3 비페이징 목록 (테스트용)
 
-- `findByUserOrderByCreatedAtDesc(Users user)` — 테스트에서만 사용, user fetch 없음
-- 우선순위 낮음 (테스트 전용)
+- `findByUserOrderByCreatedAtDesc(user, Pageable.unpaged())` — `PetCoinServiceRaceConditionTest` tearDown·검증에서 사용. `@EntityGraph`가 페이징 메서드와 동일하게 적용되어 user N+1 없음.
 
 ---
 
@@ -76,5 +75,5 @@
 | 구간 | 이유 |
 |------|------|
 | chargeCoins, deductCoins 등 | save 후 반환, user 이미 로드됨 |
-| findByRequesterOrProvider | 현재 미사용 (정의만 존재) |
+| ~~findByRequesterOrProvider~~ 등 | 도메인 리포지토리에서 **미사용 API 제거됨** (카타시안 점검 대상 JPQL 축소) |
 | findByIdForUpdate | 락 쿼리, Fetch Join 혼합 시 주의 |
