@@ -152,11 +152,7 @@ public TokenResponse login(String id, String password) {
     user.setLastLoginAt(LocalDateTime.now());
     usersRepository.save(user);
     
-    return TokenResponse.builder()
-        .accessToken(accessToken)
-        .refreshToken(refreshToken)
-        .user(userDTO)
-        .build();
+    return new TokenResponse(accessToken, refreshToken, userDTO);
 }
 ```
 
@@ -190,9 +186,10 @@ public TokenResponse processOAuth2Login(OAuth2User oauth2User, Provider provider
         user = createOrLinkUser(oauth2User, provider, providerId, email, name);
     }
     
-    // 제재 상태 확인 (일반 로그인과 동일)
+    // 제재 상태 확인 — 일반 로그인은 UserBannedException / UserSuspendedException,
+    // OAuth2 경로는 RuntimeException 메시지로 처리 (OAuth2SuccessHandler가 error 쿼리로 전달)
     if (user.getStatus() == UserStatus.BANNED) {
-        throw new RuntimeException("영구 차단된 계정입니다.");
+        throw new RuntimeException("영구 차단된 계정입니다. 웹사이트 이용이 불가능합니다.");
     }
     
     // Access Token 생성 (15분) - 일반 로그인과 동일
@@ -207,11 +204,8 @@ public TokenResponse processOAuth2Login(OAuth2User oauth2User, Provider provider
     user.setLastLoginAt(LocalDateTime.now());
     usersRepository.save(user);
     
-    return TokenResponse.builder()
-        .accessToken(accessToken)
-        .refreshToken(refreshToken)
-        .user(userDTO)
-        .build();
+    UsersDTO userDTO = usersService.getUserById(user.getId());
+    return new TokenResponse(accessToken, refreshToken, userDTO);
 }
 
 // OAuth2SuccessHandler.java
@@ -220,12 +214,12 @@ public void onAuthenticationSuccess(...) {
     TokenResponse tokenResponse = oAuth2Service.processOAuth2Login(oAuth2User, provider);
     
     // 닉네임이 없으면 닉네임 설정 페이지로 리다이렉트
-    boolean needsNickname = tokenResponse.getUser().getNickname() == null ||
-            tokenResponse.getUser().getNickname().trim().isEmpty();
+    boolean needsNickname = tokenResponse.user().getNickname() == null ||
+            tokenResponse.user().getNickname().trim().isEmpty();
     
     String targetUrl = UriComponentsBuilder.fromUriString(redirectUri)
-        .queryParam("accessToken", URLEncoder.encode(tokenResponse.getAccessToken(), ...))
-        .queryParam("refreshToken", URLEncoder.encode(tokenResponse.getRefreshToken(), ...))
+        .queryParam("accessToken", URLEncoder.encode(tokenResponse.accessToken(), ...))
+        .queryParam("refreshToken", URLEncoder.encode(tokenResponse.refreshToken(), ...))
         .queryParam("success", "true")
         .queryParam("needsNickname", needsNickname ? "true" : null)
         .build()
@@ -419,7 +413,7 @@ public UsersDTO updateMyProfile(String userId, UsersDTO dto) {
 **설명**:
 - **처리 흐름**: 사용자 조회 → 중복 체크 → 필드 업데이트
 - **주요 판단 기준**: 다른 사용자가 이미 사용 중인지 확인
-- **username vs nickname**: username(사용자명)과 nickname(닉네임)은 별도 필드. nickname은 `setNickname()` API로 설정
+- **`Users.username` vs `Users.nickname`**: DB상 별도 필드. `PUT /api/users/me`의 `username`/`email` 등은 `updateMyProfile()`. `PATCH /api/users/me/username`은 **`username`만** 변경(`updateMyUsername`, 중복은 `findByUsername`). `POST /api/users/me/nickname`은 **`nickname`** 전용(`setNickname`, `findByNickname`). 컨트롤러 주석에 "닉네임 변경"으로 적힌 `/me/username`은 필드명 기준으로는 **username** 변경이다.
 
 ### 2.2 서비스 메서드 구조
 
@@ -498,6 +492,7 @@ public UsersDTO updateMyProfile(String userId, UsersDTO dto) {
 - **예외 처리 전략**: 
   - Service 레이어에서 예외 발생 시 Controller로 전파
   - GlobalExceptionHandler에서 통합 처리 (ApiException 상속)
+- **`UserForbiddenException`**: `ownProfileOnly` — `updateMyProfile`에서 `dto.idx`가 본인과 다를 때
 
 ---
 
@@ -539,10 +534,10 @@ domain/user/
   │   ├── PetVaccination.java
   │   ├── UserSanction.java
   │   ├── SocialUser.java
-  │   ├── Provider.java               # 소셜 로그인 제공자 (GOOGLE, NAVER, KAKAO)
-  │   ├── UserStatus.java             # 사용자 상태 (ACTIVE, SUSPENDED, BANNED)
-  │   ├── Role.java                   # 역할 (USER, SERVICE_PROVIDER, ADMIN, MASTER)
-  │   └── EmailVerificationPurpose.java # 이메일 인증 용도
+  │   ├── Provider.java               # GOOGLE, NAVER, KAKAO (enum에 있으나 OAuth2 클라이언트 등록은 설정에 따름)
+  │   ├── UserStatus.java             # ACTIVE, SUSPENDED, BANNED
+  │   ├── Role.java                   # USER, SERVICE_PROVIDER, ADMIN, MASTER
+  │   └── EmailVerificationPurpose.java
   ├── converter/
   │   ├── UsersConverter.java
   │   ├── PetConverter.java
@@ -556,7 +551,10 @@ domain/user/
   │   ├── LoginRequest.java
   │   └── UserPageResponseDTO.java
   ├── exception/
-  │   └── EmailVerificationRequiredException.java
+  │   ├── EmailVerificationRequiredException.java
+  │   ├── UserBannedException.java, UserSuspendedException.java
+  │   ├── UserForbiddenException.java, UnauthenticatedException.java
+  │   └── … (Invalid*, Duplicate*, PetNotFoundException 등)
   └── scheduler/
       └── UserSanctionScheduler.java  # 제재 만료 자동 해제 스케줄러
 ```
@@ -570,8 +568,8 @@ domain/user/
 public class Users extends BaseTimeEntity {
     private Long idx;
     private String id;                     // 로그인용 아이디 (UNIQUE)
-    private String username;                // 사용자명 (UNIQUE)
-    private String nickname;                // 닉네임 (UNIQUE, 소셜 로그인 사용자 필수)
+    private String username;                // 표시용 이름 (UNIQUE, non-null)
+    private String nickname;                // 닉네임 (UNIQUE, nullable — 소셜 등에서 별도 설정)
     private String email;                  // 이메일 (UNIQUE)
     private String phone;                  // 전화번호
     private String password;               // 비밀번호 (암호화)
@@ -579,7 +577,7 @@ public class Users extends BaseTimeEntity {
     private String birthDate;              // 생년월일 (소셜 로그인)
     private String gender;                 // 성별 (소셜 로그인)
     private Boolean emailVerified;         // 이메일 인증 여부
-    private Role role;                     // 역할 (USER, ADMIN, MASTER)
+    private Role role;                     // USER, SERVICE_PROVIDER, ADMIN, MASTER
     private String location;               // 위치
     private String petInfo;                // 반려동물 정보
     private String refreshToken;           // Refresh Token
@@ -591,8 +589,7 @@ public class Users extends BaseTimeEntity {
     private LocalDateTime suspendedUntil;  // 이용제한 종료일
     private Boolean isDeleted;             // 삭제 여부
     private LocalDateTime deletedAt;       // 삭제 시간
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
+    // createdAt, updatedAt — BaseTimeEntity
     private List<SocialUser> socialUsers;   // 소셜 로그인 정보
     private List<UserSanction> sanctions;  // 제재 이력
     private List<Pet> pets;                // 등록한 반려동물 목록
@@ -683,54 +680,58 @@ erDiagram
 ```
 
 ### 3.4 API 설계
+**인증 공통**: `POST /api/auth/login`, `/register`, `/refresh`는 응답 본문이 `TokenResponse` 객체가 아니라 **`AuthController`에서 `Map`으로 조립**(예: `accessToken`, `refreshToken`, `user`, `message`).
+
 | 엔드포인트 | Method | 설명 | 요청/응답 |
 |-----------|--------|------|----------|
-| `/api/auth/login` | POST | 로그인 | `LoginRequest` → `TokenResponse` |
-| `/api/auth/register` | POST | 회원가입 | `UsersDTO` → `UsersDTO` |
-| `/api/auth/refresh` | POST | 토큰 갱신 | `refreshToken` → `TokenResponse` |
-| `/api/auth/logout` | POST | 로그아웃 | - → `204 No Content` |
-| `/api/auth/validate` | POST | 토큰 검증 | `Authorization Header` → `{valid: boolean, user: UsersDTO}` |
-| `/oauth2/authorization/google` | GET | Google 소셜 로그인 시작 | - → 리다이렉트 |
-| `/oauth2/authorization/naver` | GET | Naver 소셜 로그인 시작 | - → 리다이렉트 |
-| `/oauth2/callback` | GET | 소셜 로그인 콜백 | - → 리다이렉트 (토큰 포함) |
-| `/api/users/me` | GET | 내 프로필 조회 (리뷰 포함) | - → `UserProfileWithReviewsDTO` |
-| `/api/users/me` | PUT | 프로필 수정 | `UsersDTO` → `UsersDTO` |
-| `/api/users/me/password` | PATCH | 비밀번호 변경 | `{currentPassword, newPassword}` → `{message: string}` |
-| `/api/users/me/username` | PATCH | 사용자명 변경 | `{username}` → `UsersDTO` |
-| `/api/users/me/nickname` | POST | 닉네임 설정 (소셜 로그인 사용자용) | `{nickname}` → `UsersDTO` |
-| `/api/users/{userId}/profile` | GET | 다른 사용자 프로필 조회 (리뷰 포함, userId=idx) | - → `UserProfileWithReviewsDTO` |
-| `/api/users/{userId}/reviews` | GET | 특정 사용자의 리뷰 목록 조회 | - → `List<CareReviewDTO>` |
-| `/api/pets` | GET | 내 반려동물 목록 | - → `List<PetDTO>` |
+| `/api/auth/login` | POST | 로그인 | Body `LoginRequest` (`id`, `password`). 응답 `accessToken`, `refreshToken`, `user`, `message` |
+| `/api/auth/register` | POST | 회원가입 | `UsersDTO` → `user`, `message` |
+| `/api/auth/refresh` | POST | 토큰 갱신 | Body `{ "refreshToken": "..." }` → `accessToken`, `refreshToken`, `user`, `message` |
+| `/api/auth/logout` | POST | 로그아웃 | 헤더 `Authorization: Bearer` → `message` (Refresh Token DB 삭제) |
+| `/api/auth/validate` | POST | Access Token 검증 | 헤더 `Authorization` → 유효 시 `valid: true`, `user`; 무효 시 `400` + `valid: false` |
+| `/api/auth/forgot-password` | POST | 비밀번호 재설정 메일 | `{email}` → `success`, `message` (`EmailVerificationService.sendPasswordResetEmail`) |
+| `/oauth2/authorization/{registrationId}` | GET | 소셜 로그인 시작 | Spring Security OAuth2 표준 (`google`, `naver` 등 **등록된** 클라이언트) |
+| (백엔드 콜백) | GET | 인가 코드 → 토큰 교환 | Spring 기본: `/login/oauth2/code/{registrationId}` (프로젝트 설정에 따름) |
+| (로그인 완료 후) | — | 프론트로 리다이렉트 | `OAuth2SuccessHandler`가 `app.oauth2.redirect-uri`(기본 `http://localhost:3000/oauth2/callback`)로 `accessToken`, `refreshToken`, `success` 쿼리 전달. 닉네임 없으면 `needsNickname=true` 추가 |
+| `/api/users/me` | GET | 내 프로필 (리뷰 포함) | → `UserProfileWithReviewsDTO` |
+| `/api/users/me` | PUT | 프로필 수정 | `UsersDTO` → `UsersDTO` (`idx`가 본인과 다르면 `UserForbiddenException`) |
+| `/api/users/me/password` | PATCH | 비밀번호 변경 | `currentPassword`, `newPassword` → `message` |
+| `/api/users/me/username` | PATCH | **`username` 필드** 변경 | `username` → `UsersDTO` |
+| `/api/users/me/nickname` | POST | **`nickname` 필드** 설정 (소셜 등) | `nickname` → `UsersDTO` |
+| `/api/users/{userId}/profile` | GET | 다른 사용자 프로필 (`userId` = **Long idx**) | → `UserProfileWithReviewsDTO` |
+| `/api/users/{userId}/reviews` | GET | 특정 사용자 리뷰 | → `List<CareReviewDTO>` |
+| `/api/users/id/check` | GET | 로그인 ID 중복 | Query `id` → `available`, `message` |
+| `/api/users/nickname/check` | GET | 닉네임 중복 | Query `nickname` → `available`, `message` |
+| `/api/users/email/verify` | POST | 인증 메일 발송 | 인증 필요. `{ "purpose": "REGISTRATION" \| … }` (enum 이름) |
+| `/api/users/email/verify/pre-registration` | POST | 가입 전 인증 메일 | `{email}` (인증 불필요) |
+| `/api/users/email/verify/pre-registration/check` | GET | 가입 전 인증 완료 여부 | Query `email` |
+| `/api/users/email/verify/{token}` | GET | 링크 클릭 인증 처리 | `success`, `purpose`, `redirectUrl` 등 (`UserProfileController.getRedirectUrl` 참고) |
+| `/api/pets` | GET | 내 반려동물 목록 | → `List<PetDTO>` |
+| `/api/pets/{petIdx}` | GET | 반려동물 단건 | → `PetDTO` |
 | `/api/pets` | POST | 반려동물 등록 | `PetDTO` → `PetDTO` |
 | `/api/pets/{petIdx}` | PUT | 반려동물 수정 | `PetDTO` → `PetDTO` |
-| `/api/pets/{petIdx}` | DELETE | 반려동물 삭제 | - → `204 No Content` |
-| `/api/users/id/check` | GET | 아이디 중복 검사 | `id` → `{available: boolean}` |
-| `/api/users/nickname/check` | GET | 닉네임 중복 검사 | `nickname` → `{available: boolean}` |
-| `/api/users/email/verify` | POST | 이메일 인증 메일 발송 | `{purpose}` → `{success: boolean, message: string}` |
-| `/api/users/email/verify/pre-registration` | POST | 회원가입 전 이메일 인증 메일 발송 | `{email}` → `{success: boolean, message: string}` |
-| `/api/users/email/verify/pre-registration/check` | GET | 회원가입 전 이메일 인증 완료 여부 확인 | `email` → `{verified: boolean, message: string}` |
-| `/api/users/email/verify/{token}` | GET | 이메일 인증 처리 | - → `{success: boolean, purpose: string, redirectUrl: string}` |
-| `/api/auth/forgot-password` | POST | 비밀번호 찾기 (비밀번호 재설정 이메일 발송) | `{email}` → `{success: boolean, message: string}` |
-| `/api/admin/users/paging` | GET | 사용자 목록 (관리자, 페이징) | `page`, `size` → `UserPageResponseDTO` |
-| `/api/admin/users/{id}` | GET | 사용자 상세 조회 (관리자) | - → `UsersDTO` |
-| `/api/admin/users/{id}` | PUT | 사용자 정보 수정 (관리자) | `UsersDTO` → `UsersDTO` |
-| `/api/admin/users/{id}` | DELETE | 사용자 삭제/탈퇴 (관리자, 소프트 삭제) | - → `204 No Content` |
-| `/api/admin/users/{id}/restore` | POST | 계정 복구 (관리자) | - → `UsersDTO` |
-| `/api/admin/users/{id}/status` | PATCH | 상태 관리 (관리자) | `UsersDTO` (status, warningCount, suspendedUntil) → `UsersDTO` |
-| `/api/admin/reports/{id}/handle` | POST | 신고 처리 (경고/이용제한 포함) | `ReportHandleRequest` (actionTaken: WARN_USER, SUSPEND_USER) → `ReportDTO` |
-| `/api/master/admin-users` | * | ADMIN 계정 관리 (MASTER 전용) | ADMIN 생성/삭제/승격 등 |
+| `/api/pets/{petIdx}` | DELETE | 삭제(소프트) | → `message` |
+| `/api/pets/{petIdx}/restore` | POST | 삭제 복구 | → `PetDTO` |
+| `/api/pets/type/{petType}` | GET | 타입별 조회 | → `List<PetDTO>` |
+| `/api/admin/users/paging` | GET | 사용자 목록 페이징 | `page`, `size` |
+| `/api/admin/users` | POST | 관리자가 일반 사용자 생성 | `UsersDTO` (ADMIN/MASTER 역할 불가) |
+| `/api/admin/users/{id}` | GET / PUT / DELETE | 상세·수정·소프트 삭제 | 관리자 규칙은 `AdminUserController` 주석 참고 |
+| `/api/admin/users/{id}/restore` | POST | 계정 복구 | → `UsersDTO` |
+| `/api/admin/users/{id}/status` | PATCH | 상태·경고·정지 기간 | `UsersDTO` 일부 필드 |
+| `/api/admin/reports/{id}/handle` | POST | 신고 처리·제재 | Report 도메인 문서 참고 |
+| `/api/master/admin-users` | * | MASTER 전용 ADMIN 계정 | `AdminUserManagementController` |
 
-**소셜 로그인 플로우**:
-1. 사용자가 `/oauth2/authorization/{provider}` 접근
-2. Spring Security가 소셜 제공자로 리다이렉트
-3. 사용자가 소셜 제공자에서 인증 완료
-4. 소셜 제공자가 `/oauth2/callback`으로 리다이렉트 (인증 코드 포함)
-5. `OAuth2SuccessHandler`에서 `OAuth2Service.processOAuth2Login()` 호출
-6. JWT 토큰 발급 후 프론트엔드로 리다이렉트 (쿼리 파라미터로 토큰 전달)
-7. 닉네임이 없으면 `needsNickname=true` 파라미터와 함께 리다이렉트
+**반려동물 API 주의**: `getPet` / `updatePet` / `deletePet` 등은 **소유자 검증 없이 `petIdx`만**으로 동작한다(인증은 `/api/**` 수준).
+
+**소셜 로그인 플로우 (요약)**:
+1. `/oauth2/authorization/{registrationId}` 로 시작
+2. 제공자 인증 후 백엔드가 코드를 받아 세션/클라이언트로 토큰 교환(Spring OAuth2)
+3. `OAuth2SuccessHandler` → `OAuth2Service.processOAuth2Login()` → JWT 발급
+4. **`app.oauth2.redirect-uri`** 로 브라우저 리다이렉트(쿼리에 JWT). 실패 시 `error`, `success=false`
+5. 제재 시 `OAuth2Service`는 **BANNED** 등에서 `RuntimeException`을 던짐(일반 로그인의 `UserBannedException`과 다름)
 
 ### 3.5 관리자 도메인과의 연계
-- **AdminUserController** (`domain/admin`): 일반 사용자 목록/상세/수정/삭제/복구/상태관리 (`/api/admin/users`)
+- **AdminUserController** (`domain/admin`): 일반 사용자 목록/상세/**생성(`POST /api/admin/users`)**/수정/삭제/복구/상태관리 (`/api/admin/users`)
 - **AdminUserManagementController** (`domain/admin`): MASTER 전용, ADMIN 계정 생성/삭제/승격 (`/api/master/admin-users`)
 - **AdminReportController** (`domain/admin`): 신고 처리 시 UserSanctionService를 통해 제재 적용
 
@@ -744,11 +745,11 @@ erDiagram
 ### 3.7 데이터 흐름
 ```
 [사용자 요청] 
-  → [AuthController/UsersController] 
-  → [AuthService/UsersService] 
-  → [UsersRepository] 
+  → [AuthController / UserProfileController / PetController …] 
+  → [AuthService / UsersService / PetService …] 
+  → [Repository] 
   → [Database]
-  → [UsersConverter] (Entity → DTO)
+  → [Converter] (Entity → DTO)
   → [응답 반환]
 ```
 
@@ -928,8 +929,8 @@ public void deleteUser(long idx) {
 ## 6. 핵심 포인트 요약
 
 ### 기술적 하이라이트
-1. **JWT 기반 인증**: Access Token + Refresh Token 패턴
-2. **OAuth2 소셜 로그인**: Google, Naver 지원, 일반 로그인과 동일한 JWT 토큰 발급
+1. **JWT 기반 인증**: Access(약 15분)·Refresh(1일), `AuthService`는 `TokenResponse` record 반환 후 컨트롤러가 `Map`으로 내려줌
+2. **OAuth2 소셜 로그인**: 등록된 클라이언트(예: Google, Naver) — 성공 시 `app.oauth2.redirect-uri`로 쿼리 전달. 제재는 `RuntimeException` 경로
 3. **Provider별 표준화**: 각 소셜 제공자의 다른 응답 형식을 표준화하여 일관된 처리
 4. **제재 시스템**: 경고 누적 시 자동 이용제한, 동시성 문제 해결
 5. **소프트 삭제**: 데이터 복구 가능
