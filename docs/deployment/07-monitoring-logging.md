@@ -4,6 +4,8 @@
 
 Petory 프로젝트의 모니터링 및 로깅 전략을 설명합니다.
 
+**macOS**: 아래 `docker stats`, `docker logs` 명령은 Docker Desktop 설치 환경에서 동일하게 동작합니다. 백그라운드 스케줄(예: 헬스체크 cron)은 로컬 맥이 아니라 **배포 서버**에 두는 경우가 많습니다. 로컬 Docker만 쓸 때는 [00-macos-local.md](./00-macos-local.md)를 참고하세요.
+
 ---
 
 ## 📊 모니터링 전략
