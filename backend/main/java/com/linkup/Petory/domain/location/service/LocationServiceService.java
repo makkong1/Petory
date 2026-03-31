@@ -23,8 +23,35 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class LocationServiceService {
 
+    private static final int DEFAULT_RADIUS_METERS = 10_000;
+
     private final LocationServiceConverter locationServiceConverter;
     private final LocationServiceRepository locationServiceRepository;
+
+    /**
+     * 키워드 → 반경(위도·경도·반경 모두 존재) → 지역 계층 순으로 검색합니다.
+     * {@code /search}, {@code /recommend}에서 동일 규칙을 쓰기 위한 진입점입니다.
+     */
+    public List<LocationServiceDTO> searchLocationServices(
+            String keyword,
+            Double latitude,
+            Double longitude,
+            Integer radius,
+            String sido,
+            String sigungu,
+            String eupmyeondong,
+            String roadName,
+            String category,
+            Integer maxResults) {
+        if (StringUtils.hasText(keyword)) {
+            return searchLocationServicesByKeyword(keyword, category, maxResults);
+        }
+        if (latitude != null && longitude != null && radius != null) {
+            int radiusInMeters = radius > 0 ? radius : DEFAULT_RADIUS_METERS;
+            return searchLocationServicesByLocation(latitude, longitude, radiusInMeters, category, maxResults);
+        }
+        return searchLocationServicesByRegion(sido, sigungu, eupmyeondong, roadName, category, maxResults);
+    }
 
     /**
      * 인기 위치 서비스 조회 (카테고리별 상위 10개)
@@ -83,37 +110,10 @@ public class LocationServiceService {
         long queryTime = System.currentTimeMillis() - queryStartTime;
         log.info("⏱️  [성능 측정] DB 쿼리 실행 시간: {}ms, 조회된 레코드 수: {}개", queryTime, services.size());
 
-        // 카테고리 필터링
         long filterStartTime = System.currentTimeMillis();
         long filterTime = 0;
         if (StringUtils.hasText(category) && !services.isEmpty()) {
-            String categoryLower = category.toLowerCase(Locale.ROOT).trim();
-            services = services.stream()
-                    .filter(service -> {
-                        // category3 우선 확인
-                        if (service.getCategory3() != null) {
-                            String cat3 = service.getCategory3().toLowerCase(Locale.ROOT).trim();
-                            if (cat3.equals(categoryLower)) {
-                                return true;
-                            }
-                        }
-                        // category2 확인
-                        if (service.getCategory2() != null) {
-                            String cat2 = service.getCategory2().toLowerCase(Locale.ROOT).trim();
-                            if (cat2.equals(categoryLower)) {
-                                return true;
-                            }
-                        }
-                        // category1 확인
-                        if (service.getCategory1() != null) {
-                            String cat1 = service.getCategory1().toLowerCase(Locale.ROOT).trim();
-                            if (cat1.equals(categoryLower)) {
-                                return true;
-                            }
-                        }
-                        return false;
-                    })
-                    .collect(Collectors.toList());
+            services = applyCategoryFilter(services, category);
             filterTime = System.currentTimeMillis() - filterStartTime;
             log.info("⏱️  [성능 측정] 카테고리 필터링 시간: {}ms, 필터링 후 결과 수: {}개", filterTime, services.size());
         }
@@ -171,37 +171,10 @@ public class LocationServiceService {
         long queryTime = System.currentTimeMillis() - queryStartTime;
         log.info("⏱️  [성능 측정] 위치 기반 DB 쿼리 실행 시간: {}ms, 조회된 레코드 수: {}개", queryTime, services.size());
 
-        // 카테고리 필터링
         long filterStartTime = System.currentTimeMillis();
         long filterTime = 0;
         if (StringUtils.hasText(category) && !services.isEmpty()) {
-            String categoryLower = category.toLowerCase(Locale.ROOT).trim();
-            services = services.stream()
-                    .filter(service -> {
-                        // category3 우선 확인
-                        if (service.getCategory3() != null) {
-                            String cat3 = service.getCategory3().toLowerCase(Locale.ROOT).trim();
-                            if (cat3.equals(categoryLower)) {
-                                return true;
-                            }
-                        }
-                        // category2 확인
-                        if (service.getCategory2() != null) {
-                            String cat2 = service.getCategory2().toLowerCase(Locale.ROOT).trim();
-                            if (cat2.equals(categoryLower)) {
-                                return true;
-                            }
-                        }
-                        // category1 확인
-                        if (service.getCategory1() != null) {
-                            String cat1 = service.getCategory1().toLowerCase(Locale.ROOT).trim();
-                            if (cat1.equals(categoryLower)) {
-                                return true;
-                            }
-                        }
-                        return false;
-                    })
-                    .collect(Collectors.toList());
+            services = applyCategoryFilter(services, category);
             filterTime = System.currentTimeMillis() - filterStartTime;
             log.info("⏱️  [성능 측정] 카테고리 필터링 시간: {}ms, 필터링 후 결과 수: {}개", filterTime, services.size());
         }
@@ -261,37 +234,10 @@ public class LocationServiceService {
         long queryTime = System.currentTimeMillis() - queryStartTime;
         log.info("⏱️  [성능 측정] 키워드 검색 DB 쿼리 실행 시간: {}ms, 조회된 레코드 수: {}개", queryTime, services.size());
 
-        // 카테고리 필터링 (선택사항)
         long filterStartTime = System.currentTimeMillis();
         long filterTime = 0;
         if (StringUtils.hasText(category) && !services.isEmpty()) {
-            String categoryLower = category.toLowerCase(Locale.ROOT).trim();
-            services = services.stream()
-                    .filter(service -> {
-                        // category3 우선 확인
-                        if (service.getCategory3() != null) {
-                            String cat3 = service.getCategory3().toLowerCase(Locale.ROOT).trim();
-                            if (cat3.equals(categoryLower)) {
-                                return true;
-                            }
-                        }
-                        // category2 확인
-                        if (service.getCategory2() != null) {
-                            String cat2 = service.getCategory2().toLowerCase(Locale.ROOT).trim();
-                            if (cat2.equals(categoryLower)) {
-                                return true;
-                            }
-                        }
-                        // category1 확인
-                        if (service.getCategory1() != null) {
-                            String cat1 = service.getCategory1().toLowerCase(Locale.ROOT).trim();
-                            if (cat1.equals(categoryLower)) {
-                                return true;
-                            }
-                        }
-                        return false;
-                    })
-                    .collect(Collectors.toList());
+            services = applyCategoryFilter(services, category);
             filterTime = System.currentTimeMillis() - filterStartTime;
             log.info("⏱️  [성능 측정] 카테고리 필터링 시간: {}ms, 필터링 후 결과 수: {}개", filterTime, services.size());
         }
@@ -317,6 +263,24 @@ public class LocationServiceService {
                 totalTime, queryTime, filterTime, dtoConvertTime);
 
         return result;
+    }
+
+    private List<LocationService> applyCategoryFilter(List<LocationService> services, String category) {
+        String categoryLower = category.toLowerCase(Locale.ROOT).trim();
+        return services.stream()
+                .filter(service -> matchesCategory(service, categoryLower))
+                .collect(Collectors.toList());
+    }
+
+    private boolean matchesCategory(LocationService service, String categoryLower) {
+        return categoryFieldMatches(service.getCategory3(), categoryLower)
+                || categoryFieldMatches(service.getCategory2(), categoryLower)
+                || categoryFieldMatches(service.getCategory1(), categoryLower);
+    }
+
+    private static boolean categoryFieldMatches(String categoryField, String categoryLower) {
+        return categoryField != null
+                && categoryLower.equals(categoryField.toLowerCase(Locale.ROOT).trim());
     }
 
     /**
