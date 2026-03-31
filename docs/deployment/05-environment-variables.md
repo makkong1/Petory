@@ -4,6 +4,8 @@
 
 Petory 프로젝트의 환경 변수 관리 방법과 보안 전략을 설명합니다.
 
+**macOS(맥북)**: 아래 셸 명령(`chmod`, `openssl`)은 터미널.app / Cursor 통합 터미널에서 그대로 사용할 수 있습니다. 로컬에서 Docker만 쓸 때는 [macOS 로컬 가이드](./00-macos-local.md)와 함께 보세요.
+
 ---
 
 ## 🔐 환경 변수 분류
@@ -236,10 +238,12 @@ services:
 #### 파일 권한 설정
 
 ```bash
-# 서버에서 실행
+# 서버(Linux)에서 실행
 chmod 600 .env.production
 chown app:app .env.production
 ```
+
+**macOS(맥북)**: `chmod 600 .env.production`은 동일하게 사용합니다. `chown app:app`은 로컬에 `app` 유저가 없을 수 있으므로 보통 생략하고, 저장소에 `.env*`가 올라가지 않게만 확인합니다.
 
 ### 2. GitHub Secrets 활용
 

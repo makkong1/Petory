@@ -2,27 +2,36 @@
 
 ## 📋 일반적인 문제 해결
 
+**macOS(맥북) 로컬**: Docker Desktop, Compose 명령, `gradlew` 권한·줄바꿈 문제는 [macOS 로컬 가이드](./00-macos-local.md)를 먼저 확인하세요.
+
 ### 컨테이너 시작 실패
 
-**문제**: 컨테이너가 시작되지 않음
+**문제**: 컨테이너가 시작되지 않음  
 **해결**:
 ```bash
-docker-compose -f docker-compose.prod.yml logs backend
+docker compose -f docker-compose.prod.yml logs backend
+# 또는: docker-compose -f docker-compose.prod.yml logs backend
 docker ps -a
 ```
 
 ### 포트 충돌
 
-**문제**: 포트가 이미 사용 중
-**해결**:
+**문제**: 포트가 이미 사용 중  
+**해결 (Linux 서버)**:
 ```bash
 sudo netstat -tulpn | grep :8080
 # 포트 변경 또는 기존 프로세스 종료
 ```
 
+**해결 (macOS)**:
+```bash
+lsof -nP -iTCP:8080 -sTCP:LISTEN
+# 필요 시 해당 PID 종료 또는 docker-compose의 ports 매핑 변경
+```
+
 ### 데이터베이스 연결 오류
 
-**문제**: Backend에서 MySQL 연결 실패
+**문제**: Backend에서 MySQL 연결 실패  
 **해결**:
 ```bash
 docker exec petory-mysql-prod mysqladmin ping
@@ -31,8 +40,9 @@ docker network inspect petory_petory-network
 
 ### 메모리 부족
 
-**문제**: Out of Memory 에러
+**문제**: Out of Memory 에러  
 **해결**:
+- **Docker Desktop(macOS)**: Settings → Resources에서 메모리 상향
 - Docker 리소스 제한 확인
 - JVM 메모리 설정 조정 (`JAVA_OPTS`)
 

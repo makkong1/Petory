@@ -4,6 +4,10 @@
 
 GitHub Actions를 이용한 CI/CD 파이프라인 구축 방법을 설명합니다.
 
+워크플로는 **ubuntu-latest** 러너에서 실행됩니다. 로컬 맥에서 개발할 때는 [macOS 로컬 가이드](./00-macos-local.md)만 맞추면 되고, CI 명령은 리포지토리에 맞게 그대로 두면 됩니다.
+
+**현재 레포**: 루트에 `Dockerfile` / `docker-compose`가 없으면 아래 예시의 **Docker 이미지 빌드·푸시·배포** 단계는 그대로 쓰기 어렵습니다. 이미지와 Compose를 추가한 뒤 [Docker 설정](./02-docker-configuration.md)과 맞춰 워크플로를 연결하면 됩니다.
+
 ---
 
 ## 🔄 CI/CD 흐름

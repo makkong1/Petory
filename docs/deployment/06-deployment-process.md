@@ -4,6 +4,11 @@
 
 Petory 프로젝트의 실제 배포 프로세스를 단계별로 설명합니다.
 
+**환경 구분**
+
+- **리눅스 서버(프로덕션/스테이징)**: 아래 `ssh`, `/opt/petory` 경로, `systemd`/cron 등은 **서버** 기준입니다.
+- **macOS(맥북)**: 로컬에서 Docker로만 연습할 때는 프로젝트 클론 경로(예: `~/project/Petory`)에서 `docker compose`를 실행하면 됩니다. [macOS 로컬 가이드](./00-macos-local.md) 참고. (레포에 Compose 파일이 없으면 [Docker 설정](./02-docker-configuration.md)대로 먼저 추가.)
+
 ---
 
 ## 🎯 배포 전 준비사항
@@ -375,10 +380,16 @@ docker exec petory-backend-prod env | grep SPRING_DATASOURCE
 ### 포트 충돌
 
 ```bash
-# 포트 사용 확인
+# 포트 사용 확인 (Linux)
 sudo netstat -tulpn | grep :8080
 sudo netstat -tulpn | grep :3306
 
+# macOS(맥북) — netstat 옵션이 다르므로 예:
+lsof -nP -iTCP:8080 -sTCP:LISTEN
+lsof -nP -iTCP:3306 -sTCP:LISTEN
+```
+
+```yaml
 # 포트 변경 (docker-compose.prod.yml)
 ports:
   - "8081:8080"  # 외부 포트 변경

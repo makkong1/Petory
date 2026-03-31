@@ -1,492 +1,104 @@
-# Docker 설정
+# Docker · Redis · 향후 배포
 
-## 📋 개요
+## 📋 이 문서의 역할
 
-Petory 프로젝트의 Docker 컨테이너 설정 방법을 설명합니다.
-
----
-
-## 🏗️ Docker 파일 구조
-
-```
-Petory/
-├── docker/
-│   ├── Dockerfile.backend          # Backend Dockerfile
-│   ├── Dockerfile.frontend         # Frontend Dockerfile
-│   └── nginx/
-│       └── default.conf            # Nginx 설정
-├── docker-compose.yml              # 개발 환경
-├── docker-compose.prod.yml         # 프로덕션 환경
-└── .env.example                    # 환경 변수 예시
-```
+- **지금 실제로 쓰는 것**: 로컬에서 Redis를 Docker로 띄우고 Spring Boot(`spring.redis.*`)와 연결하는 방법  
+- **아직 레포에 없는 것**: `Dockerfile`, `docker-compose.yml` 전체 스택 — **추가 시** 아래 [향후 계획](#향후-계획-dockerfile--compose--cicd)과 [CI/CD](./03-cicd-pipeline.md)를 맞추면 됨
 
 ---
 
-## 🔧 Backend Dockerfile
+## 현재 레포 상태
 
-### `docker/Dockerfile.backend`
+| 항목 | 상태 |
+|------|------|
+| `docker/Dockerfile.*`, `docker-compose*.yml` | **미추가** (문서만으로 설계해 두었던 내용은 정리·축소함) |
+| 로컬 Redis | **`docker run`으로 수동 실행** (아래) |
+| Spring Boot ↔ Redis | `application.properties`의 **`spring.redis.*`** + `RedisConfig.java` |
 
-```dockerfile
-# Build Stage
-FROM gradle:7.6-jdk17 AS build
-WORKDIR /app
+---
 
-# Copy Gradle files
-COPY build.gradle settings.gradle ./
-COPY gradle/ ./gradle/
+## 로컬 Redis (Docker, 수동 실행)
 
-# Copy source code
-COPY backend/ ./backend/
+데이터·설정을 호스트에 두고 컨테이너에 마운트하는 방식 예시입니다. **경로는 본인 환경에 맞게 수정**하세요.
 
-# Build application
-RUN gradle clean build -x test --no-daemon
+### 구성 요약
 
-# Runtime Stage
-FROM openjdk:17-jdk-slim
-WORKDIR /app
+- 컨테이너 이름: `petory-redis`
+- 포트: `6379` (호스트 ↔ 컨테이너 동일)
+- 볼륨: 호스트 `data` → 컨테이너 `/data`, 호스트 `redis.conf` → 컨테이너 내 설정 경로
+- `redis.conf` 예: `requirepass`, `appendonly yes`, `maxmemory`, `maxmemory-policy allkeys-lru` 등
 
-# Copy JAR file
-COPY --from=build /app/build/libs/*.jar app.jar
-
-# Environment variables
-ENV SPRING_PROFILES_ACTIVE=prod
-ENV JAVA_OPTS="-Xms512m -Xmx1024m -XX:+UseG1GC"
-
-# Expose port
-EXPOSE 8080
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
-  CMD curl -f http://localhost:8080/api/actuator/health || exit 1
-
-# Run application
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
-```
-
-### 빌드 명령
+### 실행 예시 (macOS 경로 예: `~/petory_docker_data/redis/...`)
 
 ```bash
-docker build -f docker/Dockerfile.backend -t petory-backend:latest .
+docker run -d \
+  --name petory-redis \
+  -p 6379:6379 \
+  -v "$HOME/petory_docker_data/redis/data:/data" \
+  -v "$HOME/petory_docker_data/redis/conf/redis.conf:/usr/local/etc/redis/redis.conf" \
+  redis \
+  redis-server /usr/local/etc/redis/redis.conf
 ```
 
----
+- 컨테이너를 지워도 **호스트 볼륨**에 RDB/AOF가 남으면 데이터 유지 가능  
+- Redis를 끈 상태에서 Spring만 띄우면 캐시·알림 등 Redis 사용 구간에서 오류 날 수 있음 → **Redis 먼저 기동** 권장
 
-## 🎨 Frontend Dockerfile
+### Spring Boot 연동
 
-### `docker/Dockerfile.frontend`
+애플리케이션은 **호스트에서 실행**한다고 가정할 때 `localhost:6379`로 붙습니다.  
+`RedisConfig`는 **`spring.redis.host` / `spring.redis.port` / `spring.redis.password`** 를 읽습니다 (`spring.data.redis.*` 아님).
 
-```dockerfile
-# Build Stage
-FROM node:18-alpine AS build
-WORKDIR /app
-
-# Copy package files
-COPY frontend/package*.json ./
-
-# Install dependencies
-RUN npm ci
-
-# Copy source code
-COPY frontend/ ./
-
-# Build React app
-RUN npm run build
-
-# Production Stage
-FROM nginx:alpine
-WORKDIR /usr/share/nginx/html
-
-# Copy build result
-COPY --from=build /app/build /usr/share/nginx/html
-
-# Copy nginx configuration
-COPY docker/nginx/default.conf /etc/nginx/conf.d/default.conf
-
-# Expose port
-EXPOSE 80
-
-# Start nginx
-CMD ["nginx", "-g", "daemon off;"]
-```
-
-### 빌드 명령
-
-```bash
-docker build -f docker/Dockerfile.frontend -t petory-frontend:latest .
-```
-
----
-
-## 🐳 Docker Compose 설정
-
-### 개발 환경: `docker-compose.yml`
-
-```yaml
-version: '3.8'
-
-services:
-  mysql:
-    image: mysql:8.0
-    container_name: petory-mysql-dev
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-petory}
-      MYSQL_USER: ${MYSQL_USER:-petory}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-petory}
-    ports:
-      - "3306:3306"
-    volumes:
-      - mysql_data:/var/lib/mysql
-      - ./backend/main/resources/sql:/docker-entrypoint-initdb.d
-    networks:
-      - petory-network
-    command: --default-authentication-plugin=mysql_native_password
-
-  redis:
-    image: redis:7-alpine
-    container_name: petory-redis-dev
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    networks:
-      - petory-network
-    command: redis-server --appendonly yes
-
-  backend:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.backend
-    container_name: petory-backend-dev
-    environment:
-      SPRING_PROFILES_ACTIVE: dev
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-petory}
-      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-petory}
-      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-petory}
-      SPRING_REDIS_HOST: redis
-      SPRING_REDIS_PORT: 6379
-    ports:
-      - "8080:8080"
-    depends_on:
-      - mysql
-      - redis
-    networks:
-      - petory-network
-    volumes:
-      - ./uploads:/app/uploads
-
-  frontend:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.frontend
-    container_name: petory-frontend-dev
-    ports:
-      - "3000:80"
-    depends_on:
-      - backend
-    networks:
-      - petory-network
-
-volumes:
-  mysql_data:
-  redis_data:
-
-networks:
-  petory-network:
-    driver: bridge
-```
-
-### 프로덕션 환경: `docker-compose.prod.yml`
-
-```yaml
-version: '3.8'
-
-services:
-  mysql:
-    image: mysql:8.0
-    container_name: petory-mysql-prod
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${MYSQL_DATABASE}
-      MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-    volumes:
-      - mysql_data:/var/lib/mysql
-    networks:
-      - petory-network
-    restart: unless-stopped
-    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
-
-  redis:
-    image: redis:7-alpine
-    container_name: petory-redis-prod
-    volumes:
-      - redis_data:/data
-    networks:
-      - petory-network
-    restart: unless-stopped
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
-
-  backend:
-    image: petory-backend:latest
-    container_name: petory-backend-prod
-    environment:
-      SPRING_PROFILES_ACTIVE: prod
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE}
-      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER}
-      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD}
-      SPRING_REDIS_HOST: redis
-      SPRING_REDIS_PORT: 6379
-      SPRING_REDIS_PASSWORD: ${REDIS_PASSWORD}
-      JWT_SECRET: ${JWT_SECRET}
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
-    ports:
-      - "8080:8080"
-    depends_on:
-      mysql:
-        condition: service_healthy
-      redis:
-        condition: service_started
-    networks:
-      - petory-network
-    restart: unless-stopped
-    volumes:
-      - ./uploads:/app/uploads
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/api/actuator/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-
-  frontend:
-    image: petory-frontend:latest
-    container_name: petory-frontend-prod
-    ports:
-      - "3000:80"
-    depends_on:
-      - backend
-    networks:
-      - petory-network
-    restart: unless-stopped
-
-  nginx:
-    image: nginx:alpine
-    container_name: petory-nginx-prod
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./docker/nginx/ssl:/etc/nginx/ssl:ro
-    depends_on:
-      - frontend
-      - backend
-    networks:
-      - petory-network
-    restart: unless-stopped
-
-volumes:
-  mysql_data:
-  redis_data:
-
-networks:
-  petory-network:
-    driver: bridge
-```
-
----
-
-## 🔧 환경 변수 파일
-
-### `.env.example`
-
-```bash
-# Database
-MYSQL_ROOT_PASSWORD=your_root_password
-MYSQL_DATABASE=petory
-MYSQL_USER=petory
-MYSQL_PASSWORD=your_db_password
-
-# Redis
-REDIS_PASSWORD=your_redis_password
-
-# JWT
-JWT_SECRET=your_jwt_secret_key_min_256_bits
-JWT_REFRESH_SECRET=your_jwt_refresh_secret_key_min_256_bits
-
-# Spring Profile
-SPRING_PROFILES_ACTIVE=prod
-
-# Email (if needed)
-SPRING_MAIL_HOST=smtp.gmail.com
-SPRING_MAIL_PORT=587
-SPRING_MAIL_USERNAME=your_email@gmail.com
-SPRING_MAIL_PASSWORD=your_app_password
-
-# OAuth2 (if needed)
-GOOGLE_CLIENT_ID=your_google_client_id
-GOOGLE_CLIENT_SECRET=your_google_client_secret
-NAVER_CLIENT_ID=your_naver_client_id
-NAVER_CLIENT_SECRET=your_naver_client_secret
-
-# File Upload
-UPLOAD_DIR=/app/uploads
-MAX_FILE_SIZE=10485760
-```
-
----
-
-## 🚀 실행 방법
-
-### 개발 환경
-
-```bash
-# 환경 변수 파일 생성
-cp .env.example .env
-# .env 파일 수정
-
-# 컨테이너 시작
-docker-compose up -d
-
-# 로그 확인
-docker-compose logs -f
-
-# 컨테이너 중지
-docker-compose down
-
-# 데이터까지 삭제
-docker-compose down -v
-```
-
-### 프로덕션 환경
-
-```bash
-# 이미지 빌드
-docker-compose -f docker-compose.prod.yml build
-
-# 컨테이너 시작
-docker-compose -f docker-compose.prod.yml up -d
-
-# 로그 확인
-docker-compose -f docker-compose.prod.yml logs -f backend
-
-# 컨테이너 재시작
-docker-compose -f docker-compose.prod.yml restart backend
-
-# 컨테이너 중지
-docker-compose -f docker-compose.prod.yml down
-```
-
----
-
-## 📊 리소스 제한 설정
-
-### `docker-compose.prod.yml`에 추가
-
-```yaml
-services:
-  backend:
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 2G
-        reservations:
-          cpus: '1'
-          memory: 1G
-
-  mysql:
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 2G
-        reservations:
-          cpus: '1'
-          memory: 1G
-
-  redis:
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 512M
-        reservations:
-          cpus: '0.25'
-          memory: 256M
-```
-
----
-
-## 🔍 Health Check 설정
-
-### Backend Health Check
-
-Spring Boot Actuator 의존성 필요 (`build.gradle`):
-
-```gradle
-dependencies {
-    implementation 'org.springframework.boot:spring-boot-starter-actuator'
-}
-```
-
-`application.properties`:
+`application.properties` 예:
 
 ```properties
-management.endpoints.web.exposure.include=health,info
-management.endpoint.health.show-details=when-authorized
-management.health.db.enabled=true
-management.health.redis.enabled=true
+spring.redis.host=localhost
+spring.redis.port=6379
+spring.redis.password=${REDIS_PASSWORD:실제비밀번호}
 ```
 
 ---
 
-## 🗄️ 볼륨 관리
+## MySQL
 
-### 데이터 영속성
+로컬에서는 보통 **호스트에 설치한 MySQL** 또는 별도 Docker 컨테이너를 씁니다.  
+전체 스택을 나중에 Compose로 묶을 때는 서비스 이름(예: `mysql`)과 JDBC URL(`jdbc:mysql://mysql:3306/...`)을 맞추면 됩니다.
 
-```yaml
-volumes:
-  mysql_data:
-    driver: local
-  redis_data:
-    driver: local
-```
+---
 
-### 백업 스크립트 예시
+## 향후 계획: Dockerfile · Compose · CI/CD
+
+1. **Dockerfile (백엔드)**  
+   - 레포 루트에 `build.gradle`, `settings.gradle`, `gradle/`, `backend/` 구조에 맞게 복사 후 `./gradlew bootJar` 등으로 JAR 생성  
+   - 런타임은 JDK 17 이미지 등  
+   - 이 레포는 소스가 `backend/main/java`에 있으므로 예전 문서의 `COPY backend/` 만으로는 부족할 수 있음 → **루트 기준 Gradle 빌드**로 맞출 것  
+
+2. **docker-compose**  
+   - `mysql`, `redis`, `backend`(빌드한 이미지), 필요 시 `frontend`·`nginx`  
+   - 컨테이너 간 통신 시 DB/Redis 호스트명은 `localhost`가 아니라 **서비스 이름**  
+
+3. **GitHub Actions**  
+   - 테스트·빌드 후 이미지 푸시, 서버에서 `docker compose pull && up` 등 — 상세는 [03-cicd-pipeline.md](./03-cicd-pipeline.md)  
+   - **이미지·Compose 파일이 레포에 생긴 뒤** 워크플로의 빌드·배포 단계를 연결하는 것이 자연스러움  
+
+4. **환경 변수**  
+   - 배포 시 비밀번호·JWT 등은 GitHub Secrets + 서버 `.env` 등으로 분리 — [05-environment-variables.md](./05-environment-variables.md)  
+
+---
+
+## 참고로 남겨 두는 명령 (Compose 추가 후)
 
 ```bash
-#!/bin/bash
-# backup.sh
-
-DATE=$(date +%Y%m%d_%H%M%S)
-BACKUP_DIR="./backups"
-
-mkdir -p $BACKUP_DIR
-
-# MySQL 백업
-docker exec petory-mysql-prod mysqldump -u root -p${MYSQL_ROOT_PASSWORD} petory > $BACKUP_DIR/mysql_${DATE}.sql
-
-# Redis 백업 (RDB 파일 복사)
-docker cp petory-redis-prod:/data/dump.rdb $BACKUP_DIR/redis_${DATE}.rdb
+docker compose up -d
+docker compose logs -f
+docker compose down
+docker compose down -v   # 볼륨까지 삭제 시 데이터 초기화 주의
 ```
 
----
-
-## 🔐 보안 권장사항
-
-1. **비밀번호 강도**: 환경 변수로 관리, 복잡한 비밀번호 사용
-2. **네트워크 격리**: 컨테이너 간 통신만 허용
-3. **이미지 스캔**: 정기적으로 보안 취약점 스캔
-4. **최신 이미지**: 베이스 이미지 정기 업데이트
-5. **비root 사용자**: 컨테이너 내 비root 사용자로 실행
+`docker compose` / `docker-compose` 둘 중 설치된 쪽 사용 — [00-macos-local.md](./00-macos-local.md)
 
 ---
 
-## 📝 다음 단계
+## 다음 문서
 
-1. [CI/CD 파이프라인](./03-cicd-pipeline.md) - 자동 빌드 및 배포
-2. [Nginx 설정](./04-nginx-configuration.md) - 리버스 프록시 구성
-
+1. [CI/CD 파이프라인](./03-cicd-pipeline.md)  
+2. [Nginx 설정](./04-nginx-configuration.md) — 리버스 프록시는 스택 구성 후 적용
