@@ -7,7 +7,6 @@ import com.linkup.Petory.domain.location.service.LocationServiceService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
-import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -73,26 +72,17 @@ public class LocationServiceController {
                     "🚀 [성능 측정] 위치 서비스 검색 시작 - latitude={}, longitude={}, radius={}, sido={}, sigungu={}, eupmyeondong={}, category={}, keyword={}, size={} (effectiveSize={})",
                     latitude, longitude, radius, sido, sigungu, eupmyeondong, category, keyword, size, effectiveSize);
 
-            // 하이브리드 전략: 키워드 검색 > 위치 기반 검색 > 지역 계층별 검색
-            List<LocationServiceDTO> services;
-            if (StringUtils.hasText(keyword)) {
-                // 키워드 검색 우선 (FULLTEXT 인덱스 활용)
-                services = locationServiceService.searchLocationServicesByKeyword(keyword, category, effectiveSize);
-            } else if (latitude != null && longitude != null && radius != null) {
-                // 초기 로드: 위치 기반 반경 검색 (빠르고 적은 데이터)
-                int radiusInMeters = radius > 0 ? radius : 10000; // 기본값 10km
-                services = locationServiceService.searchLocationServicesByLocation(
-                        latitude, longitude, radiusInMeters, category, effectiveSize);
-            } else {
-                // 이후 검색: 시도/시군구 기반 검색 (일관성 유지)
-                services = locationServiceService.searchLocationServicesByRegion(
-                        sido,
-                        sigungu,
-                        eupmyeondong,
-                        roadName,
-                        category,
-                        effectiveSize);
-            }
+            List<LocationServiceDTO> services = locationServiceService.searchLocationServices(
+                    keyword,
+                    latitude,
+                    longitude,
+                    radius,
+                    sido,
+                    sigungu,
+                    eupmyeondong,
+                    roadName,
+                    category,
+                    effectiveSize);
 
             long queryTime = System.currentTimeMillis() - startTime;
             log.info("⏱️  [성능 측정] 위치 서비스 조회 완료 - 실행 시간: {}ms, 결과 수: {}개", queryTime, services.size());
@@ -147,18 +137,18 @@ public class LocationServiceController {
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String keyword) {
         try {
-            Integer effectiveSize = 30; // AI에 넘길 후보 수
-            List<LocationServiceDTO> services;
-            if (StringUtils.hasText(keyword)) {
-                services = locationServiceService.searchLocationServicesByKeyword(keyword, category, effectiveSize);
-            } else if (latitude != null && longitude != null && radius != null) {
-                int radiusInMeters = radius > 0 ? radius : 10000;
-                services = locationServiceService.searchLocationServicesByLocation(
-                        latitude, longitude, radiusInMeters, category, effectiveSize);
-            } else {
-                services = locationServiceService.searchLocationServicesByRegion(
-                        sido, sigungu, eupmyeondong, roadName, category, effectiveSize);
-            }
+            int effectiveSize = 30; // AI에 넘길 후보 수
+            List<LocationServiceDTO> services = locationServiceService.searchLocationServices(
+                    keyword,
+                    latitude,
+                    longitude,
+                    radius,
+                    sido,
+                    sigungu,
+                    eupmyeondong,
+                    roadName,
+                    category,
+                    effectiveSize);
 
             List<LocationServiceDTO> recommended = locationRecommendAgentService.enrichWithRecommendations(
                     services, category);
