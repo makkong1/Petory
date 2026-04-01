@@ -1,21 +1,6 @@
-import axios from 'axios';
+import { createAuthAxios } from './apiClient';
 
-const BASE_URL = 'http://localhost:8080/api/admin/missing-pets';
-
-const getToken = () => localStorage.getItem('accessToken') || localStorage.getItem('token');
-
-const api = axios.create({
-    baseURL: BASE_URL,
-    headers: { 'Content-Type': 'application/json' },
-});
-
-api.interceptors.request.use((config) => {
-    const token = getToken();
-    if (token && !config.headers.Authorization) {
-        config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-});
+const api = createAuthAxios('http://localhost:8080/api/admin/missing-pets');
 
 export const missingPetAdminApi = {
     // [리팩토링] DB 레벨 필터링 + 페이징 (기존 listMissingPets 전체 메모리 로드 제거)

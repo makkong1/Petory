@@ -1,21 +1,6 @@
-import axios from 'axios';
+import { createAuthAxios } from './apiClient';
 
-const BASE_URL = 'http://localhost:8080/api/admin';
-
-const getToken = () => localStorage.getItem('accessToken') || localStorage.getItem('token');
-
-const api = axios.create({
-    baseURL: BASE_URL,
-    headers: { 'Content-Type': 'application/json' },
-});
-
-api.interceptors.request.use((config) => {
-    const token = getToken();
-    if (token && !config.headers.Authorization) {
-        config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-});
+const api = createAuthAxios('http://localhost:8080/api/admin');
 
 export const communityAdminApi = {
     // Boards (단일 조회 - 관리자용, 조회수 증가 없음)

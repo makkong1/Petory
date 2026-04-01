@@ -1,25 +1,6 @@
-import axios from 'axios';
+import { createAuthAxios } from './apiClient';
 
-const BASE_URL = 'http://localhost:8080/api/uploads';
-
-const getToken = () => {
-  return localStorage.getItem('accessToken') || localStorage.getItem('token');
-};
-
-const api = axios.create({
-  baseURL: BASE_URL,
-});
-
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
-    if (token && !config.headers.Authorization) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
+const api = createAuthAxios('http://localhost:8080/api/uploads');
 
 export const uploadApi = {
   uploadImage: async (file, options = {}) => {

@@ -2,18 +2,55 @@
 
 ## 📋 이 문서의 역할
 
-- **지금 실제로 쓰는 것**: 로컬에서 Redis를 Docker로 띄우고 Spring Boot(`spring.redis.*`)와 연결하는 방법  
+- **지금 실제로 쓰는 것**: 로컬에서 Redis를 Docker로 띄우고 Spring Boot(`spring.redis.*`)와 연결하는 방법
 - **아직 레포에 없는 것**: `Dockerfile`, `docker-compose.yml` 전체 스택 — **추가 시** 아래 [향후 계획](#향후-계획-dockerfile--compose--cicd)과 [CI/CD](./03-cicd-pipeline.md)를 맞추면 됨
+
+---
+
+## docker 명령어 정리
+
+실행 / 종료
+
+시작
+docker start petory-redis
+docker start petory-mysql
+종료
+docker stop petory-redis
+docker stop petory-mysql
+
+재시작
+docker restart petory-redis
+docker restart petory-mysql
+
+로그 확인
+docker logs petory-redis
+docker logs petory-mysql
+
+👉 문제 생기면 무조건 이거 먼저 본다
+
+컨테이너 삭제
+docker rm petory-redis
+docker rm petory-mysql
+
+상태 확인
+docker ps # 실행 중
+docker ps -a # 전체 (꺼진 것 포함)
+
+접속 (자주 씀)
+MySQL
+docker exec -it petory-mysql mysql -u root -p
+Redis
+docker exec -it petory-redis redis-cli
 
 ---
 
 ## 현재 레포 상태
 
-| 항목 | 상태 |
-|------|------|
-| `docker/Dockerfile.*`, `docker-compose*.yml` | **미추가** (문서만으로 설계해 두었던 내용은 정리·축소함) |
-| 로컬 Redis | **`docker run`으로 수동 실행** (아래) |
-| Spring Boot ↔ Redis | `application.properties`의 **`spring.redis.*`** + `RedisConfig.java` |
+| 항목                                         | 상태                                                                 |
+| -------------------------------------------- | -------------------------------------------------------------------- |
+| `docker/Dockerfile.*`, `docker-compose*.yml` | **미추가** (문서만으로 설계해 두었던 내용은 정리·축소함)             |
+| 로컬 Redis                                   | **`docker run`으로 수동 실행** (아래)                                |
+| Spring Boot ↔ Redis                          | `application.properties`의 **`spring.redis.*`** + `RedisConfig.java` |
 
 ---
 
@@ -40,7 +77,7 @@ docker run -d \
   redis-server /usr/local/etc/redis/redis.conf
 ```
 
-- 컨테이너를 지워도 **호스트 볼륨**에 RDB/AOF가 남으면 데이터 유지 가능  
+- 컨테이너를 지워도 **호스트 볼륨**에 RDB/AOF가 남으면 데이터 유지 가능
 - Redis를 끈 상태에서 Spring만 띄우면 캐시·알림 등 Redis 사용 구간에서 오류 날 수 있음 → **Redis 먼저 기동** 권장
 
 ### Spring Boot 연동
@@ -67,21 +104,24 @@ spring.redis.password=${REDIS_PASSWORD:실제비밀번호}
 
 ## 향후 계획: Dockerfile · Compose · CI/CD
 
-1. **Dockerfile (백엔드)**  
-   - 레포 루트에 `build.gradle`, `settings.gradle`, `gradle/`, `backend/` 구조에 맞게 복사 후 `./gradlew bootJar` 등으로 JAR 생성  
-   - 런타임은 JDK 17 이미지 등  
-   - 이 레포는 소스가 `backend/main/java`에 있으므로 예전 문서의 `COPY backend/` 만으로는 부족할 수 있음 → **루트 기준 Gradle 빌드**로 맞출 것  
+1. **Dockerfile (백엔드)**
 
-2. **docker-compose**  
-   - `mysql`, `redis`, `backend`(빌드한 이미지), 필요 시 `frontend`·`nginx`  
-   - 컨테이너 간 통신 시 DB/Redis 호스트명은 `localhost`가 아니라 **서비스 이름**  
+   - 레포 루트에 `build.gradle`, `settings.gradle`, `gradle/`, `backend/` 구조에 맞게 복사 후 `./gradlew bootJar` 등으로 JAR 생성
+   - 런타임은 JDK 17 이미지 등
+   - 이 레포는 소스가 `backend/main/java`에 있으므로 예전 문서의 `COPY backend/` 만으로는 부족할 수 있음 → **루트 기준 Gradle 빌드**로 맞출 것
 
-3. **GitHub Actions**  
-   - 테스트·빌드 후 이미지 푸시, 서버에서 `docker compose pull && up` 등 — 상세는 [03-cicd-pipeline.md](./03-cicd-pipeline.md)  
-   - **이미지·Compose 파일이 레포에 생긴 뒤** 워크플로의 빌드·배포 단계를 연결하는 것이 자연스러움  
+2. **docker-compose**
 
-4. **환경 변수**  
-   - 배포 시 비밀번호·JWT 등은 GitHub Secrets + 서버 `.env` 등으로 분리 — [05-environment-variables.md](./05-environment-variables.md)  
+   - `mysql`, `redis`, `backend`(빌드한 이미지), 필요 시 `frontend`·`nginx`
+   - 컨테이너 간 통신 시 DB/Redis 호스트명은 `localhost`가 아니라 **서비스 이름**
+
+3. **GitHub Actions**
+
+   - 테스트·빌드 후 이미지 푸시, 서버에서 `docker compose pull && up` 등 — 상세는 [03-cicd-pipeline.md](./03-cicd-pipeline.md)
+   - **이미지·Compose 파일이 레포에 생긴 뒤** 워크플로의 빌드·배포 단계를 연결하는 것이 자연스러움
+
+4. **환경 변수**
+   - 배포 시 비밀번호·JWT 등은 GitHub Secrets + 서버 `.env` 등으로 분리 — [05-environment-variables.md](./05-environment-variables.md)
 
 ---
 
@@ -100,5 +140,5 @@ docker compose down -v   # 볼륨까지 삭제 시 데이터 초기화 주의
 
 ## 다음 문서
 
-1. [CI/CD 파이프라인](./03-cicd-pipeline.md)  
+1. [CI/CD 파이프라인](./03-cicd-pipeline.md)
 2. [Nginx 설정](./04-nginx-configuration.md) — 리버스 프록시는 스택 구성 후 적용

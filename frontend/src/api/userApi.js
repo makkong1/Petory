@@ -1,30 +1,8 @@
-import axios from 'axios';
+import { createAuthAxios } from './apiClient';
 import { isDemoMode } from '../mock/isDemoMode';
 import { DEMO_USERS } from '../mock/demoData';
 
-const BASE_URL = 'http://localhost:8080/api/admin/users';
-
-const getToken = () => {
-  return localStorage.getItem('accessToken') || localStorage.getItem('token');
-};
-
-const api = axios.create({
-  baseURL: BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-api.interceptors.request.use(
-  (config) => {
-    const token = getToken();
-    if (token && !config.headers.Authorization) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
+const api = createAuthAxios('http://localhost:8080/api/admin/users');
 
 const mockResolve = (data) => Promise.resolve({ data });
 
@@ -82,54 +60,14 @@ export const userApi = {
     isDemoMode() ? mockResolve({}) : api.patch(`/${id}/status`, userData),
 };
 
-// MASTER 전용: ADMIN 계정 관리 API
-const masterApi = axios.create({
-  baseURL: 'http://localhost:8080/api/master/admin-users',
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-// 요청 인터셉터 - 모든 요청에 토큰 자동 추가
-masterApi.interceptors.request.use(
-  (config) => {
-    const token = getToken();
-    if (token && !config.headers.Authorization) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
+const masterApi = createAuthAxios('http://localhost:8080/api/master/admin-users');
 
 export const adminUserApi = {
   // 일반 사용자를 ADMIN으로 승격
   promoteToAdmin: (id) => masterApi.patch(`/${id}/promote-to-admin`),
 };
 
-// 일반 사용자용 프로필 API
-const profileApi = axios.create({
-  baseURL: 'http://localhost:8080/api/users',
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-// 요청 인터셉터 - 모든 요청에 토큰 자동 추가
-profileApi.interceptors.request.use(
-  (config) => {
-    const token = getToken();
-    if (token && !config.headers.Authorization) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
+const profileApi = createAuthAxios('http://localhost:8080/api/users');
 
 export const userProfileApi = {
   // 자신의 프로필 조회
@@ -181,27 +119,7 @@ export const userProfileApi = {
     profileApi.get('/email/verify/pre-registration/check', { params: { email } }),
 };
 
-// 펫 관리 API
-const petApi = axios.create({
-  baseURL: 'http://localhost:8080/api/pets',
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-// 요청 인터셉터 - 모든 요청에 토큰 자동 추가
-petApi.interceptors.request.use(
-  (config) => {
-    const token = getToken();
-    if (token && !config.headers.Authorization) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
+const petApi = createAuthAxios('http://localhost:8080/api/pets');
 
 export const petApiClient = {
   // 자신의 펫 목록 조회

@@ -1,29 +1,7 @@
-import axios from 'axios';
+import { createAuthAxios } from './apiClient';
 import { isDemoMode } from '../mock/isDemoMode';
 
-const BASE_URL = 'http://localhost:8080/api/boards';
-
-const getToken = () => {
-  return localStorage.getItem('accessToken') || localStorage.getItem('token');
-};
-
-const api = axios.create({
-  baseURL: BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-api.interceptors.request.use(
-  (config) => {
-    const token = getToken();
-    if (token && !config.headers.Authorization) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
+const api = createAuthAxios('http://localhost:8080/api/boards');
 
 const mockResolve = (data) => Promise.resolve({ data });
 

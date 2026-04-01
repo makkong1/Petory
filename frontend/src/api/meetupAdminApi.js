@@ -1,21 +1,6 @@
-import axios from 'axios';
+import { createAuthAxios } from './apiClient';
 
-const BASE_URL = 'http://localhost:8080/api/admin/meetups';
-
-const getToken = () => localStorage.getItem('accessToken') || localStorage.getItem('token');
-
-const api = axios.create({
-    baseURL: BASE_URL,
-    headers: { 'Content-Type': 'application/json' },
-});
-
-api.interceptors.request.use((config) => {
-    const token = getToken();
-    if (token && !config.headers.Authorization) {
-        config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-});
+const api = createAuthAxios('http://localhost:8080/api/admin/meetups');
 
 export const meetupAdminApi = {
     listMeetups: (params) => api.get('', { params }),
