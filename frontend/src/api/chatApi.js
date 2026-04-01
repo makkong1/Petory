@@ -1,47 +1,7 @@
-import axios from 'axios';
+import { createAuthAxios } from './apiClient';
 import { missingPetApi } from './missingPetApi';
 
-const BASE_URL = 'http://localhost:8080/api/chat';
-
-const api = axios.create({
-  baseURL: BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-// 토큰 가져오기
-const getToken = () => {
-  return localStorage.getItem('accessToken') || localStorage.getItem('token');
-};
-
-// 요청 인터셉터 - 모든 요청에 토큰 자동 추가
-api.interceptors.request.use(
-  (config) => {
-    const token = getToken();
-    if (token && !config.headers.Authorization) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
-
-// 응답 인터셉터
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      // 인증 실패 시 로그인 페이지로 리다이렉트
-      if (window.redirectToLogin) {
-        window.redirectToLogin();
-      }
-    }
-    return Promise.reject(error);
-  }
-);
+const api = createAuthAxios('http://localhost:8080/api/chat');
 
 // ==================== Conversation API ====================
 

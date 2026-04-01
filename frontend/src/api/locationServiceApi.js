@@ -1,36 +1,9 @@
-import axios from 'axios';
+import { createAuthAxios } from './apiClient';
 import { isDemoMode } from '../mock/isDemoMode';
 import { DEMO_LOCATION_SERVICES } from '../mock/demoData';
 
-const BASE_URL = 'http://localhost:8080/api/location-services';
-
-const getToken = () => {
-  return localStorage.getItem('accessToken') || localStorage.getItem('token');
-};
-
-const api = axios.create({
-  baseURL: BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-const addAuthToken = (config) => {
-  const token = getToken();
-  if (token && !config.headers.Authorization) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-};
-
-api.interceptors.request.use(addAuthToken, (error) => Promise.reject(error));
-
-const adminApi = axios.create({
-  baseURL: 'http://localhost:8080/api/admin/location-services',
-  headers: { 'Content-Type': 'application/json' },
-});
-
-adminApi.interceptors.request.use(addAuthToken, (error) => Promise.reject(error));
+const api = createAuthAxios('http://localhost:8080/api/location-services');
+const adminApi = createAuthAxios('http://localhost:8080/api/admin/location-services');
 
 const mockResolve = (data) => Promise.resolve({ data });
 

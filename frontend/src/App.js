@@ -20,9 +20,6 @@ import MeetupPage from './components/Meetup/MeetupPage';
 import ChatWidget from './components/Chat/ChatWidget';
 import EmailVerificationPage from './components/Auth/EmailVerificationPage';
 import EmailVerificationPrompt from './components/Common/EmailVerificationPrompt.js';
-import { setupApiInterceptors } from './api/authApi';
-
-
 function AppContent() {
   const { user, loading, isAuthenticated } = useAuth();
   const [activeTab, setActiveTab] = useState('home');
@@ -98,13 +95,6 @@ function AppContent() {
     return () => {
       delete window.setActiveTab;
     };
-  }, []);
-
-  // API 인터셉터 설정 (앱 시작 시 한 번만)
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setupApiInterceptors();
-    }
   }, []);
 
   // OAuth2 콜백 페이지 체크 (useState로 관리)

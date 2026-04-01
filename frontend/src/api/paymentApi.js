@@ -1,50 +1,27 @@
-import axios from 'axios';
+import { API_ROOT, createAuthAxios } from './apiClient';
 
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8080/api';
-
-// 토큰을 헤더에 추가하는 함수
-const getAuthHeaders = () => {
-  const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
-  return {
-    'Content-Type': 'application/json',
-    ...(token && { Authorization: `Bearer ${token}` }),
-  };
-};
+const api = createAuthAxios(API_ROOT);
 
 export const paymentApi = {
-  // 코인 잔액 조회
   getBalance: async () => {
-    const response = await axios.get(`${API_BASE_URL}/payment/balance`, {
-      headers: getAuthHeaders(),
-    });
+    const response = await api.get('/payment/balance');
     return response.data;
   },
 
-  // 거래 내역 조회 (Page 응답: content, totalElements, totalPages 등)
   getTransactions: async (page = 0, size = 20) => {
-    const response = await axios.get(`${API_BASE_URL}/payment/transactions`, {
+    const response = await api.get('/payment/transactions', {
       params: { page, size },
-      headers: getAuthHeaders(),
     });
-    return response.data; // { content: [...], totalElements, totalPages, ... }
-  },
-
-  // 거래 상세 조회 (상대방 정보 포함)
-  getTransactionDetail: async (transactionId) => {
-    const response = await axios.get(
-      `${API_BASE_URL}/payment/transactions/${transactionId}`,
-      { headers: getAuthHeaders() }
-    );
     return response.data;
   },
 
-  // 코인 충전 (테스트용 - 개발 환경에서만)
+  getTransactionDetail: async (transactionId) => {
+    const response = await api.get(`/payment/transactions/${transactionId}`);
+    return response.data;
+  },
+
   chargeCoins: async (amount, description) => {
-    const response = await axios.post(
-      `${API_BASE_URL}/payment/charge`,
-      { amount, description },
-      { headers: getAuthHeaders() }
-    );
+    const response = await api.post('/payment/charge', { amount, description });
     return response.data;
   },
 };
