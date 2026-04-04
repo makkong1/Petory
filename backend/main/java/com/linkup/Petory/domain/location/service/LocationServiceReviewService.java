@@ -1,28 +1,27 @@
 package com.linkup.Petory.domain.location.service;
 
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.linkup.Petory.domain.location.converter.LocationServiceReviewConverter;
 import com.linkup.Petory.domain.location.dto.LocationServiceReviewDTO;
-import com.linkup.Petory.domain.location.exception.LocationReviewAlreadyDeletedException;
-import com.linkup.Petory.domain.location.exception.LocationReviewDuplicateException;
-import com.linkup.Petory.domain.location.exception.LocationServiceNotFoundException;
-import com.linkup.Petory.domain.location.exception.LocationServiceReviewNotFoundException;
 import com.linkup.Petory.domain.location.entity.LocationService;
 import com.linkup.Petory.domain.location.entity.LocationServiceReview;
+import com.linkup.Petory.domain.location.exception.LocationReviewAlreadyDeletedException;
+import com.linkup.Petory.domain.location.exception.LocationServiceNotFoundException;
+import com.linkup.Petory.domain.location.exception.LocationServiceReviewNotFoundException;
 import com.linkup.Petory.domain.location.repository.LocationServiceRepository;
 import com.linkup.Petory.domain.location.repository.LocationServiceReviewRepository;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException;
-import com.linkup.Petory.domain.user.exception.UserNotFoundException;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
-import java.util.Optional;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
