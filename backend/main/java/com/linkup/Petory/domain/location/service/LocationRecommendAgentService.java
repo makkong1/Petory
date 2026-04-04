@@ -12,6 +12,7 @@ import java.util.stream.Collectors;
 
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.ollama.api.OllamaOptions;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -45,7 +46,8 @@ public class LocationRecommendAgentService {
         너는 반려동물과 함께 가기 좋은 장소를 추천하는 AI다.
         다음 장소 목록에서 상위 10개를 추천 순서로 정렬하고, 각 장소별 1줄 추천 이유를 한국어로 달아라.
         고려 기준(중요도 순): 1) 거리(가까울수록) 2) 반려동물 친화 3) 평점 4) 리뷰 수 5) 카테고리.
-        JSON만 한 줄로 출력해라. 형식: {"recommendations":[{"idx":숫자,"reason":"이유"},...]}
+        반드시 서두·설명·마크다운·영어 문장 없이, 출력 전체가 JSON 객체 하나여야 한다. 첫 글자는 { 이고 마지막 글자는 } 이다.
+        형식: {"recommendations":[{"idx":숫자,"reason":"이유"},...]}
         """;
 
     /**
@@ -68,8 +70,12 @@ public class LocationRecommendAgentService {
 
         try {
             String userMessage = buildPlaceList(candidates);
+            OllamaOptions options = OllamaOptions.builder()
+                    .numPredict(1024)
+                    .temperature(0.2)
+                    .build();
             String response = CompletableFuture
-                    .supplyAsync(() -> chatModel.call(new Prompt(SYSTEM_PROMPT + "\n\n" + userMessage))
+                    .supplyAsync(() -> chatModel.call(new Prompt(SYSTEM_PROMPT + "\n\n" + userMessage, options))
                             .getResult()
                             .getOutput()
                             .getText())
@@ -111,7 +117,82 @@ public class LocationRecommendAgentService {
                     .append(" reviewCount:").append(dto.getReviewCount() != null ? dto.getReviewCount() : 0)
                     .append("\n");
         }
-        sb.append("\n위 목록에서 상위 10개를 JSON으로 출력해라.");
+        sb.append("\n위 목록에서 상위 10개만 담은 JSON만 출력해라. 다른 문장은 쓰지 마라.");
+        return sb.toString();
+    }
+
+    /**
+     * 모델이 "Here is ..." 등 서두를 붙이거나 코드 펜스를 쓴 경우, 파싱 가능한 JSON 객체 문자열만 잘라낸다.
+     */
+    private String extractJsonObject(String raw) {
+        if (raw == null) {
+            return "";
+        }
+        String t = raw.trim();
+        if (t.contains("```")) {
+            int open = t.indexOf("```");
+            int lineAfterOpen = t.indexOf('\n', open);
+            int contentStart = lineAfterOpen >= 0 ? lineAfterOpen + 1 : open + 3;
+            int close = t.indexOf("```", contentStart);
+            if (close > contentStart) {
+                t = t.substring(contentStart, close).trim();
+            }
+        }
+        int start = t.indexOf('{');
+        int end = t.lastIndexOf('}');
+        if (start >= 0 && end > start) {
+            return t.substring(start, end + 1);
+        }
+        return t;
+    }
+
+    /**
+     * JSON 파싱을 시도하고, 실패하면 잘린 JSON을 닫아서 재시도한다.
+     * 예: {"recommendations":[{"idx":1,"reason":"좋음"}  →  ]}  추가
+     */
+    private JsonNode tryParseJson(String json) {
+        try {
+            return objectMapper.readTree(json);
+        } catch (Exception first) {
+            // 잘린 JSON 복구: 열린 배열/객체를 닫는 시도
+            try {
+                String repaired = repairTruncatedJson(json);
+                JsonNode node = objectMapper.readTree(repaired);
+                log.warn("[AI추천] 잘린 JSON 복구 성공");
+                return node;
+            } catch (Exception second) {
+                log.warn("[AI추천] JSON 파싱 실패 (복구 불가): {}", first.getMessage());
+                return null;
+            }
+        }
+    }
+
+    /**
+     * 잘린 JSON에서 열린 괄호/중괄호를 닫아 최소한으로 복구한다.
+     */
+    private String repairTruncatedJson(String json) {
+        // 마지막 완전한 객체 항목 직후에서 자르기: '}' 를 기준으로 마지막 온전한 항목까지만 사용
+        int lastComplete = json.lastIndexOf('}');
+        String trimmed = lastComplete >= 0 ? json.substring(0, lastComplete + 1) : json;
+
+        // 열린 괄호 스택 계산
+        int curly = 0;
+        int square = 0;
+        boolean inString = false;
+        for (int i = 0; i < trimmed.length(); i++) {
+            char c = trimmed.charAt(i);
+            if (c == '"' && (i == 0 || trimmed.charAt(i - 1) != '\\')) inString = !inString;
+            if (!inString) {
+                if (c == '{') curly++;
+                else if (c == '}') curly--;
+                else if (c == '[') square++;
+                else if (c == ']') square--;
+            }
+        }
+
+        StringBuilder sb = new StringBuilder(trimmed);
+        for (int i = 0; i < square; i++) sb.append(']');
+        for (int i = 0; i < curly; i++) sb.append('}');
         return sb.toString();
     }
 
@@ -120,16 +201,12 @@ public class LocationRecommendAgentService {
                 .collect(Collectors.toMap(LocationServiceDTO::getIdx, dto -> dto, (a, b) -> a, LinkedHashMap::new));
 
         try {
-            String json = response.trim();
-            if (json.contains("```")) {
-                int start = json.indexOf('{');
-                int end = json.lastIndexOf('}') + 1;
-                if (start >= 0 && end > start) {
-                    json = json.substring(start, end);
-                }
+            String json = extractJsonObject(response);
+            JsonNode root = tryParseJson(json);
+            if (root == null) {
+                return candidates.stream().limit(MAX_RECOMMEND).toList();
             }
 
-            JsonNode root = objectMapper.readTree(json);
             JsonNode recs = root.get("recommendations");
             if (recs == null || !recs.isArray()) {
                 return candidates.stream().limit(MAX_RECOMMEND).toList();
