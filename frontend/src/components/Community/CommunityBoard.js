@@ -1251,10 +1251,15 @@ const PostCard = styled.div.withConfig({
   background-image: linear-gradient(135deg, ${(props) =>
     props.theme.colors.surface} 0%, ${(props) => props.theme.colors.surfaceElevated} 100%);
 
-  /* 대형 카드: 전체 너비 (12칸) */
+  /* 대형 카드: 전체 너비 (12칸) — 태블릿(4열 그리드)에서는 span 4로 맞춤 */
   ${(props) => props.size === 'large' && `
     grid-column: span 12;
     min-height: 350px;
+
+    @media (max-width: 1024px) {
+      grid-column: span 4;
+      min-height: 320px;
+    }
   `}
 
   /* 중간 카드: PC에서 6칸 (2개씩), Tablet에서 2칸 (2개씩) */

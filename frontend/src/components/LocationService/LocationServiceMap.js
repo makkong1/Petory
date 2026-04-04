@@ -399,6 +399,7 @@ const LocationServiceMap = () => {
   const [pendingSearchLocation, setPendingSearchLocation] = useState(null); // 대기 중인 검색 위치
   const [showSearchButton, setShowSearchButton] = useState(false); // "이 지역 검색" 버튼 표시 여부
   const [loadingRecommend, setLoadingRecommend] = useState(false); // AI 추천 로딩
+  const [recommendedServiceIdxs, setRecommendedServiceIdxs] = useState(null); // Map<idx, rank> | null
 
   // 리뷰 조회
   const fetchReviews = useCallback(async (serviceIdx) => {
@@ -882,6 +883,8 @@ const LocationServiceMap = () => {
       latestRequestRef.current = requestId;
 
       dispatchUI({ type: 'SET_UI', payload: { loading: true, statusMessage: '데이터 불러오는 중...', error: null } });
+      // 일반 검색 시 AI 추천 강조 초기화
+      setRecommendedServiceIdxs(null);
 
       const effectiveCategoryType = categoryOverride ?? categoryType;
       const apiCategory = effectiveCategoryType &&
@@ -1617,14 +1620,17 @@ const LocationServiceMap = () => {
         );
       }
 
+      const recommendRank = recommendedServiceIdxs?.get(service.idx ?? service.externalId) ?? null;
+
       return {
         ...service,
         key: service.externalId || service.placeUrl || `${service.latitude}-${service.longitude}-${index}`,
         distance,
         distanceLabel: formatDistance(distance),
+        recommendRank,
       };
     });
-  }, [services, userLocation]);
+  }, [services, userLocation, recommendedServiceIdxs]);
 
   const handleServiceSelect = useCallback((service) => {
     dispatchUI({ type: 'SET_SELECTED_SERVICE', payload: service });
@@ -1718,6 +1724,11 @@ const LocationServiceMap = () => {
       const recommended = response.data?.services || [];
       setAllServices(recommended);
       setServices(recommended);
+      // 순위 Map 생성: idx → rank (1-based)
+      const rankMap = new Map(
+        recommended.map((svc, i) => [svc.idx ?? svc.externalId, i + 1])
+      );
+      setRecommendedServiceIdxs(rankMap);
       dispatchRegion({ type: 'RESET_REGION' });
       dispatchUI({ type: 'SET_STATUS_MESSAGE', payload: `AI가 추천한 ${recommended.length}개의 장소입니다.` });
     } catch (err) {
@@ -2586,9 +2597,9 @@ const LocationServiceMap = () => {
                 externalId: selectedService.externalId,
                 latitude: selectedService.latitude,
                 longitude: selectedService.longitude,
-                longitude: selectedService.longitude,
               } : null}
               hoveredService={hoveredService}
+              recommendedServiceIdxs={recommendedServiceIdxs}
             />
           </MapSection>
         )}
@@ -2640,9 +2651,16 @@ const LocationServiceMap = () => {
                 >
                   <ServiceListItemHeader>
                     <ServiceListItemName>{service.name}</ServiceListItemName>
-                    {service.distanceLabel && (
-                      <ServiceDistance>{service.distanceLabel}</ServiceDistance>
-                    )}
+                    <ServiceListItemMeta>
+                      {service.recommendRank != null && (
+                        <RecommendRankBadge rank={service.recommendRank}>
+                          {service.recommendRank === 1 ? '🥇' : service.recommendRank === 2 ? '🥈' : service.recommendRank === 3 ? '🥉' : `#${service.recommendRank}`}
+                        </RecommendRankBadge>
+                      )}
+                      {service.distanceLabel && (
+                        <ServiceDistance>{service.distanceLabel}</ServiceDistance>
+                      )}
+                    </ServiceListItemMeta>
                   </ServiceListItemHeader>
                   {service.category && (
                     <ServiceListItemCategory>{service.category}</ServiceListItemCategory>
@@ -3198,7 +3216,7 @@ const ServiceListItem = styled.div.withConfig({
 const ServiceListItemHeader = styled.div`
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   margin-bottom: 0.35rem;
 `;
 
@@ -3207,6 +3225,26 @@ const ServiceListItemName = styled.div`
   font-size: 1rem;
   margin-bottom: 0.5rem;
   color: ${props => props.theme.colors.text};
+  flex: 1;
+`;
+
+const ServiceListItemMeta = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.2rem;
+  flex-shrink: 0;
+  margin-left: 0.5rem;
+`;
+
+const RecommendRankBadge = styled.span`
+  font-size: ${props => props.rank <= 3 ? '1.1rem' : '0.78rem'};
+  font-weight: 700;
+  color: ${props => props.rank <= 3 ? 'inherit' : '#F5A623'};
+  background: ${props => props.rank <= 3 ? 'transparent' : 'rgba(245,166,35,0.12)'};
+  border-radius: 4px;
+  padding: ${props => props.rank <= 3 ? '0' : '1px 5px'};
+  line-height: 1;
 `;
 
 const ServiceDistance = styled.span`
