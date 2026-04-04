@@ -2566,6 +2566,15 @@ const LocationServiceMap = () => {
       )}
 
       <MapArea>
+        {loadingRecommend && (
+          <RecommendLoadingOverlay>
+            <RecommendLoadingBox>
+              <RecommendSpinner />
+              <RecommendLoadingTitle>AI가 장소를 분석하는 중...</RecommendLoadingTitle>
+              <RecommendLoadingDesc>반려동물과 함께 가기 좋은 곳을 찾고 있어요</RecommendLoadingDesc>
+            </RecommendLoadingBox>
+          </RecommendLoadingOverlay>
+        )}
         {mapCenter && (
           <MapSection>
             {/* "이 지역 검색" 버튼 */}
@@ -3123,6 +3132,59 @@ const MapSection = styled.div`
     position: absolute;
     z-index: 2000;
   }
+`;
+
+const RecommendLoadingOverlay = styled.div`
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(2px);
+`;
+
+const RecommendLoadingBox = styled.div`
+  background: ${props => props.theme.colors.surface};
+  border-radius: 16px;
+  padding: 2rem 2.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+  min-width: 220px;
+`;
+
+const spin = `
+  @keyframes ai-spin {
+    to { transform: rotate(360deg); }
+  }
+`;
+
+const RecommendSpinner = styled.div`
+  ${spin}
+  width: 44px;
+  height: 44px;
+  border: 4px solid ${props => props.theme.colors.border || '#e0e0e0'};
+  border-top-color: #F5A623;
+  border-radius: 50%;
+  animation: ai-spin 0.8s linear infinite;
+`;
+
+const RecommendLoadingTitle = styled.p`
+  font-size: 1rem;
+  font-weight: 700;
+  color: ${props => props.theme.colors.text};
+  margin: 0;
+`;
+
+const RecommendLoadingDesc = styled.p`
+  font-size: 0.85rem;
+  color: ${props => props.theme.colors.textSecondary};
+  margin: 0;
+  text-align: center;
 `;
 
 // MapWrapper, LoadingOverlay 제거됨 (지도 미사용)
