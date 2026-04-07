@@ -13,7 +13,9 @@ import com.linkup.Petory.domain.user.entity.Users;
  * 평점(1-5)과 리뷰 내용을 포함하며, 제공자의 평균 평점 계산에 사용됩니다.
  */
 @Entity
-@Table(name = "carereview")
+@Table(name = "carereview", uniqueConstraints = {
+        @UniqueConstraint(columnNames = { "care_application_idx" })
+})
 @Getter
 @Setter
 @NoArgsConstructor

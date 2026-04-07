@@ -6,7 +6,9 @@ import com.linkup.Petory.domain.common.BaseTimeEntity;
 import com.linkup.Petory.domain.user.entity.Users;
 
 @Entity
-@Table(name = "locationservicereview")
+@Table(name = "locationservicereview", uniqueConstraints = {
+        @UniqueConstraint(columnNames = { "service_idx", "user_idx" })
+})
 @Getter
 @Setter
 @NoArgsConstructor
