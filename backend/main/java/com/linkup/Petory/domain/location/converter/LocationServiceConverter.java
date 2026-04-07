@@ -59,7 +59,7 @@ public class LocationServiceConverter {
         // category3, category2, category1 순서로 카테고리 결정
         String categoryValue = dto.getCategory3() != null ? dto.getCategory3()
                 : dto.getCategory2() != null ? dto.getCategory2()
-                        : dto.getCategory1() != null ? dto.getCategory1() : dto.getCategory();
+                : dto.getCategory1() != null ? dto.getCategory1() : dto.getCategory();
 
         return LocationService.builder()
                 .idx(dto.getIdx())
@@ -67,8 +67,7 @@ public class LocationServiceConverter {
                 // category 필드 제거됨
                 .category1(dto.getCategory1())
                 .category2(dto.getCategory2())
-                .category3(dto.getCategory3() != null ? dto.getCategory3() : dto.getCategory()) // category를 category3에
-                                                                                                // 저장
+                .category3(dto.getCategory3() != null ? dto.getCategory3() : dto.getCategory()) // category를 category3에 저장
                 .sido(dto.getSido())
                 .sigungu(dto.getSigungu())
                 .eupmyeondong(dto.getEupmyeondong())

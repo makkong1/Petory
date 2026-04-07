@@ -14,7 +14,9 @@ import com.linkup.Petory.domain.user.entity.Users;
  * 하나의 요청에는 여러 지원이 가능하지만, 일반적으로 1명만 ACCEPTED 상태가 됩니다.
  */
 @Entity
-@Table(name = "careapplication")
+@Table(name = "careapplication", uniqueConstraints = {
+        @UniqueConstraint(columnNames = { "care_request_idx", "provider_idx" })
+})
 @Getter
 @Setter
 @NoArgsConstructor
