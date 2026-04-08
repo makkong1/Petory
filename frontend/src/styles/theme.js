@@ -7,6 +7,7 @@ export const lightTheme = {
     secondary: '#4A90E2',
     background: '#FFFFFF',
     surface: '#F8F9FA',
+    surfaceSoft: '#F0F2F5',
     surfaceElevated: '#F8F9FA',
     surfaceHover: '#F1F3F4',
     text: '#212121',
@@ -14,13 +15,40 @@ export const lightTheme = {
     textLight: '#9E9E9E',
     border: '#E0E0E0',
     borderLight: '#F5F5F5',
+    borderDark: '#BDBDBD',
     success: '#4CAF50',
+    successDark: '#388E3C',
     warning: '#FF9800',
+    warningDark: '#F57C00',
     error: '#F44336',
+    errorDark: '#D32F2F',
+    info: '#2196F3',
+    infoDark: '#1565C0',
     shadow: 'rgba(0, 0, 0, 0.1)',
     shadowHover: 'rgba(0, 0, 0, 0.15)',
     gradient: 'linear-gradient(135deg, #FF7E36 0%, #FF9558 100%)',
     overlay: 'rgba(0, 0, 0, 0.5)',
+    // 상태 배지 색상
+    status: {
+      missing: '#ef4444',
+      found: '#10b981',
+      resolved: '#6366f1',
+      recruiting: '#4CAF50',
+      closed: '#FF9800',
+      completed: '#9E9E9E',
+      cancelled: '#F44336',
+      open: '#4A90E2',
+      inProgress: '#FF7E36',
+    },
+  },
+  // 차트 색상 팔레트
+  chart: ['#FF7E36', '#4A90E2', '#4CAF50', '#FF9800', '#9C27B0', '#00BCD4', '#F44336', '#FFB74D'],
+  // 그림자 토큰
+  shadows: {
+    sm: '0 2px 4px rgba(0,0,0,0.08)',
+    md: '0 4px 12px rgba(0,0,0,0.12)',
+    lg: '0 8px 24px rgba(0,0,0,0.15)',
+    xl: '0 12px 40px rgba(15,23,42,0.2)',
   },
   spacing: {
     xs: '4px',
@@ -54,23 +82,44 @@ export const darkTheme = {
     primaryDark: '#E86B2A',
     primaryLight: '#FF9558',
     secondary: '#64B5F6',
-    background: '#1A1A1A', // 더 밝게
-    surface: '#2D2D2D', // 더 밝게
-    surfaceElevated: '#363636', // 다크 모드용 elevated 배경
-    surfaceHover: '#3A3A3A', // 더 밝게
-    text: '#F5F5F5', // 더 밝게
-    textSecondary: '#C5C5C5', // 더 밝게
-    textLight: '#A0A0A0', // 더 밝게
-    border: '#404040', // 더 밝게
-    borderLight: '#363636', // 더 밝게
+    background: '#1A1A1A',
+    surface: '#2D2D2D',
+    surfaceSoft: '#262626',
+    surfaceElevated: '#363636',
+    surfaceHover: '#3A3A3A',
+    text: '#F5F5F5',
+    textSecondary: '#C5C5C5',
+    textLight: '#A0A0A0',
+    border: '#505050',
+    borderLight: '#404040',
+    borderDark: '#666666',
     success: '#66BB6A',
+    successDark: '#43A047',
     warning: '#FFB74D',
+    warningDark: '#FB8C00',
     error: '#EF5350',
+    errorDark: '#E53935',
+    info: '#42A5F5',
+    infoDark: '#1E88E5',
     shadow: 'rgba(0, 0, 0, 0.4)',
     shadowHover: 'rgba(0, 0, 0, 0.5)',
     gradient: 'linear-gradient(135deg, #FF7E36 0%, #FF9558 100%)',
     overlay: 'rgba(0, 0, 0, 0.7)',
+    // 상태 배지 색상 (다크모드)
+    status: {
+      missing: '#f87171',
+      found: '#34d399',
+      resolved: '#818cf8',
+      recruiting: '#66BB6A',
+      closed: '#FFB74D',
+      completed: '#9E9E9E',
+      cancelled: '#EF5350',
+      open: '#64B5F6',
+      inProgress: '#FF9558',
+    },
   },
+  chart: lightTheme.chart,
+  shadows: lightTheme.shadows,
   spacing: lightTheme.spacing,
   borderRadius: lightTheme.borderRadius,
   typography: lightTheme.typography,

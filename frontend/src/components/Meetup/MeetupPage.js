@@ -2428,7 +2428,7 @@ const InfoText = styled.div`
 const ErrorText = styled.div`
   margin-top: 0.25rem;
   font-size: 0.85rem;
-  color: #e74c3c;
+  color: ${props => props.theme.colors.error};
 `;
 
 const ButtonGroup = styled.div`

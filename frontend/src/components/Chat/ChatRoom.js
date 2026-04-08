@@ -33,12 +33,20 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
   const [submittingReview, setSubmittingReview] = useState(false);
   const [hasReview, setHasReview] = useState(false);
   const [gettingLocation, setGettingLocation] = useState(false);
+  const [toast, setToast] = useState(null); // { message, type: 'success' | 'error' }
+  const toastTimerRef = useRef(null);
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
   const stompClientRef = useRef(null);
   const messageInputRef = useRef(null);
   const fileInputRef = useRef(null);
   const menuRef = useRef(null);
+
+  const showToast = (message, type = 'error') => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast({ message, type });
+    toastTimerRef.current = setTimeout(() => setToast(null), 3500);
+  };
 
   // 메시지 목록 조회
   const fetchMessages = async () => {
@@ -59,7 +67,7 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
       }
     } catch (error) {
       console.error('메시지 조회 실패:', error);
-      alert('메시지를 불러오는데 실패했습니다.');
+      showToast('메시지를 불러오는데 실패했습니다.');
     } finally {
       setLoading(false);
     }
@@ -211,7 +219,7 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
 
     // 이미지 파일만 허용
     if (!file.type.startsWith('image/')) {
-      alert('이미지 파일만 업로드할 수 있습니다.');
+      showToast('이미지 파일만 업로드할 수 있습니다.');
       return;
     }
 
@@ -251,7 +259,7 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
       }
     } catch (error) {
       console.error('이미지 업로드 실패:', error);
-      alert(error.response?.data?.error || '이미지 업로드에 실패했습니다.');
+      showToast(error.response?.data?.error || '이미지 업로드에 실패했습니다.');
     } finally {
       setUploadingImage(false);
       // 파일 입력 초기화
@@ -295,7 +303,7 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
       }
     } catch (error) {
       console.error('메시지 전송 실패:', error);
-      alert(error.response?.data?.error || '메시지 전송에 실패했습니다.');
+      showToast(error.response?.data?.error || '메시지 전송에 실패했습니다.');
       setMessageInput(content); // 실패 시 입력 내용 복원
     } finally {
       setSending(false);
@@ -352,7 +360,7 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
 
     try {
       await leaveConversation(conversationIdx, user.idx);
-      alert('채팅방에서 나갔습니다.');
+      showToast('채팅방에서 나갔습니다.', 'success');
       if (onAction) {
         onAction();
       } else if (onClose) {
@@ -360,7 +368,7 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
       }
     } catch (error) {
       console.error('채팅방 나가기 실패:', error);
-      alert('채팅방 나가기에 실패했습니다.');
+      showToast('채팅방 나가기에 실패했습니다.');
     }
   };
 
@@ -374,7 +382,7 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
 
     try {
       await deleteConversation(conversationIdx, user.idx);
-      alert('채팅방이 삭제되었습니다.');
+      showToast('채팅방이 삭제되었습니다.', 'success');
       if (onAction) {
         onAction();
       } else if (onClose) {
@@ -382,7 +390,7 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
       }
     } catch (error) {
       console.error('채팅방 삭제 실패:', error);
-      alert('채팅방 삭제에 실패했습니다.');
+      showToast('채팅방 삭제에 실패했습니다.');
     }
   };
 
@@ -400,10 +408,10 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
       setDealConfirmed(true);
       // 채팅방 정보 다시 조회
       await fetchConversation();
-      alert('거래 확정이 완료되었습니다. 상대방도 확정하면 서비스가 시작됩니다.');
+      showToast('거래 확정이 완료되었습니다. 상대방도 확정하면 서비스가 시작됩니다.', 'success');
     } catch (error) {
       console.error('거래 확정 실패:', error);
-      alert(error.response?.data?.error || '거래 확정에 실패했습니다.');
+      showToast(error.response?.data?.error || '거래 확정에 실패했습니다.');
     } finally {
       setConfirmingDeal(false);
     }
@@ -423,10 +431,10 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
       setCareRequestStatus('COMPLETED');
       // 펫케어 요청 정보 다시 조회
       await fetchConversation();
-      alert('펫케어 서비스가 완료되었습니다.');
+      showToast('펫케어 서비스가 완료되었습니다.', 'success');
     } catch (error) {
       console.error('서비스 완료 실패:', error);
-      alert(error.response?.data?.error || '서비스 완료 처리에 실패했습니다.');
+      showToast(error.response?.data?.error || '서비스 완료 처리에 실패했습니다.');
     } finally {
       setCompletingCare(false);
     }
@@ -440,7 +448,7 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
   // 리뷰 작성
   const handleSubmitReview = async () => {
     if (!careRequestData || !user?.idx) {
-      alert('리뷰 작성에 필요한 정보가 없습니다.');
+      showToast('리뷰 작성에 필요한 정보가 없습니다.');
       return;
     }
 
@@ -450,12 +458,12 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
     );
 
     if (!acceptedApplication) {
-      alert('승인된 펫케어 서비스를 찾을 수 없습니다.');
+      showToast('승인된 펫케어 서비스를 찾을 수 없습니다.');
       return;
     }
 
     if (!reviewComment.trim()) {
-      alert('리뷰 내용을 입력해주세요.');
+      showToast('리뷰 내용을 입력해주세요.');
       return;
     }
 
@@ -469,7 +477,7 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
         comment: reviewComment.trim()
       });
 
-      alert('리뷰가 작성되었습니다.');
+      showToast('리뷰가 작성되었습니다.', 'success');
       setShowReviewModal(false);
       setReviewRating(5);
       setReviewComment('');
@@ -478,7 +486,7 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
       await fetchConversation();
     } catch (error) {
       console.error('리뷰 작성 실패:', error);
-      alert(error.response?.data?.error || '리뷰 작성에 실패했습니다.');
+      showToast(error.response?.data?.error || '리뷰 작성에 실패했습니다.');
     } finally {
       setSubmittingReview(false);
     }
@@ -487,7 +495,7 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
   // 내 위치 전송 (주소 텍스트 입력)
   const handleSendLocation = async () => {
     if (!navigator.geolocation) {
-      alert('브라우저가 위치 정보를 지원하지 않습니다.');
+      showToast('브라우저가 위치 정보를 지원하지 않습니다.');
       return;
     }
 
@@ -506,18 +514,18 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
             // 입력창으로 포커스
             messageInputRef.current?.focus();
           } else {
-            alert('주소 정보를 가져오는데 실패했습니다.');
+            showToast('주소 정보를 가져오는데 실패했습니다.');
           }
         } catch (err) {
           console.error('위치 변환 실패:', err);
-          alert('위치 정보를 변환하는데 실패했습니다.');
+          showToast('위치 정보를 변환하는데 실패했습니다.');
         } finally {
           setGettingLocation(false);
         }
       },
       (error) => {
         console.error('위치 권한 에러:', error);
-        alert('위치 정보를 가져올 수 없습니다. 권한을 확인해주세요.');
+        showToast('위치 정보를 가져올 수 없습니다. 권한을 확인해주세요.');
         setGettingLocation(false);
       }
     );
@@ -554,6 +562,11 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
 
   return (
     <Container>
+      {toast && (
+        <ToastNotification type={toast.type}>
+          {toast.message}
+        </ToastNotification>
+      )}
       <Header>
         {onBack && (
           <BackButton onClick={onBack}>←</BackButton>
@@ -1485,3 +1498,26 @@ const ReviewSubmitButton = styled.button`
   }
 `;
 
+
+const ToastNotification = styled.div`
+  position: absolute;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  padding: 10px 20px;
+  border-radius: ${({ theme }) => theme.borderRadius.lg};
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  box-shadow: ${({ theme }) => theme.shadows.md};
+  background: ${({ theme, type }) =>
+    type === 'success' ? theme.colors.success : theme.colors.error};
+  color: #fff;
+  animation: fadeInDown 0.2s ease;
+
+  @keyframes fadeInDown {
+    from { opacity: 0; transform: translateX(-50%) translateY(-8px); }
+    to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
+`;

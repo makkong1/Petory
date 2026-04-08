@@ -159,8 +159,8 @@ const StatusCard = styled.div`
 const Spinner = styled.div`
   width: 50px;
   height: 50px;
-  border: 4px solid #f3f3f3;
-  border-top: 4px solid #007bff;
+  border: 4px solid ${({ theme }) => theme.colors.border};
+  border-top: 4px solid ${({ theme }) => theme.colors.primary};
   border-radius: 50%;
   animation: spin 1s linear infinite;
 
@@ -173,9 +173,9 @@ const Spinner = styled.div`
 const SuccessIcon = styled.div`
   width: 50px;
   height: 50px;
-  border-radius: 50%;
-  background: #28a745;
-  color: white;
+  border-radius: ${({ theme }) => theme.borderRadius.full};
+  background: ${({ theme }) => theme.colors.success};
+  color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -186,9 +186,9 @@ const SuccessIcon = styled.div`
 const ErrorIcon = styled.div`
   width: 50px;
   height: 50px;
-  border-radius: 50%;
-  background: #dc3545;
-  color: white;
+  border-radius: ${({ theme }) => theme.borderRadius.full};
+  background: ${({ theme }) => theme.colors.error};
+  color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -199,10 +199,10 @@ const ErrorIcon = styled.div`
 const Message = styled.p`
   font-size: 1rem;
   text-align: center;
-  color: ${props => {
-    if (props.success) return '#28a745';
-    if (props.error) return '#dc3545';
-    return '#333';
+  color: ${({ theme, success, error }) => {
+    if (success) return theme.colors.success;
+    if (error) return theme.colors.error;
+    return theme.colors.text;
   }};
 `;
 

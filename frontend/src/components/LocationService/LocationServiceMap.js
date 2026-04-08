@@ -450,7 +450,6 @@ const LocationServiceMap = () => {
         // 리뷰 작성
         await locationServiceReviewApi.createReview({
           serviceIdx: selectedService.idx,
-          userIdx: user.idx,
           rating: reviewRating,
           comment: reviewComment.trim(),
         });

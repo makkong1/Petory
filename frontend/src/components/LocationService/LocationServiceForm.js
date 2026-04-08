@@ -308,7 +308,7 @@ const FormTitle = styled.h2`
   margin-bottom: 1rem;
   font-size: 1.16rem;
   font-weight: 700;
-  color: #23242c;
+  color: ${({ theme }) => theme.colors.text};
   letter-spacing: -.5px;
 `;
 const StyledForm = styled.form`
@@ -317,7 +317,7 @@ const StyledForm = styled.form`
   gap: 0.7rem;
 `;
 const FieldGroup = styled.div`
-  color: black;
+  color: ${({ theme }) => theme.colors.text};
   display: flex;
   flex-direction: column;
   gap: 0.22rem;
@@ -328,40 +328,37 @@ const FlexRow = styled.div`
 `;
 const StyledInput = styled.input`
   padding: 0.4rem 0.9rem;
-  border: 1.2px solid #dcdfe3;
-  border-radius: 6px;
+  border: 1.5px solid ${({ theme }) => theme.colors.border};
+  border-radius: ${({ theme }) => theme.borderRadius.md};
   font-size: 0.99rem;
-  color: #212227;
-  background: #fff;
+  color: ${({ theme }) => theme.colors.text};
+  background: ${({ theme }) => theme.colors.background};
   outline: none;
-  transition: border .16s;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
 
-  &::placeholder{
-    color:#bbbbbb;
-    opacity:1;
+  &::placeholder {
+    color: ${({ theme }) => theme.colors.textLight};
+    opacity: 1;
   }
 
   &:focus {
-    border-color:#45a0fe; 
-    background:#fafdff; 
+    border-color: ${({ theme }) => theme.colors.primary};
+    box-shadow: 0 0 0 3px ${({ theme }) => theme.colors.primary}20;
   }
 `;
 const StyledSelect = styled.select`
   padding: 0.4rem 0.9rem;
-  border: 1.2px solid #dcdfe3;
-  border-radius: 6px;
+  border: 1.5px solid ${({ theme }) => theme.colors.border};
+  border-radius: ${({ theme }) => theme.borderRadius.md};
   font-size: 0.98rem;
-  color: #212227;
-  background: #fff;
+  color: ${({ theme }) => theme.colors.text};
+  background: ${({ theme }) => theme.colors.background};
   outline: none;
-  
-  &::placeholder{
-   color: #bbbbbb;
-  }
+  cursor: pointer;
 
-  &:focus{
-    border-color:#45a0fe;
-    background:#fafdff;
+  &:focus {
+    border-color: ${({ theme }) => theme.colors.primary};
+    box-shadow: 0 0 0 3px ${({ theme }) => theme.colors.primary}20;
   }
 `;
 const ButtonRow = styled.div`
@@ -371,61 +368,66 @@ const ButtonRow = styled.div`
   margin-top: .2rem;
 `;
 const SubmitBtn = styled.button`
-  background: #2788eb;
+  background: ${({ theme }) => theme.colors.primary};
   color: #fff;
   padding: 0.5rem 1.2rem;
   font-size: 1rem;
   font-weight: bold;
   border: none;
-  border-radius: 6px;
+  border-radius: ${({ theme }) => theme.borderRadius.md};
   cursor: pointer;
-  transition: background .13s;
-  
-  &:hover:enabled{
-    background: #176dd1;
+  transition: background 0.13s ease;
+
+  &:hover:enabled {
+    background: ${({ theme }) => theme.colors.primaryDark};
   }
 
-  &:disabled{
-    opacity:.67;
-    cursor:not-allowed;
+  &:disabled {
+    opacity: .67;
+    cursor: not-allowed;
   }
 `;
 const CancelBtn = styled.button`
-  background: #f4f7fa;
-  color: #444;
+  background: ${({ theme }) => theme.colors.surface};
+  color: ${({ theme }) => theme.colors.textSecondary};
   padding: 0.5rem 1.1rem;
   font-size: 1rem;
-  border: 1.1px solid #cdd6e2;
-  border-radius: 6px;
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  border-radius: ${({ theme }) => theme.borderRadius.md};
   cursor: pointer;
-  transition:background .12s,color .12s;
-  &:hover{
-    background:#e9eff4;
-    color:#2788eb;
+  transition: background 0.12s ease, color 0.12s ease;
+
+  &:hover {
+    background: ${({ theme }) => theme.colors.surfaceHover};
+    color: ${({ theme }) => theme.colors.primary};
+    border-color: ${({ theme }) => theme.colors.primary};
   }
 `;
 const ErrorText = styled.div`
-  color: #df3737;
+  color: ${({ theme }) => theme.colors.error};
   font-size: 0.95rem;
   text-align: center;
-  margin-top: .1rem;`
-// 라벨 스타일 개선
+  margin-top: .1rem;
+`
+// 라벨 스타일 개선 (인라인 스타일이므로 theme 접근 불가 — textSecondary에 해당하는 색상 유지)
 const labelStyle = {
-  color:'#787b85',fontSize:'0.95em',fontWeight:500,marginBottom:'2px',marginLeft:'2px'};
+  color: '#787b85', fontSize: '0.95em', fontWeight: 500, marginBottom: '2px', marginLeft: '2px'
+};
 
 const AddressBtn = styled.button`
-  background: #eee;
-  color: #2060b7;
+  background: ${({ theme }) => theme.colors.surface};
+  color: ${({ theme }) => theme.colors.secondary};
   font-size: 0.98em;
   padding: 0.43rem 0.9rem;
-  border: 1px solid #d9e3ee;
-  border-radius: 6px;
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  border-radius: ${({ theme }) => theme.borderRadius.md};
   cursor: pointer;
   font-weight: 600;
-  transition: background .14s,color .14s;
-  &:hover{
-    background: #deefff;
-    color: #1084fe;
-    border-color: #b6d7fa;
+  transition: background 0.14s ease, color 0.14s ease;
+
+  &:hover {
+    background: ${({ theme }) => theme.colors.secondary}15;
+    color: ${({ theme }) => theme.colors.secondary};
+    border-color: ${({ theme }) => theme.colors.secondary};
   }
 `;

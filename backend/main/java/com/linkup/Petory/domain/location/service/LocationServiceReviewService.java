@@ -12,12 +12,15 @@ import com.linkup.Petory.domain.location.dto.LocationServiceReviewDTO;
 import com.linkup.Petory.domain.location.entity.LocationService;
 import com.linkup.Petory.domain.location.entity.LocationServiceReview;
 import com.linkup.Petory.domain.location.exception.LocationReviewAlreadyDeletedException;
+import com.linkup.Petory.domain.location.exception.LocationReviewDuplicateException;
 import com.linkup.Petory.domain.location.exception.LocationServiceNotFoundException;
+import com.linkup.Petory.domain.location.exception.LocationServiceReviewForbiddenException;
 import com.linkup.Petory.domain.location.exception.LocationServiceReviewNotFoundException;
 import com.linkup.Petory.domain.location.repository.LocationServiceRepository;
 import com.linkup.Petory.domain.location.repository.LocationServiceReviewRepository;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException;
+import com.linkup.Petory.domain.user.exception.UserNotFoundException;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -33,19 +36,19 @@ public class LocationServiceReviewService {
     private final UsersRepository usersRepository;
     private final LocationServiceReviewConverter converter;
 
-    // 리뷰 생성
+    // 리뷰 생성 (작성자는 JWT 기준 로그인 사용자만 허용 — 요청 본문의 userIdx는 무시)
     @Transactional
-    public LocationServiceReviewDTO createReview(LocationServiceReviewDTO reviewDTO) {
+    public LocationServiceReviewDTO createReview(LocationServiceReviewDTO reviewDTO, String currentUserLoginId) {
+        Users user = usersRepository.findByIdString(currentUserLoginId)
+                .orElseThrow(UserNotFoundException::new);
+
         // 중복 리뷰 체크
-        if (reviewRepository.existsByServiceIdxAndUserIdx(reviewDTO.getServiceIdx(), reviewDTO.getUserIdx())) {
-            throw new RuntimeException("이미 해당 서비스에 리뷰를 작성하셨습니다.");
+        if (reviewRepository.existsByServiceIdxAndUserIdx(reviewDTO.getServiceIdx(), user.getIdx())) {
+            throw new LocationReviewDuplicateException();
         }
 
         LocationService service = serviceRepository.findById(reviewDTO.getServiceIdx())
-                .orElseThrow(() -> new RuntimeException("서비스를 찾을 수 없습니다."));
-
-        Users user = usersRepository.findById(reviewDTO.getUserIdx())
-                .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
+                .orElseThrow(LocationServiceNotFoundException::new);
 
         // 이메일 인증 확인
         if (user.getEmailVerified() == null || !user.getEmailVerified()) {
@@ -71,9 +74,17 @@ public class LocationServiceReviewService {
 
     // 리뷰 수정
     @Transactional
-    public LocationServiceReviewDTO updateReview(Long reviewIdx, LocationServiceReviewDTO reviewDTO) {
+    public LocationServiceReviewDTO updateReview(Long reviewIdx, LocationServiceReviewDTO reviewDTO,
+            String currentUserLoginId) {
+        Users actor = usersRepository.findByIdString(currentUserLoginId)
+                .orElseThrow(UserNotFoundException::new);
+
         LocationServiceReview review = reviewRepository.findByIdWithUserAndService(reviewIdx)
                 .orElseThrow(LocationServiceReviewNotFoundException::new);
+
+        if (!review.getUser().getIdx().equals(actor.getIdx())) {
+            throw LocationServiceReviewForbiddenException.notOwner();
+        }
 
         // 이메일 인증 확인
         Users user = review.getUser();
@@ -96,9 +107,16 @@ public class LocationServiceReviewService {
 
     // 리뷰 삭제 (Soft Delete)
     @Transactional
-    public void deleteReview(Long reviewIdx) {
+    public void deleteReview(Long reviewIdx, String currentUserLoginId) {
+        Users actor = usersRepository.findByIdString(currentUserLoginId)
+                .orElseThrow(UserNotFoundException::new);
+
         LocationServiceReview review = reviewRepository.findByIdWithUserAndService(reviewIdx)
                 .orElseThrow(LocationServiceReviewNotFoundException::new);
+
+        if (!review.getUser().getIdx().equals(actor.getIdx())) {
+            throw LocationServiceReviewForbiddenException.notOwner();
+        }
 
         // 이미 삭제된 리뷰인지 확인
         if (review.getIsDeleted() != null && review.getIsDeleted()) {

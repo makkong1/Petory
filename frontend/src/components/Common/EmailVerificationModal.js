@@ -56,8 +56,8 @@ const EmailVerificationModal = ({ isOpen, onClose, purpose, onSuccess }) => {
   };
 
   return (
-    <ModalOverlay onClick={handleClose}>
-      <ModalContent onClick={(e) => e.stopPropagation()}>
+    <ModalOverlay onClick={handleClose} aria-hidden="true">
+      <ModalContent role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
         <ModalHeader>
           <ModalIcon>✉️</ModalIcon>
           <ModalTitle>이메일 인증이 필요합니다</ModalTitle>

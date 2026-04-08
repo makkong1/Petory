@@ -7,7 +7,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+
+import com.linkup.Petory.domain.user.exception.UnauthenticatedException;
+import com.linkup.Petory.global.exception.ApiException;
 
 import java.util.HashMap;
 import java.util.List;
@@ -22,17 +27,27 @@ public class LocationServiceReviewController {
 
     private final LocationServiceReviewService reviewService;
 
+    private String getCurrentUserLoginId() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || authentication.getPrincipal() == null) {
+            throw new UnauthenticatedException();
+        }
+        return authentication.getName();
+    }
+
     // 리뷰 생성
     @PostMapping
     public ResponseEntity<Map<String, Object>> createReview(@RequestBody LocationServiceReviewDTO reviewDTO) {
         try {
-            LocationServiceReviewDTO createdReview = reviewService.createReview(reviewDTO);
+            LocationServiceReviewDTO createdReview = reviewService.createReview(reviewDTO, getCurrentUserLoginId());
 
             Map<String, Object> response = new HashMap<>();
             response.put("review", createdReview);
             response.put("message", "리뷰가 성공적으로 작성되었습니다.");
 
             return ResponseEntity.ok(response);
+        } catch (ApiException e) {
+            throw e;
         } catch (Exception e) {
             log.error("리뷰 생성 실패: {}", e.getMessage());
             Map<String, Object> response = new HashMap<>();
@@ -46,13 +61,16 @@ public class LocationServiceReviewController {
     public ResponseEntity<Map<String, Object>> updateReview(@PathVariable Long reviewIdx,
             @RequestBody LocationServiceReviewDTO reviewDTO) {
         try {
-            LocationServiceReviewDTO updatedReview = reviewService.updateReview(reviewIdx, reviewDTO);
+            LocationServiceReviewDTO updatedReview = reviewService.updateReview(reviewIdx, reviewDTO,
+                    getCurrentUserLoginId());
 
             Map<String, Object> response = new HashMap<>();
             response.put("review", updatedReview);
             response.put("message", "리뷰가 성공적으로 수정되었습니다.");
 
             return ResponseEntity.ok(response);
+        } catch (ApiException e) {
+            throw e;
         } catch (Exception e) {
             log.error("리뷰 수정 실패: {}", e.getMessage());
             Map<String, Object> response = new HashMap<>();
@@ -65,12 +83,14 @@ public class LocationServiceReviewController {
     @DeleteMapping("/{reviewIdx}")
     public ResponseEntity<Map<String, Object>> deleteReview(@PathVariable Long reviewIdx) {
         try {
-            reviewService.deleteReview(reviewIdx);
+            reviewService.deleteReview(reviewIdx, getCurrentUserLoginId());
 
             Map<String, Object> response = new HashMap<>();
             response.put("message", "리뷰가 성공적으로 삭제되었습니다.");
 
             return ResponseEntity.ok(response);
+        } catch (ApiException e) {
+            throw e;
         } catch (Exception e) {
             log.error("리뷰 삭제 실패: {}", e.getMessage());
             Map<String, Object> response = new HashMap<>();

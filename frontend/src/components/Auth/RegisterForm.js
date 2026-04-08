@@ -800,102 +800,101 @@ const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
 
 export default RegisterForm;
 
+const sharedInputStyles = ({ theme }) => `
+  padding: 10px 14px;
+  border: 1.5px solid ${theme.colors.border};
+  border-radius: ${theme.borderRadius.lg};
+  font-size: 14px;
+  background: ${theme.colors.background};
+  color: ${theme.colors.text};
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  outline: none;
+
+  &::placeholder { color: ${theme.colors.textLight}; }
+  &:focus {
+    border-color: ${theme.colors.primary};
+    box-shadow: 0 0 0 3px ${theme.colors.primary}25;
+  }
+  &:hover:not(:focus):not(:disabled) { border-color: ${theme.colors.borderDark}; }
+  &:disabled {
+    background: ${theme.colors.surfaceSoft};
+    color: ${theme.colors.textLight};
+    cursor: not-allowed;
+  }
+`;
+
 const RegisterContainer = styled.div`
   max-width: 600px;
   width: 100%;
   margin: 0 auto;
   padding: 2.5rem;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-  
+  background: ${({ theme }) => theme.colors.background};
+  border-radius: ${({ theme }) => theme.borderRadius.xl};
+  box-shadow: ${({ theme }) => theme.shadows.lg};
+
   @media (max-width: 768px) {
     max-width: 90%;
-    padding: 2rem;
+    padding: 1.5rem;
   }
 `;
 
 const Title = styled.h2`
   text-align: center;
   margin-bottom: 2rem;
-  color: #333;
+  color: ${({ theme }) => theme.colors.text};
+  font-size: ${({ theme }) => theme.typography.h2.fontSize};
+  font-weight: ${({ theme }) => theme.typography.h2.fontWeight};
 `;
 
 const Form = styled.form`
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: ${({ theme }) => theme.spacing.lg};
 `;
 
 const InputGroup = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: ${({ theme }) => theme.spacing.sm};
 `;
 
 const Label = styled.label`
-  font-weight: 500;
-  color: #555;
+  font-weight: 600;
+  font-size: 13px;
+  color: ${({ theme }) => theme.colors.text};
 `;
 
 const Input = styled.input`
-  padding: 0.75rem;
-  border: 2px solid #e1e5e9;
-  border-radius: 6px;
-  font-size: 0.95rem;
-  transition: all 0.2s ease;
-  
-  &:focus {
-    outline: none;
-    border-color: #007bff;
-    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.1);
-    transform: translateY(-1px);
-  }
-  
-  &:hover {
-    border-color: #007bff;
-  }
+  ${sharedInputStyles}
 `;
 
 const Select = styled.select`
-  padding: 0.75rem;
-  border: 2px solid #e1e5e9;
-  border-radius: 6px;
-  font-size: 0.95rem;
-  background: white;
-  transition: all 0.2s ease;
-  
-  &:focus {
-    outline: none;
-    border-color: #007bff;
-    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.1);
-    transform: translateY(-1px);
-  }
-  
-  &:hover {
-    border-color: #007bff;
-  }
+  ${sharedInputStyles}
+  cursor: pointer;
 `;
 
 const Button = styled.button`
-  padding: 0.75rem 1.5rem;
-  background: #28a745;
-  color: white;
+  padding: 11px 20px;
+  background: ${({ theme }) => theme.colors.primary};
+  color: #fff;
   border: none;
-  border-radius: 6px;
-  font-size: 1rem;
+  border-radius: ${({ theme }) => theme.borderRadius.lg};
+  font-size: 15px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
-  
-  &:hover {
-    background: #218838;
+
+  &:hover:not(:disabled) {
+    background: ${({ theme }) => theme.colors.primaryDark};
     transform: translateY(-1px);
-    box-shadow: 0 3px 8px rgba(40, 167, 69, 0.3);
+    box-shadow: 0 4px 12px ${({ theme }) => theme.colors.primary}40;
   }
-  
+
+  &:active:not(:disabled) { transform: translateY(0); }
+
   &:disabled {
-    background: #6c757d;
+    background: ${({ theme }) => theme.colors.surfaceHover};
+    color: ${({ theme }) => theme.colors.textLight};
     cursor: not-allowed;
     transform: none;
     box-shadow: none;
@@ -903,84 +902,84 @@ const Button = styled.button`
 `;
 
 const ErrorMessage = styled.div`
-  color: #dc3545;
-  font-size: 0.875rem;
-  margin-top: 0.5rem;
+  color: ${({ theme }) => theme.colors.error};
+  font-size: 13px;
+  margin-top: 4px;
 `;
 
 const SuccessMessage = styled.div`
-  color: #28a745;
-  font-size: 0.875rem;
-  margin-top: 0.5rem;
+  color: ${({ theme }) => theme.colors.success};
+  font-size: 13px;
+  margin-top: 4px;
 `;
 
 const LinkText = styled.p`
   text-align: center;
-  margin-top: 1rem;
-  color: #666;
-  
+  margin-top: ${({ theme }) => theme.spacing.lg};
+  color: ${({ theme }) => theme.colors.textSecondary};
+  font-size: 14px;
+
   a {
-    color: #007bff;
+    color: ${({ theme }) => theme.colors.primary};
     text-decoration: none;
-    
-    &:hover {
-      text-decoration: underline;
-    }
+    font-weight: 600;
+    &:hover { text-decoration: underline; }
   }
 `;
 
 const NicknameInputGroup = styled.div`
   display: flex;
-  gap: 0.5rem;
+  gap: ${({ theme }) => theme.spacing.sm};
   align-items: flex-start;
 `;
 
 const CheckButton = styled.button`
-  padding: 0.75rem 1rem;
-  background: #007bff;
-  color: white;
+  padding: 10px 14px;
+  background: ${({ theme }) => theme.colors.primary};
+  color: #fff;
   border: none;
-  border-radius: 6px;
-  font-size: 0.9rem;
-  font-weight: 500;
+  border-radius: ${({ theme }) => theme.borderRadius.lg};
+  font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
   transition: all 0.2s ease;
-  
+
   &:hover:not(:disabled) {
-    background: #0056b3;
+    background: ${({ theme }) => theme.colors.primaryDark};
     transform: translateY(-1px);
   }
-  
+
   &:disabled {
-    background: #6c757d;
+    background: ${({ theme }) => theme.colors.surfaceHover};
+    color: ${({ theme }) => theme.colors.textLight};
     cursor: not-allowed;
     transform: none;
   }
 `;
 
 const NicknameMessage = styled.div`
-  font-size: 0.875rem;
-  margin-top: 0.25rem;
-  color: ${props => props.available ? '#28a745' : '#dc3545'};
+  font-size: 13px;
+  margin-top: 4px;
+  color: ${({ theme, available }) => available ? theme.colors.success : theme.colors.error};
 `;
 
 const PetCardsContainer = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: ${({ theme }) => theme.spacing.lg};
 `;
 
 const PetCard = styled.div`
-  border: 2px solid #e1e5e9;
-  border-radius: 8px;
-  padding: 1rem;
-  background: #f8f9fa;
+  border: 1.5px solid ${({ theme }) => theme.colors.border};
+  border-radius: ${({ theme }) => theme.borderRadius.xl};
+  padding: ${({ theme }) => theme.spacing.lg};
+  background: ${({ theme }) => theme.colors.surface};
   transition: all 0.2s ease;
-  
+
   &:hover {
-    border-color: #007bff;
-    box-shadow: 0 2px 8px rgba(0, 123, 255, 0.1);
+    border-color: ${({ theme }) => theme.colors.primary};
+    box-shadow: ${({ theme }) => theme.shadows.sm};
   }
 `;
 
@@ -988,38 +987,38 @@ const PetCardHeader = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.75rem;
+  margin-bottom: ${({ theme }) => theme.spacing.md};
 `;
 
 const PetCardTitle = styled.h4`
   margin: 0;
-  color: #333;
-  font-size: 0.95rem;
+  color: ${({ theme }) => theme.colors.text};
+  font-size: 14px;
   font-weight: 600;
 `;
 
 const RemovePetButton = styled.button`
-  background: #dc3545;
-  color: white;
+  background: ${({ theme }) => theme.colors.error};
+  color: #fff;
   border: none;
-  border-radius: 50%;
+  border-radius: ${({ theme }) => theme.borderRadius.full};
   width: 24px;
   height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  font-size: 1rem;
+  font-size: 14px;
   line-height: 1;
   transition: all 0.2s ease;
-  
+
   &:hover:not(:disabled) {
-    background: #c82333;
+    background: ${({ theme }) => theme.colors.errorDark};
     transform: scale(1.1);
   }
-  
+
   &:disabled {
-    background: #6c757d;
+    background: ${({ theme }) => theme.colors.textLight};
     cursor: not-allowed;
   }
 `;
@@ -1027,13 +1026,13 @@ const RemovePetButton = styled.button`
 const PetCardBody = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: ${({ theme }) => theme.spacing.md};
 `;
 
 const PetInputRow = styled.div`
   display: flex;
-  gap: 0.75rem;
-  
+  gap: ${({ theme }) => theme.spacing.md};
+
   @media (max-width: 768px) {
     flex-direction: column;
   }
@@ -1043,111 +1042,115 @@ const PetInputGroup = styled.div`
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: ${({ theme }) => theme.spacing.xs};
 `;
 
 const PetLabel = styled.label`
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: #555;
+  font-size: 13px;
+  font-weight: 600;
+  color: ${({ theme }) => theme.colors.text};
 `;
 
 const PetInput = styled.input`
-  padding: 0.5rem;
-  border: 1px solid #ced4da;
-  border-radius: 4px;
-  font-size: 0.9rem;
-  transition: all 0.2s ease;
-  
+  padding: 8px 12px;
+  border: 1.5px solid ${({ theme }) => theme.colors.border};
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  font-size: 13px;
+  background: ${({ theme }) => theme.colors.background};
+  color: ${({ theme }) => theme.colors.text};
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  outline: none;
+
   &:focus {
-    outline: none;
-    border-color: #007bff;
-    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.1);
+    border-color: ${({ theme }) => theme.colors.primary};
+    box-shadow: 0 0 0 3px ${({ theme }) => theme.colors.primary}20;
   }
-  
+
   &:disabled {
-    background: #e9ecef;
+    background: ${({ theme }) => theme.colors.surfaceSoft};
     cursor: not-allowed;
   }
 `;
 
 const PetSelect = styled.select`
-  padding: 0.5rem;
-  border: 1px solid #ced4da;
-  border-radius: 4px;
-  font-size: 0.9rem;
-  background: white;
-  transition: all 0.2s ease;
-  
+  padding: 8px 12px;
+  border: 1.5px solid ${({ theme }) => theme.colors.border};
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  font-size: 13px;
+  background: ${({ theme }) => theme.colors.background};
+  color: ${({ theme }) => theme.colors.text};
+  transition: border-color 0.2s ease;
+  outline: none;
+  cursor: pointer;
+
   &:focus {
-    outline: none;
-    border-color: #007bff;
-    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.1);
+    border-color: ${({ theme }) => theme.colors.primary};
+    box-shadow: 0 0 0 3px ${({ theme }) => theme.colors.primary}20;
   }
-  
+
   &:disabled {
-    background: #e9ecef;
+    background: ${({ theme }) => theme.colors.surfaceSoft};
     cursor: not-allowed;
   }
 `;
 
 const AddPetButton = styled.button`
-  padding: 0.75rem;
-  background: #f8f9fa;
-  border: 2px dashed #ced4da;
-  border-radius: 8px;
-  color: #495057;
-  font-size: 0.95rem;
+  padding: 11px;
+  background: ${({ theme }) => theme.colors.surface};
+  border: 2px dashed ${({ theme }) => theme.colors.border};
+  border-radius: ${({ theme }) => theme.borderRadius.xl};
+  color: ${({ theme }) => theme.colors.textSecondary};
+  font-size: 14px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
-  
+  gap: ${({ theme }) => theme.spacing.sm};
+
   &:hover:not(:disabled) {
-    background: #e9ecef;
-    border-color: #007bff;
-    color: #007bff;
+    background: ${({ theme }) => theme.colors.surfaceHover};
+    border-color: ${({ theme }) => theme.colors.primary};
+    color: ${({ theme }) => theme.colors.primary};
     transform: translateY(-1px);
   }
-  
+
   &:disabled {
-    background: #e9ecef;
+    opacity: 0.5;
     cursor: not-allowed;
-    opacity: 0.6;
   }
 `;
 
 const PetCheckbox = styled.input`
-  margin-right: 0.5rem;
+  margin-right: ${({ theme }) => theme.spacing.sm};
   width: 18px;
   height: 18px;
   cursor: pointer;
-  
-  &:disabled {
-    cursor: not-allowed;
-  }
+  accent-color: ${({ theme }) => theme.colors.primary};
+
+  &:disabled { cursor: not-allowed; }
 `;
 
 const PetTextarea = styled.textarea`
-  padding: 0.5rem;
-  border: 1px solid #ced4da;
-  border-radius: 4px;
-  font-size: 0.9rem;
+  padding: 8px 12px;
+  border: 1.5px solid ${({ theme }) => theme.colors.border};
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  font-size: 13px;
   font-family: inherit;
+  background: ${({ theme }) => theme.colors.background};
+  color: ${({ theme }) => theme.colors.text};
   resize: vertical;
-  transition: all 0.2s ease;
-  
+  transition: border-color 0.2s ease;
+  outline: none;
+
   &:focus {
-    outline: none;
-    border-color: #007bff;
-    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.1);
+    border-color: ${({ theme }) => theme.colors.primary};
+    box-shadow: 0 0 0 3px ${({ theme }) => theme.colors.primary}20;
   }
-  
+
   &:disabled {
-    background: #e9ecef;
+    background: ${({ theme }) => theme.colors.surfaceSoft};
     cursor: not-allowed;
   }
 `;
@@ -1155,141 +1158,86 @@ const PetTextarea = styled.textarea`
 const EmailInputGroup = styled.div`
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: ${({ theme }) => theme.spacing.sm};
   flex-wrap: wrap;
 `;
 
 const EmailIdInput = styled.input`
   flex: 1;
   min-width: 120px;
-  padding: 0.75rem;
-  border: 2px solid #e1e5e9;
-  border-radius: 6px;
-  font-size: 0.95rem;
-  transition: all 0.2s ease;
-  
-  &:focus {
-    outline: none;
-    border-color: #007bff;
-    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.1);
-    transform: translateY(-1px);
-  }
-  
-  &:hover {
-    border-color: #007bff;
-  }
-  
-  &:disabled {
-    background: #f5f5f5;
-    cursor: not-allowed;
-  }
+  ${sharedInputStyles}
 `;
 
 const EmailAt = styled.span`
-  font-size: 1rem;
+  font-size: 14px;
   font-weight: 600;
-  color: #666;
+  color: ${({ theme }) => theme.colors.textSecondary};
   white-space: nowrap;
 `;
 
 const EmailDomainSelect = styled.select`
   flex: 1;
   min-width: 150px;
-  padding: 0.75rem;
-  border: 2px solid #e1e5e9;
-  border-radius: 6px;
-  font-size: 0.95rem;
-  background: white;
-  transition: all 0.2s ease;
-  
-  &:focus {
-    outline: none;
-    border-color: #007bff;
-    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.1);
-    transform: translateY(-1px);
-  }
-  
-  &:hover {
-    border-color: #007bff;
-  }
-  
-  &:disabled {
-    background: #f5f5f5;
-    cursor: not-allowed;
-  }
+  ${sharedInputStyles}
+  cursor: pointer;
 `;
 
 const EmailVerificationErrorMessage = styled.div`
-  margin-top: 0.5rem;
-  padding: 0.5rem;
-  font-size: 0.875rem;
-  color: #dc3545;
+  margin-top: ${({ theme }) => theme.spacing.sm};
+  padding: ${({ theme }) => theme.spacing.sm};
+  font-size: 13px;
+  color: ${({ theme }) => theme.colors.error};
   font-weight: 500;
-  background: #fff5f5;
-  border-left: 3px solid #dc3545;
-  border-radius: 4px;
+  background: ${({ theme }) => theme.colors.error}10;
+  border-left: 3px solid ${({ theme }) => theme.colors.error};
+  border-radius: ${({ theme }) => theme.borderRadius.sm};
 `;
 
 const EmailVerificationStatus = styled.div`
-  margin-top: 0.5rem;
-  padding: 0.5rem;
-  font-size: 0.875rem;
-  color: ${props => props.verified ? '#4caf50' : '#ff9800'};
-  font-weight: ${props => props.verified ? '600' : '500'};
+  margin-top: ${({ theme }) => theme.spacing.sm};
+  padding: ${({ theme }) => theme.spacing.sm};
+  font-size: 13px;
+  color: ${({ theme, verified }) => verified ? theme.colors.success : theme.colors.warning};
+  font-weight: ${({ verified }) => verified ? '600' : '500'};
 `;
 
 const EmailVerificationButton = styled.button`
-  margin-top: 0.5rem;
-  padding: 0.5rem 1rem;
-  background: ${props => props.theme.colors.primary || '#007bff'};
-  color: white;
+  margin-top: ${({ theme }) => theme.spacing.sm};
+  padding: 8px 16px;
+  background: ${({ theme }) => theme.colors.primary};
+  color: #fff;
   border: none;
-  border-radius: 6px;
-  font-size: 0.875rem;
+  border-radius: ${({ theme }) => theme.borderRadius.lg};
+  font-size: 13px;
   font-weight: 600;
-  cursor: ${props => props.disabled ? 'not-allowed' : 'pointer'};
-  opacity: ${props => props.disabled ? 0.6 : 1};
+  cursor: pointer;
   transition: all 0.2s ease;
-  
+
   &:hover:not(:disabled) {
-    background: ${props => props.theme.colors.primaryDark || '#0056b3'};
+    background: ${({ theme }) => theme.colors.primaryDark};
     transform: translateY(-1px);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
   }
 `;
 
 const EmailVerificationInfo = styled.div`
-  margin-top: 0.5rem;
-  padding: 0.75rem;
-  background: #e3f2fd;
-  border-left: 3px solid #2196f3;
-  border-radius: 4px;
-  font-size: 0.875rem;
-  color: #1976d2;
+  margin-top: ${({ theme }) => theme.spacing.sm};
+  padding: ${({ theme }) => theme.spacing.md};
+  background: ${({ theme }) => theme.colors.info}15;
+  border-left: 3px solid ${({ theme }) => theme.colors.info};
+  border-radius: ${({ theme }) => theme.borderRadius.sm};
+  font-size: 13px;
+  color: ${({ theme }) => theme.colors.infoDark};
   line-height: 1.5;
 `;
 
 const EmailCustomInput = styled.input`
   flex: 1;
   min-width: 150px;
-  padding: 0.75rem;
-  border: 2px solid #e1e5e9;
-  border-radius: 6px;
-  font-size: 0.95rem;
-  transition: all 0.2s ease;
-  
-  &:focus {
-    outline: none;
-    border-color: #007bff;
-    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.1);
-    transform: translateY(-1px);
-  }
-  
-  &:hover {
-    border-color: #007bff;
-  }
-  
-  &:disabled {
-    background: #f5f5f5;
-    cursor: not-allowed;
-  }
+  ${sharedInputStyles}
 `;
