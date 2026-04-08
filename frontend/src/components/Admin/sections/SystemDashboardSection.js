@@ -158,11 +158,11 @@ const SystemDashboardSection = () => {
               <YAxis yAxisId="right" orientation="right" />
               <Tooltip />
               <Legend />
-              <Line yAxisId="left" type="monotone" dataKey="newUsers" name="신규 가입" stroke="#8884d8" activeDot={{ r: 8 }} />
-              <Line yAxisId="left" type="monotone" dataKey="newMeetups" name="새 모임" stroke="#ffc658" />
+              <Line yAxisId="left" type="monotone" dataKey="newUsers" name="신규 가입" stroke="#FF7E36" activeDot={{ r: 8 }} />
+              <Line yAxisId="left" type="monotone" dataKey="newMeetups" name="새 모임" stroke="#4A90E2" />
 
-              <Line yAxisId="right" type="monotone" dataKey="activeUsers" name="활성 유저" stroke="#82ca9d" />
-              <Line yAxisId="right" type="monotone" dataKey="newReports" name="신고" stroke="#ff7c7c" />
+              <Line yAxisId="right" type="monotone" dataKey="activeUsers" name="활성 유저" stroke="#4CAF50" />
+              <Line yAxisId="right" type="monotone" dataKey="newReports" name="신고" stroke="#F44336" />
             </LineChart>
           </ResponsiveContainer>
         </ChartContainer>
@@ -176,10 +176,10 @@ const SystemDashboardSection = () => {
               <YAxis />
               <Tooltip />
               <Legend />
-              <Bar dataKey="newPosts" name="게시글" stackId="a" fill="#8884d8" />
-              <Bar dataKey="newCareRequests" name="케어 요청" stackId="a" fill="#ffc658" />
-              <Bar dataKey="newMeetups" name="모임" stackId="a" fill="#82ca9d" />
-              <Bar dataKey="newReports" name="신고" stackId="a" fill="#ff7c7c" />
+              <Bar dataKey="newPosts" name="게시글" stackId="a" fill="#FF7E36" />
+              <Bar dataKey="newCareRequests" name="케어 요청" stackId="a" fill="#4A90E2" />
+              <Bar dataKey="newMeetups" name="모임" stackId="a" fill="#4CAF50" />
+              <Bar dataKey="newReports" name="신고" stackId="a" fill="#F44336" />
             </BarChart>
           </ResponsiveContainer>
         </ChartContainer>

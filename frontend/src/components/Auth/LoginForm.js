@@ -173,8 +173,8 @@ const LoginForm = ({ onSwitchToRegister }) => {
       </LinkText>
 
       {showForgotPassword && (
-        <ForgotPasswordModal>
-          <ForgotPasswordContent>
+        <ForgotPasswordModal aria-hidden="true">
+          <ForgotPasswordContent role="dialog" aria-modal="true" aria-label="비밀번호 찾기">
             <ForgotPasswordTitle>비밀번호 찾기</ForgotPasswordTitle>
             <ForgotPasswordForm onSubmit={handleForgotPassword}>
               <InputGroup>
@@ -228,87 +228,106 @@ const LoginContainer = styled.div`
   width: 100%;
   margin: 0 auto;
   padding: 2.5rem;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-  
+  background: ${({ theme }) => theme.colors.background};
+  border-radius: ${({ theme }) => theme.borderRadius.xl};
+  box-shadow: ${({ theme }) => theme.shadows.lg};
+
   @media (max-width: 768px) {
     max-width: 90%;
-    padding: 2rem;
+    padding: 1.5rem;
   }
 `;
 
 const Title = styled.h2`
   text-align: center;
   margin-bottom: 2rem;
-  color: #333;
+  color: ${({ theme }) => theme.colors.text};
+  font-size: ${({ theme }) => theme.typography.h2.fontSize};
+  font-weight: ${({ theme }) => theme.typography.h2.fontWeight};
 `;
 
 const DemoHint = styled.div`
   text-align: center;
   margin-bottom: 1rem;
   padding: 0.5rem;
-  background: #e8f5e9;
-  color: #2e7d32;
-  border-radius: 6px;
+  background: ${({ theme }) => theme.colors.success}18;
+  color: ${({ theme }) => theme.colors.successDark};
+  border-radius: ${({ theme }) => theme.borderRadius.md};
   font-size: 0.875rem;
 `;
 
 const Form = styled.form`
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: ${({ theme }) => theme.spacing.lg};
 `;
 
 const InputGroup = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: ${({ theme }) => theme.spacing.sm};
 `;
 
 const Label = styled.label`
-  font-weight: 500;
-  color: #555;
+  font-weight: 600;
+  font-size: 13px;
+  color: ${({ theme }) => theme.colors.text};
 `;
 
 const Input = styled.input`
-  padding: 0.75rem;
-  border: 2px solid #e1e5e9;
-  border-radius: 6px;
-  font-size: 0.95rem;
-  transition: all 0.2s ease;
-  
+  padding: 10px 14px;
+  border: 1.5px solid ${({ theme }) => theme.colors.border};
+  border-radius: ${({ theme }) => theme.borderRadius.lg};
+  font-size: 14px;
+  background: ${({ theme }) => theme.colors.background};
+  color: ${({ theme }) => theme.colors.text};
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+
+  &::placeholder {
+    color: ${({ theme }) => theme.colors.textLight};
+  }
+
   &:focus {
     outline: none;
-    border-color: #007bff;
-    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.1);
-    transform: translateY(-1px);
+    border-color: ${({ theme }) => theme.colors.primary};
+    box-shadow: 0 0 0 3px ${({ theme }) => theme.colors.primary}25;
   }
-  
-  &:hover {
-    border-color: #007bff;
+
+  &:hover:not(:focus):not(:disabled) {
+    border-color: ${({ theme }) => theme.colors.borderDark};
+  }
+
+  &:disabled {
+    background: ${({ theme }) => theme.colors.surfaceSoft};
+    color: ${({ theme }) => theme.colors.textLight};
+    cursor: not-allowed;
   }
 `;
 
 const Button = styled.button`
-  padding: 0.75rem 1.5rem;
-  background: #007bff;
-  color: white;
+  padding: 11px 20px;
+  background: ${({ theme }) => theme.colors.primary};
+  color: #fff;
   border: none;
-  border-radius: 6px;
-  font-size: 1rem;
+  border-radius: ${({ theme }) => theme.borderRadius.lg};
+  font-size: 15px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
-  
-  &:hover {
-    background: #0056b3;
+
+  &:hover:not(:disabled) {
+    background: ${({ theme }) => theme.colors.primaryDark};
     transform: translateY(-1px);
-    box-shadow: 0 3px 8px rgba(0, 123, 255, 0.3);
+    box-shadow: 0 4px 12px ${({ theme }) => theme.colors.primary}40;
   }
-  
+
+  &:active:not(:disabled) {
+    transform: translateY(0);
+  }
+
   &:disabled {
-    background: #6c757d;
+    background: ${({ theme }) => theme.colors.surfaceHover};
+    color: ${({ theme }) => theme.colors.textLight};
     cursor: not-allowed;
     transform: none;
     box-shadow: none;
@@ -316,68 +335,68 @@ const Button = styled.button`
 `;
 
 const ErrorMessage = styled.div`
-  color: #dc3545;
-  font-size: 0.875rem;
-  margin-top: 0.5rem;
+  color: ${({ theme }) => theme.colors.error};
+  font-size: 13px;
+  margin-top: 4px;
 `;
 
 const SuccessMessage = styled.div`
-  color: #28a745;
-  font-size: 0.875rem;
-  margin-top: 0.5rem;
+  color: ${({ theme }) => theme.colors.success};
+  font-size: 13px;
+  margin-top: 4px;
 `;
 
 const Divider = styled.div`
   display: flex;
   align-items: center;
-  margin: 1.5rem 0;
-  gap: 1rem;
+  margin: ${({ theme }) => theme.spacing.xl} 0;
+  gap: ${({ theme }) => theme.spacing.md};
 `;
 
 const DividerLine = styled.div`
   flex: 1;
   height: 1px;
-  background: #e1e5e9;
+  background: ${({ theme }) => theme.colors.border};
 `;
 
 const DividerText = styled.span`
-  color: #666;
-  font-size: 0.875rem;
+  color: ${({ theme }) => theme.colors.textLight};
+  font-size: 13px;
 `;
 
 const SocialLoginContainer = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  margin-top: 1rem;
+  gap: ${({ theme }) => theme.spacing.md};
+  margin-top: ${({ theme }) => theme.spacing.md};
 `;
 
 const SocialButton = styled.button`
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.75rem;
-  padding: 0.75rem 1.5rem;
+  gap: 10px;
+  padding: 11px 20px;
   border: 2px solid ${props => {
     if (props.google) return '#4285F4';
     if (props.naver) return '#03C75A';
-    return '#e1e5e9';
+    return props.theme.colors.border;
   }};
   background: ${props => {
     if (props.google) return '#4285F4';
     if (props.naver) return '#03C75A';
-    return 'white';
+    return props.theme.colors.background;
   }};
-  color: white;
-  border-radius: 6px;
-  font-size: 0.95rem;
+  color: #fff;
+  border-radius: ${({ theme }) => theme.borderRadius.lg};
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
 
   &:hover {
     transform: translateY(-1px);
-    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
+    box-shadow: ${({ theme }) => theme.shadows.md};
     opacity: 0.9;
   }
 
@@ -393,20 +412,22 @@ const SocialIcon = styled.span`
   align-items: center;
   justify-content: center;
   background: rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
+  border-radius: ${({ theme }) => theme.borderRadius.sm};
   font-weight: bold;
-  font-size: 0.875rem;
+  font-size: 13px;
 `;
 
 const LinkText = styled.p`
   text-align: center;
-  margin-top: 1rem;
-  color: #666;
-  
+  margin-top: ${({ theme }) => theme.spacing.lg};
+  color: ${({ theme }) => theme.colors.textSecondary};
+  font-size: 14px;
+
   a {
-    color: #007bff;
+    color: ${({ theme }) => theme.colors.primary};
     text-decoration: none;
-    
+    font-weight: 600;
+
     &:hover {
       text-decoration: underline;
     }
@@ -415,16 +436,16 @@ const LinkText = styled.p`
 
 const ForgotPasswordLink = styled.div`
   text-align: right;
-  margin-top: -0.5rem;
-  margin-bottom: 0.5rem;
-  
+  margin-top: -4px;
+  margin-bottom: 4px;
+
   a {
-    color: #666;
-    font-size: 0.875rem;
+    color: ${({ theme }) => theme.colors.textSecondary};
+    font-size: 13px;
     text-decoration: none;
-    
+
     &:hover {
-      color: #007bff;
+      color: ${({ theme }) => theme.colors.primary};
       text-decoration: underline;
     }
   }
@@ -436,7 +457,7 @@ const ForgotPasswordModal = styled.div`
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: ${({ theme }) => theme.colors.overlay};
   display: flex;
   justify-content: center;
   align-items: center;
@@ -444,55 +465,55 @@ const ForgotPasswordModal = styled.div`
 `;
 
 const ForgotPasswordContent = styled.div`
-  background: white;
-  border-radius: 12px;
+  background: ${({ theme }) => theme.colors.background};
+  border-radius: ${({ theme }) => theme.borderRadius.xl};
   padding: 2rem;
   max-width: 500px;
   width: 90%;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  box-shadow: ${({ theme }) => theme.shadows.xl};
 `;
 
 const ForgotPasswordTitle = styled.h3`
   text-align: center;
   margin-bottom: 1.5rem;
-  color: #333;
+  color: ${({ theme }) => theme.colors.text};
+  font-size: ${({ theme }) => theme.typography.h3.fontSize};
+  font-weight: ${({ theme }) => theme.typography.h3.fontWeight};
 `;
 
 const ForgotPasswordForm = styled.form`
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: ${({ theme }) => theme.spacing.lg};
 `;
 
 const ButtonGroup = styled.div`
   display: flex;
-  gap: 0.75rem;
-  margin-top: 0.5rem;
+  gap: ${({ theme }) => theme.spacing.md};
+  margin-top: 4px;
 `;
 
 const CancelButton = styled.button`
-  padding: 0.75rem 1.5rem;
-  background: #6c757d;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-size: 1rem;
+  padding: 11px 20px;
+  background: ${({ theme }) => theme.colors.surface};
+  color: ${({ theme }) => theme.colors.text};
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  border-radius: ${({ theme }) => theme.borderRadius.lg};
+  font-size: 15px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
   flex: 1;
-  
+
   &:hover:not(:disabled) {
-    background: #5a6268;
+    background: ${({ theme }) => theme.colors.surfaceHover};
+    border-color: ${({ theme }) => theme.colors.borderDark};
     transform: translateY(-1px);
-    box-shadow: 0 3px 8px rgba(108, 117, 125, 0.3);
   }
-  
+
   &:disabled {
-    background: #6c757d;
+    opacity: 0.5;
     cursor: not-allowed;
     transform: none;
-    box-shadow: none;
-    opacity: 0.6;
   }
 `;

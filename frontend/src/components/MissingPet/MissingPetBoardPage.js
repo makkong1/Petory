@@ -519,9 +519,9 @@ const ControlRow = styled.div`
 `;
 
 const ErrorBanner = styled.div`
-  background: #fdecea;
-  color: #c0392b;
-  border: 1px solid #f5c6cb;
+  background: ${(props) => props.theme.colors.error}12;
+  color: ${(props) => props.theme.colors.errorDark};
+  border: 1px solid ${(props) => props.theme.colors.error}40;
   border-radius: ${(props) => props.theme.borderRadius.md};
   padding: ${(props) => props.theme.spacing.md} ${(props) => props.theme.spacing.lg};
   margin-bottom: ${(props) => props.theme.spacing.lg};
@@ -620,12 +620,12 @@ const StatusBadge = styled.span.withConfig({
   background: ${(props) => {
     switch (props.status) {
       case 'FOUND':
-        return '#10b981';
+        return props.theme.colors.status.found;
       case 'RESOLVED':
-        return '#6366f1';
+        return props.theme.colors.status.resolved;
       case 'MISSING':
       default:
-        return '#ef4444';
+        return props.theme.colors.status.missing;
     }
   }};
 `;

@@ -5,8 +5,8 @@ const PermissionDeniedModal = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
 
   return (
-    <ModalOverlay onClick={onClose}>
-      <ModalContent onClick={(e) => e.stopPropagation()}>
+    <ModalOverlay onClick={onClose} aria-hidden="true">
+      <ModalContent role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
         <ModalHeader>
           <ModalIcon>⚠️</ModalIcon>
           <ModalTitle>권한 없음</ModalTitle>

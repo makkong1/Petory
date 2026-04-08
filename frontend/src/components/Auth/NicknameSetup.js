@@ -144,124 +144,139 @@ const Container = styled.div`
   align-items: center;
   min-height: 100vh;
   padding: 2rem;
-  background: ${props => props.theme?.colors?.background || '#f5f5f5'};
+  background: ${({ theme }) => theme.colors.surfaceSoft};
 `;
 
 const Card = styled.div`
   max-width: 500px;
   width: 100%;
   padding: 2.5rem;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  background: ${({ theme }) => theme.colors.background};
+  border-radius: ${({ theme }) => theme.borderRadius.xl};
+  box-shadow: ${({ theme }) => theme.shadows.lg};
+
+  @media (max-width: 768px) {
+    padding: 1.5rem;
+  }
 `;
 
 const Title = styled.h2`
   text-align: center;
-  margin-bottom: 0.5rem;
-  color: #333;
+  margin-bottom: ${({ theme }) => theme.spacing.sm};
+  color: ${({ theme }) => theme.colors.text};
+  font-size: ${({ theme }) => theme.typography.h2.fontSize};
+  font-weight: ${({ theme }) => theme.typography.h2.fontWeight};
 `;
 
 const Description = styled.p`
   text-align: center;
   margin-bottom: 2rem;
-  color: #666;
-  font-size: 0.95rem;
+  color: ${({ theme }) => theme.colors.textSecondary};
+  font-size: 14px;
 `;
 
 const Form = styled.form`
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: ${({ theme }) => theme.spacing.lg};
 `;
 
 const InputGroup = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: ${({ theme }) => theme.spacing.sm};
 `;
 
 const Label = styled.label`
-  font-weight: 500;
-  color: #555;
+  font-weight: 600;
+  font-size: 13px;
+  color: ${({ theme }) => theme.colors.text};
 `;
 
 const NicknameInputGroup = styled.div`
   display: flex;
-  gap: 0.5rem;
+  gap: ${({ theme }) => theme.spacing.sm};
   align-items: flex-start;
 `;
 
 const Input = styled.input`
   flex: 1;
-  padding: 0.75rem;
-  border: 2px solid #e1e5e9;
-  border-radius: 6px;
-  font-size: 0.95rem;
-  transition: all 0.2s ease;
-  
+  padding: 10px 14px;
+  border: 1.5px solid ${({ theme }) => theme.colors.border};
+  border-radius: ${({ theme }) => theme.borderRadius.lg};
+  font-size: 14px;
+  background: ${({ theme }) => theme.colors.background};
+  color: ${({ theme }) => theme.colors.text};
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  outline: none;
+
+  &::placeholder { color: ${({ theme }) => theme.colors.textLight}; }
+
   &:focus {
-    outline: none;
-    border-color: #007bff;
-    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.1);
+    border-color: ${({ theme }) => theme.colors.primary};
+    box-shadow: 0 0 0 3px ${({ theme }) => theme.colors.primary}25;
   }
-  
+
   &:disabled {
-    background: #f5f5f5;
+    background: ${({ theme }) => theme.colors.surfaceSoft};
     cursor: not-allowed;
   }
 `;
 
 const CheckButton = styled.button`
-  padding: 0.75rem 1rem;
-  background: #007bff;
-  color: white;
+  padding: 10px 14px;
+  background: ${({ theme }) => theme.colors.primary};
+  color: #fff;
   border: none;
-  border-radius: 6px;
-  font-size: 0.9rem;
-  font-weight: 500;
+  border-radius: ${({ theme }) => theme.borderRadius.lg};
+  font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
   transition: all 0.2s ease;
-  
+
   &:hover:not(:disabled) {
-    background: #0056b3;
+    background: ${({ theme }) => theme.colors.primaryDark};
     transform: translateY(-1px);
   }
-  
+
   &:disabled {
-    background: #6c757d;
+    background: ${({ theme }) => theme.colors.surfaceHover};
+    color: ${({ theme }) => theme.colors.textLight};
     cursor: not-allowed;
     transform: none;
   }
 `;
 
 const NicknameMessage = styled.div`
-  font-size: 0.875rem;
-  margin-top: 0.25rem;
-  color: ${props => props.available ? '#28a745' : '#dc3545'};
+  font-size: 13px;
+  margin-top: 4px;
+  color: ${({ theme, available }) => available ? theme.colors.success : theme.colors.error};
 `;
 
 const Button = styled.button`
-  padding: 0.75rem 1.5rem;
-  background: #28a745;
-  color: white;
+  padding: 11px 20px;
+  background: ${({ theme }) => theme.colors.primary};
+  color: #fff;
   border: none;
-  border-radius: 6px;
-  font-size: 1rem;
+  border-radius: ${({ theme }) => theme.borderRadius.lg};
+  font-size: 15px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
-  margin-top: 0.5rem;
-  
+  margin-top: ${({ theme }) => theme.spacing.sm};
+
   &:hover:not(:disabled) {
-    background: #218838;
+    background: ${({ theme }) => theme.colors.primaryDark};
     transform: translateY(-1px);
-    box-shadow: 0 3px 8px rgba(40, 167, 69, 0.3);
+    box-shadow: 0 4px 12px ${({ theme }) => theme.colors.primary}40;
   }
-  
+
+  &:active:not(:disabled) { transform: translateY(0); }
+
   &:disabled {
-    background: #6c757d;
+    background: ${({ theme }) => theme.colors.surfaceHover};
+    color: ${({ theme }) => theme.colors.textLight};
     cursor: not-allowed;
     transform: none;
     box-shadow: none;
@@ -269,8 +284,8 @@ const Button = styled.button`
 `;
 
 const ErrorMessage = styled.div`
-  color: #dc3545;
-  font-size: 0.875rem;
-  margin-top: 0.5rem;
+  color: ${({ theme }) => theme.colors.error};
+  font-size: 13px;
+  margin-top: 4px;
 `;
 
