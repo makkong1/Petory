@@ -8,6 +8,10 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 
 import com.linkup.Petory.domain.chat.dto.ChatMessageDTO;
+import com.linkup.Petory.domain.chat.dto.ChatWebSocketMessageRequest;
+import com.linkup.Petory.domain.chat.dto.ChatWebSocketReadRequest;
+import com.linkup.Petory.domain.chat.dto.ChatWebSocketTypingRequest;
+import com.linkup.Petory.domain.chat.dto.TypingStatusDTO;
 import com.linkup.Petory.domain.chat.entity.MessageType;
 import com.linkup.Petory.domain.chat.service.ChatMessageService;
 import com.linkup.Petory.domain.user.exception.UserNotFoundException;
@@ -145,126 +149,4 @@ public class ChatWebSocketController {
         }
     }
 
-    /**
-     * WebSocket 메시지 요청 DTO
-     */
-    public static class ChatWebSocketMessageRequest {
-        private Long conversationIdx;
-        private String content;
-        private String messageType;
-        private Long replyToMessageIdx;
-
-        // Getters and Setters
-        public Long getConversationIdx() {
-            return conversationIdx;
-        }
-
-        public void setConversationIdx(Long conversationIdx) {
-            this.conversationIdx = conversationIdx;
-        }
-
-        public String getContent() {
-            return content;
-        }
-
-        public void setContent(String content) {
-            this.content = content;
-        }
-
-        public String getMessageType() {
-            return messageType;
-        }
-
-        public void setMessageType(String messageType) {
-            this.messageType = messageType;
-        }
-
-        public Long getReplyToMessageIdx() {
-            return replyToMessageIdx;
-        }
-
-        public void setReplyToMessageIdx(Long replyToMessageIdx) {
-            this.replyToMessageIdx = replyToMessageIdx;
-        }
-    }
-
-    /**
-     * WebSocket 읽음 요청 DTO
-     */
-    public static class ChatWebSocketReadRequest {
-        private Long conversationIdx;
-        private Long lastMessageIdx;
-
-        // Getters and Setters
-        public Long getConversationIdx() {
-            return conversationIdx;
-        }
-
-        public void setConversationIdx(Long conversationIdx) {
-            this.conversationIdx = conversationIdx;
-        }
-
-        public Long getLastMessageIdx() {
-            return lastMessageIdx;
-        }
-
-        public void setLastMessageIdx(Long lastMessageIdx) {
-            this.lastMessageIdx = lastMessageIdx;
-        }
-    }
-
-    /**
-     * WebSocket 타이핑 요청 DTO
-     */
-    public static class ChatWebSocketTypingRequest {
-        private Long conversationIdx;
-        private boolean isTyping;
-
-        // Getters and Setters
-        public Long getConversationIdx() {
-            return conversationIdx;
-        }
-
-        public void setConversationIdx(Long conversationIdx) {
-            this.conversationIdx = conversationIdx;
-        }
-
-        public boolean isTyping() {
-            return isTyping;
-        }
-
-        public void setTyping(boolean typing) {
-            isTyping = typing;
-        }
-    }
-
-    /**
-     * 타이핑 상태 DTO
-     */
-    public static class TypingStatusDTO {
-        private Long userId;
-        private boolean isTyping;
-
-        public TypingStatusDTO(Long userId, boolean isTyping) {
-            this.userId = userId;
-            this.isTyping = isTyping;
-        }
-
-        // Getters and Setters
-        public Long getUserId() {
-            return userId;
-        }
-
-        public void setUserId(Long userId) {
-            this.userId = userId;
-        }
-
-        public boolean isTyping() {
-            return isTyping;
-        }
-
-        public void setTyping(boolean typing) {
-            isTyping = typing;
-        }
-    }
 }
