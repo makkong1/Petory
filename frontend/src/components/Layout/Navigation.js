@@ -218,10 +218,8 @@ const Navigation = ({ activeTab, setActiveTab, user, onNavigateToBoard }) => {
 
   const menuItems = [
     { id: 'home', label: '홈', icon: '🏠' },
-    { id: 'location-services', label: '주변 서비스', icon: '📍' },
-    { id: 'care-requests', label: '펫케어 요청', icon: '🐾' },
     { id: 'missing-pets', label: '실종 제보', icon: '🚨' },
-    { id: 'meetup', label: '산책 모임', icon: '🐾' },
+    { id: 'unified-map', label: '탐색', icon: '🗺️' },
     { id: 'community', label: '커뮤니티', icon: '💬' },
     ...(isAdmin ? [
       { id: 'admin', label: '관리자', icon: '🔧' },
@@ -306,14 +304,7 @@ const Navigation = ({ activeTab, setActiveTab, user, onNavigateToBoard }) => {
                                     }));
                                   }, 100); // 탭 전환 후 실행
                                 } else if (notification.relatedType === 'CARE_REQUEST' && notification.relatedId) {
-                                  // 펫케어 요청 탭으로 이동
-                                  setActiveTab('care-requests');
-                                  // 펫케어 요청 상세 페이지 열기 (전역 이벤트 사용)
-                                  setTimeout(() => {
-                                    window.dispatchEvent(new CustomEvent('openCareRequestDetail', {
-                                      detail: { careRequestId: notification.relatedId }
-                                    }));
-                                  }, 100); // 탭 전환 후 실행
+                                  setActiveTab('unified-map');
                                 }
                               }}
                             >

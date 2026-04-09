@@ -1,0 +1,356 @@
+# UnifiedPetMap 설계안 (Location + Meetup + Care 통합 지도)
+
+## 1) 목적
+
+Location(시설), Meetup(모임), Care Request(케어 요청)를 한 지도에서 레이어로 분리해 표출한다.  
+사용자는 "내 주변에서 지금 가능한 것"을 한 화면에서 비교하고 바로 액션(상세 보기/참여/지원)할 수 있어야 한다.
+
+---
+
+## 2) 현재 상태 요약
+
+| 도메인 | 좌표 저장 | 지도 표출 | 주변 검색 API | 상태 |
+|---|---|---|---|---|
+| Location | 있음 (Double + POINT) | 구현됨 | 있음 | 바로 연동 가능 |
+| Meetup | 있음 (Double) | 일부/미연동 | 있음 (`/api/meetups/nearby`) | 프론트 연결 위주 |
+| Care Request | 없음 (텍스트 location 중심) | 미구현 | 없음 | 백엔드 모델 보강 필요 |
+
+핵심 결론:
+- 기존 `LocationServiceMap`에 기능을 계속 붙이는 방식은 복잡도와 결합도를 크게 높인다.
+- 통합 탐색은 "시설 전용 지도"와 목적이 다르므로 별도 페이지가 적합하다.
+
+---
+
+## 3) 권장 구조
+
+### 3-1. 페이지 분리
+
+기존 지도 확장 대신 신규 `UnifiedPetMapPage`를 만들고, Navigation에 `탐색` 탭을 추가한다.
+
+### 3-2. 상단 헤더 탭(단일 활성 레이어)
+
+- `주변서비스(Location)`
+- `모임(Meetup)`
+- `펫케어(Care)`
+
+한 번에 하나의 탭만 활성화한다.
+- 탭 클릭 시 해당 도메인 API만 호출
+- 지도는 유지하고 마커만 교체
+- 각 탭의 로딩/에러/캐시는 독립 관리
+
+> 기본 탭은 `주변서비스`를 권장 (기존 사용자 경험과 연결이 자연스러움)
+
+### 3-3. 공통 지도 아이템 포맷
+
+```js
+const toMapItem = (type, raw) => ({
+  id: `${type}-${raw.idx}`,
+  type, // 'location' | 'meetup' | 'care'
+  latitude: raw.latitude,
+  longitude: raw.longitude,
+  title: raw.name || raw.title,
+  subtitle: '',
+  raw,
+});
+```
+
+---
+
+## 4) 프론트 설계
+
+```txt
+frontend/src/components/UnifiedMap/
+  UnifiedPetMapPage.js        // 상태 관리(중심 좌표, 반경, 활성 레이어)
+  DomainTabHeader.js          // 상단 탭(주변서비스/모임/펫케어)
+  RadiusFilter.js             // 반경 선택(1/3/5/10km)
+  layers/
+    LocationLayer.js          // 시설 마커 렌더
+    MeetupLayer.js            // 모임 마커 렌더
+    CareLayer.js              // 케어 마커 렌더
+
+frontend/src/api/
+  unifiedMapApi.js            // 도메인별 API를 공통 포맷으로 변환
+```
+
+재사용 컴포넌트 (기존 파일 그대로 사용):
+- `frontend/src/components/LocationService/MapContainer.js` — Naver Maps 엔진
+- `frontend/src/api/locationServiceApi.js` — 시설 검색 API
+- `frontend/src/api/meetupApi.js` — 모임 nearby API
+- `frontend/src/api/careRequestApi.js` — 케어 요청 API
+- `frontend/src/api/geocodingApi.js` — 주소 → 좌표 변환
+- `frontend/src/components/MissingPet/AddressMapSelector.js` — Care 폼 주소 입력 재사용
+
+### 마커 색상/아이콘 설정
+
+```js
+// unifiedMapApi.js 또는 constants 파일에 정의
+const LAYER_CONFIG = {
+  location: {
+    color: '#4A90D9',   // 파란색
+    icon: '🏥',
+    label: '시설',
+    zIndex: 100,
+  },
+  meetup: {
+    color: '#52C41A',   // 초록색
+    icon: '🐾',
+    label: '모임',
+    zIndex: 200,
+  },
+  care: {
+    color: '#FAAD14',   // 노란색
+    icon: '💛',
+    label: '케어 요청',
+    zIndex: 300,
+  },
+};
+```
+
+### 공통 map item 정규화 (unifiedMapApi.js)
+
+```js
+const toMapItem = (type, raw) => ({
+  id: `${type}-${raw.idx}`,
+  type,                          // 'location' | 'meetup' | 'care'
+  latitude: raw.latitude,
+  longitude: raw.longitude,
+  title: raw.name || raw.title,
+  subtitle: {
+    location: raw.category || raw.address,
+    meetup:   `${raw.meetupDate} · ${raw.currentParticipants}/${raw.maxParticipants}명`,
+    care:     `${raw.date} · ${raw.petName || ''}`,
+  }[type],
+  raw,                           // 인포윈도우 상세용 원본 데이터
+});
+
+// 활성 탭 1개만 호출
+export const fetchActiveMapItems = async ({ type, lat, lng, radius }) => {
+  if (type === 'location') {
+    const res = await locationServiceApi.search({
+      latitude: lat,
+      longitude: lng,
+      radius: radius * 1000,
+    });
+    return (res?.services ?? []).map(r => toMapItem('location', r));
+  }
+
+  if (type === 'meetup') {
+    const res = await meetupApi.getNearbyMeetups(lat, lng, radius);
+    return (res ?? []).map(r => toMapItem('meetup', r));
+  }
+
+  if (type === 'care') {
+    const res = await careRequestApi.getNearby({ lat, lng, radius });
+    return (res ?? []).map(r => toMapItem('care', r));
+  }
+
+  return [];
+};
+```
+
+권장 UI:
+- 상단: 탭 헤더 + 반경 필터 + "내 위치로 이동"
+- 지도: 도메인별 색/아이콘 구분 (LAYER_CONFIG 기준)
+- 인포윈도우: 도메인 핵심 정보 + 상세 이동 링크
+
+---
+
+## 5) 백엔드 설계 (Care 보강)
+
+### 5-1. DB 마이그레이션 (필수 선행)
+
+테이블명은 `care_request` (JPA 기본 snake_case 변환 규칙).
+
+```sql
+ALTER TABLE care_request
+  ADD COLUMN latitude  DOUBLE       NULL,
+  ADD COLUMN longitude DOUBLE       NULL,
+  ADD COLUMN address   VARCHAR(255) NULL;
+```
+
+> 기존 데이터는 좌표 NULL — 백필 계획은 아래 7) 참조
+
+### 5-2. 엔티티 확장
+
+**수정 파일:** `domain/care/entity/CareRequest.java`
+
+```java
+@Column(name = "latitude")
+private Double latitude;
+
+@Column(name = "longitude")
+private Double longitude;
+
+@Column(name = "address", length = 255)
+private String address;
+```
+
+### 5-3. DTO 확장
+
+**수정 파일:** `domain/care/dto/CareRequestDTO.java`
+
+```java
+private Double latitude;
+private Double longitude;
+private String address;
+```
+
+**수정 파일:** `domain/care/dto/CareRequestConverter.java`
+- `toDTO()` 내에 `latitude`, `longitude`, `address` 매핑 추가
+
+### 5-4. Repository — 반경 검색 쿼리 추가
+
+**수정 파일:** `domain/care/repository/SpringDataJpaCareRequestRepository.java`
+
+```java
+// Meetup과 동일한 Haversine 패턴 사용
+@Query("""
+  SELECT cr FROM CareRequest cr JOIN FETCH cr.user u
+  WHERE cr.isDeleted = false
+    AND cr.latitude IS NOT NULL
+    AND cr.status IN ('OPEN', 'IN_PROGRESS')
+    AND (6371 * acos(
+          cos(radians(:lat)) * cos(radians(cr.latitude)) *
+          cos(radians(cr.longitude) - radians(:lng)) +
+          sin(radians(:lat)) * sin(radians(cr.latitude))
+        )) <= :radius
+  ORDER BY cr.createdAt DESC
+  """)
+List<CareRequest> findNearby(
+  @Param("lat") double lat,
+  @Param("lng") double lng,
+  @Param("radius") double radiusKm
+);
+```
+
+**수정 파일:** `domain/care/repository/CareRequestRepository.java` — 인터페이스에 선언 추가
+**수정 파일:** `domain/care/repository/JpaCareRequestAdapter.java` — 위임 구현 추가
+
+### 5-5. Service 메서드 추가
+
+**수정 파일:** `domain/care/service/CareRequestService.java`
+
+```java
+public List<CareRequestDTO> getNearby(double lat, double lng, double radiusKm) {
+    return careRequestRepository.findNearby(lat, lng, radiusKm)
+        .stream()
+        .map(CareRequestConverter::toDTO)
+        .toList();
+}
+```
+
+### 5-6. API 엔드포인트 추가
+
+**수정 파일:** `domain/care/controller/CareRequestController.java`
+
+```java
+@GetMapping("/nearby")
+@PreAuthorize("isAuthenticated()")
+public ResponseEntity<List<CareRequestDTO>> getNearby(
+        @RequestParam double lat,
+        @RequestParam double lng,
+        @RequestParam(defaultValue = "5.0") double radius) {
+    return ResponseEntity.ok(careRequestService.getNearby(lat, lng, radius));
+}
+```
+
+### 5-7. 생성/수정 정책
+
+케어 요청 생성 시 좌표를 확정해 저장 — 조회 시 geocoding 반복 호출 방지.
+
+**권장: 클라이언트에서 geocoding 후 전송**
+- `CareRequestForm.js`에 `AddressMapSelector` 컴포넌트 추가 (MissingPetBoardForm에서 이미 사용 중 — 재사용)
+- 폼에서 주소 입력 → geocoding API 호출 → `latitude/longitude/address` 함께 전송
+
+> 서버 geocoding 방식은 Naver API 호출 실패 시 저장 자체가 block되는 리스크가 있어 비권장
+
+---
+
+## 6) 단계별 구현 계획
+
+## Phase 1 (빠른 가시화, 저위험)
+
+목표: Location + Meetup 통합 지도 오픈
+
+**백엔드 변경 없음** — 기존 API 그대로 연결
+
+| 순서 | 작업 | 파일 |
+|------|------|------|
+| 1 | UnifiedPetMapPage 생성 | `components/UnifiedMap/UnifiedPetMapPage.js` (신규) |
+| 2 | DomainTabHeader 생성 | `components/UnifiedMap/DomainTabHeader.js` (신규) |
+| 3 | RadiusFilter 생성 | `components/UnifiedMap/RadiusFilter.js` (신규) |
+| 4 | MeetupLayer 생성 | `components/UnifiedMap/layers/MeetupLayer.js` (신규) |
+| 5 | LocationLayer 생성 | `components/UnifiedMap/layers/LocationLayer.js` (신규) |
+| 6 | unifiedMapApi 생성 | `api/unifiedMapApi.js` (신규) |
+| 7 | Navigation 탭 추가 | `components/Layout/Navigation.js` (수정) |
+| 8 | App.js 라우팅 추가 | `App.js` (수정) |
+
+성과:
+- 백엔드 변경 거의 없이 사용자 가치 제공 가능
+
+## Phase 2 (Care 통합)
+
+목표: Care까지 3도메인 완전 통합
+
+**백엔드 수정 파일:**
+
+| 순서 | 작업 | 파일 |
+|------|------|------|
+| 1 | DB 마이그레이션 | `ALTER TABLE care_request ADD COLUMN ...` |
+| 2 | 엔티티 필드 추가 | `domain/care/entity/CareRequest.java` |
+| 3 | DTO 필드 추가 | `domain/care/dto/CareRequestDTO.java` |
+| 4 | Converter 매핑 추가 | `domain/care/dto/CareRequestConverter.java` |
+| 5 | Repository 쿼리 추가 | `domain/care/repository/SpringDataJpaCareRequestRepository.java` |
+| 6 | Repository 인터페이스 선언 | `domain/care/repository/CareRequestRepository.java` |
+| 7 | Adapter 위임 추가 | `domain/care/repository/JpaCareRequestAdapter.java` |
+| 8 | Service 메서드 추가 | `domain/care/service/CareRequestService.java` |
+| 9 | Controller 엔드포인트 추가 | `domain/care/controller/CareRequestController.java` |
+
+**프론트엔드 수정 파일:**
+
+| 순서 | 작업 | 파일 |
+|------|------|------|
+| 10 | 폼에 AddressMapSelector 추가 | `components/CareRequest/CareRequestForm.js` |
+| 11 | CareLayer 생성 | `components/UnifiedMap/layers/CareLayer.js` (신규) |
+| 12 | unifiedMapApi에 care 연결 | `api/unifiedMapApi.js` |
+
+---
+
+## 7) 데이터/성능 주의사항
+
+- 지도 초기 로딩은 활성 탭 1개만 호출하고, 다른 탭은 클릭 시 지연 로딩
+- 탭별 캐시(키: `type+lat+lng+radius`)를 두어 탭 재클릭 시 재요청 최소화
+- 마커 수가 많아지면 클러스터링 적용
+- 지도 이동/반경 변경 시 API 호출 디바운스 적용 (300~500ms 권장)
+- 반경 단위(km/m)와 좌표계(SRID 4326) 일관성 유지
+- Care는 좌표 null 데이터 백필 계획 필요
+
+---
+
+## 8) 리스크 및 대응
+
+| 리스크 | 영향 | 대응 |
+|---|---|---|
+| 기존 거대 지도 컴포넌트에 추가 개발 | 유지보수성 급락 | 별도 Unified 페이지 분리 |
+| Care 좌표 미보유 데이터 | 지도 누락 | 마이그레이션 + 점진 백필 |
+| API 응답 포맷 불일치 | 프론트 변환 로직 복잡 | `unifiedMapApi`에서 표준 포맷 강제 |
+| 지도 과밀 구간 렌더링 지연 | UX 저하 | 클러스터링 + 디바운스 |
+
+---
+
+## 9) 검증 체크리스트
+
+- [ ] 탐색 탭 진입 시 지도 정상 렌더링
+- [ ] 상단 탭(주변서비스/모임/펫케어) 전환 시 해당 도메인만 렌더링
+- [ ] 마커 클릭 시 도메인별 정보 정확성
+- [ ] 반경 변경 시 결과 재조회 정확성
+- [ ] 탭별 로딩/에러 상태가 서로 간섭 없이 동작
+- [ ] Care 생성 후 즉시 지도 반영 확인
+
+---
+
+## 10) 최종 권고
+
+1. 먼저 Phase 1을 출시해 사용자 반응과 지도 사용 패턴을 확인한다.  
+2. 이후 Phase 2에서 Care 좌표 모델을 안정적으로 도입한다.  
+3. 장기적으로는 통합 지도 전용 BFF API(단일 endpoint)로 발전시켜 프론트 복잡도를 줄인다.

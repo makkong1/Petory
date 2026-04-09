@@ -8,9 +8,9 @@ const HomePage = ({ setActiveTab }) => {
   const features = [
     {
       icon: '🗺️',
-      title: '위치 서비스',
-      description: '주변 펫케어 서비스 위치를 지도에서 확인하고 찾아보세요.',
-      action: () => setActiveTab('location-services')
+      title: '탐색',
+      description: '주변 펫케어 시설, 모임, 케어 요청을 지도에서 한눈에 확인하세요.',
+      action: () => setActiveTab('unified-map')
     },
     {
       icon: '🚨',
@@ -22,19 +22,19 @@ const HomePage = ({ setActiveTab }) => {
       icon: '🐾',
       title: '펫케어 서비스',
       description: '믿을 수 있는 펫시터와 매칭하여 소중한 반려동물을 안전하게 맡기세요.',
-      action: () => setActiveTab('care-requests')
+      action: () => setActiveTab('unified-map')
     },
     {
       icon: '⭐',
       title: '리뷰 시스템',
       description: '실제 이용 후기를 통해 믿을 수 있는 펫케어 서비스를 선택하세요.',
-      action: () => setActiveTab('care-requests')
+      action: () => setActiveTab('unified-map')
     },
     {
       icon: '🐾',
       title: '산책 모임',
       description: '주변 반려동물 산책 모임을 찾아 함께 산책하며 친구를 만나보세요.',
-      action: () => setActiveTab('meetup')
+      action: () => setActiveTab('unified-map')
     },
     {
       icon: '💬',
@@ -52,7 +52,7 @@ const HomePage = ({ setActiveTab }) => {
           주변 펫케어 서비스 위치를 지도에서 확인하고<br />
           가장 가까운 펫케어 서비스를 찾아보세요
         </HeroSubtitle>
-        <CTAButton onClick={() => setActiveTab('location-services')}>
+        <CTAButton onClick={() => setActiveTab('unified-map')}>
           지도 서비스 시작하기
         </CTAButton>
       </HeroSection>

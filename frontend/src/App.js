@@ -5,9 +5,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Navigation from './components/Layout/Navigation';
 import HomePage from './components/Home/HomePage';
 import UserList from './components/User/UserList';
-import CareRequestList from './components/CareRequest/CareRequestList';
 import CommunityBoard from './components/Community/CommunityBoard';
-import LocationServiceMap from './components/LocationService/LocationServiceMap';
 import LoginForm from './components/Auth/LoginForm';
 import RegisterForm from './components/Auth/RegisterForm';
 import OAuth2Callback from './components/Auth/OAuth2Callback';
@@ -16,7 +14,7 @@ import PermissionDeniedModal from './components/Common/PermissionDeniedModal';
 import ScrollToTopBottom from './components/Common/ScrollToTopBottom';
 import MissingPetBoardPage from './components/MissingPet/MissingPetBoardPage';
 import ActivityPage from './components/Activity/ActivityPage';
-import MeetupPage from './components/Meetup/MeetupPage';
+import UnifiedPetMapPage from './components/UnifiedMap/UnifiedPetMapPage';
 import ChatWidget from './components/Chat/ChatWidget';
 import EmailVerificationPage from './components/Auth/EmailVerificationPage';
 import EmailVerificationPrompt from './components/Common/EmailVerificationPrompt.js';
@@ -157,16 +155,12 @@ function AppContent() {
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'location-services':
-        return <LocationServiceMap />;
-      case 'care-requests':
-        return <CareRequestList />;
       case 'community':
         return <CommunityBoard />;
       case 'missing-pets':
         return <MissingPetBoardPage />;
-      case 'meetup':
-        return <MeetupPage />;
+      case 'unified-map':
+        return <UnifiedPetMapPage />;
       case 'users':
         return <UserList />;
       case 'admin':
