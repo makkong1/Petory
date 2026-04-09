@@ -79,4 +79,9 @@ public class JpaLocationServiceAdapter implements LocationServiceRepository {
     public List<LocationService> findByRoadName(String roadName) {
         return jpaRepository.findByRoadName(roadName);
     }
+
+    @Override
+    public void updateRatingByAvg(Long serviceIdx) {
+        jpaRepository.updateRatingByAvg(serviceIdx);
+    }
 }

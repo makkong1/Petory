@@ -3,6 +3,7 @@ package com.linkup.Petory.domain.location.repository;
 import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -92,4 +93,18 @@ public interface SpringDataJpaLocationServiceRepository extends JpaRepository<Lo
                         "(ls.isDeleted IS NULL OR ls.isDeleted = false) " +
                         "ORDER BY ls.rating DESC")
         List<LocationService> findByRoadName(@Param("roadName") String roadName);
+
+        // [FIX] 리뷰 평균을 DB에서 직접 계산해 rating 컬럼을 한 번의 UPDATE로 갱신.
+        // 기존 read → AVG계산 → write 패턴은 동시 리뷰 시 Lost Update 위험이 있었음.
+        // 인라인 뷰로 감싸 MySQL 버전 무관하게 호환성 확보.
+        @RepositoryMethod("장소 서비스: 평점 직접 갱신 (원자적)")
+        @Modifying
+        @Query(value = "UPDATE locationservice SET rating = (" +
+                        "SELECT avg_rating FROM (" +
+                        "SELECT COALESCE(AVG(r.rating), 0.0) AS avg_rating " +
+                        "FROM locationservicereview r " +
+                        "WHERE r.service_idx = :serviceIdx AND (r.is_deleted IS NULL OR r.is_deleted = 0)" +
+                        ") t" +
+                        ") WHERE idx = :serviceIdx", nativeQuery = true)
+        void updateRatingByAvg(@Param("serviceIdx") Long serviceIdx);
 }

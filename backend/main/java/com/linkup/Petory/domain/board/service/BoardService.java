@@ -17,23 +17,23 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.linkup.Petory.domain.board.converter.BoardConverter;
-import com.linkup.Petory.domain.common.ContentStatus;
-import com.linkup.Petory.domain.user.entity.Users;
-import com.linkup.Petory.domain.board.exception.BoardNotFoundException;
-import com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException;
-import com.linkup.Petory.domain.user.exception.UserNotFoundException;
-import com.linkup.Petory.domain.user.repository.UsersRepository;
 import com.linkup.Petory.domain.board.dto.BoardDTO;
 import com.linkup.Petory.domain.board.dto.BoardPageResponseDTO;
 import com.linkup.Petory.domain.board.entity.Board;
-import com.linkup.Petory.domain.board.repository.BoardRepository;
-import com.linkup.Petory.domain.board.repository.BoardReactionRepository;
-import com.linkup.Petory.domain.board.repository.BoardViewLogRepository;
-import com.linkup.Petory.domain.board.entity.ReactionType;
 import com.linkup.Petory.domain.board.entity.BoardViewLog;
+import com.linkup.Petory.domain.board.entity.ReactionType;
+import com.linkup.Petory.domain.board.exception.BoardNotFoundException;
+import com.linkup.Petory.domain.board.repository.BoardReactionRepository;
+import com.linkup.Petory.domain.board.repository.BoardRepository;
+import com.linkup.Petory.domain.board.repository.BoardViewLogRepository;
+import com.linkup.Petory.domain.common.ContentStatus;
 import com.linkup.Petory.domain.file.dto.FileDTO;
 import com.linkup.Petory.domain.file.entity.FileTargetType;
 import com.linkup.Petory.domain.file.service.AttachmentFileService;
+import com.linkup.Petory.domain.user.entity.Users;
+import com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException;
+import com.linkup.Petory.domain.user.exception.UserNotFoundException;
+import com.linkup.Petory.domain.user.repository.UsersRepository;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -51,6 +51,7 @@ public class BoardService {
     private final AttachmentFileService attachmentFileService;
     private final BoardConverter boardConverter;
 
+    // dklrmfowjai
     // 전체 게시글 조회 (카테고리 필터링 포함)
     // 캐시 임시 비활성화 - 개발 중 데이터 동기화 문제 해결
     // @Cacheable(value = "boardList", key = "#category != null ? #category :
@@ -73,9 +74,8 @@ public class BoardService {
     }
 
     /**
-     * 관리자용 게시글 조회 (페이징 + 필터링 지원)
-     * - 작성자 상태 체크 없이 조회 (삭제된 사용자 콘텐츠도 포함)
-     * - AdminBoardController에서 사용
+     * 관리자용 게시글 조회 (페이징 + 필터링 지원) - 작성자 상태 체크 없이 조회 (삭제된 사용자 콘텐츠도 포함) -
+     * AdminBoardController에서 사용
      */
     public BoardPageResponseDTO getAdminBoardsWithPaging(
             String status, Boolean deleted, String category, String q, int page, int size) {
@@ -117,7 +117,7 @@ public class BoardService {
                         boolean matches = (board.getTitle() != null && board.getTitle().toLowerCase().contains(keyword))
                                 || (board.getContent() != null && board.getContent().toLowerCase().contains(keyword))
                                 || (board.getUser() != null && board.getUser().getUsername() != null
-                                        && board.getUser().getUsername().toLowerCase().contains(keyword));
+                                && board.getUser().getUsername().toLowerCase().contains(keyword));
                         if (!matches) {
                             return false;
                         }
@@ -200,10 +200,8 @@ public class BoardService {
     }
 
     /**
-     * 관리자용 단일 게시글 조회 (조회수 증가 없음)
-     * [리팩토링] listBoards 전체 로드 제거 → 단건 조회 API로 대체
-     * - AdminBoardController에서 사용
-     * - 삭제된 게시글도 조회 가능
+     * 관리자용 단일 게시글 조회 (조회수 증가 없음) [리팩토링] listBoards 전체 로드 제거 → 단건 조회 API로 대체 -
+     * AdminBoardController에서 사용 - 삭제된 게시글도 조회 가능
      */
     /**
      * [리팩토링] Fetch Join - Board + User 1회 쿼리
@@ -256,8 +254,8 @@ public class BoardService {
 
     // 게시글 수정
     @Caching(evict = {
-            @CacheEvict(value = "boardDetail", key = "#idx"),
-            @CacheEvict(value = "boardList", allEntries = true) // 카테고리 변경 가능하므로 안전하게 전체 무효화
+        @CacheEvict(value = "boardDetail", key = "#idx"),
+        @CacheEvict(value = "boardList", allEntries = true) // 카테고리 변경 가능하므로 안전하게 전체 무효화
     })
     @Transactional
     public BoardDTO updateBoard(long idx, BoardDTO dto) {
@@ -272,12 +270,15 @@ public class BoardService {
                     com.linkup.Petory.domain.user.entity.EmailVerificationPurpose.BOARD_EDIT);
         }
 
-        if (dto.getTitle() != null)
+        if (dto.getTitle() != null) {
             board.setTitle(dto.getTitle());
-        if (dto.getContent() != null)
+        }
+        if (dto.getContent() != null) {
             board.setContent(dto.getContent());
-        if (dto.getCategory() != null)
+        }
+        if (dto.getCategory() != null) {
             board.setCategory(dto.getCategory());
+        }
         Board updated = boardRepository.save(board);
         if (dto.getBoardFilePath() != null) {
             attachmentFileService.syncSingleAttachment(FileTargetType.BOARD, updated.getIdx(), dto.getBoardFilePath(),
@@ -288,8 +289,8 @@ public class BoardService {
 
     // 게시글 삭제
     @Caching(evict = {
-            @CacheEvict(value = "boardDetail", key = "#idx"),
-            @CacheEvict(value = "boardList", allEntries = true) // 해당 카테고리 캐시 무효화를 위해 전체 무효화
+        @CacheEvict(value = "boardDetail", key = "#idx"),
+        @CacheEvict(value = "boardList", allEntries = true) // 해당 카테고리 캐시 무효화를 위해 전체 무효화
     })
     @Transactional
     public void deleteBoard(long idx) {
@@ -397,8 +398,7 @@ public class BoardService {
     }
 
     /**
-     * 단일 게시글에 상세 정보 매핑 (반응 정보, 첨부파일 포함)
-     * 배치 조회를 활용하여 최적화
+     * 단일 게시글에 상세 정보 매핑 (반응 정보, 첨부파일 포함) 배치 조회를 활용하여 최적화
      */
     private BoardDTO mapBoardWithDetails(Board board) {
         List<BoardDTO> results = mapBoardsWithReactionsBatch(List.of(board));
@@ -407,8 +407,9 @@ public class BoardService {
 
     /**
      * 배치 조회 결과(Object[])를 Map으로 변환
-     * 
-     * @param results Repository에서 반환된 Object[] 리스트 [boardId, reactionType, count]
+     *
+     * @param results Repository에서 반환된 Object[] 리스트 [boardId, reactionType,
+     * count]
      * @return Map<BoardId, Map<ReactionType, Count>>
      */
     private Map<Long, Map<ReactionType, Long>> parseBatchReactionCountResults(List<Object[]> results) {
@@ -426,8 +427,8 @@ public class BoardService {
 
     /**
      * BoardDTO에 반응 카운트 적용
-     * 
-     * @param dto    대상 BoardDTO
+     *
+     * @param dto 대상 BoardDTO
      * @param counts Map<ReactionType, Count>
      */
     private void applyReactionCounts(BoardDTO dto, Map<ReactionType, Long> counts) {
@@ -437,9 +438,9 @@ public class BoardService {
 
     /**
      * BoardDTO에 첨부파일 정보 적용 (배치 조회용)
-     * 
-     * @param dto            대상 BoardDTO
-     * @param boardId        게시글 ID
+     *
+     * @param dto 대상 BoardDTO
+     * @param boardId 게시글 ID
      * @param attachmentsMap Map<BoardId, List<FileDTO>>
      */
     private void applyAttachmentInfo(BoardDTO dto, Long boardId, Map<Long, List<FileDTO>> attachmentsMap) {
@@ -487,8 +488,7 @@ public class BoardService {
     }
 
     /**
-     * 여러 게시글의 좋아요/싫어요 카운트를 배치로 조회
-     * 반환값: Map<BoardId, Map<ReactionType, Count>>
+     * 여러 게시글의 좋아요/싫어요 카운트를 배치로 조회 반환값: Map<BoardId, Map<ReactionType, Count>>
      * IN 절 크기 제한을 위해 배치 단위로 나누어 조회
      */
     private Map<Long, Map<ReactionType, Long>> getReactionCountsBatch(List<Long> boardIds) {
@@ -548,12 +548,11 @@ public class BoardService {
     }
 
     /**
-     * 게시글 상태 변경 (관리자용)
-     * - AdminBoardController에서 사용
+     * 게시글 상태 변경 (관리자용) - AdminBoardController에서 사용
      */
     @Caching(evict = {
-            @CacheEvict(value = "boardDetail", key = "#id"),
-            @CacheEvict(value = "boardList", allEntries = true)
+        @CacheEvict(value = "boardDetail", key = "#id"),
+        @CacheEvict(value = "boardList", allEntries = true)
     })
     @Transactional
     public BoardDTO updateBoardStatus(long id, com.linkup.Petory.domain.common.ContentStatus status) {
@@ -565,12 +564,11 @@ public class BoardService {
     }
 
     /**
-     * 게시글 복구 (관리자용)
-     * - AdminBoardController에서 사용
+     * 게시글 복구 (관리자용) - AdminBoardController에서 사용
      */
     @Caching(evict = {
-            @CacheEvict(value = "boardDetail", key = "#id"),
-            @CacheEvict(value = "boardList", allEntries = true)
+        @CacheEvict(value = "boardDetail", key = "#id"),
+        @CacheEvict(value = "boardList", allEntries = true)
     })
     @Transactional
     public BoardDTO restoreBoard(long id) {
@@ -585,14 +583,11 @@ public class BoardService {
     }
 
     /**
-     * 관리자용 게시글 조회 (페이징 + 필터링 지원) - DB 레벨 필터링 버전
-     * [리팩토링] getAdminBoardsWithPaging 메모리 필터링 → Specification + DB 페이징
-     * 
-     * 개선사항:
-     * - 메모리 필터링 → DB 레벨 필터링 (Specification 패턴 사용)
-     * - 불필요한 데이터 조회 제거
-     * - 인덱스 활용 가능
-     * - 성능 대폭 개선
+     * 관리자용 게시글 조회 (페이징 + 필터링 지원) - DB 레벨 필터링 버전 [리팩토링] getAdminBoardsWithPaging
+     * 메모리 필터링 → Specification + DB 페이징
+     *
+     * 개선사항: - 메모리 필터링 → DB 레벨 필터링 (Specification 패턴 사용) - 불필요한 데이터 조회 제거 - 인덱스
+     * 활용 가능 - 성능 대폭 개선
      */
     public BoardPageResponseDTO getAdminBoardsWithPagingOptimized(
             String status, Boolean deleted, String category, String q, int page, int size) {

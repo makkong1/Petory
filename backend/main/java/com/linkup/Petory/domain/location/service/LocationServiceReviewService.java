@@ -1,7 +1,6 @@
 package com.linkup.Petory.domain.location.service;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
@@ -157,17 +156,11 @@ public class LocationServiceReviewService {
                 .collect(Collectors.toList());
     }
 
-    // 서비스 평점 업데이트
+    // [FIX] 서비스 평점 원자적 갱신 — DB 단일 UPDATE로 Lost Update 제거.
+    // 기존: findAverageRatingByServiceIdx → findById → setRating → save (비원자적 read-modify-write)
+    // 변경: UPDATE locationservice SET rating = (SELECT AVG ...) WHERE idx = :serviceIdx
     @Transactional
     public void updateServiceRating(Long serviceIdx) {
-        Optional<Double> averageRating = reviewRepository.findAverageRatingByServiceIdx(serviceIdx);
-
-        if (averageRating.isPresent()) {
-            LocationService service = serviceRepository.findById(serviceIdx)
-                    .orElseThrow(LocationServiceNotFoundException::new);
-
-            service.setRating(averageRating.get());
-            serviceRepository.save(service);
-        }
+        serviceRepository.updateRatingByAvg(serviceIdx);
     }
 }

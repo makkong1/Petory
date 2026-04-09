@@ -76,6 +76,11 @@ public class JpaMeetupAdapter implements MeetupRepository {
     }
 
     @Override
+    public int decrementParticipantsIfPositive(Long meetupIdx) {
+        return jpaRepository.decrementParticipantsIfPositive(meetupIdx);
+    }
+
+    @Override
     public List<Meetup> findAllNotDeleted() {
         return jpaRepository.findAllNotDeleted();
     }

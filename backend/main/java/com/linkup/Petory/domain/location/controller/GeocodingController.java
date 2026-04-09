@@ -52,13 +52,14 @@ public class GeocodingController {
                 response.put("longitude", coordinates[1]);
                 response.put("success", true);
                 log.info("✅ 지오코딩 성공 - 주소: {}, 좌표: ({}, {})", address, coordinates[0], coordinates[1]);
+                return ResponseEntity.ok(response);
             } else {
+                // [FIX] 변환 실패는 200이 아닌 400으로 반환 — 클라이언트가 success 필드 대신 HTTP 상태로 분기 가능
                 response.put("success", false);
                 response.put("message", "주소를 좌표로 변환할 수 없습니다. 네이버 클라우드 플랫폼에서 Geocoding API 구독이 필요할 수 있습니다.");
                 log.warn("⚠️ 주소 변환 실패 - 주소: {}, 좌표: {}", address, coordinates);
+                return ResponseEntity.badRequest().body(response);
             }
-
-            return ResponseEntity.ok(response);
         } catch (Exception e) {
             log.error("❌ 주소 변환 실패 - 주소: {}, 에러: {}", address, e.getMessage(), e);
             Map<String, Object> response = new HashMap<>();
@@ -91,10 +92,19 @@ public class GeocodingController {
                 return ResponseEntity.badRequest().body(errorResponse);
             }
 
-            double startLng = Double.parseDouble(startCoords[0].trim());
-            double startLat = Double.parseDouble(startCoords[1].trim());
-            double endLng = Double.parseDouble(goalCoords[0].trim());
-            double endLat = Double.parseDouble(goalCoords[1].trim());
+            // [FIX] NumberFormatException 명시적 처리 — 비숫자 입력 시 500 대신 400 반환
+            double startLng, startLat, endLng, endLat;
+            try {
+                startLng = Double.parseDouble(startCoords[0].trim());
+                startLat = Double.parseDouble(startCoords[1].trim());
+                endLng = Double.parseDouble(goalCoords[0].trim());
+                endLat = Double.parseDouble(goalCoords[1].trim());
+            } catch (NumberFormatException e) {
+                Map<String, Object> errorResponse = new HashMap<>();
+                errorResponse.put("success", false);
+                errorResponse.put("message", "좌표 값이 숫자가 아닙니다: " + e.getMessage());
+                return ResponseEntity.badRequest().body(errorResponse);
+            }
 
             Map<String, Object> result = naverMapService.getDirections(startLng, startLat, endLng, endLat, option);
             return ResponseEntity.ok(result);
