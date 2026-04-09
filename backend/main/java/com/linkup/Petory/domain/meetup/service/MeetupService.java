@@ -117,10 +117,20 @@ public class MeetupService {
     }
 
     // 모임 수정
+    // [FIX] userId 파라미터 추가 후 주최자 검증 — 기존 인증만 되면 누구나 수정 가능하던 보안 이슈 수정
     @Transactional
-    public MeetupDTO updateMeetup(Long meetupIdx, MeetupDTO meetupDTO) {
+    public MeetupDTO updateMeetup(Long meetupIdx, MeetupDTO meetupDTO, String userId) {
         Meetup meetup = meetupRepository.findByIdWithDetails(meetupIdx)
                 .orElseThrow(MeetupNotFoundException::new);
+
+        Users currentUser = usersRepository.findByIdString(userId)
+                .orElseThrow(UserNotFoundException::new);
+
+        boolean isOrganizer = meetup.getOrganizer().getIdx().equals(currentUser.getIdx());
+        boolean isAdmin = "ADMIN".equals(currentUser.getRole()) || "MASTER".equals(currentUser.getRole());
+        if (!isOrganizer && !isAdmin) {
+            throw MeetupForbiddenException.notOrganizer();
+        }
 
         if (meetupDTO.getTitle() != null) {
             meetup.setTitle(meetupDTO.getTitle());
@@ -150,10 +160,20 @@ public class MeetupService {
     }
 
     // 모임 삭제 (소프트 삭제)
+    // [FIX] userId 파라미터 추가 후 주최자 검증 — 기존 인증만 되면 누구나 삭제 가능하던 보안 이슈 수정
     @Transactional
-    public void deleteMeetup(Long meetupIdx) {
-        Meetup meetup = meetupRepository.findById(meetupIdx)
+    public void deleteMeetup(Long meetupIdx, String userId) {
+        Meetup meetup = meetupRepository.findByIdWithOrganizer(meetupIdx)
                 .orElseThrow(MeetupNotFoundException::new);
+
+        Users currentUser = usersRepository.findByIdString(userId)
+                .orElseThrow(UserNotFoundException::new);
+
+        boolean isOrganizer = meetup.getOrganizer().getIdx().equals(currentUser.getIdx());
+        boolean isAdmin = "ADMIN".equals(currentUser.getRole()) || "MASTER".equals(currentUser.getRole());
+        if (!isOrganizer && !isAdmin) {
+            throw MeetupForbiddenException.notOrganizer();
+        }
 
         meetup.setIsDeleted(true);
         meetup.setDeletedAt(LocalDateTime.now());
@@ -290,9 +310,8 @@ public class MeetupService {
         // 참가자 삭제
         meetupParticipantsRepository.delete(participant);
 
-        // currentParticipants 감소
-        meetup.setCurrentParticipants(Math.max(0, meetup.getCurrentParticipants() - 1));
-        meetupRepository.save(meetup);
+        // [FIX] 원자적 UPDATE 쿼리로 감소 — 기존 read-modify-write(Math.max)는 동시 취소 시 카운트 불일치 위험
+        meetupRepository.decrementParticipantsIfPositive(meetupIdx);
 
         // 채팅방에서도 자동으로 나가기
         try {

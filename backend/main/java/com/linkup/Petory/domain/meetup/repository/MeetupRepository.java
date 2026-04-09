@@ -70,6 +70,12 @@ public interface MeetupRepository {
     int incrementParticipantsIfAvailable(Long meetupIdx);
 
     /**
+     * [FIX] 참가 취소 시 원자적 감소 (currentParticipants > 0 조건으로 음수 방지)
+     * 반환값: 업데이트된 행 수 (0 또는 1)
+     */
+    int decrementParticipantsIfPositive(Long meetupIdx);
+
+    /**
      * 모든 모임 조회 (소프트 삭제 제외) - JOIN FETCH로 N+1 문제 해결
      */
     List<Meetup> findAllNotDeleted();

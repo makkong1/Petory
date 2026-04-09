@@ -67,4 +67,9 @@ public interface LocationServiceRepository {
      * 도로명별 조회
      */
     List<LocationService> findByRoadName(String roadName);
+
+    /**
+     * [FIX] 서비스 평점을 리뷰 평균으로 원자적 갱신 (DB 단일 UPDATE)
+     */
+    void updateRatingByAvg(Long serviceIdx);
 }

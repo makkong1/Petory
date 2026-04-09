@@ -86,6 +86,15 @@ public interface SpringDataJpaMeetupRepository extends JpaRepository<Meetup, Lon
                     "  AND m.currentParticipants < m.maxParticipants")
     int incrementParticipantsIfAvailable(@Param("meetupIdx") Long meetupIdx);
 
+    // [FIX] 참가 취소 시 원자적 감소 — 기존 read-modify-write(Math.max)는 동시 취소 시 카운트 불일치 위험.
+    // currentParticipants > 0 조건으로 음수 방지.
+    @RepositoryMethod("모임: 참여자 수 원자적 감소")
+    @Modifying
+    @Query("UPDATE Meetup m SET m.currentParticipants = m.currentParticipants - 1 " +
+                    "WHERE m.idx = :meetupIdx " +
+                    "  AND m.currentParticipants > 0")
+    int decrementParticipantsIfPositive(@Param("meetupIdx") Long meetupIdx);
+
     @RepositoryMethod("모임: 전체 목록 조회 (삭제 제외)")
     @Query("SELECT m FROM Meetup m JOIN FETCH m.organizer WHERE m.isDeleted = false OR m.isDeleted IS NULL")
     List<Meetup> findAllNotDeleted();

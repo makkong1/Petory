@@ -43,10 +43,16 @@ public class MeetupController {
     }
 
     // 모임 수정
+    // [FIX] Authentication 추가 → 서비스 레벨 주최자 검증 연동
     @PutMapping("/{meetupIdx}")
     public ResponseEntity<Map<String, Object>> updateMeetup(@PathVariable Long meetupIdx,
-            @RequestBody MeetupDTO meetupDTO) {
-        MeetupDTO updatedMeetup = meetupService.updateMeetup(meetupIdx, meetupDTO);
+            @RequestBody MeetupDTO meetupDTO,
+            Authentication authentication) {
+        String userId = authentication != null ? authentication.getName() : null;
+        if (userId == null) {
+            throw new UnauthenticatedException("인증된 사용자 정보를 찾을 수 없습니다.");
+        }
+        MeetupDTO updatedMeetup = meetupService.updateMeetup(meetupIdx, meetupDTO, userId);
 
         Map<String, Object> response = new HashMap<>();
         response.put("meetup", updatedMeetup);
@@ -56,9 +62,15 @@ public class MeetupController {
     }
 
     // 모임 삭제
+    // [FIX] Authentication 추가 → 서비스 레벨 주최자 검증 연동
     @DeleteMapping("/{meetupIdx}")
-    public ResponseEntity<Map<String, Object>> deleteMeetup(@PathVariable Long meetupIdx) {
-        meetupService.deleteMeetup(meetupIdx);
+    public ResponseEntity<Map<String, Object>> deleteMeetup(@PathVariable Long meetupIdx,
+            Authentication authentication) {
+        String userId = authentication != null ? authentication.getName() : null;
+        if (userId == null) {
+            throw new UnauthenticatedException("인증된 사용자 정보를 찾을 수 없습니다.");
+        }
+        meetupService.deleteMeetup(meetupIdx, userId);
 
         Map<String, Object> response = new HashMap<>();
         response.put("message", "모임이 성공적으로 삭제되었습니다.");
