@@ -358,8 +358,9 @@ const MapContainer = React.forwardRef(
         // 통합 핀 아이콘 생성 함수 (SVG)
         // type: 'normal' | 'selected' | 'hovered' | 'missing' | 'top'
         // rank: 'top' 타입일 때 순위 숫자 (1~10)
-        const createPinIcon = (type, rank = null) => {
-          let color = '#03C75A'; // 기본 녹색
+        // customColor: 서비스별 커스텀 마커 색상 (예: '#4A90D9')
+        const createPinIcon = (type, rank = null, customColor = null) => {
+          let color = customColor || '#03C75A'; // 커스텀 색상 또는 기본 녹색
           let scale = 1;
           let zIndex = 100;
 
@@ -433,8 +434,8 @@ const MapContainer = React.forwardRef(
           if (isSelected) type = 'selected';
           else if (isHovered && type !== 'top') type = 'hovered';
 
-          // 개별 마커용 핀 아이콘
-          const markerIcon = createPinIcon(type, recommendedRank);
+          // 개별 마커용 핀 아이콘 (service.markerColor로 커스텀 색상 지원)
+          const markerIcon = createPinIcon(type, recommendedRank, service.markerColor || null);
 
           const marker = new window.naver.maps.Marker({
             position,

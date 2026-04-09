@@ -104,4 +104,9 @@ public interface CareRequestRepository {
          * 페이징 - 검색
          */
         Page<CareRequest> searchWithPaging(String keyword, Pageable pageable);
+
+        /**
+         * 반경 기반 근처 케어 요청 조회 (지도 표출용)
+         */
+        List<CareRequest> findNearby(double lat, double lng, double radiusKm);
 }

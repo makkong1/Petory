@@ -63,6 +63,17 @@ public class CareRequestService {
                 .anyMatch(authority -> authority.equals("ROLE_ADMIN") || authority.equals("ROLE_MASTER"));
     }
 
+    /**
+     * 반경 기반 근처 케어 요청 조회 (지도 표출용)
+     */
+    @Transactional(readOnly = true)
+    public List<CareRequestDTO> getNearby(double lat, double lng, double radiusKm) {
+        return careRequestRepository.findNearby(lat, lng, radiusKm)
+                .stream()
+                .map(careRequestConverter::toDTO)
+                .toList();
+    }
+
     // 전체 케어 요청 조회 (필터링 포함) - 작성자도 활성 상태여야 함
     @Transactional(readOnly = true)
     public List<CareRequestDTO> getAllCareRequests(String status, String location) {

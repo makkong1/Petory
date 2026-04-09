@@ -216,16 +216,9 @@ const ActivityPage = () => {
 
       case 'CARE_REQUEST':
       case 'CARE_COMMENT':
-        // 펫케어 요청으로 이동
         if (window.setActiveTab) {
-          window.setActiveTab('care-requests');
+          window.setActiveTab('unified-map');
         }
-        // 펫케어 요청 상세 열기
-        setTimeout(() => {
-          window.dispatchEvent(new CustomEvent('openCareRequestDetail', {
-            detail: { requestId: targetId }
-          }));
-        }, 100);
         break;
 
       case 'MISSING_PET':
@@ -243,11 +236,9 @@ const ActivityPage = () => {
         break;
 
       case 'LOCATION_REVIEW':
-        // 주변서비스로 이동
         if (window.setActiveTab) {
-          window.setActiveTab('location-services');
+          window.setActiveTab('unified-map');
         }
-        // 리뷰 상세 열기
         setTimeout(() => {
           window.dispatchEvent(new CustomEvent('openLocationReviewDetail', {
             detail: { reviewId: idx, locationId: relatedId }

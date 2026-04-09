@@ -55,6 +55,15 @@ public class CareRequest extends BaseTimeEntity {
     @Builder.Default
     private CareRequestStatus status = CareRequestStatus.OPEN;
 
+    @Column(name = "latitude")
+    private Double latitude;
+
+    @Column(name = "longitude")
+    private Double longitude;
+
+    @Column(name = "address", length = 255)
+    private String address;
+
     @Column(name = "is_deleted")
     @Builder.Default
     private Boolean isDeleted = false;

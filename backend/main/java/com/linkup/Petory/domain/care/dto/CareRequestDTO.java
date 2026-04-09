@@ -25,6 +25,11 @@ public class CareRequestDTO {
     private Boolean deleted;
     private LocalDateTime deletedAt;
 
+    // 위치 정보
+    private Double latitude;
+    private Double longitude;
+    private String address;
+
     // 요청자 정보
     private Long userId;
     private String username;

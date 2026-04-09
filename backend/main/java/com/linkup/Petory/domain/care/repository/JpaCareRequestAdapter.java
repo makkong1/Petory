@@ -124,5 +124,10 @@ public class JpaCareRequestAdapter implements CareRequestRepository {
     public Page<CareRequest> searchWithPaging(String keyword, Pageable pageable) {
         return jpaRepository.searchWithPaging(keyword, pageable);
     }
+
+    @Override
+    public List<CareRequest> findNearby(double lat, double lng, double radiusKm) {
+        return jpaRepository.findNearbyCareRequests(lat, lng, radiusKm);
+    }
 }
 

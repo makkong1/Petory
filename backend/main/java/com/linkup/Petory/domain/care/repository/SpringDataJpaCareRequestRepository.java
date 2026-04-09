@@ -92,6 +92,21 @@ public interface SpringDataJpaCareRequestRepository extends JpaRepository<CareRe
            countQuery = "SELECT COUNT(cr) FROM CareRequest cr JOIN cr.user u WHERE cr.status = :status AND cr.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' AND (:location IS NULL OR :location = '' OR u.location LIKE CONCAT('%', :location, '%'))")
     Page<CareRequest> findByStatusAndIsDeletedFalseWithPaging(@Param("status") CareRequestStatus status, @Param("location") String location, Pageable pageable);
 
+    @RepositoryMethod("펫케어 요청: 반경 기반 근처 요청 조회")
+    @Query(value = "SELECT cr.* FROM carerequest cr " +
+                    "WHERE cr.is_deleted = false " +
+                    "AND cr.latitude IS NOT NULL " +
+                    "AND cr.status IN ('OPEN', 'IN_PROGRESS') " +
+                    "AND cr.latitude BETWEEN (:lat - :radius / 111.0) AND (:lat + :radius / 111.0) " +
+                    "AND cr.longitude BETWEEN (:lng - :radius / (111.0 * cos(radians(:lat)))) AND (:lng + :radius / (111.0 * cos(radians(:lat)))) " +
+                    "AND (6371 * acos(cos(radians(:lat)) * cos(radians(cr.latitude)) * " +
+                    "    cos(radians(cr.longitude) - radians(:lng)) + " +
+                    "    sin(radians(:lat)) * sin(radians(cr.latitude)))) <= :radius " +
+                    "ORDER BY cr.created_at DESC", nativeQuery = true)
+    List<CareRequest> findNearbyCareRequests(@Param("lat") Double lat,
+                    @Param("lng") Double lng,
+                    @Param("radius") Double radius);
+
     @RepositoryMethod("펫케어 요청: 페이징 키워드 검색")
     @Query(value = "SELECT DISTINCT cr FROM CareRequest cr JOIN FETCH cr.user u LEFT JOIN FETCH cr.pet WHERE cr.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' AND (LOWER(cr.title) LIKE LOWER(CONCAT('%', :keyword, '%')) OR LOWER(CAST(cr.description AS string)) LIKE LOWER(CONCAT('%', :keyword, '%'))) ORDER BY cr.createdAt DESC",
            countQuery = "SELECT COUNT(DISTINCT cr) FROM CareRequest cr JOIN cr.user u WHERE cr.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' AND (LOWER(cr.title) LIKE LOWER(CONCAT('%', :keyword, '%')) OR LOWER(CAST(cr.description AS string)) LIKE LOWER(CONCAT('%', :keyword, '%')))")

@@ -72,6 +72,12 @@ export const careRequestApi = {
       ? mockResolve({})
       : api.delete(`/${careRequestId}/comments/${commentId}`),
 
+  // 반경 기반 근처 케어 요청 조회 (지도 표출용)
+  getNearby: ({ lat, lng, radius = 5 }) => {
+    if (isDemoMode()) return mockResolve([]);
+    return api.get('/nearby', { params: { lat, lng, radius } });
+  },
+
   // 검색 (페이징 지원)
   searchCareRequests: (keyword, page = 0, size = 20) =>
     isDemoMode()

@@ -41,6 +41,15 @@ public class CareRequestController {
         }
     }
 
+    // 반경 기반 근처 케어 요청 조회 (지도 표출용)
+    @GetMapping("/nearby")
+    public ResponseEntity<List<CareRequestDTO>> getNearby(
+            @RequestParam double lat,
+            @RequestParam double lng,
+            @RequestParam(defaultValue = "5.0") double radius) {
+        return ResponseEntity.ok(careRequestService.getNearby(lat, lng, radius));
+    }
+
     // 전체 케어 요청 조회 (페이징 지원)
     @GetMapping
     public ResponseEntity<CareRequestPageResponseDTO> getAllCareRequests(
