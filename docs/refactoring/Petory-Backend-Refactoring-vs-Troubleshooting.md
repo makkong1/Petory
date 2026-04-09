@@ -227,6 +227,79 @@
 
 ---
 
+### 1.4 Statistics
+
+| 증상 / 위험 | 위치(참고) | 메모 | 상태 |
+|-------------|------------|------|------|
+| `completedCares` 집계가 **케어 예정일(`date`)** 기준 — 실제 완료 날짜와 무관한 통계 | `StatisticsScheduler`, `StatisticsService` | `completedAt` 필드 추가 후 해당 기준으로 집계 | ✅ 수정 완료 |
+| 스케줄러 예외 발생 시 **서비스 전체에 전파** 가능 | `StatisticsScheduler#aggregateDailyStatistics` | try-catch로 격리, 수동 복구 안내 로그 추가 | ✅ 수정 완료 |
+| 오늘 통계 조회 시 `calculateTodayStatistics()` **매번 DB 풀 쿼리** (관리자 대시보드 폴링 시 N회 실행) | `StatisticsService#calculateTodayStatistics` | `@Cacheable(todayStats, 1분)` + self-proxy 패턴 적용 | ✅ 수정 완료 |
+| `startDate > endDate` 입력 시 **빈 리스트 또는 오작동** (쿼리가 그냥 실행됨) | `StatisticsService#getDailyStatistics` | 입력 검증 추가, `IllegalArgumentException` throw | ✅ 수정 완료 |
+| PUT `/scheduler/time` 이 **HTTP 200 + 성공 메시지** 반환 — 실제로는 아무것도 변경되지 않음 | `AdminStatisticsController#setSchedulerTime` | HTTP 501 Not Implemented + 수동 적용 안내로 교체 | ✅ 수정 완료 |
+
+#### 수정 상세 — Statistics
+
+**[Fix 6] completedAt 필드 추가 및 통계 기준 교체**
+- **원인**: `StatisticsScheduler`와 `StatisticsService` 모두 `careRequestRepository.countByDateBetweenAndStatus()`를 사용. `date` 필드는 케어 *예정일*이라 "오늘 완료된 케어"가 아닌 "오늘 예정된 케어 중 완료된 것"을 집계하여 날짜가 다른 날 완료된 케어 누락.
+- **수정**:
+  - `CareRequest` 엔티티에 `@Column(name = "completed_at") LocalDateTime completedAt` 필드 추가.
+  - `CareRequestService#updateStatus()`에서 상태가 `COMPLETED`로 전환될 때 `completedAt = LocalDateTime.now()` 설정.
+  - `SpringDataJpaCareRequestRepository`에 `countByCompletedAtBetween` 쿼리 메서드 추가.
+  - 기존 `countByDateBetweenAndStatus`를 `@Deprecated` 처리.
+- **수정 파일**:
+  - `domain/care/entity/CareRequest.java` — `completedAt` 필드 추가
+  - `domain/care/service/CareRequestService.java` — COMPLETED 전환 시 `completedAt` 설정
+  - `domain/care/repository/SpringDataJpaCareRequestRepository.java` — `countByCompletedAtBetween` 추가, 기존 `countByDateBetweenAndStatus` deprecated 처리
+  - `domain/care/repository/CareRequestRepository.java` — 인터페이스에 `countByCompletedAtBetween` 선언, 기존 `@Deprecated` 추가
+  - `domain/care/repository/JpaCareRequestAdapter.java` — 위임 구현 추가
+  - `domain/statistics/service/StatisticsScheduler.java` — `countByCompletedAtBetween` 사용으로 교체
+  - `domain/statistics/service/StatisticsService.java` — `countByCompletedAtBetween` 사용으로 교체
+
+**[Fix 7] 스케줄러 예외 격리**
+- **원인**: `aggregateDailyStatistics()`가 예외를 전파하면 Spring `@Scheduled` 실행 스레드가 종료되거나 로그에 스택 트레이스만 남고, 관리자가 수동 복구 방법을 알 수 없음.
+- **수정**: try-catch로 예외를 잡아 `log.error()`로 날짜·원인·수동 복구 커맨드(`POST /api/admin/statistics/init?days=1`)를 로그에 남기고 스케줄러는 계속 실행.
+- **수정 파일**: `domain/statistics/service/StatisticsScheduler.java`
+
+**[Fix 8] 오늘 통계 캐싱 (self-proxy 패턴)**
+- **원인**: `StatisticsService#calculateTodayStatistics()`가 `private`이고 self-call로 호출되어 Spring AOP 프록시가 적용되지 않음. `@Cacheable`을 붙여도 캐싱이 동작하지 않아 관리자 대시보드 폴링마다 8개 DB 쿼리 실행.
+- **수정**:
+  - `ApplicationContext` 주입 후 `getThis()` 헬퍼로 프록시를 통해 자기 자신 호출.
+  - `calculateTodayStatistics()`를 `public`으로 변경하고 `@Cacheable(value = "todayStats", key = "'today'")` 추가.
+  - `RedisConfig`에 `todayStats` 캐시 설정 1분 TTL 추가.
+- **수정 파일**:
+  - `domain/statistics/service/StatisticsService.java` — self-proxy 패턴 적용, `@Cacheable` 추가
+  - `global/security/RedisConfig.java` — `todayStats` 1분 TTL 캐시 설정 추가
+
+**[Fix 9] 날짜 범위 입력 검증**
+- **원인**: `getDailyStatistics(startDate, endDate)`에서 `startDate > endDate`이면 DB 쿼리가 빈 결과를 반환하거나 예기치 않은 동작. 호출자가 오입력임을 알 수 없음.
+- **수정**: 메서드 진입부에서 `startDate.isAfter(endDate)` 검사 후 `IllegalArgumentException` throw.
+- **수정 파일**: `domain/statistics/service/StatisticsService.java`
+
+**[Fix 10] PUT `/scheduler/time` → HTTP 501**
+- **원인**: `AdminStatisticsController#setSchedulerTime()`이 `@Scheduled` cron은 컴파일 타임에 결정되므로 런타임 변경이 불가능함에도 HTTP 200 + "설정되었습니다." 메시지를 반환. 실제로는 아무것도 변경되지 않아 운영자 혼동 유발.
+- **수정**: `ResponseEntity.status(501 NOT_IMPLEMENTED)`로 교체. 응답 본문에 수동 적용 방법(`application.properties` + 재시작) 안내 포함.
+- **수정 파일**: `domain/admin/controller/AdminStatisticsController.java`
+
+---
+
+### 1.4 Statistics 주의사항
+
+> **`completedAt` 컬럼 마이그레이션 필요**
+
+`CareRequest` 엔티티에 `completed_at` 컬럼이 추가됩니다. 기존 DB에 이 컬럼이 없으면 서버 시작 시 `@Column` 매핑 오류 또는 `DDL-auto: validate` 모드에서 예외 발생.
+
+- `ddl-auto: update` / `create` 환경에서는 자동 추가되지만, 프로덕션에서는 **수동 마이그레이션** 필요:
+  ```sql
+  ALTER TABLE care_request ADD COLUMN completed_at DATETIME NULL;
+  ```
+- 기존 `COMPLETED` 상태 데이터는 `completed_at = NULL`이 됨 → 과거 통계 backfill 시 해당 레코드가 집계에서 제외됨. 이전 데이터 복구가 필요하면 `COMPLETED` 전환 시각을 추정해 일괄 UPDATE 필요.
+
+> **self-proxy 패턴 주의사항**
+
+`StatisticsService.getThis()`는 `ApplicationContext.getBean()`으로 프록시 빈을 가져옵니다. Spring이 완전히 초기화된 후에만 안전하게 동작하며, 순환 빈 참조 문제는 없습니다. 다만 이 패턴은 유지보수성이 낮으므로, 향후 `calculateTodayStatistics()`를 별도 `@Service`(예: `TodayStatisticsQueryService`)로 분리하는 리팩토링 권장.
+
+---
+
 ## 3. 이 문서를 쓰는 방법
 
 1. **장애·재현 가능한 잘못된 결과** → 섹션 1(트러블슈팅)부터 이슈 트래킹.

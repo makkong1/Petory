@@ -16,25 +16,25 @@ import org.springframework.transaction.annotation.Transactional;
 import com.linkup.Petory.domain.care.converter.CareRequestConverter;
 import com.linkup.Petory.domain.care.dto.CareRequestDTO;
 import com.linkup.Petory.domain.care.dto.CareRequestPageResponseDTO;
+import com.linkup.Petory.domain.care.entity.CareApplicationStatus;
 import com.linkup.Petory.domain.care.entity.CareRequest;
 import com.linkup.Petory.domain.care.entity.CareRequestStatus;
-import com.linkup.Petory.domain.care.entity.CareApplicationStatus;
-import com.linkup.Petory.domain.care.repository.CareRequestRepository;
-import com.linkup.Petory.domain.user.entity.EmailVerificationPurpose;
-import com.linkup.Petory.domain.user.entity.Pet;
-import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.care.exception.CareForbiddenException;
 import com.linkup.Petory.domain.care.exception.CarePaymentException;
 import com.linkup.Petory.domain.care.exception.CareRequestNotFoundException;
 import com.linkup.Petory.domain.care.exception.CareValidationException;
+import com.linkup.Petory.domain.care.repository.CareRequestRepository;
+import com.linkup.Petory.domain.payment.entity.EscrowStatus;
+import com.linkup.Petory.domain.payment.entity.PetCoinEscrow;
+import com.linkup.Petory.domain.payment.service.PetCoinEscrowService;
+import com.linkup.Petory.domain.user.entity.EmailVerificationPurpose;
+import com.linkup.Petory.domain.user.entity.Pet;
+import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException;
 import com.linkup.Petory.domain.user.exception.PetNotFoundException;
 import com.linkup.Petory.domain.user.exception.UserNotFoundException;
 import com.linkup.Petory.domain.user.repository.PetRepository;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
-import com.linkup.Petory.domain.payment.service.PetCoinEscrowService;
-import com.linkup.Petory.domain.payment.entity.PetCoinEscrow;
-import com.linkup.Petory.domain.payment.entity.EscrowStatus;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -78,8 +78,8 @@ public class CareRequestService {
         // 위치 필터링 (추후 구현)
         if (location != null && !location.isEmpty()) {
             requests = requests.stream()
-                    .filter(r -> r.getUser().getLocation() != null &&
-                            r.getUser().getLocation().contains(location))
+                    .filter(r -> r.getUser().getLocation() != null
+                    && r.getUser().getLocation().contains(location))
                     .collect(Collectors.toList());
         }
 
@@ -205,12 +205,15 @@ public class CareRequestService {
             throw CareForbiddenException.ownRequestOnly();
         }
 
-        if (dto.getTitle() != null)
+        if (dto.getTitle() != null) {
             request.setTitle(dto.getTitle());
-        if (dto.getDescription() != null)
+        }
+        if (dto.getDescription() != null) {
             request.setDescription(dto.getDescription());
-        if (dto.getDate() != null)
+        }
+        if (dto.getDate() != null) {
             request.setDate(dto.getDate());
+        }
 
         // 펫 정보 업데이트 (선택사항)
         if (dto.getPetIdx() != null) {
@@ -267,10 +270,10 @@ public class CareRequestService {
             // 스케줄러 등 시스템 작업(CareRequestScheduler에서 currentUserId == null)은 검증 생략
             if (currentUserId != null) {
                 boolean isRequester = request.getUser().getIdx().equals(currentUserId);
-                boolean isAcceptedProvider = request.getApplications() != null &&
-                        request.getApplications().stream()
+                boolean isAcceptedProvider = request.getApplications() != null
+                        && request.getApplications().stream()
                                 .anyMatch(app -> app.getStatus() == CareApplicationStatus.ACCEPTED
-                                        && app.getProvider().getIdx().equals(currentUserId));
+                                && app.getProvider().getIdx().equals(currentUserId));
 
                 if (!isRequester && !isAcceptedProvider) {
                     throw CareForbiddenException.ownerOrApprovedProvider();
@@ -280,6 +283,11 @@ public class CareRequestService {
 
         CareRequestStatus oldStatus = request.getStatus();
         CareRequestStatus newStatus = CareRequestStatus.valueOf(status);
+
+        // [FIX] COMPLETED 전환 시 완료 시각 기록 — 통계에서 '당일 완료 건수' 집계에 사용
+        if (oldStatus != CareRequestStatus.COMPLETED && newStatus == CareRequestStatus.COMPLETED) {
+            request.setCompletedAt(java.time.LocalDateTime.now());
+        }
 
         request.setStatus(newStatus);
         CareRequest updated = careRequestRepository.save(request);

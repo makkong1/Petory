@@ -1,7 +1,6 @@
 package com.linkup.Petory.domain.statistics.service;
 
 import com.linkup.Petory.domain.board.repository.BoardRepository;
-import com.linkup.Petory.domain.care.entity.CareRequestStatus;
 import com.linkup.Petory.domain.care.repository.CareRequestRepository;
 import com.linkup.Petory.domain.meetup.repository.MeetupParticipantsRepository;
 import com.linkup.Petory.domain.meetup.repository.MeetupRepository;
@@ -58,7 +57,13 @@ public class StatisticsScheduler {
     public void aggregateDailyStatistics() {
         log.info("통계 집계 스케줄러 실행 (설정된 시간: {}:{}), 어제 통계 집계 시작", schedulerHour, schedulerMinute);
         LocalDate yesterday = LocalDate.now().minusDays(1);
-        aggregateStatisticsForDate(yesterday);
+        // [FIX] 스케줄러 실패 시 예외 전파 차단 — 집계 실패가 서비스 전체에 영향을 주지 않도록 처리
+        try {
+            aggregateStatisticsForDate(yesterday);
+        } catch (Exception e) {
+            log.error("통계 집계 스케줄러 실패 — 날짜: {}, 원인: {}. 수동 복구: POST /api/admin/statistics/init?days=1",
+                    yesterday, e.getMessage(), e);
+        }
     }
 
     /**
@@ -87,8 +92,8 @@ public class StatisticsScheduler {
         long newCareRequests = careRequestRepository.countByCreatedAtBetween(startOfDay, endOfDay);
 
         // 4. 완료된 케어
-        long completedCares = careRequestRepository.countByDateBetweenAndStatus(startOfDay, endOfDay,
-                CareRequestStatus.COMPLETED);
+        // [FIX] date(케어 예정일) → completedAt(실제 완료 시각)으로 교체 — 기존은 완료 날짜가 아닌 예정일 기준으로 집계
+        long completedCares = careRequestRepository.countByCompletedAtBetween(startOfDay, endOfDay);
 
         // 5. 매출 (현재 0으로 고정)
         BigDecimal totalRevenue = BigDecimal.ZERO;

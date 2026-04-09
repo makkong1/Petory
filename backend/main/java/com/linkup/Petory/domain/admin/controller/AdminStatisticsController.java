@@ -118,20 +118,16 @@ public class AdminStatisticsController {
                     "error", "minute는 0-59 사이의 값이어야 합니다."));
         }
 
-        log.info("MASTER가 통계 집계 스케줄러 시간 변경 요청: {}:{}", hour, minute);
+        log.info("MASTER가 통계 집계 스케줄러 시간 변경 요청: {}:{} — 미구현 엔드포인트", hour, minute);
 
-        // TODO: 실제로는 application.properties 파일을 업데이트하거나 DB에 저장해야 함
-        // 현재는 로그만 남기고, 실제 변경은 application.properties를 수동으로 수정 후 서버 재시작 필요
-        // 향후 구현: 설정값을 DB에 저장하고 동적 스케줄러로 변경
-
-        return ResponseEntity.ok(Map.of(
-                "message", "스케줄러 시간이 설정되었습니다.",
-                "hour", hour,
-                "minute", minute,
-                "time", String.format("%02d:%02d", hour, minute),
-                "cron", String.format("0 %d %d * * ?", minute, hour),
-                "warning",
-                "실제 적용을 위해서는 application.properties에 'statistics.scheduler.hour'와 'statistics.scheduler.minute' 값을 설정하고 서버를 재시작해야 합니다.",
-                "note", "동적 스케줄러 변경 기능은 향후 구현 예정입니다."));
+        // [FIX] 동적 스케줄러 변경 미구현 — 200 대신 501 반환
+        // 실제 변경은 application.properties 수정 후 서버 재시작으로만 가능
+        // 향후 구현: TaskScheduler 기반 동적 스케줄러 + DB 설정 저장
+        return ResponseEntity.status(org.springframework.http.HttpStatus.NOT_IMPLEMENTED).body(Map.of(
+                "error", "동적 스케줄러 변경 기능은 아직 구현되지 않았습니다.",
+                "hint", String.format(
+                        "application.properties에 statistics.scheduler.hour=%d, statistics.scheduler.minute=%d 를 설정하고 서버를 재시작하세요.",
+                        hour, minute),
+                "requestedTime", String.format("%02d:%02d", hour, minute)));
     }
 }

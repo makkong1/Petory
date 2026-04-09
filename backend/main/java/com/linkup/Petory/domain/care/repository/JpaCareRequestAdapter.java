@@ -100,8 +100,14 @@ public class JpaCareRequestAdapter implements CareRequestRepository {
     }
 
     @Override
+    @Deprecated
     public long countByDateBetweenAndStatus(LocalDateTime start, LocalDateTime end, CareRequestStatus status) {
         return jpaRepository.countByDateBetweenAndStatus(start, end, status);
+    }
+
+    @Override
+    public long countByCompletedAtBetween(LocalDateTime start, LocalDateTime end) {
+        return jpaRepository.countByCompletedAtBetween(start, end);
     }
 
     @Override

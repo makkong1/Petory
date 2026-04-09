@@ -62,6 +62,10 @@ public class CareRequest extends BaseTimeEntity {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
+    // [FIX] 케어 완료 시각 — 통계 집계용. CareRequest.date(케어 예정일)와 구분
+    @Column(name = "completed_at")
+    private LocalDateTime completedAt;
+
     /** 펫케어 지원 목록 (서비스 제공자들의 지원) */
     @OneToMany(mappedBy = "careRequest", cascade = CascadeType.ALL)
     @BatchSize(size = 50)  // 페이징 목록 조회 시 CareApplication N+1 방지
