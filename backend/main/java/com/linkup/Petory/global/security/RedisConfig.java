@@ -190,11 +190,22 @@ public class RedisConfig {
                                                 .fromSerializer(jsonSerializer))
                                 .disableCachingNullValues();
 
+                // 오늘 통계 실시간 캐시: 1분 (관리자 대시보드 폴링 시 반복 쿼리 방지)
+                RedisCacheConfiguration todayStatsConfig = RedisCacheConfiguration.defaultCacheConfig()
+                                .entryTtl(Duration.ofMinutes(1))
+                                .serializeKeysWith(
+                                                RedisSerializationContext.SerializationPair
+                                                                .fromSerializer(new StringRedisSerializer()))
+                                .serializeValuesWith(RedisSerializationContext.SerializationPair
+                                                .fromSerializer(jsonSerializer))
+                                .disableCachingNullValues();
+
                 return RedisCacheManager.builder(connectionFactory)
                                 .cacheDefaults(defaultConfig)
                                 .withCacheConfiguration("boardList", boardListConfig)
                                 .withCacheConfiguration("boardDetail", boardDetailConfig)
                                 .withCacheConfiguration("user", userConfig)
+                                .withCacheConfiguration("todayStats", todayStatsConfig)
                                 .build();
         }
 }

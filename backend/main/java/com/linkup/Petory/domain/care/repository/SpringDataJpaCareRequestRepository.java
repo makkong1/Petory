@@ -75,7 +75,12 @@ public interface SpringDataJpaCareRequestRepository extends JpaRepository<CareRe
     // 통계용
     long countByCreatedAtBetween(LocalDateTime start, LocalDateTime end);
 
+    // [DEPRECATED] 케어 예정일(date)로 집계 — 통계 오류 원인
     long countByDateBetweenAndStatus(LocalDateTime start, LocalDateTime end, CareRequestStatus status);
+
+    // [FIX] 케어 완료 시각(completedAt)으로 집계 — '당일 실제 완료 건수' 정확히 반영
+    @Query("SELECT COUNT(cr) FROM CareRequest cr WHERE cr.completedAt BETWEEN :start AND :end AND cr.isDeleted = false")
+    long countByCompletedAtBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
     @RepositoryMethod("펫케어 요청: 페이징 전체 조회")
     @Query(value = "SELECT cr FROM CareRequest cr JOIN FETCH cr.user u LEFT JOIN FETCH cr.pet WHERE cr.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' AND (:location IS NULL OR :location = '' OR u.location LIKE CONCAT('%', :location, '%')) ORDER BY cr.createdAt DESC",
