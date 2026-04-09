@@ -166,6 +166,10 @@ const UnifiedPetMapPage = () => {
     if (userLocation) { setMapCenter({ ...userLocation }); setSelectedItem(null); }
   };
 
+  const handleMapIdle = useCallback(({ lat, lng }) => {
+    setMapCenter({ lat, lng });
+  }, []);
+
   // 모임 생성 성공 시 목록 갱신
   const handleMeetupCreated = () => {
     cacheRef.current = {};
@@ -239,6 +243,7 @@ const UnifiedPetMapPage = () => {
             mapCenter={mapCenter}
             mapLevel={mapLevel}
             recommendedServiceIdxs={recommendedMap}
+            onMapIdle={handleMapIdle}
           />
         ) : (
           <LoadingOverlay>위치 정보를 가져오는 중...</LoadingOverlay>
