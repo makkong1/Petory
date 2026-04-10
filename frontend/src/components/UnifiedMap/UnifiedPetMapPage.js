@@ -166,8 +166,9 @@ const UnifiedPetMapPage = () => {
     if (userLocation) { setMapCenter({ ...userLocation }); setSelectedItem(null); }
   };
 
-  const handleMapIdle = useCallback(({ lat, lng }) => {
+  const handleMapIdle = useCallback(({ lat, lng, level }) => {
     setMapCenter({ lat, lng });
+    if (level) setMapLevel(level);
   }, []);
 
   // 모임 생성 성공 시 목록 갱신

@@ -359,7 +359,7 @@ const MapContainer = React.forwardRef(
         // type: 'normal' | 'selected' | 'hovered' | 'missing' | 'top'
         // rank: 'top' 타입일 때 순위 숫자 (1~10)
         // customColor: 서비스별 커스텀 마커 색상 (예: '#4A90D9')
-        const createPinIcon = (type, rank = null, customColor = null) => {
+        const createPinIcon = (type, rank = null, customColor = null, name = null) => {
           let color = customColor || '#03C75A'; // 커스텀 색상 또는 기본 녹색
           let scale = 1;
           let zIndex = 100;
@@ -399,8 +399,13 @@ const MapContainer = React.forwardRef(
             </svg>
           `;
 
+          const shortName = name ? (name.length > 8 ? name.slice(0, 8) + '…' : name) : null;
+          const nameLabel = shortName
+            ? `<div style="background:rgba(255,255,255,0.95);padding:2px 5px;border-radius:3px;font-size:10px;font-weight:600;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,0.2);color:#333;margin-top:2px;line-height:1.3;">${shortName}</div>`
+            : '';
+
           return {
-            content: `<div style="cursor:pointer; filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.25));">${svgContent}</div>`,
+            content: `<div style="cursor:pointer;display:flex;flex-direction:column;align-items:center;"><div style="filter:drop-shadow(0px 2px 4px rgba(0,0,0,0.25));">${svgContent}</div>${nameLabel}</div>`,
             anchor: new window.naver.maps.Point(width / 2, height),
             zIndex: zIndex
           };
@@ -435,7 +440,7 @@ const MapContainer = React.forwardRef(
           else if (isHovered && type !== 'top') type = 'hovered';
 
           // 개별 마커용 핀 아이콘 (service.markerColor로 커스텀 색상 지원)
-          const markerIcon = createPinIcon(type, recommendedRank, service.markerColor || null);
+          const markerIcon = createPinIcon(type, recommendedRank, service.markerColor || null, service.name || null);
 
           const marker = new window.naver.maps.Marker({
             position,
