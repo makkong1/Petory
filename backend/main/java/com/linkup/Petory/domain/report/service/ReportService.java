@@ -12,6 +12,7 @@ import com.linkup.Petory.domain.board.repository.BoardRepository;
 import com.linkup.Petory.domain.board.repository.CommentRepository;
 import com.linkup.Petory.domain.board.repository.MissingPetBoardRepository;
 import com.linkup.Petory.domain.board.repository.MissingPetCommentRepository;
+import com.linkup.Petory.domain.care.repository.CareReviewRepository;
 import com.linkup.Petory.domain.report.converter.ReportConverter;
 import com.linkup.Petory.domain.report.dto.ReportDTO;
 import com.linkup.Petory.domain.report.exception.ReportConflictException;
@@ -46,6 +47,7 @@ public class ReportService {
     private final CommentRepository commentRepository;
     private final MissingPetBoardRepository missingPetBoardRepository;
     private final MissingPetCommentRepository missingPetCommentRepository;
+    private final CareReviewRepository careReviewRepository;
     private final ReportConverter reportConverter;
     private final UserSanctionService userSanctionService;
 
@@ -251,6 +253,17 @@ public class ReportService {
                                 .build())
                         .orElse(ReportDetailDTO.TargetPreview.builder().type(type).id(id).title("(탈퇴/없음)").build());
             }
+            case CARE_REVIEW: {
+                return careReviewRepository.findById(id)
+                        .map(r -> ReportDetailDTO.TargetPreview.builder()
+                                .type(type)
+                                .id(id)
+                                .title("케어 리뷰")
+                                .summary(ellipsis(r.getComment(), 300))
+                                .authorName(r.getReviewer() != null ? r.getReviewer().getUsername() : null)
+                                .build())
+                        .orElse(ReportDetailDTO.TargetPreview.builder().type(type).id(id).title("(삭제됨)").build());
+            }
             default: {
                 return ReportDetailDTO.TargetPreview.builder().type(type).id(id).build();
             }
@@ -298,6 +311,13 @@ public class ReportService {
                         .orElseThrow(ReportTargetNotFoundException::provider);
                 if (provider.getRole() != Role.SERVICE_PROVIDER) {
                     throw ReportForbiddenException.providerOnly();
+                }
+                break;
+            }
+            case CARE_REVIEW: {
+                exists = careReviewRepository.existsById(targetIdx);
+                if (!exists) {
+                    throw ReportTargetNotFoundException.careReview();
                 }
                 break;
             }

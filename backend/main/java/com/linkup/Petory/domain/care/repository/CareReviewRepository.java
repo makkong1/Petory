@@ -1,6 +1,7 @@
 package com.linkup.Petory.domain.care.repository;
 
 import java.util.List;
+import java.util.Optional;
 
 import com.linkup.Petory.domain.care.entity.CareReview;
 
@@ -25,4 +26,14 @@ public interface CareReviewRepository {
      * 특정 CareApplication과 Reviewer로 리뷰 작성 여부 확인
      */
     boolean existsByCareApplicationIdxAndReviewerIdx(Long careApplicationIdx, Long reviewerIdx);
+
+    /**
+     * 리뷰 존재 여부 확인 (신고 대상 유효성 검증용)
+     */
+    boolean existsById(Long idx);
+
+    /**
+     * 리뷰 단건 조회 (신고 상세 미리보기용)
+     */
+    Optional<CareReview> findById(Long idx);
 }
