@@ -11,6 +11,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+
+import com.linkup.Petory.global.security.RoleConstants;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.linkup.Petory.domain.care.converter.CareRequestConverter;
@@ -60,7 +62,7 @@ public class CareRequestService {
         }
         return authentication.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
-                .anyMatch(authority -> authority.equals("ROLE_ADMIN") || authority.equals("ROLE_MASTER"));
+                .anyMatch(authority -> authority.equals(RoleConstants.ROLE_ADMIN) || authority.equals(RoleConstants.ROLE_MASTER));
     }
 
     /**

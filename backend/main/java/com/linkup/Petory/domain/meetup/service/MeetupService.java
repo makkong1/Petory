@@ -9,6 +9,7 @@ import com.linkup.Petory.domain.meetup.entity.Meetup;
 import com.linkup.Petory.domain.meetup.entity.MeetupParticipants;
 import com.linkup.Petory.domain.meetup.repository.MeetupRepository;
 import com.linkup.Petory.domain.meetup.repository.MeetupParticipantsRepository;
+import com.linkup.Petory.domain.user.entity.Role;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException;
 import com.linkup.Petory.domain.user.exception.UserNotFoundException;
@@ -127,7 +128,7 @@ public class MeetupService {
                 .orElseThrow(UserNotFoundException::new);
 
         boolean isOrganizer = meetup.getOrganizer().getIdx().equals(currentUser.getIdx());
-        boolean isAdmin = "ADMIN".equals(currentUser.getRole()) || "MASTER".equals(currentUser.getRole());
+        boolean isAdmin = currentUser.getRole() == Role.ADMIN || currentUser.getRole() == Role.MASTER;
         if (!isOrganizer && !isAdmin) {
             throw MeetupForbiddenException.notOrganizer();
         }
@@ -170,7 +171,7 @@ public class MeetupService {
                 .orElseThrow(UserNotFoundException::new);
 
         boolean isOrganizer = meetup.getOrganizer().getIdx().equals(currentUser.getIdx());
-        boolean isAdmin = "ADMIN".equals(currentUser.getRole()) || "MASTER".equals(currentUser.getRole());
+        boolean isAdmin = currentUser.getRole() == Role.ADMIN || currentUser.getRole() == Role.MASTER;
         if (!isOrganizer && !isAdmin) {
             throw MeetupForbiddenException.notOrganizer();
         }
