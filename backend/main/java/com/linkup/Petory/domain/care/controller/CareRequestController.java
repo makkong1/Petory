@@ -69,7 +69,6 @@ public class CareRequestController {
     // 케어 요청 생성
     @PostMapping
     public ResponseEntity<CareRequestDTO> createCareRequest(@RequestBody CareRequestDTO dto) {
-        System.out.println("=== 케어 요청 생성: " + dto.getTitle() + " ===");
         return ResponseEntity.ok(careRequestService.createCareRequest(dto));
     }
 
@@ -97,7 +96,6 @@ public class CareRequestController {
     // 케어 요청 상태 변경
     @PatchMapping("/{id}/status")
     public ResponseEntity<CareRequestDTO> updateStatus(@PathVariable Long id, @RequestParam String status) {
-        System.out.println("=== 상태 변경: " + id + " -> " + status + " ===");
         Long currentUserId = getCurrentUserId();
         return ResponseEntity.ok(careRequestService.updateStatus(id, status, currentUserId));
     }
