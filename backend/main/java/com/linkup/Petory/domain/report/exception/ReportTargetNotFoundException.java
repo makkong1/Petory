@@ -31,4 +31,8 @@ public class ReportTargetNotFoundException extends ApiException {
     public static ReportTargetNotFoundException provider() {
         return new ReportTargetNotFoundException("해당 서비스 제공자를 찾을 수 없습니다.");
     }
+
+    public static ReportTargetNotFoundException careReview() {
+        return new ReportTargetNotFoundException("신고 대상 케어 리뷰를 찾을 수 없습니다.");
+    }
 }
