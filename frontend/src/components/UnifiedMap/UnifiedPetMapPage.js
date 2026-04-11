@@ -386,8 +386,8 @@ const CountBar = styled.div`
 
 const AiBadge = styled.span`
   margin-right: 8px;
-  background: #FFF8EC;
-  color: #c47d00;
+  background: ${props => props.theme.colors.ai.bg};
+  color: ${props => props.theme.colors.ai.text};
   font-weight: 700;
   padding: 2px 8px;
   border-radius: 10px;

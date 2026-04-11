@@ -28,6 +28,18 @@ export const lightTheme = {
     shadowHover: 'rgba(0, 0, 0, 0.15)',
     gradient: 'linear-gradient(135deg, #FF7E36 0%, #FF9558 100%)',
     overlay: 'rgba(0, 0, 0, 0.5)',
+    // 도메인(탐색 탭) 색상
+    domain: {
+      location: '#4A90D9',
+      meetup: '#52C41A',
+      care: '#FAAD14',
+    },
+    // AI 추천 색상
+    ai: {
+      accent: '#F5A623',
+      bg: '#FFF8EC',
+      text: '#c47d00',
+    },
     // 상태 배지 색상
     status: {
       missing: '#ef4444',
@@ -105,6 +117,18 @@ export const darkTheme = {
     shadowHover: 'rgba(0, 0, 0, 0.5)',
     gradient: 'linear-gradient(135deg, #FF7E36 0%, #FF9558 100%)',
     overlay: 'rgba(0, 0, 0, 0.7)',
+    // 도메인(탐색 탭) 색상 (다크모드)
+    domain: {
+      location: '#5BA3E6',
+      meetup: '#6AD434',
+      care: '#FFC53D',
+    },
+    // AI 추천 색상 (다크모드)
+    ai: {
+      accent: '#F5A623',
+      bg: '#3D3220',
+      text: '#F5C668',
+    },
     // 상태 배지 색상 (다크모드)
     status: {
       missing: '#f87171',

@@ -2,6 +2,11 @@ import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { meetupApi } from '../../../api/meetupApi';
 import { useAuth } from '../../../contexts/AuthContext';
+import {
+  InfoPanel as BaseInfoPanel,
+  PanelHeader, CloseButton, PanelTitle, Divider,
+  InfoRow, InfoLabel, InfoValue, InfoGrid, ActionRow,
+} from '../shared/BaseInfoPanel';
 
 const MeetupLayer = ({ selectedItem, onClose, onRefresh }) => {
   const { user } = useAuth();
@@ -83,16 +88,16 @@ const MeetupLayer = ({ selectedItem, onClose, onRefresh }) => {
     <InfoPanel>
       <PanelHeader>
         <TypeBadge>🐾 모임</TypeBadge>
-        <CloseButton onClick={onClose}>✕</CloseButton>
+        <CloseButton onClick={onClose} aria-label="닫기">✕</CloseButton>
       </PanelHeader>
 
       <PanelTitle>{r.title}</PanelTitle>
 
       <InfoGrid>
-        {dateStr && <InfoRow><InfoLabel>일시</InfoLabel><InfoValue>{dateStr}</InfoValue></InfoRow>}
-        {r.location && <InfoRow><InfoLabel>장소</InfoLabel><InfoValue>{r.location}</InfoValue></InfoRow>}
+        {dateStr && <InfoRow><InfoLabel $minWidth="36px">일시</InfoLabel><InfoValue>{dateStr}</InfoValue></InfoRow>}
+        {r.location && <InfoRow><InfoLabel $minWidth="36px">장소</InfoLabel><InfoValue>{r.location}</InfoValue></InfoRow>}
         <InfoRow>
-          <InfoLabel>인원</InfoLabel>
+          <InfoLabel $minWidth="36px">인원</InfoLabel>
           <InfoValue>
             <ParticipantCount $full={isFull}>
               {r.currentParticipants ?? 0} / {r.maxParticipants ?? 0}명
@@ -101,7 +106,7 @@ const MeetupLayer = ({ selectedItem, onClose, onRefresh }) => {
           </InfoValue>
         </InfoRow>
         {r.description && (
-          <InfoRow><InfoLabel>소개</InfoLabel><InfoValue><Description>{r.description}</Description></InfoValue></InfoRow>
+          <InfoRow><InfoLabel $minWidth="36px">소개</InfoLabel><InfoValue><Description>{r.description}</Description></InfoValue></InfoRow>
         )}
       </InfoGrid>
 
@@ -145,84 +150,12 @@ const MeetupLayer = ({ selectedItem, onClose, onRefresh }) => {
 
 export default MeetupLayer;
 
-const InfoPanel = styled.div`
-  position: absolute;
-  bottom: 0;
-  right: 0;
-  width: 300px;
-  max-height: 65vh;
-  background: ${props => props.theme.colors.surface};
-  border-left: 1px solid ${props => props.theme.colors.border};
-  border-top: 1px solid ${props => props.theme.colors.border};
-  border-radius: 12px 0 0 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  z-index: 500;
-  box-shadow: -4px -2px 16px rgba(0,0,0,0.12);
-
-  @media (max-width: 600px) {
-    width: 100%;
-    border-radius: 12px 12px 0 0;
-  }
-`;
-
-const PanelHeader = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 14px 6px;
-  flex-shrink: 0;
-`;
+const InfoPanel = styled(BaseInfoPanel)``;
 
 const TypeBadge = styled.span`
   font-size: 12px;
-  color: #52C41A;
+  color: ${props => props.theme.colors.domain.meetup};
   font-weight: 600;
-`;
-
-const CloseButton = styled.button`
-  background: none;
-  border: none;
-  color: ${props => props.theme.colors.textSecondary};
-  cursor: pointer;
-  font-size: 15px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  &:hover { background: ${props => props.theme.colors.surfaceHover}; }
-`;
-
-const PanelTitle = styled.h3`
-  font-size: 15px;
-  font-weight: 700;
-  color: ${props => props.theme.colors.text};
-  margin: 0;
-  padding: 0 14px 8px;
-`;
-
-const InfoGrid = styled.div`
-  padding: 0 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  overflow-y: auto;
-`;
-
-const InfoRow = styled.div`
-  display: flex;
-  gap: 8px;
-  font-size: 13px;
-`;
-
-const InfoLabel = styled.span`
-  color: ${props => props.theme.colors.textSecondary};
-  min-width: 36px;
-  flex-shrink: 0;
-  font-size: 12px;
-`;
-
-const InfoValue = styled.span`
-  color: ${props => props.theme.colors.text};
 `;
 
 const ParticipantCount = styled.span`
@@ -238,17 +171,12 @@ const Description = styled.span`
   line-height: 1.4;
 `;
 
-const ActionRow = styled.div`
-  padding: 10px 14px;
-  flex-shrink: 0;
-`;
-
 const JoinButton = styled.button`
   width: 100%;
   padding: 9px;
   border-radius: 8px;
   border: none;
-  background: #52C41A;
+  background: ${props => props.theme.colors.domain.meetup};
   color: white;
   font-size: 14px;
   font-weight: 600;
@@ -273,15 +201,8 @@ const LeaveButton = styled.button`
 const OrganizerBadge = styled.div`
   padding: 6px 14px;
   font-size: 12px;
-  color: #52C41A;
+  color: ${props => props.theme.colors.domain.meetup};
   font-weight: 600;
-`;
-
-const Divider = styled.hr`
-  border: none;
-  border-top: 1px solid ${props => props.theme.colors.border};
-  margin: 0;
-  flex-shrink: 0;
 `;
 
 const ParticipantSection = styled.div`

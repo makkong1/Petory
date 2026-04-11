@@ -10,18 +10,20 @@ const TABS = [
 
 const DomainTabHeader = ({ activeLayer, onTabChange, controlsCollapsed, onToggleControls }) => {
   return (
-    <TabBar>
+    <TabBar role="tablist">
       <TabsGroup>
         {TABS.map(tab => (
           <TabButton
             key={tab.id}
+            role="tab"
+            aria-selected={activeLayer === tab.id}
             $active={activeLayer === tab.id}
-            $color={tab.color}
+            $domain={tab.id}
             $disabled={tab.disabled}
             onClick={() => !tab.disabled && onTabChange(tab.id)}
             title={tab.disabled ? '준비 중' : tab.label}
           >
-            <TabIcon>{tab.icon}</TabIcon>
+            <TabIcon aria-hidden="true">{tab.icon}</TabIcon>
             <TabLabel>{tab.label}</TabLabel>
             {tab.disabled && <ComingSoon>준비중</ComingSoon>}
           </TabButton>
@@ -66,8 +68,8 @@ const TabButton = styled.button`
   gap: 6px;
   padding: 7px 12px;
   border-radius: 20px;
-  border: 2px solid ${props => props.$active ? props.$color : props.theme.colors.border};
-  background: ${props => props.$active ? props.$color : props.theme.colors.background};
+  border: 2px solid ${props => props.$active ? props.theme.colors.domain[props.$domain] : props.theme.colors.border};
+  background: ${props => props.$active ? props.theme.colors.domain[props.$domain] : props.theme.colors.background};
   color: ${props => props.$active ? 'white' : props.theme.colors.text};
   font-size: 13px;
   font-weight: ${props => props.$active ? 600 : 400};
@@ -77,8 +79,8 @@ const TabButton = styled.button`
   position: relative;
 
   &:hover:not(:disabled) {
-    border-color: ${props => props.$color};
-    color: ${props => props.$active ? 'white' : props.$color};
+    border-color: ${props => props.theme.colors.domain[props.$domain]};
+    color: ${props => props.$active ? 'white' : props.theme.colors.domain[props.$domain]};
   }
 `;
 
