@@ -2,6 +2,11 @@ import React, { useState } from 'react';
 import styled from 'styled-components';
 import { useAuth } from '../../../contexts/AuthContext';
 import { getOrCreateDirectConversation } from '../../../api/chatApi';
+import {
+  InfoPanel as BaseInfoPanel,
+  PanelHeader, CloseButton, PanelTitle,
+  InfoRow, InfoLabel, InfoValue, InfoGrid, ActionRow,
+} from '../shared/BaseInfoPanel';
 
 const CareLayer = ({ selectedItem, onClose }) => {
   const { user } = useAuth();
@@ -40,7 +45,7 @@ const CareLayer = ({ selectedItem, onClose }) => {
     <InfoPanel>
       <PanelHeader>
         <TypeBadge>💛 펫케어</TypeBadge>
-        <CloseButton onClick={onClose}>✕</CloseButton>
+        <CloseButton onClick={onClose} aria-label="닫기">✕</CloseButton>
       </PanelHeader>
 
       <PanelTitle>{selectedItem.title}</PanelTitle>
@@ -83,86 +88,12 @@ const CareLayer = ({ selectedItem, onClose }) => {
 
 export default CareLayer;
 
-const InfoPanel = styled.div`
-  position: absolute;
-  bottom: 0;
-  right: 0;
-  width: 300px;
-  max-height: 65vh;
-  background: ${props => props.theme.colors.surface};
-  border-left: 1px solid ${props => props.theme.colors.border};
-  border-top: 1px solid ${props => props.theme.colors.border};
-  border-radius: 12px 0 0 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  z-index: 500;
-  box-shadow: -4px -2px 16px rgba(0,0,0,0.12);
-
-  @media (max-width: 600px) {
-    width: 100%;
-    border-radius: 12px 12px 0 0;
-  }
-`;
-
-const PanelHeader = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 14px 6px;
-  flex-shrink: 0;
-`;
+const InfoPanel = styled(BaseInfoPanel)``;
 
 const TypeBadge = styled.span`
   font-size: 12px;
-  color: #FAAD14;
+  color: ${props => props.theme.colors.domain.care};
   font-weight: 600;
-`;
-
-const CloseButton = styled.button`
-  background: none;
-  border: none;
-  color: ${props => props.theme.colors.textSecondary};
-  cursor: pointer;
-  font-size: 15px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  &:hover { background: ${props => props.theme.colors.surfaceHover}; }
-`;
-
-const PanelTitle = styled.h3`
-  font-size: 15px;
-  font-weight: 700;
-  color: ${props => props.theme.colors.text};
-  margin: 0;
-  padding: 0 14px 8px;
-`;
-
-const InfoGrid = styled.div`
-  padding: 0 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  overflow-y: auto;
-`;
-
-const InfoRow = styled.div`
-  display: flex;
-  gap: 8px;
-  font-size: 13px;
-  align-items: flex-start;
-`;
-
-const InfoLabel = styled.span`
-  color: ${props => props.theme.colors.textSecondary};
-  min-width: 48px;
-  flex-shrink: 0;
-  font-size: 12px;
-  padding-top: 1px;
-`;
-
-const InfoValue = styled.span`
-  color: ${props => props.theme.colors.text};
 `;
 
 const StatusBadge = styled.span`
@@ -185,7 +116,7 @@ const StatusBadge = styled.span`
 `;
 
 const CoinText = styled.span`
-  color: #c47d00;
+  color: ${props => props.theme.colors.ai.text};
   font-weight: 600;
 `;
 
@@ -197,17 +128,12 @@ const Description = styled.span`
   line-height: 1.4;
 `;
 
-const ActionRow = styled.div`
-  padding: 10px 14px;
-  flex-shrink: 0;
-`;
-
 const ChatButton = styled.button`
   width: 100%;
   padding: 9px;
   border-radius: 8px;
   border: none;
-  background: #FAAD14;
+  background: ${props => props.theme.colors.domain.care};
   color: white;
   font-size: 14px;
   font-weight: 600;
@@ -219,6 +145,6 @@ const ChatButton = styled.button`
 const OwnerBadge = styled.div`
   padding: 6px 14px;
   font-size: 12px;
-  color: #FAAD14;
+  color: ${props => props.theme.colors.domain.care};
   font-weight: 600;
 `;

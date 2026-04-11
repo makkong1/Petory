@@ -26,7 +26,7 @@ const CreateButton = styled.button`
   padding: 7px 16px;
   border-radius: 8px;
   border: none;
-  background: #FAAD14;
+  background: ${props => props.theme.colors.domain.care};
   color: white;
   font-size: 13px;
   font-weight: 600;

@@ -2,6 +2,11 @@ import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { locationServiceReviewApi } from '../../../api/locationServiceReviewApi';
 import { useAuth } from '../../../contexts/AuthContext';
+import {
+  InfoPanel as BaseInfoPanel,
+  PanelHeader, CloseButton, PanelTitle, Divider,
+  InfoRow, InfoLabel, InfoValue, InfoGrid,
+} from '../shared/BaseInfoPanel';
 
 const LocationLayer = ({ selectedItem, onClose }) => {
   const { user } = useAuth();
@@ -81,10 +86,10 @@ const LocationLayer = ({ selectedItem, onClose }) => {
   };
 
   return (
-    <InfoPanel>
+    <InfoPanel $width="320px" $maxHeight="70vh">
       <PanelHeader>
         <TypeBadge>🏥 {r.category || '시설'}</TypeBadge>
-        <CloseButton onClick={onClose}>✕</CloseButton>
+        <CloseButton onClick={onClose} aria-label="닫기">✕</CloseButton>
       </PanelHeader>
 
       <PanelTitle>{selectedItem.title}</PanelTitle>
@@ -96,52 +101,53 @@ const LocationLayer = ({ selectedItem, onClose }) => {
 
       <Divider />
 
-      <InfoGrid>
-        {r.address && <InfoRow><InfoLabel>주소</InfoLabel><InfoValue>{r.address}</InfoValue></InfoRow>}
-        {r.phone && (
-          <InfoRow>
-            <InfoLabel>전화</InfoLabel>
-            <InfoValue><a href={`tel:${r.phone}`}>{r.phone}</a></InfoValue>
-          </InfoRow>
-        )}
-        {r.website && (
-          <InfoRow>
-            <InfoLabel>웹사이트</InfoLabel>
-            <InfoValue>
-              <a href={r.website} target="_blank" rel="noopener noreferrer">바로가기</a>
-            </InfoValue>
-          </InfoRow>
-        )}
-        {r.operatingHours && <InfoRow><InfoLabel>운영시간</InfoLabel><InfoValue>{r.operatingHours}</InfoValue></InfoRow>}
-        {r.closedDay && <InfoRow><InfoLabel>휴무일</InfoLabel><InfoValue>{r.closedDay}</InfoValue></InfoRow>}
-        {r.priceInfo && <InfoRow><InfoLabel>가격</InfoLabel><InfoValue>{r.priceInfo}</InfoValue></InfoRow>}
-        {r.parkingAvailable != null && (
-          <InfoRow><InfoLabel>주차</InfoLabel><InfoValue>{r.parkingAvailable ? '가능' : '불가능'}</InfoValue></InfoRow>
-        )}
-        {(r.indoor != null || r.outdoor != null) && (
-          <InfoRow>
-            <InfoLabel>장소</InfoLabel>
-            <InfoValue>
-              {[r.indoor && '실내', r.outdoor && '실외'].filter(Boolean).join(' / ')}
-            </InfoValue>
-          </InfoRow>
-        )}
-        {r.petFriendly != null && (
-          <InfoRow>
-            <InfoLabel>반려동물</InfoLabel>
-            <InfoValue>{r.petFriendly ? '✅ 동반 가능' : '❌ 동반 불가'}</InfoValue>
-          </InfoRow>
-        )}
-        {r.petSize && <InfoRow><InfoLabel>입장 크기</InfoLabel><InfoValue>{r.petSize}</InfoValue></InfoRow>}
-        {r.petRestrictions && <InfoRow><InfoLabel>제한사항</InfoLabel><InfoValue>{r.petRestrictions}</InfoValue></InfoRow>}
-        {r.petExtraFee && <InfoRow><InfoLabel>반려동물 추가요금</InfoLabel><InfoValue>{r.petExtraFee}</InfoValue></InfoRow>}
-        {r.description && <InfoRow><InfoLabel>설명</InfoLabel><InfoValue>{r.description}</InfoValue></InfoRow>}
-      </InfoGrid>
+      <ScrollBody>
+        <InfoGrid $padding="10px 14px">
+          {r.address && <InfoRow><InfoLabel $minWidth="70px">주소</InfoLabel><InfoValue>{r.address}</InfoValue></InfoRow>}
+          {r.phone && (
+            <InfoRow>
+              <InfoLabel $minWidth="70px">전화</InfoLabel>
+              <InfoValue><a href={`tel:${r.phone}`}>{r.phone}</a></InfoValue>
+            </InfoRow>
+          )}
+          {r.website && (
+            <InfoRow>
+              <InfoLabel $minWidth="70px">웹사이트</InfoLabel>
+              <InfoValue>
+                <a href={r.website} target="_blank" rel="noopener noreferrer">바로가기</a>
+              </InfoValue>
+            </InfoRow>
+          )}
+          {r.operatingHours && <InfoRow><InfoLabel $minWidth="70px">운영시간</InfoLabel><InfoValue>{r.operatingHours}</InfoValue></InfoRow>}
+          {r.closedDay && <InfoRow><InfoLabel $minWidth="70px">휴무일</InfoLabel><InfoValue>{r.closedDay}</InfoValue></InfoRow>}
+          {r.priceInfo && <InfoRow><InfoLabel $minWidth="70px">가격</InfoLabel><InfoValue>{r.priceInfo}</InfoValue></InfoRow>}
+          {r.parkingAvailable != null && (
+            <InfoRow><InfoLabel $minWidth="70px">주차</InfoLabel><InfoValue>{r.parkingAvailable ? '가능' : '불가능'}</InfoValue></InfoRow>
+          )}
+          {(r.indoor != null || r.outdoor != null) && (
+            <InfoRow>
+              <InfoLabel $minWidth="70px">장소</InfoLabel>
+              <InfoValue>
+                {[r.indoor && '실내', r.outdoor && '실외'].filter(Boolean).join(' / ')}
+              </InfoValue>
+            </InfoRow>
+          )}
+          {r.petFriendly != null && (
+            <InfoRow>
+              <InfoLabel $minWidth="70px">반려동물</InfoLabel>
+              <InfoValue>{r.petFriendly ? '✅ 동반 가능' : '❌ 동반 불가'}</InfoValue>
+            </InfoRow>
+          )}
+          {r.petSize && <InfoRow><InfoLabel $minWidth="70px">입장 크기</InfoLabel><InfoValue>{r.petSize}</InfoValue></InfoRow>}
+          {r.petRestrictions && <InfoRow><InfoLabel $minWidth="70px">제한사항</InfoLabel><InfoValue>{r.petRestrictions}</InfoValue></InfoRow>}
+          {r.petExtraFee && <InfoRow><InfoLabel $minWidth="70px">반려동물 추가요금</InfoLabel><InfoValue>{r.petExtraFee}</InfoValue></InfoRow>}
+          {r.description && <InfoRow><InfoLabel $minWidth="70px">설명</InfoLabel><InfoValue>{r.description}</InfoValue></InfoRow>}
+        </InfoGrid>
 
-      <Divider />
+        <Divider />
 
-      {/* 리뷰 섹션 */}
-      <ReviewSection>
+        {/* 리뷰 섹션 */}
+        <ReviewSection>
         <ReviewTitle>리뷰 ({reviews.length})</ReviewTitle>
 
         {reviewLoading ? (
@@ -194,70 +200,20 @@ const LocationLayer = ({ selectedItem, onClose }) => {
             </ReviewFormRow>
           </ReviewForm>
         )}
-      </ReviewSection>
+        </ReviewSection>
+      </ScrollBody>
     </InfoPanel>
   );
 };
 
 export default LocationLayer;
 
-const InfoPanel = styled.div`
-  position: absolute;
-  bottom: 0;
-  right: 0;
-  width: 320px;
-  max-height: 70vh;
-  background: ${props => props.theme.colors.surface};
-  border-left: 1px solid ${props => props.theme.colors.border};
-  border-top: 1px solid ${props => props.theme.colors.border};
-  border-radius: 12px 0 0 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  z-index: 500;
-  box-shadow: -4px -2px 16px rgba(0,0,0,0.12);
-
-  @media (max-width: 600px) {
-    width: 100%;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    border-radius: 12px 12px 0 0;
-    max-height: 60vh;
-  }
-`;
-
-const PanelHeader = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 14px 6px;
-  flex-shrink: 0;
-`;
+const InfoPanel = styled(BaseInfoPanel)``;
 
 const TypeBadge = styled.span`
   font-size: 12px;
-  color: #4A90D9;
+  color: ${props => props.theme.colors.domain.location};
   font-weight: 600;
-`;
-
-const CloseButton = styled.button`
-  background: none;
-  border: none;
-  color: ${props => props.theme.colors.textSecondary};
-  cursor: pointer;
-  font-size: 15px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  &:hover { background: ${props => props.theme.colors.surfaceHover}; }
-`;
-
-const PanelTitle = styled.h3`
-  font-size: 15px;
-  font-weight: 700;
-  color: ${props => props.theme.colors.text};
-  margin: 0;
-  padding: 0 14px 4px;
 `;
 
 const RatingRow = styled.div`
@@ -266,52 +222,15 @@ const RatingRow = styled.div`
   padding: 0 14px 8px;
 `;
 
-const Divider = styled.hr`
-  border: none;
-  border-top: 1px solid ${props => props.theme.colors.border};
-  margin: 0;
-  flex-shrink: 0;
-`;
-
-const InfoGrid = styled.div`
-  padding: 10px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
+const ScrollBody = styled.div`
+  flex: 1;
   overflow-y: auto;
-  flex-shrink: 0;
-`;
-
-const InfoRow = styled.div`
-  display: flex;
-  gap: 8px;
-  font-size: 13px;
-  line-height: 1.4;
-`;
-
-const InfoLabel = styled.span`
-  color: ${props => props.theme.colors.textSecondary};
-  min-width: 70px;
-  flex-shrink: 0;
-  font-size: 12px;
-`;
-
-const InfoValue = styled.span`
-  color: ${props => props.theme.colors.text};
-  word-break: break-word;
-
-  a {
-    color: ${props => props.theme.colors.primary};
-    text-decoration: none;
-    &:hover { text-decoration: underline; }
-  }
+  min-height: 0;
 `;
 
 const ReviewSection = styled.div`
-  flex: 1;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
   padding: 10px 14px;
 `;
 

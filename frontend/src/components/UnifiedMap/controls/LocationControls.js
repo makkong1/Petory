@@ -44,6 +44,7 @@ const LocationControls = ({ keyword, category, isAiMode, onSearch, onCategoryCha
         {KEYWORD_CATEGORIES.map(cat => (
           <CategoryChip
             key={cat.value}
+            type="button"
             $active={category === cat.value}
             onClick={() => onCategoryChange(cat.value)}
           >
@@ -104,9 +105,9 @@ const SearchButton = styled.button`
 const AiButton = styled.button`
   padding: 7px 12px;
   border-radius: 8px;
-  border: 1.5px solid ${props => props.$active ? '#F5A623' : props.theme.colors.border};
-  background: ${props => props.$active ? '#FFF8EC' : props.theme.colors.background};
-  color: ${props => props.$active ? '#c47d00' : props.theme.colors.textSecondary};
+  border: 1.5px solid ${props => props.$active ? props.theme.colors.ai.accent : props.theme.colors.border};
+  background: ${props => props.$active ? props.theme.colors.ai.bg : props.theme.colors.background};
+  color: ${props => props.$active ? props.theme.colors.ai.text : props.theme.colors.textSecondary};
   font-size: 13px;
   font-weight: ${props => props.$active ? 700 : 400};
   cursor: pointer;
@@ -114,8 +115,8 @@ const AiButton = styled.button`
   transition: all 0.15s ease;
 
   &:hover {
-    border-color: #F5A623;
-    color: #c47d00;
+    border-color: ${props => props.theme.colors.ai.accent};
+    color: ${props => props.theme.colors.ai.text};
   }
 `;
 
