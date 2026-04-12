@@ -52,10 +52,24 @@ const toMapItem = (type, raw) => {
   };
 };
 
+// 줌 레벨(카카오맵 1~14) → 반환 개수 매핑
+const ZOOM_LIMIT_TABLE = {
+  location: { 4: 30, 5: 50, 6: 100, 7: 150, 8: 250, 9: 400, default: 500 },
+  meetup:   { 4: 30, 5: 50, 6: 100, 7: 200, 8: 350, 9: 500, default: 800 },
+  care:     { 4: 20, 5: 30, 6: 50,  7: 80,  8: 150, 9: 250, default: 400 },
+};
+
+const getLimitForLevel = (type, level) => {
+  const table = ZOOM_LIMIT_TABLE[type];
+  const key = level <= 4 ? 4 : level >= 10 ? 'default' : level;
+  return table[key] ?? table['default'];
+};
+
 /**
  * 활성 탭 1개의 데이터만 조회해 공통 mapItem 배열로 반환
+ * @param {number} mapLevel - 카카오맵 기준 줌 레벨 (1=최대확대, 14=전국). 기본값 7
  */
-export const fetchActiveMapItems = async ({ type, lat, lng, radius, keyword, category }) => {
+export const fetchActiveMapItems = async ({ type, lat, lng, radius, keyword, category, mapLevel = 7 }) => {
   if (type === 'location') {
     const res = await locationServiceApi.searchPlaces({
       latitude: lat,
@@ -63,20 +77,21 @@ export const fetchActiveMapItems = async ({ type, lat, lng, radius, keyword, cat
       radius: radius * 1000, // km → m
       ...(keyword && { keyword }),
       ...(category && { category }),
+      size: getLimitForLevel('location', mapLevel),
     });
     const services = res?.data?.services ?? [];
     return services.map(r => toMapItem('location', r));
   }
 
   if (type === 'meetup') {
-    const res = await meetupApi.getNearbyMeetups(lat, lng, radius);
+    const res = await meetupApi.getNearbyMeetups(lat, lng, radius, getLimitForLevel('meetup', mapLevel));
     const meetups = res?.data?.meetups ?? res?.data ?? [];
     return meetups.map(r => toMapItem('meetup', r));
   }
 
   if (type === 'care') {
     if (isDemoMode()) return [];
-    const res = await careRequestApi.getNearby({ lat, lng, radius });
+    const res = await careRequestApi.getNearby({ lat, lng, radius, limit: getLimitForLevel('care', mapLevel) });
     const careRequests = res?.data ?? [];
     return careRequests.map(r => toMapItem('care', r));
   }

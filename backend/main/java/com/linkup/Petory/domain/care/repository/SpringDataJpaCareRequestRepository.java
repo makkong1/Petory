@@ -102,10 +102,12 @@ public interface SpringDataJpaCareRequestRepository extends JpaRepository<CareRe
                     "AND (6371 * acos(cos(radians(:lat)) * cos(radians(cr.latitude)) * " +
                     "    cos(radians(cr.longitude) - radians(:lng)) + " +
                     "    sin(radians(:lat)) * sin(radians(cr.latitude)))) <= :radius " +
-                    "ORDER BY cr.created_at DESC", nativeQuery = true)
+                    "ORDER BY cr.created_at DESC " +
+                    "LIMIT :limit", nativeQuery = true)
     List<CareRequest> findNearbyCareRequests(@Param("lat") Double lat,
                     @Param("lng") Double lng,
-                    @Param("radius") Double radius);
+                    @Param("radius") Double radius,
+                    @Param("limit") int limit);
 
     @RepositoryMethod("펫케어 요청: 페이징 키워드 검색")
     @Query(value = "SELECT DISTINCT cr FROM CareRequest cr JOIN FETCH cr.user u LEFT JOIN FETCH cr.pet WHERE cr.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' AND (LOWER(cr.title) LIKE LOWER(CONCAT('%', :keyword, '%')) OR LOWER(CAST(cr.description AS string)) LIKE LOWER(CONCAT('%', :keyword, '%'))) ORDER BY cr.createdAt DESC",

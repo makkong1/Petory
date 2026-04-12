@@ -108,5 +108,5 @@ public interface CareRequestRepository {
         /**
          * 반경 기반 근처 케어 요청 조회 (지도 표출용)
          */
-        List<CareRequest> findNearby(double lat, double lng, double radiusKm);
+        List<CareRequest> findNearby(double lat, double lng, double radiusKm, int limit);
 }
