@@ -8,6 +8,20 @@ const DEMO_LNG = 126.978;
 const DEMO_ADDRESS = '서울특별시 중구 세종대로 110';
 
 export const geocodingApi = {
+  // 주소 키워드 검색 (최대 5개 결과 반환)
+  searchPlaces: async (query) => {
+    if (isDemoMode()) {
+      return {
+        success: true,
+        results: [
+          { address: DEMO_ADDRESS, roadAddress: DEMO_ADDRESS, latitude: DEMO_LAT, longitude: DEMO_LNG },
+        ],
+      };
+    }
+    const response = await api.get('/geocoding/search', { params: { query } });
+    return response.data;
+  },
+
   // 주소를 위도/경도로 변환
   addressToCoordinates: async (address) => {
     if (isDemoMode()) {

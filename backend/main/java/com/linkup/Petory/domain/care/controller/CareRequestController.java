@@ -46,8 +46,9 @@ public class CareRequestController {
     public ResponseEntity<List<CareRequestDTO>> getNearby(
             @RequestParam double lat,
             @RequestParam double lng,
-            @RequestParam(defaultValue = "5.0") double radius) {
-        return ResponseEntity.ok(careRequestService.getNearby(lat, lng, radius));
+            @RequestParam(defaultValue = "5.0") double radius,
+            @RequestParam(defaultValue = "200") int limit) {
+        return ResponseEntity.ok(careRequestService.getNearby(lat, lng, radius, limit));
     }
 
     // 전체 케어 요청 조회 (페이징 지원)

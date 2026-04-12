@@ -69,8 +69,9 @@ public class CareRequestService {
      * 반경 기반 근처 케어 요청 조회 (지도 표출용)
      */
     @Transactional(readOnly = true)
-    public List<CareRequestDTO> getNearby(double lat, double lng, double radiusKm) {
-        return careRequestRepository.findNearby(lat, lng, radiusKm)
+    public List<CareRequestDTO> getNearby(double lat, double lng, double radiusKm, int limit) {
+        int effectiveLimit = Math.min(Math.max(limit, 1), 500);
+        return careRequestRepository.findNearby(lat, lng, radiusKm, effectiveLimit)
                 .stream()
                 .map(careRequestConverter::toDTO)
                 .toList();

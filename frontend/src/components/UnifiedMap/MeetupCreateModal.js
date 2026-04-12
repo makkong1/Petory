@@ -3,6 +3,7 @@ import styled from 'styled-components';
 import { meetupApi } from '../../api/meetupApi';
 import { geocodingApi } from '../../api/geocodingApi';
 import { useEmailVerification } from '../../hooks/useEmailVerification';
+import MiniMapPicker from './MiniMapPicker';
 
 const defaultForm = () => ({
   title: '',
@@ -23,6 +24,7 @@ const MeetupCreateModal = ({ onClose, onSuccess }) => {
   const [locationResults, setLocationResults] = useState([]);
   const [showResults, setShowResults] = useState(false);
   const [locationSearching, setLocationSearching] = useState(false);
+  const [showMap, setShowMap] = useState(true);
   const locationInputRef = useRef(null);
   const resultsRef = useRef(null);
 
@@ -36,9 +38,9 @@ const MeetupCreateModal = ({ onClose, onSuccess }) => {
     const timer = setTimeout(async () => {
       setLocationSearching(true);
       try {
-        const data = await geocodingApi.addressToCoordinates(locationQuery);
-        if (data && data.success !== false && data.latitude && data.longitude) {
-          setLocationResults([{ address: data.address || locationQuery, latitude: data.latitude, longitude: data.longitude }]);
+        const data = await geocodingApi.searchPlaces(locationQuery);
+        if (data && data.success && data.results && data.results.length > 0) {
+          setLocationResults(data.results);
           setShowResults(true);
         } else {
           setLocationResults([]);
@@ -69,6 +71,13 @@ const MeetupCreateModal = ({ onClose, onSuccess }) => {
     setFormData(prev => ({ ...prev, location: result.address, latitude: result.latitude, longitude: result.longitude }));
     setLocationQuery(result.address);
     setShowResults(false);
+    setErrors(prev => { const e = { ...prev }; delete e.location; return e; });
+  };
+
+  // 지도 클릭으로 장소 선택
+  const handleMapSelect = (lat, lng, address) => {
+    setFormData(prev => ({ ...prev, location: address || prev.location, latitude: lat, longitude: lng }));
+    if (address) setLocationQuery(address);
     setErrors(prev => { const e = { ...prev }; delete e.location; return e; });
   };
 
@@ -131,27 +140,41 @@ const MeetupCreateModal = ({ onClose, onSuccess }) => {
           </Field>
 
           <Field>
-            <Label>장소 *</Label>
+            <LocationLabelRow>
+              <Label>장소 *</Label>
+              <MapToggleBtn type="button" onClick={() => setShowMap(v => !v)}>
+                {showMap ? '지도 숨기기' : '지도 보기'}
+              </MapToggleBtn>
+            </LocationLabelRow>
             <LocationInputWrapper>
               <Input
                 ref={locationInputRef}
                 value={locationQuery}
                 onChange={e => setLocationQuery(e.target.value)}
-                placeholder="주소를 검색하세요"
+                placeholder="주소를 검색하거나 지도를 클릭하세요"
                 autoComplete="off"
               />
               {locationSearching && <SearchingHint>검색 중...</SearchingHint>}
               {showResults && locationResults.length > 0 && (
                 <ResultsList ref={resultsRef}>
                   {locationResults.map((r, i) => (
-                    <ResultItem key={i} onClick={() => handleLocationSelect(r)}>{r.address}</ResultItem>
+                    <ResultItem key={i} onClick={() => handleLocationSelect(r)}>
+                      <ResultAddress>{r.address}</ResultAddress>
+                      {r.jibunAddress && r.jibunAddress !== r.address && (
+                        <ResultSub>{r.jibunAddress}</ResultSub>
+                      )}
+                    </ResultItem>
                   ))}
                 </ResultsList>
               )}
             </LocationInputWrapper>
             {errors.location && <ErrorMsg>{errors.location}</ErrorMsg>}
-            {formData.latitude && (
-              <CoordHint>📍 {formData.latitude.toFixed(5)}, {formData.longitude.toFixed(5)}</CoordHint>
+            {showMap && (
+              <MiniMapPicker
+                lat={formData.latitude}
+                lng={formData.longitude}
+                onSelect={handleMapSelect}
+              />
             )}
           </Field>
 
@@ -331,7 +354,6 @@ const ResultsList = styled.div`
 
 const ResultItem = styled.div`
   padding: 10px 12px;
-  font-size: 13px;
   cursor: pointer;
   color: ${props => props.theme.colors.text};
 
@@ -339,9 +361,30 @@ const ResultItem = styled.div`
   & + & { border-top: 1px solid ${props => props.theme.colors.borderLight || props.theme.colors.border}; }
 `;
 
-const CoordHint = styled.div`
+const ResultAddress = styled.div`
+  font-size: 13px;
+`;
+
+const ResultSub = styled.div`
   font-size: 11px;
   color: ${props => props.theme.colors.textSecondary};
+  margin-top: 2px;
+`;
+
+const LocationLabelRow = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+`;
+
+const MapToggleBtn = styled.button`
+  background: none;
+  border: none;
+  font-size: 12px;
+  color: ${props => props.theme.colors.primary};
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
 `;
 
 const ErrorMsg = styled.span`

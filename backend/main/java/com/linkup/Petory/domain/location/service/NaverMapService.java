@@ -11,6 +11,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 네이버맵 API 서비스
@@ -242,6 +243,83 @@ public class NaverMapService {
         } catch (Exception e) {
             log.error("네이버맵 지오코딩 API 호출 실패: {}", e.getMessage(), e);
             return null;
+        }
+    }
+
+    /**
+     * 네이버맵 주소 검색 (키워드 → 주소 목록 반환)
+     *
+     * @param query 검색어 (주소 또는 장소명 일부)
+     * @return 주소 결과 목록, 각 항목에 address/roadAddress/latitude/longitude 포함
+     */
+    public List<Map<String, Object>> searchAddresses(String query) {
+        if (query == null || query.trim().isEmpty()) {
+            return List.of();
+        }
+
+        if (apiKeyId == null || apiKeyId.isEmpty() || apiKey == null || apiKey.isEmpty()) {
+            log.warn("네이버맵 API 키가 설정되지 않았습니다.");
+            return List.of();
+        }
+
+        try {
+            String cleanedQuery = query.replace("+", " ").replaceAll("\\s+", " ").trim();
+
+            String url = UriComponentsBuilder
+                    .fromUriString("https://maps.apigw.ntruss.com/map-geocode/v2/geocode")
+                    .queryParam("query", cleanedQuery)
+                    .encode()
+                    .toUriString();
+
+            Map<String, Object> responseBody = restClient.get()
+                    .uri(url)
+                    .headers(h -> {
+                        h.set("X-NCP-APIGW-API-KEY-ID", apiKeyId);
+                        h.set("X-NCP-APIGW-API-KEY", apiKey);
+                        h.set("Accept", "application/json");
+                    })
+                    .retrieve()
+                    .body(MAP_TYPE);
+
+            if (responseBody == null || !responseBody.containsKey("addresses")) {
+                return List.of();
+            }
+
+            List<?> addressesList = (List<?>) responseBody.get("addresses");
+            if (addressesList == null || addressesList.isEmpty()) {
+                return List.of();
+            }
+
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> addresses = (List<Map<String, Object>>) addressesList;
+
+            return addresses.stream()
+                    .limit(5)
+                    .map(addr -> {
+                        Map<String, Object> result = new HashMap<>();
+                        String roadAddr = (String) addr.get("roadAddress");
+                        String jibunAddr = (String) addr.get("jibunAddress");
+                        String display = (roadAddr != null && !roadAddr.isBlank()) ? roadAddr : jibunAddr;
+                        result.put("address", display);
+                        result.put("roadAddress", roadAddr);
+                        result.put("jibunAddress", jibunAddr);
+                        try {
+                            result.put("latitude", Double.parseDouble((String) addr.get("y")));
+                            result.put("longitude", Double.parseDouble((String) addr.get("x")));
+                        } catch (NumberFormatException e) {
+                            log.warn("좌표 파싱 실패: {}", addr);
+                        }
+                        return result;
+                    })
+                    .filter(r -> r.containsKey("latitude"))
+                    .collect(Collectors.toList());
+
+        } catch (RestClientResponseException e) {
+            log.error("네이버맵 주소 검색 API HTTP 에러: {} - 상태: {}", e.getMessage(), e.getStatusCode());
+            return List.of();
+        } catch (Exception e) {
+            log.error("네이버맵 주소 검색 실패: {}", e.getMessage(), e);
+            return List.of();
         }
     }
 

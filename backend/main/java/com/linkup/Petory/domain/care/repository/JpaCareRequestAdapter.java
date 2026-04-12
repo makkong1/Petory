@@ -126,8 +126,8 @@ public class JpaCareRequestAdapter implements CareRequestRepository {
     }
 
     @Override
-    public List<CareRequest> findNearby(double lat, double lng, double radiusKm) {
-        return jpaRepository.findNearbyCareRequests(lat, lng, radiusKm);
+    public List<CareRequest> findNearby(double lat, double lng, double radiusKm, int limit) {
+        return jpaRepository.findNearbyCareRequests(lat, lng, radiusKm, limit);
     }
 }
 

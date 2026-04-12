@@ -8,12 +8,12 @@ const mockResolve = (data) => Promise.resolve({ data });
 
 export const meetupApi = {
   // 반경 기반 모임 조회 (마커 표시용)
-  getNearbyMeetups: (lat, lng, radius = 5) => {
+  getNearbyMeetups: (lat, lng, radius = 5, maxResults = 200) => {
     if (isDemoMode()) {
       return mockResolve(DEMO_MEETUPS);
     }
     return api.get('/nearby', {
-      params: { lat, lng, radius },
+      params: { lat, lng, radius, maxResults },
     });
   },
 

@@ -55,6 +55,9 @@ const UnifiedPetMapPage = () => {
   // care 탭 전용
   const [showCareCreateModal, setShowCareCreateModal] = useState(false);
 
+  // 내 위치 버튼 로딩 상태
+  const [locating, setLocating] = useState(false);
+
   const cacheRef = useRef({});
   const fetchTimerRef = useRef(null);
 
@@ -73,11 +76,11 @@ const UnifiedPetMapPage = () => {
   }, []);
 
   // 데이터 조회 (디바운스 300ms)
-  const fetchItems = useCallback((type, center, r, keyword, category) => {
+  const fetchItems = useCallback((type, center, r, keyword, category, level = 7) => {
     if (!center?.lat || !center?.lng) return;
     clearTimeout(fetchTimerRef.current);
     fetchTimerRef.current = setTimeout(async () => {
-      const cacheKey = `${type}-${center.lat.toFixed(4)}-${center.lng.toFixed(4)}-${r}-${keyword}-${category}`;
+      const cacheKey = `${type}-${center.lat.toFixed(4)}-${center.lng.toFixed(4)}-${r}-${keyword}-${category}-${level}`;
       if (cacheRef.current[cacheKey]) {
         setItems(cacheRef.current[cacheKey]);
         setRecommendedMap(null);
@@ -92,6 +95,7 @@ const UnifiedPetMapPage = () => {
           type, lat: center.lat, lng: center.lng, radius: r,
           keyword: type === 'location' ? keyword : undefined,
           category: type === 'location' ? category : undefined,
+          mapLevel: level,
         });
         cacheRef.current[cacheKey] = result;
         setItems(result);
@@ -108,9 +112,9 @@ const UnifiedPetMapPage = () => {
   useEffect(() => {
     if (mapCenter) {
       setIsAiMode(false);
-      fetchItems(activeLayer, mapCenter, radius, locationKeyword, locationCategory);
+      fetchItems(activeLayer, mapCenter, radius, locationKeyword, locationCategory, mapLevel);
     }
-  }, [activeLayer, mapCenter, radius, locationKeyword, locationCategory, fetchItems]);
+  }, [activeLayer, mapCenter, radius, locationKeyword, locationCategory, mapLevel, fetchItems]);
 
   // AI 추천
   const handleAiToggle = useCallback(async () => {
@@ -163,7 +167,38 @@ const UnifiedPetMapPage = () => {
   };
 
   const handleMoveToMyLocation = () => {
-    if (userLocation) { setMapCenter({ ...userLocation }); setSelectedItem(null); }
+    // 이미 위치를 알고 있으면 바로 이동
+    if (userLocation) {
+      setMapCenter({ ...userLocation });
+      setSelectedItem(null);
+      return;
+    }
+
+    // 위치 권한이 없거나 아직 취득 전이면 재시도
+    if (!navigator.geolocation) {
+      alert('이 브라우저는 위치 서비스를 지원하지 않습니다.');
+      return;
+    }
+
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setUserLocation(loc);
+        setMapCenter(loc);
+        setSelectedItem(null);
+        setLocating(false);
+      },
+      (err) => {
+        setLocating(false);
+        if (err.code === err.PERMISSION_DENIED) {
+          alert('위치 권한이 거부되었습니다.\n브라우저 주소창 좌측 자물쇠 아이콘 → 위치 허용 후 다시 시도해주세요.');
+        } else {
+          alert('현재 위치를 가져올 수 없습니다. 잠시 후 다시 시도해주세요.');
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
   };
 
   const handleMapIdle = useCallback(({ lat, lng, level }) => {
@@ -174,13 +209,13 @@ const UnifiedPetMapPage = () => {
   // 모임 생성 성공 시 목록 갱신
   const handleMeetupCreated = () => {
     cacheRef.current = {};
-    fetchItems('meetup', mapCenter, radius, '', '');
+    fetchItems('meetup', mapCenter, radius, '', '', mapLevel);
   };
 
   // 케어 요청 생성 성공 시 목록 갱신
   const handleCareCreated = () => {
     cacheRef.current = {};
-    fetchItems('care', mapCenter, radius, '', '');
+    fetchItems('care', mapCenter, radius, '', '', mapLevel);
   };
 
   const renderLayerControls = () => {
@@ -227,8 +262,8 @@ const UnifiedPetMapPage = () => {
         <>
           <ControlBar>
             <RadiusFilter radius={radius} onRadiusChange={handleRadiusChange} />
-            <MyLocationButton onClick={handleMoveToMyLocation} title="내 위치로 이동">
-              📍 내 위치
+            <MyLocationButton onClick={handleMoveToMyLocation} disabled={locating} title="내 위치로 이동">
+              {locating ? '⏳ 위치 취득 중...' : '📍 내 위치'}
             </MyLocationButton>
           </ControlBar>
           {renderLayerControls()}
@@ -319,7 +354,8 @@ const MyLocationButton = styled.button`
   cursor: pointer;
   white-space: nowrap;
   transition: all 0.15s ease;
-  &:hover { border-color: ${props => props.theme.colors.primary}; color: ${props => props.theme.colors.primary}; }
+  &:hover:not(:disabled) { border-color: ${props => props.theme.colors.primary}; color: ${props => props.theme.colors.primary}; }
+  &:disabled { opacity: 0.6; cursor: not-allowed; }
 `;
 
 const MapWrapper = styled.div`

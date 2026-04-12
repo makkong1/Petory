@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.*;
 import com.linkup.Petory.domain.location.service.NaverMapService;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -67,6 +68,27 @@ public class GeocodingController {
             response.put("error", e.getMessage());
             response.put("message", "주소 변환 중 오류가 발생했습니다. 네이버 클라우드 플랫폼에서 Geocoding API 구독을 확인해주세요.");
             return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    /**
+     * 주소 키워드 검색 (최대 5개 결과 반환)
+     * GET /api/geocoding/search?query=서울시 강남구
+     */
+    @GetMapping("/search")
+    public ResponseEntity<Map<String, Object>> searchAddresses(@RequestParam String query) {
+        log.info("[주소 검색] query={}", query);
+        Map<String, Object> response = new HashMap<>();
+        try {
+            var results = naverMapService.searchAddresses(query);
+            response.put("success", true);
+            response.put("results", results);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("주소 검색 실패: {}", e.getMessage(), e);
+            response.put("success", false);
+            response.put("results", List.of());
+            return ResponseEntity.ok(response);
         }
     }
 

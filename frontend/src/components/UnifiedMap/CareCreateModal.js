@@ -5,6 +5,7 @@ import { geocodingApi } from '../../api/geocodingApi';
 import { petApiClient } from '../../api/userApi';
 import { paymentApi } from '../../api/paymentApi';
 import { useEmailVerification } from '../../hooks/useEmailVerification';
+import MiniMapPicker from './MiniMapPicker';
 
 const defaultForm = () => ({
   title: '',
@@ -26,6 +27,7 @@ const CareCreateModal = ({ onClose, onSuccess }) => {
   const [locationResults, setLocationResults] = useState([]);
   const [showResults, setShowResults] = useState(false);
   const [locationSearching, setLocationSearching] = useState(false);
+  const [showMap, setShowMap] = useState(true);
   const [pets, setPets] = useState([]);
   const [coinBalance, setCoinBalance] = useState(null);
   const locationInputRef = useRef(null);
@@ -46,9 +48,9 @@ const CareCreateModal = ({ onClose, onSuccess }) => {
     const timer = setTimeout(async () => {
       setLocationSearching(true);
       try {
-        const data = await geocodingApi.addressToCoordinates(locationQuery);
-        if (data && data.success !== false && data.latitude && data.longitude) {
-          setLocationResults([{ address: data.address || locationQuery, latitude: data.latitude, longitude: data.longitude }]);
+        const data = await geocodingApi.searchPlaces(locationQuery);
+        if (data && data.success && data.results && data.results.length > 0) {
+          setLocationResults(data.results);
           setShowResults(true);
         } else {
           setLocationResults([]);
@@ -78,6 +80,12 @@ const CareCreateModal = ({ onClose, onSuccess }) => {
     setFormData(prev => ({ ...prev, address: result.address, latitude: result.latitude, longitude: result.longitude }));
     setLocationQuery(result.address);
     setShowResults(false);
+    setErrors(prev => { const e = { ...prev }; delete e.address; return e; });
+  };
+
+  const handleMapSelect = (lat, lng, address) => {
+    setFormData(prev => ({ ...prev, address: address || prev.address, latitude: lat, longitude: lng }));
+    if (address) setLocationQuery(address);
     setErrors(prev => { const e = { ...prev }; delete e.address; return e; });
   };
 
@@ -151,28 +159,42 @@ const CareCreateModal = ({ onClose, onSuccess }) => {
           </Field>
 
           <Field>
-            <Label>위치 (선택)</Label>
+            <LocationLabelRow>
+              <Label>위치 (선택)</Label>
+              <MapToggleBtn type="button" onClick={() => setShowMap(v => !v)}>
+                {showMap ? '지도 숨기기' : '지도 보기'}
+              </MapToggleBtn>
+            </LocationLabelRow>
             <LocationInputWrapper>
               <Input
                 ref={locationInputRef}
                 value={locationQuery}
                 onChange={e => setLocationQuery(e.target.value)}
-                placeholder="주소를 검색하면 지도에 표시됩니다"
+                placeholder="주소를 검색하거나 지도를 클릭하세요"
                 autoComplete="off"
               />
               {locationSearching && <SearchingHint>검색 중...</SearchingHint>}
               {showResults && locationResults.length > 0 && (
                 <ResultsList ref={resultsRef}>
                   {locationResults.map((r, i) => (
-                    <ResultItem key={i} onClick={() => handleLocationSelect(r)}>{r.address}</ResultItem>
+                    <ResultItem key={i} onClick={() => handleLocationSelect(r)}>
+                      <ResultAddress>{r.address}</ResultAddress>
+                      {r.jibunAddress && r.jibunAddress !== r.address && (
+                        <ResultSub>{r.jibunAddress}</ResultSub>
+                      )}
+                    </ResultItem>
                   ))}
                 </ResultsList>
               )}
             </LocationInputWrapper>
-            {formData.latitude && (
-              <CoordHint>📍 {formData.latitude.toFixed(5)}, {formData.longitude.toFixed(5)}</CoordHint>
-            )}
             {errors.address && <ErrorMsg>{errors.address}</ErrorMsg>}
+            {showMap && (
+              <MiniMapPicker
+                lat={formData.latitude}
+                lng={formData.longitude}
+                onSelect={handleMapSelect}
+              />
+            )}
           </Field>
 
           <Row>
@@ -381,9 +403,30 @@ const ResultItem = styled.div`
   & + & { border-top: 1px solid ${props => props.theme.colors.borderLight || props.theme.colors.border}; }
 `;
 
-const CoordHint = styled.div`
+const LocationLabelRow = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+`;
+
+const MapToggleBtn = styled.button`
+  background: none;
+  border: none;
+  font-size: 12px;
+  color: ${props => props.theme.colors.domain.care};
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+`;
+
+const ResultAddress = styled.div`
+  font-size: 13px;
+`;
+
+const ResultSub = styled.div`
   font-size: 11px;
   color: ${props => props.theme.colors.textSecondary};
+  margin-top: 2px;
 `;
 
 const ErrorMsg = styled.span`
