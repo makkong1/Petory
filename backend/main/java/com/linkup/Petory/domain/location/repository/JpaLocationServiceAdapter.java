@@ -36,8 +36,8 @@ public class JpaLocationServiceAdapter implements LocationServiceRepository {
     }
 
     @Override
-    public List<LocationService> findByOrderByRatingDesc() {
-        return jpaRepository.findByOrderByRatingDesc();
+    public List<LocationService> findByOrderByRatingDesc(String keyword, String category) {
+        return jpaRepository.findByOrderByRatingDesc(keyword, category);
     }
 
     @Override
@@ -46,8 +46,8 @@ public class JpaLocationServiceAdapter implements LocationServiceRepository {
     }
 
     @Override
-    public List<LocationService> findByNameContaining(String keyword) {
-        return jpaRepository.findByNameContaining(keyword);
+    public List<LocationService> findByNameContaining(String keyword, String category) {
+        return jpaRepository.findByNameContaining(keyword, category);
     }
 
     @Override
@@ -56,28 +56,29 @@ public class JpaLocationServiceAdapter implements LocationServiceRepository {
     }
 
     @Override
-    public List<LocationService> findByRadius(Double latitude, Double longitude, Double radiusInMeters) {
-        return jpaRepository.findByRadius(latitude, longitude, radiusInMeters);
+    public List<LocationService> findByRadius(Double latitude, Double longitude, Double radiusInMeters,
+            String keyword, String category) {
+        return jpaRepository.findByRadius(latitude, longitude, radiusInMeters, keyword, category);
     }
 
     @Override
-    public List<LocationService> findBySigungu(String sigungu) {
-        return jpaRepository.findBySigungu(sigungu);
+    public List<LocationService> findBySigungu(String sigungu, String keyword, String category) {
+        return jpaRepository.findBySigungu(sigungu, keyword, category);
     }
 
     @Override
-    public List<LocationService> findBySido(String sido) {
-        return jpaRepository.findBySido(sido);
+    public List<LocationService> findBySido(String sido, String keyword, String category) {
+        return jpaRepository.findBySido(sido, keyword, category);
     }
 
     @Override
-    public List<LocationService> findByEupmyeondong(String eupmyeondong) {
-        return jpaRepository.findByEupmyeondong(eupmyeondong);
+    public List<LocationService> findByEupmyeondong(String eupmyeondong, String keyword, String category) {
+        return jpaRepository.findByEupmyeondong(eupmyeondong, keyword, category);
     }
 
     @Override
-    public List<LocationService> findByRoadName(String roadName) {
-        return jpaRepository.findByRoadName(roadName);
+    public List<LocationService> findByRoadName(String roadName, String keyword, String category) {
+        return jpaRepository.findByRoadName(roadName, keyword, category);
     }
 
     @Override

@@ -3,7 +3,6 @@ package com.linkup.Petory.domain.admin.controller;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -53,20 +52,9 @@ public class AdminLocationController {
             @RequestParam(required = false) Integer size,
             @RequestParam(required = false) String q) {
         
+        // keyword(q)는 SQL WHERE에서 처리 — Java 후처리 불필요
         List<LocationServiceDTO> services = locationServiceService.searchLocationServicesByRegion(
-                sido, sigungu, eupmyeondong, roadName, category, size);
-        
-        // 검색어 필터
-        if (q != null && !q.isBlank()) {
-            String keyword = q.toLowerCase();
-            services = services.stream()
-                    .filter(s -> (s.getName() != null && s.getName().toLowerCase().contains(keyword))
-                            || (s.getAddress() != null && s.getAddress().toLowerCase().contains(keyword))
-                            || (s.getCategory1() != null && s.getCategory1().toLowerCase().contains(keyword))
-                            || (s.getCategory2() != null && s.getCategory2().toLowerCase().contains(keyword))
-                            || (s.getCategory3() != null && s.getCategory3().toLowerCase().contains(keyword)))
-                    .collect(Collectors.toList());
-        }
+                sido, sigungu, eupmyeondong, roadName, q, category, size);
         
         Map<String, Object> response = new HashMap<>();
         response.put("services", services);

@@ -6,8 +6,6 @@ import com.linkup.Petory.domain.location.repository.LocationServiceRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import jakarta.persistence.EntityManager;
@@ -27,6 +25,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
@@ -38,11 +37,13 @@ import org.springframework.web.multipart.MultipartFile;
 public class PublicDataLocationService {
 
     private final LocationServiceRepository locationServiceRepository;
+    private final LocationServiceBatchWriter batchWriter;
 
     @PersistenceContext
     private EntityManager entityManager;
 
-    private static final int BATCH_SIZE = 1000; // 한 번에 저장할 개수
+    @Value("${app.location.import.batch-size:1000}")
+    private int batchSize;
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     /**
@@ -124,8 +125,8 @@ public class PublicDataLocationService {
                     deduplicationKeys.add(dedupKey);
 
                     // 배치 사이즈에 도달하면 저장
-                    if (batch.size() >= BATCH_SIZE) {
-                        int batchSaved = saveBatch(batch);
+                    if (batch.size() >= batchSize) {
+                        int batchSaved = batchWriter.saveBatch(batch);
                         saved += batchSaved;
                         if (batchSaved < batch.size()) {
                             error += (batch.size() - batchSaved);
@@ -146,7 +147,7 @@ public class PublicDataLocationService {
 
             // 남은 배치 저장
             if (!batch.isEmpty()) {
-                int batchSaved = saveBatch(batch);
+                int batchSaved = batchWriter.saveBatch(batch);
                 saved += batchSaved;
                 if (batchSaved < batch.size()) {
                     error += (batch.size() - batchSaved);
@@ -249,8 +250,8 @@ public class PublicDataLocationService {
                     deduplicationKeys.add(dedupKey);
 
                     // 배치 사이즈에 도달하면 저장
-                    if (batch.size() >= BATCH_SIZE) {
-                        int batchSaved = saveBatch(batch);
+                    if (batch.size() >= batchSize) {
+                        int batchSaved = batchWriter.saveBatch(batch);
                         saved += batchSaved;
                         if (batchSaved < batch.size()) {
                             error += (batch.size() - batchSaved);
@@ -271,7 +272,7 @@ public class PublicDataLocationService {
 
             // 남은 배치 저장
             if (!batch.isEmpty()) {
-                int batchSaved = saveBatch(batch);
+                int batchSaved = batchWriter.saveBatch(batch);
                 saved += batchSaved;
                 if (batchSaved < batch.size()) {
                     error += (batch.size() - batchSaved);
@@ -578,53 +579,4 @@ public class PublicDataLocationService {
         }
     }
 
-    /**
-     * 배치 저장 (예외 처리 포함)
-     * 각 배치는 별도 트랜잭션으로 처리하여 일부 실패해도 다른 배치는 저장됨
-     * 
-     * @param batch 저장할 엔티티 목록
-     * @return 실제 저장된 개수
-     */
-    @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
-    private int saveBatch(List<LocationService> batch) {
-        if (batch.isEmpty()) {
-            return 0;
-        }
-
-        try {
-            locationServiceRepository.saveAll(batch);
-            return batch.size();
-        } catch (Exception e) {
-            log.error("배치 저장 실패: {}개 중 일부 저장 실패 - {}", batch.size(), e.getMessage(), e);
-            // 세션 정리 (오염 방지)
-            entityManager.clear();
-
-            // 개별 저장 시도 (새로운 세션에서)
-            int saved = 0;
-            List<LocationService> failedEntities = new ArrayList<>();
-
-            for (LocationService entity : batch) {
-                try {
-                    // 엔티티가 세션에 연결되어 있으면 분리
-                    if (entityManager.contains(entity)) {
-                        entityManager.detach(entity);
-                    }
-                    locationServiceRepository.save(entity);
-                    saved++;
-                } catch (Exception ex) {
-                    log.warn("개별 저장 실패: {}", ex.getMessage());
-                    failedEntities.add(entity);
-                    // 개별 저장 실패 시에도 세션 정리
-                    entityManager.clear();
-                }
-            }
-
-            // 실패한 엔티티가 있으면 한 번 더 정리
-            if (!failedEntities.isEmpty()) {
-                entityManager.clear();
-            }
-
-            return saved;
-        }
-    }
 }

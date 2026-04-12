@@ -15,7 +15,6 @@ import com.linkup.Petory.domain.location.exception.LocationServiceNotFoundExcept
 import com.linkup.Petory.domain.location.repository.LocationServiceRepository;
 
 import java.util.List;
-import java.util.Locale;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -29,8 +28,14 @@ public class LocationServiceService {
     private final LocationServiceRepository locationServiceRepository;
 
     /**
-     * 키워드 → 반경(위도·경도·반경 모두 존재) → 지역 계층 순으로 검색합니다.
-     * {@code /search}, {@code /recommend}에서 동일 규칙을 쓰기 위한 진입점입니다.
+     * 주변 서비스 통합 검색 — B 방향(위치 우선, 키워드는 필터).
+     *
+     * <ol>
+     *   <li>위치(lat·lng·radius) 있음 → 반경 검색 (keyword·category는 SQL WHERE 필터)</li>
+     *   <li>지역(sido/sigungu/eupmyeondong/roadName) 있음 → 지역 검색 (keyword·category는 SQL WHERE 필터)</li>
+     *   <li>keyword만 있음 → FULLTEXT 전국 검색 (위치 없을 때 fallback)</li>
+     *   <li>아무것도 없음 → 전체 평점순</li>
+     * </ol>
      */
     public List<LocationServiceDTO> searchLocationServices(
             String keyword,
@@ -43,14 +48,41 @@ public class LocationServiceService {
             String roadName,
             String category,
             Integer maxResults) {
-        if (StringUtils.hasText(keyword)) {
+
+        // 빈 문자열("")을 null로 정규화 — SQL의 :param IS NULL 조건이 올바르게 작동하도록
+        keyword      = normalize(keyword);
+        category     = normalize(category);
+        sido         = normalize(sido);
+        sigungu      = normalize(sigungu);
+        eupmyeondong = normalize(eupmyeondong);
+        roadName     = normalize(roadName);
+
+        boolean hasLocation = latitude != null && longitude != null;
+        boolean hasRegion = StringUtils.hasText(sido) || StringUtils.hasText(sigungu)
+                || StringUtils.hasText(eupmyeondong) || StringUtils.hasText(roadName);
+        boolean hasKeyword = StringUtils.hasText(keyword);
+
+        // 1순위: 위치(반경) 우선
+        if (hasLocation) {
+            int radiusInMeters = (radius != null && radius > 0) ? radius : DEFAULT_RADIUS_METERS;
+            return searchLocationServicesByLocation(latitude, longitude, radiusInMeters,
+                    keyword, category, maxResults);
+        }
+
+        // 2순위: 지역 계층
+        if (hasRegion) {
+            return searchLocationServicesByRegion(sido, sigungu, eupmyeondong, roadName,
+                    keyword, category, maxResults);
+        }
+
+        // 3순위: 위치 없을 때 키워드 단독 FULLTEXT (fallback)
+        if (hasKeyword) {
             return searchLocationServicesByKeyword(keyword, category, maxResults);
         }
-        if (latitude != null && longitude != null && radius != null) {
-            int radiusInMeters = radius > 0 ? radius : DEFAULT_RADIUS_METERS;
-            return searchLocationServicesByLocation(latitude, longitude, radiusInMeters, category, maxResults);
-        }
-        return searchLocationServicesByRegion(sido, sigungu, eupmyeondong, roadName, category, maxResults);
+
+        // 4순위: 전체 평점순
+        return searchLocationServicesByRegion(null, null, null, null,
+                null, category, maxResults);
     }
 
     /**
@@ -67,132 +99,109 @@ public class LocationServiceService {
     /**
      * 지역 계층별 서비스 조회
      * 우선순위: roadName > eupmyeondong > sigungu > sido > 전체
-     * 
-     * @param sido         시도 (선택, 예: "서울특별시", "경기도")
-     * @param sigungu      시군구 (선택, 예: "노원구", "고양시 덕양구")
-     * @param eupmyeondong 읍면동 (선택, 예: "상계동", "동산동")
-     * @param roadName     도로명 (선택, 예: "상계로", "동세로")
-     * @param category     카테고리 (선택, 예: "동물약국", "미술관")
-     * @param maxResults   최대 결과 수 (선택)
-     * @return 검색 결과
+     * keyword·category 필터는 SQL WHERE에서 처리
      */
     public List<LocationServiceDTO> searchLocationServicesByRegion(
             String sido,
             String sigungu,
             String eupmyeondong,
             String roadName,
+            String keyword,
             String category,
             Integer maxResults) {
+
+        keyword  = normalize(keyword);
+        category = normalize(category);
 
         long methodStartTime = System.currentTimeMillis();
 
         List<LocationService> services;
 
-        // 지역 계층 우선순위에 따라 조회
+        // 지역 계층 우선순위에 따라 조회 (keyword·category는 쿼리 내부에서 필터)
         long queryStartTime = System.currentTimeMillis();
         if (StringUtils.hasText(roadName)) {
-            services = locationServiceRepository.findByRoadName(roadName);
-            log.debug("도로명 검색: roadName={}, 결과={}개", roadName, services.size());
+            services = locationServiceRepository.findByRoadName(roadName, keyword, category);
+            log.debug("도로명 검색: roadName={}, keyword={}, category={}, 결과={}개",
+                    roadName, keyword, category, services.size());
         } else if (StringUtils.hasText(eupmyeondong)) {
-            services = locationServiceRepository.findByEupmyeondong(eupmyeondong);
-            log.debug("읍면동 검색: eupmyeondong={}, 결과={}개", eupmyeondong, services.size());
+            services = locationServiceRepository.findByEupmyeondong(eupmyeondong, keyword, category);
+            log.debug("읍면동 검색: eupmyeondong={}, keyword={}, category={}, 결과={}개",
+                    eupmyeondong, keyword, category, services.size());
         } else if (StringUtils.hasText(sigungu)) {
-            services = locationServiceRepository.findBySigungu(sigungu);
-            log.debug("시군구 검색: sigungu={}, 결과={}개", sigungu, services.size());
+            services = locationServiceRepository.findBySigungu(sigungu, keyword, category);
+            log.debug("시군구 검색: sigungu={}, keyword={}, category={}, 결과={}개",
+                    sigungu, keyword, category, services.size());
         } else if (StringUtils.hasText(sido)) {
-            services = locationServiceRepository.findBySido(sido);
-            log.debug("시도 검색: sido={}, 결과={}개", sido, services.size());
+            services = locationServiceRepository.findBySido(sido, keyword, category);
+            log.debug("시도 검색: sido={}, keyword={}, category={}, 결과={}개",
+                    sido, keyword, category, services.size());
         } else {
-            // 모든 파라미터가 없으면 전체 조회
-            services = locationServiceRepository.findByOrderByRatingDesc();
-            log.debug("전체 조회: 결과={}개", services.size());
+            services = locationServiceRepository.findByOrderByRatingDesc(keyword, category);
+            log.debug("전체 조회: keyword={}, category={}, 결과={}개",
+                    keyword, category, services.size());
         }
         long queryTime = System.currentTimeMillis() - queryStartTime;
-        log.info("⏱️  [성능 측정] DB 쿼리 실행 시간: {}ms, 조회된 레코드 수: {}개", queryTime, services.size());
+        log.info("[성능 측정] DB 쿼리 실행 시간: {}ms, 조회된 레코드 수: {}개", queryTime, services.size());
 
-        long filterStartTime = System.currentTimeMillis();
-        long filterTime = 0;
-        if (StringUtils.hasText(category) && !services.isEmpty()) {
-            services = applyCategoryFilter(services, category);
-            filterTime = System.currentTimeMillis() - filterStartTime;
-            log.info("⏱️  [성능 측정] 카테고리 필터링 시간: {}ms, 필터링 후 결과 수: {}개", filterTime, services.size());
-        }
-
-        // 최대 결과 수 제한 (null이거나 0이면 제한 없음)
+        // 최대 결과 수 제한
         if (maxResults != null && maxResults > 0) {
             services = services.stream()
                     .limit(maxResults)
                     .collect(Collectors.toList());
-            log.debug("결과 수 제한: maxResults={}, 제한 후={}개", maxResults, services.size());
-        } else {
-            log.debug("결과 수 제한 없음: 전체={}개", services.size());
         }
 
-        // DTO로 변환
+        // DTO 변환
         long dtoConvertStartTime = System.currentTimeMillis();
         List<LocationServiceDTO> result = services.stream()
                 .map(locationServiceConverter::toDTO)
                 .collect(Collectors.toList());
         long dtoConvertTime = System.currentTimeMillis() - dtoConvertStartTime;
-        log.info("⏱️  [성능 측정] DTO 변환 시간: {}ms, 변환된 레코드 수: {}개", dtoConvertTime, result.size());
 
         long totalTime = System.currentTimeMillis() - methodStartTime;
-        log.info("✅ [성능 측정] searchLocationServicesByRegion 전체 시간: {}ms (쿼리: {}ms, 필터링: {}ms, DTO변환: {}ms)",
-                totalTime, queryTime, filterTime, dtoConvertTime);
+        log.info("[성능 측정] searchLocationServicesByRegion 전체: {}ms (쿼리: {}ms, DTO변환: {}ms)",
+                totalTime, queryTime, dtoConvertTime);
 
         return result;
     }
 
     /**
      * 위치 기반 서비스 조회 (반경 검색)
-     * 
-     * @param latitude       위도
-     * @param longitude      경도
-     * @param radiusInMeters 반경 (미터 단위)
-     * @param category       카테고리 (선택)
-     * @param maxResults     최대 결과 수 (선택)
-     * @return 검색 결과
+     * keyword·category 필터는 SQL WHERE에서 처리
      */
     public List<LocationServiceDTO> searchLocationServicesByLocation(
             Double latitude,
             Double longitude,
             Integer radiusInMeters,
+            String keyword,
             String category,
             Integer maxResults) {
 
+        keyword  = normalize(keyword);
+        category = normalize(category);
+
         long methodStartTime = System.currentTimeMillis();
-        log.info("📍 [위치 기반 검색] 시작 - latitude={}, longitude={}, radius={}m, category={}",
-                latitude, longitude, radiusInMeters, category);
+        log.info("[위치 기반 검색] 시작 - lat={}, lng={}, radius={}m, keyword={}, category={}",
+                latitude, longitude, radiusInMeters, keyword, category);
 
-        // 반경 검색 수행
+        // 반경 검색 (keyword·category 포함)
         long queryStartTime = System.currentTimeMillis();
-        List<com.linkup.Petory.domain.location.entity.LocationService> services = locationServiceRepository
-                .findByRadius(latitude, longitude, (double) radiusInMeters);
+        List<LocationService> services = locationServiceRepository
+                .findByRadius(latitude, longitude, (double) radiusInMeters, keyword, category);
         long queryTime = System.currentTimeMillis() - queryStartTime;
-        log.info("⏱️  [성능 측정] 위치 기반 DB 쿼리 실행 시간: {}ms, 조회된 레코드 수: {}개", queryTime, services.size());
+        log.info("[성능 측정] 위치 기반 DB 쿼리 실행 시간: {}ms, 조회된 레코드 수: {}개", queryTime, services.size());
 
-        long filterStartTime = System.currentTimeMillis();
-        long filterTime = 0;
-        if (StringUtils.hasText(category) && !services.isEmpty()) {
-            services = applyCategoryFilter(services, category);
-            filterTime = System.currentTimeMillis() - filterStartTime;
-            log.info("⏱️  [성능 측정] 카테고리 필터링 시간: {}ms, 필터링 후 결과 수: {}개", filterTime, services.size());
-        }
-
-        // 최대 결과 수 제한 (null이거나 0이면 제한 없음)
+        // 최대 결과 수 제한
         if (maxResults != null && maxResults > 0) {
             services = services.stream()
                     .limit(maxResults)
                     .collect(Collectors.toList());
-            log.debug("결과 수 제한: maxResults={}, 제한 후={}개", maxResults, services.size());
         }
 
-        // DTO로 변환 및 거리 정보 설정
+        // DTO 변환 및 거리 정보 설정
         long dtoConvertStartTime = System.currentTimeMillis();
         List<LocationServiceDTO> result = services.stream()
                 .map(service -> {
                     LocationServiceDTO dto = locationServiceConverter.toDTO(service);
-                    // 거리 계산 후 DTO에 설정
                     if (service.getLatitude() != null && service.getLongitude() != null) {
                         Double distance = calculateDistance(
                                 latitude, longitude,
@@ -203,89 +212,64 @@ public class LocationServiceService {
                 })
                 .collect(Collectors.toList());
         long dtoConvertTime = System.currentTimeMillis() - dtoConvertStartTime;
-        log.info("⏱️  [성능 측정] DTO 변환 시간: {}ms, 변환된 레코드 수: {}개", dtoConvertTime, result.size());
 
         long totalTime = System.currentTimeMillis() - methodStartTime;
-        log.info("✅ [성능 측정] searchLocationServicesByLocation 전체 시간: {}ms (쿼리: {}ms, 필터링: {}ms, DTO변환: {}ms)",
-                totalTime, queryTime, filterTime, dtoConvertTime);
+        log.info("[성능 측정] searchLocationServicesByLocation 전체: {}ms (쿼리: {}ms, DTO변환: {}ms)",
+                totalTime, queryTime, dtoConvertTime);
 
         return result;
     }
 
     /**
-     * 키워드로 서비스 검색 (이름, 설명, 카테고리 포함)
-     * FULLTEXT 인덱스를 활용한 효율적인 검색
-     * 
-     * @param keyword    검색 키워드 (필수)
-     * @param category   카테고리 필터 (선택)
-     * @param maxResults 최대 결과 수 (선택)
-     * @return 검색 결과
+     * FULLTEXT 키워드 검색 — 위치 정보가 없을 때만 사용 (fallback)
+     * category 필터는 SQL WHERE에서 처리
      */
     public List<LocationServiceDTO> searchLocationServicesByKeyword(
             String keyword,
             String category,
             Integer maxResults) {
 
+        keyword  = normalize(keyword);
+        category = normalize(category);
+
         long methodStartTime = System.currentTimeMillis();
 
-        // 키워드 검색 (FULLTEXT 인덱스 활용)
         long queryStartTime = System.currentTimeMillis();
-        List<LocationService> services = locationServiceRepository.findByNameContaining(keyword);
+        List<LocationService> services = locationServiceRepository.findByNameContaining(keyword, category);
         long queryTime = System.currentTimeMillis() - queryStartTime;
-        log.info("⏱️  [성능 측정] 키워드 검색 DB 쿼리 실행 시간: {}ms, 조회된 레코드 수: {}개", queryTime, services.size());
+        log.info("[성능 측정] 키워드 검색 DB 쿼리 실행 시간: {}ms, 조회된 레코드 수: {}개", queryTime, services.size());
 
-        long filterStartTime = System.currentTimeMillis();
-        long filterTime = 0;
-        if (StringUtils.hasText(category) && !services.isEmpty()) {
-            services = applyCategoryFilter(services, category);
-            filterTime = System.currentTimeMillis() - filterStartTime;
-            log.info("⏱️  [성능 측정] 카테고리 필터링 시간: {}ms, 필터링 후 결과 수: {}개", filterTime, services.size());
-        }
-
-        // 최대 결과 수 제한 (null이거나 0이면 제한 없음)
+        // 최대 결과 수 제한
         if (maxResults != null && maxResults > 0) {
             services = services.stream()
                     .limit(maxResults)
                     .collect(Collectors.toList());
-            log.debug("결과 수 제한: maxResults={}, 제한 후={}개", maxResults, services.size());
         }
 
-        // DTO로 변환
+        // DTO 변환
         long dtoConvertStartTime = System.currentTimeMillis();
         List<LocationServiceDTO> result = services.stream()
                 .map(locationServiceConverter::toDTO)
                 .collect(Collectors.toList());
         long dtoConvertTime = System.currentTimeMillis() - dtoConvertStartTime;
-        log.info("⏱️  [성능 측정] DTO 변환 시간: {}ms, 변환된 레코드 수: {}개", dtoConvertTime, result.size());
 
         long totalTime = System.currentTimeMillis() - methodStartTime;
-        log.info("✅ [성능 측정] searchLocationServicesByKeyword 전체 시간: {}ms (쿼리: {}ms, 필터링: {}ms, DTO변환: {}ms)",
-                totalTime, queryTime, filterTime, dtoConvertTime);
+        log.info("[성능 측정] searchLocationServicesByKeyword 전체: {}ms (쿼리: {}ms, DTO변환: {}ms)",
+                totalTime, queryTime, dtoConvertTime);
 
         return result;
     }
 
-    private List<LocationService> applyCategoryFilter(List<LocationService> services, String category) {
-        String categoryLower = category.toLowerCase(Locale.ROOT).trim();
-        return services.stream()
-                .filter(service -> matchesCategory(service, categoryLower))
-                .collect(Collectors.toList());
-    }
-
-    private boolean matchesCategory(LocationService service, String categoryLower) {
-        return categoryFieldMatches(service.getCategory3(), categoryLower)
-                || categoryFieldMatches(service.getCategory2(), categoryLower)
-                || categoryFieldMatches(service.getCategory1(), categoryLower);
-    }
-
-    private static boolean categoryFieldMatches(String categoryField, String categoryLower) {
-        return categoryField != null
-                && categoryLower.equals(categoryField.toLowerCase(Locale.ROOT).trim());
+    /**
+     * 빈 문자열("")을 null로 정규화하고 앞뒤 공백을 제거한다.
+     * SQL의 {@code :param IS NULL} 조건이 올바르게 작동하려면 빈 문자열이 아닌 null이 전달되어야 한다.
+     */
+    private static String normalize(String value) {
+        return StringUtils.hasText(value) ? value.trim() : null;
     }
 
     /**
      * 두 좌표 간 거리 계산 (Haversine 공식, 미터 단위)
-     * 내 위치에서 각 서비스까지의 거리를 계산할 때 사용
      */
     public Double calculateDistance(Double lat1, Double lng1, Double lat2, Double lng2) {
         if (lat1 == null || lng1 == null || lat2 == null || lng2 == null) {
@@ -303,25 +287,21 @@ public class LocationServiceService {
 
         double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
-        return R * c; // 미터 단위
+        return R * c;
     }
 
     /**
      * 위치 서비스 삭제 (Soft Delete)
-     * 
-     * @param serviceIdx 서비스 ID
      */
     @Transactional
     public void deleteService(Long serviceIdx) {
         LocationService service = locationServiceRepository.findById(serviceIdx)
                 .orElseThrow(LocationServiceNotFoundException::new);
 
-        // 이미 삭제된 서비스인지 확인
         if (service.getIsDeleted() != null && service.getIsDeleted()) {
             throw new LocationServiceAlreadyDeletedException();
         }
 
-        // Soft Delete 처리
         service.setIsDeleted(true);
         service.setDeletedAt(java.time.LocalDateTime.now());
         locationServiceRepository.save(service);
