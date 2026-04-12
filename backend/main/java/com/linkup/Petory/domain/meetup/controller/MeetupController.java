@@ -6,6 +6,11 @@ import com.linkup.Petory.domain.meetup.service.MeetupService;
 import com.linkup.Petory.domain.user.exception.UnauthenticatedException;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -78,14 +83,21 @@ public class MeetupController {
         return ResponseEntity.ok(response);
     }
 
-    // 모든 모임 조회
+    // 모든 모임 조회 (페이징: page, size — 생략 시 page=0, size=20)
     @GetMapping
-    public ResponseEntity<Map<String, Object>> getAllMeetups() {
-        List<MeetupDTO> meetups = meetupService.getAllMeetups();
+    public ResponseEntity<Map<String, Object>> getAllMeetups(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Page<MeetupDTO> result = meetupService.getAllMeetups(pageable);
 
         Map<String, Object> response = new HashMap<>();
-        response.put("meetups", meetups);
-        response.put("count", meetups.size());
+        response.put("meetups", result.getContent());
+        response.put("count", result.getNumberOfElements());
+        response.put("totalElements", result.getTotalElements());
+        response.put("totalPages", result.getTotalPages());
+        response.put("page", result.getNumber());
+        response.put("size", result.getSize());
 
         return ResponseEntity.ok(response);
     }
@@ -129,14 +141,20 @@ public class MeetupController {
         return ResponseEntity.ok(response);
     }
 
-    // 참여 가능한 모임 조회
+    // 참여 가능한 모임 조회 (페이징: page, size — 생략 시 page=0, size=20)
     @GetMapping("/available")
-    public ResponseEntity<Map<String, Object>> getAvailableMeetups() {
-        List<MeetupDTO> meetups = meetupService.getAvailableMeetups();
+    public ResponseEntity<Map<String, Object>> getAvailableMeetups(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "date"));
+        Slice<MeetupDTO> slice = meetupService.getAvailableMeetups(pageable);
 
         Map<String, Object> response = new HashMap<>();
-        response.put("meetups", meetups);
-        response.put("count", meetups.size());
+        response.put("meetups", slice.getContent());
+        response.put("count", slice.getNumberOfElements());
+        response.put("hasNext", slice.hasNext());
+        response.put("page", slice.getNumber());
+        response.put("size", slice.getSize());
 
         return ResponseEntity.ok(response);
     }
@@ -153,13 +171,14 @@ public class MeetupController {
         return ResponseEntity.ok(response);
     }
 
-    // 반경 기반 모임 조회 (마커 표시용)
+    // 반경 기반 모임 조회 (마커 표시용, maxResults 상한 기본 500)
     @GetMapping("/nearby")
     public ResponseEntity<Map<String, Object>> getNearbyMeetups(
             @RequestParam Double lat,
             @RequestParam Double lng,
-            @RequestParam(defaultValue = "5.0") Double radius) {
-        List<MeetupDTO> meetups = meetupService.getNearbyMeetups(lat, lng, radius);
+            @RequestParam(defaultValue = "5.0") Double radius,
+            @RequestParam(defaultValue = "500") int maxResults) {
+        List<MeetupDTO> meetups = meetupService.getNearbyMeetups(lat, lng, radius, maxResults);
 
         Map<String, Object> response = new HashMap<>();
         response.put("meetups", meetups);

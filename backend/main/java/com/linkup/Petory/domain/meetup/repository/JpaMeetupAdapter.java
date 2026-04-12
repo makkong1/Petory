@@ -1,13 +1,17 @@
 package com.linkup.Petory.domain.meetup.repository;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
 import org.springframework.context.annotation.Primary;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
 import com.linkup.Petory.domain.meetup.entity.Meetup;
+import com.linkup.Petory.domain.meetup.entity.MeetupStatus;
 
 import lombok.RequiredArgsConstructor;
 
@@ -51,13 +55,18 @@ public class JpaMeetupAdapter implements MeetupRepository {
     }
 
     @Override
-    public List<Meetup> findAvailableMeetups(LocalDateTime currentDate) {
-        return jpaRepository.findAvailableMeetups(currentDate);
+    public List<Meetup> findAvailableMeetups(LocalDateTime currentDate, Pageable pageable) {
+        return jpaRepository.findAvailableMeetups(currentDate, pageable);
     }
 
     @Override
-    public List<Meetup> findNearbyMeetups(Double lat, Double lng, Double radius, LocalDateTime currentDate) {
-        return jpaRepository.findNearbyMeetups(lat, lng, radius, currentDate);
+    public List<Long> findNearbyMeetupIds(Double lat, Double lng, Double radius, LocalDateTime currentDate, int limit) {
+        return jpaRepository.findNearbyMeetupIds(lat, lng, radius, currentDate, limit);
+    }
+
+    @Override
+    public List<Meetup> findByIdxInWithOrganizer(Collection<Long> ids) {
+        return jpaRepository.findByIdxInWithOrganizer(ids);
     }
 
     @Override
@@ -86,6 +95,11 @@ public class JpaMeetupAdapter implements MeetupRepository {
     }
 
     @Override
+    public Page<Meetup> findAllNotDeleted(Pageable pageable) {
+        return jpaRepository.findAllNotDeleted(pageable);
+    }
+
+    @Override
     public Optional<Meetup> findByIdWithDetails(Long idx) {
         return jpaRepository.findByIdWithDetails(idx);
     }
@@ -93,6 +107,16 @@ public class JpaMeetupAdapter implements MeetupRepository {
     @Override
     public long countByCreatedAtBetween(LocalDateTime start, LocalDateTime end) {
         return jpaRepository.countByCreatedAtBetween(start, end);
+    }
+
+    @Override
+    public int closeFullRecruitingMeetups(LocalDateTime now) {
+        return jpaRepository.closeFullRecruitingMeetups(now, MeetupStatus.RECRUITING, MeetupStatus.CLOSED);
+    }
+
+    @Override
+    public int completePastMeetups(LocalDateTime now) {
+        return jpaRepository.completePastMeetups(now, MeetupStatus.COMPLETED);
     }
 }
 

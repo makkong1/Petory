@@ -1,8 +1,12 @@
 package com.linkup.Petory.domain.meetup.repository;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import com.linkup.Petory.domain.meetup.entity.Meetup;
 
@@ -43,15 +47,20 @@ public interface MeetupRepository {
     List<Meetup> findByKeyword(String keyword);
 
     /**
-     * 참여 가능한 모임 조회 (최대 인원 미만, 소프트 삭제 제외)
+     * 참여 가능한 모임 조회 (최대 인원 미만, 소프트 삭제 제외).
+     * {@link Pageable#unpaged()}이면 전체, 그 외에는 DB limit/offset 적용.
      */
-    List<Meetup> findAvailableMeetups(LocalDateTime currentDate);
+    List<Meetup> findAvailableMeetups(LocalDateTime currentDate, Pageable pageable);
 
     /**
-     * 반경 기반 모임 조회 (Haversine 공식 사용, 소프트 삭제 제외)
-     * ✅ 리팩토링: currentDate 파라미터 추가 (날짜/상태 필터링을 DB에서 수행)
+     * 반경 기반 근처 모임 ID (거리·일시 정렬, 상한 적용) 후 {@link #findByIdxInWithOrganizer(Collection)}로 주최자 페치.
      */
-    List<Meetup> findNearbyMeetups(Double lat, Double lng, Double radius, LocalDateTime currentDate);
+    List<Long> findNearbyMeetupIds(Double lat, Double lng, Double radius, LocalDateTime currentDate, int limit);
+
+    /**
+     * ID 목록으로 모임 조회 (주최자 JOIN FETCH, 삭제 제외)
+     */
+    List<Meetup> findByIdxInWithOrganizer(Collection<Long> ids);
 
     /**
      * 단건 조회 (주최자 포함) - 참가/취소 시 권한 확인용
@@ -81,6 +90,11 @@ public interface MeetupRepository {
     List<Meetup> findAllNotDeleted();
 
     /**
+     * 모든 모임 페이징 (소프트 삭제 제외, 주최자 로딩 포함)
+     */
+    Page<Meetup> findAllNotDeleted(Pageable pageable);
+
+    /**
      * 특정 모임 조회 (organizer와 participants 포함) - JOIN FETCH로 N+1 문제 해결
      */
     Optional<Meetup> findByIdWithDetails(Long idx);
@@ -89,4 +103,14 @@ public interface MeetupRepository {
      * 통계용: 특정 기간 동안 생성된 모임 수
      */
     long countByCreatedAtBetween(LocalDateTime start, LocalDateTime end);
+
+    /**
+     * 정원 마감된 모집중 모임 → CLOSED (일시가 아직 지나지 않은 경우만)
+     */
+    int closeFullRecruitingMeetups(LocalDateTime now);
+
+    /**
+     * 일시가 지난 모임 → COMPLETED
+     */
+    int completePastMeetups(LocalDateTime now);
 }

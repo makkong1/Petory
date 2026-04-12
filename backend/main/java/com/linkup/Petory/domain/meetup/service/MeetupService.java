@@ -1,46 +1,56 @@
 package com.linkup.Petory.domain.meetup.service;
 
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
+
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
+import org.springframework.data.domain.SliceImpl;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+
 import com.linkup.Petory.domain.chat.service.ConversationService;
+import com.linkup.Petory.domain.meetup.annotation.Timed;
 import com.linkup.Petory.domain.meetup.converter.MeetupConverter;
 import com.linkup.Petory.domain.meetup.converter.MeetupParticipantsConverter;
 import com.linkup.Petory.domain.meetup.dto.MeetupDTO;
 import com.linkup.Petory.domain.meetup.dto.MeetupParticipantsDTO;
 import com.linkup.Petory.domain.meetup.entity.Meetup;
 import com.linkup.Petory.domain.meetup.entity.MeetupParticipants;
-import com.linkup.Petory.domain.meetup.repository.MeetupRepository;
+import com.linkup.Petory.domain.meetup.event.MeetupCreatedEvent;
+import com.linkup.Petory.domain.meetup.exception.MeetupConflictException;
+import com.linkup.Petory.domain.meetup.exception.MeetupForbiddenException;
+import com.linkup.Petory.domain.meetup.exception.MeetupNotFoundException;
+import com.linkup.Petory.domain.meetup.exception.MeetupParticipantNotFoundException;
+import com.linkup.Petory.domain.meetup.exception.MeetupValidationException;
 import com.linkup.Petory.domain.meetup.repository.MeetupParticipantsRepository;
+import com.linkup.Petory.domain.meetup.repository.MeetupRepository;
 import com.linkup.Petory.domain.user.entity.Role;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException;
 import com.linkup.Petory.domain.user.exception.UserNotFoundException;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 
-import com.linkup.Petory.domain.meetup.annotation.Timed;
-import com.linkup.Petory.domain.meetup.exception.MeetupConflictException;
-import com.linkup.Petory.domain.meetup.exception.MeetupForbiddenException;
-import com.linkup.Petory.domain.meetup.exception.MeetupNotFoundException;
-import com.linkup.Petory.domain.meetup.exception.MeetupParticipantNotFoundException;
-import com.linkup.Petory.domain.meetup.exception.MeetupValidationException;
-import com.linkup.Petory.domain.meetup.event.MeetupCreatedEvent;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
-
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class MeetupService {
+
+    /** 근처 모임 네이티브 조회 상한 (과다 로드 방지) */
+    public static final int DEFAULT_NEARBY_MAX_RESULTS = 500;
 
     private final MeetupRepository meetupRepository;
     private final MeetupParticipantsRepository meetupParticipantsRepository;
@@ -81,7 +91,7 @@ public class MeetupService {
                 .date(meetupDTO.getDate())
                 .organizer(organizer)
                 .maxParticipants(meetupDTO.getMaxParticipants() != null ? meetupDTO.getMaxParticipants() : 10)
-                .currentParticipants(0)
+                .currentParticipants(1)
                 .status(com.linkup.Petory.domain.meetup.entity.MeetupStatus.RECRUITING)
                 .build();
 
@@ -94,10 +104,6 @@ public class MeetupService {
                 .joinedAt(LocalDateTime.now())
                 .build();
         meetupParticipantsRepository.save(organizerParticipant);
-
-        // currentParticipants를 1로 설정 (주최자 포함)
-        savedMeetup.setCurrentParticipants(1);
-        meetupRepository.save(savedMeetup);
 
         // 모임 생성 완료 이벤트 발행 (트랜잭션 커밋 후 비동기로 채팅방 생성 처리)
         // 핵심 도메인(모임)과 파생 도메인(채팅방) 분리: 채팅방 생성 실패가 모임 생성까지 롤백하지 않음
@@ -190,6 +196,14 @@ public class MeetupService {
         return convertToDTOs(meetups);
     }
 
+    /**
+     * 모임 목록 페이징 (일반 사용자 API용)
+     */
+    @Timed("getAllMeetupsPaged")
+    public Page<MeetupDTO> getAllMeetups(Pageable pageable) {
+        return meetupRepository.findAllNotDeleted(pageable).map(converter::toDTO);
+    }
+
     // 특정 모임 조회 (참가자 목록 포함) - JOIN FETCH로 N+1 문제 해결
     public MeetupDTO getMeetupById(Long meetupIdx) {
         Meetup meetup = meetupRepository.findByIdWithDetails(meetupIdx)
@@ -199,25 +213,35 @@ public class MeetupService {
 
     /**
      * 반경 기반 모임 조회 (마커 표시용)
-     * [리팩토링] findAllNotDeleted + 인메모리 Haversine → findNearbyMeetups DB 쿼리 (Bounding Box + 인덱스 활용)
+     * 네이티브로 ID·정렬·LIMIT 조회 후, 주최자는 IN + JOIN FETCH로 한 번에 로딩 (organizer N+1 방지).
      */
     @Timed("getNearbyMeetups")
-    public List<MeetupDTO> getNearbyMeetups(Double lat, Double lng, Double radiusKm) {
+    public List<MeetupDTO> getNearbyMeetups(Double lat, Double lng, Double radiusKm, int maxResults) {
         LocalDateTime now = LocalDateTime.now();
-        log.info("반경 기반 모임 조회 요청: lat={}, lng={}, radius={}km, currentDate={}", lat, lng, radiusKm, now);
+        int limit = Math.min(Math.max(maxResults, 1), 1000);
+        log.info("반경 기반 모임 조회 요청: lat={}, lng={}, radius={}km, limit={}, currentDate={}",
+                lat, lng, radiusKm, limit, now);
 
-        List<Meetup> nearbyMeetups = meetupRepository.findNearbyMeetups(lat, lng, radiusKm, now);
-        log.info("DB 쿼리 결과 모임 수: {}", nearbyMeetups.size());
+        List<Long> ids = meetupRepository.findNearbyMeetupIds(lat, lng, radiusKm, now, limit);
+        log.info("DB 근처 모임 ID 수: {}", ids.size());
+        if (ids.isEmpty()) {
+            return List.of();
+        }
 
-        List<MeetupDTO> result = convertToDTOs(nearbyMeetups);
+        List<Meetup> loaded = meetupRepository.findByIdxInWithOrganizer(ids);
+        Map<Long, Meetup> byId = loaded.stream().collect(Collectors.toMap(Meetup::getIdx, m -> m));
+
+        List<MeetupDTO> result = ids.stream()
+                .map(byId::get)
+                .filter(Objects::nonNull)
+                .map(converter::toDTO)
+                .collect(Collectors.toList());
         log.info("최종 결과 모임 수: {}", result.size());
 
-        // 반경 내 모임들의 정보 로그 (최대 10개)
-        for (int i = 0; i < Math.min(10, nearbyMeetups.size()); i++) {
-            Meetup meetup = nearbyMeetups.get(i);
+        for (int i = 0; i < Math.min(10, result.size()); i++) {
+            MeetupDTO m = result.get(i);
             log.info("✅ 반경 내 모임: idx={}, title={}, date={}, lat={}, lng={}",
-                    meetup.getIdx(), meetup.getTitle(), meetup.getDate(),
-                    meetup.getLatitude(), meetup.getLongitude());
+                    m.getIdx(), m.getTitle(), m.getDate(), m.getLatitude(), m.getLongitude());
         }
 
         return result;
@@ -226,8 +250,7 @@ public class MeetupService {
     // 특정 모임의 참가자 목록 조회
     public List<MeetupParticipantsDTO> getMeetupParticipants(Long meetupIdx) {
         return convertToParticipantDTOs(
-                meetupParticipantsRepository.findByMeetupIdxOrderByJoinedAtAsc(meetupIdx)
-        );
+                meetupParticipantsRepository.findByMeetupIdxOrderByJoinedAtAsc(meetupIdx));
     }
 
     // 모임 참가 (원자적 UPDATE 쿼리 방식 - 권장)
@@ -350,18 +373,28 @@ public class MeetupService {
         return convertToDTOs(meetups);
     }
 
-    // 참여 가능한 모임 조회
+    // 참여 가능한 모임 조회 (전체 — 관리자·레거시 호출)
     @Timed("getAvailableMeetups")
     public List<MeetupDTO> getAvailableMeetups() {
-        List<Meetup> meetups = meetupRepository.findAvailableMeetups(LocalDateTime.now());
+        List<Meetup> meetups = meetupRepository.findAvailableMeetups(LocalDateTime.now(), Pageable.unpaged());
         return convertToDTOs(meetups);
+    }
+
+    /**
+     * 참여 가능한 모임 슬라이스 (count 쿼리 없이 다음 페이지 여부만)
+     */
+    @Timed("getAvailableMeetupsPaged")
+    public Slice<MeetupDTO> getAvailableMeetups(Pageable pageable) {
+        List<Meetup> list = meetupRepository.findAvailableMeetups(LocalDateTime.now(), pageable);
+        List<MeetupDTO> dtos = convertToDTOs(list);
+        boolean hasNext = pageable.isPaged() && list.size() == pageable.getPageSize();
+        return new SliceImpl<>(dtos, pageable, hasNext);
     }
 
     // 주최자별 모임 조회
     public List<MeetupDTO> getMeetupsByOrganizer(Long organizerIdx) {
         return convertToDTOs(
-                meetupRepository.findByOrganizerIdxOrderByCreatedAtDesc(organizerIdx)
-        );
+                meetupRepository.findByOrganizerIdxOrderByCreatedAtDesc(organizerIdx));
     }
 
     /**
