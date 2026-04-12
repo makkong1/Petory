@@ -199,7 +199,8 @@ class MeetupServicePerformanceTest {
         long queryCountBefore = statistics.getQueryExecutionCount();
 
         // 실제 메서드 호출
-        List<MeetupDTO> result = meetupService.getNearbyMeetups(TEST_LAT, TEST_LNG, TEST_RADIUS);
+        List<MeetupDTO> result = meetupService.getNearbyMeetups(TEST_LAT, TEST_LNG, TEST_RADIUS,
+                MeetupService.DEFAULT_NEARBY_MAX_RESULTS);
 
         // 측정 종료
         long endTime = System.currentTimeMillis();

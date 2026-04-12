@@ -16,6 +16,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -237,7 +238,7 @@ class MeetupRepositorySubqueryPerformanceTest {
 
         // DB 쿼리 실행 (리팩토링 후 - Repository 메서드 사용)
         dbStartTime = System.currentTimeMillis();
-        List<Meetup> meetupsAfter = meetupRepository.findAvailableMeetups(currentDate);
+        List<Meetup> meetupsAfter = meetupRepository.findAvailableMeetups(currentDate, Pageable.unpaged());
         long dbTimeAfter = System.currentTimeMillis() - dbStartTime;
 
         long totalTimeAfter = System.currentTimeMillis() - startTime;

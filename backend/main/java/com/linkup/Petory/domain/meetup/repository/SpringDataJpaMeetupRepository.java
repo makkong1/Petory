@@ -1,9 +1,13 @@
 package com.linkup.Petory.domain.meetup.repository;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
@@ -11,6 +15,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.linkup.Petory.domain.meetup.entity.Meetup;
+import com.linkup.Petory.domain.meetup.entity.MeetupStatus;
 import com.linkup.Petory.global.annotation.RepositoryMethod;
 
 import jakarta.persistence.LockModeType;
@@ -42,22 +47,26 @@ public interface SpringDataJpaMeetupRepository extends JpaRepository<Meetup, Lon
                     "ORDER BY m.date ASC")
     List<Meetup> findByKeyword(@Param("keyword") String keyword);
 
-    @RepositoryMethod("모임: 참여 가능 목록 조회")
-    @Query("SELECT DISTINCT m FROM Meetup m JOIN FETCH m.organizer " +
-                    "LEFT JOIN m.participants p " +
+    @RepositoryMethod("모임: 참여 가능 목록 (페이징 가능)")
+    /**
+     * {@link Pageable#unpaged()}이면 전체, 아니면 limit/offset 적용.
+     */
+    @EntityGraph(attributePaths = {"organizer"})
+    @Query("SELECT DISTINCT m FROM Meetup m LEFT JOIN m.participants p " +
                     "WHERE m.date > :currentDate " +
                     "AND (m.isDeleted = false OR m.isDeleted IS NULL) " +
                     "GROUP BY m.idx " +
                     "HAVING COUNT(p) < m.maxParticipants " +
                     "ORDER BY m.date ASC")
-    List<Meetup> findAvailableMeetups(@Param("currentDate") LocalDateTime currentDate);
+    List<Meetup> findAvailableMeetups(@Param("currentDate") LocalDateTime currentDate, Pageable pageable);
 
     @RepositoryMethod("모임: 단건 조회 (주최자 포함)")
-    @Query("SELECT m FROM Meetup m JOIN FETCH m.organizer WHERE m.idx = :idx")
+    @Query("SELECT m FROM Meetup m JOIN FETCH m.organizer WHERE m.idx = :idx " +
+                    "AND (m.isDeleted = false OR m.isDeleted IS NULL)")
     Optional<Meetup> findByIdWithOrganizer(@Param("idx") Long idx);
 
-    @RepositoryMethod("모임: 반경 기반 근처 모임 조회")
-    @Query(value = "SELECT m.* FROM meetup m " +
+    @RepositoryMethod("모임: 반경 기반 근처 모임 ID 목록 (정렬·LIMIT)")
+    @Query(value = "SELECT m.idx FROM meetup m " +
                     "WHERE m.date > :currentDate " +
                     "AND (m.status IS NULL OR m.status != 'COMPLETED') " +
                     "AND (m.is_deleted = false OR m.is_deleted IS NULL) " +
@@ -68,11 +77,18 @@ public interface SpringDataJpaMeetupRepository extends JpaRepository<Meetup, Lon
                     "    sin(radians(:lat)) * sin(radians(m.latitude)))) <= :radius " +
                     "ORDER BY (6371 * acos(cos(radians(:lat)) * cos(radians(m.latitude)) * " +
                     "         cos(radians(m.longitude) - radians(:lng)) + " +
-                    "         sin(radians(:lat)) * sin(radians(m.latitude)))) ASC, m.date ASC", nativeQuery = true)
-    List<Meetup> findNearbyMeetups(@Param("lat") Double lat,
+                    "         sin(radians(:lat)) * sin(radians(m.latitude)))) ASC, m.date ASC " +
+                    "LIMIT :limit", nativeQuery = true)
+    List<Long> findNearbyMeetupIds(@Param("lat") Double lat,
                     @Param("lng") Double lng,
                     @Param("radius") Double radius,
-                    @Param("currentDate") LocalDateTime currentDate);
+                    @Param("currentDate") LocalDateTime currentDate,
+                    @Param("limit") int limit);
+
+    @RepositoryMethod("모임: ID 목록으로 조회 (주최자 페치, N+1 방지)")
+    @Query("SELECT m FROM Meetup m JOIN FETCH m.organizer WHERE m.idx IN :ids " +
+                    "AND (m.isDeleted = false OR m.isDeleted IS NULL)")
+    List<Meetup> findByIdxInWithOrganizer(@Param("ids") Collection<Long> ids);
 
     @RepositoryMethod("모임: 비관적 락 조회 (동시성 제어)")
     @Lock(LockModeType.PESSIMISTIC_WRITE)
@@ -99,13 +115,34 @@ public interface SpringDataJpaMeetupRepository extends JpaRepository<Meetup, Lon
     @Query("SELECT m FROM Meetup m JOIN FETCH m.organizer WHERE m.isDeleted = false OR m.isDeleted IS NULL")
     List<Meetup> findAllNotDeleted();
 
+    /**
+     * 전체 목록 페이징 (JOIN FETCH 대신 EntityGraph — Pageable과 호환).
+     */
+    @EntityGraph(attributePaths = {"organizer"})
+    @Query("SELECT m FROM Meetup m WHERE (m.isDeleted = false OR m.isDeleted IS NULL)")
+    Page<Meetup> findAllNotDeleted(Pageable pageable);
+
     @RepositoryMethod("모임: 단건 상세 조회 (참여자 포함)")
     @Query("SELECT DISTINCT m FROM Meetup m " +
             "LEFT JOIN FETCH m.organizer " +
             "LEFT JOIN FETCH m.participants p " +
             "LEFT JOIN FETCH p.user " +
-            "WHERE m.idx = :idx")
+            "WHERE m.idx = :idx AND (m.isDeleted = false OR m.isDeleted IS NULL)")
     Optional<Meetup> findByIdWithDetails(@Param("idx") Long idx);
+
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE Meetup m SET m.status = :closed WHERE m.status = :recruiting " +
+                    "AND m.currentParticipants >= m.maxParticipants AND m.date >= :now " +
+                    "AND (m.isDeleted = false OR m.isDeleted IS NULL)")
+    int closeFullRecruitingMeetups(
+            @Param("now") LocalDateTime now,
+            @Param("recruiting") MeetupStatus recruiting,
+            @Param("closed") MeetupStatus closed);
+
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE Meetup m SET m.status = :completed WHERE m.date < :now AND m.status <> :completed " +
+                    "AND (m.isDeleted = false OR m.isDeleted IS NULL)")
+    int completePastMeetups(@Param("now") LocalDateTime now, @Param("completed") MeetupStatus completed);
 
     @RepositoryMethod("모임: 기간별 통계")
     long countByCreatedAtBetween(LocalDateTime start, LocalDateTime end);
