@@ -190,16 +190,16 @@ export default CommunityPostModal;
 const Overlay = styled.div`
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.45);
+  background: ${(props) => props.theme.colors.overlay};
   display: flex;
   align-items: center;
   justify-content: center;
   overflow-y: auto;
   z-index: 1100;
-  padding: 3rem 1rem;
+  padding: ${(props) => props.theme.spacing['5xl']} ${(props) => props.theme.spacing.lg};
 
   @media (max-width: 768px) {
-    padding: 1rem;
+    padding: ${(props) => props.theme.spacing.lg};
     align-items: flex-start;
   }
 `;
@@ -209,12 +209,12 @@ const Modal = styled.div`
   border-radius: ${(props) => props.theme.borderRadius.xl};
   max-width: 832px;
   width: 100%;
-  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.25);
+  box-shadow: ${(props) => props.theme.shadows.xl};
 
   @media (max-width: 768px) {
     max-width: 100%;
     border-radius: ${(props) => props.theme.borderRadius.lg};
-    margin-top: 1rem;
+    margin-top: ${(props) => props.theme.spacing.lg};
   }
 `;
 
@@ -232,13 +232,13 @@ const ModalHeader = styled.div`
 
 const ModalTitle = styled.h2`
   margin: 0;
-  font-size: 1.4rem;
+  font-size: ${(props) => props.theme.typography.h2.fontSize};
 `;
 
 const CloseButton = styled.button`
   border: none;
   background: transparent;
-  font-size: 1.5rem;
+  font-size: ${(props) => props.theme.typography.h2.fontSize};
   cursor: pointer;
   color: ${(props) => props.theme.colors.textSecondary};
 
@@ -268,16 +268,16 @@ const Field = styled.div`
 `;
 
 const Label = styled.label`
-  font-size: 0.9rem;
+  font-size: ${(props) => props.theme.typography.body2.fontSize};
   color: ${(props) => props.theme.colors.textSecondary};
 `;
 
 const Input = styled.input`
   width: 100%;
-  padding: 0.75rem;
+  padding: ${(props) => props.theme.spacing.md};
   border: 1px solid ${(props) => props.theme.colors.border};
-  border-radius: 8px;
-  font-size: 1rem;
+  border-radius: ${(props) => props.theme.borderRadius.md};
+  font-size: ${(props) => props.theme.typography.body1.fontSize};
   background: ${(props) => props.theme.colors.background};
   color: ${(props) => props.theme.colors.text};
 
@@ -289,10 +289,10 @@ const Input = styled.input`
 
 const Select = styled.select`
   width: 100%;
-  padding: 0.75rem;
+  padding: ${(props) => props.theme.spacing.md};
   border: 1px solid ${(props) => props.theme.colors.border};
-  border-radius: 8px;
-  font-size: 1rem;
+  border-radius: ${(props) => props.theme.borderRadius.md};
+  font-size: ${(props) => props.theme.typography.body1.fontSize};
   background: ${(props) => props.theme.colors.background};
   color: ${(props) => props.theme.colors.text};
 
@@ -304,10 +304,10 @@ const Select = styled.select`
 
 const Textarea = styled.textarea`
   width: 100%;
-  padding: 0.75rem;
+  padding: ${(props) => props.theme.spacing.md};
   border: 1px solid ${(props) => props.theme.colors.border};
-  border-radius: 8px;
-  font-size: 1rem;
+  border-radius: ${(props) => props.theme.borderRadius.md};
+  font-size: ${(props) => props.theme.typography.body1.fontSize};
   background: ${(props) => props.theme.colors.background};
   color: ${(props) => props.theme.colors.text};
   font-family: inherit;
@@ -345,7 +345,7 @@ const FileSelectButton = styled.label.withConfig({
   padding: ${(props) => props.theme.spacing.sm} ${(props) => props.theme.spacing.lg};
   border-radius: ${(props) => props.theme.borderRadius.md};
   background: ${(props) => props.theme.colors.primary};
-  color: #ffffff;
+  color: ${(props) => props.theme.colors.textInverse};
   font-weight: 600;
   cursor: ${(props) => (props.$disabled ? 'not-allowed' : 'pointer')};
   opacity: ${(props) => (props.$disabled ? 0.6 : 1)};
@@ -371,19 +371,19 @@ const ClearImageButton = styled.button`
   transition: all 0.2s ease;
 
   &:hover {
-    border-color: ${(props) => props.theme.colors.error || '#e11d48'};
-    color: ${(props) => props.theme.colors.error || '#e11d48'};
+    border-color: ${(props) => props.theme.colors.error};
+    color: ${(props) => props.theme.colors.error};
   }
 `;
 
 const HelperText = styled.span`
-  font-size: 0.85rem;
+  font-size: ${(props) => props.theme.typography.body2.fontSize};
   color: ${(props) => props.theme.colors.textSecondary};
 `;
 
 const ErrorText = styled.span`
-  font-size: 0.85rem;
-  color: ${(props) => props.theme.colors.error || '#e11d48'};
+  font-size: ${(props) => props.theme.typography.body2.fontSize};
+  color: ${(props) => props.theme.colors.error};
 `;
 
 const ImagePreview = styled.div`
@@ -410,7 +410,7 @@ const ButtonRow = styled.div`
 
 const PrimaryButton = styled.button`
   background: ${(props) => props.theme.colors.primary};
-  color: #ffffff;
+  color: ${(props) => props.theme.colors.textInverse};
   border: none;
   border-radius: ${(props) => props.theme.borderRadius.md};
   padding: ${(props) => props.theme.spacing.sm} ${(props) => props.theme.spacing.lg};

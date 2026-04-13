@@ -1,12 +1,21 @@
 import React from 'react';
 import styled from 'styled-components';
 
+// conversationType → 배지 라벨 + 색상 키 매핑
+const DOMAIN_BADGE_MAP = {
+  CARE_REQUEST: { label: '펫케어', colorKey: 'care' },
+  MISSING_PET:  { label: '실종',   colorKey: 'missing' },
+  DIRECT:       { label: '개인간', colorKey: 'personal' },
+  GROUP:        { label: '단체간', colorKey: 'group' },
+  ADMIN_SUPPORT:{ label: '관리자', colorKey: 'admin' },
+};
+
 const ConversationItem = ({ conversation, onClick }) => {
-  const { 
-    idx, 
-    conversationType, 
+  const {
+    idx,
+    conversationType,
     title,
-    lastMessagePreview, 
+    lastMessagePreview,
     lastMessageAt,
     unreadCount = 0,
     participants = []
@@ -17,25 +26,8 @@ const ConversationItem = ({ conversation, onClick }) => {
   const displayName = title || otherParticipant?.username || '알 수 없음';
   const profileImage = otherParticipant?.profileImageUrl || null;
 
-  // 도메인 뱃지 정보
-  const getDomainBadge = () => {
-    switch (conversationType) {
-      case 'CARE_REQUEST':
-        return { label: '펫케어', color: '#FF7E36' };
-      case 'MISSING_PET':
-        return { label: '실종', color: '#FF9800' };
-      case 'DIRECT':
-        return { label: '개인간', color: '#4CAF50' };
-      case 'GROUP':
-        return { label: '단체간', color: '#2196F3' };
-      case 'ADMIN_SUPPORT':
-        return { label: '관리자', color: '#9C27B0' };
-      default:
-        return { label: '채팅', color: '#757575' };
-    }
-  };
-
-  const badge = getDomainBadge();
+  const badgeInfo = DOMAIN_BADGE_MAP[conversationType] || { label: '채팅', colorKey: 'default' };
+  const badge = { label: badgeInfo.label, colorKey: badgeInfo.colorKey };
 
   // 시간 포맷팅
   const formatTime = (dateString) => {
@@ -59,7 +51,7 @@ const ConversationItem = ({ conversation, onClick }) => {
   return (
     <ItemContainer onClick={onClick}>
       <LeftSection>
-        <DomainBadge color={badge.color}>{badge.label}</DomainBadge>
+        <DomainBadge colorKey={badge.colorKey}>{badge.label}</DomainBadge>
         <ProfileImage>
           {profileImage ? (
             <img src={profileImage} alt={displayName} />
@@ -89,15 +81,15 @@ export default ConversationItem;
 const ItemContainer = styled.div`
   display: flex;
   align-items: center;
-  padding: 12px 16px;
+  padding: ${({ theme }) => theme.spacing.md} ${({ theme }) => theme.spacing.lg};
   cursor: pointer;
-  transition: background 0.2s ease;
+  transition: background 200ms ease;
   border-bottom: 1px solid ${({ theme }) => theme.colors.borderLight};
-  
+
   &:hover {
     background: ${({ theme }) => theme.colors.surfaceHover};
   }
-  
+
   &:last-child {
     border-bottom: none;
   }
@@ -113,30 +105,36 @@ const LeftSection = styled.div`
 
 const DomainBadge = styled.span`
   padding: 2px 6px;
-  border-radius: 4px;
-  background: ${({ color }) => color};
+  border-radius: ${({ theme }) => theme.borderRadius.sm};
+  background: ${({ theme, colorKey }) => {
+    switch (colorKey) {
+      case 'care':     return theme.colors.domain.care;
+      case 'missing':  return theme.colors.domain.missing;
+      case 'personal': return theme.colors.success;
+      case 'group':    return theme.colors.secondary;
+      case 'admin':    return theme.colors.info;
+      default:         return theme.colors.textMuted;
+    }
+  }};
   color: white;
-  font-size: 9px;
+  font-size: ${({ theme }) => theme.typography.tiny.fontSize};
   font-weight: 600;
   white-space: nowrap;
 `;
 
 const ProfileImage = styled.div`
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
+  width: 44px;
+  height: 44px;
+  border-radius: ${({ theme }) => theme.borderRadius.full};
   overflow: hidden;
-  background: ${({ theme }) => theme.colors.surface};
-  
+  background: ${({ theme }) => theme.colors.surfaceSoft};
+  border: 1.5px solid ${({ theme }) => theme.colors.border};
+  flex-shrink: 0;
+
   img {
     width: 100%;
     height: 100%;
     object-fit: cover;
-  }
-  
-  @media (max-width: 768px) {
-    width: 44px;
-    height: 44px;
   }
 `;
 
@@ -147,7 +145,7 @@ const DefaultAvatar = styled.div`
   align-items: center;
   justify-content: center;
   background: ${({ theme }) => theme.colors.primary};
-  color: white;
+  color: ${({ theme }) => theme.colors.textInverse};
   font-size: 18px;
   font-weight: 600;
 `;
@@ -161,7 +159,7 @@ const CenterSection = styled.div`
 `;
 
 const Name = styled.div`
-  font-size: 14px;
+  font-size: ${({ theme }) => theme.typography.body2.fontSize};
   font-weight: 600;
   color: ${({ theme }) => theme.colors.text};
   white-space: nowrap;
@@ -170,7 +168,7 @@ const Name = styled.div`
 `;
 
 const Preview = styled.div`
-  font-size: 13px;
+  font-size: ${({ theme }) => theme.typography.body2.fontSize};
   color: ${({ theme }) => theme.colors.textSecondary};
   white-space: nowrap;
   overflow: hidden;
@@ -186,7 +184,7 @@ const RightSection = styled.div`
 `;
 
 const Time = styled.div`
-  font-size: 12px;
+  font-size: ${({ theme }) => theme.typography.caption.fontSize};
   color: ${({ theme }) => theme.colors.textLight};
   white-space: nowrap;
 `;
@@ -195,10 +193,10 @@ const UnreadBadge = styled.span`
   min-width: 20px;
   height: 20px;
   padding: 0 6px;
-  border-radius: 10px;
+  border-radius: ${({ theme }) => theme.borderRadius.pill};
   background: ${({ theme }) => theme.colors.primary};
-  color: white;
-  font-size: 11px;
+  color: ${({ theme }) => theme.colors.textInverse};
+  font-size: ${({ theme }) => theme.typography.caption.fontSize};
   font-weight: 600;
   display: flex;
   align-items: center;

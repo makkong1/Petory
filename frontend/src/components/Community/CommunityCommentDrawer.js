@@ -316,7 +316,7 @@ export default CommunityCommentDrawer;
 const Backdrop = styled.div`
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.35);
+  background: ${(props) => props.theme.colors.overlay};
   z-index: 1090;
 `;
 
@@ -328,7 +328,7 @@ const Modal = styled.div`
   width: min(620px, calc(100% - 2rem));
   max-height: 90vh;
   background: ${(props) => props.theme.colors.surface};
-  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.25);
+  box-shadow: ${(props) => props.theme.shadows.xl};
   border-radius: ${(props) => props.theme.borderRadius.xl};
   display: flex;
   flex-direction: column;
@@ -347,21 +347,21 @@ const ModalHeader = styled.div`
 
 const ModalTitle = styled.h2`
   margin: 0;
-  font-size: 1.4rem;
+  font-size: ${(props) => props.theme.typography.h2.fontSize};
 `;
 
 const ModalSubtitle = styled.span`
-  font-size: 0.9rem;
+  font-size: ${(props) => props.theme.typography.body2.fontSize};
   color: ${(props) => props.theme.colors.textSecondary};
 `;
 
 const ModalCloseButton = styled.button`
   position: absolute;
-  top: 16px;
-  right: 20px;
+  top: ${(props) => props.theme.spacing.lg};
+  right: ${(props) => props.theme.spacing.xl};
   border: none;
   background: transparent;
-  font-size: 1.4rem;
+  font-size: ${(props) => props.theme.typography.h2.fontSize};
   cursor: pointer;
   color: ${(props) => props.theme.colors.textSecondary};
 
@@ -408,8 +408,8 @@ const LoadingState = styled.div`
 
 const ErrorState = styled.div`
   text-align: center;
-  color: ${(props) => props.theme.colors.error || '#e11d48'};
-  font-size: 0.95rem;
+  color: ${(props) => props.theme.colors.error};
+  font-size: ${(props) => props.theme.typography.body1.fontSize};
 `;
 
 const EmptyState = styled.div`
@@ -422,7 +422,7 @@ const EmptyState = styled.div`
 `;
 
 const EmptyIcon = styled.div`
-  font-size: 36px;
+  font-size: ${(props) => props.theme.typography.h1.fontSize};
 `;
 
 const EmptyText = styled.div`
@@ -466,9 +466,9 @@ const CommentAvatar = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #ffffff;
+  color: ${(props) => props.theme.colors.textInverse};
   font-weight: 700;
-  font-size: 16px;
+  font-size: ${(props) => props.theme.typography.body1.fontSize};
 `;
 
 const CommentAuthorInfo = styled.div`
@@ -488,7 +488,7 @@ const CommentAuthorName = styled.span`
 `;
 
 const CommentTimestamp = styled.span`
-  font-size: 0.8rem;
+  font-size: ${(props) => props.theme.typography.body2.fontSize};
   color: ${(props) => props.theme.colors.textSecondary};
 `;
 
@@ -508,16 +508,16 @@ const CommentActions = styled.div`
 const CommentDeleteButton = styled.button`
   padding: ${(props) => props.theme.spacing.xs} ${(props) => props.theme.spacing.md};
   border-radius: ${(props) => props.theme.borderRadius.md};
-  border: 1px solid ${(props) => props.theme.colors.error || '#dc2626'};
+  border: 1px solid ${(props) => props.theme.colors.error};
   background: transparent;
-  color: ${(props) => props.theme.colors.error || '#dc2626'};
-  font-size: 0.85rem;
+  color: ${(props) => props.theme.colors.error};
+  font-size: ${(props) => props.theme.typography.body2.fontSize};
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
 
   &:hover {
-    background: rgba(220, 38, 38, 0.08);
+    background: ${(props) => props.theme.colors.errorSoft};
     transform: translateY(-1px);
   }
 `;
@@ -525,16 +525,16 @@ const CommentDeleteButton = styled.button`
 const CommentReportButton = styled.button`
   padding: ${(props) => props.theme.spacing.xs} ${(props) => props.theme.spacing.md};
   border-radius: ${(props) => props.theme.borderRadius.md};
-  border: 1px solid ${(props) => props.theme.colors.warning || '#f97316'};
+  border: 1px solid ${(props) => props.theme.colors.warning};
   background: transparent;
-  color: ${(props) => props.theme.colors.warning || '#f97316'};
-  font-size: 0.85rem;
+  color: ${(props) => props.theme.colors.warning};
+  font-size: ${(props) => props.theme.typography.body2.fontSize};
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
 
   &:hover {
-    background: rgba(249, 115, 22, 0.12);
+    background: ${(props) => props.theme.colors.warningSoft};
     transform: translateY(-1px);
   }
 `;
@@ -563,14 +563,14 @@ const Textarea = styled.textarea`
   border-radius: ${(props) => props.theme.borderRadius.md};
   border: 1px solid ${(props) => props.theme.colors.border};
   background: ${(props) => props.theme.colors.surface};
-  font-size: 0.95rem;
+  font-size: ${(props) => props.theme.typography.body1.fontSize};
   resize: vertical;
   min-height: 120px;
 
   &:focus {
     outline: none;
     border-color: ${(props) => props.theme.colors.primary};
-    box-shadow: 0 0 0 3px rgba(255, 126, 54, 0.2);
+    box-shadow: ${(props) => props.theme.shadows.focus};
   }
 `;
 
@@ -626,19 +626,19 @@ const ClearImageButton = styled.button`
   transition: all 0.2s ease;
 
   &:hover {
-    border-color: ${(props) => props.theme.colors.error || '#e11d48'};
-    color: ${(props) => props.theme.colors.error || '#e11d48'};
+    border-color: ${(props) => props.theme.colors.error};
+    color: ${(props) => props.theme.colors.error};
   }
 `;
 
 const HelperText = styled.span`
-  font-size: 0.8rem;
+  font-size: ${(props) => props.theme.typography.body2.fontSize};
   color: ${(props) => props.theme.colors.textSecondary};
 `;
 
 const ErrorText = styled.span`
-  font-size: 0.85rem;
-  color: ${(props) => props.theme.colors.error || '#e11d48'};
+  font-size: ${(props) => props.theme.typography.body2.fontSize};
+  color: ${(props) => props.theme.colors.error};
 `;
 
 const ImagePreview = styled.div`
@@ -657,7 +657,7 @@ const PreviewImage = styled.img`
 const SubmitButton = styled.button`
   align-self: flex-end;
   background: ${(props) => props.theme.colors.primary};
-  color: #ffffff;
+  color: ${(props) => props.theme.colors.textInverse};
   border: none;
   border-radius: ${(props) => props.theme.borderRadius.md};
   padding: ${(props) => props.theme.spacing.sm} ${(props) => props.theme.spacing.lg};
@@ -678,6 +678,6 @@ const SubmitButton = styled.button`
 const LoginNotice = styled.div`
   text-align: center;
   color: ${(props) => props.theme.colors.textSecondary};
-  font-size: 0.95rem;
+  font-size: ${(props) => props.theme.typography.body1.fontSize};
 `;
 

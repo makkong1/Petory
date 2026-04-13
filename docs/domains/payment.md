@@ -220,8 +220,8 @@ careRequestService.updateStatus(
 4. 에스크로 처리 (4.2와 동일)
 
 **트랜잭션 관리**:
-- 각 요청을 개별 트랜잭션으로 처리하여 실패 시 다른 요청에 영향 없음
-- 개별 요청별 예외 처리 추가
+- `CareRequestScheduler`의 만료 처리 메서드에 `@Transactional`이 있어 **배치 단위**로 트랜잭션 경계가 잡힐 수 있음(스프링 설정·프록시 동작은 런타임 참고)
+- 루프 안에서 `updateStatus` 실패는 **try/catch**로 잡아 로그만 남기고 다음 건 진행 — “요청마다 완전히 독립 트랜잭션”이라고 단정하지 않음
 
 ## 5. 서비스 로직
 
@@ -232,7 +232,7 @@ careRequestService.updateStatus(
 - `chargeCoins()`: 코인 충전 (findByIdForUpdate 비관적 락, PaymentValidationException.chargeAmountInvalid)
 - `deductCoins()`: 코인 차감 (에스크로로 이동)
   - **비관적 락 사용**: `UsersRepository.findByIdForUpdate()`로 Race Condition 방지
-  - 잔액 부족 시 **`IllegalStateException`** (`InsufficientBalanceException` 클래스는 별도 존재하나 현재 이 경로에서는 미사용)
+  - 잔액 부족 시 **`InsufficientBalanceException.of(balanceBefore, amount)`** (HTTP 400, `errorCode=INSUFFICIENT_BALANCE`)
 - `payoutCoins()`: 코인 지급 (에스크로에서 제공자에게)
 - `refundCoins()`: 코인 환불 (에스크로에서 요청자에게)
 - `getBalance()`: 잔액 조회 (user.getPetCoinBalance() 직접 반환, 추가 쿼리 없음)
@@ -404,14 +404,15 @@ domain/payment/
 | `PaymentForbiddenException` | ownTransactionOnly (거래 상세 조회 시 본인 거래 아님) |
 | `PetCoinTransactionNotFoundException` | 거래 조회 실패 (getTransactionDetail) |
 | `PetCoinEscrowNotFoundException` | 에스크로 조회 실패 (releaseToProvider, refundToRequester) |
+| `InsufficientBalanceException` | `deductCoins` 시 잔액 부족 (`INSUFFICIENT_BALANCE`) |
 | `UserNotFoundException` | 사용자 조회 실패 |
 | `UnauthenticatedException` | 인증 정보 없음 (PetCoinController) |
-| `IllegalStateException` | deductCoins 잔액 부족, releaseToProvider HOLD 상태 아님 |
+| `IllegalStateException` | `releaseToProvider`에서 HOLD가 아닌 에스크로 지급 시도 등(메시지: HOLD만 지급 가능) |
 
 **Care 연동**: `CareRequestService`에서 에스크로 지급·환불 실패 시 `CarePaymentException.paymentFailed` / `CarePaymentException.refundFailed`로 래핑(care 도메인 예외, §7.1).
 
 ### 8.3 사용자용 API (`PetCoinController`)
-**참고**: 클래스 단 `@PreAuthorize` 없음, `SecurityConfig`의 `/api/**` 인증 규칙 적용. `getCurrentUser()` → `UnauthenticatedException`, `UserNotFoundException`
+**참고**: 클래스 단 `@PreAuthorize` 없음, `SecurityConfig`의 `/api/**` 인증 규칙 적용. `getCurrentUser()`는 `Authentication.getName()`을 **로그인 ID(문자열)** 로 보고 `usersRepository.findByIdString`으로 조회 → `UnauthenticatedException`, `UserNotFoundException`
 
 | 엔드포인트 | Method | 설명 |
 |-----------|--------|------|

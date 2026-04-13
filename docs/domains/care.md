@@ -119,8 +119,7 @@
 
 **핵심 로직**:
 - 날짜가 지났고 `OPEN` 또는 `IN_PROGRESS` 상태인 요청 조회
-- 상태를 `COMPLETED`로 변경
-- `saveAll()`로 일괄 저장
+- **건별** `careRequestService.updateStatus(idx, "COMPLETED", null)` 호출 — `COMPLETED` 시 `completedAt` 기록·에스크로 지급 등은 `CareRequestService`에 일원화
 
 **설명**:
 - **처리 흐름**: 만료된 요청 조회 → 건별 `updateStatus(idx, "COMPLETED", null)` (에스크로 반영 포함) → 실패 건은 로그 후 스킵
@@ -282,6 +281,7 @@ public CareRequestCommentDTO addComment(Long careRequestId, CareRequestCommentDT
 | 메서드 | 설명 | 주요 로직 |
 |--------|------|-----------|
 | `createCareRequest()` | 펫케어 요청 생성 | 이메일 인증 확인, offeredCoins 유효성(>0), 잔액 확인, 펫 소유자 확인 |
+| `getNearby()` | 반경 기반 근처 요청 (지도) | `radiusKm`, `limit` — 서비스에서 `limit`을 1~500으로 클램프 (`CareRequestController` 기본 `radius`=5km, `limit`=200) |
 | `getCareRequestsWithPaging()` | 요청 목록 조회 (페이징) | 상태/위치 필터링, 작성자 활성 상태 확인 |
 | `getAllCareRequests()` | 요청 목록 조회 (관리자용) | 페이징 없음 |
 | `getCareRequest()` | 단일 요청 조회 | 펫 정보 포함 조회 |
@@ -408,6 +408,10 @@ public class CareRequest extends BaseTimeEntity {
     private Integer offeredCoins;           // 제시한 코인 가격 (요청자가 설정)
     @Builder.Default
     private CareRequestStatus status = CareRequestStatus.OPEN;  // 상태 (OPEN, IN_PROGRESS, COMPLETED, CANCELLED)
+    private Double latitude;              // 지도 nearby 등 (선택)
+    private Double longitude;
+    private String address;
+    private LocalDateTime completedAt;   // COMPLETED로 바뀔 때 설정(통계 등)
     @Builder.Default
     private Boolean isDeleted = false;
     private LocalDateTime deletedAt;

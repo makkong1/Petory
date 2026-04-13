@@ -20,6 +20,24 @@ const statusLabel = {
   RESOLVED: '완료',
 };
 
+const getElapsedInfo = (lostDate) => {
+  if (!lostDate) return null;
+  const lost = new Date(lostDate);
+  if (Number.isNaN(lost.getTime())) return null;
+  const now = new Date();
+  const diffMs = now - lost;
+  if (diffMs < 0) return null;
+
+  const hours = Math.floor(diffMs / 3600000);
+  const days = Math.floor(diffMs / 86400000);
+
+  if (hours < 24) return { text: `${hours}시간 경과`, level: 'critical' };
+  if (days <= 3) return { text: `${days}일 경과`, level: 'critical' };
+  if (days <= 7) return { text: `${days}일 경과`, level: 'urgent' };
+  if (days <= 30) return { text: `${days}일 경과`, level: 'warning' };
+  return { text: `${days}일 경과`, level: 'cold' };
+};
+
 const MissingPetBoardPage = () => {
   const { user } = useAuth();
   const { checkAndRedirect, EmailVerificationPromptComponent } = useEmailVerification('MISSING_PET');
@@ -332,6 +350,12 @@ const MissingPetBoardPage = () => {
                     <StatusBadge status={board.status}>
                       {statusLabel[board.status] || board.status}
                     </StatusBadge>
+                    {board.status === 'MISSING' && (() => {
+                      const elapsed = getElapsedInfo(board.lostDate);
+                      return elapsed ? (
+                        <UrgencyBadge level={elapsed.level}>{elapsed.text}</UrgencyBadge>
+                      ) : null;
+                    })()}
                     <LostDate>
                       {board.lostDate ? `실종일: ${board.lostDate}` : '실종일 정보 없음'}
                     </LostDate>
@@ -465,13 +489,13 @@ const StatusButton = styled.button.withConfig({
   font-weight: 600;
   cursor: pointer;
   background: ${(props) => (props.active ? props.theme.colors.primary : 'transparent')};
-  color: ${(props) => (props.active ? '#ffffff' : props.theme.colors.text)};
+  color: ${(props) => (props.active ? props.theme.colors.textInverse : props.theme.colors.text)};
   transition: background 0.2s ease, color 0.2s ease, transform 0.1s ease;
 
   &:hover {
     transform: translateY(-1px);
     background: ${(props) =>
-    props.active ? props.theme.colors.primaryDark : 'rgba(255, 126, 54, 0.1)'};
+    props.active ? props.theme.colors.primaryDark : props.theme.colors.primarySoft};
   }
 `;
 
@@ -500,7 +524,7 @@ const RefreshButton = styled.button`
 const CreateButton = styled.button`
   border: none;
   background: ${(props) => props.theme.colors.primary};
-  color: #ffffff;
+  color: ${(props) => props.theme.colors.textInverse};
   border-radius: ${(props) => props.theme.borderRadius.md};
   padding: ${(props) => props.theme.spacing.sm} ${(props) => props.theme.spacing.lg};
   font-weight: 600;
@@ -530,7 +554,7 @@ const ErrorBanner = styled.div`
 const UpdatedAt = styled.div`
   margin-bottom: ${(props) => props.theme.spacing.md};
   color: ${(props) => props.theme.colors.textSecondary};
-  font-size: 0.9rem;
+  font-size: ${(props) => props.theme.typography.body2.fontSize};
 `;
 
 const EmptyState = styled.div`
@@ -568,14 +592,14 @@ const BoardCard = styled.div`
   border-radius: ${(props) => props.theme.borderRadius.lg};
   display: grid;
   grid-template-rows: auto 1fr auto;
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+  box-shadow: ${(props) => props.theme.shadows.md};
   cursor: pointer;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
   overflow: hidden;
 
   &:hover {
     transform: translateY(-4px);
-    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.14);
+    box-shadow: ${(props) => props.theme.shadows.lg};
   }
 `;
 
@@ -614,9 +638,9 @@ const StatusBadge = styled.span.withConfig({
 })`
   padding: ${(props) => props.theme.spacing.xs} ${(props) => props.theme.spacing.sm};
   border-radius: ${(props) => props.theme.borderRadius.md};
-  font-size: 0.8rem;
+  font-size: ${(props) => props.theme.typography.body2.fontSize};
   font-weight: 700;
-  color: #ffffff;
+  color: ${(props) => props.theme.colors.textInverse};
   background: ${(props) => {
     switch (props.status) {
       case 'FOUND':
@@ -630,8 +654,33 @@ const StatusBadge = styled.span.withConfig({
   }};
 `;
 
+const UrgencyBadge = styled.span.withConfig({
+  shouldForwardProp: (prop) => prop !== 'level',
+})`
+  padding: ${(props) => props.theme.spacing.xs} ${(props) => props.theme.spacing.sm};
+  border-radius: ${(props) => props.theme.borderRadius.pill};
+  font-size: ${(props) => props.theme.typography.caption.fontSize};
+  font-weight: 700;
+  white-space: nowrap;
+  animation: ${(props) => props.level === 'critical' ? 'urgencyPulse 2s infinite' : 'none'};
+  color: ${(props) => props.theme.colors.textInverse};
+  background: ${(props) => {
+    switch (props.level) {
+      case 'critical': return props.theme.colors.error;
+      case 'urgent': return props.theme.colors.warning;
+      case 'warning': return props.theme.colors.info;
+      default: return props.theme.colors.textMuted;
+    }
+  }};
+
+  @keyframes urgencyPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+`;
+
 const LostDate = styled.span`
-  font-size: 0.85rem;
+  font-size: ${(props) => props.theme.typography.body2.fontSize};
   color: ${(props) => props.theme.colors.textSecondary};
 `;
 
@@ -645,7 +694,7 @@ const CardTitleRow = styled.div`
 
 const CardTitle = styled.h2`
   margin: 0;
-  font-size: 1.1rem;
+  font-size: ${(props) => props.theme.typography.h4.fontSize};
   color: ${(props) => props.theme.colors.text};
   flex: 1;
   min-width: 0;
@@ -662,14 +711,14 @@ const MetaRow = styled.div`
   display: flex;
   flex-wrap: wrap;
   gap: ${(props) => props.theme.spacing.xs};
-  font-size: 0.9rem;
+  font-size: ${(props) => props.theme.typography.body2.fontSize};
   color: ${(props) => props.theme.colors.textSecondary};
 `;
 
 const MetaItem = styled.span`
   background: ${(props) => props.theme.colors.surfaceHover};
   border-radius: ${(props) => props.theme.borderRadius.sm};
-  padding: 2px 8px;
+  padding: ${(props) => props.theme.spacing.xs} ${(props) => props.theme.spacing.sm};
 `;
 
 const LostLocation = styled.div`
@@ -688,7 +737,7 @@ const CardFooter = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 0.9rem;
+  font-size: ${(props) => props.theme.typography.body2.fontSize};
   color: ${(props) => props.theme.colors.textSecondary};
 `;
 
@@ -700,14 +749,14 @@ const Reporter = styled.span`
 const CommentCount = styled.span`
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: ${(props) => props.theme.spacing.xs};
 `;
 
 const EmptyAction = styled.button`
   margin-top: ${(props) => props.theme.spacing.lg};
   border: none;
   background: ${(props) => props.theme.colors.primary};
-  color: #ffffff;
+  color: ${(props) => props.theme.colors.textInverse};
   border-radius: ${(props) => props.theme.borderRadius.md};
   padding: ${(props) => props.theme.spacing.sm} ${(props) => props.theme.spacing.lg};
   font-weight: 600;
@@ -721,7 +770,7 @@ const EmptyAction = styled.button`
 const DrawerBackdrop = styled.div`
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.35);
+  background: ${(props) => props.theme.colors.overlay};
   backdrop-filter: blur(2px);
   z-index: 900;
 `;
@@ -734,7 +783,7 @@ const DrawerLoader = styled.div`
   background: ${(props) => props.theme.colors.surface};
   border-radius: ${(props) => props.theme.borderRadius.lg};
   padding: ${(props) => props.theme.spacing.lg} ${(props) => props.theme.spacing.xl};
-  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.2);
+  box-shadow: ${(props) => props.theme.shadows.xl};
   z-index: 1001;
   font-weight: 600;
   color: ${(props) => props.theme.colors.text};
@@ -795,7 +844,7 @@ const PageSizeButton = styled.button`
   border: 1px solid ${props => props.theme.colors.border};
   border-radius: ${props => props.theme.borderRadius.md};
   background: ${props => props.active ? props.theme.colors.primary : 'transparent'};
-  color: ${props => props.active ? 'white' : props.theme.colors.text};
+  color: ${props => props.active ? props.theme.colors.textInverse : props.theme.colors.text};
   font-size: ${props => props.theme.typography.body2.fontSize};
   font-weight: ${props => props.active ? 600 : 400};
   cursor: pointer;
