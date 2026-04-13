@@ -627,6 +627,7 @@ domain/location/
   │   ├── LocationServiceReviewService.java
   │   ├── LocationRecommendAgentService.java   # AI 추천 (LLM 기반)
   │   ├── PublicDataLocationService.java
+  │   ├── LocationServiceBatchWriter.java
   │   ├── LocationServiceAdminService.java
   │   └── NaverMapService.java
   ├── entity/
@@ -667,9 +668,9 @@ erDiagram
 
 | 엔드포인트 | Method | 설명 |
 |-----------|--------|------|
-| `/api/location-services/search` | GET | 통합 검색 §1.1: **위치(lat+lng)** → **지역** → **키워드 단독 FULLTEXT** → 평점순. `radius` 생략·`≤0`이면 서비스에서 10000m. `size` 기본 100, `≤0`이면 전체. 응답 `{"services","count"}` |
-| `/api/location-services/recommend` | GET | AI 추천 — **인증 필수 아님**(공개 GET). 후보 30건 한도 후 LLM으로 최대 10건+이유(`LocationRecommendAgentService`). Ollama/설정에 따라 실패 시 원본 목록 유지 |
-| `/api/location-services/{serviceIdx}` | DELETE | 위치 서비스 삭제 (Soft Delete, LocationServiceNotFoundException, LocationServiceAlreadyDeletedException) |
+| `/api/location-services/search` | GET | 통합 검색 §1.1: **위치(lat+lng)** → **지역** → **키워드 단독 FULLTEXT** → 평점순. `radius` 생략·`≤0`이면 서비스에서 10000m. `size` 기본 100, `≤0`이면 전체. 응답 `{"services","count"}`. **`/api/**` 인증 필요** |
+| `/api/location-services/recommend` | GET | AI 추천 — **`/api/**` 인증 필요**(컨트롤러 메서드에 `@PreAuthorize`는 없으나 `SecurityConfig`와 동일). 후보 최대 30건 → LLM으로 최대 10건+이유(`LocationRecommendAgentService`, Spring AI `ChatModel`/Ollama). 실패 시 원본 상위 유지 |
+| `/api/location-services/{serviceIdx}` | DELETE | 위치 서비스 삭제 (Soft Delete, `ADMIN`/`MASTER`, LocationServiceNotFoundException, LocationServiceAlreadyDeletedException) |
 | `/api/location-service-reviews` | POST | 리뷰 작성 (인증 필요, 클래스 레벨 `@PreAuthorize`, 응답: `{"review": {...}, "message": "..."}`) |
 | `/api/location-service-reviews/{reviewIdx}` | PUT | 리뷰 수정 (인증 필요, 클래스 레벨 `@PreAuthorize`, 응답: `{"review": {...}, "message": "..."}`) |
 | `/api/location-service-reviews/{reviewIdx}` | DELETE | 리뷰 삭제 (인증 필요, Soft Delete, LocationServiceReviewNotFoundException, LocationReviewAlreadyDeletedException) |
@@ -682,7 +683,7 @@ erDiagram
 #### 관리자 (`AdminLocationController`, `/api/admin/location-services`)
 | 엔드포인트 | Method | 설명 |
 |-----------|--------|------|
-| `/api/admin/location-services` | GET | 목록 — `searchLocationServicesByRegion` + 선택 `q`(메모리 필터), `ADMIN`/`MASTER` |
+| `/api/admin/location-services` | GET | 목록 — `searchLocationServicesByRegion` + 선택 `q`(키워드, **SQL WHERE**), `ADMIN`/`MASTER` |
 | `/api/admin/location-services/load-data` | POST | 초기 데이터 로드 — `MASTER` 전용 |
 | `/api/admin/location-services/import-public-data` | POST | CSV 업로드 임포트 — `MASTER`, `multipart/form-data` |
 | `/api/admin/location-services/import-public-data-path` | POST | CSV 경로 임포트 — `MASTER` |
@@ -707,7 +708,7 @@ GET /api/location-services/search?latitude=37.5665&longitude=126.9780
 # 위치 분기 O, 기본 반경 10000m
 ```
 
-**AI 추천 요청 예시** (컨트롤러에 `@PreAuthorize` 없음 — 공개):
+**AI 추천 요청 예시** (JWT 등 **로그인 세션 필요** — `/search`와 동일하게 `/api/**` 인증 규칙):
 ```http
 GET /api/location-services/recommend?latitude=37.5665&longitude=126.9780&radius=10000&category=동물병원
 # 검색 분기는 `/search`와 동일, 후보 최대 30건 후 LLM으로 최대 10건+추천 이유

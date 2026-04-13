@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import styled from 'styled-components';
+import styled, { useTheme } from 'styled-components';
 import { boardApi } from '../../api/boardApi';
 import { reportApi } from '../../api/reportApi';
 import { usePermission } from '../../hooks/usePermission';
@@ -8,9 +8,29 @@ import PageNavigation from '../Common/PageNavigation';
 import CommunityPostModal from './CommunityPostModal';
 import CommunityDetailPage from './CommunityDetailPage';
 
+const CATEGORY_THEME_KEY = {
+  ALL: 'all', 일상: 'daily', 자랑: 'pride', PRIDE: 'pride',
+  질문: 'question', 정보공유: 'info', 정보: 'info',
+  후기: 'review', 모임: 'meetup', 공지: 'notice',
+};
+
+const CATEGORY_META = {
+  ALL: { label: '전체', icon: '📋' },
+  일상: { label: '일상', icon: '📖' },
+  자랑: { label: '자랑', icon: '🐾' },
+  질문: { label: '질문', icon: '❓' },
+  정보공유: { label: '정보공유', icon: '📢' },
+  정보: { label: '정보공유', icon: '📢' },
+  후기: { label: '후기', icon: '📝' },
+  모임: { label: '모임', icon: '🤝' },
+  공지: { label: '공지', icon: '📢' },
+  PRIDE: { label: '자랑', icon: '🐾' },
+};
+
 const CommunityBoard = () => {
   const { requireLogin } = usePermission();
   const { user, redirectToLogin } = useAuth();
+  const theme = useTheme();
 
   const [posts, setPosts] = useState([]); // 레거시 호환 (점진적 제거 예정)
   const [loading, setLoading] = useState(false);
@@ -85,31 +105,24 @@ const CommunityBoard = () => {
     return { map, order };
   }, []);
 
-  const categories = [
-    { key: 'ALL', label: '전체', icon: '📋', color: '#6366F1' },
-    { key: '일상', label: '일상', icon: '📖', color: '#EC4899' },
-    { key: '자랑', label: '자랑', icon: '🐾', color: '#F472B6' },
-    { key: '질문', label: '질문', icon: '❓', color: '#3B82F6' },
-    { key: '정보공유', label: '정보공유', icon: '📢', color: '#10B981' },
-    { key: '후기', label: '후기', icon: '📝', color: '#8B5CF6' },
-    { key: '모임', label: '모임', icon: '🤝', color: '#F59E0B' },
-    { key: '공지', label: '공지', icon: '📢', color: '#EF4444' },
-  ];
+  const categoryColors = theme.colors.category;
+
+  const categories = useMemo(() => [
+    { key: 'ALL', label: '전체', icon: '📋', color: categoryColors.all },
+    { key: '일상', label: '일상', icon: '📖', color: categoryColors.daily },
+    { key: '자랑', label: '자랑', icon: '🐾', color: categoryColors.pride },
+    { key: '질문', label: '질문', icon: '❓', color: categoryColors.question },
+    { key: '정보공유', label: '정보공유', icon: '📢', color: categoryColors.info },
+    { key: '후기', label: '후기', icon: '📝', color: categoryColors.review },
+    { key: '모임', label: '모임', icon: '🤝', color: categoryColors.meetup },
+    { key: '공지', label: '공지', icon: '📢', color: categoryColors.notice },
+  ], [categoryColors]);
 
   const getCategoryInfo = useCallback((category) => {
-    const mapping = {
-      ALL: { label: '전체', icon: '📋', color: '#6366F1' },
-      일상: { label: '일상', icon: '📖', color: '#EC4899' },
-      자랑: { label: '자랑', icon: '🐾', color: '#F472B6' },
-      질문: { label: '질문', icon: '❓', color: '#3B82F6' },
-      정보: { label: '정보공유', icon: '📢', color: '#10B981' },
-      후기: { label: '후기', icon: '📝', color: '#8B5CF6' },
-      모임: { label: '모임', icon: '🤝', color: '#F59E0B' },
-      공지: { label: '공지', icon: '📢', color: '#EF4444' },
-      PRIDE: { label: '자랑', icon: '🐾', color: '#F472B6' }, // 레거시 호환
-    };
-    return mapping[category] || { label: category || '전체', icon: '📋', color: '#6366F1' };
-  }, []);
+    const meta = CATEGORY_META[category] || { label: category || '전체', icon: '📋' };
+    const themeKey = CATEGORY_THEME_KEY[category] || 'all';
+    return { ...meta, color: categoryColors[themeKey] || categoryColors.all };
+  }, [categoryColors]);
 
   const formatDate = (dateString) => {
     if (!dateString) return '-';
@@ -1111,7 +1124,7 @@ const TitleSection = styled.div`
 `;
 
 const TitleIcon = styled.span`
-  font-size: 28px;
+  font-size: ${props => props.theme.typography.h1.fontSize};
   margin-bottom: ${props => props.theme.spacing.xs};
 `;
 
@@ -1139,7 +1152,7 @@ const Subtitle = styled.p`
 
 const WriteButton = styled.button`
   background: ${props => props.theme.colors.gradient};
-  color: white;
+  color: ${props => props.theme.colors.textInverse};
   border: none;
   padding: ${props => props.theme.spacing.md} ${props => props.theme.spacing.xl};
   border-radius: ${props => props.theme.borderRadius.xl};
@@ -1150,11 +1163,11 @@ const WriteButton = styled.button`
   display: flex;
   align-items: center;
   gap: ${props => props.theme.spacing.sm};
-  box-shadow: 0 4px 12px rgba(255, 126, 54, 0.25);
+  box-shadow: ${props => props.theme.shadows.md};
   
   &:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(255, 126, 54, 0.35);
+    box-shadow: ${props => props.theme.shadows.lg};
   }
   
   &:active {
@@ -1163,7 +1176,7 @@ const WriteButton = styled.button`
 `;
 
 const WriteIcon = styled.span`
-  font-size: 15px;
+  font-size: ${props => props.theme.typography.body1.fontSize};
 `;
 
 const CategoryTabs = styled.div`
@@ -1178,7 +1191,7 @@ const CategoryTab = styled.button`
   background: ${props => props.active
     ? `linear-gradient(135deg, ${props.categoryColor} 0%, ${props.categoryColor}dd 100%)`
     : props.theme.colors.surface};
-  color: ${props => props.active ? 'white' : props.theme.colors.text};
+  color: ${props => props.active ? props.theme.colors.textInverse : props.theme.colors.text};
   border: 2px solid ${props => props.active ? props.categoryColor : props.theme.colors.border};
   padding: ${props => props.theme.spacing.sm} ${props => props.theme.spacing.lg};
   border-radius: ${props => props.theme.borderRadius.full};
@@ -1205,7 +1218,7 @@ const CategoryTab = styled.button`
 `;
 
 const CategoryIcon = styled.span`
-  font-size: 14px;
+  font-size: ${props => props.theme.typography.body2.fontSize};
 `;
 
 const PostGrid = styled.div`
@@ -1227,13 +1240,13 @@ const PostGrid = styled.div`
 
 
 const ErrorBanner = styled.div`
-  background: rgba(220, 38, 38, 0.1);
-  color: ${props => props.theme.colors.error || '#dc2626'};
-  border: 1px solid rgba(220, 38, 38, 0.2);
+  background: ${props => props.theme.colors.errorSoft};
+  color: ${props => props.theme.colors.error};
+  border: 1px solid ${props => props.theme.colors.error}33;
   border-radius: ${props => props.theme.borderRadius.lg};
   padding: ${props => props.theme.spacing.md} ${props => props.theme.spacing.lg};
   margin-bottom: ${props => props.theme.spacing.lg};
-  font-size: 0.95rem;
+  font-size: ${props => props.theme.typography.body1.fontSize};
 `;
 
 const PostCard = styled.div.withConfig({
@@ -1358,7 +1371,7 @@ const PostNumber = styled.span`
 
 const CategoryBadge = styled.span`
   background: ${props => `linear-gradient(135deg, ${props.categoryColor} 0%, ${props.categoryColor}dd 100%)`};
-  color: white;
+  color: ${props => props.theme.colors.textInverse};
   padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.md};
   border-radius: ${props => props.theme.borderRadius.md};
   font-size: ${props => props.theme.typography.caption.fontSize};
@@ -1371,7 +1384,7 @@ const CategoryBadge = styled.span`
 `;
 
 const CategoryBadgeIcon = styled.span`
-  font-size: 12px;
+  font-size: ${props => props.theme.typography.caption.fontSize};
 `;
 
 const PostContent = styled.p.withConfig({
@@ -1426,10 +1439,10 @@ const AuthorAvatar = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
+  color: ${(props) => props.theme.colors.textInverse};
   font-weight: 700;
-  font-size: 14px;
-  box-shadow: 0 3px 10px rgba(255, 126, 54, 0.25);
+  font-size: ${(props) => props.theme.typography.body2.fontSize};
+  box-shadow: ${(props) => props.theme.shadows.sm};
 `;
 
 const AuthorDetails = styled.div`
@@ -1461,7 +1474,7 @@ const AuthorLocation = styled.div`
 `;
 
 const LocationIcon = styled.span`
-  font-size: 12px;
+  font-size: ${props => props.theme.typography.caption.fontSize};
 `;
 
 const PostActions = styled.div`
@@ -1514,7 +1527,7 @@ const StatInfo = styled.div`
 `;
 
 const StatIcon = styled.span`
-  font-size: 14px;
+  font-size: ${props => props.theme.typography.body2.fontSize};
 `;
 
 const StatValue = styled.span`
@@ -1542,23 +1555,23 @@ const ReportButton = styled.button`
   justify-content: center;
   
   &:hover {
-    color: ${props => props.theme.colors.error || '#dc3545'};
-    background: ${props => props.theme.colors.surfaceHover || 'rgba(220, 53, 69, 0.1)'};
+    color: ${props => props.theme.colors.error};
+    background: ${props => props.theme.colors.errorSoft};
     transform: scale(1.1);
   }
 `;
 
 const DeleteButton = styled.button`
   background: none;
-  border: 1px solid ${props => props.theme.colors.error || '#dc2626'};
-  color: ${props => props.theme.colors.error || '#dc2626'};
+  border: 1px solid ${props => props.theme.colors.error};
+  color: ${props => props.theme.colors.error};
   cursor: pointer;
   padding: ${props => props.theme.spacing.sm};
   border-radius: ${props => props.theme.borderRadius.md};
   transition: all 0.2s ease;
 
   &:hover {
-    background: rgba(220, 38, 38, 0.08);
+    background: ${props => props.theme.colors.errorSoft};
     transform: translateY(-1px);
   }
 `;
@@ -1571,7 +1584,7 @@ const PostActionsRight = styled.div`
 `;
 
 const ReportIcon = styled.span`
-  font-size: 15px;
+  font-size: ${props => props.theme.typography.body1.fontSize};
 `;
 
 const PopularSection = styled.section`
@@ -1613,7 +1626,7 @@ const PopularTab = styled.button`
   padding: ${(props) => props.theme.spacing.xs} ${(props) => props.theme.spacing.md};
   border: none;
   background: ${(props) => (props.active ? props.theme.colors.primary : 'transparent')};
-  color: ${(props) => (props.active ? '#fff' : props.theme.colors.textSecondary)};
+  color: ${(props) => (props.active ? props.theme.colors.textInverse : props.theme.colors.textSecondary)};
   cursor: pointer;
   font-weight: 600;
   font-size: ${props => props.theme.typography.body2.fontSize};
@@ -1674,7 +1687,7 @@ const PopularCard = styled.button`
 
   &:hover {
     transform: translateY(-4px);
-    box-shadow: 0 10px 20px rgba(15, 23, 42, 0.1);
+    box-shadow: ${(props) => props.theme.shadows.lg};
   }
 `;
 
@@ -1702,7 +1715,7 @@ const PopularStats = styled.div`
   display: flex;
   gap: ${(props) => props.theme.spacing.sm};
   color: ${(props) => props.theme.colors.textSecondary};
-  font-size: 0.85rem;
+  font-size: ${(props) => props.theme.typography.body2.fontSize};
   flex-wrap: wrap;
 `;
 
@@ -1774,7 +1787,7 @@ const EmptyState = styled.div`
 `;
 
 const EmptyIcon = styled.div`
-  font-size: 56px;
+  font-size: ${props => props.theme.typography.hero.fontSize};
   margin-bottom: ${props => props.theme.spacing.md};
 `;
 
@@ -1847,7 +1860,7 @@ const SearchTypeSelect = styled.select`
 const SearchButton = styled.button`
   padding: ${props => props.theme.spacing.sm} ${props => props.theme.spacing.lg};
   background: ${props => props.theme.colors.gradient};
-  color: white;
+  color: ${props => props.theme.colors.textInverse};
   border: none;
   border-radius: ${props => props.theme.borderRadius.md};
   font-size: ${props => props.theme.typography.body2.fontSize};
@@ -1858,7 +1871,7 @@ const SearchButton = styled.button`
   
   &:hover:not(:disabled) {
     transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    box-shadow: ${props => props.theme.shadows.md};
   }
   
   &:disabled {
@@ -1918,7 +1931,7 @@ const PageSizeButton = styled.button`
   border: 1px solid ${props => props.theme.colors.border};
   border-radius: ${props => props.theme.borderRadius.md};
   background: ${props => props.active ? props.theme.colors.primary : 'transparent'};
-  color: ${props => props.active ? 'white' : props.theme.colors.text};
+  color: ${props => props.active ? props.theme.colors.textInverse : props.theme.colors.text};
   font-size: ${props => props.theme.typography.body2.fontSize};
   font-weight: ${props => props.active ? 600 : 400};
   cursor: pointer;

@@ -14,6 +14,24 @@ const statusLabel = {
   RESOLVED: '완료',
 };
 
+const getElapsedInfo = (lostDate) => {
+  if (!lostDate) return null;
+  const lost = new Date(lostDate);
+  if (Number.isNaN(lost.getTime())) return null;
+  const now = new Date();
+  const diffMs = now - lost;
+  if (diffMs < 0) return null;
+
+  const hours = Math.floor(diffMs / 3600000);
+  const days = Math.floor(diffMs / 86400000);
+
+  if (hours < 24) return { text: `${hours}시간 경과`, level: 'critical' };
+  if (days <= 3) return { text: `${days}일 경과`, level: 'critical' };
+  if (days <= 7) return { text: `${days}일 경과`, level: 'urgent' };
+  if (days <= 30) return { text: `${days}일 경과`, level: 'warning' };
+  return { text: `${days}일 경과`, level: 'cold' };
+};
+
 const MissingPetBoardDetail = ({
   board,
   onClose,
@@ -287,6 +305,12 @@ const MissingPetBoardDetail = ({
               <StatusBadge status={board.status}>
                 {statusLabel[board.status] || board.status}
               </StatusBadge>
+              {board.status === 'MISSING' && (() => {
+                const elapsed = getElapsedInfo(board.lostDate);
+                return elapsed ? (
+                  <UrgencyBadge level={elapsed.level}>{elapsed.text}</UrgencyBadge>
+                ) : null;
+              })()}
               <DetailTitle>{board.title}</DetailTitle>
             </DetailTitleRow>
           </DetailHeader>
@@ -559,7 +583,7 @@ export default MissingPetBoardDetail;
 const Backdrop = styled.div`
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.45);
+  background: ${(props) => props.theme.colors.overlay};
   backdrop-filter: blur(4px);
   z-index: 1090;
 `;
@@ -584,7 +608,7 @@ const DetailCard = styled.article`
   width: min(1000px, 100%);
   background: ${(props) => props.theme.colors.surface};
   border-radius: ${(props) => props.theme.borderRadius.xl};
-  box-shadow: 0 22px 48px rgba(15, 23, 42, 0.25);
+  box-shadow: ${(props) => props.theme.shadows.xl};
   border: 1px solid ${(props) => props.theme.colors.border};
   overflow: hidden;
   display: flex;
@@ -593,7 +617,7 @@ const DetailCard = styled.article`
   @media (max-width: 768px) {
     width: 100%;
     border-radius: ${(props) => props.theme.borderRadius.lg};
-    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.2);
+    box-shadow: ${(props) => props.theme.shadows.lg};
   }
 `;
 
@@ -675,7 +699,7 @@ const DetailTitle = styled.h2`
 const CloseButton = styled.button`
   border: none;
   background: transparent;
-  font-size: 1.2rem;
+  font-size: ${(props) => props.theme.typography.h3.fontSize};
   color: ${(props) => props.theme.colors.textSecondary};
   cursor: pointer;
 
@@ -685,9 +709,9 @@ const CloseButton = styled.button`
 `;
 
 const DeleteBoardButton = styled.button`
-  border: 1px solid ${(props) => props.theme.colors.error || '#dc2626'};
+  border: 1px solid ${(props) => props.theme.colors.error};
   background: transparent;
-  color: ${(props) => props.theme.colors.error || '#dc2626'};
+  color: ${(props) => props.theme.colors.error};
   border-radius: ${(props) => props.theme.borderRadius.md};
   padding: ${(props) => props.theme.spacing.xs} ${(props) => props.theme.spacing.sm};
   font-weight: 600;
@@ -695,15 +719,15 @@ const DeleteBoardButton = styled.button`
   transition: all 0.2s ease;
 
   &:hover {
-    background: rgba(220, 38, 38, 0.1);
+    background: ${(props) => props.theme.colors.errorSoft};
     transform: translateY(-1px);
   }
 `;
 
 const ReportBoardButton = styled.button`
-  border: 1px solid ${(props) => props.theme.colors.warning || '#f97316'};
+  border: 1px solid ${(props) => props.theme.colors.warning};
   background: transparent;
-  color: ${(props) => props.theme.colors.warning || '#f97316'};
+  color: ${(props) => props.theme.colors.warning};
   border-radius: ${(props) => props.theme.borderRadius.md};
   padding: ${(props) => props.theme.spacing.xs} ${(props) => props.theme.spacing.sm};
   font-weight: 600;
@@ -711,7 +735,7 @@ const ReportBoardButton = styled.button`
   transition: all 0.2s ease;
 
   &:hover {
-    background: rgba(249, 115, 22, 0.1);
+    background: ${(props) => props.theme.colors.warningSoft};
     transform: translateY(-1px);
   }
 `;
@@ -776,7 +800,7 @@ const InfoItem = styled.div.withConfig({
 `;
 
 const InfoLabel = styled.span`
-  font-size: 0.8rem;
+  font-size: ${(props) => props.theme.typography.body2.fontSize};
   color: ${(props) => props.theme.colors.textSecondary};
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -828,7 +852,7 @@ const Section = styled.section`
 
 const SectionTitle = styled.h3`
   margin: 0;
-  font-size: 0.95rem;
+  font-size: ${(props) => props.theme.typography.body1.fontSize};
 `;
 
 const ContentBox = styled.div`
@@ -845,23 +869,48 @@ const ContentBox = styled.div`
   box-sizing: border-box;
 `;
 
+const UrgencyBadge = styled.span.withConfig({
+  shouldForwardProp: (prop) => prop !== 'level',
+})`
+  padding: ${(props) => props.theme.spacing.xs} ${(props) => props.theme.spacing.sm};
+  border-radius: ${(props) => props.theme.borderRadius.pill};
+  font-size: ${(props) => props.theme.typography.caption.fontSize};
+  font-weight: 700;
+  white-space: nowrap;
+  animation: ${(props) => props.level === 'critical' ? 'urgencyPulse 2s infinite' : 'none'};
+  color: ${(props) => props.theme.colors.textInverse};
+  background: ${(props) => {
+    switch (props.level) {
+      case 'critical': return props.theme.colors.error;
+      case 'urgent': return props.theme.colors.warning;
+      case 'warning': return props.theme.colors.info;
+      default: return props.theme.colors.textMuted;
+    }
+  }};
+
+  @keyframes urgencyPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+`;
+
 const StatusBadge = styled.span.withConfig({
   shouldForwardProp: (prop) => prop !== 'status',
 })`
-  padding: 4px 10px;
-  border-radius: 999px;
+  padding: ${(props) => props.theme.spacing.xs} ${(props) => props.theme.spacing.md};
+  border-radius: ${(props) => props.theme.borderRadius.pill};
   font-weight: 700;
-  font-size: 0.8rem;
-  color: #ffffff;
+  font-size: ${(props) => props.theme.typography.body2.fontSize};
+  color: ${(props) => props.theme.colors.textInverse};
   background: ${(props) => {
     switch (props.status) {
       case 'FOUND':
-        return '#10b981';
+        return props.theme.colors.status.found;
       case 'RESOLVED':
-        return '#6366f1';
+        return props.theme.colors.status.resolved;
       case 'MISSING':
       default:
-        return '#ef4444';
+        return props.theme.colors.status.missing;
     }
   }};
 `;
@@ -873,7 +922,7 @@ const StatusControl = styled.div`
 `;
 
 const StatusControlLabel = styled.span`
-  font-size: 0.85rem;
+  font-size: ${(props) => props.theme.typography.body2.fontSize};
   color: ${(props) => props.theme.colors.textSecondary};
   font-weight: 600;
 `;
@@ -892,7 +941,7 @@ const StatusButton = styled.button.withConfig({
   font-weight: 600;
   cursor: pointer;
   background: ${(props) => (props.active ? props.theme.colors.primary : props.theme.colors.surface)};
-  color: ${(props) => (props.active ? '#ffffff' : props.theme.colors.text)};
+  color: ${(props) => (props.active ? props.theme.colors.textInverse : props.theme.colors.text)};
   border: 1px solid ${(props) =>
     props.active ? props.theme.colors.primary : props.theme.colors.border};
   transition: all 0.2s ease;
@@ -941,7 +990,7 @@ const CommentAuthor = styled.span`
 `;
 
 const CommentDate = styled.span`
-  font-size: 0.8rem;
+  font-size: ${(props) => props.theme.typography.body2.fontSize};
   color: ${(props) => props.theme.colors.textSecondary};
 `;
 
@@ -962,8 +1011,8 @@ const CommentActions = styled.div`
 const CommentDeleteButton = styled.button`
   border: none;
   background: transparent;
-  color: ${(props) => props.theme.colors.red || '#ef4444'};
-  font-size: 0.82rem;
+  color: ${(props) => props.theme.colors.error};
+  font-size: ${(props) => props.theme.typography.body2.fontSize};
   cursor: pointer;
 
   &:hover {
@@ -974,16 +1023,16 @@ const CommentDeleteButton = styled.button`
 const CommentReportButton = styled.button`
   border: none;
   background: transparent;
-  color: ${(props) => props.theme.colors.warning || '#f97316'};
+  color: ${(props) => props.theme.colors.warning};
   cursor: pointer;
-  font-size: 0.85rem;
+  font-size: ${(props) => props.theme.typography.body2.fontSize};
   font-weight: 600;
-  padding: 0.1rem 0.4rem;
+  padding: ${(props) => props.theme.spacing.xs};
   border-radius: ${(props) => props.theme.borderRadius.sm};
   transition: all 0.2s ease;
 
   &:hover {
-    background: rgba(249, 115, 22, 0.1);
+    background: ${(props) => props.theme.colors.warningSoft};
   }
 `;
 
@@ -1013,7 +1062,7 @@ const CommentTextArea = styled.textarea`
   &:focus {
     outline: none;
     border-color: ${(props) => props.theme.colors.primary};
-    box-shadow: 0 0 0 3px rgba(255, 126, 54, 0.2);
+    box-shadow: ${(props) => props.theme.shadows.focus};
   }
 `;
 
@@ -1022,7 +1071,7 @@ const CommentLocation = styled.div`
   padding: ${(props) => props.theme.spacing.xs} ${(props) => props.theme.spacing.sm};
   background: ${(props) => props.theme.colors.surfaceHover};
   border-radius: ${(props) => props.theme.borderRadius.sm};
-  font-size: 0.9rem;
+  font-size: ${(props) => props.theme.typography.body2.fontSize};
   color: ${(props) => props.theme.colors.text};
   font-weight: 500;
 `;
@@ -1035,26 +1084,26 @@ const WitnessButtonContainer = styled.div`
 
 const WitnessButton = styled.button`
   background: ${(props) => props.theme.colors.primary};
-  color: white;
+  color: ${(props) => props.theme.colors.textInverse};
   border: none;
   border-radius: ${(props) => props.theme.borderRadius.md};
   padding: ${(props) => props.theme.spacing.md} ${(props) => props.theme.spacing.xl};
   font-weight: 600;
-  font-size: 1rem;
+  font-size: ${(props) => props.theme.typography.body1.fontSize};
   cursor: pointer;
   transition: all 0.2s ease;
   width: 100%;
   max-width: 300px;
 
   &:hover:not(:disabled) {
-    background: ${(props) => props.theme.colors.primaryHover || props.theme.colors.primary};
+    background: ${(props) => props.theme.colors.primaryDark};
     transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    box-shadow: ${(props) => props.theme.shadows.md};
   }
 
   &:active:not(:disabled) {
     transform: translateY(0);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: ${(props) => props.theme.shadows.sm};
   }
 
   &:disabled {
@@ -1073,7 +1122,7 @@ const AddressToggleButton = styled.button`
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
-  font-size: 0.9rem;
+  font-size: ${(props) => props.theme.typography.body2.fontSize};
   margin-top: ${(props) => props.theme.spacing.xs};
 
   &:hover:not(:disabled) {
@@ -1081,7 +1130,7 @@ const AddressToggleButton = styled.button`
     border-color: ${(props) => props.theme.colors.primary};
     color: ${(props) => props.theme.colors.primary};
     transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: ${(props) => props.theme.shadows.sm};
   }
 
   &:active:not(:disabled) {
@@ -1097,10 +1146,10 @@ const AddressToggleButton = styled.button`
 const MapWrapper = styled.div`
   width: 100%;
   height: 300px;
-  border-radius: 8px;
+  border-radius: ${(props) => props.theme.borderRadius.md};
   overflow: hidden;
-  margin-top: 12px;
-  border: 1px solid #e2e8f0;
+  margin-top: ${(props) => props.theme.spacing.md};
+  border: 1px solid ${(props) => props.theme.colors.border};
 `;
 
 const AddressMapContainer = styled.div`
@@ -1114,7 +1163,7 @@ const AddressMapContainer = styled.div`
 const CommentSubmit = styled.button`
   align-self: flex-end;
   background: ${(props) => props.theme.colors.primary};
-  color: #ffffff;
+  color: ${(props) => props.theme.colors.textInverse};
   border: none;
   border-radius: ${(props) => props.theme.borderRadius.md};
   padding: ${(props) => props.theme.spacing.sm} ${(props) => props.theme.spacing.lg};

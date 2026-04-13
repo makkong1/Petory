@@ -583,7 +583,8 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
           </HeaderTitle>
           <HeaderSubtitle>
             {otherParticipant && `${otherParticipant.username} • `}
-            {connected ? '🟢 연결됨' : '🔴 연결 중...'}
+            <ConnectionDot $connected={connected} />
+            {connected ? '연결됨' : '연결 중...'}
           </HeaderSubtitle>
         </HeaderInfo>
         <HeaderActions>
@@ -627,7 +628,7 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
                     <MessageContent>{message.content}</MessageContent>
                   )}
                   {showTime && (
-                    <MessageTime>{formatTime(message.createdAt)}</MessageTime>
+                    <MessageTime isMyMessage={isMyMessage}>{formatTime(message.createdAt)}</MessageTime>
                   )}
                 </MessageBubble>
               </MessageWrapper>
@@ -802,10 +803,12 @@ const Container = styled.div`
 const Header = styled.div`
   display: flex;
   align-items: center;
-  padding: 12px 16px;
+  height: 56px;
+  padding: 0 16px;
   border-bottom: 1px solid ${({ theme }) => theme.colors.border};
   background: ${({ theme }) => theme.colors.surface};
   gap: 12px;
+  flex-shrink: 0;
 `;
 
 const BackButton = styled.button`
@@ -819,9 +822,9 @@ const BackButton = styled.button`
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  transition: all 0.2s ease;
-  
+  border-radius: ${({ theme }) => theme.borderRadius.full};
+  transition: all ${({ theme }) => theme.duration?.normal || '200ms'} ${({ theme }) => theme.easing?.easeOut || 'ease'};
+
   &:hover {
     background: ${({ theme }) => theme.colors.surfaceHover};
   }
@@ -832,17 +835,34 @@ const HeaderInfo = styled.div`
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
 `;
 
 const HeaderTitle = styled.div`
-  font-size: 16px;
+  font-size: ${({ theme }) => theme.typography.h3.fontSize};
   font-weight: 600;
   color: ${({ theme }) => theme.colors.text};
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 `;
 
 const HeaderSubtitle = styled.div`
-  font-size: 12px;
+  font-size: ${({ theme }) => theme.typography.caption.fontSize};
   color: ${({ theme }) => theme.colors.textSecondary};
+  display: flex;
+  align-items: center;
+  gap: 6px;
+`;
+
+const ConnectionDot = styled.span`
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: ${({ theme }) => theme.borderRadius.full};
+  background: ${({ $connected, theme }) =>
+    $connected ? theme.colors.success : theme.colors.error};
+  flex-shrink: 0;
 `;
 
 const HeaderActions = styled.div`
@@ -863,9 +883,9 @@ const MenuButton = styled.button`
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  transition: all 0.2s ease;
-  
+  border-radius: ${({ theme }) => theme.borderRadius.full};
+  transition: all ${({ theme }) => theme.duration?.normal || '200ms'} ${({ theme }) => theme.easing?.easeOut || 'ease'};
+
   &:hover {
     background: ${({ theme }) => theme.colors.surfaceHover};
   }
@@ -878,8 +898,8 @@ const MenuDropdown = styled.div`
   margin-top: 8px;
   background: ${({ theme }) => theme.colors.surface};
   border: 1px solid ${({ theme }) => theme.colors.border};
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  box-shadow: ${({ theme }) => theme.shadows.md};
   z-index: 1000;
   min-width: 120px;
   overflow: hidden;
@@ -891,15 +911,15 @@ const MenuItem = styled.button`
   border: none;
   background: transparent;
   color: ${({ theme, danger }) => danger ? theme.colors.error : theme.colors.text};
-  font-size: 14px;
+  font-size: ${({ theme }) => theme.typography.body2.fontSize};
   text-align: left;
   cursor: pointer;
-  transition: all 0.2s ease;
-  
+  transition: all ${({ theme }) => theme.duration?.normal || '200ms'} ${({ theme }) => theme.easing?.easeOut || 'ease'};
+
   &:hover {
     background: ${({ theme }) => theme.colors.surfaceHover};
   }
-  
+
   &:not(:last-child) {
     border-bottom: 1px solid ${({ theme }) => theme.colors.border};
   }
@@ -916,9 +936,9 @@ const CloseButton = styled.button`
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  transition: all 0.2s ease;
-  
+  border-radius: ${({ theme }) => theme.borderRadius.full};
+  transition: all ${({ theme }) => theme.duration?.normal || '200ms'} ${({ theme }) => theme.easing?.easeOut || 'ease'};
+
   &:hover {
     background: ${({ theme }) => theme.colors.surfaceHover};
     color: ${({ theme }) => theme.colors.text};
@@ -960,63 +980,38 @@ const MessageWrapper = styled.div`
 `;
 
 const SenderName = styled.div`
-  font-size: 12px;
-  color: ${({ theme }) => theme.colors.textSecondary};
+  font-size: ${({ theme }) => theme.typography.caption.fontSize};
+  color: ${({ theme }) => theme.colors.textMuted};
   padding: 0 8px;
 `;
 
 const MessageBubble = styled.div`
   max-width: 70%;
   padding: 12px 16px;
-  border-radius: ${({ isMyMessage }) =>
-    isMyMessage ? '18px 18px 4px 18px' : '18px 18px 18px 4px'};
+  border-radius: ${({ isMyMessage, theme }) =>
+    isMyMessage
+      ? `${theme.borderRadius.lg} 0 ${theme.borderRadius.lg} ${theme.borderRadius.lg}`
+      : `0 ${theme.borderRadius.lg} ${theme.borderRadius.lg} ${theme.borderRadius.lg}`};
   background: ${({ theme, isMyMessage }) =>
     isMyMessage
       ? theme.colors.primary
-      : theme.colors.surface || '#E8E8E8'};
+      : theme.colors.surfaceSoft};
   color: ${({ theme, isMyMessage }) =>
     isMyMessage
-      ? '#ffffff'
-      : theme.colors.text || '#212121'};
+      ? theme.colors.textInverse
+      : theme.colors.text};
   word-wrap: break-word;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  box-shadow: ${({ isMyMessage }) =>
-    isMyMessage
-      ? '0 2px 8px rgba(0, 0, 0, 0.15)'
-      : '0 2px 8px rgba(0, 0, 0, 0.1)'};
+  box-shadow: ${({ theme }) => theme.shadows.sm};
   border: ${({ theme, isMyMessage }) =>
     isMyMessage ? 'none' : `1px solid ${theme.colors.border}`};
   position: relative;
-  
-  /* 말풍선 꼬리 효과 */
-  &::after {
-    content: '';
-    position: absolute;
-    width: 0;
-    height: 0;
-    ${({ isMyMessage, theme }) => isMyMessage
-    ? `
-        right: -8px;
-        bottom: 12px;
-        border-top: 8px solid transparent;
-        border-bottom: 8px solid transparent;
-        border-left: 8px solid ${theme.colors.primary};
-      `
-    : `
-        left: -8px;
-        bottom: 12px;
-        border-top: 8px solid transparent;
-        border-bottom: 8px solid transparent;
-        border-right: 8px solid ${theme.colors.surface || '#E8E8E8'};
-      `
-  }
-  }
 `;
 
 const MessageContent = styled.div`
-  font-size: 15px;
+  font-size: ${({ theme }) => theme.typography.body1.fontSize};
   line-height: 1.5;
   word-wrap: break-word;
   font-weight: 400;
@@ -1026,25 +1021,27 @@ const MessageContent = styled.div`
 const MessageImage = styled.img`
   max-width: 100%;
   max-height: 300px;
-  border-radius: 8px;
+  border-radius: ${({ theme }) => theme.borderRadius.md};
   object-fit: contain;
   cursor: pointer;
-  
+
   &:hover {
     opacity: 0.9;
   }
 `;
 
 const MessageTime = styled.div`
-  font-size: 11px;
-  opacity: 0.7;
+  font-size: ${({ theme }) => theme.typography.caption.fontSize};
+  color: ${({ theme, isMyMessage }) =>
+    isMyMessage ? 'rgba(255,255,255,0.7)' : theme.colors.textMuted};
   align-self: flex-end;
 `;
 
 const InputContainer = styled.div`
-  padding: 12px 16px;
+  padding: ${({ theme }) => theme.spacing.md} ${({ theme }) => theme.spacing.lg};
   border-top: 1px solid ${({ theme }) => theme.colors.border};
   background: ${({ theme }) => theme.colors.surface};
+  flex-shrink: 0;
 `;
 
 const MessageForm = styled.form`
@@ -1071,20 +1068,20 @@ const ImageButton = styled.button`
   color: ${({ theme }) => theme.colors.text};
   font-size: 20px;
   cursor: pointer;
-  border-radius: 50%;
+  border-radius: ${({ theme }) => theme.borderRadius.full};
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease;
+  transition: all ${({ theme }) => theme.duration?.normal || '200ms'} ${({ theme }) => theme.easing?.easeOut || 'ease'};
   flex-shrink: 0;
-  
+
   &:hover:not(:disabled) {
     background: ${({ theme }) => theme.colors.surfaceHover};
     transform: scale(1.05);
   }
-  
+
   &:disabled {
-    opacity: 0.6;
+    opacity: 0.4;
     cursor: not-allowed;
   }
 `;
@@ -1092,17 +1089,22 @@ const ImageButton = styled.button`
 const MessageInput = styled.input`
   flex: 1;
   padding: 10px 14px;
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  border-radius: 20px;
-  font-size: 14px;
+  border: 1.5px solid ${({ theme }) => theme.colors.border};
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  font-size: ${({ theme }) => theme.typography.body2.fontSize};
   background: ${({ theme }) => theme.colors.background};
   color: ${({ theme }) => theme.colors.text};
-  
+  transition: border-color ${({ theme }) => theme.duration?.normal || '200ms'} ${({ theme }) => theme.easing?.easeOut || 'ease'};
+
+  &::placeholder {
+    color: ${({ theme }) => theme.colors.textMuted};
+  }
+
   &:focus {
     outline: none;
     border-color: ${({ theme }) => theme.colors.primary};
   }
-  
+
   &:disabled {
     opacity: 0.6;
     cursor: not-allowed;
@@ -1112,20 +1114,20 @@ const MessageInput = styled.input`
 const SendButton = styled.button`
   padding: 10px 20px;
   border: none;
-  border-radius: 20px;
+  border-radius: ${({ theme }) => theme.borderRadius.md};
   background: ${({ theme }) => theme.colors.primary};
-  color: #ffffff;
-  font-size: 14px;
+  color: ${({ theme }) => theme.colors.textInverse};
+  font-size: ${({ theme }) => theme.typography.body2.fontSize};
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
-  
+  transition: all ${({ theme }) => theme.duration?.normal || '200ms'} ${({ theme }) => theme.easing?.easeOut || 'ease'};
+
   &:hover:not(:disabled) {
     background: ${({ theme }) => theme.colors.primaryDark};
   }
-  
+
   &:disabled {
-    opacity: 0.6;
+    opacity: 0.4;
     cursor: not-allowed;
   }
 `;
@@ -1134,14 +1136,14 @@ const LoadingMessage = styled.div`
   padding: 40px 20px;
   text-align: center;
   color: ${({ theme }) => theme.colors.textSecondary};
-  font-size: 14px;
+  font-size: ${({ theme }) => theme.typography.body2.fontSize};
 `;
 
 const EmptyMessage = styled.div`
   padding: 60px 20px;
   text-align: center;
   color: ${({ theme }) => theme.colors.textLight};
-  font-size: 14px;
+  font-size: ${({ theme }) => theme.typography.body2.fontSize};
 `;
 
 const ImageModal = styled.div`
@@ -1179,12 +1181,12 @@ const ImageModalClose = styled.button`
   color: white;
   font-size: 20px;
   cursor: pointer;
-  border-radius: 50%;
+  border-radius: ${({ theme }) => theme.borderRadius.full};
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease;
-  
+  transition: all ${({ theme }) => theme.duration?.normal || '200ms'} ${({ theme }) => theme.easing?.easeOut || 'ease'};
+
   &:hover {
     background: rgba(255, 255, 255, 0.3);
   }
@@ -1194,7 +1196,7 @@ const ImageModalImage = styled.img`
   max-width: 100%;
   max-height: 90vh;
   object-fit: contain;
-  border-radius: 8px;
+  border-radius: ${({ theme }) => theme.borderRadius.md};
 `;
 
 const DealConfirmSection = styled.div`
@@ -1209,13 +1211,13 @@ const DealConfirmSection = styled.div`
 const DealConfirmButton = styled.button`
   padding: 10px 20px;
   background: ${({ theme }) => theme.colors.primary};
-  color: white;
+  color: ${({ theme }) => theme.colors.textInverse};
   border: none;
-  border-radius: 8px;
-  font-size: 14px;
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  font-size: ${({ theme }) => theme.typography.body2.fontSize};
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all ${({ theme }) => theme.duration?.normal || '200ms'} ${({ theme }) => theme.easing?.easeOut || 'ease'};
 
   &:hover:not(:disabled) {
     background: ${({ theme }) => theme.colors.primaryDark};
@@ -1223,7 +1225,7 @@ const DealConfirmButton = styled.button`
   }
 
   &:disabled {
-    opacity: 0.6;
+    opacity: 0.4;
     cursor: not-allowed;
   }
 `;
@@ -1233,18 +1235,18 @@ const DealConfirmStatus = styled.div`
   background: ${({ theme }) => theme.colors.surfaceElevated};
   color: ${({ theme }) => theme.colors.primary};
   border: 1px solid ${({ theme }) => theme.colors.primary};
-  border-radius: 8px;
-  font-size: 14px;
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  font-size: ${({ theme }) => theme.typography.body2.fontSize};
   font-weight: 600;
 `;
 
 const DealConfirmedBanner = styled.div`
   padding: 12px 16px;
-  background: ${({ theme }) => theme.colors.success || '#10b981'}20;
-  color: ${({ theme }) => theme.colors.success || '#10b981'};
+  background: ${({ theme }) => theme.colors.successSoft};
+  color: ${({ theme }) => theme.colors.success};
   border-top: 1px solid ${({ theme }) => theme.colors.border};
   text-align: center;
-  font-size: 14px;
+  font-size: ${({ theme }) => theme.typography.body2.fontSize};
   font-weight: 600;
 `;
 
@@ -1259,43 +1261,43 @@ const CompleteCareSection = styled.div`
 
 const CompleteCareButton = styled.button`
   padding: 10px 20px;
-  background: ${({ theme }) => theme.colors.success || '#10b981'};
-  color: white;
+  background: ${({ theme }) => theme.colors.success};
+  color: ${({ theme }) => theme.colors.textInverse};
   border: none;
-  border-radius: 8px;
-  font-size: 14px;
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  font-size: ${({ theme }) => theme.typography.body2.fontSize};
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all ${({ theme }) => theme.duration?.normal || '200ms'} ${({ theme }) => theme.easing?.easeOut || 'ease'};
 
   &:hover:not(:disabled) {
-    background: ${({ theme }) => theme.colors.successDark || '#059669'};
+    background: ${({ theme }) => theme.colors.successDark};
     transform: translateY(-1px);
   }
 
   &:disabled {
-    opacity: 0.6;
+    opacity: 0.4;
     cursor: not-allowed;
   }
 `;
 
 const CompletedBanner = styled.div`
   padding: 12px 16px;
-  background: ${({ theme }) => theme.colors.success || '#10b981'}20;
-  color: ${({ theme }) => theme.colors.success || '#10b981'};
+  background: ${({ theme }) => theme.colors.successSoft};
+  color: ${({ theme }) => theme.colors.success};
   border-top: 1px solid ${({ theme }) => theme.colors.border};
   text-align: center;
-  font-size: 14px;
+  font-size: ${({ theme }) => theme.typography.body2.fontSize};
   font-weight: 600;
 `;
 
 const ReviewCompletedBanner = styled.div`
   padding: 12px 16px;
-  background: ${({ theme }) => theme.colors.info || '#3b82f6'}20;
-  color: ${({ theme }) => theme.colors.info || '#3b82f6'};
+  background: ${({ theme }) => theme.colors.infoSoft};
+  color: ${({ theme }) => theme.colors.info};
   border-top: 1px solid ${({ theme }) => theme.colors.border};
   text-align: center;
-  font-size: 14px;
+  font-size: ${({ theme }) => theme.typography.body2.fontSize};
   font-weight: 600;
 `;
 
@@ -1310,22 +1312,22 @@ const ReviewSection = styled.div`
 
 const ReviewButton = styled.button`
   padding: 10px 20px;
-  background: ${({ theme }) => theme.colors.warning || '#f59e0b'};
-  color: white;
+  background: ${({ theme }) => theme.colors.warning};
+  color: ${({ theme }) => theme.colors.textInverse};
   border: none;
-  border-radius: 8px;
-  font-size: 14px;
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  font-size: ${({ theme }) => theme.typography.body2.fontSize};
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all ${({ theme }) => theme.duration?.normal || '200ms'} ${({ theme }) => theme.easing?.easeOut || 'ease'};
 
   &:hover:not(:disabled) {
-    background: ${({ theme }) => theme.colors.warningDark || '#d97706'};
+    background: ${({ theme }) => theme.colors.warningDark};
     transform: translateY(-1px);
   }
 
   &:disabled {
-    opacity: 0.6;
+    opacity: 0.4;
     cursor: not-allowed;
   }
 `;
@@ -1336,7 +1338,7 @@ const ReviewModal = styled.div`
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: ${({ theme }) => theme.colors.overlay};
   z-index: 2000;
   display: flex;
   align-items: center;
@@ -1345,13 +1347,13 @@ const ReviewModal = styled.div`
 `;
 
 const ReviewModalContent = styled.div`
-  background: ${({ theme }) => theme.colors.surface || '#ffffff'};
-  border-radius: 12px;
+  background: ${({ theme }) => theme.colors.surface};
+  border-radius: ${({ theme }) => theme.borderRadius.lg};
   width: 100%;
   max-width: 500px;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  box-shadow: ${({ theme }) => theme.shadows.xl};
 `;
 
 const ReviewModalHeader = styled.div`
@@ -1364,7 +1366,7 @@ const ReviewModalHeader = styled.div`
 
 const ReviewModalTitle = styled.h2`
   margin: 0;
-  font-size: 20px;
+  font-size: ${({ theme }) => theme.typography.h3.fontSize};
   font-weight: 600;
   color: ${({ theme }) => theme.colors.text};
 `;
@@ -1380,8 +1382,8 @@ const ReviewModalClose = styled.button`
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  transition: all 0.2s ease;
+  border-radius: ${({ theme }) => theme.borderRadius.full};
+  transition: all ${({ theme }) => theme.duration?.normal || '200ms'} ${({ theme }) => theme.easing?.easeOut || 'ease'};
 
   &:hover {
     background: ${({ theme }) => theme.colors.surfaceHover};
@@ -1403,7 +1405,7 @@ const ReviewCommentSection = styled.div`
 const ReviewLabel = styled.label`
   display: block;
   margin-bottom: 8px;
-  font-size: 14px;
+  font-size: ${({ theme }) => theme.typography.body2.fontSize};
   font-weight: 600;
   color: ${({ theme }) => theme.colors.text};
 `;
@@ -1422,7 +1424,7 @@ const StarButton = styled.button`
   padding: 0;
   line-height: 1;
   filter: ${({ active }) => active ? 'none' : 'grayscale(100%) opacity(0.3)'};
-  transition: all 0.2s ease;
+  transition: all ${({ theme }) => theme.duration?.normal || '200ms'} ${({ theme }) => theme.easing?.easeOut || 'ease'};
 
   &:hover {
     transform: scale(1.1);
@@ -1431,7 +1433,7 @@ const StarButton = styled.button`
 
 const RatingText = styled.span`
   margin-left: 8px;
-  font-size: 16px;
+  font-size: ${({ theme }) => theme.typography.h3.fontSize};
   font-weight: 600;
   color: ${({ theme }) => theme.colors.text};
 `;
@@ -1439,13 +1441,14 @@ const RatingText = styled.span`
 const ReviewTextarea = styled.textarea`
   width: 100%;
   padding: 12px;
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  border-radius: 8px;
-  font-size: 14px;
+  border: 1.5px solid ${({ theme }) => theme.colors.border};
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  font-size: ${({ theme }) => theme.typography.body2.fontSize};
   font-family: inherit;
   resize: vertical;
   color: ${({ theme }) => theme.colors.text};
   background: ${({ theme }) => theme.colors.background};
+  transition: border-color ${({ theme }) => theme.duration?.normal || '200ms'} ${({ theme }) => theme.easing?.easeOut || 'ease'};
 
   &:focus {
     outline: none;
@@ -1466,11 +1469,11 @@ const ReviewCancelButton = styled.button`
   background: ${({ theme }) => theme.colors.surface};
   color: ${({ theme }) => theme.colors.text};
   border: 1px solid ${({ theme }) => theme.colors.border};
-  border-radius: 8px;
-  font-size: 14px;
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  font-size: ${({ theme }) => theme.typography.body2.fontSize};
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all ${({ theme }) => theme.duration?.normal || '200ms'} ${({ theme }) => theme.easing?.easeOut || 'ease'};
 
   &:hover {
     background: ${({ theme }) => theme.colors.surfaceHover};
@@ -1480,20 +1483,20 @@ const ReviewCancelButton = styled.button`
 const ReviewSubmitButton = styled.button`
   padding: 10px 20px;
   background: ${({ theme }) => theme.colors.primary};
-  color: white;
+  color: ${({ theme }) => theme.colors.textInverse};
   border: none;
-  border-radius: 8px;
-  font-size: 14px;
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  font-size: ${({ theme }) => theme.typography.body2.fontSize};
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all ${({ theme }) => theme.duration?.normal || '200ms'} ${({ theme }) => theme.easing?.easeOut || 'ease'};
 
   &:hover:not(:disabled) {
     background: ${({ theme }) => theme.colors.primaryDark};
   }
 
   &:disabled {
-    opacity: 0.6;
+    opacity: 0.4;
     cursor: not-allowed;
   }
 `;
@@ -1507,14 +1510,14 @@ const ToastNotification = styled.div`
   z-index: 100;
   padding: 10px 20px;
   border-radius: ${({ theme }) => theme.borderRadius.lg};
-  font-size: 13px;
+  font-size: ${({ theme }) => theme.typography.body2.fontSize};
   font-weight: 500;
   white-space: nowrap;
   box-shadow: ${({ theme }) => theme.shadows.md};
   background: ${({ theme, type }) =>
     type === 'success' ? theme.colors.success : theme.colors.error};
-  color: #fff;
-  animation: fadeInDown 0.2s ease;
+  color: ${({ theme }) => theme.colors.textInverse};
+  animation: fadeInDown ${({ theme }) => theme.duration?.normal || '200ms'} ease;
 
   @keyframes fadeInDown {
     from { opacity: 0; transform: translateX(-50%) translateY(-8px); }

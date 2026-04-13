@@ -174,7 +174,7 @@ function AppContent() {
   };
 
   return (
-    <>
+    <AppContainer>
       <PermissionDeniedModal
         isOpen={showGlobalPermissionModal}
         onClose={() => setShowGlobalPermissionModal(false)}
@@ -185,17 +185,19 @@ function AppContent() {
         onCancel={handleEmailVerificationCancel}
         purpose={emailVerificationPurpose}
       />
-      <Navigation
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        user={user}
-      />
-      <MainContent>
-        {renderContent()}
-      </MainContent>
+      <AppLayout>
+        <Navigation
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          user={user}
+        />
+        <ContentArea>
+          {renderContent()}
+        </ContentArea>
+      </AppLayout>
       <ScrollToTopBottom />
       <ChatWidget />
-    </>
+    </AppContainer>
   );
 }
 
@@ -203,10 +205,8 @@ function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <AppContainer>
-          <GlobalStyle />
-          <AppContent />
-        </AppContainer>
+        <GlobalStyle />
+        <AppContent />
       </AuthProvider>
     </ThemeProvider>
   );
@@ -261,15 +261,28 @@ const AppContainer = styled.div`
   transition: all 0.3s ease;
 `;
 
-const MainContent = styled.main`
-  min-height: calc(100vh - 80px);
+const AppLayout = styled.div`
+  display: flex;
+  min-height: 100vh;
+`;
+
+const ContentArea = styled.main`
+  margin-left: 240px;
+  flex: 1;
+  min-height: 100vh;
+  background: ${props => props.theme.colors.background};
+
+  @media (max-width: 768px) {
+    margin-left: 0;
+    padding-bottom: 60px;
+  }
 `;
 
 const AuthContainer = styled.div`
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: calc(100vh - 80px);
+  min-height: 100vh;
   padding: 2rem;
 `;
 
@@ -277,7 +290,7 @@ const LoadingContainer = styled.div`
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: calc(100vh - 80px);
+  min-height: 100vh;
   font-size: 1.2rem;
   color: ${props => props.theme.colors.text};
 `;

@@ -306,7 +306,7 @@ public class Notification {
 **특징**:
 - `BaseTimeEntity`를 상속하지 않음 (`@PrePersist`로 직접 `createdAt` 관리)
 - 읽음 여부: `isRead` 필드로 읽음 상태 관리
-- 관련 엔티티: `relatedId`, `relatedType`으로 다양한 엔티티와 연동
+- 관련 엔티티: `relatedId`, `relatedType` — 댓글 알림 등은 구현상 **게시글·케어요청·실종제보 등 상위 리소스 id**를 넣는 경우가 많음(엔티티 주석은 “게시글/댓글” 포괄 표현)
 
 #### NotificationType (알림 타입)
 ```java
@@ -426,8 +426,8 @@ data: {"idx":1,"userId":1,"type":"BOARD_COMMENT","title":"게시글에 새로운
 ## 5. 트랜잭션 처리
 
 ### 5.1 트랜잭션 전략
-- **알림 생성**: `@Transactional` - 알림 생성과 Redis 저장을 원자적으로 처리 (Redis는 트랜잭션 외부)
-- **읽음 처리**: `@Transactional` - DB 업데이트와 Redis 제거를 원자적으로 처리 (Redis는 트랜잭션 외부)
+- **알림 생성**: `@Transactional` — **JPA `save`만** 같은 트랜잭션에 묶임. `saveToRedis`·`sendNotification`은 그 직후 실행되나 **Redis/SSE는 2PC가 아님**(§3.3)
+- **읽음 처리**: `@Transactional` — DB 갱신 후 Redis 갱신/삭제. Redis 실패 시 DB 롤백 가능성 등은 §3.3과 동일한 분산 한계
 - **조회 메서드**: `@Transactional(readOnly = true)` - 읽기 전용 최적화 (클래스 레벨)
 
 ### 5.2 동시성 제어
@@ -520,7 +520,7 @@ CREATE INDEX fk_notifications_user ON notifications(user_idx);
 - **타입 관리**: `NotificationType` enum으로 알림 타입 관리
 
 ### 8.6 SSE 연결 관리
-- **연결 저장**: `ConcurrentHashMap<Long, SseEmitter>`로 사용자별 연결 저장
+- **연결 저장**: `ConcurrentHashMap<Long, SseEmitter>`로 사용자별 연결 저장 — **`userId`당 마지막 연결만 유지**(같은 계정으로 스트림을 다시 열면 이전 emitter는 맵에서 대체)
 - **자동 정리**: `onCompletion`, `onTimeout`, `onError`로 연결 자동 정리
 - **에러 처리**: 전송 실패 시 연결 제거 및 에러 처리
-- **초기 알림 개수**: 연결 즉시 읽지 않은 알림 개수 전송
+- **초기 알림 개수**: 연결 즉시 읽지 않은 알림 개수 전송 (`getUnreadCount`는 `@Transactional(NOT_SUPPORTED)`)

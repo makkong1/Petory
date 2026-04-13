@@ -704,16 +704,16 @@ export default MissingPetBoardForm;
 const Overlay = styled.div`
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.45);
+  background: ${(props) => props.theme.colors.overlay};
   display: flex;
   align-items: flex-start;
   justify-content: center;
   overflow-y: auto;
   z-index: 1000;
-  padding: 3rem 1rem;
+  padding: ${(props) => props.theme.spacing['5xl']} ${(props) => props.theme.spacing.lg};
 
   @media (max-width: 768px) {
-    padding: 1rem;
+    padding: ${(props) => props.theme.spacing.lg};
   }
 `;
 
@@ -722,7 +722,7 @@ const Modal = styled.div`
   border-radius: ${(props) => props.theme.borderRadius.xl};
   max-width: 880px;
   width: 100%;
-  box-shadow: 0 25px 80px rgba(15, 23, 42, 0.25);
+  box-shadow: ${(props) => props.theme.shadows.xl};
 
   @media (max-width: 768px) {
     max-width: 100%;
@@ -744,13 +744,13 @@ const ModalHeader = styled.div`
 
 const ModalTitle = styled.h2`
   margin: 0;
-  font-size: 1.6rem;
+  font-size: ${(props) => props.theme.typography.h2.fontSize};
 `;
 
 const CloseButton = styled.button`
   border: none;
   background: transparent;
-  font-size: 1.5rem;
+  font-size: ${(props) => props.theme.typography.h2.fontSize};
   cursor: pointer;
   color: ${(props) => props.theme.colors.textSecondary};
 
@@ -798,7 +798,7 @@ const RightCard = styled.div`
 
 const CardTitle = styled.h3`
   margin: 0 0 ${(props) => props.theme.spacing.md} 0;
-  font-size: 1.1rem;
+  font-size: ${(props) => props.theme.typography.h4.fontSize};
   color: ${(props) => props.theme.colors.text};
 `;
 
@@ -808,13 +808,13 @@ const PetSelect = styled.select`
   border-radius: ${(props) => props.theme.borderRadius.md};
   border: 1px solid ${(props) => props.theme.colors.border};
   background: ${(props) => props.theme.colors.surface};
-  font-size: 0.95rem;
+  font-size: ${(props) => props.theme.typography.body1.fontSize};
   margin-bottom: ${(props) => props.theme.spacing.md};
 
   &:focus {
     outline: none;
     border-color: ${(props) => props.theme.colors.primary};
-    box-shadow: 0 0 0 3px rgba(255, 126, 54, 0.2);
+    box-shadow: ${(props) => props.theme.shadows.focus};
   }
 `;
 
@@ -852,7 +852,7 @@ const NoImagePlaceholder = styled.div`
 
 const NoImageText = styled.div`
   color: ${(props) => props.theme.colors.textSecondary};
-  font-size: 0.9rem;
+  font-size: ${(props) => props.theme.typography.body2.fontSize};
 `;
 
 const PetDetails = styled.div`
@@ -862,13 +862,13 @@ const PetDetails = styled.div`
 `;
 
 const PetName = styled.div`
-  font-size: 1.1rem;
+  font-size: ${(props) => props.theme.typography.h4.fontSize};
   font-weight: 600;
   color: ${(props) => props.theme.colors.text};
 `;
 
 const PetDetail = styled.div`
-  font-size: 0.9rem;
+  font-size: ${(props) => props.theme.typography.body2.fontSize};
   color: ${(props) => props.theme.colors.textSecondary};
 `;
 
@@ -899,7 +899,7 @@ const Section = styled.div`
 
 const SectionTitle = styled.h3`
   margin: 0;
-  font-size: 1.2rem;
+  font-size: ${(props) => props.theme.typography.h3.fontSize};
   color: ${(props) => props.theme.colors.text};
 `;
 
@@ -922,16 +922,16 @@ const Field = styled.div`
 `;
 
 const Label = styled.label`
-  font-size: 0.9rem;
+  font-size: ${(props) => props.theme.typography.body2.fontSize};
   color: ${(props) => props.theme.colors.textSecondary};
 `;
 
 const Input = styled.input`
   width: 100%;
-  padding: 0.75rem;
+  padding: ${(props) => props.theme.spacing.md};
   border: 1px solid ${(props) => props.theme.colors.border};
-  border-radius: 8px;
-  font-size: 1rem;
+  border-radius: ${(props) => props.theme.borderRadius.md};
+  font-size: ${(props) => props.theme.typography.body1.fontSize};
   background: ${(props) => props.theme.colors.background};
   color: ${(props) => props.theme.colors.text};
 
@@ -943,10 +943,10 @@ const Input = styled.input`
 
 const Select = styled.select`
   width: 100%;
-  padding: 0.75rem;
+  padding: ${(props) => props.theme.spacing.md};
   border: 1px solid ${(props) => props.theme.colors.border};
-  border-radius: 8px;
-  font-size: 1rem;
+  border-radius: ${(props) => props.theme.borderRadius.md};
+  font-size: ${(props) => props.theme.typography.body1.fontSize};
   background: ${(props) => props.theme.colors.background};
   color: ${(props) => props.theme.colors.text};
 
@@ -958,10 +958,10 @@ const Select = styled.select`
 
 const Textarea = styled.textarea`
   width: 100%;
-  padding: 0.75rem;
+  padding: ${(props) => props.theme.spacing.md};
   border: 1px solid ${(props) => props.theme.colors.border};
-  border-radius: 8px;
-  font-size: 1rem;
+  border-radius: ${(props) => props.theme.borderRadius.md};
+  font-size: ${(props) => props.theme.typography.body1.fontSize};
   background: ${(props) => props.theme.colors.background};
   color: ${(props) => props.theme.colors.text};
   font-family: inherit;
@@ -998,7 +998,7 @@ const FileSelectButton = styled.label.withConfig({
   padding: ${(props) => props.theme.spacing.sm} ${(props) => props.theme.spacing.lg};
   border-radius: ${(props) => props.theme.borderRadius.md};
   background: ${(props) => props.theme.colors.primary};
-  color: #ffffff;
+  color: ${(props) => props.theme.colors.textInverse};
   font-weight: 600;
   cursor: ${(props) => (props.$disabled ? 'not-allowed' : 'pointer')};
   opacity: ${(props) => (props.$disabled ? 0.6 : 1)};
@@ -1024,19 +1024,19 @@ const ClearImageButton = styled.button`
   transition: all 0.2s ease;
 
   &:hover {
-    border-color: ${(props) => props.theme.colors.error || '#e11d48'};
-    color: ${(props) => props.theme.colors.error || '#e11d48'};
+    border-color: ${(props) => props.theme.colors.error};
+    color: ${(props) => props.theme.colors.error};
   }
 `;
 
 const HelperText = styled.span`
-  font-size: 0.85rem;
+  font-size: ${(props) => props.theme.typography.body2.fontSize};
   color: ${(props) => props.theme.colors.textSecondary};
 `;
 
 const ErrorText = styled.span`
-  font-size: 0.85rem;
-  color: ${(props) => props.theme.colors.error || '#e11d48'};
+  font-size: ${(props) => props.theme.typography.body2.fontSize};
+  color: ${(props) => props.theme.colors.error};
 `;
 
 const ManualUrlInput = styled(Input)`
@@ -1068,7 +1068,7 @@ const ButtonRow = styled.div`
 
 const PrimaryButton = styled.button`
   background: ${(props) => props.theme.colors.primary};
-  color: #ffffff;
+  color: ${(props) => props.theme.colors.textInverse};
   border: none;
   border-radius: ${(props) => props.theme.borderRadius.md};
   padding: ${(props) => props.theme.spacing.sm} ${(props) => props.theme.spacing.lg};
@@ -1133,7 +1133,7 @@ const DateInputButton = styled.button`
 `;
 
 const CalendarIcon = styled.span`
-  font-size: 1.2rem;
+  font-size: ${(props) => props.theme.typography.h3.fontSize};
 `;
 
 const DatePickerDropdown = styled.div`
@@ -1141,9 +1141,9 @@ const DatePickerDropdown = styled.div`
   z-index: 2000;
   background: ${(props) => props.theme.colors.surface};
   border: 1px solid ${(props) => props.theme.colors.border};
-  border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
-  padding: 1rem;
+  border-radius: ${(props) => props.theme.borderRadius.lg};
+  box-shadow: ${(props) => props.theme.shadows.xl};
+  padding: ${(props) => props.theme.spacing.lg};
   min-width: 320px;
   max-width: 90vw;
   animation: slideDown 0.2s ease-out;
@@ -1162,20 +1162,19 @@ const DatePickerDropdown = styled.div`
   @media (max-width: 768px) {
     min-width: 280px;
     max-width: 95vw;
-    padding: 0.75rem;
-    left: 50% !important; /* Centered for mobile */
+    padding: ${(props) => props.theme.spacing.md};
+    left: 50% !important;
     transform: translateX(-50%);
-    top: 50% !important; /* Centered for mobile */
-    margin-top: -200px; /* Adjusted for vertical centering */
+    top: 50% !important;
+    margin-top: -200px;
     max-width: 90vw;
-    padding: 0.75rem;
   }
 `;
 
 const CalendarContainer = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: ${(props) => props.theme.spacing.lg};
 `;
 
 const CalendarHeader = styled.div`
@@ -1191,9 +1190,9 @@ const NavButton = styled.button`
   border: none;
   background: ${(props) => props.theme.colors.background};
   color: ${(props) => props.theme.colors.text};
-  border-radius: 6px;
+  border-radius: ${(props) => props.theme.borderRadius.md};
   cursor: pointer;
-  font-size: 1.2rem;
+  font-size: ${(props) => props.theme.typography.h3.fontSize};
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1201,13 +1200,13 @@ const NavButton = styled.button`
 
   &:hover {
     background: ${(props) => props.theme.colors.primary};
-    color: white;
+    color: ${(props) => props.theme.colors.textInverse};
   }
 `;
 
 const MonthYear = styled.div`
   font-weight: 600;
-  font-size: 1.1rem;
+  font-size: ${(props) => props.theme.typography.h4.fontSize};
   color: ${(props) => props.theme.colors.text};
 `;
 
@@ -1220,9 +1219,9 @@ const CalendarGrid = styled.div`
 const CalendarDayHeader = styled.div`
   text-align: center;
   font-weight: 600;
-  font-size: 0.85rem;
+  font-size: ${(props) => props.theme.typography.body2.fontSize};
   color: ${(props) => props.theme.colors.textSecondary};
-  padding: 0.5rem 0;
+  padding: ${(props) => props.theme.spacing.sm} 0;
 `;
 
 const CalendarDay = styled.button`
@@ -1234,13 +1233,13 @@ const CalendarDay = styled.button`
     return 'transparent';
   }};
   color: ${(props) => {
-    if (props.isSelected) return 'white';
+    if (props.isSelected) return props.theme.colors.textInverse;
     if (!props.isCurrentMonth) return props.theme.colors.textSecondary + '60';
     return props.theme.colors.text;
   }};
-  border-radius: 6px;
+  border-radius: ${(props) => props.theme.borderRadius.md};
   cursor: ${(props) => !props.isCurrentMonth ? 'not-allowed' : 'pointer'};
-  font-size: 0.9rem;
+  font-size: ${(props) => props.theme.typography.body2.fontSize};
   font-weight: ${(props) => (props.isToday || props.isSelected) ? '600' : '400'};
   transition: all 0.2s;
   opacity: ${(props) => !props.isCurrentMonth ? 0.5 : 1};
@@ -1262,10 +1261,10 @@ const CalendarDay = styled.button`
 const TimeSelector = styled.div`
   display: flex;
   align-items: center;
-  gap: 1rem;
-  padding: 1rem;
+  gap: ${(props) => props.theme.spacing.lg};
+  padding: ${(props) => props.theme.spacing.lg};
   background: ${(props) => props.theme.colors.background};
-  border-radius: 8px;
+  border-radius: ${(props) => props.theme.borderRadius.md};
   border: 1px solid ${(props) => props.theme.colors.border};
 `;
 
@@ -1282,11 +1281,11 @@ const TimeInputs = styled.div`
 
 const TimeInput = styled.input`
   width: 60px;
-  padding: 0.5rem;
+  padding: ${(props) => props.theme.spacing.sm};
   border: 1px solid ${(props) => props.theme.colors.border};
-  border-radius: 6px;
+  border-radius: ${(props) => props.theme.borderRadius.md};
   text-align: center;
-  font-size: 1rem;
+  font-size: ${(props) => props.theme.typography.body1.fontSize};
   background: ${(props) => props.theme.colors.surface};
   color: ${(props) => props.theme.colors.text};
 
@@ -1297,7 +1296,7 @@ const TimeInput = styled.input`
 `;
 
 const TimeSeparator = styled.span`
-  font-size: 1.2rem;
+  font-size: ${(props) => props.theme.typography.h3.fontSize};
   font-weight: 600;
   color: ${(props) => props.theme.colors.text};
 `;
@@ -1309,11 +1308,11 @@ const DatePickerActions = styled.div`
 `;
 
 const DatePickerButton = styled.button`
-  padding: 0.5rem 1.5rem;
+  padding: ${(props) => props.theme.spacing.sm} ${(props) => props.theme.spacing.xl};
   border: none;
-  border-radius: 6px;
+  border-radius: ${(props) => props.theme.borderRadius.md};
   background: ${(props) => props.theme.colors.primary};
-  color: white;
+  color: ${(props) => props.theme.colors.textInverse};
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
