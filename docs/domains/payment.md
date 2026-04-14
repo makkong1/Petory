@@ -412,14 +412,16 @@ domain/payment/
 **Care 연동**: `CareRequestService`에서 에스크로 지급·환불 실패 시 `CarePaymentException.paymentFailed` / `CarePaymentException.refundFailed`로 래핑(care 도메인 예외, §7.1).
 
 ### 8.3 사용자용 API (`PetCoinController`)
-**참고**: 클래스 단 `@PreAuthorize` 없음, `SecurityConfig`의 `/api/**` 인증 규칙 적용. `getCurrentUser()`는 `Authentication.getName()`을 **로그인 ID(문자열)** 로 보고 `usersRepository.findByIdString`으로 조회 → `UnauthenticatedException`, `UserNotFoundException`
+**인증·현재 사용자**: 클래스 단 `@PreAuthorize`는 없음. `GET` 잔액·거래·상세는 `getCurrentUser()`로 **본인 데이터만** 조회. `getCurrentUser()`는 `Authentication.getName()`을 **로그인 ID(문자열)** 로 보고 `usersRepository.findByIdString`으로 조회 → `UnauthenticatedException`, `UserNotFoundException`.
+
+**변경 (2026-04-14)**: `POST /api/payment/charge`에 **`@PreAuthorize("isAuthenticated()")`** 메서드 단위 부여(명시적 인가). 나머지 엔드포인트는 기존처럼 `SecurityConfig`의 `/api/**` 인증 + 서비스 레벨 본인 검증에 의존.
 
 | 엔드포인트 | Method | 설명 |
 |-----------|--------|------|
 | `GET /api/payment/balance` | GET | 코인 잔액 조회 |
 | `GET /api/payment/transactions` | GET | 거래 내역 조회 (페이징, PageableDefault size=20) |
 | `GET /api/payment/transactions/{id}` | GET | 거래 상세 조회 (상대방 정보 포함, 본인 거래만 조회 가능) |
-| `POST /api/payment/charge` | POST | 코인 충전 (PaymentValidationException.chargeAmountInvalid) |
+| `POST /api/payment/charge` | POST | 코인 충전 (`@PreAuthorize("isAuthenticated()")`, `PaymentValidationException.chargeAmountInvalid`) |
 
 ### 8.4 관리자용 API (`AdminPaymentController`, ADMIN/MASTER)
 | 엔드포인트 | Method | 설명 |
@@ -446,6 +448,10 @@ domain/payment/
 - 나머지 로직(차감, 지급, 환불)은 그대로 사용 가능
 
 ## 10. 보안 고려사항
+
+### 10.0 API 인가 (2026-04-14 반영)
+- 사용자 충전 `POST /api/payment/charge`는 **`@PreAuthorize("isAuthenticated()")`** 로 메서드에 명시됨.
+- 관리자 API는 `AdminPaymentController` 클래스 레벨 `hasAnyRole('ADMIN', 'MASTER')` 유지.
 
 ### 10.1 트랜잭션 안전성
 - 모든 코인 거래는 `@Transactional`로 보호됨
@@ -479,6 +485,7 @@ domain/payment/
 
 ## 관련 문서
 
-- **코드 리뷰 (2026-04-14)**: `docs/refactoring/care/care-payment-code-review-2026-04-14.md` — @PreAuthorize 누락, 트랜잭션 범위 과대 등 Critical 6건
+- **코드 리뷰 (2026-04-14)**: `docs/refactoring/care/care-payment-code-review-2026-04-14.md`
+- **리팩토링 기록**(위치 → 개선 코드 → 완료): `docs/refactoring/care/care-payment-refactoring-2026-04-14.md`
 - **Race Condition 분석**: `docs/refactoring/payment/petcoin-service-race-condition.md`
 - **성능 최적화**: `docs/refactoring/payment/payment-backend-performance-optimization.md`

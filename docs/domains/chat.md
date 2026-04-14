@@ -78,14 +78,15 @@ Chat 도메인은 실시간 채팅 기능을 제공하는 도메인입니다. We
 
 ### 3.1 채팅방 생성
 
-**구현 위치**: `ConversationService.createConversation()` 
+**구현 위치**: `ConversationCreatorService.createConversation()` (`REQUIRES_NEW`), `ConversationService`는 위임·도메인 조합만 담당.
 
 **핵심 로직**:
 - **참여자 유효성 검증**: 사용자 존재 확인, 탈퇴한 사용자 제외
+- **요청 주체 검증**: JWT principal(`actingUserId`)이 참여자 목록에 포함되어야 함(범용 생성·직접 채팅·실종 채팅 등)
 - **그룹 채팅(MEETUP)**: 최소 1명 허용, 1:1 채팅은 최소 2명 필요
 - **relatedType/relatedIdx 기존 채팅방 확인**: 펫케어 요청 등 연관 엔티티가 있으면 기존 채팅방 확인
 - **1:1 채팅 중복 방지**: 기존 채팅방이 있으면 재사용, relatedType/relatedIdx 업데이트 지원 (기존 일반 채팅방을 펫케어 채팅방으로 변환 가능)
-- **별도 트랜잭션**: `REQUIRES_NEW`로 실패해도 호출한 트랜잭션에 영향 없음
+- **별도 트랜잭션**: `ConversationCreatorService`에서 `REQUIRES_NEW`로 실패해도 호출한 트랜잭션에 영향 없음(동일 클래스 self-invocation 문제 회피)
 - **참여자 추가**: 각 참여자에 대해 `ConversationParticipant` 생성 (role 기본값: MEMBER, unreadCount: 0, status: ACTIVE, joinedAt: 현재 시간)
 
 ### 3.2 메시지 전송
@@ -194,7 +195,8 @@ public void markAsRead(Long conversationIdx, Long userId, Long lastMessageIdx) {
 - **메시지 필터링**: 재참여한 경우 `joinedAt` 이후 메시지만 조회 (`findByConversationIdxAndCreatedAtAfterOrderByCreatedAtDesc`)
 - **페이징**: 기본값 page=0, size=50, 최신순 정렬 (DESC)
 - **재참여 처리**: `joinMeetupChat()`에서 LEFT 상태였던 참여자가 재참여 시 `lastReadMessage`, `lastReadAt`, `unreadCount` 초기화
-- **참고**: `getMessagesBefore()`(커서 API)는 참여자 `joinedAt` 기준 필터를 적용하지 않음 — 재참여 사용자도 과거 시점 이전 메시지를 커서로 조회할 수 있음(클라이언트 정책 또는 추후 서버 필터 검토)
+- **참고**: `getMessagesBefore()`(커서 API)는 참여자 `joinedAt` 기준 필터를 적용하지 않음 — 재참여 사용자도 과거 시점 이전 메시지를 커서로 조회할 수 있음(클라이언트 정책 또는 추후 서버 필터 검토).
+- **보안(2026-04-14 반영)**: `getMessagesBefore()`·`searchMessages()`·`getMessages()`·`getUnreadCount()` 등은 **ACTIVE 참여자** 검증 후에만 동작한다.
 
 ### 3.5 실종제보 채팅방 생성
 
@@ -204,6 +206,7 @@ public void markAsRead(Long conversationIdx, Long userId, Long lastMessageIdx) {
 - **제보자-목격자 조합별 개별 채팅방**: 같은 제보에 대해 여러 목격자가 있을 수 있으므로 조합별로 개별 채팅방 생성
 - **기존 채팅방 확인**: 제보자와 목격자가 모두 참여한 기존 채팅방이 있으면 재사용
 - **본인 제보 체크**: 목격자가 제보자와 같은 경우 예외 발생
+- **성능**: 기존 방 탐색은 `conversationIdx` 목록에 대해 참가자 **배치 조회** 후 메모리에서 `(reporterId, witnessId)` 매칭으로 N+1을 제거함.
 
 ### 3.6 산책모임 채팅방 관리
 
@@ -366,9 +369,9 @@ domain/chat/
 | `ConversationNotFoundException` | 채팅방 조회 실패 |
 | `ConversationParticipantNotFoundException` | 참여자 조회 실패 |
 | `ChatMessageNotFoundException` | 메시지 조회 실패 (deleteMessage) |
-| `ChatForbiddenException` | notParticipant, notActiveParticipant, ownMessageOnly, deletedUserCannotSend |
+| `ChatForbiddenException` | notParticipant, notActiveParticipant, ownMessageOnly, deletedUserCannotSend, notAllowedToCreateConversation, notCareApplicationParty |
 | `ChatConflictException` | 채팅방 중복 등 충돌 |
-| `ChatValidationException` | invalidConversation, minParticipantsRequired, ownReportCannotChat, notCareConversation |
+| `ChatValidationException` | invalidConversation, minParticipantsRequired, ownReportCannotChat, notCareConversation, cannotChatWithSelf |
 | `UserNotFoundException` | 사용자 조회 실패 |
 
 ### 4.4 도메인 연관관계
@@ -391,17 +394,17 @@ graph TD
 | 메서드 | 설명 | 주요 로직 |
 |--------|------|-----------|
 | `getMyConversations()` | 내 채팅방 목록 조회 | N+1 문제 해결을 위한 배치 조회 사용 |
-| `getConversation()` | 채팅방 상세 조회 | 참여자 확인, 탈퇴한 사용자 체크 |
-| `createConversation()` | 채팅방 생성 (범용) | 기존 채팅방 확인, 참여자 유효성 검증, REQUIRES_NEW 트랜잭션 |
-| `createCareRequestConversation()` | 펫케어 채팅방 생성 | `RelatedType.CARE_APPLICATION` 사용 |
-| `getOrCreateDirectConversation()` | 1:1 채팅방 생성/조회 | 기존 채팅방 재사용 |
-| `createMissingPetChat()` | 실종제보 채팅방 생성 | 제보자-목격자 조합별 개별 채팅방 |
+| `getConversation()` | 채팅방 상세 조회 | ACTIVE 참여자 확인, 탈퇴한 사용자 체크 |
+| `createConversation()` | 채팅방 생성 (범용) | `actingUserId` 포함 검증 후 `ConversationCreatorService`에 위임 |
+| `createCareRequestConversation()` | 펫케어 채팅방 생성 | `CareApplication` 로드 후 현재 사용자가 요청자·제공자인지 검증, `RelatedType.CARE_APPLICATION` |
+| `getOrCreateDirectConversation()` | 1:1 채팅방 생성/조회 | 현재 사용자 + 상대만 허용, 기존 채팅방 재사용 |
+| `createMissingPetChat()` | 실종제보 채팅방 생성 | 제보자-목격자 조합별 개별 채팅방, 참가자 배치 조회 |
 | `joinMeetupChat()` | 산책모임 채팅방 참여 | 재참여 시 이전 대화 내용 못 보도록 초기화 |
 | `leaveMeetupChat()` | 산책모임 채팅방 나가기 | 참여자 상태만 LEFT로 변경 |
 | `getMeetupChatParticipantCount()` | 산책모임 채팅방 참여 인원 수 조회 | 활성 참여자 수 조회 |
 | `leaveConversation()` | 채팅방 나가기 | 참여자 상태 변경, 활성 참여자 없으면 채팅방 CLOSED |
 | `deleteConversation()` | 채팅방 삭제 | Soft Delete |
-| `updateConversationStatus()` | 채팅방 상태 변경 | ACTIVE ↔ CLOSED |
+| `updateConversationStatus()` | 채팅방 상태 변경 | ACTIVE 참여자만 허용, ACTIVE ↔ CLOSED |
 | `setParticipantRole()` | 참여자 역할 설정 | REQUIRES_NEW 트랜잭션 |
 | `confirmCareDeal()` | 펫케어 거래 확정 | 양쪽 모두 확정 시 자동 승인 및 상태 변경 |
 
@@ -409,38 +412,46 @@ graph TD
 | 메서드 | 설명 | 주요 로직 |
 |--------|------|-----------|
 | `sendMessage()` | 메시지 전송 | UserNotFoundException, ConversationNotFoundException, ChatForbiddenException(notParticipant, notActiveParticipant, deletedUserCannotSend), incrementUnreadCount |
-| `getMessages()` | 메시지 목록 조회 (페이징) | 재참여 시 joinedAt 이후 메시지만 조회 |
-| `getMessagesBefore()` | 메시지 목록 조회 (커서 기반) | 특정 날짜 이전 메시지 조회 |
+| `getMessages()` | 메시지 목록 조회 (페이징) | ACTIVE 참여자 검증, 재참여 시 joinedAt 이후 메시지만 조회 |
+| `getMessagesBefore()` | 메시지 목록 조회 (커서 기반) | ACTIVE 참여자 검증 후 특정 날짜 이전 메시지 조회 |
 | `markAsRead()` | 메시지 읽음 처리 | ChatForbiddenException.notParticipant, unreadCount 초기화, lastReadMessage 저장 |
 | `deleteMessage()` | 메시지 삭제 | ChatMessageNotFoundException, ChatForbiddenException.ownMessageOnly, 본인 메시지만, Soft Delete |
-| `searchMessages()` | 메시지 검색 | 키워드로 메시지 검색 |
-| `getUnreadCount()` | 읽지 않은 메시지 수 조회 | 참여자의 unreadCount 반환 (Long 타입) |
+| `searchMessages()` | 메시지 검색 | ACTIVE 참여자 검증, MySQL FULLTEXT `MATCH(content)` + idx 재조회 |
+| `getUnreadCount()` | 읽지 않은 메시지 수 조회 | ACTIVE 참여자 검증 후 unreadCount 반환 |
 
 ### 4.6 API 설계
 
 #### REST API
 | 엔드포인트 | Method | 설명 |
 |-----------|--------|------|
-| `/api/chat/conversations` | GET | 내 채팅방 목록 (userId 파라미터) |
-| `/api/chat/conversations/{conversationIdx}` | GET | 채팅방 상세 (userId 파라미터) |
-| `/api/chat/conversations` | POST | 채팅방 생성 (범용) |
-| `/api/chat/conversations/care-request` | POST | 펫케어 채팅방 생성 (careApplicationIdx, requesterId, providerId 파라미터) |
-| `/api/chat/conversations/direct` | POST | 1:1 채팅방 생성/조회 (user1Id, user2Id 파라미터) |
-| `/api/chat/conversations/{conversationIdx}/leave` | POST | 채팅방 나가기 (userId 파라미터, 응답: 204 No Content) |
-| `/api/chat/conversations/{conversationIdx}` | DELETE | 채팅방 삭제 (userId 파라미터, 응답: 204 No Content) |
-| `/api/chat/conversations/{conversationIdx}/status` | PATCH | 채팅방 상태 변경 (status 파라미터, ConversationStatus.valueOf - 잘못된 값 시 IllegalArgumentException) |
-| `/api/chat/conversations/meetup/{meetupIdx}/join` | POST | 산책모임 채팅방 참여 (userId 파라미터) |
+| `/api/chat/conversations` | GET | 내 채팅방 목록 (**JWT principal = 사용자 idx**, 쿼리 파라미터 없음) |
+| `/api/chat/conversations/{conversationIdx}` | GET | 채팅방 상세 (동일) |
+| `/api/chat/conversations` | POST | 채팅방 생성 (범용). 요청 본문의 `participantUserIds`에 로그인 사용자가 포함되어야 함 |
+| `/api/chat/conversations/care-request` | POST | 펫케어 채팅방 생성 (`careApplicationIdx`만; 당사자 여부는 `CareApplication` 기준 서버 검증) |
+| `/api/chat/conversations/direct` | POST | 1:1 채팅방 생성/조회 (`otherUserId`만; 로그인 사용자는 토큰에서 결정) |
+| `/api/chat/conversations/{conversationIdx}/leave` | POST | 채팅방 나가기 (응답: 204 No Content) |
+| `/api/chat/conversations/{conversationIdx}` | DELETE | 채팅방 삭제 (응답: 204 No Content) |
+| `/api/chat/conversations/{conversationIdx}/status` | PATCH | 채팅방 상태 변경 (`status` 파라미터, **ACTIVE 참여자**만) |
+| `/api/chat/conversations/meetup/{meetupIdx}/join` | POST | 산책모임 채팅방 참여 |
 | `/api/chat/conversations/meetup/{meetupIdx}/participant-count` | GET | 산책모임 채팅방 참여 인원 수 조회 (응답: Integer) |
-| `/api/chat/conversations/{conversationIdx}/confirm-deal` | POST | 펫케어 거래 확정 (userId 파라미터, 양쪽 모두 확정 시 자동 승인, 응답: 204 No Content) |
-| `/api/chat/messages` | POST | 메시지 전송 (senderIdx 파라미터, RequestBody: SendMessageRequest) |
-| `/api/chat/messages/conversation/{conversationIdx}` | GET | 메시지 목록 조회 (페이징, userId 파라미터, page 기본값 0, size 기본값 50) |
-| `/api/chat/messages/conversation/{conversationIdx}/before` | GET | 메시지 목록 조회 (커서 기반, beforeDate 파라미터 ISO 형식, size 기본값 50, userId 없음) |
-| `/api/chat/messages/conversation/{conversationIdx}/read` | POST | 메시지 읽음 처리 (userId, lastMessageIdx 파라미터, 응답: 204 No Content) |
-| `/api/chat/messages/{messageIdx}` | DELETE | 메시지 삭제 (userId 파라미터, 응답: 204 No Content) |
-| `/api/chat/messages/conversation/{conversationIdx}/search` | GET | 메시지 검색 (`keyword` 필수) |
-| `/api/chat/messages/conversation/{conversationIdx}/unread-count` | GET | 읽지 않은 메시지 수 조회 (userId 파라미터, 응답: Long) |
+| `/api/chat/conversations/{conversationIdx}/confirm-deal` | POST | 펫케어 거래 확정 (양쪽 모두 확정 시 자동 승인, 응답: 204 No Content) |
+| `/api/chat/messages` | POST | 메시지 전송 (RequestBody: `SendMessageRequest`; 발신자는 JWT principal) |
+| `/api/chat/messages/conversation/{conversationIdx}` | GET | 메시지 목록 조회 (페이징, page 기본값 0, size 기본값 50) |
+| `/api/chat/messages/conversation/{conversationIdx}/before` | GET | 메시지 목록 조회 (커서 기반, beforeDate ISO, size 기본값 50) |
+| `/api/chat/messages/conversation/{conversationIdx}/read` | POST | 메시지 읽음 처리 (`lastMessageIdx` 선택, 응답: 204 No Content) |
+| `/api/chat/messages/{messageIdx}` | DELETE | 메시지 삭제 (응답: 204 No Content) |
+| `/api/chat/messages/conversation/{conversationIdx}/search` | GET | 메시지 검색 (`keyword` 필수, FULLTEXT 인덱스 전제) |
+| `/api/chat/messages/conversation/{conversationIdx}/unread-count` | GET | 읽지 않은 메시지 수 조회 (응답: Long) |
+| `/api/missing-pets/{boardIdx}/start-chat` | POST | 실종 채팅 시작 (**목격자 = JWT principal**, `witnessId` 파라미터 없음) |
 
-**보안 참고**: `SecurityConfig`에서 `/api/**`는 인증 필요. 채팅 REST API는 컨트롤러에 `@PreAuthorize("isAuthenticated()")`가 붙어 있습니다. WebSocket 엔드포인트(`/ws/**` 등)는 핸드셰이크는 허용되나, **JWT는 인터셉터에서 검증**합니다(프로젝트 설정과 동일 전제).
+**보안 참고 (2026-04-14 현행)**:
+
+- 채팅 REST는 사용자 식별을 **SecurityContext principal(Long 문자열)** 에서만 취한다. `userId`/`senderIdx` 등 클라이언트 스푸핑 파라미터는 제거됨.
+- 메시지 조회·커서·검색·읽음·삭제·unread-count는 **ACTIVE 참여자** 검증 후에만 수행한다.
+- `PATCH .../conversations/{id}/status`는 **ACTIVE 참여자**만 호출 가능.
+- **WebSocket**(`/ws/**` 등): 핸드셰이크 후 **JWT 인터셉터 검증** 전제. `ChatWebSocketController`는 `Principal`으로 발신자를 서버가 결정한다.
+
+상세·점수판·우선순위: `docs/refactoring/chat/chat-code-review-2026-04-14.md`.
 
 #### WebSocket API
 | 엔드포인트 | Method | 설명 |
@@ -479,11 +490,12 @@ graph TD
 ## 5. 트랜잭션 처리
 
 ### 5.1 트랜잭션 전략
-- **채팅방 생성**: `@Transactional(propagation = Propagation.REQUIRES_NEW)` - 실패해도 호출한 트랜잭션에 영향 없음
+- **채팅방 생성**: `createConversation()`에 `@Transactional(propagation = Propagation.REQUIRES_NEW)`가 선언되어 있으나, **`ConversationService` 내부의 `this.createConversation(...)` 호출(self-invocation)은 Spring AOP 프록시를 거치지 않아 `REQUIRES_NEW`가 적용되지 않을 수 있음** — 의도(별도 트랜잭션)와 실제가 다를 수 있음. 개선은 별도 `@Service` 분리 등(`chat-code-review` Critical §4).
+- **채팅방 생성(의도 문구)**: 주석상으로는 실패해도 호출한 트랜잭션에 영향 없도록 설계
 - **메시지 전송**: `@Transactional` - 메시지 저장, 원자적 unreadCount 증가, 메타데이터 업데이트를 원자적으로 처리
 - **읽음 처리**: `@Transactional` - unreadCount 초기화, lastReadMessage 저장을 원자적으로 처리 (Repository의 markAsRead() 미사용, Service에서 직접 업데이트)
 - **거래 확정**: `@Transactional` - 양쪽 모두 확정 확인, CareApplication 생성/승인, CareRequest 상태 변경을 원자적으로 처리
-- **조회 메서드**: `@Transactional(readOnly = true)` - 읽기 전용 최적화 (클래스 레벨)
+- **조회 메서드**: `ChatMessageService`는 클래스 레벨 `@Transactional(readOnly = true)`. `ConversationService`는 클래스 레벨 readOnly가 없고 메서드별로 상이함(리뷰 Warning 참고).
 
 ### 5.2 동시성 제어
 - **읽지 않은 메시지 수 증가**: `@Modifying @Query`로 DB 레벨 원자적 증가 (`incrementUnreadCount()`)
@@ -535,7 +547,7 @@ CREATE UNIQUE INDEX uk_participant_conversation_user ON conversationparticipant(
 **chatmessage 테이블**:
 ```sql
 -- 내용 검색 (Full-Text)
-CREATE FULLTEXT INDEX idx_chat_message_content ON chatmessage(content);
+CREATE FULLTEXT INDEX idx_chat_message_content ON chatmessage(content) WITH PARSER ngram;
 
 -- 채팅방별 메시지 조회 (시간순)
 CREATE INDEX idx_chat_message_conversation_created ON chatmessage(conversation_idx, created_at);
@@ -612,7 +624,8 @@ CREATE INDEX reply_to_message_idx ON chatmessage(reply_to_message_idx);
 - **인덱스 전략**: 자주 조회되는 컬럼 조합 인덱싱
 - **원자적 증가**: `incrementUnreadCount()`로 DB 레벨에서 읽지 않은 메시지 수 증가하여 Lost Update 문제 해결
 - **재참여 최적화**: `joinedAt` 이후 메시지만 조회하여 불필요한 데이터 로딩 방지
-- **트랜잭션 분리**: 채팅방 생성 시 `REQUIRES_NEW`로 실패해도 호출한 트랜잭션에 영향 없음
+- **트랜잭션 분리(의도)**: 채팅방 생성에 `REQUIRES_NEW` 선언 — **실효 여부는 self-invocation 여부에 따라 달라질 수 있음**(위 5.1 참고)
+- **알려진 N+1**: `createMissingPetChat()` 기존 방 탐색 루프에서 참가자 조회 반복 가능
 
 ### 8.5 엔티티 설계 특징
 - **BaseTimeEntity 사용**: `ChatMessage`는 `BaseTimeEntity`를 상속받음 (`createdAt`, `updatedAt` 자동 관리)
@@ -621,4 +634,14 @@ CREATE INDEX reply_to_message_idx ON chatmessage(reply_to_message_idx);
 - **재참여 지원**: `joinedAt`, `leftAt`, `lastReadMessage`를 통한 재참여 처리
 - **거래 확정**: 펫케어 채팅방에서 `dealConfirmed`, `dealConfirmedAt` 필드로 거래 확정 상태 관리
 - **MessageReadStatus**: 제거됨 (성능 문제 및 불필요한 로직, 참여자의 unreadCount와 lastReadMessage만으로 충분)
+
+---
+
+## 9. 관련 문서
+
+- **코드 리뷰 (룰 기반, Critical/Warning)**: `docs/refactoring/chat/chat-code-review-2026-04-14.md`
+- **보안·트랜잭션·검색 정리 (2026-04-14)**: `docs/refactoring/chat/chat-backend-security-transaction-2026-04-14.md`
+- **채팅 아키텍처**: `docs/architecture/채팅 시스템 설계.md`
+- **예외 처리**: `docs/refactoring/exception/chat/채팅예외처리.md`
+- **DB 하이라이트**: `docs/db_concept/db-concept-highlights-chat.md`
 
