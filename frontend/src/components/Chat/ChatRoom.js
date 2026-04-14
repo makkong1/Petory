@@ -54,7 +54,7 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
 
     setLoading(true);
     try {
-      const data = await getMessages(conversationIdx, user.idx, 0, 100);
+      const data = await getMessages(conversationIdx, 0, 100);
       const messagesList = data.content || data || [];
       // 백엔드에서 DESC로 정렬되어 최신부터 오므로, reverse()로 오래된 것부터 최신 순서로 변경 (최신이 맨 아래)
       const sortedMessages = [...messagesList].reverse();
@@ -63,7 +63,7 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
       // 읽음 처리
       if (sortedMessages.length > 0) {
         const lastMessage = sortedMessages[sortedMessages.length - 1];
-        await markAsRead(conversationIdx, user.idx, lastMessage.idx);
+        await markAsRead(conversationIdx, lastMessage.idx);
       }
     } catch (error) {
       console.error('메시지 조회 실패:', error);
@@ -78,7 +78,7 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
     if (!conversationIdx || !user?.idx) return;
 
     try {
-      const data = await getConversation(conversationIdx, user.idx);
+      const data = await getConversation(conversationIdx);
       setConversation(data);
       // 내가 거래 확정했는지 확인
       const myParticipant = data?.participants?.find(p => p.userIdx === user.idx);
@@ -177,7 +177,7 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
 
               // 읽음 처리 (내가 보낸 메시지가 아닌 경우)
               if (messageData.senderIdx !== user.idx) {
-                markAsRead(conversationIdx, user.idx, messageData.idx).catch(err => {
+                markAsRead(conversationIdx, messageData.idx).catch(err => {
                   console.error('읽음 처리 실패:', err);
                 });
               }
@@ -250,12 +250,12 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
           },
         });
 
-        await markAsRead(conversationIdx, user.idx, null);
+        await markAsRead(conversationIdx, null);
       } else {
         // HTTP API로 폴백
-        const newMessage = await sendMessage(conversationIdx, user.idx, imageUrl, 'IMAGE');
+        const newMessage = await sendMessage(conversationIdx, imageUrl, 'IMAGE');
         setMessages(prev => [...prev, newMessage]);
-        await markAsRead(conversationIdx, user.idx, newMessage.idx);
+        await markAsRead(conversationIdx, newMessage.idx);
       }
     } catch (error) {
       console.error('이미지 업로드 실패:', error);
@@ -294,12 +294,12 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
         });
 
         // 읽음 처리 (내가 보낸 메시지)
-        await markAsRead(conversationIdx, user.idx, null);
+        await markAsRead(conversationIdx, null);
       } else {
         // WebSocket이 연결되지 않은 경우 HTTP API로 폴백
-        const newMessage = await sendMessage(conversationIdx, user.idx, content);
+        const newMessage = await sendMessage(conversationIdx, content);
         setMessages(prev => [...prev, newMessage]);
-        await markAsRead(conversationIdx, user.idx, newMessage.idx);
+        await markAsRead(conversationIdx, newMessage.idx);
       }
     } catch (error) {
       console.error('메시지 전송 실패:', error);
@@ -359,7 +359,7 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
     }
 
     try {
-      await leaveConversation(conversationIdx, user.idx);
+      await leaveConversation(conversationIdx);
       showToast('채팅방에서 나갔습니다.', 'success');
       if (onAction) {
         onAction();
@@ -381,7 +381,7 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
     }
 
     try {
-      await deleteConversation(conversationIdx, user.idx);
+      await deleteConversation(conversationIdx);
       showToast('채팅방이 삭제되었습니다.', 'success');
       if (onAction) {
         onAction();
@@ -404,7 +404,7 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
 
     setConfirmingDeal(true);
     try {
-      await confirmCareDeal(conversationIdx, user.idx);
+      await confirmCareDeal(conversationIdx);
       setDealConfirmed(true);
       // 채팅방 정보 다시 조회
       await fetchConversation();

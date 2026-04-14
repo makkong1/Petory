@@ -7,12 +7,16 @@ import org.springframework.data.domain.Page;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import com.linkup.Petory.domain.chat.dto.ChatMessageDTO;
 import com.linkup.Petory.domain.chat.dto.SendMessageRequest;
 import com.linkup.Petory.domain.chat.entity.MessageType;
+import com.linkup.Petory.domain.chat.exception.ChatValidationException;
 import com.linkup.Petory.domain.chat.service.ChatMessageService;
+import com.linkup.Petory.domain.user.exception.UnauthenticatedException;
 
 import lombok.RequiredArgsConstructor;
 
@@ -23,14 +27,24 @@ public class ChatMessageController {
 
     private final ChatMessageService chatMessageService;
 
+    private Long getCurrentUserId() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || authentication.getPrincipal() == null) {
+            throw new UnauthenticatedException("인증되지 않은 사용자입니다.");
+        }
+        try {
+            return Long.parseLong(authentication.getName());
+        } catch (NumberFormatException e) {
+            throw new ChatValidationException("인증 사용자 식별값이 올바르지 않습니다.");
+        }
+    }
+
     /**
      * 메시지 전송
      */
     @PostMapping
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ChatMessageDTO> sendMessage(
-            @RequestBody SendMessageRequest request,
-            @RequestParam Long senderIdx) {
+    public ResponseEntity<ChatMessageDTO> sendMessage(@RequestBody SendMessageRequest request) {
 
         MessageType messageType = request.messageType() != null
                 ? MessageType.valueOf(request.messageType())
@@ -38,7 +52,7 @@ public class ChatMessageController {
 
         ChatMessageDTO dto = chatMessageService.sendMessage(
                 request.conversationIdx(),
-                senderIdx,
+                getCurrentUserId(),
                 request.content(),
                 messageType);
 
@@ -53,10 +67,9 @@ public class ChatMessageController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Page<ChatMessageDTO>> getMessages(
             @PathVariable Long conversationIdx,
-            @RequestParam Long userId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
-        return ResponseEntity.ok(chatMessageService.getMessages(conversationIdx, userId, page, size));
+        return ResponseEntity.ok(chatMessageService.getMessages(conversationIdx, getCurrentUserId(), page, size));
     }
 
     /**
@@ -68,7 +81,8 @@ public class ChatMessageController {
             @PathVariable Long conversationIdx,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime beforeDate,
             @RequestParam(defaultValue = "50") int size) {
-        return ResponseEntity.ok(chatMessageService.getMessagesBefore(conversationIdx, beforeDate, size));
+        return ResponseEntity.ok(chatMessageService.getMessagesBefore(
+                conversationIdx, getCurrentUserId(), beforeDate, size));
     }
 
     /**
@@ -78,9 +92,8 @@ public class ChatMessageController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Void> markAsRead(
             @PathVariable Long conversationIdx,
-            @RequestParam Long userId,
             @RequestParam(required = false) Long lastMessageIdx) {
-        chatMessageService.markAsRead(conversationIdx, userId, lastMessageIdx);
+        chatMessageService.markAsRead(conversationIdx, getCurrentUserId(), lastMessageIdx);
         return ResponseEntity.noContent().build();
     }
 
@@ -89,10 +102,8 @@ public class ChatMessageController {
      */
     @DeleteMapping("/{messageIdx}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Void> deleteMessage(
-            @PathVariable Long messageIdx,
-            @RequestParam Long userId) {
-        chatMessageService.deleteMessage(messageIdx, userId);
+    public ResponseEntity<Void> deleteMessage(@PathVariable Long messageIdx) {
+        chatMessageService.deleteMessage(messageIdx, getCurrentUserId());
         return ResponseEntity.noContent().build();
     }
 
@@ -104,7 +115,8 @@ public class ChatMessageController {
     public ResponseEntity<List<ChatMessageDTO>> searchMessages(
             @PathVariable Long conversationIdx,
             @RequestParam String keyword) {
-        return ResponseEntity.ok(chatMessageService.searchMessages(conversationIdx, keyword));
+        return ResponseEntity.ok(chatMessageService.searchMessages(
+                conversationIdx, getCurrentUserId(), keyword));
     }
 
     /**
@@ -112,9 +124,7 @@ public class ChatMessageController {
      */
     @GetMapping("/conversation/{conversationIdx}/unread-count")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Long> getUnreadCount(
-            @PathVariable Long conversationIdx,
-            @RequestParam Long userId) {
-        return ResponseEntity.ok(chatMessageService.getUnreadCount(conversationIdx, userId));
+    public ResponseEntity<Long> getUnreadCount(@PathVariable Long conversationIdx) {
+        return ResponseEntity.ok(chatMessageService.getUnreadCount(conversationIdx, getCurrentUserId()));
     }
 }

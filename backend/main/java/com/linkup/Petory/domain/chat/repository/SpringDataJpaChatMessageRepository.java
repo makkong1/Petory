@@ -1,6 +1,7 @@
 package com.linkup.Petory.domain.chat.repository;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 
 import org.springframework.data.domain.Page;
@@ -107,17 +108,22 @@ public interface SpringDataJpaChatMessageRepository extends JpaRepository<ChatMe
            "  )")
     List<ChatMessage> findLatestMessagesByConversationIdxs(@Param("conversationIdxs") List<Long> conversationIdxs);
 
-    @RepositoryMethod("채팅 메시지: 키워드 검색")
-    @Query("SELECT m FROM ChatMessage m " +
-           "JOIN FETCH m.sender s " +
-           "JOIN FETCH m.conversation c " +
-           "WHERE m.conversation.idx = :conversationIdx " +
-           "  AND m.isDeleted = false " +
-           "  AND s.isDeleted = false " +
-           "  AND (m.content LIKE CONCAT('%', :keyword, '%')) " +
-           "ORDER BY m.createdAt DESC")
-    List<ChatMessage> searchMessagesByKeyword(
-        @Param("conversationIdx") Long conversationIdx,
-        @Param("keyword") String keyword);
+    @RepositoryMethod("채팅 메시지: FULLTEXT 검색 — idx 목록 (인덱스 docs/migration/db/indexes.sql)")
+    @Query(value = "SELECT m.idx FROM chatmessage m "
+            + "INNER JOIN users s ON s.idx = m.sender_idx "
+            + "WHERE m.conversation_idx = :conversationIdx "
+            + "AND (m.is_deleted IS NULL OR m.is_deleted = 0) "
+            + "AND (s.is_deleted IS NULL OR s.is_deleted = 0) "
+            + "AND MATCH(m.content) AGAINST(:keyword IN NATURAL LANGUAGE MODE) "
+            + "ORDER BY m.created_at DESC",
+            nativeQuery = true)
+    List<Long> findIdxByFulltextContent(
+            @Param("conversationIdx") Long conversationIdx,
+            @Param("keyword") String keyword);
+
+    @RepositoryMethod("채팅 메시지: idx 목록으로 발신자 FETCH 조회")
+    @Query("SELECT DISTINCT m FROM ChatMessage m JOIN FETCH m.sender s LEFT JOIN FETCH m.replyToMessage "
+            + "WHERE m.idx IN :ids")
+    List<ChatMessage> findByIdxInWithAssociations(@Param("ids") Collection<Long> ids);
 }
 

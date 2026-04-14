@@ -31,4 +31,12 @@ public class ChatForbiddenException extends ApiException {
     public static ChatForbiddenException deletedUserCannotSend() {
         return new ChatForbiddenException("탈퇴한 사용자는 메시지를 보낼 수 없습니다.");
     }
+
+    public static ChatForbiddenException notAllowedToCreateConversation() {
+        return new ChatForbiddenException("채팅방 생성 요청에는 로그인한 사용자가 참여자 목록에 포함되어야 합니다.");
+    }
+
+    public static ChatForbiddenException notCareApplicationParty() {
+        return new ChatForbiddenException("해당 케어 지원의 요청자 또는 제공자만 채팅방을 생성할 수 있습니다.");
+    }
 }

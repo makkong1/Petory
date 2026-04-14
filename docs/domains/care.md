@@ -164,13 +164,14 @@ public CareRequestDTO updateCareRequest(Long idx, CareRequestDTO dto, Long curre
 **구현 위치**: `CareRequestService.updateStatus()`
 
 **핵심 로직**:
-1. 권한 확인 (작성자 또는 승인된 제공자만 가능)
-2. 상태 변경
-3. **펫코인 지급 처리** (상태가 `COMPLETED`로 변경될 때):
+1. 요청 조회 후 **`isDeleted == true`이면 `CareRequestNotFoundException`** (소프트 삭제된 요청은 상태 변경 불가)
+2. 권한 확인 (작성자 또는 승인된 제공자만 가능)
+3. 상태 변경
+4. **펫코인 지급 처리** (상태가 `COMPLETED`로 변경될 때):
    - 에스크로 조회 (`findByCareRequestForUpdate` - 비관적 락)
    - 에스크로 상태가 `HOLD`인 경우: 제공자에게 코인 지급
    - 상세 내용은 [Payment 도메인 문서](../domains/payment.md) 참조
-4. **펫코인 환불 처리** (상태가 `CANCELLED`로 변경될 때): 요청자에게 환불
+5. **펫코인 환불 처리** (상태가 `CANCELLED`로 변경될 때): 요청자에게 환불
 
 #### 로직 4-1: 상태 변경 권한 체크
 ```java
@@ -178,7 +179,9 @@ public CareRequestDTO updateCareRequest(Long idx, CareRequestDTO dto, Long curre
 @Transactional
 public CareRequestDTO updateStatus(Long idx, String status, Long currentUserId) {
     CareRequest request = careRequestRepository.findByIdWithApplications(idx).orElseThrow();
-    
+    if (Boolean.TRUE.equals(request.getIsDeleted())) {
+        throw new CareRequestNotFoundException();
+    }
     // 관리자는 권한 검증 우회
     if (!isAdmin()) {
         // 작성자 또는 승인된 제공자만 상태 변경 가능
@@ -284,11 +287,11 @@ public CareRequestCommentDTO addComment(Long careRequestId, CareRequestCommentDT
 | `getNearby()` | 반경 기반 근처 요청 (지도) | `radiusKm`, `limit` — 서비스에서 `limit`을 1~500으로 클램프 (`CareRequestController` 기본 `radius`=5km, `limit`=200) |
 | `getCareRequestsWithPaging()` | 요청 목록 조회 (페이징) | 상태/위치 필터링, 작성자 활성 상태 확인 |
 | `getAllCareRequests()` | 요청 목록 조회 (관리자용) | 페이징 없음 |
-| `getCareRequest()` | 단일 요청 조회 | 펫 정보 포함 조회 |
+| `getCareRequest()` | 단일 요청 조회 | `findByIdWithApplications`, **`isDeleted`면 NotFound** (단건과 동일 정책) |
 | `updateCareRequest()` | 요청 수정 | 작성자 확인 (관리자 우회), 펫 정보 업데이트/연결 해제 지원, 펫 소유자 확인 |
 | `deleteCareRequest()` | 요청 삭제 | 작성자 확인 (관리자 우회), Soft Delete |
-| `getMyCareRequests()` | 내 요청 목록 | 사용자별 요청 조회 |
-| `updateStatus()` | 상태 변경 | 작성자 또는 승인된 제공자 확인 (관리자 우회), OPEN → IN_PROGRESS → COMPLETED, CANCELLED 시 환불 |
+| `getMyCareRequests()` | 내 요청 목록 | `userId` 인자로 조회 (호출자는 컨트롤러에서 **토큰 기준 userId**만 전달) |
+| `updateStatus()` | 상태 변경 | **삭제된 요청 거부**, 작성자 또는 승인된 제공자 확인 (관리자 우회), `COMPLETED`/`CANCELLED` 시 에스크로 |
 | `searchCareRequestsWithPaging()` | 요청 검색 (페이징) | `searchWithPaging` (제목·설명, 활성 작성자만) |
 | `searchCareRequests()` | 요청 검색 (비페이징) | 레거시/내부용 — REST 컨트롤러 미연결 |
 
@@ -302,10 +305,10 @@ public CareRequestCommentDTO addComment(Long careRequestId, CareRequestCommentDT
 #### CareReviewService
 | 메서드 | 설명 | 주요 로직 |
 |--------|------|-----------|
-| `createReview()` | 리뷰 작성 | CareApplication ACCEPTED 상태 확인, 중복 리뷰 방지, 요청자만 작성 가능 |
-| `getReviewsByReviewee()` | 리뷰 대상별 리뷰 목록 조회 | 특정 사용자(제공자)에 대한 리뷰 목록 |
-| `getReviewsByReviewer()` | 리뷰 작성자별 리뷰 목록 조회 | 특정 사용자가 작성한 리뷰 목록 |
-| `getAverageRating()` | 평균 평점 조회 | 리뷰 목록에서 평균 계산 (캐싱 없음) |
+| `createReview()` | 리뷰 작성 | ACCEPTED 검증·중복 방지·요청자만; **`save` 시 `DataIntegrityViolationException` → `CareConflictException.alreadyReviewed()`** |
+| `getReviewsByReviewee()` | 리뷰 대상별 리뷰 목록 조회 | `@Transactional(readOnly = true)` |
+| `getReviewsByReviewer()` | 리뷰 작성자별 리뷰 목록 조회 | `@Transactional(readOnly = true)` |
+| `getAverageRating()` | 평균 평점 조회 | `@Transactional(readOnly = true)`, 리뷰 목록에서 평균 계산 |
 | `getReviewsWithAverage()` | 리뷰+평균+개수 1회 조회 | UserProfileController용, 2쿼리 → 1쿼리 |
 
 ### 2.3 트랜잭션 처리
@@ -328,7 +331,7 @@ public CareRequestCommentDTO addComment(Long careRequestId, CareRequestCommentDT
   - `CareRequestNotFoundException`: 요청을 찾을 수 없는 경우
   - `CareForbiddenException`: 권한 없음 (ownRequestOnly, petOwnerOnly, ownerOrApprovedProvider, commentNotAllowed, requesterOnly)
   - `CareValidationException`: offeredCoins 유효성, careApplicationId 필수 등
-  - `CareConflictException`: 이미 리뷰 작성함 (alreadyReviewed)
+  - `CareConflictException`: 이미 리뷰 작성함 (`alreadyReviewed`) — `exists` 체크 이후 **`save`에서 DB 유니크 위반 시에도** 동일 예외로 매핑
   - `CarePaymentException`: 코인 지급/환불 실패
   - `CareApplicationNotFoundException`, `CareCommentNotFoundException`, `CareCommentNotBelongException`
   - `EmailVerificationRequiredException`: 이메일 인증 필요
@@ -502,22 +505,26 @@ erDiagram
 |-----------|--------|------|
 | `/api/care-requests` | GET | 요청 목록 (페이징, status, location 파라미터) → `CareRequestPageResponseDTO` |
 | `/api/care-requests/{id}` | GET | 단일 요청 조회 |
-| `/api/care-requests` | POST | 요청 생성 (이메일 인증 필요) |
-| `/api/care-requests/{id}` | PUT | 요청 수정 (작성자만 가능, 관리자 우회, currentUserId 자동 추출) |
-| `/api/care-requests/{id}` | DELETE | 요청 삭제 (작성자만 가능, 관리자 우회, currentUserId 자동 추출) |
-| `/api/care-requests/my-requests` | GET | 내 요청 목록 (userId 파라미터) |
-| `/api/care-requests/{id}/status` | PATCH | 상태 변경 (작성자 또는 승인된 제공자만 가능, 관리자 우회, status 파라미터, currentUserId 자동 추출) |
+| `/api/care-requests` | POST | 요청 생성 (이메일 인증 필요), **`@PreAuthorize("isAuthenticated()")`** |
+| `/api/care-requests/{id}` | PUT | 요청 수정 (작성자만 가능, 관리자 우회), **`@PreAuthorize`**, `getCurrentUserId()` |
+| `/api/care-requests/{id}` | DELETE | 요청 삭제 (작성자만 가능, 관리자 우회), **`@PreAuthorize`**, `getCurrentUserId()` |
+| `/api/care-requests/my-requests` | GET | 내 요청 목록 — **쿼리 파라미터 없음**, `SecurityContext` → `getCurrentUserId()` 후 서비스 호출 |
+| `/api/care-requests/{id}/status` | PATCH | 상태 변경, **`@PreAuthorize`**, `getCurrentUserId()` + 서비스 권한·삭제 여부 검증 |
 | `/api/care-requests/search` | GET | 요청 검색 (페이징, `keyword` 필수, `page`, `size`) → `CareRequestPageResponseDTO` |
 | `/api/care-requests/{careRequestId}/comments` | GET | 댓글 목록 조회 |
 | `/api/care-requests/{careRequestId}/comments` | POST | 댓글 작성 (SERVICE_PROVIDER만 가능, 파일 첨부 지원 - 첫 번째 파일만 저장, 작성자가 요청자가 아닌 경우에만 알림 발송) |
 | `/api/care-requests/{careRequestId}/comments/{commentId}` | DELETE | 댓글 삭제 (Soft Delete) |
 | `/api/chat/conversations/{conversationIdx}/confirm-deal` | POST | 거래 확정 (`userId` 쿼리 파라미터 필수, 인증 필요, 양쪽 모두 확정 시 자동 승인·에스크로) |
-| `/api/care-reviews` | POST | 리뷰 작성 |
+| `/api/care-reviews` | POST | 리뷰 작성, **`@PreAuthorize("isAuthenticated()")`** |
 | `/api/care-reviews/reviewee/{revieweeIdx}` | GET | 특정 사용자(제공자)에 대한 리뷰 목록 |
 | `/api/care-reviews/reviewer/{reviewerIdx}` | GET | 특정 사용자가 작성한 리뷰 목록 |
 | `/api/care-reviews/average-rating/{revieweeIdx}` | GET | 특정 사용자의 평균 평점 조회 |
 
-**보안 참고**: `SecurityConfig`에서 `/api/**`는 기본 인증이 필요합니다. 펫케어 API도 동일합니다.
+**보안 참고 (코드 기준, 2026-04-14 리팩토링 반영)**:
+- `SecurityConfig`에서 `/api/**`는 기본 인증 필요.
+- **변경**: `POST/PUT/DELETE/PATCH` 및 `GET /my-requests`에 **`@PreAuthorize("isAuthenticated()")`** 명시 (`CareRequestController`, `CareReviewController`).
+- **변경**: `GET /my-requests`는 **`userId` 쿼리 파라미터 제거** — 타인 목록 조회(IDOR) 방지. 프론트는 `frontend/src/api/careRequestApi.js`의 `getMyCareRequests()` 인자 없이 호출.
+- `getCurrentUserId()`는 `Authentication.getName()`을 **숫자 user idx(Long)** 로 파싱하는 전제(프로젝트 JWT 설정과 일치).
 
 ### 관리자 (Admin) - domain/admin/controller/AdminCareRequestController
 | 엔드포인트 | Method | 설명 |
@@ -621,7 +628,8 @@ List<CareRequest> findAllWithUserAndPet();
 
 ## 7. 관련 문서
 
-- **코드 리뷰**: `docs/refactoring/care/care-payment-code-review-2026-04-14.md` (Critical 6건, Warning 7건)
+- **코드 리뷰**: `docs/refactoring/care/care-payment-code-review-2026-04-14.md`
+- **리팩토링 기록**(위치 → 개선 코드 → 완료): `docs/refactoring/care/care-payment-refactoring-2026-04-14.md`
 - **트러블슈팅**: `docs/troubleshooting/care/potential-issues.md`
 - **N+1 분석**: `docs/troubleshooting/care/care-request-n-plus-one-analysis.md`
 - **거래 확정 Race Condition**: `docs/troubleshooting/care/care-deal-confirmation-race-condition.md`

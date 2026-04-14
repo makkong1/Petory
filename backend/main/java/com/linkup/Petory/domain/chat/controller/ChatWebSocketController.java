@@ -49,7 +49,7 @@ public class ChatWebSocketController {
             // 사용자 ID 추출 (principal.getName()은 로그인 ID를 반환하므로 Users 테이블에서 조회)
             String loginId = principal.getName();
             Long senderIdx = usersRepository.findByIdString(loginId)
-                    .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다: " + loginId))
+                    .orElseThrow(() -> new UserNotFoundException("사용자를 찾을 수 없습니다: " + loginId))
                     .getIdx();
             Long conversationIdx = messageRequest.getConversationIdx();
 

@@ -1,6 +1,7 @@
 package com.linkup.Petory.domain.care.repository;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -41,18 +42,20 @@ public interface SpringDataJpaCareRequestRepository extends JpaRepository<CareRe
     @Query("SELECT DISTINCT cr FROM CareRequest cr JOIN FETCH cr.user u LEFT JOIN FETCH cr.pet LEFT JOIN FETCH cr.applications WHERE cr.status = :status AND cr.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY cr.createdAt DESC")
     List<CareRequest> findByStatusAndIsDeletedFalse(@Param("status") CareRequestStatus status);
 
-    // 제목이나 설명에 키워드 포함된 케어 요청 검색 - 작성자도 활성 상태여야 함
-    // [1단계 최적화] CareApplication N+1 문제 해결: LEFT JOIN FETCH cr.applications 추가
-    // [3단계 최적화] PetVaccination N+1 문제 해결: @BatchSize 사용 (Hibernate 중첩 컬렉션 제한으로 인해 FETCH JOIN 제거)
-    @RepositoryMethod("펫케어 요청: 제목/설명 키워드 검색")
-    @Query("SELECT DISTINCT cr FROM CareRequest cr JOIN FETCH cr.user u LEFT JOIN FETCH cr.pet LEFT JOIN FETCH cr.applications WHERE cr.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' AND "
-                    +
-                    "(LOWER(cr.title) LIKE LOWER(CONCAT('%', :titleKeyword, '%')) OR " +
-                    "LOWER(CAST(cr.description AS string)) LIKE LOWER(CONCAT('%', :descKeyword, '%'))) " +
-                    "ORDER BY cr.createdAt DESC")
-    List<CareRequest> findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCaseAndIsDeletedFalse(
-                    @Param("titleKeyword") String titleKeyword,
-                    @Param("descKeyword") String descKeyword);
+    // FULLTEXT로 idx 목록만 조회 후, 어댑터에서 JOIN FETCH로 재조회(순서 유지·N+1 방지).
+    @RepositoryMethod("펫케어 요청: FULLTEXT 검색 — idx 목록")
+    @Query(value = "SELECT cr.idx FROM carerequest cr "
+                    + "INNER JOIN users u ON u.idx = cr.user_idx "
+                    + "WHERE (cr.is_deleted IS NULL OR cr.is_deleted = 0) "
+                    + "AND (u.is_deleted IS NULL OR u.is_deleted = 0) AND u.status = 'ACTIVE' "
+                    + "AND MATCH(cr.title, cr.description) AGAINST(:keyword IN NATURAL LANGUAGE MODE) "
+                    + "ORDER BY cr.created_at DESC",
+            nativeQuery = true)
+    List<Long> findIdxByFulltextKeyword(@Param("keyword") String keyword);
+
+    @RepositoryMethod("펫케어 요청: idx 목록으로 연관 FETCH 조회")
+    @Query("SELECT DISTINCT cr FROM CareRequest cr JOIN FETCH cr.user u LEFT JOIN FETCH cr.pet LEFT JOIN FETCH cr.applications WHERE cr.idx IN :ids")
+    List<CareRequest> findByIdxInWithAssociations(@Param("ids") Collection<Long> ids);
 
     // 날짜가 지났고 특정 상태인 요청 조회 (스케줄러용)
     @RepositoryMethod("펫케어 요청: 만료된 요청 조회 (스케줄러)")
@@ -82,14 +85,15 @@ public interface SpringDataJpaCareRequestRepository extends JpaRepository<CareRe
     @Query("SELECT COUNT(cr) FROM CareRequest cr WHERE cr.completedAt BETWEEN :start AND :end AND cr.isDeleted = false")
     long countByCompletedAtBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
+    // location: 접두사 일치만 허용 (LIKE '값%') — B-tree 인덱스(users.location) 활용 가능. 부분 문자열(중간 일치)은 제외.
     @RepositoryMethod("펫케어 요청: 페이징 전체 조회")
-    @Query(value = "SELECT cr FROM CareRequest cr JOIN FETCH cr.user u LEFT JOIN FETCH cr.pet WHERE cr.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' AND (:location IS NULL OR :location = '' OR u.location LIKE CONCAT('%', :location, '%')) ORDER BY cr.createdAt DESC",
-           countQuery = "SELECT COUNT(cr) FROM CareRequest cr JOIN cr.user u WHERE cr.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' AND (:location IS NULL OR :location = '' OR u.location LIKE CONCAT('%', :location, '%'))")
+    @Query(value = "SELECT cr FROM CareRequest cr JOIN FETCH cr.user u LEFT JOIN FETCH cr.pet WHERE cr.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' AND (:location IS NULL OR :location = '' OR (u.location IS NOT NULL AND u.location LIKE CONCAT(:location, '%'))) ORDER BY cr.createdAt DESC",
+           countQuery = "SELECT COUNT(cr) FROM CareRequest cr JOIN cr.user u WHERE cr.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' AND (:location IS NULL OR :location = '' OR (u.location IS NOT NULL AND u.location LIKE CONCAT(:location, '%')))")
     Page<CareRequest> findAllActiveRequestsWithPaging(@Param("location") String location, Pageable pageable);
 
     @RepositoryMethod("펫케어 요청: 페이징 상태별 조회")
-    @Query(value = "SELECT cr FROM CareRequest cr JOIN FETCH cr.user u LEFT JOIN FETCH cr.pet WHERE cr.status = :status AND cr.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' AND (:location IS NULL OR :location = '' OR u.location LIKE CONCAT('%', :location, '%')) ORDER BY cr.createdAt DESC",
-           countQuery = "SELECT COUNT(cr) FROM CareRequest cr JOIN cr.user u WHERE cr.status = :status AND cr.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' AND (:location IS NULL OR :location = '' OR u.location LIKE CONCAT('%', :location, '%'))")
+    @Query(value = "SELECT cr FROM CareRequest cr JOIN FETCH cr.user u LEFT JOIN FETCH cr.pet WHERE cr.status = :status AND cr.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' AND (:location IS NULL OR :location = '' OR (u.location IS NOT NULL AND u.location LIKE CONCAT(:location, '%'))) ORDER BY cr.createdAt DESC",
+           countQuery = "SELECT COUNT(cr) FROM CareRequest cr JOIN cr.user u WHERE cr.status = :status AND cr.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' AND (:location IS NULL OR :location = '' OR (u.location IS NOT NULL AND u.location LIKE CONCAT(:location, '%')))")
     Page<CareRequest> findByStatusAndIsDeletedFalseWithPaging(@Param("status") CareRequestStatus status, @Param("location") String location, Pageable pageable);
 
     @RepositoryMethod("펫케어 요청: 반경 기반 근처 요청 조회")
@@ -109,9 +113,20 @@ public interface SpringDataJpaCareRequestRepository extends JpaRepository<CareRe
                     @Param("radius") Double radius,
                     @Param("limit") int limit);
 
-    @RepositoryMethod("펫케어 요청: 페이징 키워드 검색")
-    @Query(value = "SELECT DISTINCT cr FROM CareRequest cr JOIN FETCH cr.user u LEFT JOIN FETCH cr.pet WHERE cr.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' AND (LOWER(cr.title) LIKE LOWER(CONCAT('%', :keyword, '%')) OR LOWER(CAST(cr.description AS string)) LIKE LOWER(CONCAT('%', :keyword, '%'))) ORDER BY cr.createdAt DESC",
-           countQuery = "SELECT COUNT(DISTINCT cr) FROM CareRequest cr JOIN cr.user u WHERE cr.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' AND (LOWER(cr.title) LIKE LOWER(CONCAT('%', :keyword, '%')) OR LOWER(CAST(cr.description AS string)) LIKE LOWER(CONCAT('%', :keyword, '%')))")
+    // 키워드 검색: FULLTEXT (인덱스 docs/migration/db/indexes.sql). 페이징은 Spring이 LIMIT/OFFSET 처리.
+    @RepositoryMethod("펫케어 요청: 페이징 키워드 검색 (FULLTEXT)")
+    @Query(value = "SELECT cr.* FROM carerequest cr "
+                    + "INNER JOIN users u ON u.idx = cr.user_idx "
+                    + "WHERE (cr.is_deleted IS NULL OR cr.is_deleted = 0) "
+                    + "AND (u.is_deleted IS NULL OR u.is_deleted = 0) AND u.status = 'ACTIVE' "
+                    + "AND MATCH(cr.title, cr.description) AGAINST(:keyword IN NATURAL LANGUAGE MODE) "
+                    + "ORDER BY cr.created_at DESC",
+            countQuery = "SELECT COUNT(cr.idx) FROM carerequest cr "
+                    + "INNER JOIN users u ON u.idx = cr.user_idx "
+                    + "WHERE (cr.is_deleted IS NULL OR cr.is_deleted = 0) "
+                    + "AND (u.is_deleted IS NULL OR u.is_deleted = 0) AND u.status = 'ACTIVE' "
+                    + "AND MATCH(cr.title, cr.description) AGAINST(:keyword IN NATURAL LANGUAGE MODE)",
+            nativeQuery = true)
     Page<CareRequest> searchWithPaging(@Param("keyword") String keyword, Pageable pageable);
 }
 

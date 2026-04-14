@@ -35,6 +35,7 @@ import com.linkup.Petory.domain.user.exception.UserNotFoundException;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 import com.linkup.Petory.domain.care.entity.CareRequest;
 import com.linkup.Petory.domain.care.entity.CareApplication;
+import com.linkup.Petory.domain.care.exception.CareApplicationNotFoundException;
 import com.linkup.Petory.domain.care.exception.CareRequestNotFoundException;
 import com.linkup.Petory.domain.care.entity.CareApplicationStatus;
 import com.linkup.Petory.domain.care.entity.CareRequestStatus;
@@ -48,6 +49,7 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 @RequiredArgsConstructor
 @Slf4j
+@Transactional(readOnly = true)
 public class ConversationService {
 
         private final ConversationRepository conversationRepository;
@@ -60,11 +62,11 @@ public class ConversationService {
         private final CareRequestRepository careRequestRepository;
         private final CareApplicationRepository careApplicationRepository;
         private final PetCoinEscrowService petCoinEscrowService;
+        private final ConversationCreatorService conversationCreatorService;
 
         /**
          * 사용자별 활성 채팅방 목록 조회 (N+1 문제 최적화)
          */
-        @Transactional(readOnly = true)
         public List<ConversationDTO> getMyConversations(Long userId) {
                 // 탈퇴하지 않은 사용자의 채팅방만 조회
                 List<Conversation> conversations = conversationRepository
@@ -141,9 +143,10 @@ public class ConversationService {
                 Conversation conversation = conversationRepository.findById(conversationIdx)
                                 .orElseThrow(ConversationNotFoundException::new);
 
-                // 참여자인지 확인
                 ConversationParticipant participant = participantRepository
                                 .findByConversationIdxAndUserIdx(conversationIdx, userId)
+                                .filter(p -> p.getStatus() == ParticipantStatus.ACTIVE
+                                                && !Boolean.TRUE.equals(p.getIsDeleted()))
                                 .orElseThrow(ChatForbiddenException::notParticipant);
 
                 // 탈퇴한 사용자가 포함된 채팅방인지 확인
@@ -165,136 +168,38 @@ public class ConversationService {
         }
 
         /**
-         * 채팅방 생성
-         * 별도 트랜잭션으로 실행하여 실패해도 호출한 트랜잭션에 영향을 주지 않음
+         * 채팅방 생성. 실제 생성은 {@link ConversationCreatorService}의 REQUIRES_NEW 트랜잭션에서 수행한다.
          */
-        @Transactional(propagation = Propagation.REQUIRES_NEW)
+        @Transactional
         public ConversationDTO createConversation(
                         ConversationType conversationType,
                         RelatedType relatedType,
                         Long relatedIdx,
                         String title,
-                        List<Long> participantUserIds) {
-
-                // 참여자 유효성 검증
-                List<Users> participants = participantUserIds.stream()
-                                .map(userId -> usersRepository.findById(userId)
-                                                .orElseThrow(UserNotFoundException::new))
-                                .collect(Collectors.toList());
-
-                // 탈퇴한 사용자 제외
-                participants = participants.stream()
-                                .filter(user -> !Boolean.TRUE.equals(user.getIsDeleted()))
-                                .collect(Collectors.toList());
-
-                // 그룹 채팅(MEETUP)의 경우 최소 1명도 허용, 1:1 채팅은 최소 2명 필요
-                if (conversationType == ConversationType.MEETUP) {
-                        if (participants.size() < 1) {
-                                throw ChatValidationException.minParticipantsRequired(1);
-                        }
-                } else {
-                        if (participants.size() < 2) {
-                                throw ChatValidationException.minParticipantsRequired(2);
-                        }
-                }
-
-                // relatedType과 relatedIdx가 있는 경우 기존 채팅방 확인 (펫케어 요청 등)
-                if (relatedType != null && relatedIdx != null) {
-                        Optional<Conversation> existing = conversationRepository
-                                        .findByRelatedTypeAndRelatedIdxAndIsDeletedFalse(relatedType, relatedIdx);
-
-                        if (existing.isPresent()) {
-                                Conversation existingConv = existing.get();
-                                // 참여자 확인 (양쪽 모두 참여하고 있는지)
-                                List<ConversationParticipant> existingParticipants = participantRepository
-                                                .findByConversationIdxAndStatus(existingConv.getIdx(),
-                                                                ParticipantStatus.ACTIVE);
-                                java.util.Set<Long> existingParticipantIds = existingParticipants.stream()
-                                                .map(p -> p.getUser().getIdx())
-                                                .collect(Collectors.toSet());
-                                java.util.Set<Long> newParticipantIds = participants.stream()
-                                                .map(Users::getIdx)
-                                                .collect(Collectors.toSet());
-
-                                // 참여자가 일치하면 기존 채팅방 반환
-                                if (existingParticipantIds.equals(newParticipantIds)) {
-                                        // relatedType과 relatedIdx가 없으면 업데이트
-                                        if (existingConv.getRelatedType() == null
-                                                        || existingConv.getRelatedIdx() == null) {
-                                                existingConv.setRelatedType(relatedType);
-                                                existingConv.setRelatedIdx(relatedIdx);
-                                                existingConv = conversationRepository.save(existingConv);
-                                        }
-                                        ConversationDTO dto = conversationConverter.toDTO(existingConv);
-                                        dto.setParticipants(participantConverter.toDTOList(existingParticipants));
-                                        return dto;
-                                }
-                        }
-                }
-
-                // 1:1 채팅인 경우 기존 채팅방 확인
-                if (conversationType == ConversationType.DIRECT && participants.size() == 2) {
-                        Optional<Conversation> existing = conversationRepository.findDirectConversationBetweenUsers(
-                                        participants.get(0).getIdx(),
-                                        participants.get(1).getIdx());
-
-                        if (existing.isPresent()) {
-                                Conversation existingConv = existing.get();
-
-                                // relatedType과 relatedIdx가 있으면 업데이트 (기존 일반 채팅방을 펫케어 채팅방으로 변환)
-                                if (relatedType != null && relatedIdx != null) {
-                                        if (existingConv.getRelatedType() == null
-                                                        || existingConv.getRelatedIdx() == null) {
-                                                existingConv.setRelatedType(relatedType);
-                                                existingConv.setRelatedIdx(relatedIdx);
-                                                existingConv = conversationRepository.save(existingConv);
-                                                log.info("기존 채팅방에 relatedType 업데이트: conversationIdx={}, relatedType={}, relatedIdx={}",
-                                                                existingConv.getIdx(), relatedType, relatedIdx);
-                                        }
-                                }
-
-                                List<ConversationParticipant> existingParticipants = participantRepository
-                                                .findByConversationIdxAndStatus(existingConv.getIdx(),
-                                                                ParticipantStatus.ACTIVE);
-                                ConversationDTO dto = conversationConverter.toDTO(existingConv);
-                                dto.setParticipants(participantConverter.toDTOList(existingParticipants));
-                                return dto;
-                        }
-                }
-
-                // Conversation 생성
-                Conversation conversation = Conversation.builder()
-                                .conversationType(conversationType)
-                                .relatedType(relatedType)
-                                .relatedIdx(relatedIdx)
-                                .title(title)
-                                .status(ConversationStatus.ACTIVE)
-                                .build();
-
-                conversation = conversationRepository.save(conversation);
-
-                // 참여자 추가
-                for (Users user : participants) {
-                        ConversationParticipant participant = ConversationParticipant.builder()
-                                        .conversation(conversation)
-                                        .user(user)
-                                        .role(ParticipantRole.MEMBER)
-                                        .status(ParticipantStatus.ACTIVE)
-                                        .unreadCount(0)
-                                        .build();
-                        participantRepository.save(participant);
-                }
-
-                return conversationConverter.toDTO(conversation);
+                        List<Long> participantUserIds,
+                        Long actingUserId) {
+                return conversationCreatorService.createConversation(
+                                conversationType,
+                                relatedType,
+                                relatedIdx,
+                                title,
+                                participantUserIds,
+                                actingUserId);
         }
 
         /**
          * 펫케어 요청 채팅방 생성 (CareApplication 승인 시)
          */
         @Transactional
-        public ConversationDTO createCareRequestConversation(Long careApplicationIdx, Long requesterId,
-                        Long providerId) {
-                // 이미 채팅방이 있는지 확인
+        public ConversationDTO createCareRequestConversation(Long careApplicationIdx, Long currentUserId) {
+                CareApplication application = careApplicationRepository.findById(careApplicationIdx)
+                                .orElseThrow(CareApplicationNotFoundException::new);
+                Long requesterId = application.getCareRequest().getUser().getIdx();
+                Long providerId = application.getProvider().getIdx();
+                if (!currentUserId.equals(requesterId) && !currentUserId.equals(providerId)) {
+                        throw ChatForbiddenException.notCareApplicationParty();
+                }
+
                 Optional<Conversation> existing = conversationRepository
                                 .findByRelatedTypeAndRelatedIdxAndIsDeletedFalse(RelatedType.CARE_APPLICATION,
                                                 careApplicationIdx);
@@ -303,34 +208,39 @@ public class ConversationService {
                         return conversationConverter.toDTO(existing.get());
                 }
 
-                return createConversation(
+                return conversationCreatorService.createConversation(
                                 ConversationType.CARE_REQUEST,
                                 RelatedType.CARE_APPLICATION,
                                 careApplicationIdx,
                                 null,
-                                List.of(requesterId, providerId));
+                                List.of(requesterId, providerId),
+                                currentUserId);
         }
 
         /**
          * 1:1 일반 채팅방 생성 또는 조회
          */
         @Transactional
-        public ConversationDTO getOrCreateDirectConversation(Long user1Id, Long user2Id) {
-                // 기존 채팅방 확인
-                Optional<Conversation> existing = conversationRepository.findDirectConversationBetweenUsers(user1Id,
-                                user2Id);
+        public ConversationDTO getOrCreateDirectConversation(Long currentUserId, Long otherUserId) {
+                if (currentUserId.equals(otherUserId)) {
+                        throw ChatValidationException.cannotChatWithSelf();
+                }
+
+                Optional<Conversation> existing = conversationRepository.findDirectConversationBetweenUsers(
+                                currentUserId,
+                                otherUserId);
 
                 if (existing.isPresent() && !Boolean.TRUE.equals(existing.get().getIsDeleted())) {
                         return conversationConverter.toDTO(existing.get());
                 }
 
-                // 새로 생성
-                return createConversation(
+                return conversationCreatorService.createConversation(
                                 ConversationType.DIRECT,
                                 null,
                                 null,
                                 null,
-                                List.of(user1Id, user2Id));
+                                List.of(currentUserId, otherUserId),
+                                currentUserId);
         }
 
         /**
@@ -340,7 +250,7 @@ public class ConversationService {
         public void leaveConversation(Long conversationIdx, Long userId) {
                 ConversationParticipant participant = participantRepository
                                 .findByConversationIdxAndUserIdx(conversationIdx, userId)
-                                .orElseThrow(() -> new IllegalArgumentException("채팅방 참여자가 아닙니다."));
+                                .orElseThrow(ChatForbiddenException::notParticipant);
 
                 participant.setStatus(ParticipantStatus.LEFT);
                 participant.setLeftAt(LocalDateTime.now());
@@ -381,7 +291,13 @@ public class ConversationService {
          * 채팅방 상태 변경
          */
         @Transactional
-        public ConversationDTO updateConversationStatus(Long conversationIdx, ConversationStatus status) {
+        public ConversationDTO updateConversationStatus(Long conversationIdx, ConversationStatus status,
+                        Long actingUserId) {
+                participantRepository.findByConversationIdxAndUserIdx(conversationIdx, actingUserId)
+                                .filter(p -> p.getStatus() == ParticipantStatus.ACTIVE
+                                                && !Boolean.TRUE.equals(p.getIsDeleted()))
+                                .orElseThrow(ChatForbiddenException::notParticipant);
+
                 Conversation conversation = conversationRepository.findById(conversationIdx)
                                 .orElseThrow(ConversationNotFoundException::new);
 
@@ -512,40 +428,51 @@ public class ConversationService {
                         throw ChatValidationException.ownReportCannotChat();
                 }
 
-                // 같은 제보(boardIdx)에 대한 모든 채팅방 조회
                 List<Conversation> conversations = conversationRepository
                                 .findByRelatedTypeAndRelatedIdxInAndIsDeletedFalse(
                                                 RelatedType.MISSING_PET_BOARD,
                                                 List.of(boardIdx));
 
-                // 제보자와 목격자가 모두 참여한 채팅방 찾기
+                if (conversations.isEmpty()) {
+                        return conversationCreatorService.createConversation(
+                                        ConversationType.MISSING_PET,
+                                        RelatedType.MISSING_PET_BOARD,
+                                        boardIdx,
+                                        null,
+                                        List.of(reporterId, witnessId),
+                                        witnessId);
+                }
+
+                List<Long> conversationIdxs = conversations.stream()
+                                .map(Conversation::getIdx)
+                                .collect(Collectors.toList());
+                List<ConversationParticipant> allActive = participantRepository
+                                .findParticipantsByConversationIdxsAndStatus(conversationIdxs,
+                                                ParticipantStatus.ACTIVE);
+                Map<Long, Set<Long>> participantIdsByConversation = allActive.stream()
+                                .collect(Collectors.groupingBy(
+                                                p -> p.getConversation().getIdx(),
+                                                Collectors.mapping(p -> p.getUser().getIdx(), Collectors.toSet())));
+
                 Optional<Conversation> existing = conversations.stream()
                                 .filter(conv -> {
-                                        List<ConversationParticipant> participants = participantRepository
-                                                        .findByConversationIdxAndStatus(conv.getIdx(),
-                                                                        ParticipantStatus.ACTIVE);
-
-                                        Set<Long> participantIds = participants.stream()
-                                                        .map(p -> p.getUser().getIdx())
-                                                        .collect(Collectors.toSet());
-
-                                        return participantIds.contains(reporterId)
-                                                        && participantIds.contains(witnessId);
+                                        Set<Long> ids = participantIdsByConversation.getOrDefault(conv.getIdx(),
+                                                        Set.of());
+                                        return ids.contains(reporterId) && ids.contains(witnessId);
                                 })
                                 .findFirst();
 
                 if (existing.isPresent()) {
-                        // 기존 채팅방 반환
                         return conversationConverter.toDTO(existing.get());
                 }
 
-                // 새 채팅방 생성
-                return createConversation(
+                return conversationCreatorService.createConversation(
                                 ConversationType.MISSING_PET,
                                 RelatedType.MISSING_PET_BOARD,
                                 boardIdx,
-                                null, // 1:1이므로 제목 없음
-                                List.of(reporterId, witnessId));
+                                null,
+                                List.of(reporterId, witnessId),
+                                witnessId);
         }
 
         /**

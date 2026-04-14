@@ -129,6 +129,7 @@ frontend/src/
 | 리팩토링 | `.claude/skills/refactor.md` | 3가지 타입(구조/성능/가독성) 분류 + 측정 기준(쿼리 수, 코드량) 포함 계획 |
 | 트러블슈팅 | `.claude/skills/fix.md` | 재현 가능성 체크 → 빠른 해결(Hotfix) + 근본 해결(Proper Fix) 2단계 제시 |
 | 테스트 | `.claude/skills/test.md` | 변경 코드 기반 테스트 자동 생성 (정상/예외/경계값 3종 필수, 동시성 테스트 포함) |
+| **순서(파이프라인)** | `.claude/skills/workflow.md` | review 이후 fix·refactor 분기 → test → commit → docs (분기·예외 규칙) |
 
 ## 개발 워크플로우 파이프라인
 
@@ -152,6 +153,8 @@ Skill 간 자동 연계 흐름:
   │                      ▼
   └──────────────────  /docs (문서 현행화)
 ```
+
+상세 분기·예외(핫픽스)는 **`.claude/skills/workflow.md`** 참고.
 
 ### 워크플로우 규칙
 - `/review` → Critical 0개일 때만 "커밋 가능" 판정

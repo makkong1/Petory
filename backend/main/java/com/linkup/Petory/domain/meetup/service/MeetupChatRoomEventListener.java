@@ -3,6 +3,7 @@ package com.linkup.Petory.domain.meetup.service;
 import com.linkup.Petory.domain.chat.entity.ConversationType;
 import com.linkup.Petory.domain.chat.entity.ParticipantRole;
 import com.linkup.Petory.domain.chat.entity.RelatedType;
+import com.linkup.Petory.domain.chat.service.ConversationCreatorService;
 import com.linkup.Petory.domain.chat.service.ConversationService;
 import com.linkup.Petory.domain.meetup.event.MeetupCreatedEvent;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,7 @@ import java.util.List;
 public class MeetupChatRoomEventListener {
 
         private final ConversationService conversationService;
+        private final ConversationCreatorService conversationCreatorService;
 
         /**
          * 이 이벤트 리스너는 모임 생성 완료 이벤트를 수신하여 채팅방을 생성
@@ -51,12 +53,13 @@ public class MeetupChatRoomEventListener {
 
                 try {
                         // 그룹 채팅방 생성 (주최자만 초기 참여)
-                        conversationService.createConversation(
+                        conversationCreatorService.createConversation(
                                         ConversationType.MEETUP,
                                         RelatedType.MEETUP,
                                         meetupIdx,
                                         meetupTitle,
-                                        List.of(organizerIdx));
+                                        List.of(organizerIdx),
+                                        organizerIdx);
 
                         // 주최자를 ADMIN 역할로 설정
                         conversationService.setParticipantRole(

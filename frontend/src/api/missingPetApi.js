@@ -48,9 +48,9 @@ export const missingPetApi = {
     isDemoMode()
       ? mockResolve({})
       : api.delete(`/${boardId}/comments/${commentId}`),
-  startChat: (boardIdx, witnessId) =>
+  startChat: (boardIdx) =>
     isDemoMode()
       ? mockResolve({ idx: 1 })
-      : api.post(`/${boardIdx}/start-chat`, null, { params: { witnessId } }),
+      : api.post(`/${boardIdx}/start-chat`),
 };
 

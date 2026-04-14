@@ -41,6 +41,18 @@ public class ChatMessageService {
     private final UsersRepository usersRepository;
     private final ChatMessageConverter messageConverter;
 
+    private void requireActiveParticipant(Long conversationIdx, Long userId) {
+        ConversationParticipant participant = participantRepository
+                .findByConversationIdxAndUserIdx(conversationIdx, userId)
+                .orElseThrow(ChatForbiddenException::notParticipant);
+        if (participant.getStatus() != ParticipantStatus.ACTIVE) {
+            throw ChatForbiddenException.notActiveParticipant();
+        }
+        if (Boolean.TRUE.equals(participant.getIsDeleted())) {
+            throw ChatForbiddenException.notParticipant();
+        }
+    }
+
     /**
      * 메시지 전송
      */
@@ -104,13 +116,14 @@ public class ChatMessageService {
      * 재참여한 경우 joinedAt 이후 메시지만 조회
      */
     public Page<ChatMessageDTO> getMessages(Long conversationIdx, Long userId, int page, int size) {
-        // 참여자 정보 확인 (재참여 여부 체크)
+        requireActiveParticipant(conversationIdx, userId);
+
         ConversationParticipant participant = participantRepository
                 .findByConversationIdxAndUserIdx(conversationIdx, userId)
-                .orElse(null);
+                .orElseThrow(ChatForbiddenException::notParticipant);
 
         LocalDateTime readFrom = null;
-        if (participant != null && participant.getLastReadMessage() == null && participant.getJoinedAt() != null) {
+        if (participant.getLastReadMessage() == null && participant.getJoinedAt() != null) {
             // 재참여한 경우: lastReadMessage가 null이고 joinedAt이 있으면 재참여로 간주
             readFrom = participant.getJoinedAt();
         }
@@ -134,7 +147,10 @@ public class ChatMessageService {
     /**
      * 채팅방 메시지 조회 (커서 기반 페이징)
      */
-    public List<ChatMessageDTO> getMessagesBefore(Long conversationIdx, LocalDateTime beforeDate, int size) {
+    public List<ChatMessageDTO> getMessagesBefore(Long conversationIdx, Long userId, LocalDateTime beforeDate,
+            int size) {
+        requireActiveParticipant(conversationIdx, userId);
+
         Pageable pageable = PageRequest.of(0, size);
 
         List<ChatMessage> messages = chatMessageRepository
@@ -150,7 +166,8 @@ public class ChatMessageService {
      */
     @Transactional
     public void markAsRead(Long conversationIdx, Long userId, Long lastMessageIdx) {
-        // 참여자 확인
+        requireActiveParticipant(conversationIdx, userId);
+
         ConversationParticipant participant = participantRepository
                 .findByConversationIdxAndUserIdx(conversationIdx, userId)
                 .orElseThrow(ChatForbiddenException::notParticipant);
@@ -181,6 +198,8 @@ public class ChatMessageService {
         ChatMessage message = chatMessageRepository.findById(messageIdx)
                 .orElseThrow(ChatMessageNotFoundException::new);
 
+        requireActiveParticipant(message.getConversation().getIdx(), userId);
+
         // 본인 메시지만 삭제 가능
         if (!message.getSender().getIdx().equals(userId)) {
             throw ChatForbiddenException.ownMessageOnly();
@@ -194,7 +213,9 @@ public class ChatMessageService {
     /**
      * 메시지 검색
      */
-    public List<ChatMessageDTO> searchMessages(Long conversationIdx, String keyword) {
+    public List<ChatMessageDTO> searchMessages(Long conversationIdx, Long userId, String keyword) {
+        requireActiveParticipant(conversationIdx, userId);
+
         List<ChatMessage> messages = chatMessageRepository
                 .searchMessagesByKeyword(conversationIdx, keyword);
 
@@ -207,13 +228,11 @@ public class ChatMessageService {
      * 읽지 않은 메시지 수 조회
      */
     public Long getUnreadCount(Long conversationIdx, Long userId) {
+        requireActiveParticipant(conversationIdx, userId);
+
         ConversationParticipant participant = participantRepository
                 .findByConversationIdxAndUserIdx(conversationIdx, userId)
-                .orElse(null);
-
-        if (participant == null) {
-            return 0L;
-        }
+                .orElseThrow(ChatForbiddenException::notParticipant);
 
         return participant.getUnreadCount() != null ? (long) participant.getUnreadCount() : 0L;
     }

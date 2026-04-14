@@ -89,11 +89,14 @@ public class CareRequestService {
             requests = careRequestRepository.findAllActiveRequests();
         }
 
-        // 위치 필터링 (추후 구현)
+        // 위치 필터링 — 페이징 API와 동일하게 접두사 일치만 허용 (LIKE '값%')
         if (location != null && !location.isEmpty()) {
+            final String locPrefix = location;
             requests = requests.stream()
-                    .filter(r -> r.getUser().getLocation() != null
-                    && r.getUser().getLocation().contains(location))
+                    .filter(r -> {
+                        String ul = r.getUser().getLocation();
+                        return ul != null && ul.startsWith(locPrefix);
+                    })
                     .collect(Collectors.toList());
         }
 
@@ -135,7 +138,8 @@ public class CareRequestService {
         if (keyword == null || keyword.trim().isEmpty()) {
             return getCareRequestsWithPaging(null, null, page, size);
         }
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        // FULLTEXT 네이티브 쿼리에서 ORDER BY created_at 정렬 — Pageable Sort 중복 방지
+        Pageable pageable = PageRequest.of(page, size);
         Page<CareRequest> requestPage = careRequestRepository.searchWithPaging(keyword.trim(), pageable);
         List<CareRequestDTO> dtos = careRequestConverter.toDTOList(requestPage.getContent());
         return new CareRequestPageResponseDTO(

@@ -31,7 +31,7 @@ const CareLayer = ({ selectedItem, onClose }) => {
     if (!user || !ownerId || user.idx === ownerId) return;
     setChatLoading(true);
     try {
-      await getOrCreateDirectConversation(user.idx, ownerId);
+      await getOrCreateDirectConversation(ownerId);
       // 채팅 위젯 열기
       window.dispatchEvent(new CustomEvent('openChat', { detail: { userId: ownerId } }));
     } catch (err) {

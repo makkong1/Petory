@@ -20,7 +20,7 @@ const ChatWidget = () => {
 
     setLoading(true);
     try {
-      const data = await getMyConversations(user.idx);
+      const data = await getMyConversations();
       setConversations(data || []);
       
       // 전체 읽지 않은 메시지 수 계산
