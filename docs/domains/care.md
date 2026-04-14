@@ -617,3 +617,12 @@ List<CareRequest> findAllWithUserAndPet();
 9. **파일 첨부 지원**: 댓글에 파일 첨부 가능 (`FileTargetType.CARE_COMMENT`, dto.attachments 첫 번째만)
 10. **CANCELLED 상태**: 거래 취소 시 에스크로에서 요청자에게 코인 환불
 
+---
+
+## 7. 관련 문서
+
+- **코드 리뷰**: `docs/refactoring/care/care-payment-code-review-2026-04-14.md` (Critical 6건, Warning 7건)
+- **트러블슈팅**: `docs/troubleshooting/care/potential-issues.md`
+- **N+1 분석**: `docs/troubleshooting/care/care-request-n-plus-one-analysis.md`
+- **거래 확정 Race Condition**: `docs/troubleshooting/care/care-deal-confirmation-race-condition.md`
+

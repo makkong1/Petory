@@ -3,6 +3,7 @@ package com.linkup.Petory.domain.care.controller;
 import java.util.List;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import com.linkup.Petory.domain.care.dto.CareReviewDTO;
@@ -21,6 +22,7 @@ public class CareReviewController {
      * 리뷰 작성
      */
     @PostMapping
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<CareReviewDTO> createReview(@RequestBody CareReviewDTO dto) {
         return ResponseEntity.ok(careReviewService.createReview(dto));
     }

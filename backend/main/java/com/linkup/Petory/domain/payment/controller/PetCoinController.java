@@ -4,6 +4,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
@@ -85,6 +86,7 @@ public class PetCoinController {
          * 별도의 결제 서비스로 분리하여 구현해야 합니다.
          */
         @PostMapping("/charge")
+        @PreAuthorize("isAuthenticated()")
         public ResponseEntity<PetCoinTransactionDTO> chargeCoins(
                         @RequestBody PetCoinChargeRequest request) {
                 Users user = getCurrentUser();

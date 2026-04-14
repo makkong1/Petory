@@ -474,3 +474,11 @@ domain/payment/
 ## ✨ 한 줄 요약
 
 **"실제 결제 시스템 연동 없이 시뮬레이션으로 구현했으며, 비관적 락으로 동시성을 제어하고, 에스크로 지급·환불은 `CareRequestService` 트랜잭션과 묶입니다(거래 확정 시 최초 에스크로 생성은 §4.1·§7.2). 실제 운영 시 충전 단계만 PG로 대체하면 되도록 설계됨"**
+
+---
+
+## 관련 문서
+
+- **코드 리뷰 (2026-04-14)**: `docs/refactoring/care/care-payment-code-review-2026-04-14.md` — @PreAuthorize 누락, 트랜잭션 범위 과대 등 Critical 6건
+- **Race Condition 분석**: `docs/refactoring/payment/petcoin-service-race-condition.md`
+- **성능 최적화**: `docs/refactoring/payment/payment-backend-performance-optimization.md`
