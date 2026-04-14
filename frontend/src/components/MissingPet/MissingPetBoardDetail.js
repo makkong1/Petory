@@ -266,7 +266,7 @@ const MissingPetBoardDetail = ({
     }
 
     try {
-      const conversation = await startMissingPetChat(board.idx, currentUser.idx);
+      const conversation = await startMissingPetChat(board.idx);
       // 채팅 위젯 열기
       if (window.openChatWidget) {
         window.openChatWidget(conversation.idx);
