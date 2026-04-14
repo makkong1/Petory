@@ -5,12 +5,11 @@ import java.util.stream.Collectors;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import com.linkup.Petory.domain.care.dto.CareRequestDTO;
 import com.linkup.Petory.domain.care.service.CareRequestService;
+import com.linkup.Petory.global.security.AuthenticatedUserIdResolver;
 
 import lombok.RequiredArgsConstructor;
 
@@ -26,21 +25,10 @@ import lombok.RequiredArgsConstructor;
 public class AdminCareRequestController {
 
     private final CareRequestService careRequestService;
+    private final AuthenticatedUserIdResolver authenticatedUserIdResolver;
 
-    /**
-     * 현재 로그인한 사용자의 ID 추출
-     */
     private Long getCurrentUserId() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || authentication.getPrincipal() == null) {
-            throw new RuntimeException("인증되지 않은 사용자입니다.");
-        }
-        String userIdString = authentication.getName();
-        try {
-            return Long.parseLong(userIdString);
-        } catch (NumberFormatException e) {
-            throw new RuntimeException("유효하지 않은 사용자 ID입니다.");
-        }
+        return authenticatedUserIdResolver.requireCurrentUserIdx();
     }
 
     /**

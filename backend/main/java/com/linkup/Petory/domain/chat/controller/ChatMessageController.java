@@ -7,16 +7,13 @@ import org.springframework.data.domain.Page;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import com.linkup.Petory.domain.chat.dto.ChatMessageDTO;
 import com.linkup.Petory.domain.chat.dto.SendMessageRequest;
 import com.linkup.Petory.domain.chat.entity.MessageType;
-import com.linkup.Petory.domain.chat.exception.ChatValidationException;
 import com.linkup.Petory.domain.chat.service.ChatMessageService;
-import com.linkup.Petory.domain.user.exception.UnauthenticatedException;
+import com.linkup.Petory.global.security.AuthenticatedUserIdResolver;
 
 import lombok.RequiredArgsConstructor;
 
@@ -26,17 +23,10 @@ import lombok.RequiredArgsConstructor;
 public class ChatMessageController {
 
     private final ChatMessageService chatMessageService;
+    private final AuthenticatedUserIdResolver authenticatedUserIdResolver;
 
     private Long getCurrentUserId() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || authentication.getPrincipal() == null) {
-            throw new UnauthenticatedException("인증되지 않은 사용자입니다.");
-        }
-        try {
-            return Long.parseLong(authentication.getName());
-        } catch (NumberFormatException e) {
-            throw new ChatValidationException("인증 사용자 식별값이 올바르지 않습니다.");
-        }
+        return authenticatedUserIdResolver.requireCurrentUserIdx();
     }
 
     /**

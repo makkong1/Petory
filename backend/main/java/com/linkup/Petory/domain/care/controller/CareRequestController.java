@@ -4,15 +4,12 @@ import java.util.List;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import com.linkup.Petory.domain.care.dto.CareRequestDTO;
-import com.linkup.Petory.domain.care.exception.CareValidationException;
-import com.linkup.Petory.domain.user.exception.UnauthenticatedException;
 import com.linkup.Petory.domain.care.dto.CareRequestPageResponseDTO;
 import com.linkup.Petory.domain.care.service.CareRequestService;
+import com.linkup.Petory.global.security.AuthenticatedUserIdResolver;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,22 +21,10 @@ import lombok.extern.slf4j.Slf4j;
 public class CareRequestController {
 
     private final CareRequestService careRequestService;
+    private final AuthenticatedUserIdResolver authenticatedUserIdResolver;
 
-    /**
-     * 현재 로그인한 사용자의 ID 추출
-     */
     private Long getCurrentUserId() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || authentication.getPrincipal() == null) {
-            throw new UnauthenticatedException("인증되지 않은 사용자입니다.");
-        }
-        // UserDetails의 username이 실제로는 userId (id 필드)
-        String userIdString = authentication.getName();
-        try {
-            return Long.parseLong(userIdString);
-        } catch (NumberFormatException e) {
-            throw CareValidationException.invalidUserId();
-        }
+        return authenticatedUserIdResolver.requireCurrentUserIdx();
     }
 
     // 반경 기반 근처 케어 요청 조회 (지도 표출용)
