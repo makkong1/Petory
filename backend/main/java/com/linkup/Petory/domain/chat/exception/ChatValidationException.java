@@ -31,4 +31,8 @@ public class ChatValidationException extends ApiException {
     public static ChatValidationException notCareConversation() {
         return new ChatValidationException("펫케어 관련 채팅방이 아닙니다.");
     }
+
+    public static ChatValidationException cannotChatWithSelf() {
+        return new ChatValidationException("본인과는 채팅방을 만들 수 없습니다.");
+    }
 }

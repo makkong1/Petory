@@ -174,6 +174,18 @@ CREATE FULLTEXT INDEX idx_carerequest_title_description ON carerequest(title, de
 
 
 -- ============================================
+-- CHATMESSAGE TABLE INDEXES
+-- ============================================
+-- 채팅방 내 메시지 본문 검색 (MATCH ... AGAINST, SpringDataJpaChatMessageRepository.findIdxByFulltextContent)
+-- 운영 기준 인덱스명: idx_chat_message_content (content 단일 FULLTEXT).
+-- MySQL 8: 동일 컬럼에 FULLTEXT가 2개면(이름만 다른 경우 포함) "Duplicate index ... deprecated" 경고.
+-- 잘못 추가된 보조 이름만 제거.
+ALTER TABLE chatmessage DROP INDEX IF EXISTS idx_chatmessage_content;
+-- 신규 DB: 아래 CREATE 실행. 이미 idx_chat_message_content 가 있으면(운영) Duplicate 오류 나므로 이 줄은 생략.
+CREATE FULLTEXT INDEX idx_chat_message_content ON chatmessage(content) WITH PARSER ngram;
+
+
+-- ============================================
 -- BOARDPOPULARITYSNAPSHOT TABLE INDEXES
 -- ============================================
 -- 기본 조회 쿼리 최적화 (정확한 날짜 매칭)

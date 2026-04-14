@@ -2,7 +2,11 @@ package com.linkup.Petory.domain.chat.repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import org.springframework.context.annotation.Primary;
 import org.springframework.data.domain.Page;
@@ -112,7 +116,21 @@ public class JpaChatMessageAdapter implements ChatMessageRepository {
     public List<ChatMessage> searchMessagesByKeyword(
             Long conversationIdx,
             String keyword) {
-        return jpaRepository.searchMessagesByKeyword(conversationIdx, keyword);
+        if (keyword == null || keyword.isBlank()) {
+            return List.of();
+        }
+        String trimmed = keyword.trim();
+        List<Long> ids = jpaRepository.findIdxByFulltextContent(conversationIdx, trimmed);
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        List<ChatMessage> loaded = jpaRepository.findByIdxInWithAssociations(ids);
+        Map<Long, ChatMessage> byId = loaded.stream()
+                .collect(Collectors.toMap(ChatMessage::getIdx, Function.identity(), (a, b) -> a));
+        return ids.stream()
+                .map(byId::get)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
     }
 }
 

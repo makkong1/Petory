@@ -5,6 +5,8 @@ import java.util.Map;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -25,7 +27,9 @@ import com.linkup.Petory.domain.board.exception.BoardValidationException;
 import com.linkup.Petory.domain.board.service.MissingPetBoardService;
 import com.linkup.Petory.domain.board.service.MissingPetCommentService;
 import com.linkup.Petory.domain.chat.dto.ConversationDTO;
+import com.linkup.Petory.domain.chat.exception.ChatValidationException;
 import com.linkup.Petory.domain.chat.service.ConversationService;
+import com.linkup.Petory.domain.user.exception.UnauthenticatedException;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -47,11 +51,24 @@ public class MissingPetBoardController {
     private final MissingPetCommentService missingPetCommentService;
     private final ConversationService conversationService;
 
+    /** JWT principal = Users.idx (CareRequestController 등과 동일 패턴). */
+    private Long getCurrentUserId() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || authentication.getPrincipal() == null) {
+            throw new UnauthenticatedException("인증되지 않은 사용자입니다.");
+        }
+        try {
+            return Long.parseLong(authentication.getName());
+        } catch (NumberFormatException e) {
+            throw new ChatValidationException("인증 사용자 식별값이 올바르지 않습니다.");
+        }
+    }
+
     // ==================== 게시글 관련 API (MissingPetBoardService) ====================
 
     /**
-     * 실종 제보 목록 조회 (페이징 지원)
-     * GET /api/missing-pets?status={status}&page={page}&size={size}
+     * 실종 제보 목록 조회 (페이징 지원).
+     * 쿼리: status, page, size.
      * 서비스: MissingPetBoardService.getBoardsWithPaging()
      */
     @GetMapping
@@ -63,14 +80,13 @@ public class MissingPetBoardController {
     }
 
     /**
-     * 실종 제보 상세 조회 (댓글 페이징 지원)
-     * GET
-     * /api/missing-pets/{id}?commentPage={commentPage}&commentSize={commentSize}
+     * 실종 제보 상세 조회 (댓글 페이징 지원).
+     * path: 게시글 id. 쿼리: commentPage, commentSize.
      * 서비스: MissingPetBoardService.getBoard()
      * - 댓글 페이징 처리 (commentPage, commentSize 파라미터)
      * - 기본값: commentPage=0, commentSize=20 (첫 페이지, 20개씩)
      * - 댓글 제외: commentSize=0
-     * - 댓글 전체: 별도 API 사용 (GET /api/missing-pets/{id}/comments)
+     * - 댓글 전체: 댓글 목록 전용 엔드포인트(getComments) 사용
      */
     @GetMapping("/{id}")
     public ResponseEntity<MissingPetBoardDTO> getBoard(
@@ -84,8 +100,7 @@ public class MissingPetBoardController {
     }
 
     /**
-     * 실종 제보 작성
-     * POST /api/missing-pets
+     * 실종 제보 작성.
      * 서비스: MissingPetBoardService.createBoard()
      */
     @PostMapping
@@ -95,8 +110,8 @@ public class MissingPetBoardController {
     }
 
     /**
-     * 실종 제보 수정
-     * PUT /api/missing-pets/{id}
+     * 실종 제보 수정.
+     * path: 게시글 id.
      * 서비스: MissingPetBoardService.updateBoard()
      */
     @PutMapping("/{id}")
@@ -108,8 +123,8 @@ public class MissingPetBoardController {
     }
 
     /**
-     * 실종 제보 상태 변경
-     * PATCH /api/missing-pets/{id}/status
+     * 실종 제보 상태 변경.
+     * path: 게시글 id 및 status 세그먼트.
      * 서비스: MissingPetBoardService.updateStatus()
      */
     @PatchMapping("/{id}/status")
@@ -133,8 +148,8 @@ public class MissingPetBoardController {
     }
 
     /**
-     * 실종 제보 삭제 (소프트 삭제)
-     * DELETE /api/missing-pets/{id}
+     * 실종 제보 삭제 (소프트 삭제).
+     * path: 게시글 id.
      * 서비스: MissingPetBoardService.deleteBoard()
      * 참고: 관련 댓글도 함께 소프트 삭제됨 (MissingPetCommentService.deleteAllCommentsByBoard())
      */
@@ -149,8 +164,8 @@ public class MissingPetBoardController {
     // ========== 댓글 관련 API (MissingPetCommentService) ==========
 
     /**
-     * 댓글 목록 조회 (페이징 지원)
-     * GET /api/missing-pets/{id}/comments?page={page}&size={size}
+     * 댓글 목록 조회 (페이징 지원).
+     * path: 게시글 id. 쿼리: page, size.
      * 서비스: MissingPetCommentService.getCommentsWithPaging()
      */
     @GetMapping("/{id}/comments")
@@ -162,8 +177,8 @@ public class MissingPetBoardController {
     }
 
     /**
-     * 댓글 작성
-     * POST /api/missing-pets/{id}/comments
+     * 댓글 작성.
+     * path: 게시글 id.
      * 서비스: MissingPetCommentService.addComment()
      */
     @PostMapping("/{id}/comments")
@@ -175,8 +190,8 @@ public class MissingPetBoardController {
     }
 
     /**
-     * 댓글 삭제 (소프트 삭제)
-     * DELETE /api/missing-pets/{boardId}/comments/{commentId}
+     * 댓글 삭제 (소프트 삭제).
+     * path: 게시글 id, 댓글 id.
      * 서비스: MissingPetCommentService.deleteComment()
      */
     @DeleteMapping("/{boardId}/comments/{commentId}")
@@ -192,22 +207,17 @@ public class MissingPetBoardController {
     // ==================== 채팅 관련 API ====================
 
     /**
-     * 실종제보 채팅 시작 ("목격했어요" 버튼 클릭)
-     * POST /api/missing-pets/{boardIdx}/start-chat?witnessId={witnessId}
-     * 서비스: MissingPetBoardService.getBoard() +
-     * ConversationService.createMissingPetChat()
-     */
-
-    /**
-     * 실종제보 채팅 시작 ("목격했어요" 버튼 클릭)
+     * 실종 제보 채팅 시작 (목격 제보).
+     * path 변수 boardIdx. 목격자는 JWT principal(로그인 사용자 idx)만 사용하며 witnessId 쿼리는 받지 않음.
+     *
+     * @see MissingPetBoardService#getUserIdByBoardIdx
+     * @see ConversationService#createMissingPetChat
      */
     @PostMapping("/{boardIdx}/start-chat")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ConversationDTO> startMissingPetChat(
-            @PathVariable Long boardIdx,
-            @RequestParam Long witnessId) {
-        // [리팩토링] getBoard 전체 조회 → userId 프로젝션 1쿼리
+    public ResponseEntity<ConversationDTO> startMissingPetChat(@PathVariable Long boardIdx) {
         Long reporterId = missingPetBoardService.getUserIdByBoardIdx(boardIdx);
+        Long witnessId = getCurrentUserId();
 
         ConversationDTO conversation = conversationService.createMissingPetChat(
                 boardIdx, reporterId, witnessId);

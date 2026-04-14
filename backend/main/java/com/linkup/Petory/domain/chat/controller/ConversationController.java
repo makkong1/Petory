@@ -4,6 +4,8 @@ import java.util.List;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import com.linkup.Petory.domain.chat.dto.ConversationDTO;
@@ -11,7 +13,9 @@ import com.linkup.Petory.domain.chat.dto.CreateConversationRequest;
 import com.linkup.Petory.domain.chat.entity.ConversationStatus;
 import com.linkup.Petory.domain.chat.entity.ConversationType;
 import com.linkup.Petory.domain.chat.entity.RelatedType;
+import com.linkup.Petory.domain.chat.exception.ChatValidationException;
 import com.linkup.Petory.domain.chat.service.ConversationService;
+import com.linkup.Petory.domain.user.exception.UnauthenticatedException;
 
 import lombok.RequiredArgsConstructor;
 
@@ -22,13 +26,25 @@ public class ConversationController {
 
     private final ConversationService conversationService;
 
+    private Long getCurrentUserId() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || authentication.getPrincipal() == null) {
+            throw new UnauthenticatedException("인증되지 않은 사용자입니다.");
+        }
+        try {
+            return Long.parseLong(authentication.getName());
+        } catch (NumberFormatException e) {
+            throw new ChatValidationException("인증 사용자 식별값이 올바르지 않습니다.");
+        }
+    }
+
     /**
      * 내 채팅방 목록 조회
      */
     @GetMapping
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<List<ConversationDTO>> getMyConversations(@RequestParam Long userId) {
-        return ResponseEntity.ok(conversationService.getMyConversations(userId));
+    public ResponseEntity<List<ConversationDTO>> getMyConversations() {
+        return ResponseEntity.ok(conversationService.getMyConversations(getCurrentUserId()));
     }
 
     /**
@@ -36,10 +52,8 @@ public class ConversationController {
      */
     @GetMapping("/{conversationIdx}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ConversationDTO> getConversation(
-            @PathVariable Long conversationIdx,
-            @RequestParam Long userId) {
-        return ResponseEntity.ok(conversationService.getConversation(conversationIdx, userId));
+    public ResponseEntity<ConversationDTO> getConversation(@PathVariable Long conversationIdx) {
+        return ResponseEntity.ok(conversationService.getConversation(conversationIdx, getCurrentUserId()));
     }
 
     /**
@@ -58,7 +72,8 @@ public class ConversationController {
                 relatedType,
                 request.relatedIdx(),
                 request.title(),
-                request.participantUserIds());
+                request.participantUserIds(),
+                getCurrentUserId());
 
         return ResponseEntity.ok(dto);
     }
@@ -69,11 +84,9 @@ public class ConversationController {
     @PostMapping("/care-request")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ConversationDTO> createCareRequestConversation(
-            @RequestParam Long careApplicationIdx,
-            @RequestParam Long requesterId,
-            @RequestParam Long providerId) {
+            @RequestParam Long careApplicationIdx) {
         return ResponseEntity.ok(conversationService.createCareRequestConversation(
-                careApplicationIdx, requesterId, providerId));
+                careApplicationIdx, getCurrentUserId()));
     }
 
     /**
@@ -81,10 +94,9 @@ public class ConversationController {
      */
     @PostMapping("/direct")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ConversationDTO> getOrCreateDirectConversation(
-            @RequestParam Long user1Id,
-            @RequestParam Long user2Id) {
-        return ResponseEntity.ok(conversationService.getOrCreateDirectConversation(user1Id, user2Id));
+    public ResponseEntity<ConversationDTO> getOrCreateDirectConversation(@RequestParam Long otherUserId) {
+        return ResponseEntity.ok(conversationService.getOrCreateDirectConversation(
+                getCurrentUserId(), otherUserId));
     }
 
     /**
@@ -92,10 +104,8 @@ public class ConversationController {
      */
     @PostMapping("/{conversationIdx}/leave")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Void> leaveConversation(
-            @PathVariable Long conversationIdx,
-            @RequestParam Long userId) {
-        conversationService.leaveConversation(conversationIdx, userId);
+    public ResponseEntity<Void> leaveConversation(@PathVariable Long conversationIdx) {
+        conversationService.leaveConversation(conversationIdx, getCurrentUserId());
         return ResponseEntity.noContent().build();
     }
 
@@ -104,10 +114,8 @@ public class ConversationController {
      */
     @DeleteMapping("/{conversationIdx}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Void> deleteConversation(
-            @PathVariable Long conversationIdx,
-            @RequestParam Long userId) {
-        conversationService.deleteConversation(conversationIdx, userId);
+    public ResponseEntity<Void> deleteConversation(@PathVariable Long conversationIdx) {
+        conversationService.deleteConversation(conversationIdx, getCurrentUserId());
         return ResponseEntity.noContent().build();
     }
 
@@ -120,7 +128,8 @@ public class ConversationController {
             @PathVariable Long conversationIdx,
             @RequestParam String status) {
         ConversationStatus conversationStatus = ConversationStatus.valueOf(status);
-        return ResponseEntity.ok(conversationService.updateConversationStatus(conversationIdx, conversationStatus));
+        return ResponseEntity.ok(conversationService.updateConversationStatus(
+                conversationIdx, conversationStatus, getCurrentUserId()));
     }
 
     /**
@@ -128,10 +137,8 @@ public class ConversationController {
      */
     @PostMapping("/meetup/{meetupIdx}/join")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ConversationDTO> joinMeetupChat(
-            @PathVariable Long meetupIdx,
-            @RequestParam Long userId) {
-        return ResponseEntity.ok(conversationService.joinMeetupChat(meetupIdx, userId));
+    public ResponseEntity<ConversationDTO> joinMeetupChat(@PathVariable Long meetupIdx) {
+        return ResponseEntity.ok(conversationService.joinMeetupChat(meetupIdx, getCurrentUserId()));
     }
 
     /**
@@ -148,10 +155,8 @@ public class ConversationController {
      */
     @PostMapping("/{conversationIdx}/confirm-deal")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Void> confirmCareDeal(
-            @PathVariable Long conversationIdx,
-            @RequestParam Long userId) {
-        conversationService.confirmCareDeal(conversationIdx, userId);
+    public ResponseEntity<Void> confirmCareDeal(@PathVariable Long conversationIdx) {
+        conversationService.confirmCareDeal(conversationIdx, getCurrentUserId());
         return ResponseEntity.noContent().build();
     }
 }
