@@ -3,6 +3,9 @@
 > **날짜**: 2026-04-14
 > **대상**: `domain/care/`, `domain/payment/` 전체
 > **리뷰 기준**: `.claude/skills/review.md` 체크리스트 A~E
+>
+> **리팩토링 적용 서술**(발생 위치 → 개선 코드 → **개선 완료**):  
+> → `docs/refactoring/care/care-payment-refactoring-2026-04-14.md` 를 본문으로 본다.
 
 ---
 
@@ -114,6 +117,8 @@ public ResponseEntity<List<CareRequestDTO>> getMyCareRequests() {
 
 `LOWER(cr.title) LIKE LOWER(CONCAT('%', :keyword, '%'))` → B-tree 인덱스 미사용, 풀 스캔. 데이터량 증가 시 FULLTEXT INDEX 전환 필요.
 
+**조치 (완료)**: `MATCH(cr.title, cr.description) AGAINST(:keyword IN NATURAL LANGUAGE MODE)`로 전환. 목록 검색은 `findIdxByFulltextKeyword` + `findByIdxInWithAssociations`, 페이징은 네이티브 `searchWithPaging` 후 `JpaCareRequestAdapter`에서 동일 FETCH 재조회. DB에 `idx_carerequest_title_description` FULLTEXT 인덱스 적용 필수 (`docs/migration/db/indexes.sql`).
+
 ---
 
 ### 2. [A3] 페이징 location 필터 - LIKE '%location%'
@@ -121,6 +126,8 @@ public ResponseEntity<List<CareRequestDTO>> getMyCareRequests() {
 **파일**: `SpringDataJpaCareRequestRepository.java:86~88`
 
 `u.location LIKE CONCAT('%', :location, '%')` → 풀 스캔. 지역 필드 분리(sido, sigungu) 또는 접두사 검색 권장.
+
+**조치 (완료)**: `u.location LIKE CONCAT(:location, '%')` 접두사 검색으로 변경. 전체 목록 API(`getAllCareRequests`)도 동일하게 `startsWith`로 맞춤. 중간 일치는 더 이상 지원하지 않음. `users.location` 인덱스는 `idx_users_location` 참고.
 
 ---
 
@@ -225,3 +232,15 @@ public ResponseEntity<List<CareRequestDTO>> getMyCareRequests() {
 | [B2] updateStatus() 트랜잭션 분리 | 구조 변경 규모 큼, 별도 PR 권장 |
 | [B2] addComment() 알림 분리 | @TransactionalEventListener 도입 필요, 별도 작업 |
 | [A3] FULLTEXT 전환 | 데이터량 적을 때는 현행 유지, 성능 이슈 발생 시 적용 |
+
+---
+
+## 도메인 문서 동기화 (docs-sync, 2026-04-14)
+
+코드가 진실인 전제로 `docs/domains/care.md`, `docs/domains/payment.md`를 아래와 같이 맞춤.
+
+| 문서 | 반영 내용 |
+|------|-----------|
+| `care.md` | §2 로직 4·서비스 표: `updateStatus` **소프트 삭제 거부**, `getCareRequest`/`getMyCareRequests`/`CareReviewService` 동작; §3.4 API·**보안 참고**(@PreAuthorize, my-requests 무파라미터, `careRequestApi.js`); §7 링크 문구 |
+| `payment.md` | §8.3·§10.0: **`POST /charge`에 `@PreAuthorize("isAuthenticated()")`**; 관련 문서 링크 문구 |
+| `care-payment-refactoring-2026-04-14.md` | **신규** — 위 리팩토링을 「발생 위치 → 문제 → 개선 코드 → 상태」형으로 정리 |

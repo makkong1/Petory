@@ -2,9 +2,14 @@ package com.linkup.Petory.domain.care.repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Repository;
@@ -73,8 +78,21 @@ public class JpaCareRequestAdapter implements CareRequestRepository {
     public List<CareRequest> findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCaseAndIsDeletedFalse(
             String titleKeyword,
             String descKeyword) {
-        return jpaRepository.findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCaseAndIsDeletedFalse(
-                titleKeyword, descKeyword);
+        String keyword = titleKeyword != null ? titleKeyword : descKeyword;
+        if (keyword == null || keyword.isBlank()) {
+            return List.of();
+        }
+        List<Long> ids = jpaRepository.findIdxByFulltextKeyword(keyword);
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        List<CareRequest> loaded = jpaRepository.findByIdxInWithAssociations(ids);
+        Map<Long, CareRequest> byId = loaded.stream()
+                .collect(Collectors.toMap(CareRequest::getIdx, Function.identity(), (a, b) -> a));
+        return ids.stream()
+                .map(byId::get)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -122,7 +140,21 @@ public class JpaCareRequestAdapter implements CareRequestRepository {
 
     @Override
     public Page<CareRequest> searchWithPaging(String keyword, Pageable pageable) {
-        return jpaRepository.searchWithPaging(keyword, pageable);
+        Page<CareRequest> raw = jpaRepository.searchWithPaging(keyword, pageable);
+        if (raw.isEmpty()) {
+            return raw;
+        }
+        List<Long> ids = raw.getContent().stream()
+                .map(CareRequest::getIdx)
+                .collect(Collectors.toList());
+        List<CareRequest> hydrated = jpaRepository.findByIdxInWithAssociations(ids);
+        Map<Long, CareRequest> byId = hydrated.stream()
+                .collect(Collectors.toMap(CareRequest::getIdx, Function.identity(), (a, b) -> a));
+        List<CareRequest> ordered = ids.stream()
+                .map(byId::get)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+        return new PageImpl<>(ordered, pageable, raw.getTotalElements());
     }
 
     @Override
