@@ -279,6 +279,10 @@ public class CareRequestService {
         CareRequest request = careRequestRepository.findByIdWithApplications(idx)
                 .orElseThrow(() -> new CareRequestNotFoundException());
 
+        if (Boolean.TRUE.equals(request.getIsDeleted())) {
+            throw new CareRequestNotFoundException();
+        }
+
         // 관리자는 권한 검증 우회
         if (!isAdmin()) {
             // 스케줄러 등 시스템 작업(CareRequestScheduler에서 currentUserId == null)은 검증 생략

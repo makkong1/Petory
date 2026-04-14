@@ -116,3 +116,45 @@ frontend/src/
 - `GET /api/boards`에 `@PreAuthorize("permitAll()")` 있어도 `SecurityConfig`의 `/api/**` catch-all 때문에 실제로는 인증 필요.
 - 회원가입 payload에 `"role":"USER"` 필드 필요.
 - OAuth2 소셜 로그인은 실제 credentials 없으면 동작 안 함 — 로컬 인증은 정상 동작.
+
+## Skills (커스텀 명령)
+
+`.claude/skills/` 디렉토리에 정의된 전용 Skill 파일:
+
+| Skill | 파일 | 핵심 기능 |
+|-------|------|----------|
+| 코드 리뷰 | `.claude/skills/review.md` | 룰 기반 체크리스트(JPA/트랜잭션/보안) + [문제→원인→개선코드] 형식 + 점수판 |
+| 커밋+푸시 | `.claude/skills/commit.md` | 파일 필터링(민감파일 자동제외) → type/scope 자동분류 → 도메인별 커밋 분리 제안 |
+| 문서화 | `.claude/skills/docs-sync.md` | 변경 파일 기반 영향 문서 자동 탐지 → 코드 사실 확인 → 문서 현행화 |
+| 리팩토링 | `.claude/skills/refactor.md` | 3가지 타입(구조/성능/가독성) 분류 + 측정 기준(쿼리 수, 코드량) 포함 계획 |
+| 트러블슈팅 | `.claude/skills/fix.md` | 재현 가능성 체크 → 빠른 해결(Hotfix) + 근본 해결(Proper Fix) 2단계 제시 |
+| 테스트 | `.claude/skills/test.md` | 변경 코드 기반 테스트 자동 생성 (정상/예외/경계값 3종 필수, 동시성 테스트 포함) |
+
+## 개발 워크플로우 파이프라인
+
+Skill 간 자동 연계 흐름:
+
+```
+코드 수정
+  │
+  ▼
+/review  (룰 기반 점검)
+  │
+  ├─ Critical 있음 → /refactor (수정) 또는 /fix (버그)
+  │                      │
+  │                      ▼
+  │                   /test (검증)
+  │                      │
+  ├─ Critical 없음 ──────┤
+  │                      ▼
+  │                   /commit (커밋+푸시)
+  │                      │
+  │                      ▼
+  └──────────────────  /docs (문서 현행화)
+```
+
+### 워크플로우 규칙
+- `/review` → Critical 0개일 때만 "커밋 가능" 판정
+- `/refactor` 또는 `/fix` 완료 후 → 반드시 `/test` 제안
+- `/test` 전부 통과 후 → `/commit` 제안
+- 코드 변경이 있는 커밋 후 → `/docs` 영향 문서 확인 제안

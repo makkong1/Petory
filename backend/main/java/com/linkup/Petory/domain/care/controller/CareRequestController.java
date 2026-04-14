@@ -3,6 +3,7 @@ package com.linkup.Petory.domain.care.controller;
 import java.util.List;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
@@ -67,35 +68,36 @@ public class CareRequestController {
         return ResponseEntity.ok(careRequestService.getCareRequest(id));
     }
 
-    // 케어 요청 생성
     @PostMapping
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<CareRequestDTO> createCareRequest(@RequestBody CareRequestDTO dto) {
         return ResponseEntity.ok(careRequestService.createCareRequest(dto));
     }
 
-    // 케어 요청 수정
     @PutMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<CareRequestDTO> updateCareRequest(@PathVariable Long id, @RequestBody CareRequestDTO dto) {
         Long currentUserId = getCurrentUserId();
         return ResponseEntity.ok(careRequestService.updateCareRequest(id, dto, currentUserId));
     }
 
-    // 케어 요청 삭제
     @DeleteMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Void> deleteCareRequest(@PathVariable Long id) {
         Long currentUserId = getCurrentUserId();
         careRequestService.deleteCareRequest(id, currentUserId);
         return ResponseEntity.noContent().build();
     }
 
-    // 내 케어 요청 조회
     @GetMapping("/my-requests")
-    public ResponseEntity<List<CareRequestDTO>> getMyCareRequests(@RequestParam Long userId) {
-        return ResponseEntity.ok(careRequestService.getMyCareRequests(userId));
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<List<CareRequestDTO>> getMyCareRequests() {
+        Long currentUserId = getCurrentUserId();
+        return ResponseEntity.ok(careRequestService.getMyCareRequests(currentUserId));
     }
 
-    // 케어 요청 상태 변경
     @PatchMapping("/{id}/status")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<CareRequestDTO> updateStatus(@PathVariable Long id, @RequestParam String status) {
         Long currentUserId = getCurrentUserId();
         return ResponseEntity.ok(careRequestService.updateStatus(id, status, currentUserId));

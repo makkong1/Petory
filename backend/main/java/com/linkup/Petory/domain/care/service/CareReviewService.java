@@ -3,6 +3,7 @@ package com.linkup.Petory.domain.care.service;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,8 +37,9 @@ public class CareReviewService {
     /**
      * 특정 사용자(reviewee)에 대한 리뷰 목록 조회
      */
+    @Transactional(readOnly = true)
     public List<CareReviewDTO> getReviewsByReviewee(Long revieweeIdx) {
-        List<com.linkup.Petory.domain.care.entity.CareReview> reviews = reviewRepository
+        List<CareReview> reviews = reviewRepository
                 .findByRevieweeIdxOrderByCreatedAtDesc(revieweeIdx);
         return reviews.stream()
                 .map(reviewConverter::toDTO)
@@ -47,8 +49,9 @@ public class CareReviewService {
     /**
      * 특정 사용자(reviewer)가 작성한 리뷰 목록 조회
      */
+    @Transactional(readOnly = true)
     public List<CareReviewDTO> getReviewsByReviewer(Long reviewerIdx) {
-        List<com.linkup.Petory.domain.care.entity.CareReview> reviews = reviewRepository
+        List<CareReview> reviews = reviewRepository
                 .findByReviewerIdxOrderByCreatedAtDesc(reviewerIdx);
         return reviews.stream()
                 .map(reviewConverter::toDTO)
@@ -76,7 +79,7 @@ public class CareReviewService {
      */
     @Transactional(readOnly = true)
     public Double getAverageRating(Long revieweeIdx) {
-        List<com.linkup.Petory.domain.care.entity.CareReview> reviews = reviewRepository
+        List<CareReview> reviews = reviewRepository
                 .findByRevieweeIdxOrderByCreatedAtDesc(revieweeIdx);
 
         if (reviews.isEmpty()) {
@@ -84,7 +87,7 @@ public class CareReviewService {
         }
 
         double sum = reviews.stream()
-                .mapToInt(com.linkup.Petory.domain.care.entity.CareReview::getRating)
+                .mapToInt(CareReview::getRating)
                 .sum();
 
         return sum / reviews.size();
@@ -142,7 +145,11 @@ public class CareReviewService {
                 .comment(dto.getComment())
                 .build();
 
-        CareReview saved = reviewRepository.save(review);
-        return reviewConverter.toDTO(saved);
+        try {
+            CareReview saved = reviewRepository.save(review);
+            return reviewConverter.toDTO(saved);
+        } catch (DataIntegrityViolationException e) {
+            throw CareConflictException.alreadyReviewed();
+        }
     }
 }

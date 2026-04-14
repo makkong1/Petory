@@ -46,11 +46,10 @@ export const careRequestApi = {
   // 케어 요청 삭제
   deleteCareRequest: (id) => (isDemoMode() ? mockResolve({}) : api.delete(`/${id}`)),
 
-  // 내 케어 요청 조회
-  getMyCareRequests: (userId) =>
+  getMyCareRequests: () =>
     isDemoMode()
       ? mockResolve({ careRequests: DEMO_CARE_REQUESTS.filter((c) => c.userId === 1), totalCount: 1 })
-      : api.get('/my-requests', { params: { userId } }),
+      : api.get('/my-requests'),
 
   // 상태 변경
   updateStatus: (id, status) =>
