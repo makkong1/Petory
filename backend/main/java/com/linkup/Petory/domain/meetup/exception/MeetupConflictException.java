@@ -12,15 +12,23 @@ public class MeetupConflictException extends ApiException {
 
     public static final String ERROR_CODE = "MEETUP_CONFLICT";
 
+    public MeetupConflictException(String message, String errorCode) {
+        super(message, HttpStatus.CONFLICT, errorCode);
+    }
+
     public MeetupConflictException(String message) {
-        super(message, HttpStatus.CONFLICT, ERROR_CODE);
+        this(message, ERROR_CODE);
     }
 
     public static MeetupConflictException alreadyJoined() {
-        return new MeetupConflictException("이미 참가한 모임입니다.");
+        return new MeetupConflictException("이미 참가한 모임입니다.", "MEETUP_ALREADY_JOINED");
     }
 
     public static MeetupConflictException fullCapacity() {
-        return new MeetupConflictException("모임 인원이 가득 찼습니다.");
+        return new MeetupConflictException("모임 인원이 가득 찼습니다.", "MEETUP_FULL");
+    }
+
+    public static MeetupConflictException meetupNotRecruiting() {
+        return new MeetupConflictException("모집이 마감된 모임입니다.", "MEETUP_NOT_RECRUITING");
     }
 }

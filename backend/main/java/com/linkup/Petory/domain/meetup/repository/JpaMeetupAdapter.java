@@ -55,8 +55,8 @@ public class JpaMeetupAdapter implements MeetupRepository {
     }
 
     @Override
-    public List<Meetup> findAvailableMeetups(LocalDateTime currentDate, Pageable pageable) {
-        return jpaRepository.findAvailableMeetups(currentDate, pageable);
+    public List<Meetup> findAvailableMeetups(LocalDateTime currentDate, MeetupStatus recruiting, Pageable pageable) {
+        return jpaRepository.findAvailableMeetups(currentDate, recruiting, pageable);
     }
 
     @Override
@@ -80,8 +80,8 @@ public class JpaMeetupAdapter implements MeetupRepository {
     }
 
     @Override
-    public int incrementParticipantsIfAvailable(Long meetupIdx) {
-        return jpaRepository.incrementParticipantsIfAvailable(meetupIdx);
+    public int incrementParticipantsIfAvailable(Long meetupIdx, MeetupStatus recruiting) {
+        return jpaRepository.incrementParticipantsIfAvailable(meetupIdx, recruiting);
     }
 
     @Override

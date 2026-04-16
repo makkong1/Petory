@@ -24,9 +24,11 @@ import com.linkup.Petory.domain.meetup.dto.MeetupDTO;
 import com.linkup.Petory.domain.meetup.dto.MeetupParticipantsDTO;
 import com.linkup.Petory.domain.meetup.entity.Meetup;
 import com.linkup.Petory.domain.meetup.entity.MeetupParticipants;
+import com.linkup.Petory.domain.meetup.entity.MeetupStatus;
 import com.linkup.Petory.domain.meetup.event.MeetupCreatedEvent;
 import com.linkup.Petory.domain.meetup.exception.MeetupConflictException;
 import com.linkup.Petory.domain.meetup.exception.MeetupForbiddenException;
+import com.linkup.Petory.global.exception.ApiException;
 import com.linkup.Petory.domain.meetup.exception.MeetupNotFoundException;
 import com.linkup.Petory.domain.meetup.exception.MeetupParticipantNotFoundException;
 import com.linkup.Petory.domain.meetup.exception.MeetupValidationException;
@@ -51,6 +53,9 @@ public class MeetupService {
 
     /** 근처 모임 네이티브 조회 상한 (과다 로드 방지) */
     public static final int DEFAULT_NEARBY_MAX_RESULTS = 500;
+
+    /** 위치·키워드·주최자별 목록 조회 상한 (OOM 방지, 풀 페이징 전환 전 임시 상한) */
+    public static final int MAX_LIST_SIZE = 500;
 
     private final MeetupRepository meetupRepository;
     private final MeetupParticipantsRepository meetupParticipantsRepository;
@@ -92,7 +97,7 @@ public class MeetupService {
                 .organizer(organizer)
                 .maxParticipants(meetupDTO.getMaxParticipants() != null ? meetupDTO.getMaxParticipants() : 10)
                 .currentParticipants(1)
-                .status(com.linkup.Petory.domain.meetup.entity.MeetupStatus.RECRUITING)
+                .status(MeetupStatus.RECRUITING)
                 .build();
 
         Meetup savedMeetup = meetupRepository.save(meetup);
@@ -127,7 +132,9 @@ public class MeetupService {
     // [FIX] userId 파라미터 추가 후 주최자 검증 — 기존 인증만 되면 누구나 수정 가능하던 보안 이슈 수정
     @Transactional
     public MeetupDTO updateMeetup(Long meetupIdx, MeetupDTO meetupDTO, String userId) {
-        Meetup meetup = meetupRepository.findByIdWithDetails(meetupIdx)
+        // [리팩토링] findByIdWithDetails(참가자 전체 FETCH) → findByIdWithOrganizer(주최자만 FETCH)
+        // updateMeetup에는 organizer 확인만 필요하므로 참가자 FETCH 불필요
+        Meetup meetup = meetupRepository.findByIdWithOrganizer(meetupIdx)
                 .orElseThrow(MeetupNotFoundException::new);
 
         Users currentUser = usersRepository.findByIdString(userId)
@@ -156,10 +163,20 @@ public class MeetupService {
             meetup.setLongitude(meetupDTO.getLongitude());
         }
         if (meetupDTO.getDate() != null) {
+            if (meetupDTO.getDate().isBefore(LocalDateTime.now())) {
+                throw MeetupValidationException.dateMustBeFuture();
+            }
             meetup.setDate(meetupDTO.getDate());
         }
         if (meetupDTO.getMaxParticipants() != null) {
-            meetup.setMaxParticipants(meetupDTO.getMaxParticipants());
+            int newMax = meetupDTO.getMaxParticipants();
+            if (newMax < 1) {
+                throw MeetupValidationException.invalidMaxParticipants();
+            }
+            if (newMax < meetup.getCurrentParticipants()) {
+                throw MeetupValidationException.maxBelowCurrent();
+            }
+            meetup.setMaxParticipants(newMax);
         }
 
         Meetup savedMeetup = meetupRepository.save(meetup);
@@ -247,8 +264,10 @@ public class MeetupService {
         return result;
     }
 
-    // 특정 모임의 참가자 목록 조회
+    // 특정 모임의 참가자 목록 조회 (존재·삭제 여부 먼저 확인)
     public List<MeetupParticipantsDTO> getMeetupParticipants(Long meetupIdx) {
+        meetupRepository.findByIdWithOrganizer(meetupIdx)
+                .orElseThrow(MeetupNotFoundException::new);
         return convertToParticipantDTOs(
                 meetupParticipantsRepository.findByMeetupIdxOrderByJoinedAtAsc(meetupIdx));
     }
@@ -282,9 +301,15 @@ public class MeetupService {
 
         // 주최자가 아닌 경우에만 인원 증가 (원자적 UPDATE 쿼리)
         if (!meetup.getOrganizer().getIdx().equals(userIdx)) {
-            // 원자적 UPDATE 쿼리로 조건부 증가 (DB 레벨에서 체크 + 증가 동시 처리)
-            int updated = meetupRepository.incrementParticipantsIfAvailable(meetupIdx);
+            // 원자적 UPDATE 쿼리로 조건부 증가 (RECRUITING 상태 + 인원 미달 조건 동시 체크)
+            int updated = meetupRepository.incrementParticipantsIfAvailable(meetupIdx, MeetupStatus.RECRUITING);
             if (updated == 0) {
+                // RECRUITING 상태가 아니면 모집 마감, 상태는 맞지만 인원이 찼으면 fullCapacity
+                if (meetup.getStatus() != MeetupStatus.RECRUITING) {
+                    log.warn("모집이 마감된 모임입니다. meetupIdx={}, userId={}, status={}",
+                            meetupIdx, userId, meetup.getStatus());
+                    throw MeetupConflictException.meetupNotRecruiting();
+                }
                 log.warn("모임 인원이 가득 찼습니다. meetupIdx={}, userId={}, 현재인원={}, 최대인원={}",
                         meetupIdx, userId, meetup.getCurrentParticipants(), meetup.getMaxParticipants());
                 throw MeetupConflictException.fullCapacity();
@@ -337,25 +362,24 @@ public class MeetupService {
         // [FIX] 원자적 UPDATE 쿼리로 감소 — 기존 read-modify-write(Math.max)는 동시 취소 시 카운트 불일치 위험
         meetupRepository.decrementParticipantsIfPositive(meetupIdx);
 
-        // 채팅방에서도 자동으로 나가기
+        // 채팅방에서도 자동으로 나가기 (채팅 실패가 참가 취소를 막으면 안 됨)
         try {
             conversationService.leaveMeetupChat(meetupIdx, userIdx);
             log.info("채팅방에서 나가기 완료: meetupIdx={}, userIdx={}", meetupIdx, userIdx);
+        } catch (ApiException e) {
+            log.warn("채팅방 나가기 실패 (비즈니스): meetupIdx={}, userIdx={}, error={}", meetupIdx, userIdx, e.getMessage());
         } catch (Exception e) {
-            log.error("채팅방 나가기 실패: meetupIdx={}, userIdx={}, error={}", meetupIdx, userIdx, e.getMessage());
-            // 채팅방 나가기 실패해도 모임 참여 취소는 성공으로 처리
+            log.error("채팅방 나가기 예상치 못한 오류: meetupIdx={}, userIdx={}", meetupIdx, userIdx, e);
         }
 
         log.info("모임 참가 취소 완료: meetupIdx={}, userId={}, userIdx={}", meetupIdx, userId, userIdx);
     }
 
     // 사용자가 특정 모임에 참가했는지 확인
+    // [리팩토링] findByIdString(Users 전체 로딩) → findIdxByIdString(idx 스칼라만 조회)
     public boolean isUserParticipating(Long meetupIdx, String userId) {
-        // 사용자 확인 (userId는 Users의 id 필드, 문자열)
-        Users user = usersRepository.findByIdString(userId)
+        Long userIdx = usersRepository.findIdxByIdString(userId)
                 .orElseThrow(UserNotFoundException::new);
-
-        Long userIdx = user.getIdx(); // Users의 idx 필드 (Long)
         return meetupParticipantsRepository.existsByMeetupIdxAndUserIdx(meetupIdx, userIdx);
     }
 
@@ -363,20 +387,24 @@ public class MeetupService {
     @Timed("getMeetupsByLocation")
     public List<MeetupDTO> getMeetupsByLocation(Double minLat, Double maxLat, Double minLng, Double maxLng) {
         List<Meetup> meetups = meetupRepository.findByLocationRange(minLat, maxLat, minLng, maxLng);
-        return convertToDTOs(meetups);
+        return convertToDTOs(meetups.size() > MAX_LIST_SIZE ? meetups.subList(0, MAX_LIST_SIZE) : meetups);
     }
 
     // 키워드로 모임 검색
     @Timed("searchMeetupsByKeyword")
     public List<MeetupDTO> searchMeetupsByKeyword(String keyword) {
         List<Meetup> meetups = meetupRepository.findByKeyword(keyword);
-        return convertToDTOs(meetups);
+        return convertToDTOs(meetups.size() > MAX_LIST_SIZE ? meetups.subList(0, MAX_LIST_SIZE) : meetups);
     }
 
-    // 참여 가능한 모임 조회 (전체 — 관리자·레거시 호출)
+    /**
+     * @deprecated 컨트롤러는 {@link #getAvailableMeetups(Pageable)}를 사용하세요.
+     *             이 메서드는 Pageable.unpaged()로 전량 조회합니다.
+     */
+    @Deprecated
     @Timed("getAvailableMeetups")
     public List<MeetupDTO> getAvailableMeetups() {
-        List<Meetup> meetups = meetupRepository.findAvailableMeetups(LocalDateTime.now(), Pageable.unpaged());
+        List<Meetup> meetups = meetupRepository.findAvailableMeetups(LocalDateTime.now(), MeetupStatus.RECRUITING, Pageable.unpaged());
         return convertToDTOs(meetups);
     }
 
@@ -385,7 +413,7 @@ public class MeetupService {
      */
     @Timed("getAvailableMeetupsPaged")
     public Slice<MeetupDTO> getAvailableMeetups(Pageable pageable) {
-        List<Meetup> list = meetupRepository.findAvailableMeetups(LocalDateTime.now(), pageable);
+        List<Meetup> list = meetupRepository.findAvailableMeetups(LocalDateTime.now(), MeetupStatus.RECRUITING, pageable);
         List<MeetupDTO> dtos = convertToDTOs(list);
         boolean hasNext = pageable.isPaged() && list.size() == pageable.getPageSize();
         return new SliceImpl<>(dtos, pageable, hasNext);
@@ -393,8 +421,8 @@ public class MeetupService {
 
     // 주최자별 모임 조회
     public List<MeetupDTO> getMeetupsByOrganizer(Long organizerIdx) {
-        return convertToDTOs(
-                meetupRepository.findByOrganizerIdxOrderByCreatedAtDesc(organizerIdx));
+        List<Meetup> meetups = meetupRepository.findByOrganizerIdxOrderByCreatedAtDesc(organizerIdx);
+        return convertToDTOs(meetups.size() > MAX_LIST_SIZE ? meetups.subList(0, MAX_LIST_SIZE) : meetups);
     }
 
     /**

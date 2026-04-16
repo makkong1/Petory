@@ -106,7 +106,6 @@ public class GlobalExceptionHandler {
         log.warn("API 예외: {} [{}] - {}", e.getErrorCode(), status, e.getMessage());
 
         Map<String, Object> response = new HashMap<>();
-        response.put("error", e.getMessage());
         response.put("message", e.getMessage());
         response.put("status", status.value());
         if (e.getErrorCode() != null) {
@@ -139,22 +138,21 @@ public class GlobalExceptionHandler {
 
     /**
      * 기타 예외 처리
-     * AsyncRequestTimeoutException은 위에서 처리하므로 제외
+     * AsyncRequestTimeoutException은 위에 전용 핸들러가 있으므로 재throw하여 위임
      */
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<Map<String, Object>> handleException(Exception e) {
-        // AsyncRequestTimeoutException은 이미 처리했으므로 제외
-        if (e instanceof AsyncRequestTimeoutException) {
-            return null;
+    public ResponseEntity<Map<String, Object>> handleException(Exception e) throws AsyncRequestTimeoutException {
+        if (e instanceof AsyncRequestTimeoutException ate) {
+            throw ate;
         }
-        
+
         log.error("예상치 못한 오류 발생", e);
-        
+
         Map<String, Object> response = new HashMap<>();
         response.put("error", "서버 오류가 발생했습니다.");
         response.put("message", "잠시 후 다시 시도해주세요.");
         response.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
-        
+
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
     }
 }

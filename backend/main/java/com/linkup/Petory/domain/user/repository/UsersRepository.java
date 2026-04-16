@@ -60,6 +60,11 @@ public interface UsersRepository {
     Optional<Users> findByIdString(String id);
 
     /**
+     * 로그인 아이디(String)로 idx 스칼라만 조회 (Users 전체 로딩 없는 경량 버전)
+     */
+    Optional<Long> findIdxByIdString(String id);
+
+    /**
      * Refresh Token으로 사용자 조회
      */
     Optional<Users> findByRefreshToken(String refreshToken);

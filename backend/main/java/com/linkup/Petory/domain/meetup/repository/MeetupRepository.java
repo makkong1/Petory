@@ -9,6 +9,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 import com.linkup.Petory.domain.meetup.entity.Meetup;
+import com.linkup.Petory.domain.meetup.entity.MeetupStatus;
 
 /**
  * Meetup 도메인 Repository 인터페이스입니다.
@@ -47,10 +48,10 @@ public interface MeetupRepository {
     List<Meetup> findByKeyword(String keyword);
 
     /**
-     * 참여 가능한 모임 조회 (최대 인원 미만, 소프트 삭제 제외).
-     * {@link Pageable#unpaged()}이면 전체, 그 외에는 DB limit/offset 적용.
+     * 참여 가능한 모임 조회 (RECRUITING 상태 + 인원 미달, 소프트 삭제 제외).
+     * {@link Pageable#unpaged()}이면 전체, 그 외에는 DB LIMIT/OFFSET 적용.
      */
-    List<Meetup> findAvailableMeetups(LocalDateTime currentDate, Pageable pageable);
+    List<Meetup> findAvailableMeetups(LocalDateTime currentDate, MeetupStatus recruiting, Pageable pageable);
 
     /**
      * 반경 기반 근처 모임 ID (거리·일시 정렬, 상한 적용) 후 {@link #findByIdxInWithOrganizer(Collection)}로 주최자 페치.
@@ -73,10 +74,10 @@ public interface MeetupRepository {
     Optional<Meetup> findByIdWithLock(Long idx);
 
     /**
-     * 원자적 UPDATE 쿼리로 동시 접근 방지
+     * 원자적 UPDATE 쿼리로 동시 접근 방지 (RECRUITING 상태인 경우에만 증가)
      * 반환값: 업데이트된 행 수 (0 또는 1)
      */
-    int incrementParticipantsIfAvailable(Long meetupIdx);
+    int incrementParticipantsIfAvailable(Long meetupIdx, MeetupStatus recruiting);
 
     /**
      * [FIX] 참가 취소 시 원자적 감소 (currentParticipants > 0 조건으로 음수 방지)

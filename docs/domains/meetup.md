@@ -177,9 +177,13 @@ public MeetupParticipantsDTO joinMeetup(Long meetupIdx, String userId) {
 
     // 5. 주최자가 아닌 경우에만 인원 증가 (원자적 UPDATE 쿼리)
     if (!meetup.getOrganizer().getIdx().equals(userIdx)) {
-        // 원자적 UPDATE 쿼리로 조건부 증가 (DB 레벨에서 체크 + 증가 동시 처리)
-        int updated = meetupRepository.incrementParticipantsIfAvailable(meetupIdx);
+        // 원자적 UPDATE 쿼리로 조건부 증가 (RECRUITING 상태 + 인원 미달 조건 동시 체크)
+        int updated = meetupRepository.incrementParticipantsIfAvailable(meetupIdx, MeetupStatus.RECRUITING);
         if (updated == 0) {
+            // RECRUITING 상태가 아니면 모집 마감, 상태는 맞지만 인원이 찼으면 fullCapacity
+            if (meetup.getStatus() != MeetupStatus.RECRUITING) {
+                throw MeetupConflictException.meetupNotRecruiting();
+            }
             throw MeetupConflictException.fullCapacity();
         }
         // [리팩토링] findById 2회 호출 제거 → entityManager.refresh()로 영속성 컨텍스트 동기화
@@ -202,12 +206,13 @@ public MeetupParticipantsDTO joinMeetup(Long meetupIdx, String userId) {
 **핵심 로직**:
 
 - **이메일 인증 확인**: 모임 참여 시 이메일 인증 필요 (`EmailVerificationPurpose.MEETUP`)
-- **상태·일시**: `joinMeetup`은 **`RECRUITING`/과거 일시 등을 별도 검증하지 않음** — 인원·중복만 처리 (정책 강화 시 서비스에서 추가)
-- **중복 참여 체크**: `existsByMeetupIdxAndUserIdx()` → `MeetupConflictException.alreadyJoined()`
-- **최대 인원 체크**: 주최자가 아닌 경우에만 → `MeetupConflictException.fullCapacity()` (인원 가득 시)
+- **상태 검증**: `RECRUITING` 상태가 아닌(`CLOSED`/`COMPLETED`) 모임에 참가 시도 → `MeetupConflictException.meetupNotRecruiting()` (errorCode: `MEETUP_NOT_RECRUITING`)
+- **중복 참여 체크**: `existsByMeetupIdxAndUserIdx()` → `MeetupConflictException.alreadyJoined()` (errorCode: `MEETUP_ALREADY_JOINED`)
+- **최대 인원 체크**: 주최자가 아닌 경우에만 → `MeetupConflictException.fullCapacity()` (인원 가득 시, errorCode: `MEETUP_FULL`)
 - **인원 증가**: 원자적 UPDATE 쿼리 사용 (`incrementParticipantsIfAvailable`)
-  - DB 레벨에서 조건 체크와 증가를 동시에 처리하여 동시성 문제 해결
-  - `UPDATE Meetup SET currentParticipants = currentParticipants + 1 WHERE idx = :meetupIdx AND currentParticipants < maxParticipants`
+  - DB 레벨에서 **RECRUITING 상태 + 인원 미달** 두 조건을 동시에 체크 및 증가
+  - `UPDATE Meetup SET currentParticipants = currentParticipants + 1 WHERE idx = :meetupIdx AND currentParticipants < maxParticipants AND status = :recruiting`
+  - `updated == 0`이면 status 필드로 "모집 마감 vs 인원 초과" 역추론 후 분기
 - **동시성 제어**: 원자적 UPDATE 쿼리로 Race Condition 해결
 
 #### 로직 3: 모임 참여 취소
@@ -242,13 +247,15 @@ public void cancelMeetupParticipation(Long meetupIdx, String userId) {
     // 5. currentParticipants 원자적 감소 (동시 취소 대비)
     meetupRepository.decrementParticipantsIfPositive(meetupIdx);
 
-    // 6. 채팅방에서도 자동으로 나가기 (실패해도 모임 참여 취소는 성공)
+    // 6. 채팅방에서도 자동으로 나가기 (채팅 실패가 참가 취소를 막으면 안 됨)
     try {
         conversationService.leaveMeetupChat(meetupIdx, userIdx);
+    } catch (ApiException e) {
+        // 비즈니스 예외: warn 레벨
+        log.warn("채팅방 나가기 실패 (비즈니스): meetupIdx={}, userIdx={}, error={}", meetupIdx, userIdx, e.getMessage());
     } catch (Exception e) {
-        // 채팅방 나가기 실패해도 모임 참여 취소는 성공으로 처리
-        log.error("채팅방 나가기 실패: meetupIdx={}, userIdx={}, error={}",
-                meetupIdx, userIdx, e.getMessage());
+        // 예상치 못한 오류: error 레벨 (스택트레이스 포함)
+        log.error("채팅방 나가기 예상치 못한 오류: meetupIdx={}, userIdx={}", meetupIdx, userIdx, e);
     }
 }
 ```
@@ -260,7 +267,7 @@ public void cancelMeetupParticipation(Long meetupIdx, String userId) {
 - **참가자 삭제**: `MeetupParticipants` 엔티티 삭제
 - **인원 감소**: `decrementParticipantsIfPositive(meetupIdx)` — DB 원자적 UPDATE (`currentParticipants > 0` 조건)
 - **채팅방 나가기**: 채팅방에서도 자동으로 나가기 (`leaveMeetupChat()`)
-- **에러 처리**: 채팅방 나가기 실패해도 모임 참여 취소는 성공으로 처리
+- **에러 처리**: `ApiException`(비즈니스 오류) → warn, `Exception`(예상치 못한 오류) → error(스택트레이스). 어느 경우든 모임 참여 취소는 성공으로 처리
 
 #### 로직 4: 모임 생성 이벤트 리스너 (채팅방 생성)
 
@@ -326,19 +333,22 @@ public void handleMeetupCreated(MeetupCreatedEvent event) {
 | 메서드                        | 설명                  | 주요 로직                                                                                                        |
 | ----------------------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | `createMeetup()`              | 모임 생성             | 이메일 인증 확인, 날짜 검증, `currentParticipants=1`로 저장 후 주최자 참가자 행 추가, 커밋 후 채팅방 이벤트                                                  |
-| `updateMeetup()`              | 모임 수정             | `findByIdWithDetails()`, **주최자 또는 `Role.ADMIN`/`MASTER`** 아니면 `MeetupForbiddenException.notOrganizer()`                    |
+| `updateMeetup()`              | 모임 수정             | `findByIdWithOrganizer()`(참가자 FETCH 불필요), **주최자 또는 `ADMIN`/`MASTER`** 검증, 날짜 과거 검증(`dateMustBeFuture`), `maxParticipants` 축소 검증(`maxBelowCurrent`)                    |
 | `deleteMeetup()`              | 모임 삭제             | `findByIdWithOrganizer()`, 동일 권한 검증 후 Soft Delete                                                                 |
 | `getAllMeetups()`             | 모든 모임 조회        | 비페이징: `findAllNotDeleted()` / 페이징: `findAllNotDeleted(Pageable)` — 목록 API는 페이징 버전 사용                                                                     |
 | `getMeetupById()`             | 특정 모임 조회        | `findByIdWithDetails()`, MeetupNotFoundException, organizer·participants 포함                                    |
 | `getNearbyMeetups()`          | 반경 기반 모임 조회   | `findNearbyMeetupIds` + `findByIdxInWithOrganizer`, Bounding Box + Haversine, `maxResults` 클램프, @Timed                                     |
 | `getMeetupsByLocation()`      | 지역별 모임 조회      | `findByLocationRange()`, 위도/경도 범위                                                                          |
 | `searchMeetupsByKeyword()`    | 키워드 검색           | `findByKeyword()` — 제목·설명 `LIKE` (구현: `SpringDataJpaMeetupRepository`)                                     |
-| `getAvailableMeetups()`       | 참여 가능한 모임 조회 | 비페이징·`Slice` 페이징 모두 `findAvailableMeetups(now, pageable)` — JPQL에서 `COUNT(participants) < maxParticipants` 등                                                               |
-| `getMeetupsByOrganizer()`     | 주최자별 모임 조회    | `findByOrganizerIdxOrderByCreatedAtDesc()`                                                                       |
-| `joinMeetup()`                | 모임 참여             | MeetupConflictException(alreadyJoined/fullCapacity), findByIdWithOrganizer, 원자적 UPDATE, entityManager.refresh |
-| `cancelMeetupParticipation()` | 모임 참여 취소        | MeetupForbiddenException, MeetupParticipantNotFoundException, 주최자 보호, 채팅방 나가기                         |
-| `getMeetupParticipants()`     | 참가자 목록 조회      | `findByMeetupIdxOrderByJoinedAtAsc()`                                                                            |
-| `isUserParticipating()`       | 참여 여부 확인        | UserNotFoundException, `existsByMeetupIdxAndUserIdx()`                                                           |
+| `getAvailableMeetups()`       | 참여 가능한 모임 조회 (레거시, `@Deprecated`) | `Pageable.unpaged()` 전량 조회. 컨트롤러는 `getAvailableMeetups(Pageable)` 사용                                                               |
+| `getAvailableMeetups(Pageable)` | 참여 가능한 모임 Slice | `findAvailableMeetups(now, RECRUITING, pageable)` — `currentParticipants < maxParticipants AND status = RECRUITING` (DB 직접 비교, 메모리 페이징 없음)                                |
+| `getMeetupsByOrganizer()`     | 주최자별 모임 조회    | `findByOrganizerIdxOrderByCreatedAtDesc()`, 결과 상한 `MAX_LIST_SIZE(500)` 적용                                                                       |
+| `getMeetupsByLocation()`      | 지역별 모임 조회      | `findByLocationRange()`, 결과 상한 `MAX_LIST_SIZE(500)` 적용                                                                       |
+| `searchMeetupsByKeyword()`    | 키워드 검색           | `findByKeyword()`, 결과 상한 `MAX_LIST_SIZE(500)` 적용                                                                       |
+| `joinMeetup()`                | 모임 참여             | `meetupNotRecruiting()`(CLOSED/COMPLETED 시), `alreadyJoined()`, `fullCapacity()`, 원자적 UPDATE(RECRUITING+인원 조건), entityManager.refresh |
+| `cancelMeetupParticipation()` | 모임 참여 취소        | 주최자 보호, MeetupParticipantNotFoundException, 채팅방 나가기(ApiException/Exception 분리 catch)                         |
+| `getMeetupParticipants()`     | 참가자 목록 조회      | `findByIdWithOrganizer`로 모임 존재·삭제 여부 선확인 후 참가자 조회                                                                            |
+| `isUserParticipating()`       | 참여 여부 확인        | `findIdxByIdString` 경량 쿼리(Users 전체 로딩 없음), `existsByMeetupIdxAndUserIdx()`                                                           |
 
 ### 3.3 트랜잭션 처리
 
@@ -354,10 +364,10 @@ public void handleMeetupCreated(MeetupCreatedEvent event) {
 | 예외                                 | 발생 시점                                                                                        |
 | ------------------------------------ | ------------------------------------------------------------------------------------------------ |
 | `MeetupNotFoundException`            | 모임 조회 실패, updateMeetup, deleteMeetup, getMeetupById, joinMeetup, cancelMeetupParticipation |
-| `MeetupConflictException`            | `alreadyJoined()`: 중복 참여, `fullCapacity()`: 인원 가득 참                                     |
-| `MeetupForbiddenException`           | `organizerCannotCancel()`: 주최자 참가 취소 시도, `notOrganizer()`: 주최자·관리자가 아닌 사용자의 수정/삭제 시도                                                 |
-| `MeetupParticipantNotFoundException` | 참가자 조회 실패 (cancelMeetupParticipation)                                                     |
-| `MeetupValidationException`          | `dateMustBeFuture()`: 모임 일시가 과거인 경우                                                    |
+| `MeetupConflictException`            | `alreadyJoined()` (errorCode: `MEETUP_ALREADY_JOINED`): 중복 참여, `fullCapacity()` (errorCode: `MEETUP_FULL`): 인원 가득 참, `meetupNotRecruiting()` (errorCode: `MEETUP_NOT_RECRUITING`): CLOSED/COMPLETED 상태 모임 참가 시도 |
+| `MeetupForbiddenException`           | `organizerCannotCancel()`: 주최자 참가 취소 시도, `notOrganizer()`: 주최자·관리자가 아닌 사용자의 수정/삭제 시도 |
+| `MeetupParticipantNotFoundException` | 참가자 조회 실패 (cancelMeetupParticipation) |
+| `MeetupValidationException`          | `dateMustBeFuture()`: 모임 일시가 과거인 경우(생성·수정 모두 적용), `maxBelowCurrent()`: maxParticipants < currentParticipants, `invalidMaxParticipants()`: maxParticipants < 1 |
 | `UserNotFoundException`              | 사용자 조회 실패 (createMeetup, joinMeetup, cancelMeetupParticipation, isUserParticipating)      |
 | `UnauthenticatedException`           | 인증 정보 없음 (컨트롤러, Authentication null 시)                                                |
 
@@ -665,8 +675,8 @@ GET /api/meetups/nearby?lat=37.5665&lng=126.9780
 ### 5.2 동시성 제어
 
 - **최대 인원 제한**: 원자적 UPDATE 쿼리 사용 (`incrementParticipantsIfAvailable`)
-  - DB 레벨에서 조건 체크와 증가를 동시에 처리하여 Race Condition 해결
-  - `UPDATE Meetup SET currentParticipants = currentParticipants + 1 WHERE idx = :meetupIdx AND currentParticipants < maxParticipants`
+  - DB 레벨에서 **RECRUITING 상태 + 인원 미달** 두 조건 동시 체크 및 증가 (Race Condition 해결)
+  - `UPDATE Meetup SET currentParticipants = currentParticipants + 1 WHERE idx = :meetupIdx AND currentParticipants < maxParticipants AND status = 'RECRUITING'`
   - 주최자는 인원 체크 제외
 - **중복 참여 방지**: 사전 `exists` 검사 + PK `(meetup_idx, user_idx)`
 - **인원 수 업데이트**: 증가·감소 모두 원자적 UPDATE (`incrementParticipantsIfAvailable`, `decrementParticipantsIfPositive`)
@@ -782,18 +792,20 @@ CREATE INDEX user_idx ON meetupparticipants(user_idx);
 ### 8.2 모임 참여 및 취소
 
 - **중복 참여 방지**: `existsByMeetupIdxAndUserIdx` + PK `(meetup_idx, user_idx)`
-- **최대 인원 제한**: 원자적 UPDATE 쿼리 사용 (`incrementParticipantsIfAvailable`)
-  - DB 레벨에서 조건 체크와 증가를 동시에 처리하여 동시성 문제 해결
+- **상태 검증**: `RECRUITING` 아닌 모임 참가 시 `meetupNotRecruiting()` (CLOSED/COMPLETED 모두 차단)
+- **최대 인원 제한**: 원자적 UPDATE 쿼리 (`incrementParticipantsIfAvailable`) — RECRUITING + 인원 미달 DB 동시 체크
+  - `updated == 0`이면 status로 역추론 → meetupNotRecruiting or fullCapacity 분기
   - 주최자가 아닌 경우에만 인원 체크 및 증가
   - 영속성 컨텍스트 동기화: `entityManager.refresh()`로 중복 DB 쿼리 제거
 - **주최자 보호**: 주최자는 참가 취소 불가
-- **채팅**: 모임 참가 API만으로 채팅방에 들어가지 않음 — **`joinMeetupChat`** 별도 호출. 참가 취소 시에만 `leaveMeetupChat` 시도(실패해도 취소는 성공)
+- **채팅**: 모임 참가 API만으로 채팅방에 들어가지 않음 — **`joinMeetupChat`** 별도 호출. 참가 취소 시에만 `leaveMeetupChat` 시도(ApiException·Exception 분리 catch, 실패해도 취소는 성공)
 
 ### 8.3 동시성 제어
 
 - **트랜잭션 보장**: `@Transactional`로 모임 참여/취소를 원자적으로 처리
 - **인원 수 업데이트**: 증가·감소 모두 원자적 UPDATE (`incrementParticipantsIfAvailable`, `decrementParticipantsIfPositive`)
-  - `UPDATE Meetup SET currentParticipants = currentParticipants + 1 WHERE idx = :meetupIdx AND currentParticipants < maxParticipants`
+  - 증가: `UPDATE Meetup SET currentParticipants = currentParticipants + 1 WHERE idx = :meetupIdx AND currentParticipants < maxParticipants AND status = 'RECRUITING'`
+  - 감소: `UPDATE Meetup SET currentParticipants = currentParticipants - 1 WHERE idx = :meetupIdx AND currentParticipants > 0`
 - **중복 방지**: PK + `existsByMeetupIdxAndUserIdx`
 
 ### 8.4 위치 기반 검색

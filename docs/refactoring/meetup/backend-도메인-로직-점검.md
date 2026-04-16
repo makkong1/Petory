@@ -1,89 +1,406 @@
 # Meetup 백엔드 도메인 로직 점검 · 리팩토링 백로그
 
-**작성일**: 2026-04-12  
-**목적**: `MeetupService`, `SpringDataJpaMeetupRepository`, 컨트롤러 등 백엔드 로직을 기준으로 이슈를 정리하고, 별도 세션에서 도출된 분석과 **교차 검증**한 결과를 문서화한다.
-
-**범위**: 백엔드(Java) 위주. 프론트·지도 UX는 `refactoring-summary.md` 및 도메인 문서를 참고.
-
----
-
-## 1. 외부 분석 vs 코드 대조 (요약)
-
-| #   | 이슈                                          | 대조 결과     | 비고                                                                                           |
-| --- | --------------------------------------------- | ------------- | ---------------------------------------------------------------------------------------------- |
-| 1   | `findNearbyMeetups()` organizer N+1           | **해당**      | 네이티브 `SELECT m.*` 후 `MeetupConverter.toDTO`에서 `organizer` 접근 → lazy 로딩 가능         |
-| 2   | 상태 전이 부재 (`CLOSED` / `COMPLETED`)       | **해당**      | 스케줄러·배치 없음. `CareRequestScheduler`와 달리 모임 자동 전이 없음                          |
-| 3   | 생성 시 `currentParticipants` 0 → 1 이중 저장 | **해당**      | INSERT 후 `setCurrentParticipants(1)` + `save`로 불필요한 UPDATE                               |
-| 4   | 목록 페이징 없음                              | **해당**      | `findAllNotDeleted`, `findAvailableMeetups` 등 전량 `List`                                     |
-| 5   | Chat 도메인 결합                              | **부분 해당** | 생성은 `MeetupCreatedEvent` + 리스너로 분리됨. **참가 취소**는 `ConversationService` 직접 호출 |
-| 6   | `findByIdWithOrganizer` 소프트 삭제 필터 없음 | **해당**      | `WHERE m.idx = :idx`만 존재                                                                    |
-| 7   | 컨트롤러 인증 체크 중복                       | **해당**      | `@PreAuthorize("isAuthenticated()")` + 메서드마다 `Authentication` null 체크                   |
-| 8   | Bean Validation 미활용                        | **해당**      | 날짜 등 서비스 수동 검증                                                                       |
-| 9   | `findByIdWithDetails` DISTINCT + 다중 FETCH   | **해당**      | 대규모 참가자 시 부하 가능                                                                     |
-| —   | 관리자 상태 변경 API 없음                     | **해당**      | `AdminMeetupController`에 상태 변경 엔드포인트 없음                                            |
+**최초 작성일**: 2026-04-12  
+**재분석일**: 2026-04-16 (2차 — 예외 처리 포함)  
+**목적**: 백엔드 meetup 폴더(서비스·리포지토리·컨트롤러·엔티티·컨버터·예외) 및 글로벌 예외 처리까지 직접 읽고 이슈를 재정리한다.  
+**분석 대상 파일**: `MeetupService`, `SpringDataJpaMeetupRepository`, `JpaMeetupAdapter`, `MeetupRepository`, `MeetupController`, `MeetupScheduler`, `MeetupChatRoomEventListener`, `MeetupConverter`, `MeetupDTO`, `Meetup`, `Meetup*Exception`, `ApiException`, `GlobalExceptionHandler`
 
 ---
 
-## 2. 우선순위별 백로그
+## 1. 이전 분석 대비 구현 상태 확인
 
-### Critical (즉시 검토 권장)
+| # | 이슈 (2026-04-12) | 현재 상태 | 비고 |
+|---|---|---|---|
+| 1 | `findNearbyMeetups()` organizer N+1 | ✅ **해결됨** | `findNearbyMeetupIds` + `findByIdxInWithOrganizer` 2-step |
+| 2 | 상태 전이 부재 (`CLOSED`/`COMPLETED`) | ✅ **해결됨** | `MeetupScheduler` 매시 정각 bulk UPDATE |
+| 3 | 생성 시 `currentParticipants` 이중 저장 | ✅ **해결됨** | 빌더에서 `currentParticipants(1)` 단일 INSERT |
+| 4 | 목록 페이징 없음 | ✅ **부분 해결** | `getAllMeetups(Pageable)`, `getAvailableMeetups(Pageable)` 추가. 위치·키워드·주최자 조회는 미적용 |
+| 5 | 참가 취소 Chat 도메인 직접 결합 | ⚠️ **미해결** | `cancelMeetupParticipation` → `conversationService.leaveMeetupChat()` 직접 호출 유지 (catch 범위는 개선됨) |
+| 6 | `findByIdWithOrganizer` 소프트 삭제 필터 없음 | ✅ **해결됨** | `AND (m.isDeleted = false OR m.isDeleted IS NULL)` 추가됨 |
+| 7 | 컨트롤러 인증 체크 중복 | ⚠️ **미해결** | `authentication != null ? ... : null` + `UnauthenticatedException` 패턴 전 메서드 반복 |
+| 8 | Bean Validation 미활용 | ⚠️ **미해결** | `MeetupDTO` 필드에 검증 애노테이션 없음, 날짜 검증 서비스에만 존재 |
+| 9 | `findByIdWithDetails` DISTINCT + 다중 FETCH | ✅ **부분 해결** | `updateMeetup`에서 `findByIdWithOrganizer`로 교체. `getMeetupById`는 참가자 필요하므로 유지 |
+| — | 관리자 상태 변경 API 없음 | ⚠️ **미해결** | `AdminMeetupController` 파일 자체가 존재하지 않음 |
 
-| 항목              | 위치                                                                        | 문제                                                 | 개선 방향                                                                      |
-| ----------------- | --------------------------------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------ |
-| 근처 모임 N+1     | `SpringDataJpaMeetupRepository#findNearbyMeetups` → `MeetupConverter#toDTO` | 주최자 미 페치 시 행마다 `Users` 조회                | 네이티브에서 `users` JOIN + 매핑, 또는 조회 후 `IN` 배치 로딩, 또는 2단계 쿼리 |
-| 상태 전이         | `MeetupStatus`, `MeetupService`                                             | 정원·일시에 따른 `CLOSED`/`COMPLETED` 자동 반영 없음 | `@Scheduled` + 벌크 UPDATE (케어 도메인 스케줄러 패턴 참고)                    |
-| 생성 시 이중 저장 | `MeetupService#createMeetup`                                                | `currentParticipants(0)` 후 `1`로 UPDATE             | 빌더에서 처음부터 `1` (주최자 참가 row와 일치)                                 |
+---
+
+## 2. 도메인 로직 이슈
+
+### Critical
+
+#### 2-1. `joinMeetup` — 상태 검증 누락
+
+**위치**: `MeetupService#joinMeetup:286`  
+**문제**: `incrementParticipantsIfAvailable` 쿼리는 `currentParticipants < maxParticipants` 만 체크. `CLOSED`/`COMPLETED` 상태를 확인하지 않아 스케줄러가 상태를 전이한 후에도 모임 참가가 허용됨.
+
+```sql
+-- 현재 (문제)
+UPDATE Meetup m SET m.currentParticipants = m.currentParticipants + 1
+WHERE m.idx = :meetupIdx
+  AND m.currentParticipants < m.maxParticipants
+
+-- 개선 (상태 조건 추가)
+UPDATE Meetup m SET m.currentParticipants = m.currentParticipants + 1
+WHERE m.idx = :meetupIdx
+  AND m.currentParticipants < m.maxParticipants
+  AND m.status = 'RECRUITING'
+```
+
+---
 
 ### High
 
-| 항목               | 위치                                                         | 문제                                    | 개선 방향                                                   |
-| ------------------ | ------------------------------------------------------------ | --------------------------------------- | ----------------------------------------------------------- |
-| 전량 목록          | `getAllMeetups`, `getAvailableMeetups`, 관리자 `listMeetups` | OOM·응답 지연 위험                      | `Pageable` + DB 페이징, 관리자는 필터를 SQL로               |
-| 소프트 삭제 일관성 | `findByIdWithOrganizer`, `findByIdWithDetails`               | 삭제된 모임이 단건 API로 조회될 수 있음 | `(isDeleted = false OR isDeleted IS NULL)` 통일             |
-| 근처 검색 상한     | `findNearbyMeetups`                                          | LIMIT 없음 시 대량 로드                 | `LIMIT` + 필요 시 페이징                                    |
-| 키워드 검색        | `findByKeyword`                                              | `LIKE %:keyword%` → 인덱스 비효율       | 접두사 검색·FULLTEXT·검색 엔진 등 (프로젝트 검색 규칙 참고) |
+#### 2-2. `updateMeetup` — `findByIdWithDetails` 불필요 사용
+
+**위치**: `MeetupService#updateMeetup:130`  
+**문제**: 수정 시 `findByIdWithDetails`를 호출해 주최자 + 참가자 전체를 FETCH. 수정에는 주최자 정보만 필요.  
+**개선**: `findByIdWithOrganizer`로 교체.
+
+---
+
+#### 2-3. `updateMeetup` — `maxParticipants` 축소 검증 없음
+
+**위치**: `MeetupService#updateMeetup:161`  
+**문제**: 현재 참가자 수(예: 5명)보다 작은 값(예: 3명)으로 줄여도 오류 없이 저장. `currentParticipants > maxParticipants` 상태가 되어 스케줄러가 즉시 `CLOSED`로 전이하는 부작용 발생.  
+**개선**: `newMax >= meetup.getCurrentParticipants()` 검증 추가.
+
+---
+
+#### 2-4. 위치·키워드·주최자별 조회 — 페이징 없음
+
+**위치**: `MeetupService#getMeetupsByLocation`, `#searchMeetupsByKeyword`, `#getMeetupsByOrganizer`  
+**문제**: 세 메서드 모두 전량 `List` 반환. 데이터 증가 시 OOM·응답 지연 위험.  
+**개선**: `Pageable` 파라미터 추가 또는 최소한 상한(`LIMIT`) 적용.
+
+---
+
+#### 2-5. `findAvailableMeetups` — `@EntityGraph` + `GROUP BY` + `Pageable` 조합
+
+**위치**: `SpringDataJpaMeetupRepository#findAvailableMeetups`  
+**문제**: `GROUP BY m.idx HAVING COUNT(p) < m.maxParticipants` + `@EntityGraph(organizer)` + `Pageable` 조합. Hibernate는 컬렉션 페치와 페이징이 함께 사용될 때 SQL `LIMIT/OFFSET` 대신 **메모리 페이징**(`HHH90003004`)을 수행할 수 있음. 데이터 증가 시 전량 로드 후 애플리케이션 메모리에서 잘림.
+
+```java
+// 개선 예시: GROUP BY/HAVING 제거, currentParticipants 직접 비교
+@Query("SELECT m FROM Meetup m JOIN FETCH m.organizer " +
+       "WHERE m.date > :currentDate " +
+       "AND m.currentParticipants < m.maxParticipants " +
+       "AND m.status = 'RECRUITING' " +
+       "AND (m.isDeleted = false OR m.isDeleted IS NULL) " +
+       "ORDER BY m.date ASC")
+```
+
+---
 
 ### Medium
 
-| 항목                         | 위치                                      | 문제                               | 개선 방향                                                       |
-| ---------------------------- | ----------------------------------------- | ---------------------------------- | --------------------------------------------------------------- |
-| 참가 취소 ↔ 채팅             | `MeetupService#cancelMeetupParticipation` | 생성과 달리 채팅 직접 호출         | `MeetupLeftEvent` 등으로 대칭 분리 (실패 시 정책은 유지 가능)   |
-| 컨트롤러 인증 보일러플레이트 | `MeetupController`                        | 동일 null 체크 반복                | `AuthenticationPrincipal` / 헬퍼 / AOP 등 팀 컨벤션에 맞게 축소 |
-| DTO 검증                     | `MeetupDTO`, `MeetupService`              | 서비스에만 검증 로직               | `@Future` 등 Bean Validation + 그룹 검증                        |
-| 상세 FETCH                   | `findByIdWithDetails`                     | 3중 `LEFT JOIN FETCH` + `DISTINCT` | 참가자 많을 때 entity graph·단계 조회·DTO 프로젝션 검토         |
+#### 2-6. `findByIdWithLock` — 소프트 삭제 필터 없음 + 미사용
 
-### 추가 (점검에서만 언급된 항목)
-
-| 항목             | 위치                                                                | 문제                                                             | 개선 방향                                                                     |
-| ---------------- | ------------------------------------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| 관리자 삭제      | `AdminMeetupController#deleteMeetup` → `MeetupService#deleteMeetup` | `userId`로 `"ADMIN"` 문자열 전달 시 `findByIdString` 실패 가능   | SecurityContext의 관리자 계정·또는 `deleteMeetupAsAdmin(meetupIdx)` 전용 경로 |
-| 참가 도메인 규칙 | `MeetupService#joinMeetup`                                          | `CLOSED`/`COMPLETED`·과거 일시에 대한 명시적 거부 여부 확인 필요 | 비즈니스 규칙에 맞게 상태·`date` 검증 추가                                    |
+**위치**: `SpringDataJpaMeetupRepository#findByIdWithLock`  
+**문제**: 쿼리에 `isDeleted` 조건이 없고, `MeetupService` 내에서 실제 호출 없음 (원자적 UPDATE 방식으로 대체됨).  
+**개선**: 소프트 삭제 조건 추가, 또는 사용하지 않으면 인터페이스에서 제거.
 
 ---
 
-## 3. 이미 잘 된 부분 (참고)
+#### 2-7. `MeetupDTO` — 소프트 삭제 메타 필드 클라이언트 노출
 
-- **모임 생성 → 채팅방**: `MeetupCreatedEvent` + `MeetupChatRoomEventListener`, 트랜잭션 분리 주석과 구현이 일치.
-- **동시성**: `incrementParticipantsIfAvailable` / `decrementParticipantsIfPositive`, 비관적 락 조회 등은 운영 수준으로 정리됨.
-- **목록 일부**: `JOIN FETCH m.organizer`가 붙은 JPQL 쿼리는 주최자 N+1을 이미 방지.
-
----
-
-## 4. 코드 앵커 (빠른 탐색)
-
-| 주제                      | 클래스 / 메서드                                                               |
-| ------------------------- | ----------------------------------------------------------------------------- |
-| 근처 모임 네이티브 쿼리   | `SpringDataJpaMeetupRepository#findNearbyMeetups`                             |
-| DTO 변환 (organizer 접근) | `MeetupConverter#toDTO`                                                       |
-| 생성 이중 저장            | `MeetupService#createMeetup`                                                  |
-| 소프트 삭제 단건          | `SpringDataJpaMeetupRepository#findByIdWithOrganizer`, `#findByIdWithDetails` |
-| 채팅 직접 호출            | `MeetupService#cancelMeetupParticipation`                                     |
-| 채팅 이벤트 분리          | `MeetupChatRoomEventListener#handleMeetupCreated`                             |
-| 관리자 API                | `AdminMeetupController`                                                       |
+**위치**: `MeetupDTO:28-29`  
+**문제**: `isDeleted`, `deletedAt` 필드가 응답 JSON에 포함됨. 내부 운영 데이터 노출.  
+**개선**: 응답 DTO에서 제거 또는 `@JsonIgnore` 적용.
 
 ---
 
-## 5. 관련 문서
+#### 2-8. `isUserParticipating` — 참여 확인에 풀 Users 엔티티 로딩
+
+**위치**: `MeetupService#isUserParticipating:353`  
+**문제**: userId → `findByIdString` → `Users` 전체 엔티티 → `getIdx()`만 사용. `idx`만 필요한데 전체 엔티티 로드.  
+**개선**: `usersRepository`에 `findIdxByIdString(String id): Optional<Long>` 경량 쿼리 추가, 또는 참가 확인 쿼리에 userId 직접 JOIN.
+
+---
+
+#### 2-9. `getMeetupParticipants` — 모임 존재 확인 없음
+
+**위치**: `MeetupService#getMeetupParticipants:251`  
+**문제**: 존재 여부·삭제 여부 확인 없이 바로 참가자 목록 조회. 삭제된 모임의 참가자도 반환됨.  
+**개선**: 메서드 앞에 `meetupRepository.findByIdWithOrganizer(meetupIdx).orElseThrow(MeetupNotFoundException::new)` 추가.
+
+---
+
+### Low
+
+#### 2-10. `getAvailableMeetups()` 무한 레거시 메서드 잔존
+
+**위치**: `MeetupService#getAvailableMeetups():378`  
+**문제**: `Pageable.unpaged()`를 넘기는 페이징 없는 버전이 여전히 존재. 컨트롤러는 이미 Slice 버전만 사용하지만 내부 재사용 위험.  
+**개선**: `@Deprecated` 마킹 또는 제거.
+
+---
+
+#### 2-11. `@Timed` 이름 충돌
+
+**위치**: `MeetupService#getAllMeetups()`, `#getAllMeetups(Pageable)`  
+**문제**: 두 메서드 모두 `@Timed("getAllMeetups")`로 동일 이름 사용. 메트릭 집계 시 두 메서드의 측정값이 합산됨.  
+**개선**: 비페이징 버전을 제거하거나 이름을 `getAllMeetupsPaged`처럼 구분.
+
+---
+
+## 3. 예외 처리 이슈
+
+### Critical
+
+#### 3-1. `GlobalExceptionHandler#handleException` — `null` 반환
+
+**위치**: `GlobalExceptionHandler:147-149`  
+**문제**: `Exception` 폴백 핸들러에서 `AsyncRequestTimeoutException`을 다시 걸러 `return null`을 반환. `@ExceptionHandler`에서 `null`을 반환하면 Spring MVC가 응답 처리를 포기하거나 NPE를 발생시킬 수 있음.
+
+```java
+// 현재 (문제)
+@ExceptionHandler(Exception.class)
+public ResponseEntity<...> handleException(Exception e) {
+    if (e instanceof AsyncRequestTimeoutException) {
+        return null;   // ← 위험
+    }
+    ...
+}
+
+// 개선 (null 대신 예외를 다시 던지거나, 빈 응답 반환)
+if (e instanceof AsyncRequestTimeoutException) {
+    throw (AsyncRequestTimeoutException) e;
+    // 또는: return ResponseEntity.noContent().build();
+}
+```
+
+> `AsyncRequestTimeoutException`은 위에 별도 `void` 핸들러가 이미 있으므로, 정상적으로는 폴백 핸들러까지 오지 않지만 Spring 버전이나 설정에 따라 라우팅이 달라질 수 있어 안전하게 처리해야 함.
+
+---
+
+### High
+
+#### 3-2. `MeetupConflictException` — errorCode 단일값으로 두 상황 구분 불가
+
+**위치**: `MeetupConflictException`  
+**문제**: `alreadyJoined()`와 `fullCapacity()` 모두 `errorCode = "MEETUP_CONFLICT"` 사용. 프론트엔드가 두 상황을 errorCode로 구분할 수 없어 동일한 메시지 처리만 가능.
+
+```java
+// 개선: 상황별 errorCode 분리
+public static MeetupConflictException alreadyJoined() {
+    return new MeetupConflictException("이미 참가한 모임입니다.", "MEETUP_ALREADY_JOINED");
+}
+
+public static MeetupConflictException fullCapacity() {
+    return new MeetupConflictException("모임 인원이 가득 찼습니다.", "MEETUP_FULL");
+}
+```
+
+---
+
+#### 3-3. `updateMeetup` — 날짜 변경 시 과거 날짜 검증 없음
+
+**위치**: `MeetupService#updateMeetup:158-160`  
+**문제**: `createMeetup`에서는 날짜가 현재 이후인지 검증하지만, `updateMeetup`에서는 날짜를 과거로 변경해도 그대로 저장됨. 스케줄러가 바로 `COMPLETED`로 전이시키는 부작용 발생.
+
+```java
+// createMeetup에는 있음
+if (meetupDTO.getDate() != null && meetupDTO.getDate().isBefore(LocalDateTime.now())) {
+    throw MeetupValidationException.dateMustBeFuture();
+}
+
+// updateMeetup에는 없음 ← 추가 필요
+if (meetupDTO.getDate() != null) {
+    if (meetupDTO.getDate().isBefore(LocalDateTime.now())) {
+        throw MeetupValidationException.dateMustBeFuture();
+    }
+    meetup.setDate(meetupDTO.getDate());
+}
+```
+
+---
+
+#### 3-4. `joinMeetup` — 상태 거부용 예외 팩토리 메서드 없음
+
+**위치**: `MeetupConflictException` 또는 `MeetupValidationException`  
+**문제**: 2-1에서 `CLOSED`/`COMPLETED` 상태 검증을 추가하더라도, 이 상황에 대응하는 명시적 팩토리 메서드가 없음. 현재 `MeetupConflictException`의 개념(충돌)과 맞지 않는 상황에서 억지로 재사용하거나 raw 생성자를 호출하게 됨.
+
+```java
+// 추가 필요
+public static MeetupConflictException meetupNotRecruiting() {
+    return new MeetupConflictException("모집이 마감된 모임입니다.", "MEETUP_NOT_RECRUITING");
+}
+```
+
+---
+
+### Medium
+
+#### 3-5. `cancelMeetupParticipation` — `catch (Exception e)` 과도하게 광범위
+
+**위치**: `MeetupService#cancelMeetupParticipation:341-347`  
+**문제**: 채팅방 나가기를 `catch (Exception e)`로 감싸 모든 예외를 삼킴. 의도는 옳으나(채팅 실패가 참가 취소를 막으면 안 됨) 범위가 너무 넓어 프로그래밍 오류(NPE, ClassCast 등)도 무시됨.
+
+```java
+// 현재
+} catch (Exception e) {
+    log.error("채팅방 나가기 실패: ...", e.getMessage());
+}
+
+// 개선: 예상 가능한 비즈니스 예외만 처리
+} catch (ApiException e) {
+    log.warn("채팅방 나가기 실패 (비즈니스): meetupIdx={}, error={}", meetupIdx, e.getMessage());
+} catch (Exception e) {
+    log.error("채팅방 나가기 예상치 못한 오류: meetupIdx={}", meetupIdx, e);
+}
+```
+
+---
+
+#### 3-6. `MeetupChatRoomEventListener` — 채팅방 생성 실패 복구 없음
+
+**위치**: `MeetupChatRoomEventListener#handleMeetupCreated:74-82`  
+**문제**: 채팅방 생성 실패 시 `log.error`만 남기고 끝. 재시도 메커니즘이 없어 **모임은 존재하나 채팅방이 없는 불일치 상태**가 그대로 유지됨. TODO 주석만 남아 있음.
+
+```java
+// 현재 (TODO 미이행)
+} catch (Exception e) {
+    log.error("모임 채팅방 생성 실패: ...");
+    // TODO: 재시도 메커니즘 추가 고려
+}
+```
+
+**개선 방향**:
+- `MeetupScheduler`에서 채팅방 없는 모임 감지 후 재생성 시도
+- 또는 별도 재시도 큐(Spring Retry, Dead Letter Queue) 활용
+
+---
+
+#### 3-7. `ApiException` 응답 — `error`와 `message` 동일값 중복
+
+**위치**: `GlobalExceptionHandler#handleApiException:109-110`  
+**문제**: `response.put("error", e.getMessage())`와 `response.put("message", e.getMessage())`가 동일한 값을 다른 키에 중복 저장. 불필요한 응답 payload.
+
+```java
+// 현재
+response.put("error", e.getMessage());
+response.put("message", e.getMessage());
+
+// 개선: 키 통일 또는 역할 분리
+// error: 기술적 설명, message: 사용자 메시지로 구분하거나 하나만 사용
+response.put("message", e.getMessage());
+response.put("errorCode", e.getErrorCode());
+```
+
+---
+
+### Low
+
+#### 3-8. `MeetupValidationException` — 생성/수정 공통 검증 미정의
+
+**위치**: `MeetupValidationException`  
+**문제**: `dateMustBeFuture()` 하나만 존재. `maxParticipants`(1 이상, 최대값 이하), 제목 길이 등 다른 검증 케이스가 늘어날 때 서비스에서 raw 생성자를 직접 쓰거나 팩토리 패턴을 일관되게 적용하지 못함.  
+**개선**: 검증 케이스별 static factory 메서드 추가.
+
+```java
+public static MeetupValidationException invalidMaxParticipants() {
+    return new MeetupValidationException("최대 참여 인원은 1 이상이어야 합니다.");
+}
+
+public static MeetupValidationException maxBelowCurrent() {
+    return new MeetupValidationException("최대 인원은 현재 참여자 수보다 작을 수 없습니다.");
+}
+```
+
+---
+
+#### 3-9. 정상 응답과 오류 응답 DTO 구조 불일치
+
+**위치**: `MeetupController` 전체, `GlobalExceptionHandler` 전체  
+**문제**: 정상 응답은 `{"meetup": ..., "message": "..."}`, 오류 응답은 `{"error": "...", "message": "...", "status": ..., "errorCode": "..."}` 구조. 키 이름과 계층이 달라 프론트엔드 에러 핸들링 코드가 분기 처리를 해야 함.  
+**개선**: 공통 `ApiResponse<T>` 래퍼 클래스 도입 (다른 도메인과 통일 전 팀 컨벤션 확인 필요).
+
+---
+
+## 4. 우선순위별 전체 백로그 요약
+
+### Critical
+
+| 항목 | 위치 | 문제 |
+|---|---|---|
+| `joinMeetup` 상태 미검증 | `MeetupService#joinMeetup:286` | CLOSED/COMPLETED 모임 참가 가능 |
+| `handleException` null 반환 | `GlobalExceptionHandler:147` | Spring MVC NPE 또는 빈 응답 위험 |
+
+### High
+
+| 항목 | 위치 | 문제 |
+|---|---|---|
+| `updateMeetup` 불필요 페치 | `MeetupService#updateMeetup:130` | `findByIdWithDetails` → `findByIdWithOrganizer` |
+| `updateMeetup` maxParticipants 검증 없음 | `MeetupService#updateMeetup:161` | 현재 인원 초과 축소 허용 |
+| `updateMeetup` 날짜 변경 시 과거 허용 | `MeetupService#updateMeetup:158` | 과거 날짜로 변경 → 즉시 COMPLETED |
+| 위치·키워드·주최자 조회 페이징 없음 | `getMeetupsByLocation` 등 3개 메서드 | 전량 List 반환 |
+| `findAvailableMeetups` 메모리 페이징 위험 | `SpringDataJpaMeetupRepository` | GROUP BY + @EntityGraph + Pageable |
+| `MeetupConflictException` errorCode 공유 | `MeetupConflictException` | 프론트 두 상황 구분 불가 |
+| 상태 거부용 예외 팩토리 없음 | `MeetupConflictException` | joinMeetup 상태 검증 추가 시 필요 |
+
+### Medium
+
+| 항목 | 위치 | 문제 |
+|---|---|---|
+| 참가 취소 ↔ 채팅 직접 결합 | `MeetupService#cancelMeetupParticipation` | 이벤트 비대칭 |
+| 컨트롤러 인증 보일러플레이트 | `MeetupController` 전 메서드 | null 체크 반복 |
+| `cancelMeetupParticipation` 광범위 catch | `MeetupService:341` | 프로그래밍 오류도 삼킴 |
+| 채팅방 생성 실패 복구 없음 | `MeetupChatRoomEventListener:74` | 모임↔채팅 불일치 상태 지속 |
+| `findByIdWithLock` 소프트 삭제 필터 없음 + 미사용 | `SpringDataJpaMeetupRepository` | 삭제된 모임 잠금 가능 |
+| `MeetupDTO` 소프트 삭제 필드 노출 | `MeetupDTO:28-29` | isDeleted, deletedAt 응답 포함 |
+| `isUserParticipating` Users 전체 엔티티 로딩 | `MeetupService:353` | 참여 확인에 불필요한 SELECT |
+| `getMeetupParticipants` 모임 존재 확인 없음 | `MeetupService:251` | 삭제된 모임 참가자 반환 |
+| `ApiException` 응답 error/message 중복 | `GlobalExceptionHandler:109-110` | 동일값 두 키에 저장 |
+
+### Low
+
+| 항목 | 위치 | 문제 |
+|---|---|---|
+| Bean Validation 미활용 | `MeetupDTO`, `MeetupService` | 날짜·제목 등 서비스 수동 검증 |
+| `getAvailableMeetups()` 레거시 잔존 | `MeetupService:378` | `Pageable.unpaged()` 무한 버전 |
+| `MeetupValidationException` 팩토리 미비 | `MeetupValidationException` | 검증 케이스 확장 시 일관성 없음 |
+| `@Timed` 이름 중복 | `MeetupService` | 두 getAllMeetups 메서드 동일 이름 |
+| 정상/오류 응답 구조 불일치 | `MeetupController`, `GlobalExceptionHandler` | 프론트 에러 핸들링 분기 필요 |
+| `findByIdWithDetails` 3-way FETCH | `SpringDataJpaMeetupRepository` | 참가자 많을 때 카르테시안 증가 |
+| AdminMeetupController 부재 | — | 관리자 강제 상태 변경 API 없음 |
+| 키워드 LIKE % 양방향 | `findByKeyword` | 인덱스 비효율 (스키마 변경 필요) |
+
+---
+
+## 5. 잘 된 부분 (유지)
+
+| 항목 | 위치 | 내용 |
+|---|---|---|
+| 모임 생성 → 채팅방 | `MeetupChatRoomEventListener` | `afterCommit` 후 `@Async` + `REQUIRES_NEW` — 트랜잭션 분리 올바름 |
+| 참여자 수 동시성 제어 | `incrementParticipantsIfAvailable`, `decrementParticipantsIfPositive` | DB 레벨 원자적 UPDATE |
+| 근처 모임 2-step 조회 | `findNearbyMeetupIds` + `findByIdxInWithOrganizer` | organizer N+1 완전 제거 |
+| 상태 자동 전이 | `MeetupScheduler` | `closeFullRecruitingMeetups` + `completePastMeetups` 매시 정각 벌크 UPDATE |
+| 단건 조회 소프트 삭제 | `findByIdWithOrganizer`, `findByIdWithDetails` | 두 쿼리 모두 `isDeleted` 조건 포함 |
+| 어댑터 패턴 | `MeetupRepository` + `JpaMeetupAdapter` | 도메인 인터페이스와 JPA 구현체 분리 |
+| 도메인 예외 계층 | `Meetup*Exception` → `ApiException` | HTTP 상태 코드 + errorCode 포함, 글로벌 핸들러 일원화 |
+| `@BatchSize(size = 50)` | `Meetup#participants` | 목록 조회 시 참가자 N+1 배치 로딩 |
+
+---
+
+## 6. 코드 앵커 (빠른 탐색)
+
+| 주제 | 클래스 / 메서드 |
+|---|---|
+| 참가 상태 미검증 | `MeetupService#joinMeetup:286` |
+| `handleException` null 반환 | `GlobalExceptionHandler:147` |
+| updateMeetup 날짜 검증 누락 | `MeetupService#updateMeetup:158` |
+| updateMeetup 불필요 페치 | `MeetupService#updateMeetup:130` |
+| `cancelMeetupParticipation` 광범위 catch | `MeetupService:341` |
+| 채팅방 실패 복구 TODO | `MeetupChatRoomEventListener:79` |
+| errorCode 공유 | `MeetupConflictException:13` |
+| 소프트 삭제 필드 노출 | `MeetupDTO:28-29` |
+| 메모리 페이징 위험 | `SpringDataJpaMeetupRepository#findAvailableMeetups` |
+| 스케줄러 | `MeetupScheduler#transitionMeetupStatuses` |
+| 글로벌 예외 처리 | `GlobalExceptionHandler` |
+
+---
+
+## 7. 관련 문서
 
 - 종합 요약·FE 포함: [refactoring-summary.md](./refactoring-summary.md)
 - 도메인 스펙: [docs/domains/meetup.md](../../domains/meetup.md)
@@ -91,13 +408,30 @@
 
 ---
 
-## 6. 구현 진행 (2026-04-12)
+## 8. 구현 이력
 
-| 구간     | 내용                                                                                                                                                             |
-| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Critical | 근처 모임: `findNearbyMeetupIds` + `findByIdxInWithOrganizer` + `maxResults`(기본 500) — organizer N+1 완화; 생성 시 `currentParticipants(1)` 단일 INSERT로 정리 |
-| Critical | `MeetupScheduler`: 매시 정각, 정원 마감 → `CLOSED`, 일시 경과 → `COMPLETED`                                                                                      |
-| High     | `findByIdWithOrganizer` / `findByIdWithDetails`에 소프트 삭제 조건 추가                                                                                          |
-| High     | `GET /api/meetups` `page`/`size` 페이징, `GET /api/meetups/available` Slice(`hasNext`, `page`, `size`)                                                           |
-
-| 미구현 | 키워드 `LIKE %` → FULLTEXT 등은 DB 스키마 변경 필요로 코드 미적용 |
+| 날짜 | 구간 | 내용 |
+|---|---|---|
+| 2026-04-12 | Critical | `findNearbyMeetupIds` + `findByIdxInWithOrganizer` — organizer N+1 해결 |
+| 2026-04-12 | Critical | `createMeetup` `currentParticipants(1)` 단일 INSERT |
+| 2026-04-12 | Critical | `MeetupScheduler` 추가 |
+| 2026-04-12 | High | `findByIdWithOrganizer` / `findByIdWithDetails` 소프트 삭제 조건 추가 |
+| 2026-04-12 | High | `GET /api/meetups` Page 페이징, `GET /api/meetups/available` Slice 페이징 |
+| 2026-04-16 | — | **2차 재분석 완료**: 예외 처리 포함 신규 이슈 추가 (Critical 2, High 7, Medium 9, Low 8) |
+| 2026-04-16 | Critical | 2-1: `incrementParticipantsIfAvailable` RECRUITING 조건 추가, `joinMeetup` 상태 분기(meetupNotRecruiting/fullCapacity) |
+| 2026-04-16 | Critical | 3-1: `GlobalExceptionHandler#handleException` null → `AsyncRequestTimeoutException` rethrow |
+| 2026-04-16 | High | 2-2: `updateMeetup` `findByIdWithDetails` → `findByIdWithOrganizer` 교체 |
+| 2026-04-16 | High | 2-3: `updateMeetup` `maxParticipants` 축소 검증 추가 (`maxBelowCurrent`, `invalidMaxParticipants`) |
+| 2026-04-16 | High | 3-3: `updateMeetup` 날짜 변경 시 과거 날짜 검증 추가 |
+| 2026-04-16 | High | 2-5: `findAvailableMeetups` GROUP BY/HAVING 제거 → `currentParticipants < maxParticipants AND status = RECRUITING` 직접 비교 |
+| 2026-04-16 | High | 3-2: `MeetupConflictException` errorCode 분리 (`MEETUP_ALREADY_JOINED` / `MEETUP_FULL` / `MEETUP_NOT_RECRUITING`) |
+| 2026-04-16 | Medium | 3-4: `MeetupConflictException.meetupNotRecruiting()` 팩토리 추가 |
+| 2026-04-16 | Medium | 3-7: `GlobalExceptionHandler#handleApiException` error/message 중복 제거 (`message` + `errorCode` + `status` 통일) |
+| 2026-04-16 | Medium | 3-5: `cancelMeetupParticipation` catch 범위 `ApiException` + `Exception` 분리 |
+| 2026-04-16 | Medium | 2-6: `findByIdWithLock` 소프트 삭제 조건 추가 |
+| 2026-04-16 | Medium | 2-7: `MeetupDTO` `isDeleted`/`deletedAt` `@JsonIgnore` 적용 |
+| 2026-04-16 | Medium | 2-8: `isUserParticipating` `findIdxByIdString` 경량 쿼리로 교체 |
+| 2026-04-16 | Medium | 2-9: `getMeetupParticipants` 모임 존재·삭제 여부 선확인 추가 |
+| 2026-04-16 | Low | 2-4: `getMeetupsByLocation`/`searchMeetupsByKeyword`/`getMeetupsByOrganizer` 서비스 레이어 `MAX_LIST_SIZE(500)` 상한 적용 |
+| 2026-04-16 | Low | 3-8: `MeetupValidationException.maxBelowCurrent()`, `invalidMaxParticipants()` 팩토리 추가 |
+| 2026-04-16 | Low | 2-10: `getAvailableMeetups()` 무인자 레거시 버전 `@Deprecated` 마킹 |
