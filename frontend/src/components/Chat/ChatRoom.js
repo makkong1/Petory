@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import styled from 'styled-components';
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
@@ -42,6 +42,54 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
   const fileInputRef = useRef(null);
   const menuRef = useRef(null);
 
+  /** 수신 메시지 읽음: REST 호출을 묶어 서버·네트워크 부하 감소 */
+  const READ_DEBOUNCE_MS = 500;
+  const readDebounceTimerRef = useRef(null);
+  const pendingReadMessageIdxRef = useRef(null);
+
+  const clearReadDebounce = useCallback(() => {
+    if (readDebounceTimerRef.current) {
+      clearTimeout(readDebounceTimerRef.current);
+      readDebounceTimerRef.current = null;
+    }
+  }, []);
+
+  const flushMarkAsRead = useCallback(
+    async (lastMessageIdx) => {
+      clearReadDebounce();
+      pendingReadMessageIdxRef.current = null;
+      if (!conversationIdx) return;
+      try {
+        await markAsRead(conversationIdx, lastMessageIdx);
+      } catch (err) {
+        console.error('읽음 처리 실패:', err);
+      }
+    },
+    [conversationIdx, clearReadDebounce]
+  );
+
+  const scheduleIncomingMessageRead = useCallback(
+    (messageIdx) => {
+      if (!conversationIdx || messageIdx == null) return;
+      const prev = pendingReadMessageIdxRef.current;
+      pendingReadMessageIdxRef.current =
+        prev == null ? messageIdx : Math.max(prev, messageIdx);
+
+      clearReadDebounce();
+      readDebounceTimerRef.current = setTimeout(() => {
+        readDebounceTimerRef.current = null;
+        const pending = pendingReadMessageIdxRef.current;
+        pendingReadMessageIdxRef.current = null;
+        if (pending != null) {
+          markAsRead(conversationIdx, pending).catch((err) => {
+            console.error('읽음 처리 실패:', err);
+          });
+        }
+      }, READ_DEBOUNCE_MS);
+    },
+    [conversationIdx, clearReadDebounce]
+  );
+
   const showToast = (message, type = 'error') => {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast({ message, type });
@@ -52,6 +100,9 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
   const fetchMessages = async () => {
     if (!conversationIdx || !user?.idx) return;
 
+    clearReadDebounce();
+    pendingReadMessageIdxRef.current = null;
+
     setLoading(true);
     try {
       const data = await getMessages(conversationIdx, 0, 100);
@@ -60,10 +111,10 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
       const sortedMessages = [...messagesList].reverse();
       setMessages(sortedMessages);
 
-      // 읽음 처리
+      // 읽음 처리 (초기 로드 — 디바운스 없이 즉시)
       if (sortedMessages.length > 0) {
         const lastMessage = sortedMessages[sortedMessages.length - 1];
-        await markAsRead(conversationIdx, lastMessage.idx);
+        await flushMarkAsRead(lastMessage.idx);
       }
     } catch (error) {
       console.error('메시지 조회 실패:', error);
@@ -175,11 +226,9 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
                 });
               });
 
-              // 읽음 처리 (내가 보낸 메시지가 아닌 경우)
+              // 읽음 처리 (상대 메시지) — 디바운스로 연속 수신 시 1회에 가깝게 병합
               if (messageData.senderIdx !== user.idx) {
-                markAsRead(conversationIdx, messageData.idx).catch(err => {
-                  console.error('읽음 처리 실패:', err);
-                });
+                scheduleIncomingMessageRead(messageData.idx);
               }
             } catch (error) {
               console.error('메시지 파싱 실패:', error);
@@ -205,12 +254,14 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
 
     // cleanup
     return () => {
+      clearReadDebounce();
+      pendingReadMessageIdxRef.current = null;
       if (stompClientRef.current) {
         stompClientRef.current.deactivate();
         stompClientRef.current = null;
       }
     };
-  }, [conversationIdx, user?.idx]);
+  }, [conversationIdx, user?.idx, clearReadDebounce, scheduleIncomingMessageRead]);
 
   // 이미지 업로드 및 전송
   const handleImageUpload = async (e) => {
@@ -250,12 +301,12 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
           },
         });
 
-        await markAsRead(conversationIdx, null);
+        await flushMarkAsRead(null);
       } else {
         // HTTP API로 폴백
         const newMessage = await sendMessage(conversationIdx, imageUrl, 'IMAGE');
         setMessages(prev => [...prev, newMessage]);
-        await markAsRead(conversationIdx, newMessage.idx);
+        await flushMarkAsRead(newMessage.idx);
       }
     } catch (error) {
       console.error('이미지 업로드 실패:', error);
@@ -294,12 +345,12 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
         });
 
         // 읽음 처리 (내가 보낸 메시지)
-        await markAsRead(conversationIdx, null);
+        await flushMarkAsRead(null);
       } else {
         // WebSocket이 연결되지 않은 경우 HTTP API로 폴백
         const newMessage = await sendMessage(conversationIdx, content);
         setMessages(prev => [...prev, newMessage]);
-        await markAsRead(conversationIdx, newMessage.idx);
+        await flushMarkAsRead(newMessage.idx);
       }
     } catch (error) {
       console.error('메시지 전송 실패:', error);

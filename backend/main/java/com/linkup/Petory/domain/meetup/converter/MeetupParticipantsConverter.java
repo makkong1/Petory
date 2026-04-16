@@ -5,6 +5,9 @@ import com.linkup.Petory.domain.meetup.entity.MeetupParticipants;
 
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+import java.util.stream.Collectors;
+
 @Component
 public class MeetupParticipantsConverter {
 
@@ -18,6 +21,13 @@ public class MeetupParticipantsConverter {
                 participants.getUser().getUsername(),
                 participants.getJoinedAt()
         );
+    }
+
+    public List<MeetupParticipantsDTO> toDTOList(List<MeetupParticipants> participants) {
+        if (participants == null) {
+            return List.of();
+        }
+        return participants.stream().map(this::toDTO).collect(Collectors.toList());
     }
 
     public MeetupParticipants toEntity(MeetupParticipantsDTO dto) {

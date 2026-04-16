@@ -19,6 +19,65 @@ def run_command(command, cwd=None):
         logging.error(f"Command failed: {command}\nError: {e.stderr}")
         return None
 
+
+def run_command_verbose(command, cwd=None):
+    """성공 시 True. 실패 시 stderr 로깅 후 False."""
+    result = subprocess.run(command, shell=True, capture_output=True, text=True, cwd=cwd)
+    if result.returncode != 0:
+        logging.error(f"Command failed: {command}\n{result.stderr or result.stdout}")
+        return False
+    if result.stdout.strip():
+        print(result.stdout.strip())
+    return True
+
+
+def confirm_ko(question):
+    """터미널에서만 y/n 질문. 비대화형(파이프·CI)이면 False."""
+    if not sys.stdin.isatty():
+        logging.info(f"비대화형 stdin — 건너뜀: {question}")
+        return False
+    try:
+        line = input(f"{question} (y/n): ").strip().lower()
+    except EOFError:
+        return False
+    return line in ("y", "yes", "예")
+
+
+def optional_push_and_merge_dev(feature_branch):
+    """
+    작업 브랜치 푸시 후, 사용자 확인 시 로컬 dev에 병합하고 origin dev 푸시.
+    끝나면 다시 feature_branch 로 체크아웃.
+    """
+    cwd = os.getcwd()
+
+    if not confirm_ko(f"현재 브랜치 '{feature_branch}' 를 origin 에 푸시할까요?"):
+        logging.info("푸시 단계를 건너뜁니다.")
+    else:
+        if not run_command_verbose(f"git push -u origin {feature_branch}", cwd=cwd):
+            logging.error("푸시에 실패했습니다. 머지 단계는 진행하지 않습니다.")
+            return
+
+    if not confirm_ko("로컬 dev 에 이 브랜치를 머지한 뒤, origin dev 로 푸시할까요?"):
+        logging.info("dev 머지 단계를 건너뜁니다.")
+        return
+
+    for cmd in (
+        "git fetch origin",
+        "git checkout dev",
+        "git pull origin dev",
+        f"git merge {feature_branch}",
+        "git push origin dev",
+        f"git checkout {feature_branch}",
+    ):
+        if not run_command_verbose(cmd, cwd=cwd):
+            logging.error(
+                "dev 머지/푸시 중 실패했습니다. "
+                "충돌이면 현재 브랜치에서 해결 후 다시 시도하세요."
+            )
+            return
+
+    logging.info("dev 반영 및 작업 브랜치 복귀까지 완료했습니다.")
+
 def load_json(file_path):
     if os.path.exists(file_path):
         with open(file_path, 'r') as f:
@@ -112,6 +171,10 @@ def main():
         
     setup_git_branch(task_name)
     run_step(task_name, task_data)
+
+    feature_branch = f"feat-{task_name}"
+    print("\n--- Git 후속 (선택) ---")
+    optional_push_and_merge_dev(feature_branch)
 
 if __name__ == "__main__":
     main()

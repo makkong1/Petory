@@ -54,6 +54,13 @@ public class MeetupConverter {
                 .build();
     }
 
+    public List<MeetupDTO> toDTOList(List<Meetup> meetups) {
+        if (meetups == null) {
+            return List.of();
+        }
+        return meetups.stream().map(this::toDTO).collect(Collectors.toList());
+    }
+
     public Meetup toEntity(MeetupDTO dto) {
         if (dto == null) {
             return null;

@@ -7,12 +7,12 @@
 
 ## 요약
 
-| 순위 | 이슈 | 핵심 | 개선 방향 (요약) |
-|------|------|------|------------------|
-| 1 | 카테고리 필터가 애플리케이션 메모리에서 처리 | 지역/반경으로 DB에서 많이 읽은 뒤 Java에서 `category1~3` 필터 | SQL `WHERE`에 카테고리 조건 통합 또는 전용 쿼리 |
-| 2 | 반경 검색의 바운딩 POLYGON 근사 | `ST_Within` 직사각형 + `COS(RADIANS(lat))` 보정 후 `ST_Distance_Sphere`로 최종 필터 | 근사 박스 누락 방지 검토, 또는 원형 조건만으로 단순화·인덱스 전략 정리 |
-| 3 | `findTop10ByCategoryOrderByRatingDesc`에 상위 N 제한 없음 | 메서드명은 Top10, JPQL에는 `LIMIT`/setMaxResults 없음 → 카테고리별 전량 조회 가능 | `LIMIT 10` 또는 `setMaxResults(10)`, 메서드명·캐시 키 정합성 |
-| 4 | `PublicDataLocationService.saveBatch`의 트랜잭션 | `private` + `@Transactional(REQUIRES_NEW)` + 동일 클래스 self-invocation → AOP 미적용 가능성 | `public` + 별도 빈 호출 또는 `TransactionTemplate` |
+| 순위 | 이슈 | 핵심 | 개선 방향 (요약) | 상태 |
+|------|------|------|------------------|------|
+| 1 | 카테고리 필터가 애플리케이션 메모리에서 처리 | 지역/반경으로 DB에서 많이 읽은 뒤 Java에서 `category1~3` 필터 | SQL `WHERE`에 카테고리 조건 통합 또는 전용 쿼리 | ✅ 해결 |
+| 2 | 반경 검색의 바운딩 POLYGON 근사 | `ST_Within` 직사각형 + `COS(RADIANS(lat))` 보정 후 `ST_Distance_Sphere`로 최종 필터 | 근사 박스 누락 방지 검토, 또는 원형 조건만으로 단순화·인덱스 전략 정리 | ⚠️ 모니터링 대기 |
+| 3 | `findTop10ByCategoryOrderByRatingDesc`에 상위 N 제한 없음 | 메서드명은 Top10, JPQL에는 `LIMIT`/setMaxResults 없음 → 카테고리별 전량 조회 가능 | `LIMIT 10` 또는 `setMaxResults(10)`, 메서드명·캐시 키 정합성 | ✅ 해결 |
+| 4 | `PublicDataLocationService.saveBatch`의 트랜잭션 | `private` + `@Transactional(REQUIRES_NEW)` + 동일 클래스 self-invocation → AOP 미적용 가능성 | `public` + 별도 빈 호출 또는 `TransactionTemplate` | ✅ 해결 |
 
 ---
 
@@ -38,9 +38,21 @@
 - 지역별·반경별 **네이티브/JPQL에 `category1/2/3` 조건**을 넣어 DB에서 걸러낸 뒤 정렬·LIMIT.
 - 키워드(FULLTEXT)와의 조합 정책은 제품 규칙에 맞춰 별도 설계.
 
+### 해결 내역
+
+- `LocationServiceService`에서 `applyCategoryFilter` / `matchesCategory` / `categoryFieldMatches` 메서드를 제거.
+- 모든 조회 쿼리(`findBySigungu`, `findBySido`, `findByEupmyeondong`, `findByRoadName`, `findByOrderByRatingDesc`, `findByRadius`, `findByNameContaining`)에 다음 조건 추가:
+  ```sql
+  AND (:category IS NULL
+       OR category3 = :category
+       OR category2 = :category
+       OR category1 = :category)
+  ```
+- 서비스 메서드는 `category` 파라미터를 정규화(`normalize`)한 뒤 그대로 쿼리에 전달. Java 스트림 필터 없음.
+
 ### 관련 문서
 
-- `docs/refactoring/location/검색-분기-및-카테고리-필터-통합.md` (분기·필터 공통화는 이미 반영; **필터 위치를 DB로 옮기는 작업**은 별도)
+- `docs/refactoring/location/검색-분기-및-카테고리-필터-통합.md`
 
 ---
 
@@ -55,6 +67,13 @@
 ### 리스크
 
 - 바운딩 박스는 **원을 완전히 덮는다**는 보장을 위도/경도·미터 환산 근사만으로는 모든 위도에서 엄밀히 말하기 어렵다. 박스가 **실제 원보다 좁으면** 일부 행이 누락될 **이론적 위험**이 있다 (반대로 박스가 넓으면 후단 `ST_Distance_Sphere`가 잘라 줌).
+
+### 현재 상태
+
+- `findByRadius` 쿼리 구조는 문서 작성 당시와 동일하게 유지 중.
+- 후단 `ST_Distance_Sphere` 필터가 있어 **결과 정확도에는 실제 문제 없음**.
+- 이론적으로 POLYGON 박스가 원보다 좁게 계산될 경우 일부 행이 1차 필터에서 누락될 수 있으나, 운영 데이터 기준 재현된 사례 없음.
+- **EXPLAIN 및 운영 데이터 모니터링 후 필요 시 개선** 방향으로 유지.
 
 ### 리팩토링 방향
 
@@ -81,10 +100,18 @@
 - `SpringDataJpaLocationServiceRepository.findTop10ByCategoryOrderByRatingDesc`
 - `LocationServiceService.getPopularLocationServices`
 
-### 리팩토링 방향
+### 해결 내역
 
-- 네이티브 `LIMIT 10` 또는 `TypedQuery#setMaxResults(10)`.
-- 메서드명을 실제 동작과 맞추거나, 주석으로 “인기 10건”이 **DB에서 잘린다**는 것을 명시.
+- `@Query`를 네이티브 쿼리로 전환하고 `ORDER BY rating DESC LIMIT 10` 추가.
+- 메서드명 `findTop10ByCategoryOrderByRatingDesc`이 실제 동작(DB에서 10건 제한)과 일치.
+
+```sql
+SELECT * FROM locationservice WHERE
+(:category IS NULL OR category3 = :category OR category2 = :category OR category1 = :category)
+AND is_deleted = 0
+ORDER BY rating DESC
+LIMIT 10
+```
 
 ---
 
@@ -100,10 +127,16 @@
 
 - `PublicDataLocationService.saveBatch`
 
-### 리팩토링 방향
+### 해결 내역
 
-- 배치 커밋을 분리하려면: **`public` 메서드를 별도 스프링 빈**(예: `LocationServiceBatchWriter`)으로 옮겨 외부에서 호출하거나, **`TransactionTemplate`** 으로 명시적 `REQUIRES_NEW` 실행.
-- 의도(배치 단위 부분 실패 허용)와 문서 주석을 코드에 맞게 정리.
+- `saveBatch` 로직을 `LocationServiceBatchWriter` 별도 스프링 빈으로 분리.
+- `PublicDataLocationService`에서 `batchWriter.saveBatch(batch)` 형태로 외부 빈 호출 → Spring AOP 프록시 정상 적용.
+- `@Transactional(propagation = Propagation.REQUIRES_NEW)` 가 배치 단위로 실제 독립 트랜잭션으로 동작.
+
+```
+Before: PublicDataLocationService.importFromCsv() → this.saveBatch()  (self-invocation, AOP 미적용)
+After:  PublicDataLocationService.importFromCsv() → batchWriter.saveBatch()  (별도 빈, REQUIRES_NEW 적용)
+```
 
 ### 관련 문서
 
