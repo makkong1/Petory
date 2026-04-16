@@ -23,6 +23,7 @@
 ```bash
 python3 scripts/execute.py {task-name}
 ```
+스크립트 마지막에 **대화형**으로 묻는다: (1) `feat-{task-name}` 를 origin 에 푸시할지, (2) 로컬 `dev` 에 머지한 뒤 `origin dev` 로 푸시할지. 파이프·CI처럼 stdin 이 tty 가 아니면 두 단계 모두 건너뛴다.
 
 ## Step 설계 원칙
 1. **Scope 최소화**: 하나의 step에서 하나의 레이어 또는 모듈만 다룬다.

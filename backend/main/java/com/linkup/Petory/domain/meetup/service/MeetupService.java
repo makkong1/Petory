@@ -210,7 +210,7 @@ public class MeetupService {
     @Timed("getAllMeetups")
     public List<MeetupDTO> getAllMeetups() {
         List<Meetup> meetups = meetupRepository.findAllNotDeleted(); // 원래는 여기에서 n+1문제가 발생했지만 join fetch로 해결
-        return convertToDTOs(meetups);
+        return converter.toDTOList(meetups);
     }
 
     /**
@@ -268,7 +268,7 @@ public class MeetupService {
     public List<MeetupParticipantsDTO> getMeetupParticipants(Long meetupIdx) {
         meetupRepository.findByIdWithOrganizer(meetupIdx)
                 .orElseThrow(MeetupNotFoundException::new);
-        return convertToParticipantDTOs(
+        return participantsConverter.toDTOList(
                 meetupParticipantsRepository.findByMeetupIdxOrderByJoinedAtAsc(meetupIdx));
     }
 
@@ -387,14 +387,14 @@ public class MeetupService {
     @Timed("getMeetupsByLocation")
     public List<MeetupDTO> getMeetupsByLocation(Double minLat, Double maxLat, Double minLng, Double maxLng) {
         List<Meetup> meetups = meetupRepository.findByLocationRange(minLat, maxLat, minLng, maxLng);
-        return convertToDTOs(meetups.size() > MAX_LIST_SIZE ? meetups.subList(0, MAX_LIST_SIZE) : meetups);
+        return converter.toDTOList(meetups.size() > MAX_LIST_SIZE ? meetups.subList(0, MAX_LIST_SIZE) : meetups);
     }
 
     // 키워드로 모임 검색
     @Timed("searchMeetupsByKeyword")
     public List<MeetupDTO> searchMeetupsByKeyword(String keyword) {
         List<Meetup> meetups = meetupRepository.findByKeyword(keyword);
-        return convertToDTOs(meetups.size() > MAX_LIST_SIZE ? meetups.subList(0, MAX_LIST_SIZE) : meetups);
+        return converter.toDTOList(meetups.size() > MAX_LIST_SIZE ? meetups.subList(0, MAX_LIST_SIZE) : meetups);
     }
 
     /**
@@ -405,7 +405,7 @@ public class MeetupService {
     @Timed("getAvailableMeetups")
     public List<MeetupDTO> getAvailableMeetups() {
         List<Meetup> meetups = meetupRepository.findAvailableMeetups(LocalDateTime.now(), MeetupStatus.RECRUITING, Pageable.unpaged());
-        return convertToDTOs(meetups);
+        return converter.toDTOList(meetups);
     }
 
     /**
@@ -414,7 +414,7 @@ public class MeetupService {
     @Timed("getAvailableMeetupsPaged")
     public Slice<MeetupDTO> getAvailableMeetups(Pageable pageable) {
         List<Meetup> list = meetupRepository.findAvailableMeetups(LocalDateTime.now(), MeetupStatus.RECRUITING, pageable);
-        List<MeetupDTO> dtos = convertToDTOs(list);
+        List<MeetupDTO> dtos = converter.toDTOList(list);
         boolean hasNext = pageable.isPaged() && list.size() == pageable.getPageSize();
         return new SliceImpl<>(dtos, pageable, hasNext);
     }
@@ -422,24 +422,7 @@ public class MeetupService {
     // 주최자별 모임 조회
     public List<MeetupDTO> getMeetupsByOrganizer(Long organizerIdx) {
         List<Meetup> meetups = meetupRepository.findByOrganizerIdxOrderByCreatedAtDesc(organizerIdx);
-        return convertToDTOs(meetups.size() > MAX_LIST_SIZE ? meetups.subList(0, MAX_LIST_SIZE) : meetups);
+        return converter.toDTOList(meetups.size() > MAX_LIST_SIZE ? meetups.subList(0, MAX_LIST_SIZE) : meetups);
     }
 
-    /**
-     * [리팩토링] Meetup 엔티티 리스트 → DTO 리스트 변환 공통화 (7개 메서드 중복 제거)
-     */
-    private List<MeetupDTO> convertToDTOs(List<Meetup> meetups) {
-        return meetups.stream()
-                .map(converter::toDTO)
-                .collect(Collectors.toList());
-    }
-
-    /**
-     * [리팩토링] MeetupParticipants 엔티티 리스트 → DTO 리스트 변환 공통화
-     */
-    private List<MeetupParticipantsDTO> convertToParticipantDTOs(List<MeetupParticipants> participants) {
-        return participants.stream()
-                .map(participantsConverter::toDTO)
-                .collect(Collectors.toList());
-    }
 }
