@@ -56,6 +56,10 @@ public interface SpringDataJpaUsersRepository extends JpaRepository<Users, Long>
     @Query("SELECT u FROM Users u WHERE u.id = :id")
     Optional<Users> findByIdString(@Param("id") String id);
 
+    @RepositoryMethod("사용자: 로그인 ID(String)로 idx 스칼라 조회 (경량)")
+    @Query("SELECT u.idx FROM Users u WHERE u.id = :id")
+    Optional<Long> findIdxByIdString(@Param("id") String id);
+
     @RepositoryMethod("사용자: RefreshToken으로 조회")
     Optional<Users> findByRefreshToken(String refreshToken);
 

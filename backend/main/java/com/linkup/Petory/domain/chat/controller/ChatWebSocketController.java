@@ -2,6 +2,8 @@ package com.linkup.Petory.domain.chat.controller;
 
 import java.security.Principal;
 
+import org.springframework.dao.DataAccessException;
+import org.springframework.messaging.MessagingException;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -13,6 +15,8 @@ import com.linkup.Petory.domain.chat.dto.ChatWebSocketReadRequest;
 import com.linkup.Petory.domain.chat.dto.ChatWebSocketTypingRequest;
 import com.linkup.Petory.domain.chat.dto.TypingStatusDTO;
 import com.linkup.Petory.domain.chat.entity.MessageType;
+import com.linkup.Petory.domain.chat.exception.ChatForbiddenException;
+import com.linkup.Petory.domain.chat.exception.ConversationNotFoundException;
 import com.linkup.Petory.domain.chat.service.ChatMessageService;
 import com.linkup.Petory.domain.user.exception.UserNotFoundException;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
@@ -73,7 +77,8 @@ public class ChatWebSocketController {
                     "/topic/conversation/" + conversationIdx,
                     messageDTO);
 
-        } catch (Exception e) {
+        } catch (UserNotFoundException | IllegalArgumentException | ChatForbiddenException
+                | ConversationNotFoundException | MessagingException | DataAccessException e) {
             log.error("WebSocket 메시지 전송 실패: {}", e.getMessage(), e);
 
             // 에러 메시지 전송
@@ -115,7 +120,7 @@ public class ChatWebSocketController {
             // "/topic/conversation/" + readRequest.getConversationIdx() + "/read",
             // new ReadStatusDTO(userId, readRequest.getLastMessageIdx()));
 
-        } catch (Exception e) {
+        } catch (UserNotFoundException | ChatForbiddenException | DataAccessException e) {
             log.error("WebSocket 읽음 처리 실패: {}", e.getMessage(), e);
         }
     }
@@ -144,7 +149,7 @@ public class ChatWebSocketController {
                     "/topic/conversation/" + typingRequest.getConversationIdx() + "/typing",
                     new TypingStatusDTO(userId, typingRequest.isTyping()));
 
-        } catch (Exception e) {
+        } catch (UserNotFoundException | MessagingException | DataAccessException e) {
             log.error("WebSocket 타이핑 처리 실패: {}", e.getMessage(), e);
         }
     }

@@ -1,0 +1,12 @@
+{
+  "phases": [
+    {
+      "dir": "mock-task",
+      "status": "pending"
+    },
+    {
+      "dir": "meetup-backend-refactor",
+      "status": "pending"
+    }
+  ]
+}

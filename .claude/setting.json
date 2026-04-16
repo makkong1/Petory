@@ -1,4 +1,16 @@
 {
+  "hooks": {
+    "PreToolUse": "scripts/hooks/dangerous-cmd-guard.sh",
+    "PostToolUseFailure": "scripts/hooks/circuit-breaker.sh",
+    "TaskCompleted": "scripts/hooks/tdd-guard.sh"
+  },
+  "customCommands": [
+    {
+      "name": "harness",
+      "description": "원스톱 실행 파이프라인. 스크립트 기반 phase 관리.",
+      "prompt": "해당 작업은 .claude/commands/harness.md 규칙에 따라 수행되며 scripts/execute.py 스크립트를 사용하여 phase 진행 상황을 JSON으로 저장하고 불러옵니다."
+    }
+  ],
   "env": {
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
   }

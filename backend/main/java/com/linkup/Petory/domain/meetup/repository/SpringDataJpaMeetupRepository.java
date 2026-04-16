@@ -47,18 +47,21 @@ public interface SpringDataJpaMeetupRepository extends JpaRepository<Meetup, Lon
                     "ORDER BY m.date ASC")
     List<Meetup> findByKeyword(@Param("keyword") String keyword);
 
-    @RepositoryMethod("모임: 참여 가능 목록 (페이징 가능)")
     /**
-     * {@link Pageable#unpaged()}이면 전체, 아니면 limit/offset 적용.
+     * 참여 가능 목록. GROUP BY/HAVING 제거 → currentParticipants 직접 비교로 메모리 페이징 위험 해소.
+     * {@link Pageable#unpaged()}이면 전체, 아니면 DB LIMIT/OFFSET 적용.
      */
-    @EntityGraph(attributePaths = {"organizer"})
-    @Query("SELECT DISTINCT m FROM Meetup m LEFT JOIN m.participants p " +
+    @RepositoryMethod("모임: 참여 가능 목록 (페이징 가능, RECRUITING 상태만)")
+    @Query("SELECT m FROM Meetup m JOIN FETCH m.organizer " +
                     "WHERE m.date > :currentDate " +
+                    "AND m.currentParticipants < m.maxParticipants " +
+                    "AND m.status = :recruiting " +
                     "AND (m.isDeleted = false OR m.isDeleted IS NULL) " +
-                    "GROUP BY m.idx " +
-                    "HAVING COUNT(p) < m.maxParticipants " +
                     "ORDER BY m.date ASC")
-    List<Meetup> findAvailableMeetups(@Param("currentDate") LocalDateTime currentDate, Pageable pageable);
+    List<Meetup> findAvailableMeetups(
+                    @Param("currentDate") LocalDateTime currentDate,
+                    @Param("recruiting") MeetupStatus recruiting,
+                    Pageable pageable);
 
     @RepositoryMethod("모임: 단건 조회 (주최자 포함)")
     @Query("SELECT m FROM Meetup m JOIN FETCH m.organizer WHERE m.idx = :idx " +
@@ -90,17 +93,20 @@ public interface SpringDataJpaMeetupRepository extends JpaRepository<Meetup, Lon
                     "AND (m.isDeleted = false OR m.isDeleted IS NULL)")
     List<Meetup> findByIdxInWithOrganizer(@Param("ids") Collection<Long> ids);
 
-    @RepositoryMethod("모임: 비관적 락 조회 (동시성 제어)")
+    @RepositoryMethod("모임: 비관적 락 조회 (동시성 제어, 소프트 삭제 제외)")
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("SELECT m FROM Meetup m WHERE m.idx = :idx")
+    @Query("SELECT m FROM Meetup m WHERE m.idx = :idx AND (m.isDeleted = false OR m.isDeleted IS NULL)")
     Optional<Meetup> findByIdWithLock(@Param("idx") Long idx);
 
-    @RepositoryMethod("모임: 참여자 수 원자적 증가")
+    @RepositoryMethod("모임: 참여자 수 원자적 증가 (RECRUITING 상태 + 인원 미달 조건)")
     @Modifying
     @Query("UPDATE Meetup m SET m.currentParticipants = m.currentParticipants + 1 " +
                     "WHERE m.idx = :meetupIdx " +
-                    "  AND m.currentParticipants < m.maxParticipants")
-    int incrementParticipantsIfAvailable(@Param("meetupIdx") Long meetupIdx);
+                    "  AND m.currentParticipants < m.maxParticipants " +
+                    "  AND m.status = :recruiting")
+    int incrementParticipantsIfAvailable(
+                    @Param("meetupIdx") Long meetupIdx,
+                    @Param("recruiting") MeetupStatus recruiting);
 
     // [FIX] 참가 취소 시 원자적 감소 — 기존 read-modify-write(Math.max)는 동시 취소 시 카운트 불일치 위험.
     // currentParticipants > 0 조건으로 음수 방지.

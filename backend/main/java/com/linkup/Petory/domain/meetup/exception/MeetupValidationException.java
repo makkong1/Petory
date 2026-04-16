@@ -19,4 +19,12 @@ public class MeetupValidationException extends ApiException {
     public static MeetupValidationException dateMustBeFuture() {
         return new MeetupValidationException("모임 일시는 현재 시간 이후여야 합니다.");
     }
+
+    public static MeetupValidationException invalidMaxParticipants() {
+        return new MeetupValidationException("최대 참여 인원은 1 이상이어야 합니다.");
+    }
+
+    public static MeetupValidationException maxBelowCurrent() {
+        return new MeetupValidationException("최대 인원은 현재 참여자 수보다 작을 수 없습니다.");
+    }
 }

@@ -86,6 +86,11 @@ public class JpaUsersAdapter implements UsersRepository {
     }
 
     @Override
+    public Optional<Long> findIdxByIdString(String id) {
+        return jpaRepository.findIdxByIdString(id);
+    }
+
+    @Override
     public Optional<Users> findByRefreshToken(String refreshToken) {
         return jpaRepository.findByRefreshToken(refreshToken);
     }

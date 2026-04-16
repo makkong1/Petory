@@ -1,5 +1,6 @@
 package com.linkup.Petory.domain.meetup.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.*;
 
 import java.time.LocalDateTime;
@@ -25,7 +26,9 @@ public class MeetupDTO {
     private String status; // 모임 상태: RECRUITING, CLOSED, COMPLETED
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    @JsonIgnore
     private Boolean isDeleted;
+    @JsonIgnore
     private LocalDateTime deletedAt;
     private List<MeetupParticipantsDTO> participants;
 }
