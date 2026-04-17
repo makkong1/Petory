@@ -14,6 +14,7 @@ const MeetupLayer = ({ selectedItem, onClose, onRefresh }) => {
   const [isParticipating, setIsParticipating] = useState(false);
   const [participantLoading, setParticipantLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [actionError, setActionError] = useState(null);
   const [meetupDetail, setMeetupDetail] = useState(null);
 
   useEffect(() => {
@@ -50,6 +51,7 @@ const MeetupLayer = ({ selectedItem, onClose, onRefresh }) => {
     try {
       await meetupApi.joinMeetup(r.idx);
       setIsParticipating(true);
+      setActionError(null);
       const [pRes, mRes] = await Promise.all([
         meetupApi.getParticipants(r.idx),
         meetupApi.getMeetupById(r.idx),
@@ -58,18 +60,18 @@ const MeetupLayer = ({ selectedItem, onClose, onRefresh }) => {
       setMeetupDetail(mRes.data?.meetup || r);
       onRefresh?.();
     } catch (err) {
-      alert(err.response?.data?.error || '참가에 실패했습니다.');
+      setActionError(err.response?.data?.error || '참가에 실패했습니다.');
     } finally {
       setActionLoading(false);
     }
   };
 
   const handleLeave = async () => {
-    if (!window.confirm('참가를 취소할까요?')) return;
     setActionLoading(true);
     try {
       await meetupApi.cancelParticipation(r.idx);
       setIsParticipating(false);
+      setActionError(null);
       const [pRes, mRes] = await Promise.all([
         meetupApi.getParticipants(r.idx),
         meetupApi.getMeetupById(r.idx),
@@ -78,7 +80,7 @@ const MeetupLayer = ({ selectedItem, onClose, onRefresh }) => {
       setMeetupDetail(mRes.data?.meetup || r);
       onRefresh?.();
     } catch (err) {
-      alert(err.response?.data?.error || '취소에 실패했습니다.');
+      setActionError(err.response?.data?.error || '취소에 실패했습니다.');
     } finally {
       setActionLoading(false);
     }
@@ -110,6 +112,7 @@ const MeetupLayer = ({ selectedItem, onClose, onRefresh }) => {
         )}
       </InfoGrid>
 
+      {actionError && <ActionErrorMsg>{actionError}</ActionErrorMsg>}
       {/* 참가/취소 버튼 */}
       {user && !isOrganizer && (
         <ActionRow>
@@ -233,4 +236,13 @@ const ParticipantItem = styled.div`
   font-size: 13px;
   color: ${props => props.theme.colors.text};
   padding: 3px 0;
+`;
+
+const ActionErrorMsg = styled.div`
+  margin: 0 14px 4px;
+  padding: 6px 10px;
+  background: ${props => props.theme.colors.errorSoft};
+  color: ${props => props.theme.colors.error};
+  border-radius: 6px;
+  font-size: 12px;
 `;

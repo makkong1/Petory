@@ -95,7 +95,8 @@ const LocationLayer = ({ selectedItem, onClose }) => {
       <PanelTitle>{selectedItem.title}</PanelTitle>
       {avgRating && (
         <RatingRow>
-          {'⭐'.repeat(Math.round(Number(avgRating)))} {avgRating} ({reviews.length}개 리뷰)
+          <StarRating value={Number(avgRating)} />
+          <RatingText>{avgRating} ({reviews.length}개 리뷰)</RatingText>
         </RatingRow>
       )}
 
@@ -160,7 +161,7 @@ const LocationLayer = ({ selectedItem, onClose }) => {
               <ReviewItem key={rv.idx}>
                 <ReviewMeta>
                   <ReviewAuthor>{rv.nickname || rv.username || '익명'}</ReviewAuthor>
-                  <ReviewRating>{'⭐'.repeat(rv.rating || 0)}</ReviewRating>
+                  <ReviewRating><StarRating value={rv.rating || 0} size={11} /></ReviewRating>
                   <ReviewDate>{rv.createdAt ? new Date(rv.createdAt).toLocaleDateString('ko-KR') : ''}</ReviewDate>
                 </ReviewMeta>
                 <ReviewComment>{rv.comment}</ReviewComment>
@@ -216,10 +217,39 @@ const TypeBadge = styled.span`
   font-weight: 600;
 `;
 
+const StarRating = ({ value, max = 5, size = 13 }) => {
+  const filled = Math.round(value);
+  return (
+    <StarGroup aria-label={`${value}점`}>
+      {Array.from({ length: max }, (_, i) => (
+        <StarChar key={i} $filled={i < filled} $size={size}>★</StarChar>
+      ))}
+    </StarGroup>
+  );
+};
+
+const StarGroup = styled.span`
+  display: inline-flex;
+  gap: 1px;
+  vertical-align: middle;
+`;
+
+const StarChar = styled.span`
+  font-size: ${p => p.$size}px;
+  color: ${p => p.$filled ? '#F59E0B' : p.theme.colors.border};
+  line-height: 1;
+`;
+
 const RatingRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px 8px;
+`;
+
+const RatingText = styled.span`
   font-size: 12px;
   color: ${props => props.theme.colors.textSecondary};
-  padding: 0 14px 8px;
 `;
 
 const ScrollBody = styled.div`

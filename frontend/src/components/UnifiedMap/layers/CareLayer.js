@@ -11,6 +11,7 @@ import {
 const CareLayer = ({ selectedItem, onClose }) => {
   const { user } = useAuth();
   const [chatLoading, setChatLoading] = useState(false);
+  const [chatError, setChatError] = useState(null);
 
   if (!selectedItem) return null;
   const r = selectedItem.raw;
@@ -35,7 +36,7 @@ const CareLayer = ({ selectedItem, onClose }) => {
       // 채팅 위젯 열기
       window.dispatchEvent(new CustomEvent('openChat', { detail: { userId: ownerId } }));
     } catch (err) {
-      alert('채팅 연결에 실패했습니다.');
+      setChatError('채팅 연결에 실패했습니다.');
     } finally {
       setChatLoading(false);
     }
@@ -74,9 +75,10 @@ const CareLayer = ({ selectedItem, onClose }) => {
         )}
       </InfoGrid>
 
+      {chatError && <ActionErrorMsg>{chatError}</ActionErrorMsg>}
       {user && !isOwner && r.status === 'OPEN' && (
         <ActionRow>
-          <ChatButton onClick={handleChat} disabled={chatLoading}>
+          <ChatButton onClick={() => { setChatError(null); handleChat(); }} disabled={chatLoading}>
             {chatLoading ? '연결 중...' : '💬 채팅으로 문의하기'}
           </ChatButton>
         </ActionRow>
@@ -102,16 +104,18 @@ const StatusBadge = styled.span`
   padding: 1px 8px;
   border-radius: 8px;
   background: ${props => {
-    if (props.$status === 'OPEN') return '#e6f7ff';
-    if (props.$status === 'IN_PROGRESS') return '#fff7e6';
-    if (props.$status === 'COMPLETED') return '#f6ffed';
-    return '#f5f5f5';
+    if (props.$status === 'OPEN') return props.theme.colors.infoSoft;
+    if (props.$status === 'IN_PROGRESS') return props.theme.colors.warningSoft;
+    if (props.$status === 'COMPLETED') return props.theme.colors.successSoft;
+    if (props.$status === 'CANCELLED') return props.theme.colors.errorSoft;
+    return props.theme.colors.surfaceSoft;
   }};
   color: ${props => {
-    if (props.$status === 'OPEN') return '#1890ff';
-    if (props.$status === 'IN_PROGRESS') return '#fa8c16';
-    if (props.$status === 'COMPLETED') return '#52c41a';
-    return '#999';
+    if (props.$status === 'OPEN') return props.theme.colors.status.open;
+    if (props.$status === 'IN_PROGRESS') return props.theme.colors.status.inProgress;
+    if (props.$status === 'COMPLETED') return props.theme.colors.status.completed;
+    if (props.$status === 'CANCELLED') return props.theme.colors.status.cancelled;
+    return props.theme.colors.textMuted;
   }};
 `;
 
@@ -147,4 +151,13 @@ const OwnerBadge = styled.div`
   font-size: 12px;
   color: ${props => props.theme.colors.domain.care};
   font-weight: 600;
+`;
+
+const ActionErrorMsg = styled.div`
+  margin: 0 14px 4px;
+  padding: 6px 10px;
+  background: ${props => props.theme.colors.errorSoft};
+  color: ${props => props.theme.colors.error};
+  border-radius: 6px;
+  font-size: 12px;
 `;

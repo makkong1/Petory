@@ -90,7 +90,7 @@ const MapContainer = React.forwardRef(
           logoControl: false, // 네이버맵 로고 숨기기
           mapDataControl: false, // 지도 데이터 컨트롤 숨기기
           scaleControl: false, // 스케일 컨트롤 숨기기
-          scrollWheel: false, // 마우스 휠 확대/축소 비활성화
+          scrollWheel: true,
           disableDoubleClickZoom: false, // 더블클릭 확대 활성화
           disableDoubleClick: false,
         };
@@ -552,10 +552,7 @@ const MapContainer = React.forwardRef(
           setTimeout(() => {
             map.setCenter(new window.naver.maps.LatLng(mapCenter.lat, mapCenter.lng));
             lastProgrammaticCenterRef.current = { ...mapCenter };
-            console.log('지도 줌 변경 완료:', mapCenter, '줌:', targetZoom, '레벨:', mapLevel);
           }, 300);
-        } else {
-          console.log('지도 줌 변경 완료 (중심 동일):', mapCenter, '줌:', targetZoom, '레벨:', mapLevel);
         }
         return;
       }
@@ -614,36 +611,6 @@ const MapContainer = React.forwardRef(
     }, [hoverMarker]);
 
     // GeoJSON 폴리곤 표시 기능 제거됨 (geojsonUtils 파일 없음)
-
-    // 네이버맵 인증 관련 요소 주기적으로 숨기기 (동적으로 생성될 수 있음)
-    useEffect(() => {
-      if (!mapReadyRef.current) return;
-
-      const hideAuthElements = () => {
-        const authElements = document.querySelectorAll('iframe[src*="oapi.map.naver.com"], iframe[src*="auth"], a[href*="oapi.map.naver.com"], a[href*="auth"]');
-        authElements.forEach((el) => {
-          if (el instanceof HTMLElement) {
-            el.style.display = 'none';
-            el.style.visibility = 'hidden';
-            el.style.opacity = '0';
-            el.style.width = '0';
-            el.style.height = '0';
-            el.style.position = 'absolute';
-            el.style.left = '-9999px';
-          }
-        });
-      };
-
-      // 주기적으로 인증 관련 요소 숨기기
-      const hideAuthInterval = setInterval(hideAuthElements, 1000);
-
-      // 초기 실행
-      hideAuthElements();
-
-      return () => {
-        clearInterval(hideAuthInterval);
-      };
-    }, [mapReady]);
 
     // 정리
     useEffect(() => {
@@ -775,47 +742,40 @@ const MapError = styled.div`
 
 const ZoomControls = styled.div`
   position: absolute;
-  top: 20px;
-  right: 20px;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
   z-index: 1000;
   display: flex;
   flex-direction: column;
-  gap: 4px;
   background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  border-radius: 6px;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.18);
   overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.07);
 `;
 
 const ZoomButton = styled.button`
-  width: 48px;
-  height: 48px;
+  width: 36px;
+  height: 36px;
   border: none;
   background: white;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s;
+  transition: background 0.12s;
   padding: 0;
 
-  &:hover {
-    background: #f3f4f6;
-  }
-
-  &:active {
-    background: #e5e7eb;
-  }
-
-  &:first-child {
-    border-bottom: 1px solid #e5e7eb;
-  }
+  &:hover { background: #f5f5f4; }
+  &:active { background: #eae8e4; }
+  &:first-child { border-bottom: 1px solid #e8e5e0; }
 `;
 
 const ZoomIcon = styled.span`
-  font-size: 28px;
+  font-size: 20px;
   font-weight: 300;
-  color: #374151;
+  color: #4b4743;
   line-height: 1;
   user-select: none;
 `;

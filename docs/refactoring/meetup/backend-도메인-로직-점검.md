@@ -2,8 +2,48 @@
 
 **최초 작성일**: 2026-04-12  
 **재분석일**: 2026-04-16 (2차 — 예외 처리 포함)  
+**문서 동기화 (3차)**: 2026-04-16 — `phases/meetup-backend-refactor` step 1~5 완료를 본 문서에 반영. §2·§3 원문은 당시 스냅샷으로 두었으니, **현재 코드와의 대응은 아래 §0 표**를 우선한다.  
 **목적**: 백엔드 meetup 폴더(서비스·리포지토리·컨트롤러·엔티티·컨버터·예외) 및 글로벌 예외 처리까지 직접 읽고 이슈를 재정리한다.  
 **분석 대상 파일**: `MeetupService`, `SpringDataJpaMeetupRepository`, `JpaMeetupAdapter`, `MeetupRepository`, `MeetupController`, `MeetupScheduler`, `MeetupChatRoomEventListener`, `MeetupConverter`, `MeetupDTO`, `Meetup`, `Meetup*Exception`, `ApiException`, `GlobalExceptionHandler`
+
+---
+
+## 0. `phases/meetup-backend-refactor` 반영 현황 (2026-04-16)
+
+- **Phase 상태**: 루트 `phases/index.json`의 `meetup-backend-refactor`는 **completed**. 스텝별 요약·변경 근거는 `phases/meetup-backend-refactor/index.json`, `step1.md` ~ `step5.md`.
+- **전역 문서 정리**: meetup 한 파일만이 아니라 `agent-docs/` · `docs/domains/` · `docs/refactoring/` 교차·목차 통합은 **별도(반나절~1일)** 작업으로 두는 것을 권장.
+
+### 0.1 §2·§3 세부 이슈 ↔ 코드 (요약)
+
+| 구간 | 상태 | 비고 |
+|------|------|------|
+| §2-1 `joinMeetup` RECRUITING | ✅ | `incrementParticipantsIfAvailable(..., RECRUITING)`, `meetupNotRecruiting()` |
+| §2-2 `updateMeetup` FETCH | ✅ | `findByIdWithOrganizer` |
+| §2-3 `maxParticipants` 축소 | ✅ | `currentParticipants` 초과 시 검증 |
+| §2-4 위치·키워드·주최자 전량 List | ⚠️ 부분 | DB 전량 조회 후 서비스에서 **`MAX_LIST_SIZE`(500)** 잘라 응답. **Pageable API**는 `/available` 등과 달리 미적용 |
+| §2-5 `findAvailableMeetups` GROUP BY | ✅ | JPQL 단순화 + `Pageable` LIMIT (Slice 응답) |
+| §2-6 `findByIdWithLock` 소프트삭제 | ✅ | `isDeleted` 조건 추가 (프로덕션 서비스 경로에서 미사용이면 테스트 전용) |
+| §2-7 `MeetupDTO` 삭제 메타 노출 | ✅ | `isDeleted` / `deletedAt` → `@JsonIgnore` |
+| §2-8 `isUserParticipating` 풀 Users | ✅ | `findIdxByIdString` |
+| §2-9 `getMeetupParticipants` 존재 확인 | ✅ | 선행 `findByIdWithOrganizer` |
+| §2-10 무페이징 `getAvailableMeetups()` | ✅ | `@Deprecated`, 컨트롤러는 Slice 버전 |
+| §2-11 `@Timed` 이름 충돌 | ✅ | 페이징 버전 `@Timed("getAllMeetupsPaged")` 등 구분 |
+| §3-1 `handleException` null | ✅ | `AsyncRequestTimeoutException` 재throw |
+| §3-2 `MeetupConflictException` errorCode | ✅ | `MEETUP_ALREADY_JOINED` / `MEETUP_FULL` 등 분리 |
+| §3-3 `updateMeetup` 과거 날짜 | ✅ | `dateMustBeFuture` 등 |
+| §3-4 `meetupNotRecruiting` 팩토리 | ✅ | §2-1과 함께 반영 |
+| §3-5 `cancelMeetupParticipation` catch | ✅ | `ApiException` / `Exception` 분리 로깅 |
+| §3-7 응답 `error`/`message` 중복 | ✅ | `handleApiException` 등 3-key 구조 (step4) |
+| §3-6 채팅방 생성 실패 복구 | ⚠️ 미해결 | 재시도·보상 트랜잭션은 백로그 |
+| §3-8·§3-9 검증·응답 구조 | ⚠️ 검토 | 필요 시 별도 이슈로 쪼개기 |
+
+### 0.2 §1 표와 겹치는 **남은 백로그** (코드 기준)
+
+- **§1 #5** — `cancelMeetupParticipation` → `conversationService.leaveMeetupChat` 직접 호출(도메인 경계).
+- **§1 #7** — 컨트롤러 `Authentication` null 체크 반복.
+- **§1 #8** — `MeetupDTO` Bean Validation 미흡.
+- **§1 #9** — `findByIdWithDetails` 다중 FETCH 구조 유지(의도적 트레이드오프).
+- **§2-4** — 위치·키워드·주최자 API에 **DB 페이징**을 둘지 제품 결정 후 진행.
 
 ---
 
@@ -14,7 +54,7 @@
 | 1   | `findNearbyMeetups()` organizer N+1           | ✅ **해결됨**    | `findNearbyMeetupIds` + `findByIdxInWithOrganizer` 2-step                                         |
 | 2   | 상태 전이 부재 (`CLOSED`/`COMPLETED`)         | ✅ **해결됨**    | `MeetupScheduler` 매시 정각 bulk UPDATE                                                           |
 | 3   | 생성 시 `currentParticipants` 이중 저장       | ✅ **해결됨**    | 빌더에서 `currentParticipants(1)` 단일 INSERT                                                     |
-| 4   | 목록 페이징 없음                              | ✅ **부분 해결** | `getAllMeetups(Pageable)`, `getAvailableMeetups(Pageable)` 추가. 위치·키워드·주최자 조회는 미적용 |
+| 4   | 목록 페이징 없음                              | ✅ **부분 해결** | `getAllMeetups(Pageable)`, `getAvailableMeetups` → Slice+Pageable. 위치·키워드·주최자는 **서비스 `MAX_LIST_SIZE`(500) 상한**만 적용, DB OFFSET 페이징 API는 미적용 |
 | 5   | 참가 취소 Chat 도메인 직접 결합               | ⚠️ **미해결**    | `cancelMeetupParticipation` → `conversationService.leaveMeetupChat()` 직접 호출 유지              |
 | 6   | `findByIdWithOrganizer` 소프트 삭제 필터 없음 | ✅ **해결됨**    | `AND (m.isDeleted = false OR m.isDeleted IS NULL)` 추가됨                                         |
 | 7   | 컨트롤러 인증 체크 중복                       | ⚠️ **미해결**    | `authentication != null ? ... : null` + `UnauthenticatedException` 패턴 전 메서드 반복            |
