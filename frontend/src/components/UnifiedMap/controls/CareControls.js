@@ -14,8 +14,6 @@ const CareControls = ({ onCreateClick }) => {
 export default CareControls;
 
 const Wrapper = styled.div`
-  background: ${props => props.theme.colors.surface};
-  border-bottom: 1px solid ${props => props.theme.colors.border};
   padding: 8px 14px;
   display: flex;
   align-items: center;

@@ -24,23 +24,30 @@ const LocationControls = ({ keyword, category, isAiMode, onSearch, onCategoryCha
 
   return (
     <Wrapper>
-      <SearchRow onSubmit={handleSubmit}>
-        <SearchInput
-          value={inputValue}
-          onChange={e => setInputValue(e.target.value)}
-          placeholder="시설명, 주소 검색..."
-        />
-        <SearchButton type="submit">검색</SearchButton>
+      <SearchRow>
+        {/* 검색 pill: input + 검색 버튼 합체 */}
+        <SearchPill onSubmit={handleSubmit}>
+          <SearchIcon aria-hidden="true">🔍</SearchIcon>
+          <SearchInput
+            value={inputValue}
+            onChange={e => setInputValue(e.target.value)}
+            placeholder="시설명, 주소 검색..."
+            aria-label="시설 검색"
+          />
+          <SearchButton type="submit">검색</SearchButton>
+        </SearchPill>
+
         <AiButton
           type="button"
           $active={isAiMode}
           onClick={onAiToggle}
           title="AI 추천: 내 주변 최적 시설 TOP 10"
         >
-          ✨ AI 추천
+          ✨ AI
         </AiButton>
       </SearchRow>
-      <CategoryRow>
+
+      <CategoryRow role="group" aria-label="카테고리 필터">
         {KEYWORD_CATEGORIES.map(cat => (
           <CategoryChip
             key={cat.value}
@@ -59,59 +66,89 @@ const LocationControls = ({ keyword, category, isAiMode, onSearch, onCategoryCha
 export default LocationControls;
 
 const Wrapper = styled.div`
-  background: ${props => props.theme.colors.surface};
-  border-bottom: 1px solid ${props => props.theme.colors.border};
   padding: 8px 12px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 7px;
 `;
 
-const SearchRow = styled.form`
+const SearchRow = styled.div`
   display: flex;
-  gap: 6px;
+  gap: 8px;
   align-items: center;
+`;
+
+/* 검색창 전체를 하나의 pill로 */
+const SearchPill = styled.form`
+  flex: 1;
+  display: flex;
+  align-items: center;
+  background: ${props => props.theme.colors.background};
+  border: 1.5px solid ${props => props.theme.colors.border};
+  border-radius: 999px;
+  overflow: hidden;
+  transition: border-color 0.15s, box-shadow 0.15s;
+
+  &:focus-within {
+    border-color: ${props => props.theme.colors.primary};
+    box-shadow: 0 0 0 3px rgba(232, 113, 74, 0.15);
+  }
+`;
+
+const SearchIcon = styled.span`
+  padding: 0 4px 0 14px;
+  font-size: 14px;
+  flex-shrink: 0;
+  opacity: 0.5;
 `;
 
 const SearchInput = styled.input`
   flex: 1;
-  padding: 7px 12px;
-  border: 1px solid ${props => props.theme.colors.border};
-  border-radius: 8px;
-  background: ${props => props.theme.colors.background};
+  height: 38px;
+  padding: 0 6px;
+  border: none;
+  background: transparent;
   color: ${props => props.theme.colors.text};
-  font-size: 13px;
+  font-size: 14px;
   outline: none;
+  min-width: 0;
 
-  &:focus {
-    border-color: ${props => props.theme.colors.primary};
-  }
+  &::placeholder { color: ${props => props.theme.colors.textMuted}; }
 `;
 
 const SearchButton = styled.button`
-  padding: 7px 14px;
-  border-radius: 8px;
+  height: 38px;
+  padding: 0 16px;
   border: none;
   background: ${props => props.theme.colors.primary};
   color: white;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background 0.15s;
 
-  &:hover { opacity: 0.9; }
+  &:hover { background: ${props => props.theme.colors.primaryDark}; }
 `;
 
 const AiButton = styled.button`
-  padding: 7px 12px;
-  border-radius: 8px;
-  border: 1.5px solid ${props => props.$active ? props.theme.colors.ai.accent : props.theme.colors.border};
-  background: ${props => props.$active ? props.theme.colors.ai.bg : props.theme.colors.background};
-  color: ${props => props.$active ? props.theme.colors.ai.text : props.theme.colors.textSecondary};
+  height: 38px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1.5px solid ${props => props.$active
+    ? props.theme.colors.ai.accent
+    : props.theme.colors.border};
+  background: ${props => props.$active
+    ? props.theme.colors.ai.bg
+    : 'transparent'};
+  color: ${props => props.$active
+    ? props.theme.colors.ai.text
+    : props.theme.colors.textSecondary};
   font-size: 13px;
   font-weight: ${props => props.$active ? 700 : 400};
   cursor: pointer;
   white-space: nowrap;
+  flex-shrink: 0;
   transition: all 0.15s ease;
 
   &:hover {
@@ -122,28 +159,31 @@ const AiButton = styled.button`
 
 const CategoryRow = styled.div`
   display: flex;
-  gap: 6px;
+  gap: 5px;
   overflow-x: auto;
   padding-bottom: 2px;
-
-  /* 스크롤바 숨기기 */
   scrollbar-width: none;
   &::-webkit-scrollbar { display: none; }
 `;
 
 const CategoryChip = styled.button`
-  padding: 4px 12px;
-  border-radius: 14px;
-  border: 1px solid ${props => props.$active ? props.theme.colors.primary : props.theme.colors.border};
-  background: ${props => props.$active ? props.theme.colors.primary : props.theme.colors.background};
-  color: ${props => props.$active ? 'white' : props.theme.colors.text};
+  padding: 3px 11px;
+  border-radius: 999px;
+  border: 1.5px solid ${props => props.$active
+    ? props.theme.colors.domain.location
+    : props.theme.colors.border};
+  background: ${props => props.$active
+    ? props.theme.colors.domain.location
+    : 'transparent'};
+  color: ${props => props.$active ? 'white' : props.theme.colors.textSecondary};
   font-size: 12px;
   white-space: nowrap;
   cursor: pointer;
   transition: all 0.15s ease;
+  flex-shrink: 0;
 
   &:hover {
-    border-color: ${props => props.theme.colors.primary};
-    color: ${props => props.$active ? 'white' : props.theme.colors.primary};
+    border-color: ${props => props.theme.colors.domain.location};
+    color: ${props => props.$active ? 'white' : props.theme.colors.domain.location};
   }
 `;

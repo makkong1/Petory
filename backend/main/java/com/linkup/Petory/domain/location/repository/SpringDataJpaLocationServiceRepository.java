@@ -18,7 +18,8 @@ public interface SpringDataJpaLocationServiceRepository extends JpaRepository<Lo
         @RepositoryMethod("장소 서비스: 평점순 전체 조회 (keyword·category 필터)")
         @Query(value = "SELECT * FROM locationservice WHERE " +
                         "is_deleted = 0 " +
-                        "AND (:keyword IS NULL OR name LIKE CONCAT('%', :keyword, '%')) " +
+                        "AND (:keyword IS NULL OR MATCH(name, description, category1, category2, category3) " +
+                        "     AGAINST(CONCAT(:keyword, '*') IN BOOLEAN MODE)) " +
                         "AND (:category IS NULL " +
                         "     OR category3 = :category " +
                         "     OR category2 = :category " +
@@ -105,7 +106,7 @@ public interface SpringDataJpaLocationServiceRepository extends JpaRepository<Lo
                         @Param("category") String category);
 
         @RepositoryMethod("장소 서비스: 시도별 조회 (keyword·category 필터)")
-        @Query(value = "SELECT * FROM locationservice " +
+        @Query(value = "SELECT * FROM locationservice USE INDEX (idx_locationservice_sido_deleted_rating) " +
                         "WHERE sido = :sido AND " +
                         "is_deleted = 0 " +
                         "AND (:keyword IS NULL OR name LIKE CONCAT('%', :keyword, '%')) " +
@@ -135,7 +136,7 @@ public interface SpringDataJpaLocationServiceRepository extends JpaRepository<Lo
                         @Param("category") String category);
 
         @RepositoryMethod("장소 서비스: 도로명별 조회 (keyword·category 필터)")
-        @Query(value = "SELECT * FROM locationservice " +
+        @Query(value = "SELECT * FROM locationservice USE INDEX (idx_road_name_deleted_rating) " +
                         "WHERE road_name = :roadName AND " +
                         "is_deleted = 0 " +
                         "AND (:keyword IS NULL OR name LIKE CONCAT('%', :keyword, '%')) " +

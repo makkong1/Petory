@@ -1,4 +1,14 @@
-import styled from 'styled-components';
+import styled, { keyframes } from 'styled-components';
+
+const slideInRight = keyframes`
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+`;
+
+const slideInUp = keyframes`
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+`;
 
 export const InfoPanel = styled.div`
   position: absolute;
@@ -15,11 +25,13 @@ export const InfoPanel = styled.div`
   overflow: hidden;
   z-index: 500;
   box-shadow: -4px -2px 16px rgba(0,0,0,0.12);
+  animation: ${slideInRight} 0.25s cubic-bezier(0, 0, 0.2, 1);
 
   @media (max-width: 600px) {
     width: 100%;
     border-radius: 12px 12px 0 0;
     max-height: 60vh;
+    animation: ${slideInUp} 0.25s cubic-bezier(0, 0, 0.2, 1);
   }
 `;
 
