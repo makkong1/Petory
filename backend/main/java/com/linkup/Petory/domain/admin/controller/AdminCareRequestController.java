@@ -1,103 +1,56 @@
 package com.linkup.Petory.domain.admin.controller;
 
-import java.util.List;
-import java.util.stream.Collectors;
-
+import com.linkup.Petory.domain.admin.service.AdminCareAndMeetupFacade;
+import com.linkup.Petory.domain.care.dto.CareRequestDTO;
+import com.linkup.Petory.global.security.AuthenticatedUserIdResolver;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import com.linkup.Petory.domain.care.dto.CareRequestDTO;
-import com.linkup.Petory.domain.care.service.CareRequestService;
-import com.linkup.Petory.global.security.AuthenticatedUserIdResolver;
-
-import lombok.RequiredArgsConstructor;
-
-/**
- * 케어서비스 관리 컨트롤러 (관리자용)
- * - ADMIN과 MASTER 모두 접근 가능
- * - 케어 요청 목록 조회, 상태 변경, 삭제/복구
- */
 @RestController
 @RequestMapping("/api/admin/care-requests")
 @RequiredArgsConstructor
 @PreAuthorize("hasAnyRole('ADMIN','MASTER')")
 public class AdminCareRequestController {
 
-    private final CareRequestService careRequestService;
-    private final AuthenticatedUserIdResolver authenticatedUserIdResolver;
+    private final AdminCareAndMeetupFacade facade;
+    private final AuthenticatedUserIdResolver userIdResolver;
 
-    private Long getCurrentUserId() {
-        return authenticatedUserIdResolver.requireCurrentUserIdx();
-    }
-
-    /**
-     * 케어 요청 목록 조회 (필터링 지원)
-     */
     @GetMapping
-    public ResponseEntity<List<CareRequestDTO>> listCareRequests(
-            @RequestParam(value = "status", required = false) String status,
-            @RequestParam(value = "location", required = false) String location,
-            @RequestParam(value = "deleted", required = false) Boolean deleted,
-            @RequestParam(value = "q", required = false) String q) {
-        
-        List<CareRequestDTO> all = careRequestService.getAllCareRequests(status, location);
-        
-        // 삭제 여부 필터 (서비스에서 삭제된 것 제외하므로, deleted=true일 때만 추가 조회 필요)
-        // TODO: 서비스에 관리자용 전체 조회 메서드 추가 필요
-        if (Boolean.TRUE.equals(deleted)) {
-            // 삭제된 것도 포함하려면 서비스 메서드 추가 필요
-            // 현재는 삭제되지 않은 것만 반환
-        }
-        
-        // 검색어 필터
-        if (q != null && !q.isBlank()) {
-            String keyword = q.toLowerCase();
-            all = all.stream()
-                    .filter(r -> (r.getTitle() != null && r.getTitle().toLowerCase().contains(keyword))
-                            || (r.getDescription() != null && r.getDescription().toLowerCase().contains(keyword))
-                            || (r.getUsername() != null && r.getUsername().toLowerCase().contains(keyword)))
-                    .collect(Collectors.toList());
-        }
-        
-        return ResponseEntity.ok(all);
+    public ResponseEntity<Page<CareRequestDTO>> listCareRequests(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) Boolean deleted,
+            @RequestParam(required = false) String q,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(facade.getCareRequests(status, deleted, q, page, size));
     }
 
-    /**
-     * 케어 요청 상세 조회
-     */
     @GetMapping("/{id}")
     public ResponseEntity<CareRequestDTO> getCareRequest(@PathVariable Long id) {
-        return ResponseEntity.ok(careRequestService.getCareRequest(id));
+        return ResponseEntity.ok(facade.getCareRequest(id));
     }
 
-    /**
-     * 케어 요청 상태 변경 (관리자는 권한 검증 우회)
-     */
     @PatchMapping("/{id}/status")
     public ResponseEntity<CareRequestDTO> updateStatus(
             @PathVariable Long id,
             @RequestParam String status) {
-        Long currentUserId = getCurrentUserId();
-        return ResponseEntity.ok(careRequestService.updateStatus(id, status, currentUserId));
+        Long adminIdx = userIdResolver.requireCurrentUserIdx();
+        return ResponseEntity.ok(facade.updateCareStatus(id, status, adminIdx));
     }
 
-    /**
-     * 케어 요청 삭제 (소프트 삭제, 관리자는 권한 검증 우회)
-     */
     @PostMapping("/{id}/delete")
     public ResponseEntity<Void> deleteCareRequest(@PathVariable Long id) {
-        Long currentUserId = getCurrentUserId();
-        careRequestService.deleteCareRequest(id, currentUserId);
+        Long adminIdx = userIdResolver.requireCurrentUserIdx();
+        facade.deleteCareRequest(id, adminIdx);
         return ResponseEntity.noContent().build();
     }
 
-    /**
-     * 케어 요청 복구
-     */
     @PostMapping("/{id}/restore")
     public ResponseEntity<CareRequestDTO> restoreCareRequest(@PathVariable Long id) {
-        return ResponseEntity.ok(careRequestService.restoreForAdmin(id));
+        Long adminIdx = userIdResolver.requireCurrentUserIdx();
+        return ResponseEntity.ok(facade.restoreCareRequest(id, adminIdx));
     }
 }
-
