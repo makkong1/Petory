@@ -11,24 +11,28 @@ const MeetupManagementSection = () => {
   const [selectedMeetup, setSelectedMeetup] = useState(null);
   const [participants, setParticipants] = useState([]);
   const [showParticipants, setShowParticipants] = useState(false);
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const PAGE_SIZE = 20;
 
   const fetchMeetups = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const params = {};
+      const params = { page, size: PAGE_SIZE };
       if (status && status !== 'ALL') params.status = status;
       if (q) params.q = q;
 
       const res = await meetupAdminApi.listMeetups(params);
-      setMeetups(res.data || []);
+      setMeetups(res.data.content || []);
+      setTotalPages(res.data.totalPages || 0);
     } catch (e) {
       console.error('모임 목록 조회 실패:', e);
       setError(e.response?.data?.message || '목록을 불러오지 못했습니다.');
     } finally {
       setLoading(false);
     }
-  }, [status, q]);
+  }, [status, q, page]);
 
   useEffect(() => {
     fetchMeetups();
@@ -74,7 +78,7 @@ const MeetupManagementSection = () => {
       <Filters>
         <Group>
           <Label>상태</Label>
-          <Select value={status} onChange={e => setStatus(e.target.value)}>
+          <Select value={status} onChange={e => { setStatus(e.target.value); setPage(0); }}>
             {statusOptions.map(opt => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
@@ -85,7 +89,7 @@ const MeetupManagementSection = () => {
           <Input
             placeholder="제목/내용/위치/주최자"
             value={q}
-            onChange={e => setQ(e.target.value)}
+            onChange={e => { setQ(e.target.value); setPage(0); }}
           />
         </Group>
         <Group>
@@ -138,6 +142,14 @@ const MeetupManagementSection = () => {
           </Table>
         )}
       </Card>
+
+      {totalPages > 1 && (
+        <PaginationRow>
+          <PageBtn onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}>이전</PageBtn>
+          <span>{page + 1} / {totalPages}</span>
+          <PageBtn onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}>다음</PageBtn>
+        </PaginationRow>
+      )}
 
       {showParticipants && (
         <ModalOverlay onClick={() => setShowParticipants(false)}>
@@ -341,4 +353,20 @@ const CloseButton = styled.button`
 const ModalBody = styled.div`
   max-height: 60vh;
   overflow-y: auto;
+`;
+
+const PaginationRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${props => props.theme.spacing.sm};
+  justify-content: center;
+  margin-top: ${props => props.theme.spacing.md};
+`;
+
+const PageBtn = styled.button`
+  padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.sm};
+  border: 1px solid ${props => props.theme.colors.border};
+  border-radius: 4px;
+  background: ${props => props.disabled ? props.theme.colors.backgroundSecondary : 'white'};
+  cursor: ${props => props.disabled ? 'not-allowed' : 'pointer'};
 `;

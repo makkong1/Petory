@@ -10,26 +10,30 @@ const CareServiceManagementSection = () => {
   const [careRequests, setCareRequests] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const PAGE_SIZE = 20;
 
   const fetchCareRequests = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const params = {};
+      const params = { page, size: PAGE_SIZE };
       if (status) params.status = status;
       if (location) params.location = location;
       if (deleted !== '') params.deleted = deleted === 'true';
       if (q) params.q = q;
 
       const res = await careRequestAdminApi.listCareRequests(params);
-      setCareRequests(res.data || []);
+      setCareRequests(res.data.content || []);
+      setTotalPages(res.data.totalPages || 0);
     } catch (e) {
       console.error('케어 요청 목록 조회 실패:', e);
       setError(e.response?.data?.message || '목록을 불러오지 못했습니다.');
     } finally {
       setLoading(false);
     }
-  }, [status, location, deleted, q]);
+  }, [status, location, deleted, q, page]);
 
   useEffect(() => {
     fetchCareRequests();
@@ -72,7 +76,7 @@ const CareServiceManagementSection = () => {
       <Filters>
         <Group>
           <Label>상태</Label>
-          <Select value={status} onChange={e => setStatus(e.target.value)}>
+          <Select value={status} onChange={e => { setStatus(e.target.value); setPage(0); }}>
             {statusOptions.map(opt => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
@@ -83,12 +87,12 @@ const CareServiceManagementSection = () => {
           <Input
             placeholder="위치 검색"
             value={location}
-            onChange={e => setLocation(e.target.value)}
+            onChange={e => { setLocation(e.target.value); setPage(0); }}
           />
         </Group>
         <Group>
           <Label>삭제여부</Label>
-          <Select value={deleted} onChange={e => setDeleted(e.target.value)}>
+          <Select value={deleted} onChange={e => { setDeleted(e.target.value); setPage(0); }}>
             <option value="">전체</option>
             <option value="false">미삭제</option>
             <option value="true">삭제됨</option>
@@ -99,7 +103,7 @@ const CareServiceManagementSection = () => {
           <Input
             placeholder="제목/내용/작성자"
             value={q}
-            onChange={e => setQ(e.target.value)}
+            onChange={e => { setQ(e.target.value); setPage(0); }}
           />
         </Group>
         <Group>
@@ -164,6 +168,14 @@ const CareServiceManagementSection = () => {
           </Table>
         )}
       </Card>
+
+      {totalPages > 1 && (
+        <PaginationRow>
+          <PageBtn onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}>이전</PageBtn>
+          <span>{page + 1} / {totalPages}</span>
+          <PageBtn onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}>다음</PageBtn>
+        </PaginationRow>
+      )}
     </Wrapper>
   );
 };
@@ -283,4 +295,20 @@ const Danger = styled.button`
   background: transparent;
   border-radius: ${props => props.theme.borderRadius.sm};
   cursor: pointer;
+`;
+
+const PaginationRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${props => props.theme.spacing.sm};
+  justify-content: center;
+  margin-top: ${props => props.theme.spacing.md};
+`;
+
+const PageBtn = styled.button`
+  padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.sm};
+  border: 1px solid ${props => props.theme.colors.border};
+  border-radius: 4px;
+  background: ${props => props.disabled ? props.theme.colors.backgroundSecondary : 'white'};
+  cursor: ${props => props.disabled ? 'not-allowed' : 'pointer'};
 `;

@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Optional;
 import java.time.LocalDateTime;
 
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -111,4 +112,16 @@ public interface SpringDataJpaUsersRepository extends JpaRepository<Users, Long>
     @RepositoryMethod("사용자: id(String)로 조회 (펫 포함)")
     @Query("SELECT DISTINCT u FROM Users u LEFT JOIN FETCH u.pets WHERE u.id = :userId")
     Optional<Users> findByIdStringWithPets(@Param("userId") String userId);
+
+    @RepositoryMethod("사용자: 관리자 필터 페이징 조회")
+    @Query("SELECT u FROM Users u WHERE " +
+           "(:role IS NULL OR CAST(u.role AS string) = :role) AND " +
+           "(:status IS NULL OR CAST(u.status AS string) = :status) AND " +
+           "(:keyword IS NULL OR u.username LIKE %:keyword% OR u.nickname LIKE %:keyword% OR u.email LIKE %:keyword%) " +
+           "ORDER BY u.createdAt DESC")
+    Page<Users> findAllForAdmin(
+            @Param("role") String role,
+            @Param("status") String status,
+            @Param("keyword") String keyword,
+            Pageable pageable);
 }
