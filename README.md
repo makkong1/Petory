@@ -81,6 +81,7 @@
 - **효율적인 데이터 집계**: 실시간 쿼리 부하를 줄이기 위해 `DailyStatistics` 테이블을 설계하여 일별 핵심 지표(가입자, 게시글 등)를 요약 저장
 - **시각화**: Recharts를 활용하여 일별 성장 추이(Line Chart) 및 서비스 활성화 지표(Bar Chart) 시각화
 - **통합 관리**: 신고(Report), 유저, 콘텐츠, 케어 서비스를 한곳에서 제어하는 중앙 집중형 관리자 페이지
+- **감사·설정 영속화**: 관리자 쓰기 행위는 `admin_audit_log`에 기록하고, 마스터 시스템 설정은 `system_config`에 키-값으로 저장
 
 ### 알림 시스템 (Notification System)
 - **이중 저장소 전략**:
@@ -245,6 +246,8 @@ Petory/
 - **Notification**: 알림 (타입별 분류, 읽음 상태)
 - **Report**: 신고 (타입별 분류, 처리 상태)
 - **DailyStatistics**: 일별 통계 요약 (배치 작업으로 집계)
+- **AdminAuditLog** (`admin_audit_log`): 관리자 감사 로그 (행위 코드, 대상 타입·idx, 시각순 조회용 인덱스)
+- **SystemConfig** (`system_config`): 시스템 설정 키-값 (`config_key` UNIQUE, `BaseTimeEntity`로 생성·수정 시각)
 
 ### 인덱스 전략
 - **공간 인덱스**: `LocationService`의 `location` 필드에 SPATIAL INDEX 적용
