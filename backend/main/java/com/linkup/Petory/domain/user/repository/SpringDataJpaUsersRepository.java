@@ -124,4 +124,7 @@ public interface SpringDataJpaUsersRepository extends JpaRepository<Users, Long>
             @Param("status") String status,
             @Param("keyword") String keyword,
             Pageable pageable);
+
+    @RepositoryMethod("사용자: 역할+기간별 통계 (신규 서비스 제공자 집계용)")
+    long countByRoleAndCreatedAtBetween(Role role, LocalDateTime start, LocalDateTime end);
 }

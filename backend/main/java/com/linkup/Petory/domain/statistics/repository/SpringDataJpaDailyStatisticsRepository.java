@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import com.linkup.Petory.domain.statistics.entity.DailyStatistics;
 import com.linkup.Petory.global.annotation.RepositoryMethod;
@@ -19,5 +21,9 @@ public interface SpringDataJpaDailyStatisticsRepository extends JpaRepository<Da
 
     @RepositoryMethod("일별 통계: 날짜 범위별 조회")
     List<DailyStatistics> findByStatDateBetweenOrderByStatDateAsc(LocalDate startDate, LocalDate endDate);
-}
 
+    @Query("SELECT d.statDate FROM DailyStatistics d WHERE d.statDate BETWEEN :startDate AND :endDate")
+    List<LocalDate> findStatDatesByDateRange(@Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
+
+    void deleteByStatDateBefore(LocalDate cutoffDate);
+}

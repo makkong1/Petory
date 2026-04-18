@@ -1,24 +1,37 @@
 package com.linkup.Petory.domain.statistics.service;
 
 import com.linkup.Petory.domain.board.repository.BoardRepository;
+import com.linkup.Petory.domain.care.entity.CareRequestStatus;
 import com.linkup.Petory.domain.care.repository.CareRequestRepository;
 import com.linkup.Petory.domain.meetup.repository.MeetupParticipantsRepository;
 import com.linkup.Petory.domain.meetup.repository.MeetupRepository;
+import com.linkup.Petory.domain.report.entity.ReportStatus;
 import com.linkup.Petory.domain.report.repository.ReportRepository;
 import com.linkup.Petory.domain.statistics.entity.DailyStatistics;
+import com.linkup.Petory.domain.statistics.entity.MonthlyStatistics;
+import com.linkup.Petory.domain.statistics.entity.WeeklyStatistics;
 import com.linkup.Petory.domain.statistics.repository.DailyStatisticsRepository;
+import com.linkup.Petory.domain.statistics.repository.MonthlyStatisticsRepository;
+import com.linkup.Petory.domain.statistics.repository.WeeklyStatisticsRepository;
+import com.linkup.Petory.domain.user.entity.Role;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.temporal.IsoFields;
+import java.util.List;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -26,6 +39,8 @@ import java.time.LocalTime;
 public class StatisticsScheduler {
 
     private final DailyStatisticsRepository dailyStatisticsRepository;
+    private final WeeklyStatisticsRepository weeklyStatisticsRepository;
+    private final MonthlyStatisticsRepository monthlyStatisticsRepository;
     private final UsersRepository usersRepository;
     private final BoardRepository boardRepository;
     private final CareRequestRepository careRequestRepository;
@@ -33,111 +48,220 @@ public class StatisticsScheduler {
     private final MeetupParticipantsRepository meetupParticipantsRepository;
     private final ReportRepository reportRepository;
 
-    // application.properties에서 스케줄러 시간 읽기 (기본값: 18:30)
-    @Value("${statistics.scheduler.hour:18}")
-    private int schedulerHour;
-
-    @Value("${statistics.scheduler.minute:30}")
-    private int schedulerMinute;
-
-    /**
-     * 매일 지정된 시간에 실행되어 '어제'의 통계를 집계
-     * 
-     * 기본값: 매일 오후 6시 30분(18:30:00)
-     * 설정 변경: application.properties에 다음 추가
-     *   statistics.scheduler.hour=18
-     *   statistics.scheduler.minute=30
-     * 
-     * 주의: @Scheduled는 컴파일 타임에 결정되므로, 동적 변경을 위해서는
-     *       TaskScheduler를 사용한 동적 스케줄러 구현이 필요합니다.
-     *       현재는 application.properties 수정 후 서버 재시작이 필요합니다.
-     */
-    @Scheduled(cron = "${statistics.scheduler.cron:0 30 18 * * ?}")
+    @Scheduled(cron = "0 0 18 * * ?")
     @Transactional
     public void aggregateDailyStatistics() {
-        log.info("통계 집계 스케줄러 실행 (설정된 시간: {}:{}), 어제 통계 집계 시작", schedulerHour, schedulerMinute);
         LocalDate yesterday = LocalDate.now().minusDays(1);
-        // [FIX] 스케줄러 실패 시 예외 전파 차단 — 집계 실패가 서비스 전체에 영향을 주지 않도록 처리
         try {
+            detectAndBackfillMissing(yesterday);
             aggregateStatisticsForDate(yesterday);
+            if (yesterday.getDayOfWeek() == DayOfWeek.SUNDAY) {
+                rollupWeekly(yesterday);
+            }
+            if (yesterday.equals(yesterday.withDayOfMonth(yesterday.lengthOfMonth()))) {
+                rollupMonthly(yesterday.getYear(), yesterday.getMonthValue());
+            }
+            deleteExpiredDaily();
         } catch (Exception e) {
-            log.error("통계 집계 스케줄러 실패 — 날짜: {}, 원인: {}. 수동 복구: POST /api/admin/statistics/init?days=1",
-                    yesterday, e.getMessage(), e);
+            log.error("통계 집계 실패 — 날짜: {}, 원인: {}", yesterday, e.getMessage(), e);
         }
     }
 
-    /**
-     * 특정 날짜의 통계 집계 (재사용 가능)
-     */
     @Transactional
     public void aggregateStatisticsForDate(LocalDate date) {
-        log.info("일일 통계 집계 시작: {}", date);
-
-        // 이미 집계된 데이터가 있는지 확인 (중복 방지)
         if (dailyStatisticsRepository.findByStatDate(date).isPresent()) {
-            log.warn("이미 {}의 통계가 존재합니다. 집계를 건너뜁니다.", date);
+            log.warn("이미 {}의 통계가 존재합니다. 건너뜁니다.", date);
             return;
         }
 
-        LocalDateTime startOfDay = date.atStartOfDay();
-        LocalDateTime endOfDay = date.atTime(LocalTime.MAX);
+        LocalDateTime start = date.atStartOfDay();
+        LocalDateTime end = date.atTime(LocalTime.MAX);
 
-        // 1. 신규 가입자
-        long newUsers = usersRepository.countByCreatedAtBetween(startOfDay, endOfDay);
-
-        // 2. 새 게시글
-        long newPosts = boardRepository.countByCreatedAtBetween(startOfDay, endOfDay);
-
-        // 3. 케어 요청
-        long newCareRequests = careRequestRepository.countByCreatedAtBetween(startOfDay, endOfDay);
-
-        // 4. 완료된 케어
-        // [FIX] date(케어 예정일) → completedAt(실제 완료 시각)으로 교체 — 기존은 완료 날짜가 아닌 예정일 기준으로 집계
-        long completedCares = careRequestRepository.countByCompletedAtBetween(startOfDay, endOfDay);
-
-        // 5. 매출 (현재 0으로 고정)
-        BigDecimal totalRevenue = BigDecimal.ZERO;
-
-        // 6. DAU
-        long activeUsers = usersRepository.countByLastLoginAtBetween(startOfDay, endOfDay);
-
-        // 7. 새 모임
-        long newMeetups = meetupRepository.countByCreatedAtBetween(startOfDay, endOfDay);
-
-        // 8. 모임 참여
-        long meetupParticipants = meetupParticipantsRepository.countByJoinedAtBetween(startOfDay, endOfDay);
-
-        // 9. 신고 접수
-        long newReports = reportRepository.countByCreatedAtBetween(startOfDay, endOfDay);
+        long completed = careRequestRepository.countByCompletedAtBetween(start, end);
+        long cancelled = careRequestRepository.countByStatusAndUpdatedAtBetween(CareRequestStatus.CANCELLED, start, end);
+        BigDecimal completionRate = calcRate(completed, completed + cancelled);
 
         DailyStatistics stats = DailyStatistics.builder()
                 .statDate(date)
-                .newUsers((int) newUsers)
-                .newPosts((int) newPosts)
-                .newCareRequests((int) newCareRequests)
-                .completedCares((int) completedCares)
-                .totalRevenue(totalRevenue)
-                .activeUsers((int) activeUsers)
-                .newMeetups((int) newMeetups)
-                .meetupParticipants((int) meetupParticipants)
-                .newReports((int) newReports)
+                .newUsers(usersRepository.countByCreatedAtBetween(start, end))
+                .activeUsers(usersRepository.countByLastLoginAtBetween(start, end))
+                .newProviders(usersRepository.countByRoleAndCreatedAtBetween(Role.SERVICE_PROVIDER, start, end))
+                .newCareRequests(careRequestRepository.countByCreatedAtBetween(start, end))
+                .completedCares(completed)
+                .cancelledCares(cancelled)
+                .careCompletionRate(completionRate)
+                .totalRevenue(BigDecimal.ZERO)
+                .transactionCount(0L)
+                .avgTransaction(BigDecimal.ZERO)
+                .newPosts(boardRepository.countByCreatedAtBetween(start, end))
+                .newMeetups(meetupRepository.countByCreatedAtBetween(start, end))
+                .meetupParticipants(meetupParticipantsRepository.countByJoinedAtBetween(start, end))
+                .newReports(reportRepository.countByCreatedAtBetween(start, end))
+                .resolvedReports(reportRepository.countByStatusAndUpdatedAtBetween(ReportStatus.RESOLVED, start, end))
                 .build();
 
         dailyStatisticsRepository.save(stats);
-
-        log.info("일일 통계 집계 완료: {}", stats);
+        log.info("일일 통계 집계 완료: {}", date);
     }
 
-    /**
-     * 과거 데이터 초기화 (Backfill)
-     * 오늘 기준 days일 전부터 어제까지 집계
-     */
     @Transactional
-    public void backfillStatistics(int days) {
-        LocalDate today = LocalDate.now();
-        for (int i = days; i > 0; i--) {
-            LocalDate targetDate = today.minusDays(i);
-            aggregateStatisticsForDate(targetDate);
+    public void rollupWeekly(LocalDate sunday) {
+        LocalDate monday = sunday.minusDays(6);
+        int year = sunday.get(IsoFields.WEEK_BASED_YEAR);
+        int weekNumber = sunday.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR);
+
+        if (weeklyStatisticsRepository.findByYearAndWeekNumber(year, weekNumber).isPresent()) {
+            log.warn("이미 {}년 {}주차 통계가 존재합니다.", year, weekNumber);
+            return;
         }
+
+        List<DailyStatistics> days = dailyStatisticsRepository
+                .findByStatDateBetweenOrderByStatDateAsc(monday, sunday);
+
+        long completed = sumLong(days, DailyStatistics::getCompletedCares);
+        long cancelled = sumLong(days, DailyStatistics::getCancelledCares);
+        long currentWau = sumLong(days, DailyStatistics::getActiveUsers);
+        BigDecimal retentionRate = calcWeeklyRetention(year, weekNumber, currentWau);
+        BigDecimal totalRevenue = sumRevenue(days);
+        long txCount = sumLong(days, DailyStatistics::getTransactionCount);
+
+        WeeklyStatistics weekly = WeeklyStatistics.builder()
+                .year(year).weekNumber(weekNumber)
+                .startDate(monday).endDate(sunday)
+                .newUsers(sumLong(days, DailyStatistics::getNewUsers))
+                .activeUsers(currentWau)
+                .newProviders(sumLong(days, DailyStatistics::getNewProviders))
+                .weeklyRetentionRate(retentionRate)
+                .newCareRequests(sumLong(days, DailyStatistics::getNewCareRequests))
+                .completedCares(completed).cancelledCares(cancelled)
+                .careCompletionRate(calcRate(completed, completed + cancelled))
+                .totalRevenue(totalRevenue)
+                .transactionCount(txCount)
+                .avgTransaction(calcAvgTransaction(totalRevenue, txCount))
+                .newPosts(sumLong(days, DailyStatistics::getNewPosts))
+                .newMeetups(sumLong(days, DailyStatistics::getNewMeetups))
+                .meetupParticipants(sumLong(days, DailyStatistics::getMeetupParticipants))
+                .newReports(sumLong(days, DailyStatistics::getNewReports))
+                .resolvedReports(sumLong(days, DailyStatistics::getResolvedReports))
+                .build();
+
+        weeklyStatisticsRepository.save(weekly);
+        log.info("주간 통계 롤업 완료: {}년 {}주차", year, weekNumber);
+    }
+
+    @Transactional
+    public void rollupMonthly(int year, int month) {
+        if (monthlyStatisticsRepository.findByYearAndMonth(year, month).isPresent()) {
+            log.warn("이미 {}년 {}월 통계가 존재합니다.", year, month);
+            return;
+        }
+
+        LocalDate start = LocalDate.of(year, month, 1);
+        LocalDate end = start.withDayOfMonth(start.lengthOfMonth());
+        List<DailyStatistics> days = dailyStatisticsRepository
+                .findByStatDateBetweenOrderByStatDateAsc(start, end);
+
+        long completed = sumLong(days, DailyStatistics::getCompletedCares);
+        long cancelled = sumLong(days, DailyStatistics::getCancelledCares);
+        long currentMau = sumLong(days, DailyStatistics::getActiveUsers);
+        BigDecimal retention = calcMonthlyRetention(year, month, currentMau);
+        BigDecimal churn = BigDecimal.valueOf(100).subtract(retention).max(BigDecimal.ZERO);
+        BigDecimal totalRevenue = sumRevenue(days);
+        long txCount = sumLong(days, DailyStatistics::getTransactionCount);
+
+        MonthlyStatistics monthly = MonthlyStatistics.builder()
+                .year(year).month(month)
+                .newUsers(sumLong(days, DailyStatistics::getNewUsers))
+                .activeUsers(currentMau)
+                .newProviders(sumLong(days, DailyStatistics::getNewProviders))
+                .monthlyRetentionRate(retention).churnRate(churn)
+                .newCareRequests(sumLong(days, DailyStatistics::getNewCareRequests))
+                .completedCares(completed).cancelledCares(cancelled)
+                .careCompletionRate(calcRate(completed, completed + cancelled))
+                .totalRevenue(totalRevenue)
+                .transactionCount(txCount)
+                .avgTransaction(calcAvgTransaction(totalRevenue, txCount))
+                .newPosts(sumLong(days, DailyStatistics::getNewPosts))
+                .newMeetups(sumLong(days, DailyStatistics::getNewMeetups))
+                .meetupParticipants(sumLong(days, DailyStatistics::getMeetupParticipants))
+                .newReports(sumLong(days, DailyStatistics::getNewReports))
+                .resolvedReports(sumLong(days, DailyStatistics::getResolvedReports))
+                .build();
+
+        monthlyStatisticsRepository.save(monthly);
+        log.info("월간 통계 롤업 완료: {}년 {}월", year, month);
+    }
+
+    @Transactional
+    public void backfill(LocalDate startDate, LocalDate endDate) {
+        startDate.datesUntil(endDate.plusDays(1)).forEach(date -> {
+            try {
+                aggregateStatisticsForDate(date);
+            } catch (Exception e) {
+                log.error("Backfill 실패 — 날짜: {}, 원인: {}", date, e.getMessage());
+            }
+        });
+    }
+
+    private void detectAndBackfillMissing(LocalDate yesterday) {
+        LocalDate checkStart = yesterday.minusDays(6);
+        Set<LocalDate> existing = dailyStatisticsRepository
+                .findStatDatesByDateRange(checkStart, yesterday.minusDays(1))
+                .stream().collect(Collectors.toSet());
+
+        checkStart.datesUntil(yesterday).forEach(date -> {
+            if (!existing.contains(date)) {
+                log.warn("누락된 통계 감지: {} — 자동 backfill 실행", date);
+                try {
+                    aggregateStatisticsForDate(date);
+                } catch (Exception e) {
+                    log.error("자동 backfill 실패: {}", date);
+                }
+            }
+        });
+    }
+
+    private void deleteExpiredDaily() {
+        LocalDate cutoff = LocalDate.now().minusYears(1);
+        dailyStatisticsRepository.deleteByStatDateBefore(cutoff);
+    }
+
+    private long sumLong(List<DailyStatistics> days, Function<DailyStatistics, Long> getter) {
+        return days.stream().mapToLong(getter::apply).sum();
+    }
+
+    private BigDecimal sumRevenue(List<DailyStatistics> days) {
+        return days.stream().map(DailyStatistics::getTotalRevenue)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private BigDecimal calcRate(long numerator, long denominator) {
+        if (denominator == 0) return BigDecimal.ZERO;
+        return BigDecimal.valueOf(numerator * 100.0 / denominator).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal calcAvgTransaction(BigDecimal total, long count) {
+        if (count == 0) return BigDecimal.ZERO;
+        return total.divide(BigDecimal.valueOf(count), 2, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal calcWeeklyRetention(int year, int weekNumber, long currentWau) {
+        int prevWeek = weekNumber - 1;
+        int prevYear = year;
+        if (prevWeek == 0) { prevYear--; prevWeek = 52; }
+        return weeklyStatisticsRepository.findByYearAndWeekNumber(prevYear, prevWeek)
+                .map(prev -> prev.getActiveUsers() == 0 ? BigDecimal.ZERO
+                        : calcRate(currentWau, prev.getActiveUsers()))
+                .orElse(BigDecimal.ZERO);
+    }
+
+    private BigDecimal calcMonthlyRetention(int year, int month, long currentMau) {
+        int prevMonth = month - 1;
+        int prevYear = year;
+        if (prevMonth == 0) { prevYear--; prevMonth = 12; }
+        return monthlyStatisticsRepository.findByYearAndMonth(prevYear, prevMonth)
+                .map(prev -> prev.getActiveUsers() == 0 ? BigDecimal.ZERO
+                        : calcRate(currentMau, prev.getActiveUsers()))
+                .orElse(BigDecimal.ZERO);
     }
 }

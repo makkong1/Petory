@@ -140,5 +140,8 @@ public interface SpringDataJpaCareRequestRepository extends JpaRepository<CareRe
             @Param("deleted") Boolean deleted,
             @Param("keyword") String keyword,
             Pageable pageable);
+
+    @RepositoryMethod("펫케어 요청: 상태+기간별 통계 (취소 케어 집계용)")
+    long countByStatusAndUpdatedAtBetween(CareRequestStatus status, LocalDateTime start, LocalDateTime end);
 }
 

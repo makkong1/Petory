@@ -50,5 +50,14 @@ public class JpaDailyStatisticsAdapter implements DailyStatisticsRepository {
     public List<DailyStatistics> findByStatDateBetweenOrderByStatDateAsc(LocalDate startDate, LocalDate endDate) {
         return jpaRepository.findByStatDateBetweenOrderByStatDateAsc(startDate, endDate);
     }
-}
 
+    @Override
+    public List<LocalDate> findStatDatesByDateRange(LocalDate startDate, LocalDate endDate) {
+        return jpaRepository.findStatDatesByDateRange(startDate, endDate);
+    }
+
+    @Override
+    public void deleteByStatDateBefore(LocalDate cutoffDate) {
+        jpaRepository.deleteByStatDateBefore(cutoffDate);
+    }
+}

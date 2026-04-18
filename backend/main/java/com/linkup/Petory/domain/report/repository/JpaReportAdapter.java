@@ -77,5 +77,10 @@ public class JpaReportAdapter implements ReportRepository {
     public long countByCreatedAtBetween(LocalDateTime start, LocalDateTime end) {
         return jpaRepository.countByCreatedAtBetween(start, end);
     }
+
+    @Override
+    public long countByStatusAndUpdatedAtBetween(ReportStatus status, LocalDateTime start, LocalDateTime end) {
+        return jpaRepository.countByStatusAndUpdatedAtBetween(status, start, end);
+    }
 }
 

@@ -134,4 +134,9 @@ public class JpaUsersAdapter implements UsersRepository {
     public Page<Users> findAllForAdmin(String role, String status, String keyword, Pageable pageable) {
         return jpaRepository.findAllForAdmin(role, status, keyword, pageable);
     }
+
+    @Override
+    public long countByRoleAndCreatedAtBetween(Role role, LocalDateTime start, LocalDateTime end) {
+        return jpaRepository.countByRoleAndCreatedAtBetween(role, start, end);
+    }
 }

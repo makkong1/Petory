@@ -16,7 +16,10 @@ import com.linkup.Petory.domain.user.entity.Users;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
+
+import com.linkup.Petory.domain.statistics.service.StatisticsService;
 
 /**
  * 펫코인 에스크로 서비스
@@ -29,6 +32,7 @@ public class PetCoinEscrowService {
 
         private final PetCoinEscrowRepository escrowRepository;
         private final PetCoinService petCoinService;
+        private final StatisticsService statisticsService;
 
         /**
          * 에스크로 생성 (거래 확정 시)
@@ -109,6 +113,8 @@ public class PetCoinEscrowService {
                 // 에스크로 상태 변경
                 escrow.setStatus(EscrowStatus.RELEASED);
                 escrow.setReleasedAt(LocalDateTime.now());
+
+                statisticsService.recordPayment(BigDecimal.valueOf(escrow.getAmount()));
 
                 PetCoinEscrow saved = escrowRepository.save(escrow);
 

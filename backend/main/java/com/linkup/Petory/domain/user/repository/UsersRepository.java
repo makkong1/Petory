@@ -112,4 +112,9 @@ public interface UsersRepository {
      * 관리자용 사용자 목록 페이징 (role / status / 키워드 복합 필터)
      */
     Page<Users> findAllForAdmin(String role, String status, String keyword, Pageable pageable);
+
+    /**
+     * 통계용: 특정 기간 동안 특정 역할로 가입한 사용자 수 (createdAt 기준)
+     */
+    long countByRoleAndCreatedAtBetween(Role role, LocalDateTime start, LocalDateTime end);
 }
