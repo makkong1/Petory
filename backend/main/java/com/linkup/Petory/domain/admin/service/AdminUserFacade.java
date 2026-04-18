@@ -14,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -99,7 +100,12 @@ public class AdminUserFacade {
         Users user = usersConverter.toEntity(dto);
         user.setRole(Role.ADMIN);
         user.setPassword(passwordEncoder.encode(dto.getPassword()));
-        Users saved = usersRepository.save(user);
+        Users saved;
+        try {
+            saved = usersRepository.save(user);
+        } catch (DataIntegrityViolationException e) {
+            throw new IllegalArgumentException("이미 존재하는 아이디 또는 사용자명입니다.");
+        }
         log.info("MASTER({}) ADMIN 계정 생성: username={}", masterIdx, saved.getUsername());
         auditService.log(masterIdx, "ADMIN_CREATE", "USER", saved.getIdx(), "username=" + saved.getUsername());
         return usersConverter.toDTO(saved);
@@ -110,6 +116,9 @@ public class AdminUserFacade {
         Users user = usersRepository.findById(targetId).orElseThrow(UserNotFoundException::new);
         if (user.getRole() == Role.MASTER) {
             throw new IllegalArgumentException("MASTER 권한은 변경할 수 없습니다.");
+        }
+        if (user.getRole() == Role.ADMIN) {
+            return usersConverter.toDTO(user);
         }
         user.setRole(Role.ADMIN);
         Users updated = usersRepository.save(user);
@@ -123,7 +132,9 @@ public class AdminUserFacade {
         if (user.getRole() != Role.ADMIN) {
             throw new IllegalArgumentException("ADMIN 계정만 이 엔드포인트로 삭제할 수 있습니다.");
         }
-        usersRepository.deleteById(targetId);
+        user.setIsDeleted(true);
+        user.setDeletedAt(java.time.LocalDateTime.now());
+        usersRepository.save(user);
         log.warn("MASTER({}) ADMIN 계정 삭제: userId={}", masterIdx, targetId);
         auditService.log(masterIdx, "ADMIN_DELETE", "USER", targetId, "username=" + user.getUsername());
     }
