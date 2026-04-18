@@ -370,4 +370,14 @@ public class CareRequestService {
 
         return careRequestConverter.toDTOList(requests);
     }
+
+    // 케어 요청 복구 (관리자용)
+    @Transactional
+    public CareRequestDTO restoreForAdmin(Long id) {
+        CareRequest request = careRequestRepository.findById(id)
+                .orElseThrow(CareRequestNotFoundException::new);
+        request.setIsDeleted(false);
+        request.setDeletedAt(null);
+        return careRequestConverter.toDTO(careRequestRepository.save(request));
+    }
 }

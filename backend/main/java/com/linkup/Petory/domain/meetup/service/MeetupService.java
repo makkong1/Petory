@@ -206,6 +206,17 @@ public class MeetupService {
         log.info("모임 소프트 삭제 완료: meetupIdx={}", meetupIdx);
     }
 
+    // 관리자용 모임 삭제 (사용자 검증 불필요)
+    @Transactional
+    public void deleteMeetupForAdmin(Long meetupIdx) {
+        Meetup meetup = meetupRepository.findById(meetupIdx)
+                .orElseThrow(MeetupNotFoundException::new);
+        meetup.setIsDeleted(true);
+        meetup.setDeletedAt(LocalDateTime.now());
+        meetupRepository.save(meetup);
+        log.info("관리자 소프트 삭제: meetupIdx={}", meetupIdx);
+    }
+
     // 모든 모임 조회 (소프트 삭제 제외)
     @Timed("getAllMeetups")
     public List<MeetupDTO> getAllMeetups() {

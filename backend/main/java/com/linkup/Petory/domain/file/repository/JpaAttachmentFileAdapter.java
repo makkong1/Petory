@@ -4,6 +4,8 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.context.annotation.Primary;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
 import com.linkup.Petory.domain.file.entity.AttachmentFile;
@@ -64,6 +66,11 @@ public class JpaAttachmentFileAdapter implements AttachmentFileRepository {
     @Override
     public List<AttachmentFile> findByTargetTypeAndTargetIdxIn(FileTargetType targetType, List<Long> targetIndices) {
         return jpaRepository.findByTargetTypeAndTargetIdxIn(targetType, targetIndices);
+    }
+
+    @Override
+    public Page<AttachmentFile> findAllForAdmin(String targetType, String keyword, Pageable pageable) {
+        return jpaRepository.findAllForAdmin(targetType, keyword, pageable);
     }
 }
 

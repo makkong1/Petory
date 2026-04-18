@@ -107,4 +107,9 @@ public interface UsersRepository {
      * 사용자 단건 조회 (펫 포함, Fetch Join)
      */
     Optional<Users> findByIdStringWithPets(String userId);
+
+    /**
+     * 관리자용 사용자 목록 페이징 (role / status / 키워드 복합 필터)
+     */
+    Page<Users> findAllForAdmin(String role, String status, String keyword, Pageable pageable);
 }

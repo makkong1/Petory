@@ -129,4 +129,9 @@ public class JpaUsersAdapter implements UsersRepository {
     public Optional<Users> findByIdStringWithPets(String userId) {
         return jpaRepository.findByIdStringWithPets(userId);
     }
+
+    @Override
+    public Page<Users> findAllForAdmin(String role, String status, String keyword, Pageable pageable) {
+        return jpaRepository.findAllForAdmin(role, status, keyword, pageable);
+    }
 }

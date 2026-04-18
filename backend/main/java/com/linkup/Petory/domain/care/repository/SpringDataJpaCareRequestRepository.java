@@ -128,5 +128,17 @@ public interface SpringDataJpaCareRequestRepository extends JpaRepository<CareRe
                     + "AND MATCH(cr.title, cr.description) AGAINST(:keyword IN NATURAL LANGUAGE MODE)",
             nativeQuery = true)
     Page<CareRequest> searchWithPaging(@Param("keyword") String keyword, Pageable pageable);
+
+    @RepositoryMethod("펫케어 요청: 관리자 필터 페이징 조회")
+    @Query("SELECT r FROM CareRequest r WHERE " +
+           "(:status IS NULL OR CAST(r.status AS string) = :status) AND " +
+           "(:deleted IS NULL OR r.isDeleted = :deleted) AND " +
+           "(:keyword IS NULL OR r.title LIKE %:keyword% OR r.description LIKE %:keyword%) " +
+           "ORDER BY r.createdAt DESC")
+    Page<CareRequest> findAllForAdmin(
+            @Param("status") String status,
+            @Param("deleted") Boolean deleted,
+            @Param("keyword") String keyword,
+            Pageable pageable);
 }
 
