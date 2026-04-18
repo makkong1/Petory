@@ -63,23 +63,8 @@ public class AdminCareAndMeetupFacade {
     // ── 모임 ─────────────────────────────────────────────────────────────
 
     public Page<MeetupDTO> getMeetups(String status, String keyword, int page, int size) {
-        Pageable pageable = PageRequest.of(page, size);
-        Page<MeetupDTO> meetupPage = meetupService.getAllMeetups(pageable);
-
-        if ((status != null && !"ALL".equals(status)) || (keyword != null && !keyword.isBlank())) {
-            List<MeetupDTO> filtered = meetupPage.getContent().stream()
-                    .filter(m -> {
-                        boolean statusMatch = status == null || "ALL".equals(status) ||
-                                (m.getStatus() != null && m.getStatus().equalsIgnoreCase(status));
-                        boolean keywordMatch = keyword == null || keyword.isBlank() ||
-                                (m.getTitle() != null && m.getTitle().toLowerCase().contains(keyword.toLowerCase())) ||
-                                (m.getDescription() != null && m.getDescription().toLowerCase().contains(keyword.toLowerCase()));
-                        return statusMatch && keywordMatch;
-                    })
-                    .toList();
-            return new org.springframework.data.domain.PageImpl<>(filtered, pageable, meetupPage.getTotalElements());
-        }
-        return meetupPage;
+        // TODO: status/keyword DB-level filter 추가 예정 (MeetupRepository 쿼리 확장 후 교체)
+        return meetupService.getAllMeetups(PageRequest.of(page, size));
     }
 
     public MeetupDTO getMeetup(Long id) {
