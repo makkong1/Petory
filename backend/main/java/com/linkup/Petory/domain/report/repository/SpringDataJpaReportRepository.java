@@ -43,5 +43,8 @@ public interface SpringDataJpaReportRepository extends JpaRepository<Report, Lon
 
     @RepositoryMethod("신고: 기간별 통계")
     long countByCreatedAtBetween(LocalDateTime start, LocalDateTime end);
+
+    @RepositoryMethod("신고: 상태+기간별 통계 (처리 신고 집계용)")
+    long countByStatusAndUpdatedAtBetween(ReportStatus status, LocalDateTime start, LocalDateTime end);
 }
 

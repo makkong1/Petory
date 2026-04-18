@@ -166,5 +166,10 @@ public class JpaCareRequestAdapter implements CareRequestRepository {
     public Page<CareRequest> findAllForAdmin(String status, Boolean deleted, String keyword, Pageable pageable) {
         return jpaRepository.findAllForAdmin(status, deleted, keyword, pageable);
     }
+
+    @Override
+    public long countByStatusAndUpdatedAtBetween(CareRequestStatus status, LocalDateTime start, LocalDateTime end) {
+        return jpaRepository.countByStatusAndUpdatedAtBetween(status, start, end);
+    }
 }
 

@@ -115,4 +115,9 @@ public interface CareRequestRepository {
          * deleted null → 전체(삭제 포함), false → 미삭제만, true → 삭제된 것만
          */
         Page<CareRequest> findAllForAdmin(String status, Boolean deleted, String keyword, Pageable pageable);
+
+        /**
+         * 통계용: 특정 기간 동안 특정 상태로 변경된 케어 요청 수 (updatedAt 기준)
+         */
+        long countByStatusAndUpdatedAtBetween(CareRequestStatus status, LocalDateTime start, LocalDateTime end);
 }

@@ -56,5 +56,10 @@ public interface ReportRepository {
      * 통계용: 특정 기간 동안 접수된 신고 수
      */
     long countByCreatedAtBetween(LocalDateTime start, LocalDateTime end);
+
+    /**
+     * 통계용: 특정 기간 동안 특정 상태로 처리된 신고 수 (updatedAt 기준)
+     */
+    long countByStatusAndUpdatedAtBetween(ReportStatus status, LocalDateTime start, LocalDateTime end);
 }
 
