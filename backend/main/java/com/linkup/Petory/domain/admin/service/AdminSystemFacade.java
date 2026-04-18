@@ -22,7 +22,7 @@ public class AdminSystemFacade {
 
     public Map<String, String> getAllConfigs() {
         return configRepository.findAll().stream()
-                .collect(Collectors.toMap(SystemConfig::getConfigKey, SystemConfig::getConfigValue));
+                .collect(Collectors.toMap(SystemConfig::getConfigKey, SystemConfig::getConfigValue, (a, b) -> b));
     }
 
     public String getConfig(String key, String defaultValue) {
@@ -40,7 +40,7 @@ public class AdminSystemFacade {
                         .build());
         config.setConfigValue(value);
         configRepository.save(config);
-        log.info("시스템 설정 변경: key={}, value={}, adminIdx={}", key, value, adminIdx);
+        log.info("시스템 설정 변경: key={}, adminIdx={}", key, adminIdx);
         auditService.log(adminIdx, "SYSTEM_CONFIG_UPDATE", "SYSTEM", null, key + "=" + value);
     }
 
