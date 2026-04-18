@@ -6,27 +6,28 @@
 -- 1. daily_statistics 테이블 변경
 --    - Integer → BIGINT (오버플로우 방지)
 --    - 신규 컬럼 추가
+-- 실행 팁: 클라이언트가 여러 문장을 한 번에 못 돌리면 아래 ALTER를 각각 실행.
 -- ============================================================
 
-ALTER TABLE daily_statistics
-    -- 기존 Integer 컬럼 BIGINT로 변경
-    MODIFY COLUMN new_users          BIGINT       NOT NULL DEFAULT 0  COMMENT '신규 가입자',
-    MODIFY COLUMN active_users       BIGINT       NOT NULL DEFAULT 0  COMMENT 'DAU',
-    MODIFY COLUMN new_care_requests  BIGINT       NOT NULL DEFAULT 0  COMMENT '케어 요청 수',
-    MODIFY COLUMN completed_cares    BIGINT       NOT NULL DEFAULT 0  COMMENT '케어 완료 수',
-    MODIFY COLUMN new_posts          BIGINT       NOT NULL DEFAULT 0  COMMENT '신규 게시글',
-    MODIFY COLUMN new_meetups        BIGINT       NOT NULL DEFAULT 0  COMMENT '신규 모임',
-    MODIFY COLUMN meetup_participants BIGINT      NOT NULL DEFAULT 0  COMMENT '모임 참여자 수',
-    MODIFY COLUMN new_reports        BIGINT       NOT NULL DEFAULT 0  COMMENT '신고 접수',
+-- 1a) 기존 정수형 컬럼 → BIGINT
+ALTER TABLE dailystatistics
+    MODIFY COLUMN new_users           BIGINT NOT NULL DEFAULT 0 COMMENT '신규 가입자',
+    MODIFY COLUMN active_users        BIGINT NOT NULL DEFAULT 0 COMMENT 'DAU',
+    MODIFY COLUMN new_care_requests BIGINT NOT NULL DEFAULT 0 COMMENT '케어 요청 수',
+    MODIFY COLUMN completed_cares     BIGINT NOT NULL DEFAULT 0 COMMENT '케어 완료 수',
+    MODIFY COLUMN new_posts           BIGINT NOT NULL DEFAULT 0 COMMENT '신규 게시글',
+    MODIFY COLUMN new_meetups         BIGINT NOT NULL DEFAULT 0 COMMENT '신규 모임',
+    MODIFY COLUMN meetup_participants BIGINT NOT NULL DEFAULT 0 COMMENT '모임 참여자 수',
+    MODIFY COLUMN new_reports         BIGINT NOT NULL DEFAULT 0 COMMENT '신고 접수';
 
-    -- 신규 컬럼 추가
-    ADD COLUMN new_providers         BIGINT       NOT NULL DEFAULT 0  COMMENT '신규 서비스 제공자'   AFTER active_users,
-    ADD COLUMN cancelled_cares       BIGINT       NOT NULL DEFAULT 0  COMMENT '케어 취소 수'         AFTER completed_cares,
-    ADD COLUMN care_completion_rate  DECIMAL(5,2) NOT NULL DEFAULT 0  COMMENT '완료/(완료+취소)×100' AFTER cancelled_cares,
-    ADD COLUMN total_revenue         DECIMAL(15,2) NOT NULL DEFAULT 0 COMMENT '일 매출 (이벤트 즉시 반영)' AFTER care_completion_rate,
-    ADD COLUMN transaction_count     BIGINT       NOT NULL DEFAULT 0  COMMENT '결제 건수'            AFTER total_revenue,
-    ADD COLUMN avg_transaction       DECIMAL(15,2) NOT NULL DEFAULT 0 COMMENT '평균 거래금액'         AFTER transaction_count,
-    ADD COLUMN resolved_reports      BIGINT       NOT NULL DEFAULT 0  COMMENT '신고 처리 수'         AFTER new_reports;
+-- 1b) 신규 컬럼 (JPA로 이미 만들어졌으면 Duplicate column 에러 — 해당 ADD 줄만 건너뛰면 됨)
+ALTER TABLE dailystatistics
+    ADD COLUMN new_providers         BIGINT        NOT NULL DEFAULT 0 COMMENT '신규 서비스 제공자' AFTER active_users,
+    ADD COLUMN cancelled_cares       BIGINT        NOT NULL DEFAULT 0 COMMENT '케어 취소 수' AFTER completed_cares,
+    ADD COLUMN care_completion_rate  DECIMAL(5,2)  NOT NULL DEFAULT 0 COMMENT '케어 완료율 pct' AFTER cancelled_cares,
+    ADD COLUMN transaction_count     BIGINT        NOT NULL DEFAULT 0 COMMENT '결제 건수' AFTER total_revenue,
+    ADD COLUMN avg_transaction       DECIMAL(15,2) NOT NULL DEFAULT 0 COMMENT '평균 거래금액' AFTER transaction_count,
+    ADD COLUMN resolved_reports      BIGINT        NOT NULL DEFAULT 0 COMMENT '신고 처리 수' AFTER new_reports;
 
 -- ============================================================
 -- 2. weekly_statistics 테이블 생성

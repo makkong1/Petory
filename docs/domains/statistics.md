@@ -1,519 +1,201 @@
-# Statistics 도메인 - 포트폴리오 상세 설명
+# Statistics 도메인
 
 ## 1. 개요
 
-Statistics 도메인은 일별 통계 수집 및 조회 도메인으로, 시스템의 전반적인 통계 데이터를 관리합니다. 스케줄러를 통한 자동 통계 수집, 실시간 통계 조회, 과거 데이터 초기화 등의 기능을 제공합니다.
+Statistics 도메인은 **일별 / 주별 / 월별 3단계 집계 구조**로 운영 모니터링과 비즈니스 의사결정을 지원합니다. 스케줄러가 매일 daily 집계를 수행하고, 주말·월말에 rollup 집계를 자동 실행합니다. 매출은 에스크로 완료 이벤트로 즉시 반영됩니다.
 
 **주요 기능**:
-- 일별 통계 수집 (스케줄러)
-- 활성 사용자 수, 신규 가입자 수 집계
-- 게시글 수, 펫케어 요청 수 등 집계
-- 기간별 통계 조회
-- 실시간 통계 조회 (오늘 날짜 포함 시)
-- 과거 데이터 초기화 (Backfill)
+- 일별 통계 자동 집계 (매일 18:00 배치)
+- 주간 / 월간 rollup 집계
+- 누락 날짜 자동 감지 및 backfill
+- 매출 이벤트 즉시 반영 (`PetCoinEscrowService` 연동)
+- 1년 경과 daily 데이터 자동 삭제
+- Redis 1분 캐시 기반 오늘 스냅샷 조회
 
 ---
 
-## 2. 기능 설명
+## 2. 엔티티 구조
 
-### 2.1 일별 통계 수집 (스케줄러)
+### 2.1 DailyStatistics (`daily_statistics`, 1년 보관)
 
-**스케줄러 실행 프로세스**:
-1. 매일 오후 6시 30분(18:30:00)에 자동 실행 (`@Scheduled(cron = "0 30 18 * * ?")`)
-2. 어제 날짜의 통계 집계 (`LocalDate.now().minusDays(1)`)
-3. 중복 방지 확인 (이미 집계된 날짜는 건너뜀)
-4. 통계 항목 집계:
-   - 신규 가입자 수 (`countByCreatedAtBetween()`)
-   - 신규 게시글 수 (`countByCreatedAtBetween()`)
-   - 신규 펫케어 요청 수 (`countByCreatedAtBetween()`)
-   - 완료된 펫케어 수 (`countByDateBetweenAndStatus(COMPLETED)`)
-   - 활성 사용자 수 (DAU) (`countByLastLoginAtBetween()`)
-   - 매출 (현재 0으로 고정)
-5. `DailyStatistics` 저장
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| id | Long | PK |
+| statDate | LocalDate | 집계 날짜 (UNIQUE) |
+| newUsers | Long | 신규 가입자 |
+| activeUsers | Long | DAU |
+| newProviders | Long | 신규 서비스 제공자 |
+| newCareRequests | Long | 케어 요청 수 |
+| completedCares | Long | 케어 완료 수 |
+| cancelledCares | Long | 케어 취소 수 |
+| careCompletionRate | BigDecimal(5,2) | 완료/(완료+취소)×100 |
+| totalRevenue | BigDecimal(15,2) | 일 매출 (이벤트 즉시 반영) |
+| transactionCount | Long | 결제 건수 |
+| avgTransaction | BigDecimal(15,2) | 평균 거래금액 |
+| newPosts | Long | 신규 게시글 |
+| newMeetups | Long | 신규 모임 |
+| meetupParticipants | Long | 모임 참여자 수 |
+| newReports | Long | 신고 접수 |
+| resolvedReports | Long | 신고 처리 수 |
 
-### 2.2 실시간 통계 조회
+### 2.2 WeeklyStatistics (`weekly_statistics`, 무기한)
 
-**실시간 집계 프로세스**:
-1. 기간별 통계 조회 시 오늘 날짜 포함 여부 확인
-2. 오늘이 포함되어 있고 DB에 오늘의 통계가 없으면 실시간 집계
-3. `calculateTodayStatistics()`로 현재 시점까지의 통계 계산
-4. 결과 리스트에만 합치고 **`DailyStatistics` 테이블에는 저장하지 않음**(스케줄러가 다음날 어제 행을 저장하는 흐름과 구분)
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| id | Long | PK |
+| year | Integer | ISO 연도 |
+| weekNumber | Integer | ISO 주차 (1~53) |
+| startDate | LocalDate | 해당 주 월요일 |
+| endDate | LocalDate | 해당 주 일요일 |
+| weeklyRetentionRate | BigDecimal(5,2) | 주간 재방문율 |
+| (daily와 동일한 집계 컬럼들) | | daily 합산 |
+| UNIQUE | (year, weekNumber) | |
 
-### 2.3 과거 데이터 초기화 (Backfill)
+### 2.3 MonthlyStatistics (`monthly_statistics`, 무기한)
 
-**초기화 프로세스**:
-1. 관리자가 초기화 요청 (`POST /api/admin/statistics/init?days={days}`)
-2. 오늘 기준 `days`일 전부터 어제까지 순차적으로 집계
-3. 각 날짜별로 `aggregateStatisticsForDate()` 호출
-4. 중복 방지로 이미 집계된 날짜는 건너뜀
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| id | Long | PK |
+| year | Integer | 연도 |
+| month | Integer | 월 (1~12) |
+| monthlyRetentionRate | BigDecimal(5,2) | 월간 재방문율 |
+| churnRate | BigDecimal(5,2) | 이탈율 (100 - retention) |
+| (daily와 동일한 집계 컬럼들) | | daily 합산 |
+| UNIQUE | (year, month) | |
 
----
-
-## 3. 서비스 로직 설명
-
-### 3.1 핵심 비즈니스 로직
-
-#### 로직 1: 일별 통계 수집 (스케줄러)
-**구현 위치**: `StatisticsScheduler.aggregateDailyStatistics()`
-
-```java
-@Scheduled(cron = "${statistics.scheduler.cron:0 30 18 * * ?}")
-@Transactional
-public void aggregateDailyStatistics() {
-    LocalDate yesterday = LocalDate.now().minusDays(1);
-    aggregateStatisticsForDate(yesterday);
-}
-```
-
-**스케줄러 설정**:
-- **Cron**: `statistics.scheduler.cron` (기본 `0 30 18 * * ?` — 매일 18:30). 별도로 `statistics.scheduler.hour` / `minute`는 로그·`AdminStatisticsController` GET 응답용 기본값
-- **집계 대상**: **어제**(`LocalDate.now().minusDays(1)`)
-- **동적 변경**: `@Scheduled`는 컴파일 시점 cron 문자열 사용 — **실행 시각을 API로 바꿔도 반영되지 않음**(컨트롤러 PUT은 비영속, 주석 참고)
-
-#### 로직 2: 특정 날짜 통계 집계
-**구현 위치**: `StatisticsScheduler.aggregateStatisticsForDate()`
-
-```java
-@Transactional
-public void aggregateStatisticsForDate(LocalDate date) {
-    log.info("일일 통계 집계 시작: {}", date);
-    
-    // 1. 중복 방지: 이미 집계된 데이터가 있는지 확인
-    if (dailyStatisticsRepository.findByStatDate(date).isPresent()) {
-        log.warn("이미 {}의 통계가 존재합니다. 집계를 건너뜁니다.", date);
-        return;
-    }
-    
-    LocalDateTime startOfDay = date.atStartOfDay();
-    LocalDateTime endOfDay = date.atTime(LocalTime.MAX);
-    
-    // 2. 신규 가입자
-    long newUsers = usersRepository.countByCreatedAtBetween(startOfDay, endOfDay);
-    
-    // 3. 새 게시글
-    long newPosts = boardRepository.countByCreatedAtBetween(startOfDay, endOfDay);
-    
-    // 4. 케어 요청
-    long newCareRequests = careRequestRepository.countByCreatedAtBetween(startOfDay, endOfDay);
-    
-    // 5. 완료된 케어
-    long completedCares = careRequestRepository.countByDateBetweenAndStatus(startOfDay, endOfDay,
-            CareRequestStatus.COMPLETED);
-    
-    // 6. 매출 (현재 0으로 고정)
-    BigDecimal totalRevenue = BigDecimal.ZERO;
-    
-    // 7. DAU (활성 사용자)
-    long activeUsers = usersRepository.countByLastLoginAtBetween(startOfDay, endOfDay);
-    
-    // 8. 신규 모임
-    long newMeetups = meetupRepository.countByCreatedAtBetween(startOfDay, endOfDay);
-    
-    // 9. 모임 참여
-    long meetupParticipants = meetupParticipantsRepository.countByJoinedAtBetween(startOfDay, endOfDay);
-    
-    // 10. 신고 접수
-    long newReports = reportRepository.countByCreatedAtBetween(startOfDay, endOfDay);
-    
-    DailyStatistics stats = DailyStatistics.builder()
-            .statDate(date)
-            .newUsers((int) newUsers)
-            .newPosts((int) newPosts)
-            .newCareRequests((int) newCareRequests)
-            .completedCares((int) completedCares)
-            .totalRevenue(totalRevenue)
-            .activeUsers((int) activeUsers)
-            .newMeetups((int) newMeetups)
-            .meetupParticipants((int) meetupParticipants)
-            .newReports((int) newReports)
-            .build();
-    
-    dailyStatisticsRepository.save(stats);
-    log.info("일일 통계 집계 완료: {}", stats);
-}
-```
-
-**핵심 로직**:
-- **중복 방지**: 이미 집계된 데이터가 있으면 건너뜀
-- **신규 가입자**: `countByCreatedAtBetween()`로 집계
-- **새 게시글**: `countByCreatedAtBetween()`로 집계
-- **케어 요청**: `countByCreatedAtBetween()`로 집계
-- **완료된 케어**: `countByDateBetweenAndStatus(COMPLETED)`로 집계
-- **활성 사용자**: `countByLastLoginAtBetween()`로 집계 (DAU)
-- **신규 모임**: `MeetupRepository.countByCreatedAtBetween()`로 집계
-- **모임 참여**: `MeetupParticipantsRepository.countByJoinedAtBetween()`로 집계
-- **신고 접수**: `ReportRepository.countByCreatedAtBetween()`로 집계
-- **매출**: 현재 0으로 고정
-
-#### 로직 3: 실시간 통계 조회
-**구현 위치**: `StatisticsService.getDailyStatistics()`
-
-```java
-public List<DailyStatistics> getDailyStatistics(LocalDate startDate, LocalDate endDate) {
-    List<DailyStatistics> stats = dailyStatisticsRepository.findByStatDateBetweenOrderByStatDateAsc(startDate,
-            endDate);
-    
-    LocalDate today = LocalDate.now();
-    // 조회 기간에 오늘이 포함되어 있고, DB에 아직 오늘의 통계가 없는 경우
-    if (!startDate.isAfter(today) && !endDate.isBefore(today)) {
-        boolean todayExists = stats.stream().anyMatch(s -> s.getStatDate().equals(today));
-        if (!todayExists) {
-            stats.add(calculateTodayStatistics());
-        }
-    }
-    
-    return stats;
-}
-```
-
-**핵심 로직**:
-- **오늘 날짜 포함 확인**: 조회 기간에 오늘이 포함되어 있는지 확인
-- **실시간 집계**: DB에 오늘의 통계가 없으면 `calculateTodayStatistics()`로 실시간 집계 추가
-
-#### 로직 4: 오늘 통계 실시간 계산
-**구현 위치**: `StatisticsService.calculateTodayStatistics()`
-
-```java
-private DailyStatistics calculateTodayStatistics() {
-    LocalDate today = LocalDate.now();
-    LocalDateTime startOfDay = today.atStartOfDay();
-    LocalDateTime endOfDay = LocalDateTime.now(); // 현재 시점까지
-    
-    long newUsers = usersRepository.countByCreatedAtBetween(startOfDay, endOfDay);
-    long newPosts = boardRepository.countByCreatedAtBetween(startOfDay, endOfDay);
-    long newCareRequests = careRequestRepository.countByCreatedAtBetween(startOfDay, endOfDay);
-    long completedCares = careRequestRepository.countByDateBetweenAndStatus(startOfDay, endOfDay,
-            CareRequestStatus.COMPLETED);
-    long activeUsers = usersRepository.countByLastLoginAtBetween(startOfDay, endOfDay);
-    long newMeetups = meetupRepository.countByCreatedAtBetween(startOfDay, endOfDay);
-    long meetupParticipants = meetupParticipantsRepository.countByJoinedAtBetween(startOfDay, endOfDay);
-    long newReports = reportRepository.countByCreatedAtBetween(startOfDay, endOfDay);
-    
-    return DailyStatistics.builder()
-            .statDate(today)
-            .newUsers((int) newUsers)
-            .newPosts((int) newPosts)
-            .newCareRequests((int) newCareRequests)
-            .completedCares((int) completedCares)
-            .totalRevenue(BigDecimal.ZERO)
-            .activeUsers((int) activeUsers)
-            .newMeetups((int) newMeetups)
-            .meetupParticipants((int) meetupParticipants)
-            .newReports((int) newReports)
-            .build();
-}
-```
-
-**핵심 로직**:
-- **현재 시점까지 집계**: `startOfDay`부터 `LocalDateTime.now()`까지 집계
-- **실시간 통계**: 스케줄러가 실행되기 전까지의 실시간 통계 제공
-
-#### 로직 5: 과거 데이터 초기화 (Backfill)
-**구현 위치**: `StatisticsScheduler.backfillStatistics()`
-
-```java
-@Transactional
-public void backfillStatistics(int days) {
-    LocalDate today = LocalDate.now();
-    for (int i = days; i > 0; i--) {
-        LocalDate targetDate = today.minusDays(i);
-        aggregateStatisticsForDate(targetDate);
-    }
-}
-```
-
-**핵심 로직**:
-- **순차적 집계**: 오늘 기준 `days`일 전부터 어제까지 순차적으로 집계
-- **중복 방지**: `aggregateStatisticsForDate()` 내부에서 중복 확인
-
-### 3.2 서비스 메서드 구조
-
-#### StatisticsService
-| 메서드 | 설명 | 주요 로직 |
-|--------|------|-----------|
-| `getDailyStatistics(startDate, endDate)` | 기간별 일일 통계 조회 | DB 조회, 기간에 오늘이 포함되고 오늘 행이 없으면 `calculateTodayStatistics()` 결과를 리스트에 **추가**(저장하지 않음) |
-| `getDailyStatistics(date)` | 단일 일자 | **오늘**이면 항상 `calculateTodayStatistics()`. 그 외는 DB `findByStatDate` → **없으면 `null`** |
-| `calculateTodayStatistics()` | private — 오늘 누적 | 자정~**현재 시각**까지 집계, 엔티티는 빌더만 하고 **DB에 저장하지 않음** |
-| `initStatistics(days)` | `@Transactional` — 백필 | `StatisticsScheduler.backfillStatistics(days)` 위임 |
-
-#### StatisticsScheduler
-| 메서드 | 설명 | 주요 로직 |
-|--------|------|-----------|
-| `aggregateDailyStatistics()` | 일별 통계 수집 (스케줄러) | 매일 오후 6시 30분에 어제 통계 집계 |
-| `aggregateStatisticsForDate(date)` | 특정 날짜 통계 집계 | 중복 확인, 통계 항목 집계, 저장 |
-| `backfillStatistics(days)` | 과거 데이터 초기화 | 지정된 일수만큼 과거 통계 집계 |
-
-### 3.3 트랜잭션 처리
-- **`StatisticsService`**: 클래스 `@Transactional(readOnly = true)` — `initStatistics`만 `@Transactional`로 덮어씀
-- **`StatisticsScheduler`**: `aggregateDailyStatistics`, `aggregateStatisticsForDate`, `backfillStatistics`에 `@Transactional` (집계·저장)
-- **격리 수준**: 기본값 (READ_COMMITTED)
-- **중복 방지**: 애플리케이션에서 `findByStatDate` 선확인 + 컬럼 `stat_date` **unique**
-
----
-
-## 4. 아키텍처 설명
-
-### 4.1 엔티티 구조
-
-#### DailyStatistics (일일 통계)
-```java
-@Entity
-@Table(name = "dailystatistics")
-public class DailyStatistics {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-    
-    @Column(name = "stat_date", unique = true, nullable = false)
-    private LocalDate statDate; // 통계 날짜 (UNIQUE)
-    
-    @Builder.Default
-    @Column(name = "new_users")
-    private Integer newUsers = 0; // 신규 사용자 수
-    
-    @Builder.Default
-    @Column(name = "new_posts")
-    private Integer newPosts = 0; // 신규 게시글 수
-    
-    @Builder.Default
-    @Column(name = "new_care_requests")
-    private Integer newCareRequests = 0; // 신규 펫케어 요청 수
-    
-    @Builder.Default
-    @Column(name = "completed_cares")
-    private Integer completedCares = 0; // 완료된 펫케어 수
-    
-    @Builder.Default
-    @Column(name = "total_revenue")
-    private BigDecimal totalRevenue = BigDecimal.ZERO; // 총 수익
-    
-    @Builder.Default
-    @Column(name = "active_users")
-    private Integer activeUsers = 0; // 활성 사용자 수 (DAU)
-    
-    @Builder.Default
-    @Column(name = "new_meetups")
-    private Integer newMeetups = 0; // 신규 모임 수
-    
-    @Builder.Default
-    @Column(name = "meetup_participants")
-    private Integer meetupParticipants = 0; // 모임 참여 수
-    
-    @Builder.Default
-    @Column(name = "new_reports")
-    private Integer newReports = 0; // 신고 접수 수
-    
-    @Column(name = "created_at", updatable = false)
-    private LocalDateTime createdAt;
-    
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
-    
-    @PrePersist
-    protected void onCreate() {
-        createdAt = LocalDateTime.now();
-        updatedAt = LocalDateTime.now();
-    }
-    
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
-    }
-}
-```
-
-**특징**:
-- `BaseTimeEntity`를 상속하지 않음 (`@PrePersist`, `@PreUpdate`로 직접 관리)
-- Unique 제약조건: `statDate`에 Unique 제약조건으로 중복 방지
-- 통계 항목: 신규 사용자, 신규 게시글, 신규 케어 요청, 완료된 케어, 매출, 활성 사용자(DAU), 신규 모임, 모임 참여, 신고 접수
-
-### 4.2 도메인 구조
+### 2.4 도메인 구조
 ```
 domain/statistics/
+  ├── entity/
+  │   ├── DailyStatistics.java
+  │   ├── WeeklyStatistics.java
+  │   └── MonthlyStatistics.java
+  ├── repository/
+  │   ├── DailyStatisticsRepository.java (인터페이스)
+  │   ├── JpaDailyStatisticsAdapter.java
+  │   ├── SpringDataJpaDailyStatisticsRepository.java
+  │   ├── WeeklyStatisticsRepository.java
+  │   ├── JpaWeeklyStatisticsAdapter.java
+  │   ├── SpringDataJpaWeeklyStatisticsRepository.java
+  │   ├── MonthlyStatisticsRepository.java
+  │   ├── JpaMonthlyStatisticsAdapter.java
+  │   └── SpringDataJpaMonthlyStatisticsRepository.java
   ├── service/
   │   ├── StatisticsService.java
   │   └── StatisticsScheduler.java
-  ├── entity/
-  │   └── DailyStatistics.java
-  └── repository/
-      ├── DailyStatisticsRepository.java
-      ├── JpaDailyStatisticsAdapter.java
-      └── SpringDataJpaDailyStatisticsRepository.java
-```
-
-**참고**: `AdminStatisticsController`는 `domain/admin/controller/`에 위치하며, ADMIN/MASTER 권한으로 통계 API를 제공합니다.
-
-### 4.3 엔티티 관계도 (ERD)
-```mermaid
-erDiagram
-    DailyStatistics ||--o| Users : "신규 가입자/활성 사용자 집계"
-    DailyStatistics ||--o| Board : "신규 게시글 집계"
-    DailyStatistics ||--o| CareRequest : "신규 요청/완료된 케어 집계"
-```
-
-### 4.4 API 설계
-
-#### REST API (AdminStatisticsController)
-`@RequestMapping("/api/admin/statistics")`, 나머지 `/api/**` 인증 규칙과 함께 메서드 단 `@PreAuthorize` 적용.
-
-| 엔드포인트 | Method | 설명 | 권한 |
-|-----------|--------|------|------|
-| `/api/admin/statistics/daily` | GET | 기간별 일일 통계. `endDate` 없으면 오늘, `startDate` 없으면 `endDate.minusDays(29)` → **최대 30일(포함)** 구간 | `@PreAuthorize("hasAnyRole('ADMIN','MASTER')")` |
-| `/api/admin/statistics/init` | POST | `backfillStatistics(days)` — 오늘 기준 `days`일 **전부터** 하루씩 `today.minusDays(i)`로 집계(`i=days…1`), 즉 **어제까지** 포함된 과거 구간 | `hasRole('MASTER')`만. Query `days` 기본값 30 |
-| `/api/admin/statistics/scheduler/time` | GET | 응답: `hour`, `minute`, `time`, `cron`, `description` — 값은 **`statistics.scheduler.hour` / `minute` 기본값**(컨트롤러 `@Value`). **`statistics.scheduler.cron`만 따로 쓰면** 표시와 실제 스케줄이 다를 수 있음 | ADMIN, MASTER |
-| `/api/admin/statistics/scheduler/time` | PUT | Body `{hour, minute}` 유효성(0–23, 0–59) 검사 후 **성공 형태로 반환만** 함. **`application.properties` 갱신·재시작 없으면 실제 스케줄은 변하지 않음**(코드 내 TODO·`warning`/`note` 필드 참고) | MASTER만 |
-
-**기간별 통계 조회 요청 예시**:
-```http
-GET /api/admin/statistics/daily?startDate=2024-01-01&endDate=2024-01-31
-```
-
-**기간별 통계 조회 응답 예시**:
-```json
-[
-  {
-    "id": 1,
-    "statDate": "2024-01-01",
-    "newUsers": 10,
-    "newPosts": 25,
-    "newCareRequests": 5,
-    "completedCares": 3,
-    "totalRevenue": 0,
-    "activeUsers": 150,
-    "newMeetups": 2,
-    "meetupParticipants": 8,
-    "newReports": 1,
-    "createdAt": "2024-01-02T18:30:00",
-    "updatedAt": "2024-01-02T18:30:00"
-  },
-  {
-    "id": 2,
-    "statDate": "2024-01-02",
-    "newUsers": 12,
-    "newPosts": 30,
-    "newCareRequests": 7,
-    "completedCares": 4,
-    "totalRevenue": 0,
-    "activeUsers": 165,
-    "newMeetups": 3,
-    "meetupParticipants": 12,
-    "newReports": 0,
-    "createdAt": "2024-01-03T18:30:00",
-    "updatedAt": "2024-01-03T18:30:00"
-  }
-]
-```
-
-**과거 통계 초기화 요청 예시**:
-```http
-POST /api/admin/statistics/init?days=30
-```
-
-**과거 통계 초기화 응답 예시**:
-```json
-"지난 30일간의 통계 집계가 완료되었습니다."
+  └── dto/
+      ├── DailyStatisticsResponse.java
+      ├── WeeklyStatisticsResponse.java
+      ├── MonthlyStatisticsResponse.java
+      └── TodaySnapshotResponse.java
 ```
 
 ---
 
-## 5. 트랜잭션 처리
+## 3. 비즈니스 로직
 
-### 5.1 트랜잭션 전략
-- §3.3과 동일 — 조회는 `StatisticsService`의 `readOnly`, 스케줄러/백필은 쓰기 트랜잭션
+### 3.1 StatisticsScheduler
 
-### 5.2 동시성 제어
-- **중복 방지**: Unique 제약조건 `statDate`로 DB 레벨에서 중복 방지
-- **스케줄러 중복 실행 방지**: `findByStatDate()`로 이미 집계된 날짜 확인
+#### 일별 집계 (`aggregateStatisticsForDate`)
+- 중복 방지: `findByStatDate` 선확인 → 이미 존재하면 skip
+- 집계 항목: 신규가입/DAU/신규제공자/케어요청/완료케어/취소케어/완료율/게시글/모임/참여자/신고/처리신고
+- careCompletionRate = `completed / (completed + cancelled) × 100`
+- totalRevenue는 배치에서 0으로 초기화 (에스크로 이벤트로 실시간 누적됨)
+
+#### 배치 트리거 (`aggregateDailyStatistics`, 매일 18:00)
+1. 최근 7일 누락 날짜 감지 → 자동 backfill
+2. 어제 daily 집계
+3. 어제가 일요일이면 → `rollupWeekly()` 실행
+4. 어제가 월 마지막 날이면 → `rollupMonthly()` 실행
+5. 1년 이전 daily 데이터 삭제
+
+#### 주간 rollup (`rollupWeekly`)
+- 해당 주 월요일~일요일의 daily 데이터 합산
+- weeklyRetentionRate = 이번 주 WAU / 지난 주 WAU × 100
+
+#### 월간 rollup (`rollupMonthly`)
+- 해당 월의 daily 데이터 합산
+- monthlyRetentionRate = 이번 달 MAU / 지난 달 MAU × 100
+- churnRate = 100 - monthlyRetentionRate (음수 방지: max 0)
+
+#### backfill (`backfill(startDate, endDate)`)
+- 지정 기간의 날짜를 순회하며 `aggregateStatisticsForDate` 호출
+- 각 날짜별로 예외 격리 (한 날짜 실패가 전체를 중단하지 않음)
+
+### 3.2 StatisticsService
+
+| 메서드 | 설명 |
+|--------|------|
+| `getDailyStatistics(startDate, endDate)` | 기간별 daily 통계 조회. startDate > endDate 시 IllegalArgumentException |
+| `getWeeklyStatistics(year)` | 연도별 주간 통계 전체 조회 |
+| `getMonthlyStatistics(year)` | 연도별 월간 통계 전체 조회 |
+| `getTodaySnapshot()` | 오늘 daily 행 조회 (없으면 빈 엔티티). Redis 1분 캐시 |
+| `recordPayment(amount)` | 당일 totalRevenue/transactionCount/avgTransaction 업데이트. @Transactional |
+| `backfill(startDate, endDate)` | StatisticsScheduler.backfill() 위임 |
+
+### 3.3 매출 이벤트 연동 (PetCoinEscrowService)
+`PetCoinEscrowService.releaseToProvider()` — 제공자에게 코인 지급 완료 직후 `statisticsService.recordPayment(BigDecimal.valueOf(escrow.getAmount()))` 호출.
+
+### 3.4 트랜잭션
+- `StatisticsService`: 클래스 `@Transactional(readOnly = true)`, `recordPayment`·`backfill`만 `@Transactional`
+- `StatisticsScheduler`: 집계 메서드 전부 `@Transactional`
 
 ---
 
-## 6. 트러블슈팅
+## 4. API
+
+`AdminStatisticsController` (`/api/admin/statistics`), **전체 `@PreAuthorize("hasRole('MASTER')")`**
+
+| Method | URL | 설명 | Query Params |
+|--------|-----|------|------|
+| GET | `/daily` | 기간별 daily 통계 | `startDate`, `endDate` (기본: 최근 30일) |
+| GET | `/weekly` | 연도별 주간 통계 | `year` (기본: 올해) |
+| GET | `/monthly` | 연도별 월간 통계 | `year` (기본: 올해) |
+| GET | `/summary` | 오늘 실시간 스냅샷 (Redis 1분 캐시) | - |
+| POST | `/backfill` | 기간 backfill | `startDate`, `endDate` (required) |
+
+### 응답 구조 (DailyStatisticsResponse)
+```json
+{
+  "statDate": "2026-04-17",
+  "users": { "newUsers": 12, "activeUsers": 340, "newProviders": 3 },
+  "care": { "newRequests": 25, "completed": 18, "cancelled": 4, "completionRate": 81.82 },
+  "revenue": { "totalRevenue": 450000, "transactionCount": 18, "avgTransaction": 25000 },
+  "community": { "newPosts": 47, "newMeetups": 5, "meetupParticipants": 32 },
+  "moderation": { "newReports": 2, "resolvedReports": 1 }
+}
+```
+
+---
+
+## 5. 데이터 보관 정책
+
+| 테이블 | 보관 기간 | 삭제 방식 |
+|--------|---------|---------|
+| daily_statistics | 1년 | 배치 실행 시 `deleteByStatDateBefore(now - 1년)` |
+| weekly_statistics | 무기한 | - |
+| monthly_statistics | 무기한 | - |
+
+---
+
+## 6. 캐시 전략
+
+| 캐시 키 | TTL | 대상 |
+|---------|-----|------|
+| `todayStats::today` | 1분 | `getTodaySnapshot()` |
 
 ---
 
 ## 7. 성능 최적화
 
-### 7.1 DB 최적화
-
-#### 인덱스 전략
-
-**dailystatistics 테이블**:
-```sql
--- 날짜별 통계 조회 (Unique 제약조건, 중복 방지)
-CREATE UNIQUE INDEX stat_date ON dailystatistics(stat_date);
-```
-
-**선정 이유**:
-- 자주 조회되는 컬럼 (stat_date)
-- WHERE 절에서 자주 사용되는 조건 (stat_date BETWEEN)
-- 중복 방지를 위한 Unique 제약조건
-
-### 7.2 애플리케이션 레벨 최적화
-
-#### 스케줄러 최적화
-**구현 위치**: `StatisticsScheduler.aggregateStatisticsForDate()`
-
-**최적화 사항**:
-- **중복 방지**: 이미 집계된 날짜는 건너뜀으로 불필요한 집계 방지
-- **배치 집계**: 한 번의 트랜잭션으로 모든 통계 항목 집계
-- **로그 기록**: 집계 시작/완료 로그로 모니터링 가능
-
-**효과**: 스케줄러 중복 실행 시 불필요한 집계 방지, 성능 향상
-
-#### 실시간 통계 최적화
-**구현 위치**: `StatisticsService.calculateTodayStatistics()`
-
-**최적화 사항**:
-- **필요 시에만 계산**: 오늘 날짜가 조회 기간에 포함되고 DB에 없을 때만 계산
-- **현재 시점까지 집계**: `LocalDateTime.now()`까지 집계하여 실시간성 보장
-
-**효과**: 불필요한 실시간 집계 방지, 응답 시간 단축
-
-#### 과거 데이터 초기화 최적화
-**구현 위치**: `StatisticsScheduler.backfillStatistics()`
-
-**최적화 사항**:
-- **순차적 집계**: 날짜별로 순차적으로 집계하여 메모리 사용량 최소화
-- **중복 방지**: 각 날짜별로 중복 확인하여 안전하게 집계
-
-**효과**: 대량의 과거 데이터 초기화 시 메모리 효율적 처리
+- **배치 집계**: 실시간 집계 쿼리 부하 없음. 대시보드 조회 = 단순 SELECT
+- **Integer → Long**: 오버플로우 방지
+- **careCompletionRate 사전 계산**: 조회 시 연산 없이 저장된 값 바로 사용
+- **누락 감지**: 최근 7일만 체크하여 backfill 범위 최소화
 
 ---
 
-## 8. 핵심 포인트 요약
+## 8. 관련 문서
 
-### 8.1 스케줄러 활용
-- **자동 집계**: 매일 오후 6시 30분에 어제 통계 자동 수집 (`@Scheduled`)
-- **중복 방지**: 이미 집계된 날짜는 건너뜀
-- **로깅**: 집계 시작/완료 로그로 모니터링 가능
-
-### 8.2 실시간 통계 조회
-- **오늘 날짜 포함 시**: 조회 기간에 오늘이 포함되어 있고 DB에 오늘의 통계가 없으면 실시간 집계 추가
-- **현재 시점까지 집계**: `LocalDateTime.now()`까지 집계하여 실시간성 보장
-- **필요 시에만 계산**: 불필요한 실시간 집계 방지
-
-### 8.3 과거 데이터 초기화
-- **Backfill 지원**: `backfillStatistics()`로 과거 데이터 일괄 집계 지원
-- **순차적 집계**: 날짜별로 순차적으로 집계하여 메모리 효율적 처리
-- **중복 방지**: 각 날짜별로 중복 확인하여 안전하게 집계
-
-### 8.4 통계 항목
-- **신규 가입자**: `countByCreatedAtBetween()`로 집계
-- **신규 게시글**: `countByCreatedAtBetween()`로 집계
-- **신규 케어 요청**: `countByCreatedAtBetween()`로 집계
-- **완료된 케어**: `countByDateBetweenAndStatus(COMPLETED)`로 집계
-- **활성 사용자 (DAU)**: `countByLastLoginAtBetween()`로 집계
-- **신규 모임**: `MeetupRepository.countByCreatedAtBetween()`로 집계
-- **모임 참여**: `MeetupParticipantsRepository.countByJoinedAtBetween()`로 집계
-- **신고 접수**: `ReportRepository.countByCreatedAtBetween()`로 집계
-- **매출**: 현재 0으로 고정 (향후 확장 가능)
-
-### 8.5 성능 최적화
-- **인덱스**: 엔티티에 `@Index` 없음 — `stat_date` unique로 조회·중복 방지(§7.1)
-- **필요 시에만 계산**: 오늘 행이 없을 때만 `calculateTodayStatistics()`로 메모리상 항목 추가
-
-### 8.6 엔티티 설계 특징
-- **BaseTimeEntity 미사용**: `@PrePersist`, `@PreUpdate`로 직접 시간 관리
-- **Unique 제약조건**: `statDate`에 Unique 제약조건으로 중복 방지
-- **통계 항목**: 신규 사용자, 신규 게시글, 신규 케어 요청, 완료된 케어, 매출, 활성 사용자(DAU), 신규 모임, 모임 참여, 신고 접수
-- **기본값 설정**: 모든 통계 항목에 기본값 설정 (`@Builder.Default`)
+- 아키텍처: `docs/architecture/관리자 대시보드 & 통계 시스템 아키텍처.md`
+- 마이그레이션: `backend/main/resources/sql/migration/statistics-redesign.sql`
