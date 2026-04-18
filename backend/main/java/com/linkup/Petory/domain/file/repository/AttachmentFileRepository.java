@@ -3,6 +3,9 @@ package com.linkup.Petory.domain.file.repository;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
 import com.linkup.Petory.domain.file.entity.AttachmentFile;
 import com.linkup.Petory.domain.file.entity.FileTargetType;
 
@@ -38,5 +41,10 @@ public interface AttachmentFileRepository {
      * 여러 타겟의 첨부파일을 한 번에 조회 (배치 조회)
      */
     List<AttachmentFile> findByTargetTypeAndTargetIdxIn(FileTargetType targetType, List<Long> targetIndices);
+
+    /**
+     * 관리자용 파일 목록 페이징 (targetType / keyword 복합 필터)
+     */
+    Page<AttachmentFile> findAllForAdmin(String targetType, String keyword, Pageable pageable);
 }
 
