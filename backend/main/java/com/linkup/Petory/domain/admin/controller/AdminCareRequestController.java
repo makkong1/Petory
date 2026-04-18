@@ -97,8 +97,7 @@ public class AdminCareRequestController {
      */
     @PostMapping("/{id}/restore")
     public ResponseEntity<CareRequestDTO> restoreCareRequest(@PathVariable Long id) {
-        // TODO: 서비스에 복구 메서드 추가 필요
-        throw new UnsupportedOperationException("복구 기능은 아직 구현되지 않았습니다.");
+        return ResponseEntity.ok(careRequestService.restoreForAdmin(id));
     }
 }
 
