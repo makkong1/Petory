@@ -79,7 +79,7 @@ public class AdminMeetupController {
      */
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteMeetup(@PathVariable Long id) {
-        meetupService.deleteMeetup(id, "ADMIN");
+        meetupService.deleteMeetupForAdmin(id);
         return ResponseEntity.noContent().build();
     }
 
