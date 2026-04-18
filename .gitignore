@@ -65,3 +65,5 @@ application.properties
 # =====================
 .DS_Store
 **/.DS_Store
+# Worktrees
+.worktrees/
