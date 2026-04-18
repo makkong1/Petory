@@ -109,4 +109,10 @@ public interface CareRequestRepository {
          * 반경 기반 근처 케어 요청 조회 (지도 표출용)
          */
         List<CareRequest> findNearby(double lat, double lng, double radiusKm, int limit);
+
+        /**
+         * 관리자용 케어 요청 페이징 (status / deleted / keyword 복합 필터)
+         * deleted null → 전체(삭제 포함), false → 미삭제만, true → 삭제된 것만
+         */
+        Page<CareRequest> findAllForAdmin(String status, Boolean deleted, String keyword, Pageable pageable);
 }

@@ -161,5 +161,10 @@ public class JpaCareRequestAdapter implements CareRequestRepository {
     public List<CareRequest> findNearby(double lat, double lng, double radiusKm, int limit) {
         return jpaRepository.findNearbyCareRequests(lat, lng, radiusKm, limit);
     }
+
+    @Override
+    public Page<CareRequest> findAllForAdmin(String status, Boolean deleted, String keyword, Pageable pageable) {
+        return jpaRepository.findAllForAdmin(status, deleted, keyword, pageable);
+    }
 }
 
