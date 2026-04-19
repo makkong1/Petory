@@ -10,6 +10,7 @@ import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.web.filter.HiddenHttpMethodFilter;
+import de.codecentric.boot.admin.server.config.EnableAdminServer;
 
 @SpringBootApplication
 @ConfigurationProperties(prefix = "app")
@@ -17,6 +18,7 @@ import org.springframework.web.filter.HiddenHttpMethodFilter;
 @EnableScheduling // 주기적 작업을 활성화+
 @EnableAsync
 @EnableCaching
+@EnableAdminServer
 @EnableJpaAuditing // JPA Auditing 활성화
 @EnableMethodSecurity(prePostEnabled = true) // @PreAuthorize 작동 활성화
 // cd backend
