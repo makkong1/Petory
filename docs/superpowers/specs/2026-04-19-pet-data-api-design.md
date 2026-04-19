@@ -12,10 +12,10 @@
 |------|------|
 | 웹 프레임워크 | FastAPI |
 | DB ORM | SQLAlchemy 2.0 (async) |
-| DB | PostgreSQL |
+| DB | PostgreSQL (pg_trgm 확장 사용) |
 | 스케줄러 | APScheduler |
 | HTTP 클라이언트 | httpx (async) |
-| 인증 | API Key (`X-API-Key` 헤더, bcrypt 해싱) |
+| 인증 | API Key (`X-API-Key` 헤더, SHA-256 해싱) |
 | 환경변수 | python-dotenv |
 
 ---
@@ -55,6 +55,7 @@ pet-data-api/
 ## DB 모델
 
 ### `abandoned_animals`
+
 | 컬럼 | 타입 | 설명 |
 |------|------|------|
 | id | SERIAL PK | |
@@ -70,28 +71,27 @@ pet-data-api/
 | collected_at | TIMESTAMP | 수집 시각 |
 
 **인덱스 전략:**
-- `notice_no` — UNIQUE 인덱스 (upsert 기준키, 중복 방지)
-- `(region, status)` — 복합 인덱스 (목록 필터 쿼리 핵심 경로)
-- `notice_date` — 단일 인덱스 (날짜 범위 조회, 통계 집계)
-- `animal_type` — 단일 인덱스 (종류 필터)
 
-### `daily_region_stats`
-| 컬럼 | 타입 | 설명 |
-|------|------|------|
-| id | SERIAL PK | |
-| region | VARCHAR | 지역 |
-| date | DATE | 집계 날짜 |
-| total_count | INT | 전체 유기동물 수 |
-| adopted_count | INT | 입양 수 |
-| euthanized_count | INT | 안락사 수 |
+```sql
+-- upsert 기준키
+CREATE UNIQUE INDEX idx_animals_notice_no ON abandoned_animals(notice_no);
 
-**인덱스 전략:**
-- `(region, date)` — UNIQUE 복합 인덱스 (upsert 기준키, 통계 조회 핵심 경로)
-- `date` — 단일 인덱스 (월별 추이 쿼리)
+-- 목록 필터 핵심 경로 (region + status + animal_type 동시 필터 커버)
+CREATE INDEX idx_animals_region_status_type ON abandoned_animals(region, status, animal_type);
 
-> Petory의 DailyStatistics 배치 집계 패턴과 동일한 개념.
+-- 날짜 범위 조회 / 통계 집계
+CREATE INDEX idx_animals_notice_date ON abandoned_animals(notice_date);
+
+-- 품종/보호소명 한국어 퍼지 검색 (pg_trgm)
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE INDEX idx_animals_breed_trgm ON abandoned_animals USING gin(breed gin_trgm_ops);
+CREATE INDEX idx_animals_shelter_trgm ON abandoned_animals USING gin(shelter_name gin_trgm_ops);
+```
+
+> 중장기: `notice_date` 기준 Range Partition (연도별). 데이터 증가 시 파티션 프루닝으로 Full Scan 방지.
 
 ### `collection_logs`
+
 | 컬럼 | 타입 | 설명 |
 |------|------|------|
 | id | SERIAL PK | |
@@ -105,11 +105,37 @@ pet-data-api/
 
 ---
 
+## 통계 — Materialized View
+
+`daily_region_stats` 테이블 대신 **PostgreSQL Materialized View** 사용.
+
+```sql
+CREATE MATERIALIZED VIEW mv_region_stats AS
+SELECT
+    region,
+    DATE(notice_date)          AS date,
+    COUNT(*)                   AS total_count,
+    COUNT(*) FILTER (WHERE status = '입양')   AS adopted_count,
+    COUNT(*) FILTER (WHERE status = '안락사') AS euthanized_count
+FROM abandoned_animals
+GROUP BY region, DATE(notice_date);
+
+CREATE UNIQUE INDEX ON mv_region_stats(region, date);
+```
+
+**갱신 전략:**
+- 수집 완료 후 `REFRESH MATERIALIZED VIEW CONCURRENTLY mv_region_stats` 실행
+- `CONCURRENTLY` 옵션: 갱신 중에도 기존 뷰 읽기 가능 (락 없음)
+- Full Scan은 REFRESH 시점 1회만 발생. 조회 쿼리는 항상 인덱스 탐색.
+- 수집 실패 시 REFRESH 건너뜀 (기존 뷰 보존)
+
+---
+
 ## API 엔드포인트
 
 | 메서드 | 경로 | 설명 |
 |--------|------|------|
-| GET | `/animals` | 유기동물 목록 (지역/상태/종류 필터, 페이지네이션) |
+| GET | `/animals` | 유기동물 목록 (필터, 검색, 커서 페이지네이션) |
 | GET | `/animals/{id}` | 유기동물 상세 |
 | GET | `/stats/region` | 지역별 현황 통계 |
 | GET | `/stats/trend` | 월별 추이 (year, month 파라미터) |
@@ -117,55 +143,87 @@ pet-data-api/
 
 모든 엔드포인트에 `X-API-Key` 헤더 필수.
 
-### 페이지네이션
-`GET /animals` — offset 기반 페이지네이션:
-- 파라미터: `limit` (기본 20, 최대 100), `offset` (기본 0)
-- 응답에 `total_count`, `limit`, `offset` 포함
-- 이유: 유기동물 데이터는 공고번호 기준 upsert라 cursor 기반보다 offset이 단순하고 충분함
+### 페이지네이션 — Keyset (Cursor)
+
+`GET /animals` offset 기반 **금지**. `id` 기준 커서 페이지네이션 사용.
+
+```
+# 첫 페이지
+GET /animals?limit=20
+
+# 다음 페이지 (이전 응답의 next_cursor 사용)
+GET /animals?limit=20&cursor=12345
+```
+
+```sql
+-- 실행 쿼리
+SELECT * FROM abandoned_animals
+WHERE id > :cursor
+  AND region = :region          -- 선택적 필터
+  AND status = :status
+  AND animal_type = :animal_type
+ORDER BY id ASC
+LIMIT :limit;
+```
+
+- offset 기반은 OFFSET N 증가 시 O(n) Full Scan 발생 → 사용 금지
+- `id` 오름차순 정렬 + `WHERE id > cursor` → 항상 인덱스 탐색 O(log n)
+- 응답: `{ items, next_cursor, has_next }`
+
+### 검색
+
+`GET /animals?search=골든리트리버` — 품종(breed) 대상 trigram 유사도 검색:
+
+```sql
+SELECT * FROM abandoned_animals
+WHERE breed % :query          -- pg_trgm 유사도 연산자
+ORDER BY similarity(breed, :query) DESC, id ASC
+LIMIT :limit;
+```
+
+- `%` 연산자: GIN trigram 인덱스 탐색 (LIKE '%...%' Full Scan 금지)
+- search 파라미터와 필터 파라미터 동시 사용 가능
 
 ---
 
 ## 수집 스케줄
 
 - **실행 시각:** 매일 오후 7시
-- **방식:** APScheduler → 공공API 호출 → DB upsert → 통계 집계 순차 실행
-- **중복 실행 방지:** APScheduler `max_instances=1` 설정으로 동시 실행 차단
+- **중복 실행 방지:** APScheduler `max_instances=1`
+- **실행 순서:** 공공API 수집 → DB upsert → `REFRESH MATERIALIZED VIEW`
 
-### 통계 업데이트 전략
-수집 완료 후 즉시 `daily_region_stats` 재집계:
-- 오늘 날짜 기준으로 `abandoned_animals`를 region별 GROUP BY 집계
-- `INSERT ... ON CONFLICT (region, date) DO UPDATE` — 멱등성 보장
-- 수집 실패 시 통계 집계 건너뜀 (기존 통계 보존)
+### 실패 처리
 
----
-
-## 실패 처리
-
-### 수집기 실패 처리
-1. httpx 자동 재시도 3회 (지수 백오프: 1s → 2s → 4s)
-2. 3회 모두 실패 → `collection_logs`에 `status=failed` 기록, 기존 DB 데이터 보존
-3. 부분 성공 허용: 1000건 중 800건 저장 성공 시 `status=partial`로 기록
-4. 수동 재수집: `POST /collect/trigger`로 언제든 재실행 가능
-
-### 트랜잭션 처리
-- upsert는 건별 트랜잭션이 아닌 배치 단위 트랜잭션 (1회 수집 = 1 트랜잭션)
-- 배치 트랜잭션 실패 시 전체 롤백 → 부분 저장 방지
-- 통계 집계는 별도 트랜잭션 (수집과 독립)
+1. httpx 재시도 3회 (지수 백오프: 1s → 2s → 4s)
+2. 3회 실패 → `collection_logs` `status=failed`, DB 기존 데이터 보존
+3. 부분 성공 허용: 일부 저장 성공 시 `status=partial` 기록
+4. upsert는 배치 단위 트랜잭션 (실패 시 전체 롤백, 부분 저장 방지)
+5. 통계 REFRESH는 수집 성공/partial일 때만 실행
 
 ---
 
 ## 인증
 
 ### API Key 구조
-두 종류의 키:
+
+두 종류:
 - **일반 키** — 조회/통계 엔드포인트 접근
-- **관리자 키** — 모든 엔드포인트 접근 (`/collect/trigger` 포함)
+- **관리자 키** — 전체 접근 (`/collect/trigger` 포함)
 
 ### 보안 처리
-- 키는 `secrets.token_hex(32)`로 생성 (64자 랜덤 hex)
-- DB에 bcrypt 해싱 후 저장 (평문 저장 금지)
-- 요청마다 `bcrypt.checkpw()`로 검증
-- FastAPI 의존성 주입(`Depends`)으로 엔드포인트별 권한 분리
+
+```
+키 생성: secrets.token_hex(32)  →  64자 랜덤 hex 문자열
+저장:    hashlib.sha256(key).hexdigest()  →  DB에 해시값만 저장
+검증:    요청 키를 SHA-256 해싱 후 DB 해시와 비교
+```
+
+**bcrypt 대신 SHA-256을 쓰는 이유:**
+- bcrypt는 패스워드용 — 의도적으로 느림 (요청마다 수십ms 소요)
+- API Key는 `secrets.token_hex`로 생성한 고엔트로피 랜덤값 → 브루트포스 불가
+- SHA-256은 빠르고 충분히 안전 (API Key 검증 표준 방식)
+
+FastAPI `Depends`로 엔드포인트별 권한 분리.
 
 ---
 
@@ -173,7 +231,7 @@ pet-data-api/
 
 | 코드 | 상황 |
 |------|------|
-| 400 | 잘못된 파라미터 (limit > 100 등) |
+| 400 | 잘못된 파라미터 (limit 범위 초과 등) |
 | 401 | API Key 없거나 틀림 |
 | 403 | 일반 키로 관리자 전용 엔드포인트 접근 |
 | 404 | 해당 ID 없음 |
