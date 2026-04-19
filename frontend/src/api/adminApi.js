@@ -25,7 +25,9 @@ export const adminApi = {
 
   // 통계 수동 집계 (MASTER 전용)
   initStatistics: async (days = 30) => {
-    const response = await api.post(`/statistics/init?days=${days}`);
+    const endDate = new Date().toISOString().split('T')[0];
+    const startDate = new Date(Date.now() - (days - 1) * 86400000).toISOString().split('T')[0];
+    const response = await api.post(`/statistics/backfill?startDate=${startDate}&endDate=${endDate}`);
     return response.data;
   },
 };

@@ -70,7 +70,7 @@ frontend/src/components/Admin/sections/MeetupManagementSection.js — 페이징 
 `MeetupService.java`의 기존 `deleteMeetup()` 메서드 아래에 추가:
 
 ```java
-@Transactional
+@Transaction
 public void deleteMeetupForAdmin(Long meetupIdx) {
     Meetup meetup = meetupRepository.findById(meetupIdx)
             .orElseThrow(MeetupNotFoundException::new);

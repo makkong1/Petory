@@ -652,94 +652,96 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
         </HeaderActions>
       </Header>
 
-      <MessagesContainer ref={messagesContainerRef}>
-        {loading ? (
-          <LoadingMessage>메시지를 불러오는 중...</LoadingMessage>
-        ) : messages.length === 0 ? (
-          <EmptyMessage>메시지가 없습니다. 첫 메시지를 보내보세요!</EmptyMessage>
-        ) : (
-          messages.map((message, index) => {
-            const isMyMessage = message.senderIdx === user?.idx;
-            const showTime = index === 0 ||
-              new Date(message.createdAt).getTime() - new Date(messages[index - 1].createdAt).getTime() > 60000;
-
-            return (
-              <MessageWrapper key={message.idx || index} isMyMessage={isMyMessage}>
-                {!isMyMessage && (
-                  <SenderName>{message.senderUsername || otherParticipant?.username || '알 수 없음'}</SenderName>
-                )}
-                <MessageBubble isMyMessage={isMyMessage}>
-                  {message.messageType === 'IMAGE' ? (
-                    <MessageImage
-                      src={message.content}
-                      alt="이미지"
-                      onClick={() => setSelectedImage(message.content)}
-                    />
-                  ) : (
-                    <MessageContent>{message.content}</MessageContent>
-                  )}
-                  {showTime && (
-                    <MessageTime isMyMessage={isMyMessage}>{formatTime(message.createdAt)}</MessageTime>
-                  )}
-                </MessageBubble>
-              </MessageWrapper>
-            );
-          })
-        )}
-        <div ref={messagesEndRef} />
-      </MessagesContainer>
-
-      {/* 거래 확정 버튼 (펫케어 채팅방인 경우) */}
-      {isCareRequestChat && !allParticipantsConfirmed && (
-        <DealConfirmSection>
-          {dealConfirmed ? (
-            <DealConfirmStatus>
-              ✓ 거래 확정 완료 (상대방 확정 대기 중)
-            </DealConfirmStatus>
+      <MiddleColumn>
+        <MessagesContainer ref={messagesContainerRef}>
+          {loading ? (
+            <LoadingMessage>메시지를 불러오는 중...</LoadingMessage>
+          ) : messages.length === 0 ? (
+            <EmptyMessage>메시지가 없습니다. 첫 메시지를 보내보세요!</EmptyMessage>
           ) : (
-            <DealConfirmButton onClick={handleConfirmDeal} disabled={confirmingDeal}>
-              {confirmingDeal ? '확정 중...' : '🤝 거래 확정'}
-            </DealConfirmButton>
+            messages.map((message, index) => {
+              const isMyMessage = message.senderIdx === user?.idx;
+              const showTime = index === 0 ||
+                new Date(message.createdAt).getTime() - new Date(messages[index - 1].createdAt).getTime() > 60000;
+
+              return (
+                <MessageWrapper key={message.idx || index} isMyMessage={isMyMessage}>
+                  {!isMyMessage && (
+                    <SenderName>{message.senderUsername || otherParticipant?.username || '알 수 없음'}</SenderName>
+                  )}
+                  <MessageBubble isMyMessage={isMyMessage}>
+                    {message.messageType === 'IMAGE' ? (
+                      <MessageImage
+                        src={message.content}
+                        alt="이미지"
+                        onClick={() => setSelectedImage(message.content)}
+                      />
+                    ) : (
+                      <MessageContent>{message.content}</MessageContent>
+                    )}
+                    {showTime && (
+                      <MessageTime isMyMessage={isMyMessage}>{formatTime(message.createdAt)}</MessageTime>
+                    )}
+                  </MessageBubble>
+                </MessageWrapper>
+              );
+            })
           )}
-        </DealConfirmSection>
-      )}
+          <div ref={messagesEndRef} />
+        </MessagesContainer>
 
-      {allParticipantsConfirmed && isCareRequestChat && (
-        <DealConfirmedBanner>
-          ✓ 양쪽 모두 거래 확정 완료! 펫케어 서비스가 시작되었습니다.
-        </DealConfirmedBanner>
-      )}
+        {/* 거래 확정 버튼 (펫케어 채팅방인 경우) */}
+        {isCareRequestChat && !allParticipantsConfirmed && (
+          <DealConfirmSection>
+            {dealConfirmed ? (
+              <DealConfirmStatus>
+                ✓ 거래 확정 완료 (상대방 확정 대기 중)
+              </DealConfirmStatus>
+            ) : (
+              <DealConfirmButton onClick={handleConfirmDeal} disabled={confirmingDeal}>
+                {confirmingDeal ? '확정 중...' : '🤝 거래 확정'}
+              </DealConfirmButton>
+            )}
+          </DealConfirmSection>
+        )}
 
-      {/* 서비스 완료 버튼 (IN_PROGRESS 상태이고 제공자일 때만 표시) */}
-      {isCareRequestChat && careRequestStatus === 'IN_PROGRESS' && isProvider && (
-        <CompleteCareSection>
-          <CompleteCareButton onClick={handleCompleteCare} disabled={completingCare}>
-            {completingCare ? '완료 처리 중...' : '✅ 서비스 완료'}
-          </CompleteCareButton>
-        </CompleteCareSection>
-      )}
+        {allParticipantsConfirmed && isCareRequestChat && (
+          <DealConfirmedBanner>
+            ✓ 양쪽 모두 거래 확정 완료! 펫케어 서비스가 시작되었습니다.
+          </DealConfirmedBanner>
+        )}
 
-      {isCareRequestChat && careRequestStatus === 'COMPLETED' && (
-        <CompletedBanner>
-          ✓ 펫케어 서비스가 완료되었습니다.
-        </CompletedBanner>
-      )}
+        {/* 서비스 완료 버튼 (IN_PROGRESS 상태이고 제공자일 때만 표시) */}
+        {isCareRequestChat && careRequestStatus === 'IN_PROGRESS' && isProvider && (
+          <CompleteCareSection>
+            <CompleteCareButton onClick={handleCompleteCare} disabled={completingCare}>
+              {completingCare ? '완료 처리 중...' : '✅ 서비스 완료'}
+            </CompleteCareButton>
+          </CompleteCareSection>
+        )}
 
-      {/* 리뷰 작성 버튼 (COMPLETED 상태이고 요청자이며 아직 리뷰를 작성하지 않았을 때만 표시) */}
-      {isCareRequestChat && careRequestStatus === 'COMPLETED' && isRequester && !hasReview && (
-        <ReviewSection>
-          <ReviewButton onClick={handleOpenReviewModal}>
-            ⭐ 리뷰 작성하기
-          </ReviewButton>
-        </ReviewSection>
-      )}
+        {isCareRequestChat && careRequestStatus === 'COMPLETED' && (
+          <CompletedBanner>
+            ✓ 펫케어 서비스가 완료되었습니다.
+          </CompletedBanner>
+        )}
 
-      {/* 리뷰 작성 완료 메시지 */}
-      {isCareRequestChat && careRequestStatus === 'COMPLETED' && isRequester && hasReview && (
-        <ReviewCompletedBanner>
-          ✓ 리뷰를 작성하셨습니다.
-        </ReviewCompletedBanner>
-      )}
+        {/* 리뷰 작성 버튼 (COMPLETED 상태이고 요청자이며 아직 리뷰를 작성하지 않았을 때만 표시) */}
+        {isCareRequestChat && careRequestStatus === 'COMPLETED' && isRequester && !hasReview && (
+          <ReviewSection>
+            <ReviewButton onClick={handleOpenReviewModal}>
+              ⭐ 리뷰 작성하기
+            </ReviewButton>
+          </ReviewSection>
+        )}
+
+        {/* 리뷰 작성 완료 메시지 */}
+        {isCareRequestChat && careRequestStatus === 'COMPLETED' && isRequester && hasReview && (
+          <ReviewCompletedBanner>
+            ✓ 리뷰를 작성하셨습니다.
+          </ReviewCompletedBanner>
+        )}
+      </MiddleColumn>
 
       <InputContainer>
         <MessageForm onSubmit={handleSendMessage}>
@@ -847,8 +849,19 @@ export default ChatRoom;
 const Container = styled.div`
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1 1 0;
+  min-height: 0;
+  min-width: 0;
+  position: relative;
   background: ${({ theme }) => theme.colors.background};
+`;
+
+const MiddleColumn = styled.div`
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 `;
 
 const Header = styled.div`
@@ -998,6 +1011,7 @@ const CloseButton = styled.button`
 
 const MessagesContainer = styled.div`
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 16px;
   display: flex;
@@ -1090,6 +1104,10 @@ const MessageTime = styled.div`
 
 const InputContainer = styled.div`
   padding: ${({ theme }) => theme.spacing.md} ${({ theme }) => theme.spacing.lg};
+  padding-bottom: max(
+    ${({ theme }) => theme.spacing.md},
+    env(safe-area-inset-bottom, 0px)
+  );
   border-top: 1px solid ${({ theme }) => theme.colors.border};
   background: ${({ theme }) => theme.colors.surface};
   flex-shrink: 0;
@@ -1555,7 +1573,7 @@ const ReviewSubmitButton = styled.button`
 
 const ToastNotification = styled.div`
   position: absolute;
-  top: 60px;
+  top: calc(56px + 8px);
   left: 50%;
   transform: translateX(-50%);
   z-index: 100;
