@@ -15,7 +15,7 @@
 | DB | PostgreSQL |
 | 스케줄러 | APScheduler |
 | HTTP 클라이언트 | httpx (async) |
-| 인증 | API Key (`X-API-Key` 헤더) |
+| 인증 | API Key (`X-API-Key` 헤더, bcrypt 해싱) |
 | 환경변수 | python-dotenv |
 
 ---
@@ -69,6 +69,12 @@ pet-data-api/
 | notice_date | DATE | 공고일 |
 | collected_at | TIMESTAMP | 수집 시각 |
 
+**인덱스 전략:**
+- `notice_no` — UNIQUE 인덱스 (upsert 기준키, 중복 방지)
+- `(region, status)` — 복합 인덱스 (목록 필터 쿼리 핵심 경로)
+- `notice_date` — 단일 인덱스 (날짜 범위 조회, 통계 집계)
+- `animal_type` — 단일 인덱스 (종류 필터)
+
 ### `daily_region_stats`
 | 컬럼 | 타입 | 설명 |
 |------|------|------|
@@ -79,7 +85,23 @@ pet-data-api/
 | adopted_count | INT | 입양 수 |
 | euthanized_count | INT | 안락사 수 |
 
+**인덱스 전략:**
+- `(region, date)` — UNIQUE 복합 인덱스 (upsert 기준키, 통계 조회 핵심 경로)
+- `date` — 단일 인덱스 (월별 추이 쿼리)
+
 > Petory의 DailyStatistics 배치 집계 패턴과 동일한 개념.
+
+### `collection_logs`
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| id | SERIAL PK | |
+| source | VARCHAR | 수집 대상 API 이름 |
+| status | VARCHAR | success / partial / failed |
+| total_fetched | INT | 공공API에서 받아온 건수 |
+| total_saved | INT | 실제 DB 저장 건수 |
+| error_message | TEXT | 실패 시 에러 내용 |
+| started_at | TIMESTAMP | |
+| finished_at | TIMESTAMP | |
 
 ---
 
@@ -95,23 +117,55 @@ pet-data-api/
 
 모든 엔드포인트에 `X-API-Key` 헤더 필수.
 
+### 페이지네이션
+`GET /animals` — offset 기반 페이지네이션:
+- 파라미터: `limit` (기본 20, 최대 100), `offset` (기본 0)
+- 응답에 `total_count`, `limit`, `offset` 포함
+- 이유: 유기동물 데이터는 공고번호 기준 upsert라 cursor 기반보다 offset이 단순하고 충분함
+
 ---
 
 ## 수집 스케줄
 
 - **실행 시각:** 매일 오후 7시
-- **방식:** APScheduler → 공공API 호출 → DB upsert (notice_no 기준)
-- **실패 처리:** httpx 자동 재시도 3회 → 실패 시 로그 기록, 기존 DB 데이터 보존
+- **방식:** APScheduler → 공공API 호출 → DB upsert → 통계 집계 순차 실행
+- **중복 실행 방지:** APScheduler `max_instances=1` 설정으로 동시 실행 차단
+
+### 통계 업데이트 전략
+수집 완료 후 즉시 `daily_region_stats` 재집계:
+- 오늘 날짜 기준으로 `abandoned_animals`를 region별 GROUP BY 집계
+- `INSERT ... ON CONFLICT (region, date) DO UPDATE` — 멱등성 보장
+- 수집 실패 시 통계 집계 건너뜀 (기존 통계 보존)
+
+---
+
+## 실패 처리
+
+### 수집기 실패 처리
+1. httpx 자동 재시도 3회 (지수 백오프: 1s → 2s → 4s)
+2. 3회 모두 실패 → `collection_logs`에 `status=failed` 기록, 기존 DB 데이터 보존
+3. 부분 성공 허용: 1000건 중 800건 저장 성공 시 `status=partial`로 기록
+4. 수동 재수집: `POST /collect/trigger`로 언제든 재실행 가능
+
+### 트랜잭션 처리
+- upsert는 건별 트랜잭션이 아닌 배치 단위 트랜잭션 (1회 수집 = 1 트랜잭션)
+- 배치 트랜잭션 실패 시 전체 롤백 → 부분 저장 방지
+- 통계 집계는 별도 트랜잭션 (수집과 독립)
 
 ---
 
 ## 인증
 
-API Key 두 종류:
-- **일반 키** (`API_KEY`) — 조회/통계 엔드포인트 접근 가능
-- **관리자 키** (`ADMIN_API_KEY`) — `/collect/trigger` 등 관리 엔드포인트 추가 접근
+### API Key 구조
+두 종류의 키:
+- **일반 키** — 조회/통계 엔드포인트 접근
+- **관리자 키** — 모든 엔드포인트 접근 (`/collect/trigger` 포함)
 
-키는 `.env`에 저장, FastAPI 의존성 주입으로 검증.
+### 보안 처리
+- 키는 `secrets.token_hex(32)`로 생성 (64자 랜덤 hex)
+- DB에 bcrypt 해싱 후 저장 (평문 저장 금지)
+- 요청마다 `bcrypt.checkpw()`로 검증
+- FastAPI 의존성 주입(`Depends`)으로 엔드포인트별 권한 분리
 
 ---
 
@@ -119,8 +173,8 @@ API Key 두 종류:
 
 | 코드 | 상황 |
 |------|------|
-| 400 | 잘못된 파라미터 |
+| 400 | 잘못된 파라미터 (limit > 100 등) |
 | 401 | API Key 없거나 틀림 |
 | 403 | 일반 키로 관리자 전용 엔드포인트 접근 |
 | 404 | 해당 ID 없음 |
-| 500 | 공공API 호출 실패 |
+| 500 | 공공API 호출 실패 또는 DB 오류 |
