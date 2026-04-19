@@ -66,16 +66,17 @@ export default ScrollToTopBottom;
 
 const ButtonContainer = styled.div`
   position: fixed;
-  bottom: 20px;
+  bottom: calc(24px + 56px + 12px);
   right: 20px;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  z-index: 999;
+  z-index: 998;
 
   @media (max-width: 768px) {
-    bottom: 16px;
-    right: 16px;
+    bottom: calc(60px + 16px + env(safe-area-inset-bottom, 0px));
+    left: max(16px, env(safe-area-inset-left, 0px));
+    right: auto;
     gap: 6px;
   }
 `;

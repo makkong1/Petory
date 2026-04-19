@@ -79,6 +79,7 @@ const ModalContainer = styled.div`
   right: 0;
   height: 80vh;
   max-height: 800px;
+  min-height: 0;
   background: ${({ theme }) => theme.colors.background};
   border-radius: 16px 16px 0 0;
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
@@ -86,6 +87,19 @@ const ModalContainer = styled.div`
   display: flex;
   flex-direction: column;
   animation: slideUp 0.3s ease;
+
+  @media (max-width: 768px) {
+    /* 하단 탭바(60px) 위에 붙여 입력창·탭과 겹침 방지 */
+    bottom: calc(60px + env(safe-area-inset-bottom, 0px));
+    height: min(85vh, calc(100vh - 120px));
+    height: min(
+      85vh,
+      calc(100dvh - 60px - env(safe-area-inset-bottom, 0px) - env(safe-area-inset-top, 0px))
+    );
+    max-height: calc(100vh - 68px - env(safe-area-inset-bottom, 0px));
+    max-height: calc(100dvh - 68px - env(safe-area-inset-bottom, 0px));
+    overflow: hidden;
+  }
   
   @keyframes slideUp {
     from {
@@ -162,6 +176,7 @@ const CloseButton = styled.button`
 
 const ModalBody = styled.div`
   flex: 1;
+  min-height: 0;
   overflow: hidden;
   display: flex;
   flex-direction: column;

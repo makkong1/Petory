@@ -39,8 +39,8 @@ const FloatingButton = styled.button`
   }
 
   @media (max-width: 768px) {
-    bottom: 80px;
-    right: 16px;
+    bottom: calc(60px + 16px + env(safe-area-inset-bottom, 0px));
+    right: max(16px, env(safe-area-inset-right, 0px));
     width: 52px;
     height: 52px;
   }
