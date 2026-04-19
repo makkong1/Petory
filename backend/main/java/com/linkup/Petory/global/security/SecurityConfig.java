@@ -69,6 +69,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/uploads/**").permitAll() // 업로드 파일 공개 조회
                         .requestMatchers("/api/geocoding/**").permitAll() // 지오코딩 API 공개 접근 허용
                         .requestMatchers("/error").permitAll() // 에러 페이지
+                        .requestMatchers("/actuator/**").permitAll()   // 모니터링 엔드포인트 (로컬 전용)
+                        .requestMatchers("/admin-ui/**").permitAll()   // Spring Boot Admin UI (로컬 전용)
                         .requestMatchers("/ws/**", "/chat/**").permitAll() // WebSocket 엔드포인트 (인증은 인터셉터에서 처리)
                         // MASTER 전용 API - 최상위 권한만 접근 가능
                         .requestMatchers("/api/master/**").hasRole("MASTER")
