@@ -19,11 +19,13 @@ public class JpaCareApplicationAdapter implements CareApplicationRepository {
 
     private final SpringDataJpaCareApplicationRepository jpaRepository;
 
+    @SuppressWarnings("null")
     @Override
     public CareApplication saveAndFlush(CareApplication careApplication) {
         return jpaRepository.saveAndFlush(careApplication);
     }
 
+    @SuppressWarnings("null")
     @Override
     public Optional<CareApplication> findById(Long id) {
         return jpaRepository.findById(id);

@@ -21,21 +21,25 @@ public class JpaDailyStatisticsAdapter implements DailyStatisticsRepository {
 
     private final SpringDataJpaDailyStatisticsRepository jpaRepository;
 
+    @SuppressWarnings("null")
     @Override
     public DailyStatistics save(DailyStatistics dailyStatistics) {
         return jpaRepository.save(dailyStatistics);
     }
 
+    @SuppressWarnings("null")
     @Override
     public Optional<DailyStatistics> findById(Long id) {
         return jpaRepository.findById(id);
     }
 
+    @SuppressWarnings("null")
     @Override
     public void delete(DailyStatistics dailyStatistics) {
         jpaRepository.delete(dailyStatistics);
     }
 
+    @SuppressWarnings("null")
     @Override
     public void deleteById(Long id) {
         jpaRepository.deleteById(id);

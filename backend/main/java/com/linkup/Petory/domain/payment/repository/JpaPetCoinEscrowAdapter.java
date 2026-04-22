@@ -20,6 +20,7 @@ public class JpaPetCoinEscrowAdapter implements PetCoinEscrowRepository {
 
     private final SpringDataJpaPetCoinEscrowRepository jpaRepository;
 
+    @SuppressWarnings("null")
     @Override
     public PetCoinEscrow save(PetCoinEscrow escrow) {
         return jpaRepository.save(escrow);

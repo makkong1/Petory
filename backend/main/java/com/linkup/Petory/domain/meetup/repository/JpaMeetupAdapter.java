@@ -25,11 +25,13 @@ public class JpaMeetupAdapter implements MeetupRepository {
 
     private final SpringDataJpaMeetupRepository jpaRepository;
 
+    @SuppressWarnings("null")
     @Override
     public Meetup save(Meetup meetup) {
         return jpaRepository.save(meetup);
     }
 
+    @SuppressWarnings("null")
     @Override
     public Optional<Meetup> findById(Long id) {
         return jpaRepository.findById(id);
@@ -119,4 +121,3 @@ public class JpaMeetupAdapter implements MeetupRepository {
         return jpaRepository.completePastMeetups(now, MeetupStatus.COMPLETED);
     }
 }
-

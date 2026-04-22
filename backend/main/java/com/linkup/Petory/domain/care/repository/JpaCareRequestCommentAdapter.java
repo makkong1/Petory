@@ -22,11 +22,13 @@ public class JpaCareRequestCommentAdapter implements CareRequestCommentRepositor
 
     private final SpringDataJpaCareRequestCommentRepository jpaRepository;
 
+    @SuppressWarnings("null")
     @Override
     public CareRequestComment save(CareRequestComment comment) {
         return jpaRepository.save(comment);
     }
 
+    @SuppressWarnings("null")
     @Override
     public Optional<CareRequestComment> findById(Long id) {
         return jpaRepository.findById(id);

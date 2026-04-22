@@ -1,18 +1,18 @@
 package com.linkup.Petory.domain.user.repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
-import java.time.LocalDateTime;
 
 import org.springframework.context.annotation.Primary;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
 import com.linkup.Petory.domain.user.entity.Role;
 import com.linkup.Petory.domain.user.entity.Users;
 
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import lombok.RequiredArgsConstructor;
 
 /**
@@ -34,11 +34,13 @@ public class JpaUsersAdapter implements UsersRepository {
 
     private final SpringDataJpaUsersRepository jpaRepository;
 
+    @SuppressWarnings("null")
     @Override
     public Users save(Users user) {
         return jpaRepository.save(user);
     }
 
+    @SuppressWarnings("null")
     @Override
     public Optional<Users> findById(Long id) {
         return jpaRepository.findById(id);
@@ -49,11 +51,13 @@ public class JpaUsersAdapter implements UsersRepository {
         return jpaRepository.findAll();
     }
 
+    @SuppressWarnings("null")
     @Override
     public Page<Users> findAll(Pageable pageable) {
         return jpaRepository.findAll(pageable);
     }
 
+    @SuppressWarnings("null")
     @Override
     public void deleteById(Long id) {
         jpaRepository.deleteById(id);

@@ -33,125 +33,126 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class ChatWebSocketController {
 
-    private final ChatMessageService chatMessageService;
-    private final SimpMessagingTemplate messagingTemplate;
-    private final UsersRepository usersRepository;
+        private final ChatMessageService chatMessageService;
+        private final SimpMessagingTemplate messagingTemplate;
+        private final UsersRepository usersRepository;
 
-    /**
-     * 메시지 전송
-     * 클라이언트: /app/chat.send
-     * 
-     * @param messageRequest 메시지 요청 DTO (conversationIdx 포함)
-     * @param principal      인증된 사용자 (WebSocket 인증 인터셉터에서 설정)
-     */
-    @MessageMapping("/chat.send")
-    public void sendMessage(
-            @Payload ChatWebSocketMessageRequest messageRequest,
-            Principal principal) {
+        /**
+         * 메시지 전송
+         * 클라이언트: /app/chat.send
+         * 
+         * @param messageRequest 메시지 요청 DTO (conversationIdx 포함)
+         * @param principal      인증된 사용자 (WebSocket 인증 인터셉터에서 설정)
+         */
+        @SuppressWarnings("null")
+        @MessageMapping("/chat.send")
+        public void sendMessage(
+                        @Payload ChatWebSocketMessageRequest messageRequest,
+                        Principal principal) {
 
-        try {
-            // 사용자 ID 추출 (principal.getName()은 로그인 ID를 반환하므로 Users 테이블에서 조회)
-            String loginId = principal.getName();
-            Long senderIdx = usersRepository.findByIdString(loginId)
-                    .orElseThrow(() -> new UserNotFoundException("사용자를 찾을 수 없습니다: " + loginId))
-                    .getIdx();
-            Long conversationIdx = messageRequest.getConversationIdx();
+                try {
+                        // 사용자 ID 추출 (principal.getName()은 로그인 ID를 반환하므로 Users 테이블에서 조회)
+                        String loginId = principal.getName();
+                        Long senderIdx = usersRepository.findByIdString(loginId)
+                                        .orElseThrow(() -> new UserNotFoundException("사용자를 찾을 수 없습니다: " + loginId))
+                                        .getIdx();
+                        Long conversationIdx = messageRequest.getConversationIdx();
 
-            log.info("WebSocket 메시지 전송: conversationIdx={}, senderIdx={}, content={}",
-                    conversationIdx, senderIdx, messageRequest.getContent());
+                        log.info("WebSocket 메시지 전송: conversationIdx={}, senderIdx={}, content={}",
+                                        conversationIdx, senderIdx, messageRequest.getContent());
 
-            // 메시지 타입 파싱
-            MessageType messageType = messageRequest.getMessageType() != null
-                    ? MessageType.valueOf(messageRequest.getMessageType())
-                    : MessageType.TEXT;
+                        // 메시지 타입 파싱
+                        MessageType messageType = messageRequest.getMessageType() != null
+                                        ? MessageType.valueOf(messageRequest.getMessageType())
+                                        : MessageType.TEXT;
 
-            // 메시지 전송 (서비스 호출)
-            ChatMessageDTO messageDTO = chatMessageService.sendMessage(
-                    conversationIdx,
-                    senderIdx,
-                    messageRequest.getContent(),
-                    messageType);
+                        // 메시지 전송 (서비스 호출)
+                        ChatMessageDTO messageDTO = chatMessageService.sendMessage(
+                                        conversationIdx,
+                                        senderIdx,
+                                        messageRequest.getContent(),
+                                        messageType);
 
-            // 채팅방 참여자들에게 브로드캐스트
-            messagingTemplate.convertAndSend(
-                    "/topic/conversation/" + conversationIdx,
-                    messageDTO);
+                        // 채팅방 참여자들에게 브로드캐스트
+                        messagingTemplate.convertAndSend(
+                                        "/topic/conversation/" + conversationIdx,
+                                        messageDTO);
 
-        } catch (UserNotFoundException | IllegalArgumentException | ChatForbiddenException
-                | ConversationNotFoundException | MessagingException | DataAccessException e) {
-            log.error("WebSocket 메시지 전송 실패: {}", e.getMessage(), e);
+                } catch (UserNotFoundException | IllegalArgumentException | ChatForbiddenException
+                                | ConversationNotFoundException | MessagingException | DataAccessException e) {
+                        log.error("WebSocket 메시지 전송 실패: {}", e.getMessage(), e);
 
-            // 에러 메시지 전송
-            ChatMessageDTO errorMessage = new ChatMessageDTO();
-            errorMessage.setContent("메시지 전송에 실패했습니다: " + e.getMessage());
-            messagingTemplate.convertAndSend(
-                    "/user/" + principal.getName() + "/queue/errors",
-                    errorMessage);
+                        // 에러 메시지 전송
+                        ChatMessageDTO errorMessage = new ChatMessageDTO();
+                        errorMessage.setContent("메시지 전송에 실패했습니다: " + e.getMessage());
+                        messagingTemplate.convertAndSend(
+                                        "/user/" + principal.getName() + "/queue/errors",
+                                        errorMessage);
+                }
         }
-    }
 
-    /**
-     * 메시지 읽음 처리
-     * 클라이언트: /app/chat.read
-     */
-    @MessageMapping("/chat.read")
-    public void markAsRead(
-            @Payload ChatWebSocketReadRequest readRequest,
-            Principal principal) {
+        /**
+         * 메시지 읽음 처리
+         * 클라이언트: /app/chat.read
+         */
+        @MessageMapping("/chat.read")
+        public void markAsRead(
+                        @Payload ChatWebSocketReadRequest readRequest,
+                        Principal principal) {
 
-        try {
-            // 사용자 ID 추출
-            String loginId = principal.getName();
-            Long userId = usersRepository.findByIdString(loginId)
-                    .orElseThrow(() -> new UserNotFoundException("사용자를 찾을 수 없습니다: " + loginId))
-                    .getIdx();
+                try {
+                        // 사용자 ID 추출
+                        String loginId = principal.getName();
+                        Long userId = usersRepository.findByIdString(loginId)
+                                        .orElseThrow(() -> new UserNotFoundException("사용자를 찾을 수 없습니다: " + loginId))
+                                        .getIdx();
 
-            log.info("WebSocket 읽음 처리: conversationIdx={}, userId={}",
-                    readRequest.getConversationIdx(), userId);
+                        log.info("WebSocket 읽음 처리: conversationIdx={}, userId={}",
+                                        readRequest.getConversationIdx(), userId);
 
-            // 읽음 처리
-            chatMessageService.markAsRead(
-                    readRequest.getConversationIdx(),
-                    userId,
-                    readRequest.getLastMessageIdx());
+                        // 읽음 처리
+                        chatMessageService.markAsRead(
+                                        readRequest.getConversationIdx(),
+                                        userId,
+                                        readRequest.getLastMessageIdx());
 
-            // 다른 참여자에게 읽음 상태 알림 (선택사항)
-            // messagingTemplate.convertAndSend(
-            // "/topic/conversation/" + readRequest.getConversationIdx() + "/read",
-            // new ReadStatusDTO(userId, readRequest.getLastMessageIdx()));
+                        // 다른 참여자에게 읽음 상태 알림 (선택사항)
+                        // messagingTemplate.convertAndSend(
+                        // "/topic/conversation/" + readRequest.getConversationIdx() + "/read",
+                        // new ReadStatusDTO(userId, readRequest.getLastMessageIdx()));
 
-        } catch (UserNotFoundException | ChatForbiddenException | DataAccessException e) {
-            log.error("WebSocket 읽음 처리 실패: {}", e.getMessage(), e);
+                } catch (UserNotFoundException | ChatForbiddenException | DataAccessException e) {
+                        log.error("WebSocket 읽음 처리 실패: {}", e.getMessage(), e);
+                }
         }
-    }
 
-    /**
-     * 타이핑 표시 (선택사항)
-     * 클라이언트: /app/chat.typing
-     */
-    @MessageMapping("/chat.typing")
-    public void typing(
-            @Payload ChatWebSocketTypingRequest typingRequest,
-            Principal principal) {
+        /**
+         * 타이핑 표시 (선택사항)
+         * 클라이언트: /app/chat.typing
+         */
+        @MessageMapping("/chat.typing")
+        public void typing(
+                        @Payload ChatWebSocketTypingRequest typingRequest,
+                        Principal principal) {
 
-        try {
-            // 사용자 ID 추출
-            String loginId = principal.getName();
-            Long userId = usersRepository.findByIdString(loginId)
-                    .orElseThrow(() -> new UserNotFoundException("사용자를 찾을 수 없습니다: " + loginId))
-                    .getIdx();
+                try {
+                        // 사용자 ID 추출
+                        String loginId = principal.getName();
+                        Long userId = usersRepository.findByIdString(loginId)
+                                        .orElseThrow(() -> new UserNotFoundException("사용자를 찾을 수 없습니다: " + loginId))
+                                        .getIdx();
 
-            log.debug("WebSocket 타이핑: conversationIdx={}, userId={}, isTyping={}",
-                    typingRequest.getConversationIdx(), userId, typingRequest.isTyping());
+                        log.debug("WebSocket 타이핑: conversationIdx={}, userId={}, isTyping={}",
+                                        typingRequest.getConversationIdx(), userId, typingRequest.isTyping());
 
-            // 다른 참여자에게 타이핑 상태 브로드캐스트 (본인 제외)
-            messagingTemplate.convertAndSend(
-                    "/topic/conversation/" + typingRequest.getConversationIdx() + "/typing",
-                    new TypingStatusDTO(userId, typingRequest.isTyping()));
+                        // 다른 참여자에게 타이핑 상태 브로드캐스트 (본인 제외)
+                        messagingTemplate.convertAndSend(
+                                        "/topic/conversation/" + typingRequest.getConversationIdx() + "/typing",
+                                        new TypingStatusDTO(userId, typingRequest.isTyping()));
 
-        } catch (UserNotFoundException | MessagingException | DataAccessException e) {
-            log.error("WebSocket 타이핑 처리 실패: {}", e.getMessage(), e);
+                } catch (UserNotFoundException | MessagingException | DataAccessException e) {
+                        log.error("WebSocket 타이핑 처리 실패: {}", e.getMessage(), e);
+                }
         }
-    }
 
 }

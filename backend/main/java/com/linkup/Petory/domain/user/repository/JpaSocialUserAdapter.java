@@ -30,6 +30,7 @@ public class JpaSocialUserAdapter implements SocialUserRepository {
 
     private final SpringDataJpaSocialUserRepository jpaRepository;
 
+    @SuppressWarnings("null")
     @Override
     public SocialUser save(SocialUser socialUser) {
         return jpaRepository.save(socialUser);
@@ -40,6 +41,7 @@ public class JpaSocialUserAdapter implements SocialUserRepository {
         return jpaRepository.findAll();
     }
 
+    @SuppressWarnings("null")
     @Override
     public void deleteById(Long id) {
         jpaRepository.deleteById(id);
@@ -50,4 +52,3 @@ public class JpaSocialUserAdapter implements SocialUserRepository {
         return jpaRepository.findByProviderAndProviderId(provider, providerId);
     }
 }
-

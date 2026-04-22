@@ -20,6 +20,7 @@ public class JpaLocationServiceReviewAdapter implements LocationServiceReviewRep
 
     private final SpringDataJpaLocationServiceReviewRepository jpaRepository;
 
+    @SuppressWarnings("null")
     @Override
     public LocationServiceReview save(LocationServiceReview review) {
         return jpaRepository.save(review);

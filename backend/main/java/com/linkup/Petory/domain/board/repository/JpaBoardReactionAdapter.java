@@ -6,10 +6,10 @@ import java.util.Optional;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Repository;
 
-import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.board.entity.Board;
 import com.linkup.Petory.domain.board.entity.BoardReaction;
 import com.linkup.Petory.domain.board.entity.ReactionType;
+import com.linkup.Petory.domain.user.entity.Users;
 
 import lombok.RequiredArgsConstructor;
 
@@ -23,11 +23,13 @@ public class JpaBoardReactionAdapter implements BoardReactionRepository {
 
     private final SpringDataJpaBoardReactionRepository jpaRepository;
 
+    @SuppressWarnings("null")
     @Override
     public BoardReaction save(BoardReaction reaction) {
         return jpaRepository.save(reaction);
     }
 
+    @SuppressWarnings("null")
     @Override
     public void delete(BoardReaction reaction) {
         jpaRepository.delete(reaction);
@@ -54,4 +56,3 @@ public class JpaBoardReactionAdapter implements BoardReactionRepository {
         return jpaRepository.countByBoardsAndReactionType(boardIds, reactionType);
     }
 }
-

@@ -23,11 +23,13 @@ public class JpaAttachmentFileAdapter implements AttachmentFileRepository {
 
     private final SpringDataJpaAttachmentFileRepository jpaRepository;
 
+    @SuppressWarnings("null")
     @Override
     public AttachmentFile save(AttachmentFile attachmentFile) {
         return jpaRepository.save(attachmentFile);
     }
 
+    @SuppressWarnings("null")
     @Override
     public Optional<AttachmentFile> findById(Long id) {
         return jpaRepository.findById(id);
@@ -43,11 +45,13 @@ public class JpaAttachmentFileAdapter implements AttachmentFileRepository {
         return jpaRepository.count();
     }
 
+    @SuppressWarnings("null")
     @Override
     public void delete(AttachmentFile attachmentFile) {
         jpaRepository.delete(attachmentFile);
     }
 
+    @SuppressWarnings("null")
     @Override
     public void deleteById(Long id) {
         jpaRepository.deleteById(id);
@@ -73,4 +77,3 @@ public class JpaAttachmentFileAdapter implements AttachmentFileRepository {
         return jpaRepository.findAllForAdmin(targetType, keyword, pageable);
     }
 }
-

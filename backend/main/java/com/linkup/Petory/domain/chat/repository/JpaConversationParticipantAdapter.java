@@ -23,21 +23,25 @@ public class JpaConversationParticipantAdapter implements ConversationParticipan
 
     private final SpringDataJpaConversationParticipantRepository jpaRepository;
 
+    @SuppressWarnings("null")
     @Override
     public ConversationParticipant save(ConversationParticipant participant) {
         return jpaRepository.save(participant);
     }
 
+    @SuppressWarnings("null")
     @Override
     public Optional<ConversationParticipant> findById(Long id) {
         return jpaRepository.findById(id);
     }
 
+    @SuppressWarnings("null")
     @Override
     public void delete(ConversationParticipant participant) {
         jpaRepository.delete(participant);
     }
 
+    @SuppressWarnings("null")
     @Override
     public void deleteById(Long id) {
         jpaRepository.deleteById(id);
@@ -117,9 +121,9 @@ public class JpaConversationParticipantAdapter implements ConversationParticipan
         return jpaRepository.findParticipantsByConversationIdxsAndStatus(conversationIdxs, status);
     }
 
+    @SuppressWarnings("null")
     @Override
     public void deleteAllInBatch(List<ConversationParticipant> participants) {
         jpaRepository.deleteAllInBatch(participants);
     }
 }
-

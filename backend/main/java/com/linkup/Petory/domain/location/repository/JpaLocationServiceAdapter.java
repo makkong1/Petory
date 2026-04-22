@@ -20,16 +20,19 @@ public class JpaLocationServiceAdapter implements LocationServiceRepository {
 
     private final SpringDataJpaLocationServiceRepository jpaRepository;
 
+    @SuppressWarnings("null")
     @Override
     public LocationService save(LocationService locationService) {
         return jpaRepository.save(locationService);
     }
 
+    @SuppressWarnings("null")
     @Override
     public List<LocationService> saveAll(List<LocationService> locationServices) {
         return jpaRepository.saveAll(locationServices);
     }
 
+    @SuppressWarnings("null")
     @Override
     public Optional<LocationService> findById(Long id) {
         return jpaRepository.findById(id);

@@ -46,17 +46,25 @@ public class ActivityService {
                                 .orElseThrow(UserNotFoundException::new);
 
                 return Stream.of(
-                                careRequestRepository.findByUserAndIsDeletedFalseOrderByCreatedAtDesc(user).stream().map(activityConverter::toActivityDto),
-                                boardRepository.findByUserAndIsDeletedFalseOrderByCreatedAtDesc(user).stream().map(activityConverter::toActivityDto),
-                                missingPetBoardRepository.findByUserAndIsDeletedFalseOrderByCreatedAtDesc(user).stream().map(activityConverter::toActivityDto),
-                                careRequestCommentRepository.findByUserAndIsDeletedFalseOrderByCreatedAtDesc(user).stream().map(activityConverter::toActivityDto),
-                                commentRepository.findByUserAndIsDeletedFalseOrderByCreatedAtDesc(user).stream().map(activityConverter::toActivityDto),
-                                missingPetCommentRepository.findByUserAndIsDeletedFalseOrderByCreatedAtDesc(user).stream().map(activityConverter::toActivityDto))
+                                careRequestRepository.findByUserAndIsDeletedFalseOrderByCreatedAtDesc(user).stream()
+                                                .map(activityConverter::toActivityDto),
+                                boardRepository.findByUserAndIsDeletedFalseOrderByCreatedAtDesc(user).stream()
+                                                .map(activityConverter::toActivityDto),
+                                missingPetBoardRepository.findByUserAndIsDeletedFalseOrderByCreatedAtDesc(user).stream()
+                                                .map(activityConverter::toActivityDto),
+                                careRequestCommentRepository.findByUserAndIsDeletedFalseOrderByCreatedAtDesc(user)
+                                                .stream().map(activityConverter::toActivityDto),
+                                commentRepository.findByUserAndIsDeletedFalseOrderByCreatedAtDesc(user).stream()
+                                                .map(activityConverter::toActivityDto),
+                                missingPetCommentRepository.findByUserAndIsDeletedFalseOrderByCreatedAtDesc(user)
+                                                .stream().map(activityConverter::toActivityDto))
                                 .flatMap(s -> s)
-                                .sorted(Comparator.comparing(ActivityDTO::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                                .sorted(Comparator.comparing(ActivityDTO::getCreatedAt,
+                                                Comparator.nullsLast(Comparator.reverseOrder())))
                                 .toList();
         }
 
+        @SuppressWarnings("null")
         public ActivityPageResponseDTO getUserActivitiesWithPaging(long userId, String filter, int page, int size) {
                 List<ActivityDTO> allActivities = getUserActivities(userId);
                 List<ActivityDTO> filteredActivities = filterActivities(allActivities, filter);
@@ -64,9 +72,12 @@ public class ActivityService {
                 long allCount = allActivities.size();
                 long postsCount = 0, commentsCount = 0, reviewsCount = 0;
                 for (ActivityDTO a : allActivities) {
-                        if (isPostType(a.getType())) postsCount++;
-                        else if (isCommentType(a.getType())) commentsCount++;
-                        else if ("LOCATION_REVIEW".equals(a.getType())) reviewsCount++;
+                        if (isPostType(a.getType()))
+                                postsCount++;
+                        else if (isCommentType(a.getType()))
+                                commentsCount++;
+                        else if ("LOCATION_REVIEW".equals(a.getType()))
+                                reviewsCount++;
                 }
 
                 Pageable pageable = PageRequest.of(page, size);
@@ -98,22 +109,18 @@ public class ActivityService {
                         return activities;
                 }
 
-                switch (filter) {
-                        case "POSTS":
-                                return activities.stream()
-                                                .filter(a -> isPostType(a.getType()))
-                                                .toList();
-                        case "COMMENTS":
-                                return activities.stream()
-                                                .filter(a -> isCommentType(a.getType()))
-                                                .toList();
-                        case "REVIEWS":
-                                return activities.stream()
-                                                .filter(a -> "LOCATION_REVIEW".equals(a.getType()))
-                                                .toList();
-                        default:
-                                return activities;
-                }
+                return switch (filter) {
+                        case "POSTS" -> activities.stream()
+                                        .filter(a -> isPostType(a.getType()))
+                                        .toList();
+                        case "COMMENTS" -> activities.stream()
+                                        .filter(a -> isCommentType(a.getType()))
+                                        .toList();
+                        case "REVIEWS" -> activities.stream()
+                                        .filter(a -> "LOCATION_REVIEW".equals(a.getType()))
+                                        .toList();
+                        default -> activities;
+                };
         }
 
         private boolean isPostType(String type) {

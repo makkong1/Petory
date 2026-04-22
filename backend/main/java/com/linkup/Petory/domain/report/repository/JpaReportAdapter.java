@@ -23,28 +23,33 @@ public class JpaReportAdapter implements ReportRepository {
 
     private final SpringDataJpaReportRepository jpaRepository;
 
+    @SuppressWarnings("null")
     @Override
     public Report save(Report report) {
         return jpaRepository.save(report);
     }
 
+    @SuppressWarnings("null")
     @Override
     public Optional<Report> findById(Long id) {
         return jpaRepository.findById(id);
     }
 
+    @SuppressWarnings("null")
     @Override
     public void delete(Report report) {
         jpaRepository.delete(report);
     }
 
+    @SuppressWarnings("null")
     @Override
     public void deleteById(Long id) {
         jpaRepository.deleteById(id);
     }
 
     @Override
-    public boolean existsByTargetTypeAndTargetIdxAndReporterIdx(ReportTargetType targetType, Long targetIdx, Long reporterIdx) {
+    public boolean existsByTargetTypeAndTargetIdxAndReporterIdx(ReportTargetType targetType, Long targetIdx,
+            Long reporterIdx) {
         return jpaRepository.existsByTargetTypeAndTargetIdxAndReporterIdx(targetType, targetIdx, reporterIdx);
     }
 
@@ -64,7 +69,8 @@ public class JpaReportAdapter implements ReportRepository {
     }
 
     @Override
-    public List<Report> findByTargetTypeAndStatusOrderByCreatedAtDesc(ReportTargetType targetType, ReportStatus status) {
+    public List<Report> findByTargetTypeAndStatusOrderByCreatedAtDesc(ReportTargetType targetType,
+            ReportStatus status) {
         return jpaRepository.findByTargetTypeAndStatusOrderByCreatedAtDesc(targetType, status);
     }
 
@@ -83,4 +89,3 @@ public class JpaReportAdapter implements ReportRepository {
         return jpaRepository.countByStatusAndUpdatedAtBetween(status, start, end);
     }
 }
-

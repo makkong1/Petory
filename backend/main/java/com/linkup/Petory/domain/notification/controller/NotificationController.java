@@ -85,6 +85,7 @@ public class NotificationController {
      * 참고: EventSource는 헤더에 토큰을 보낼 수 없으므로,
      * SecurityConfig에서 이 엔드포인트는 쿼리 파라미터의 토큰으로 인증하도록 설정됨
      */
+    @SuppressWarnings({ "null", "UseSpecificCatch" })
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamNotifications(@RequestParam Long userId) {
         log.info("SSE 연결 요청: userId={}", userId);

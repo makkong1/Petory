@@ -1,6 +1,10 @@
 package com.linkup.Petory.domain.location.service;
 
-import lombok.extern.slf4j.Slf4j;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
@@ -8,10 +12,7 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.util.UriComponentsBuilder;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * 네이버맵 API 서비스
@@ -20,8 +21,8 @@ import java.util.stream.Collectors;
 @Service
 public class NaverMapService {
 
-    private static final ParameterizedTypeReference<Map<String, Object>> MAP_TYPE =
-            new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<Map<String, Object>> MAP_TYPE = new ParameterizedTypeReference<>() {
+    };
 
     @Value("${naver.map.api.client-id:}")
     private String apiKeyId;
@@ -45,6 +46,7 @@ public class NaverMapService {
      * @param option   경로 옵션 (traoptimal=최적, trafast=최단, tracomfort=편한길)
      * @return 길찾기 결과
      */
+    @SuppressWarnings("UseSpecificCatch")
     public Map<String, Object> getDirections(double startLng, double startLat, double endLng, double endLat,
             String option) {
         try {
@@ -70,6 +72,7 @@ public class NaverMapService {
 
             log.debug("요청 URL: {}", url);
 
+            @SuppressWarnings("null")
             Map<String, Object> responseBody = restClient.get()
                     .uri(url)
                     .headers(h -> {
@@ -135,6 +138,7 @@ public class NaverMapService {
      * @param address 변환할 주소
      * @return 위도, 경도 정보가 담긴 배열 [latitude, longitude], 변환 실패 시 null
      */
+    @SuppressWarnings({ "null", "SizeReplaceableByIsEmpty", "UseSpecificCatch" })
     public Double[] addressToCoordinates(String address) {
         log.info("📍 [NaverMapService] addressToCoordinates 호출됨 - 주소: {}", address);
 
@@ -196,7 +200,9 @@ public class NaverMapService {
 
                         if (latitudeStr != null && longitudeStr != null) {
                             try {
+                                @SuppressWarnings("UnnecessaryTemporaryOnConversionFromString")
                                 Double latitude = Double.parseDouble(latitudeStr);
+                                @SuppressWarnings("UnnecessaryTemporaryOnConversionFromString")
                                 Double longitude = Double.parseDouble(longitudeStr);
                                 log.info("네이버맵 지오코딩 성공 - 좌표: ({}, {})", latitude, longitude);
                                 return new Double[] { latitude, longitude };
@@ -252,6 +258,7 @@ public class NaverMapService {
      * @param query 검색어 (주소 또는 장소명 일부)
      * @return 주소 결과 목록, 각 항목에 address/roadAddress/latitude/longitude 포함
      */
+    @SuppressWarnings({ "null", "UnnecessaryTemporaryOnConversionFromString", "UseSpecificCatch" })
     public List<Map<String, Object>> searchAddresses(String query) {
         if (query == null || query.trim().isEmpty()) {
             return List.of();
@@ -330,6 +337,7 @@ public class NaverMapService {
      * @param lng 경도
      * @return 주소 정보
      */
+    @SuppressWarnings({ "SizeReplaceableByIsEmpty", "UseSpecificCatch" })
     public Map<String, Object> coordinatesToAddress(double lat, double lng) {
         try {
             // API 키가 없으면 에러 반환
@@ -351,6 +359,7 @@ public class NaverMapService {
 
             log.info("🌐 [역지오코딩] 요청 URL: {}", url);
 
+            @SuppressWarnings("null")
             Map<String, Object> responseBody = restClient.get()
                     .uri(url)
                     .headers(h -> {

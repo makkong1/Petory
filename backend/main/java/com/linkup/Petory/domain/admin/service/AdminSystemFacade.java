@@ -1,15 +1,16 @@
 package com.linkup.Petory.domain.admin.service;
 
-import com.linkup.Petory.domain.admin.entity.SystemConfig;
-import com.linkup.Petory.domain.admin.repository.SystemConfigRepository;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import java.util.Map;
+import java.util.stream.Collectors;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
+import com.linkup.Petory.domain.admin.entity.SystemConfig;
+import com.linkup.Petory.domain.admin.repository.SystemConfigRepository;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service

@@ -20,6 +20,7 @@ public class JpaCareReviewAdapter implements CareReviewRepository {
 
     private final SpringDataJpaCareReviewRepository jpaRepository;
 
+    @SuppressWarnings("null")
     @Override
     public CareReview save(CareReview careReview) {
         return jpaRepository.save(careReview);
@@ -40,11 +41,13 @@ public class JpaCareReviewAdapter implements CareReviewRepository {
         return jpaRepository.existsByCareApplicationIdxAndReviewerIdx(careApplicationIdx, reviewerIdx);
     }
 
+    @SuppressWarnings("null")
     @Override
     public boolean existsById(Long idx) {
         return jpaRepository.existsById(idx);
     }
 
+    @SuppressWarnings("null")
     @Override
     public Optional<CareReview> findById(Long idx) {
         return jpaRepository.findById(idx);

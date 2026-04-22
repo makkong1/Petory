@@ -34,21 +34,25 @@ public class JpaBoardAdapter implements BoardRepository {
 
     private final SpringDataJpaBoardRepository jpaRepository;
 
+    @SuppressWarnings("null")
     @Override
     public Board save(Board board) {
         return jpaRepository.save(board);
     }
 
+    @SuppressWarnings("null")
     @Override
     public Board saveAndFlush(Board board) {
         return jpaRepository.saveAndFlush(board);
     }
 
+    @SuppressWarnings("null")
     @Override
     public List<Board> saveAll(List<Board> boards) {
         return jpaRepository.saveAll(boards);
     }
 
+    @SuppressWarnings("null")
     @Override
     public Optional<Board> findById(Long id) {
         return jpaRepository.findById(id);
@@ -59,21 +63,25 @@ public class JpaBoardAdapter implements BoardRepository {
         return jpaRepository.findByIdWithUser(id);
     }
 
+    @SuppressWarnings("null")
     @Override
     public boolean existsById(Long id) {
         return jpaRepository.existsById(id);
     }
 
+    @SuppressWarnings("null")
     @Override
     public void delete(Board board) {
         jpaRepository.delete(board);
     }
 
+    @SuppressWarnings("null")
     @Override
     public void deleteById(Long id) {
         jpaRepository.deleteById(id);
     }
 
+    @SuppressWarnings("null")
     @Override
     public Page<Board> findAll(Specification<Board> spec, Pageable pageable) {
         return jpaRepository.findAll(spec, pageable);
@@ -134,4 +142,3 @@ public class JpaBoardAdapter implements BoardRepository {
         return jpaRepository.findAllForAdmin();
     }
 }
-

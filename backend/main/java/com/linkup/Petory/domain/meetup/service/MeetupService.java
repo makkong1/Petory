@@ -28,7 +28,6 @@ import com.linkup.Petory.domain.meetup.entity.MeetupStatus;
 import com.linkup.Petory.domain.meetup.event.MeetupCreatedEvent;
 import com.linkup.Petory.domain.meetup.exception.MeetupConflictException;
 import com.linkup.Petory.domain.meetup.exception.MeetupForbiddenException;
-import com.linkup.Petory.global.exception.ApiException;
 import com.linkup.Petory.domain.meetup.exception.MeetupNotFoundException;
 import com.linkup.Petory.domain.meetup.exception.MeetupParticipantNotFoundException;
 import com.linkup.Petory.domain.meetup.exception.MeetupValidationException;
@@ -39,6 +38,7 @@ import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException;
 import com.linkup.Petory.domain.user.exception.UserNotFoundException;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
+import com.linkup.Petory.global.exception.ApiException;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -415,16 +415,19 @@ public class MeetupService {
     @Deprecated
     @Timed("getAvailableMeetups")
     public List<MeetupDTO> getAvailableMeetups() {
-        List<Meetup> meetups = meetupRepository.findAvailableMeetups(LocalDateTime.now(), MeetupStatus.RECRUITING, Pageable.unpaged());
+        List<Meetup> meetups = meetupRepository.findAvailableMeetups(LocalDateTime.now(), MeetupStatus.RECRUITING,
+                Pageable.unpaged());
         return converter.toDTOList(meetups);
     }
 
     /**
      * 참여 가능한 모임 슬라이스 (count 쿼리 없이 다음 페이지 여부만)
      */
+    @SuppressWarnings("null")
     @Timed("getAvailableMeetupsPaged")
     public Slice<MeetupDTO> getAvailableMeetups(Pageable pageable) {
-        List<Meetup> list = meetupRepository.findAvailableMeetups(LocalDateTime.now(), MeetupStatus.RECRUITING, pageable);
+        List<Meetup> list = meetupRepository.findAvailableMeetups(LocalDateTime.now(), MeetupStatus.RECRUITING,
+                pageable);
         List<MeetupDTO> dtos = converter.toDTOList(list);
         boolean hasNext = pageable.isPaged() && list.size() == pageable.getPageSize();
         return new SliceImpl<>(dtos, pageable, hasNext);

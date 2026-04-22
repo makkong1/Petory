@@ -23,6 +23,7 @@ public class JpaBoardPopularitySnapshotAdapter implements BoardPopularitySnapsho
 
     private final SpringDataJpaBoardPopularitySnapshotRepository jpaRepository;
 
+    @SuppressWarnings("null")
     @Override
     public List<BoardPopularitySnapshot> saveAll(List<BoardPopularitySnapshot> snapshots) {
         return jpaRepository.saveAll(snapshots);
@@ -37,6 +38,7 @@ public class JpaBoardPopularitySnapshotAdapter implements BoardPopularitySnapsho
                 periodType, periodStartDate, periodEndDate);
     }
 
+    @SuppressWarnings("null")
     @Override
     public List<BoardPopularitySnapshot> findAll(Specification<BoardPopularitySnapshot> spec, Sort sort) {
         return jpaRepository.findAll(spec, sort);
@@ -57,4 +59,3 @@ public class JpaBoardPopularitySnapshotAdapter implements BoardPopularitySnapsho
                 periodType, periodStartDate, periodEndDate);
     }
 }
-

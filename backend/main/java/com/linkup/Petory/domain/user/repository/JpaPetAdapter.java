@@ -30,11 +30,13 @@ public class JpaPetAdapter implements PetRepository {
 
     private final SpringDataJpaPetRepository jpaRepository;
 
+    @SuppressWarnings("null")
     @Override
     public Pet save(Pet pet) {
         return jpaRepository.save(pet);
     }
 
+    @SuppressWarnings("null")
     @Override
     public Optional<Pet> findById(Long id) {
         return jpaRepository.findById(id);

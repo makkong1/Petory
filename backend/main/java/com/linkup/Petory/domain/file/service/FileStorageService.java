@@ -87,6 +87,7 @@ public class FileStorageService {
     public Resource loadAsResource(String relativePath) {
         try {
             Path filePath = resolveStoragePath(relativePath);
+            @SuppressWarnings("null")
             Resource resource = new UrlResource(filePath.toUri());
             if (resource.exists() && resource.isReadable()) {
                 return resource;
