@@ -5,7 +5,6 @@ import java.util.List;
 
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import com.linkup.Petory.domain.care.entity.CareRequest;
 import com.linkup.Petory.domain.care.entity.CareRequestStatus;
@@ -37,9 +36,10 @@ public class CareRequestScheduler {
      * - 직접 상태 변경 대신 CareRequestService.updateStatus() 호출
      * - 에스크로 처리 로직이 포함된 서비스 메서드 사용
      * - 개별 요청별 예외 처리 추가
+     * 스케줄러 메서드에 @Transactional을 두지 않음 — 루프 전체를 한 TX로 묶으면
+     * updateStatus(에스크로 등)와 합쳐져 {@code UnexpectedRollbackException}이 날 수 있음.
      */
     @Scheduled(cron = "0 0 * * * ?") // 매 시간 정각에 실행
-    @Transactional
     public void updateExpiredCareRequests() {
         log.info("펫케어 요청 상태 자동 업데이트 시작");
 
@@ -87,7 +87,6 @@ public class CareRequestScheduler {
      * 위의 매시간 실행과 중복되지만, 더 정확한 처리를 위해 유지
      */
     @Scheduled(cron = "0 0 0 * * ?") // 매일 자정에 실행
-    @Transactional
     public void updateExpiredCareRequestsDaily() {
         log.info("펫케어 요청 일일 상태 업데이트 시작");
         updateExpiredCareRequests();

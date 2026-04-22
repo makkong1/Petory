@@ -53,7 +53,7 @@ const FacilityItem = styled.li`
   &:last-child { border-bottom: none; }
 `;
 
-function RecommendCard({ lat, lng, context }) {
+function RecommendCard({ lat, lng, context, onFacilitiesLoaded }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -63,10 +63,21 @@ function RecommendCard({ lat, lng, context }) {
     setLoading(true);
     recommendApi
       .getRecommendation({ lat, lng, context })
-      .then((res) => setData(res.data))
-      .catch(() => setData(null))
+      .then((res) => {
+        setData(res.data);
+        if (onFacilitiesLoaded) {
+          const withCoords = (res.data?.facilities ?? []).filter(
+            (f) => f.lat != null && f.lng != null
+          );
+          onFacilitiesLoaded(withCoords);
+        }
+      })
+      .catch(() => {
+        setData(null);
+        onFacilitiesLoaded?.([]);
+      })
       .finally(() => setLoading(false));
-  }, [lat, lng, context]);
+  }, [lat, lng, context]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) return <Spinner text="추천 정보 불러오는 중..." />;
   if (!data || (!data.recommendation && !data.trends?.length)) return null;

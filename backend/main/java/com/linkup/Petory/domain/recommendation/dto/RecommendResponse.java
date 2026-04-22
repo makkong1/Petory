@@ -14,7 +14,9 @@ public record RecommendResponse(
     public record FacilityItem(
             String name,
             @JsonProperty("distance_m") int distanceM,
-            String address
+            String address,
+            Double lat,
+            Double lng
     ) {}
 
     public record TrendItem(
