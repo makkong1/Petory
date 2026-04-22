@@ -33,26 +33,31 @@ public class JpaCommentAdapter implements CommentRepository {
 
     private final SpringDataJpaCommentRepository jpaRepository;
 
+    @SuppressWarnings("null")
     @Override
     public Comment save(Comment comment) {
         return jpaRepository.save(comment);
     }
 
+    @SuppressWarnings("null")
     @Override
     public Optional<Comment> findById(Long id) {
         return jpaRepository.findById(id);
     }
 
+    @SuppressWarnings("null")
     @Override
     public boolean existsById(Long id) {
         return jpaRepository.existsById(id);
     }
 
+    @SuppressWarnings("null")
     @Override
     public void delete(Comment comment) {
         jpaRepository.delete(comment);
     }
 
+    @SuppressWarnings("null")
     @Override
     public void deleteById(Long id) {
         jpaRepository.deleteById(id);
@@ -83,4 +88,3 @@ public class JpaCommentAdapter implements CommentRepository {
         return jpaRepository.findByBoardIdAndIsDeletedFalseOrderByCreatedAtAsc(boardId, pageable);
     }
 }
-

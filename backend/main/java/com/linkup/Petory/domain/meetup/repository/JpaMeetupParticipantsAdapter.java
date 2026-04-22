@@ -22,21 +22,25 @@ public class JpaMeetupParticipantsAdapter implements MeetupParticipantsRepositor
 
     private final SpringDataJpaMeetupParticipantsRepository jpaRepository;
 
+    @SuppressWarnings("null")
     @Override
     public MeetupParticipants save(MeetupParticipants participant) {
         return jpaRepository.save(participant);
     }
 
+    @SuppressWarnings("null")
     @Override
     public Optional<MeetupParticipants> findById(MeetupParticipantsId id) {
         return jpaRepository.findById(id);
     }
 
+    @SuppressWarnings("null")
     @Override
     public void delete(MeetupParticipants participant) {
         jpaRepository.delete(participant);
     }
 
+    @SuppressWarnings("null")
     @Override
     public void deleteById(MeetupParticipantsId id) {
         jpaRepository.deleteById(id);
@@ -77,4 +81,3 @@ public class JpaMeetupParticipantsAdapter implements MeetupParticipantsRepositor
         return jpaRepository.countByJoinedAtBetween(start, end);
     }
 }
-

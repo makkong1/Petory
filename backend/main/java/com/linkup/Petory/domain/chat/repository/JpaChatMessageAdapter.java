@@ -30,26 +30,31 @@ public class JpaChatMessageAdapter implements ChatMessageRepository {
 
     private final SpringDataJpaChatMessageRepository jpaRepository;
 
+    @SuppressWarnings("null")
     @Override
     public ChatMessage save(ChatMessage chatMessage) {
         return jpaRepository.save(chatMessage);
     }
 
+    @SuppressWarnings("null")
     @Override
     public List<ChatMessage> saveAll(List<ChatMessage> chatMessages) {
         return jpaRepository.saveAll(chatMessages);
     }
 
+    @SuppressWarnings("null")
     @Override
     public Optional<ChatMessage> findById(Long id) {
         return jpaRepository.findById(id);
     }
 
+    @SuppressWarnings("null")
     @Override
     public void delete(ChatMessage chatMessage) {
         jpaRepository.delete(chatMessage);
     }
 
+    @SuppressWarnings("null")
     @Override
     public void deleteById(Long id) {
         jpaRepository.deleteById(id);
@@ -133,4 +138,3 @@ public class JpaChatMessageAdapter implements ChatMessageRepository {
                 .collect(Collectors.toList());
     }
 }
-

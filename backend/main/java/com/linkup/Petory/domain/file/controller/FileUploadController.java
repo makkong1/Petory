@@ -5,8 +5,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Map;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -72,6 +72,7 @@ public class FileUploadController {
         return ResponseEntity.ok(response);
     }
 
+    @SuppressWarnings("null")
     @GetMapping("/file")
     public ResponseEntity<Resource> serveFile(@RequestParam("path") String relativePath) {
         Resource resource;

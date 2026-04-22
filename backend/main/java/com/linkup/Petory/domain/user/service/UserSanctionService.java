@@ -33,6 +33,7 @@ public class UserSanctionService {
      * 경고 추가
      * 경고 3회 도달 시 자동으로 이용제한 3일 적용
      */
+    @SuppressWarnings("null")
     @Transactional
     public UserSanction addWarning(Long userId, String reason, Long adminId, Long reportId) {
         Users user = usersRepository.findById(userId)
@@ -77,6 +78,7 @@ public class UserSanctionService {
     /**
      * 이용제한 추가 (일시적)
      */
+    @SuppressWarnings("null")
     @Transactional
     public UserSanction addSuspension(Long userId, String reason, Long adminId, Long reportId, int days) {
         Users user = usersRepository.findById(userId)
@@ -111,6 +113,7 @@ public class UserSanctionService {
     /**
      * 영구 차단
      */
+    @SuppressWarnings("null")
     @Transactional
     public UserSanction addBan(Long userId, String reason, Long adminId, Long reportId) {
         Users user = usersRepository.findById(userId)

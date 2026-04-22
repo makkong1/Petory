@@ -34,21 +34,25 @@ public class JpaMissingPetBoardAdapter implements MissingPetBoardRepository {
 
     private final SpringDataJpaMissingPetBoardRepository jpaRepository;
 
+    @SuppressWarnings("null")
     @Override
     public MissingPetBoard save(MissingPetBoard board) {
         return jpaRepository.save(board);
     }
 
+    @SuppressWarnings("null")
     @Override
     public MissingPetBoard saveAndFlush(MissingPetBoard board) {
         return jpaRepository.saveAndFlush(board);
     }
 
+    @SuppressWarnings("null")
     @Override
     public Optional<MissingPetBoard> findById(Long id) {
         return jpaRepository.findById(id);
     }
 
+    @SuppressWarnings("null")
     @Override
     public boolean existsById(Long id) {
         return jpaRepository.existsById(id);
@@ -59,11 +63,13 @@ public class JpaMissingPetBoardAdapter implements MissingPetBoardRepository {
         jpaRepository.flush();
     }
 
+    @SuppressWarnings("null")
     @Override
     public void delete(MissingPetBoard board) {
         jpaRepository.delete(board);
     }
 
+    @SuppressWarnings("null")
     @Override
     public void deleteById(Long id) {
         jpaRepository.deleteById(id);
@@ -100,6 +106,7 @@ public class JpaMissingPetBoardAdapter implements MissingPetBoardRepository {
     }
 
     // [리팩토링] Admin 페이징 - Specification 기반 DB 레벨 필터링
+    @SuppressWarnings("null")
     @Override
     public Page<MissingPetBoard> findAll(Specification<MissingPetBoard> spec, Pageable pageable) {
         return jpaRepository.findAll(spec, pageable);
@@ -110,4 +117,3 @@ public class JpaMissingPetBoardAdapter implements MissingPetBoardRepository {
         return jpaRepository.findUserIdByIdx(idx);
     }
 }
-

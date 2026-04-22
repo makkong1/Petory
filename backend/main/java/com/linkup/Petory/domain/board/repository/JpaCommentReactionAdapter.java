@@ -6,10 +6,10 @@ import java.util.Optional;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Repository;
 
-import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.board.entity.Comment;
 import com.linkup.Petory.domain.board.entity.CommentReaction;
 import com.linkup.Petory.domain.board.entity.ReactionType;
+import com.linkup.Petory.domain.user.entity.Users;
 
 import lombok.RequiredArgsConstructor;
 
@@ -23,11 +23,13 @@ public class JpaCommentReactionAdapter implements CommentReactionRepository {
 
     private final SpringDataJpaCommentReactionRepository jpaRepository;
 
+    @SuppressWarnings("null")
     @Override
     public CommentReaction save(CommentReaction reaction) {
         return jpaRepository.save(reaction);
     }
 
+    @SuppressWarnings("null")
     @Override
     public void delete(CommentReaction reaction) {
         jpaRepository.delete(reaction);
@@ -48,4 +50,3 @@ public class JpaCommentReactionAdapter implements CommentReactionRepository {
         return jpaRepository.countByCommentsGroupByReactionType(commentIds);
     }
 }
-

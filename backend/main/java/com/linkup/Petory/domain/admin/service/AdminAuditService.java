@@ -1,13 +1,15 @@
 package com.linkup.Petory.domain.admin.service;
 
-import com.linkup.Petory.domain.admin.entity.AdminAuditLog;
-import com.linkup.Petory.domain.admin.repository.AdminAuditLogRepository;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+
+import com.linkup.Petory.domain.admin.entity.AdminAuditLog;
+import com.linkup.Petory.domain.admin.repository.AdminAuditLogRepository;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
@@ -16,6 +18,7 @@ public class AdminAuditService {
 
     private final AdminAuditLogRepository auditLogRepository;
 
+    @SuppressWarnings("null")
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void log(Long adminIdx, String action, String targetType, Long targetIdx, String detail) {

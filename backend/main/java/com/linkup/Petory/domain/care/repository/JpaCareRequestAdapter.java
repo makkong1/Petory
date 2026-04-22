@@ -8,10 +8,10 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import org.springframework.context.annotation.Primary;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
-import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Repository;
 
 import com.linkup.Petory.domain.care.entity.CareRequest;
@@ -39,21 +39,25 @@ public class JpaCareRequestAdapter implements CareRequestRepository {
 
     private final SpringDataJpaCareRequestRepository jpaRepository;
 
+    @SuppressWarnings("null")
     @Override
     public CareRequest save(CareRequest careRequest) {
         return jpaRepository.save(careRequest);
     }
 
+    @SuppressWarnings("null")
     @Override
     public Optional<CareRequest> findById(Long id) {
         return jpaRepository.findById(id);
     }
 
+    @SuppressWarnings("null")
     @Override
     public CareRequest getReferenceById(Long id) {
         return jpaRepository.getReferenceById(id);
     }
 
+    @SuppressWarnings("null")
     @Override
     public void deleteById(Long id) {
         jpaRepository.deleteById(id);
@@ -134,10 +138,12 @@ public class JpaCareRequestAdapter implements CareRequestRepository {
     }
 
     @Override
-    public Page<CareRequest> findByStatusAndIsDeletedFalseWithPaging(CareRequestStatus status, String location, Pageable pageable) {
+    public Page<CareRequest> findByStatusAndIsDeletedFalseWithPaging(CareRequestStatus status, String location,
+            Pageable pageable) {
         return jpaRepository.findByStatusAndIsDeletedFalseWithPaging(status, location, pageable);
     }
 
+    @SuppressWarnings("null")
     @Override
     public Page<CareRequest> searchWithPaging(String keyword, Pageable pageable) {
         Page<CareRequest> raw = jpaRepository.searchWithPaging(keyword, pageable);
@@ -172,4 +178,3 @@ public class JpaCareRequestAdapter implements CareRequestRepository {
         return jpaRepository.countByStatusAndUpdatedAtBetween(status, start, end);
     }
 }
-

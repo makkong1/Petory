@@ -23,17 +23,17 @@ public class NotificationSseService {
      */
     public SseEmitter createConnection(Long userId) {
         SseEmitter emitter = new SseEmitter(3600000L); // 1시간 타임아웃
-        
+
         emitter.onCompletion(() -> {
             log.info("SSE 연결 완료: userId={}", userId);
             emitters.remove(userId);
         });
-        
+
         emitter.onTimeout(() -> {
             log.info("SSE 연결 타임아웃: userId={}", userId);
             emitters.remove(userId);
         });
-        
+
         emitter.onError((ex) -> {
             log.error("SSE 연결 오류: userId={}, error={}", userId, ex.getMessage());
             emitters.remove(userId);
@@ -41,20 +41,21 @@ public class NotificationSseService {
 
         emitters.put(userId, emitter);
         log.info("SSE 연결 생성: userId={}, 현재 연결 수={}", userId, emitters.size());
-        
+
         return emitter;
     }
 
     /**
      * 특정 사용자에게 알림 전송
      */
+    @SuppressWarnings("null")
     public void sendNotification(Long userId, NotificationDTO notification) {
         SseEmitter emitter = emitters.get(userId);
         if (emitter != null) {
             try {
                 emitter.send(SseEmitter.event()
-                    .name("notification")
-                    .data(notification));
+                        .name("notification")
+                        .data(notification));
                 log.info("알림 전송 성공: userId={}, notificationId={}", userId, notification.getIdx());
             } catch (IOException e) {
                 log.error("알림 전송 실패: userId={}, error={}", userId, e.getMessage());
@@ -91,4 +92,3 @@ public class NotificationSseService {
         return emitters.size();
     }
 }
-

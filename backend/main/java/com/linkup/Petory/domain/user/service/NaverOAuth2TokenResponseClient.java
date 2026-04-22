@@ -1,6 +1,8 @@
 package com.linkup.Petory.domain.user.service;
 
-import lombok.extern.slf4j.Slf4j;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.RequestEntity;
 import org.springframework.http.ResponseEntity;
@@ -8,15 +10,14 @@ import org.springframework.security.oauth2.client.endpoint.OAuth2AccessTokenResp
 import org.springframework.security.oauth2.client.endpoint.OAuth2AuthorizationCodeGrantRequest;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AccessTokenResponse;
 import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames;
+import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestOperations;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
-import org.springframework.stereotype.Component;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Component
@@ -29,6 +30,7 @@ public class NaverOAuth2TokenResponseClient
         this.restOperations = new RestTemplate();
     }
 
+    @SuppressWarnings("null")
     @Override
     public OAuth2AccessTokenResponse getTokenResponse(
             OAuth2AuthorizationCodeGrantRequest authorizationCodeGrantRequest) {
@@ -66,6 +68,7 @@ public class NaverOAuth2TokenResponseClient
             formParameters.add(OAuth2ParameterNames.CLIENT_SECRET,
                     authorizationCodeGrantRequest.getClientRegistration().getClientSecret());
 
+            @SuppressWarnings("null")
             RequestEntity<MultiValueMap<String, String>> requestEntity = RequestEntity
                     .post(tokenUri)
                     .header("Content-Type", "application/x-www-form-urlencoded")
@@ -116,8 +119,8 @@ public class NaverOAuth2TokenResponseClient
             if (responseBody.containsKey(OAuth2ParameterNames.EXPIRES_IN)) {
                 Object expiresIn = responseBody.get(OAuth2ParameterNames.EXPIRES_IN);
                 long expiresInSeconds;
-                if (expiresIn instanceof Number) {
-                    expiresInSeconds = ((Number) expiresIn).longValue();
+                if (expiresIn instanceof Number number) {
+                    expiresInSeconds = number.longValue();
                 } else {
                     expiresInSeconds = Long.parseLong(expiresIn.toString());
                 }
@@ -146,7 +149,7 @@ public class NaverOAuth2TokenResponseClient
 
             return tokenResponse;
 
-        } catch (Exception e) {
+        } catch (RestClientException e) {
             log.error("Naver OAuth2 토큰 응답 처리 실패: {}", e.getMessage(), e);
             throw new RestClientException("Naver 토큰 응답 처리 중 오류 발생: " + e.getMessage(), e);
         }

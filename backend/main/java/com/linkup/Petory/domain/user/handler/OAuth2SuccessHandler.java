@@ -1,12 +1,9 @@
 package com.linkup.Petory.domain.user.handler;
 
-import com.linkup.Petory.domain.user.dto.TokenResponse;
-import com.linkup.Petory.domain.user.entity.Provider;
-import com.linkup.Petory.domain.user.service.OAuth2Service;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
@@ -15,9 +12,14 @@ import org.springframework.security.web.authentication.SimpleUrlAuthenticationSu
 import org.springframework.stereotype.Component;
 import org.springframework.web.util.UriComponentsBuilder;
 
-import java.io.IOException;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
+import com.linkup.Petory.domain.user.dto.TokenResponse;
+import com.linkup.Petory.domain.user.entity.Provider;
+import com.linkup.Petory.domain.user.service.OAuth2Service;
+
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Component
@@ -29,6 +31,7 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
         @Value("${app.oauth2.redirect-uri:http://localhost:3000/oauth2/callback}")
         private String redirectUri;
 
+        @SuppressWarnings({ "null", "UseSpecificCatch" })
         @Override
         public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
                         Authentication authentication) throws IOException {

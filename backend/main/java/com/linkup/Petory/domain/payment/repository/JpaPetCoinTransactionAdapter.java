@@ -2,9 +2,9 @@ package com.linkup.Petory.domain.payment.repository;
 
 import java.util.Optional;
 
+import org.springframework.context.annotation.Primary;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Repository;
 
 import com.linkup.Petory.domain.payment.entity.PetCoinTransaction;
@@ -22,6 +22,7 @@ public class JpaPetCoinTransactionAdapter implements PetCoinTransactionRepositor
 
     private final SpringDataJpaPetCoinTransactionRepository jpaRepository;
 
+    @SuppressWarnings("null")
     @Override
     public PetCoinTransaction save(PetCoinTransaction transaction) {
         return jpaRepository.save(transaction);

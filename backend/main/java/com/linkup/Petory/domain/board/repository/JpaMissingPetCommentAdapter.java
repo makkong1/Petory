@@ -25,21 +25,25 @@ public class JpaMissingPetCommentAdapter implements MissingPetCommentRepository 
 
     private final SpringDataJpaMissingPetCommentRepository jpaRepository;
 
+    @SuppressWarnings("null")
     @Override
     public MissingPetComment save(MissingPetComment comment) {
         return jpaRepository.save(comment);
     }
 
+    @SuppressWarnings("null")
     @Override
     public MissingPetComment saveAndFlush(MissingPetComment comment) {
         return jpaRepository.saveAndFlush(comment);
     }
 
+    @SuppressWarnings("null")
     @Override
     public Optional<MissingPetComment> findById(Long id) {
         return jpaRepository.findById(id);
     }
 
+    @SuppressWarnings("null")
     @Override
     public boolean existsById(Long id) {
         return jpaRepository.existsById(id);
@@ -55,11 +59,13 @@ public class JpaMissingPetCommentAdapter implements MissingPetCommentRepository 
         jpaRepository.flush();
     }
 
+    @SuppressWarnings("null")
     @Override
     public void delete(MissingPetComment comment) {
         jpaRepository.delete(comment);
     }
 
+    @SuppressWarnings("null")
     @Override
     public void deleteById(Long id) {
         jpaRepository.deleteById(id);
@@ -101,4 +107,3 @@ public class JpaMissingPetCommentAdapter implements MissingPetCommentRepository 
         return jpaRepository.softDeleteAllByBoardIdx(boardIdx, deletedAt);
     }
 }
-

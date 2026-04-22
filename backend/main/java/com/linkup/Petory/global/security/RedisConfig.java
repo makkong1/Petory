@@ -1,5 +1,7 @@
 package com.linkup.Petory.global.security;
 
+import java.time.Duration;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
@@ -19,8 +21,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.jsontype.PolymorphicTypeValidator;
 import com.fasterxml.jackson.databind.jsontype.impl.LaissezFaireSubTypeValidator;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-
-import java.time.Duration;
 
 @Configuration
 @EnableCaching
@@ -58,6 +58,7 @@ public class RedisConfig {
         /**
          * Java 8 날짜/시간 타입을 지원하는 GenericJackson2JsonRedisSerializer 생성
          */
+        @SuppressWarnings("null")
         private GenericJackson2JsonRedisSerializer createJsonRedisSerializer() {
                 return new GenericJackson2JsonRedisSerializer(createObjectMapper());
         }
@@ -65,6 +66,7 @@ public class RedisConfig {
         /**
          * Redis 연결 설정
          */
+        @SuppressWarnings("null")
         @Bean
         public RedisConnectionFactory redisConnectionFactory() {
                 RedisStandaloneConfiguration config = new RedisStandaloneConfiguration();
@@ -99,6 +101,7 @@ public class RedisConfig {
          * 객체 저장용 RedisTemplate (JSON 직렬화)
          * - 게시글 캐싱, 사용자 정보 캐싱 등에 사용
          */
+        @SuppressWarnings("null")
         @Bean
         public RedisTemplate<String, Object> objectRedisTemplate(RedisConnectionFactory connectionFactory) {
                 RedisTemplate<String, Object> template = new RedisTemplate<>();
@@ -116,6 +119,7 @@ public class RedisConfig {
          * - 사용자별 알림 리스트 저장
          * - Key: "notification:{userId}", Value: 알림 리스트
          */
+        @SuppressWarnings("null")
         @Bean
         public RedisTemplate<String, Object> notificationRedisTemplate(RedisConnectionFactory connectionFactory) {
                 RedisTemplate<String, Object> template = new RedisTemplate<>();
@@ -133,6 +137,7 @@ public class RedisConfig {
          * - Key: "reaction:board:{boardId}" 또는 "reaction:comment:{commentId}"
          * - Value: 좋아요/싫어요 카운트 (임시 저장)
          */
+        @SuppressWarnings("null")
         @Bean
         public RedisTemplate<String, Long> reactionCountRedisTemplate(RedisConnectionFactory connectionFactory) {
                 RedisTemplate<String, Long> template = new RedisTemplate<>();
@@ -147,10 +152,11 @@ public class RedisConfig {
          * Spring Cache Manager 설정
          * - @Cacheable 어노테이션 사용 시 적용
          */
+        @SuppressWarnings("null")
         @Bean
         public CacheManager cacheManager(RedisConnectionFactory connectionFactory) {
                 GenericJackson2JsonRedisSerializer jsonSerializer = createJsonRedisSerializer();
-                
+
                 RedisCacheConfiguration defaultConfig = RedisCacheConfiguration.defaultCacheConfig()
                                 .entryTtl(Duration.ofMinutes(30)) // 기본 TTL: 30분
                                 .serializeKeysWith(

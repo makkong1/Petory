@@ -30,16 +30,19 @@ public class JpaNotificationAdapter implements NotificationRepository {
 
     private final SpringDataJpaNotificationRepository jpaRepository;
 
+    @SuppressWarnings("null")
     @Override
     public Notification save(Notification notification) {
         return jpaRepository.save(notification);
     }
 
+    @SuppressWarnings("null")
     @Override
     public List<Notification> saveAll(List<Notification> notifications) {
         return jpaRepository.saveAll(notifications);
     }
 
+    @SuppressWarnings("null")
     @Override
     public Optional<Notification> findById(Long id) {
         return jpaRepository.findById(id);

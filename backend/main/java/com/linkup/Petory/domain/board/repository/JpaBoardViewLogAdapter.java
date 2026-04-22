@@ -21,6 +21,7 @@ public class JpaBoardViewLogAdapter implements BoardViewLogRepository {
 
     private final SpringDataJpaBoardViewLogRepository jpaRepository;
 
+    @SuppressWarnings("null")
     @Override
     public BoardViewLog save(BoardViewLog viewLog) {
         return jpaRepository.save(viewLog);
@@ -36,4 +37,3 @@ public class JpaBoardViewLogAdapter implements BoardViewLogRepository {
         return jpaRepository.countByBoards(boardIds);
     }
 }
-

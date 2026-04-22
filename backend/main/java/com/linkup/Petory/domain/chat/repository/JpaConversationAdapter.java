@@ -32,21 +32,25 @@ public class JpaConversationAdapter implements ConversationRepository {
 
     private final SpringDataJpaConversationRepository jpaRepository;
 
+    @SuppressWarnings("null")
     @Override
     public Conversation save(Conversation conversation) {
         return jpaRepository.save(conversation);
     }
 
+    @SuppressWarnings("null")
     @Override
     public Optional<Conversation> findById(Long id) {
         return jpaRepository.findById(id);
     }
 
+    @SuppressWarnings("null")
     @Override
     public void delete(Conversation conversation) {
         jpaRepository.delete(conversation);
     }
 
+    @SuppressWarnings("null")
     @Override
     public void deleteById(Long id) {
         jpaRepository.deleteById(id);
@@ -97,4 +101,3 @@ public class JpaConversationAdapter implements ConversationRepository {
         return jpaRepository.findByIdWithLock(idx);
     }
 }
-
