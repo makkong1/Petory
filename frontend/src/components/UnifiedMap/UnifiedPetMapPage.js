@@ -13,6 +13,15 @@ import MeetupLayer from './layers/MeetupLayer';
 import CareLayer from './layers/CareLayer';
 import { fetchActiveMapItems, LAYER_CONFIG } from '../../api/unifiedMapApi';
 import { locationServiceApi } from '../../api/locationServiceApi';
+import RecommendCard from '../Recommendation/RecommendCard';
+
+const CATEGORY_TO_CONTEXT = {
+  '미용': 'grooming',
+  '동물병원': 'hospital',
+  '간식': 'snack',
+  '사료': 'food',
+  '의류': 'clothes',
+};
 
 const DEFAULT_CENTER = { lat: 37.5665, lng: 126.9780 };
 const DEFAULT_RADIUS = 5;
@@ -304,6 +313,14 @@ const UnifiedPetMapPage = () => {
 
         {renderInfoPanel()}
       </MapWrapper>
+
+      {activeLayer === 'location' && userLocation && CATEGORY_TO_CONTEXT[locationCategory] && (
+        <RecommendCard
+          lat={userLocation.lat}
+          lng={userLocation.lng}
+          context={CATEGORY_TO_CONTEXT[locationCategory]}
+        />
+      )}
 
       {showMeetupCreateModal && (
         <MeetupCreateModal
