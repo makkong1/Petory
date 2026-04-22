@@ -109,22 +109,18 @@ public class ActivityService {
                         return activities;
                 }
 
-                switch (filter) {
-                        case "POSTS":
-                                return activities.stream()
-                                                .filter(a -> isPostType(a.getType()))
-                                                .toList();
-                        case "COMMENTS":
-                                return activities.stream()
-                                                .filter(a -> isCommentType(a.getType()))
-                                                .toList();
-                        case "REVIEWS":
-                                return activities.stream()
-                                                .filter(a -> "LOCATION_REVIEW".equals(a.getType()))
-                                                .toList();
-                        default:
-                                return activities;
-                }
+                return switch (filter) {
+                        case "POSTS" -> activities.stream()
+                                        .filter(a -> isPostType(a.getType()))
+                                        .toList();
+                        case "COMMENTS" -> activities.stream()
+                                        .filter(a -> isCommentType(a.getType()))
+                                        .toList();
+                        case "REVIEWS" -> activities.stream()
+                                        .filter(a -> "LOCATION_REVIEW".equals(a.getType()))
+                                        .toList();
+                        default -> activities;
+                };
         }
 
         private boolean isPostType(String type) {
