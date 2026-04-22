@@ -56,6 +56,7 @@ const UnifiedPetMapPage = () => {
   const [locationCategory, setLocationCategory] = useState('');
   const [isAiMode, setIsAiMode] = useState(false);
   const [recommendedMap, setRecommendedMap] = useState(null);
+  const [aiRecommendFacilities, setAiRecommendFacilities] = useState([]);
 
   // meetup 탭 전용
   const [showMeetupCreateModal, setShowMeetupCreateModal] = useState(false);
@@ -164,6 +165,7 @@ const UnifiedPetMapPage = () => {
     setSelectedItem(null);
     setIsAiMode(false);
     setRecommendedMap(null);
+    setAiRecommendFacilities([]);
     if (layer !== 'location') { setLocationKeyword(''); setLocationCategory(''); }
   };
 
@@ -234,7 +236,7 @@ const UnifiedPetMapPage = () => {
           category={locationCategory}
           isAiMode={isAiMode}
           onSearch={(kw) => { setLocationKeyword(kw); cacheRef.current = {}; }}
-          onCategoryChange={(cat) => { setLocationCategory(cat); cacheRef.current = {}; }}
+          onCategoryChange={(cat) => { setLocationCategory(cat); setAiRecommendFacilities([]); cacheRef.current = {}; }}
           onAiToggle={handleAiToggle}
         />
       );
@@ -254,6 +256,19 @@ const UnifiedPetMapPage = () => {
     if (selectedItem.type === 'location') return <LocationLayer {...props} />;
     if (selectedItem.type === 'meetup') return <MeetupLayer {...props} onRefresh={handleMeetupCreated} />;
     if (selectedItem.type === 'care') return <CareLayer {...props} />;
+    if (selectedItem.type === 'ai_recommend') return (
+      <AiInfoPanel>
+        <AiInfoClose onClick={() => setSelectedItem(null)}>✕</AiInfoClose>
+        <AiInfoBadge>✨ AI 추천</AiInfoBadge>
+        <AiInfoName>{selectedItem.name}</AiInfoName>
+        {selectedItem.distanceM != null && (
+          <AiInfoMeta>{selectedItem.distanceM}m</AiInfoMeta>
+        )}
+        {selectedItem.subtitle && (
+          <AiInfoMeta>{selectedItem.subtitle}</AiInfoMeta>
+        )}
+      </AiInfoPanel>
+    );
     return null;
   };
 
@@ -264,7 +279,20 @@ const UnifiedPetMapPage = () => {
       <MapWrapper>
         {mapCenter ? (
           <MapContainer
-            services={items}
+            services={[
+              ...items,
+              ...aiRecommendFacilities.map((f, i) => ({
+                id: `ai-${i}`,
+                type: 'ai_recommend',
+                latitude: f.lat,
+                longitude: f.lng,
+                name: f.name,
+                title: f.name,
+                subtitle: f.address,
+                distanceM: f.distance_m,
+                markerColor: '#FFD700',
+              })),
+            ]}
             onServiceClick={setSelectedItem}
             userLocation={userLocation}
             mapCenter={mapCenter}
@@ -319,6 +347,7 @@ const UnifiedPetMapPage = () => {
           lat={userLocation.lat}
           lng={userLocation.lng}
           context={CATEGORY_TO_CONTEXT[locationCategory]}
+          onFacilitiesLoaded={setAiRecommendFacilities}
         />
       )}
 
@@ -500,4 +529,55 @@ const EmptyBanner = styled.div`
   font-size: 13px;
   z-index: 400;
   white-space: nowrap;
+`;
+
+const AiInfoPanel = styled.div`
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: ${props => props.theme.colors.surface};
+  border: 1.5px solid #FFD700;
+  border-radius: 12px;
+  padding: 14px 18px;
+  min-width: 220px;
+  max-width: 320px;
+  z-index: 500;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+`;
+
+const AiInfoClose = styled.button`
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  background: none;
+  border: none;
+  font-size: 14px;
+  cursor: pointer;
+  color: ${props => props.theme.colors.textSecondary};
+  padding: 0;
+`;
+
+const AiInfoBadge = styled.span`
+  display: inline-block;
+  background: #FFF9C4;
+  color: #B8860B;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 20px;
+  margin-bottom: 8px;
+`;
+
+const AiInfoName = styled.p`
+  font-size: 15px;
+  font-weight: 700;
+  color: ${props => props.theme.colors.text};
+  margin: 0 0 4px;
+`;
+
+const AiInfoMeta = styled.p`
+  font-size: 12px;
+  color: ${props => props.theme.colors.textSecondary};
+  margin: 2px 0 0;
 `;

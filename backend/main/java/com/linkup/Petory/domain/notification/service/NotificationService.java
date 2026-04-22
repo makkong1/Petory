@@ -3,6 +3,7 @@ package com.linkup.Petory.domain.notification.service;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -10,19 +11,16 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.linkup.Petory.domain.notification.converter.NotificationConverter;
 import com.linkup.Petory.domain.notification.dto.NotificationDTO;
-import com.linkup.Petory.domain.notification.exception.NotificationForbiddenException;
-import com.linkup.Petory.domain.notification.exception.NotificationNotFoundException;
 import com.linkup.Petory.domain.notification.entity.Notification;
 import com.linkup.Petory.domain.notification.entity.NotificationType;
+import com.linkup.Petory.domain.notification.exception.NotificationForbiddenException;
+import com.linkup.Petory.domain.notification.exception.NotificationNotFoundException;
 import com.linkup.Petory.domain.notification.repository.NotificationRepository;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.exception.UserNotFoundException;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 
-import lombok.RequiredArgsConstructor;
-
 @Service
-@RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class NotificationService {
 
@@ -31,6 +29,19 @@ public class NotificationService {
     private final NotificationConverter notificationConverter;
     private final RedisTemplate<String, Object> notificationRedisTemplate;
     private final NotificationSseService sseService;
+
+    public NotificationService(
+            NotificationRepository notificationRepository,
+            UsersRepository usersRepository,
+            NotificationConverter notificationConverter,
+            @Qualifier("notificationRedisTemplate") RedisTemplate<String, Object> notificationRedisTemplate,
+            NotificationSseService sseService) {
+        this.notificationRepository = notificationRepository;
+        this.usersRepository = usersRepository;
+        this.notificationConverter = notificationConverter;
+        this.notificationRedisTemplate = notificationRedisTemplate;
+        this.sseService = sseService;
+    }
 
     private static final String REDIS_KEY_PREFIX = "notification:";
     private static final int REDIS_TTL_HOURS = 24; // Redis에 24시간 저장

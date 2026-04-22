@@ -28,7 +28,7 @@ public class RecommendService {
                 .lat(lat)
                 .lng(lng)
                 .context(context)
-                .radiusKm(3.0)
+                .radiusKm(10.0)
                 .topN(5)
                 .pet(petInfo)
                 .build();
