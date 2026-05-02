@@ -86,8 +86,8 @@ public class MeetupController {
     // 모든 모임 조회 (페이징: page, size — 생략 시 page=0, size=20)
     @GetMapping
     public ResponseEntity<Map<String, Object>> getAllMeetups(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "20") int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         Page<MeetupDTO> result = meetupService.getAllMeetups(pageable);
 
@@ -116,10 +116,10 @@ public class MeetupController {
     // 지역별 모임 조회
     @GetMapping("/location")
     public ResponseEntity<Map<String, Object>> getMeetupsByLocation(
-            @RequestParam Double minLat,
-            @RequestParam Double maxLat,
-            @RequestParam Double minLng,
-            @RequestParam Double maxLng) {
+            @RequestParam(value = "minLat") Double minLat,
+            @RequestParam(value = "maxLat") Double maxLat,
+            @RequestParam(value = "minLng") Double minLng,
+            @RequestParam(value = "maxLng") Double maxLng) {
         List<MeetupDTO> meetups = meetupService.getMeetupsByLocation(minLat, maxLat, minLng, maxLng);
 
         Map<String, Object> response = new HashMap<>();
@@ -131,7 +131,7 @@ public class MeetupController {
 
     // 키워드로 모임 검색
     @GetMapping("/search")
-    public ResponseEntity<Map<String, Object>> searchMeetupsByKeyword(@RequestParam String keyword) {
+    public ResponseEntity<Map<String, Object>> searchMeetupsByKeyword(@RequestParam(value = "keyword") String keyword) {
         List<MeetupDTO> meetups = meetupService.searchMeetupsByKeyword(keyword);
 
         Map<String, Object> response = new HashMap<>();
@@ -144,8 +144,8 @@ public class MeetupController {
     // 참여 가능한 모임 조회 (페이징: page, size — 생략 시 page=0, size=20)
     @GetMapping("/available")
     public ResponseEntity<Map<String, Object>> getAvailableMeetups(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "20") int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "date"));
         Slice<MeetupDTO> slice = meetupService.getAvailableMeetups(pageable);
 
@@ -174,10 +174,10 @@ public class MeetupController {
     // 반경 기반 모임 조회 (마커 표시용, maxResults 상한 기본 500)
     @GetMapping("/nearby")
     public ResponseEntity<Map<String, Object>> getNearbyMeetups(
-            @RequestParam Double lat,
-            @RequestParam Double lng,
-            @RequestParam(defaultValue = "5.0") Double radius,
-            @RequestParam(defaultValue = "500") int maxResults) {
+            @RequestParam(value = "lat") Double lat,
+            @RequestParam(value = "lng") Double lng,
+            @RequestParam(value = "radius", defaultValue = "5.0") Double radius,
+            @RequestParam(value = "maxResults", defaultValue = "500") int maxResults) {
         List<MeetupDTO> meetups = meetupService.getNearbyMeetups(lat, lng, radius, maxResults);
 
         Map<String, Object> response = new HashMap<>();

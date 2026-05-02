@@ -46,16 +46,16 @@ public class LocationServiceController {
      */
     @GetMapping("/search")
     public ResponseEntity<Map<String, Object>> searchLocationServices(
-            @RequestParam(required = false) Double latitude,
-            @RequestParam(required = false) Double longitude,
-            @RequestParam(required = false) Integer radius,
-            @RequestParam(required = false) String sido,
-            @RequestParam(required = false) String sigungu,
-            @RequestParam(required = false) String eupmyeondong,
-            @RequestParam(required = false) String roadName,
-            @RequestParam(required = false) String category,
-            @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) Integer size) {
+            @RequestParam(value = "latitude", required = false) Double latitude,
+            @RequestParam(value = "longitude", required = false) Double longitude,
+            @RequestParam(value = "radius", required = false) Integer radius,
+            @RequestParam(value = "sido", required = false) String sido,
+            @RequestParam(value = "sigungu", required = false) String sigungu,
+            @RequestParam(value = "eupmyeondong", required = false) String eupmyeondong,
+            @RequestParam(value = "roadName", required = false) String roadName,
+            @RequestParam(value = "category", required = false) String category,
+            @RequestParam(value = "keyword", required = false) String keyword,
+            @RequestParam(value = "size", required = false) Integer size) {
         try {
             // ========== 성능 측정 시작 ==========
             long startTime = System.currentTimeMillis();
@@ -128,15 +128,15 @@ public class LocationServiceController {
      */
     @GetMapping("/recommend")
     public ResponseEntity<Map<String, Object>> recommendLocationServices(
-            @RequestParam(required = false) Double latitude,
-            @RequestParam(required = false) Double longitude,
-            @RequestParam(required = false) Integer radius,
-            @RequestParam(required = false) String sido,
-            @RequestParam(required = false) String sigungu,
-            @RequestParam(required = false) String eupmyeondong,
-            @RequestParam(required = false) String roadName,
-            @RequestParam(required = false) String category,
-            @RequestParam(required = false) String keyword) {
+            @RequestParam(value = "latitude", required = false) Double latitude,
+            @RequestParam(value = "longitude", required = false) Double longitude,
+            @RequestParam(value = "radius", required = false) Integer radius,
+            @RequestParam(value = "sido", required = false) String sido,
+            @RequestParam(value = "sigungu", required = false) String sigungu,
+            @RequestParam(value = "eupmyeondong", required = false) String eupmyeondong,
+            @RequestParam(value = "roadName", required = false) String roadName,
+            @RequestParam(value = "category", required = false) String category,
+            @RequestParam(value = "keyword", required = false) String keyword) {
         try {
             int effectiveSize = 30; // AI에 넘길 후보 수
             List<LocationServiceDTO> services = locationServiceService.searchLocationServices(

@@ -30,20 +30,20 @@ public class CareRequestController {
     // 반경 기반 근처 케어 요청 조회 (지도 표출용)
     @GetMapping("/nearby")
     public ResponseEntity<List<CareRequestDTO>> getNearby(
-            @RequestParam double lat,
-            @RequestParam double lng,
-            @RequestParam(defaultValue = "5.0") double radius,
-            @RequestParam(defaultValue = "200") int limit) {
+            @RequestParam(value = "lat") double lat,
+            @RequestParam(value = "lng") double lng,
+            @RequestParam(value = "radius", defaultValue = "5.0") double radius,
+            @RequestParam(value = "limit", defaultValue = "200") int limit) {
         return ResponseEntity.ok(careRequestService.getNearby(lat, lng, radius, limit));
     }
 
     // 전체 케어 요청 조회 (페이징 지원)
     @GetMapping
     public ResponseEntity<CareRequestPageResponseDTO> getAllCareRequests(
-            @RequestParam(required = false) String status,
-            @RequestParam(required = false) String location,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(value = "status", required = false) String status,
+            @RequestParam(value = "location", required = false) String location,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "20") int size) {
         return ResponseEntity.ok(careRequestService.getCareRequestsWithPaging(status, location, page, size));
     }
 
@@ -83,7 +83,8 @@ public class CareRequestController {
 
     @PatchMapping("/{id}/status")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<CareRequestDTO> updateStatus(@PathVariable Long id, @RequestParam String status) {
+    public ResponseEntity<CareRequestDTO> updateStatus(@PathVariable Long id,
+            @RequestParam(value = "status") String status) {
         Long currentUserId = getCurrentUserId();
         return ResponseEntity.ok(careRequestService.updateStatus(id, status, currentUserId));
     }
@@ -91,9 +92,9 @@ public class CareRequestController {
     // 케어 요청 검색 (페이징 지원)
     @GetMapping("/search")
     public ResponseEntity<CareRequestPageResponseDTO> searchCareRequests(
-            @RequestParam String keyword,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(value = "keyword") String keyword,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "20") int size) {
         return ResponseEntity.ok(careRequestService.searchCareRequestsWithPaging(keyword, page, size));
     }
 }

@@ -1,16 +1,18 @@
 package com.linkup.Petory.domain.recommendation.service;
 
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
+
+import org.springframework.stereotype.Service;
+
 import com.linkup.Petory.domain.recommendation.client.PetDataApiClient;
 import com.linkup.Petory.domain.recommendation.dto.RecommendRequest;
 import com.linkup.Petory.domain.recommendation.dto.RecommendResponse;
 import com.linkup.Petory.domain.user.entity.Pet;
 import com.linkup.Petory.domain.user.repository.PetRepository;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
 
-import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
-import java.util.List;
+import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor

@@ -1,14 +1,10 @@
 package com.linkup.Petory.domain.meetup.repository;
 
-import com.linkup.Petory.domain.meetup.entity.Meetup;
-import com.linkup.Petory.domain.meetup.entity.MeetupParticipants;
-import com.linkup.Petory.domain.meetup.entity.MeetupStatus;
-import com.linkup.Petory.domain.user.entity.Role;
-import com.linkup.Petory.domain.user.entity.UserStatus;
-import com.linkup.Petory.domain.user.entity.Users;
-import com.linkup.Petory.domain.user.repository.UsersRepository;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import org.hibernate.Session;
 import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,11 +15,16 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
+import com.linkup.Petory.domain.meetup.entity.Meetup;
+import com.linkup.Petory.domain.meetup.entity.MeetupParticipants;
+import com.linkup.Petory.domain.meetup.entity.MeetupStatus;
+import com.linkup.Petory.domain.user.entity.Role;
+import com.linkup.Petory.domain.user.entity.UserStatus;
+import com.linkup.Petory.domain.user.entity.Users;
+import com.linkup.Petory.domain.user.repository.UsersRepository;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 
 /**
  * ====================================================================================
@@ -68,12 +69,13 @@ class MeetupParticipantsRepositoryPerformanceTest {
     private Users testOrganizer;
     private List<Meetup> testMeetups;
     private List<MeetupParticipants> testParticipants;
-    
+
     // 테스트 파라미터
     private static final int TOTAL_PARTICIPATION_COUNT = 100; // 사용자가 참여한 모임 수
     private static final int TOTAL_MEETUP_COUNT = 200; // 전체 모임 수 (다른 사용자들이 참여한 모임 포함)
 
     @BeforeEach
+    @SuppressWarnings("unused")
     void setUp() {
         // 테스트 사용자 생성
         long timestamp = System.currentTimeMillis();
@@ -103,7 +105,7 @@ class MeetupParticipantsRepositoryPerformanceTest {
         // 다양한 날짜의 meetup 생성
         testMeetups = new ArrayList<>();
         LocalDateTime now = LocalDateTime.now();
-        
+
         for (int i = 0; i < TOTAL_MEETUP_COUNT; i++) {
             Meetup meetup = Meetup.builder()
                     .title("테스트 모임 " + i)
@@ -177,8 +179,8 @@ class MeetupParticipantsRepositoryPerformanceTest {
         long dbStartTime = System.currentTimeMillis();
         List<MeetupParticipants> participants = entityManager.createQuery(
                 "SELECT mp FROM MeetupParticipants mp " +
-                "WHERE mp.user.idx = :userIdx " +
-                "ORDER BY mp.joinedAt DESC",
+                        "WHERE mp.user.idx = :userIdx " +
+                        "ORDER BY mp.joinedAt DESC",
                 MeetupParticipants.class)
                 .setParameter("userIdx", testUser.getIdx())
                 .getResultList();
@@ -195,7 +197,7 @@ class MeetupParticipantsRepositoryPerformanceTest {
                 meetupAccessCount++;
                 String title = meetup.getTitle(); // Lazy 로딩 트리거
             }
-            
+
             // user 접근 시 추가 쿼리 발생
             Users user = participant.getUser();
             if (user != null) {
@@ -215,7 +217,7 @@ class MeetupParticipantsRepositoryPerformanceTest {
         long queryCount = statistics.getQueryExecutionCount();
         long entityLoadCount = statistics.getEntityLoadCount();
         long collectionLoadCount = statistics.getCollectionLoadCount();
-        
+
         // 더 자세한 통계 정보
         long prepareStatementCount = statistics.getPrepareStatementCount();
         long closeStatementCount = statistics.getCloseStatementCount();
@@ -250,7 +252,8 @@ class MeetupParticipantsRepositoryPerformanceTest {
         System.out.println("📋 상세 분석:");
         System.out.println("- 현재 구현: JOIN FETCH 없이 연관 엔티티 조회");
         System.out.println("- 예상 문제: N+1 쿼리 발생 (1 + N개 meetup 쿼리 + N개 user 쿼리)");
-        System.out.println("- 예상 쿼리 수: " + (1 + TOTAL_PARTICIPATION_COUNT * 2) + " 개 (1 + " + TOTAL_PARTICIPATION_COUNT + " * 2)");
+        System.out.println(
+                "- 예상 쿼리 수: " + (1 + TOTAL_PARTICIPATION_COUNT * 2) + " 개 (1 + " + TOTAL_PARTICIPATION_COUNT + " * 2)");
         System.out.println("- 예상 개선 포인트:");
         System.out.println("  * JOIN FETCH 적용 → N+1 쿼리 제거");
         System.out.println("  * 쿼리 수: " + (1 + TOTAL_PARTICIPATION_COUNT * 2) + "개 → 1개");
@@ -260,7 +263,7 @@ class MeetupParticipantsRepositoryPerformanceTest {
         // 검증
         assertThat(participants).isNotNull();
         assertThat(participants.size()).isEqualTo(TOTAL_PARTICIPATION_COUNT);
-        
+
         // 실제 측정 결과 분석
         // 쿼리 수가 1개인 경우: Hibernate 배치 로딩이나 다른 최적화가 적용되었을 수 있음
         // 엔티티 로드 횟수가 202개인 경우: 실제로는 여러 엔티티가 로드되었지만 배치로 처리됨
@@ -268,7 +271,7 @@ class MeetupParticipantsRepositoryPerformanceTest {
         System.out.println("⚠️  주의: 쿼리 수가 1개로 측정되었지만, 엔티티 로드 횟수(" + entityLoadCount + ")를 보면");
         System.out.println("   실제로는 여러 엔티티가 로드되었습니다. Hibernate 배치 로딩이 적용되었을 수 있습니다.");
         System.out.println("   PrepareStatement 수(" + prepareStatementCount + ")를 확인하여 실제 DB 쿼리 수를 파악하세요.");
-        
+
         // 실제 DB 쿼리 수는 PrepareStatement 수로 확인 가능
         // N+1 쿼리가 발생했다면 PrepareStatement 수가 1보다 많아야 함
         // 하지만 배치 로딩이 적용되면 PrepareStatement 수도 적을 수 있음
@@ -295,7 +298,8 @@ class MeetupParticipantsRepositoryPerformanceTest {
 
         // DB 쿼리 실행 (JOIN FETCH 적용)
         long dbStartTime = System.currentTimeMillis();
-        List<MeetupParticipants> participants = meetupParticipantsRepository.findByUserIdxOrderByJoinedAtDesc(testUser.getIdx());
+        List<MeetupParticipants> participants = meetupParticipantsRepository
+                .findByUserIdxOrderByJoinedAtDesc(testUser.getIdx());
         long dbTime = System.currentTimeMillis() - dbStartTime;
 
         // 연관 엔티티 접근 (이미 JOIN FETCH로 로드되어 추가 쿼리 없음)
@@ -309,7 +313,7 @@ class MeetupParticipantsRepositoryPerformanceTest {
                 meetupAccessCount++;
                 String title = meetup.getTitle(); // 추가 쿼리 없음
             }
-            
+
             // user 접근 (이미 로드되어 있음)
             Users user = participant.getUser();
             if (user != null) {
@@ -329,7 +333,7 @@ class MeetupParticipantsRepositoryPerformanceTest {
         long queryCount = statistics.getQueryExecutionCount();
         long entityLoadCount = statistics.getEntityLoadCount();
         long collectionLoadCount = statistics.getCollectionLoadCount();
-        
+
         // 더 자세한 통계 정보
         long prepareStatementCount = statistics.getPrepareStatementCount();
         long closeStatementCount = statistics.getCloseStatementCount();
@@ -374,7 +378,7 @@ class MeetupParticipantsRepositoryPerformanceTest {
         // 검증
         assertThat(participants).isNotNull();
         assertThat(participants.size()).isEqualTo(TOTAL_PARTICIPATION_COUNT);
-        
+
         // JOIN FETCH 적용 후 쿼리 수가 Before보다 크게 줄어들어야 함
         // Before: PrepareStatement 102개 → After: 1개 (예상)
         // 실제 결과에 따라 assertion 조정

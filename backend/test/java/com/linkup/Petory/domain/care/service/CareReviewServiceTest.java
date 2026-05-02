@@ -178,7 +178,6 @@ class CareReviewServiceTest {
         void 예외_비요청자_리뷰() {
                 Users requester = createUser(1L);
                 Users provider = createUser(2L);
-                Users stranger = createUser(3L);
                 CareApplication app = createAcceptedApplication(10L, requester, provider);
 
                 CareReviewDTO dto = createReviewDTO(10L, 3L, 2L);

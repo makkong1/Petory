@@ -51,16 +51,15 @@ const Navigation = ({ activeTab, setActiveTab, user, onNavigateToBoard }) => {
 
   // 알림 조회
   const fetchNotifications = useCallback(async () => {
-    const userId = user?.idx || user?.id;
-    if (!userId) {
-      console.warn('알림 조회 실패: user 정보가 없습니다.', user);
+    if (!user) {
+      console.warn('알림 조회 실패: user 정보가 없습니다.');
       return;
     }
     try {
       setLoadingNotifications(true);
       const [notificationsRes, countRes] = await Promise.all([
-        notificationApi.getUserNotifications(userId),
-        notificationApi.getUnreadCount(userId),
+        notificationApi.getUserNotifications(),
+        notificationApi.getUnreadCount(),
       ]);
       setNotifications(notificationsRes.data || []);
       setUnreadCount(countRes.data || 0);
@@ -81,18 +80,16 @@ const Navigation = ({ activeTab, setActiveTab, user, onNavigateToBoard }) => {
 
   // 알림 목록 열 때 조회
   useEffect(() => {
-    const userId = user?.idx || user?.id;
-    if (isNotificationOpen && userId) {
+    if (isNotificationOpen && user) {
       fetchNotifications();
     }
   }, [isNotificationOpen, user, fetchNotifications]);
 
   // 알림 개수 업데이트 함수
   const updateUnreadCount = useCallback(async () => {
-    const userId = user?.idx || user?.id;
-    if (!userId) return;
+    if (!user) return;
     try {
-      const res = await notificationApi.getUnreadCount(userId);
+      const res = await notificationApi.getUnreadCount();
       setUnreadCount(res.data || 0);
     } catch (err) {
       if (err.response?.status !== 401) {
@@ -103,8 +100,7 @@ const Navigation = ({ activeTab, setActiveTab, user, onNavigateToBoard }) => {
 
   // Server-Sent Events를 통한 실시간 알림 구독
   useEffect(() => {
-    const userId = user?.idx || user?.id;
-    if (!userId) return;
+    if (!user) return;
 
     const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
     if (!token) return;
@@ -119,7 +115,7 @@ const Navigation = ({ activeTab, setActiveTab, user, onNavigateToBoard }) => {
       }
 
       eventSource = new EventSource(
-        `http://localhost:8080/api/notifications/stream?userId=${userId}&token=${encodeURIComponent(token)}`,
+        `/api/notifications/stream?token=${encodeURIComponent(token)}`,
         { withCredentials: true }
       );
 
@@ -186,10 +182,9 @@ const Navigation = ({ activeTab, setActiveTab, user, onNavigateToBoard }) => {
 
   // 알림 읽음 처리
   const handleMarkAsRead = async (notificationId) => {
-    const userId = user?.idx || user?.id;
-    if (!userId) return;
+    if (!user) return;
     try {
-      await notificationApi.markAsRead(notificationId, userId);
+      await notificationApi.markAsRead(notificationId);
       setNotifications(prev =>
         prev.map(n => n.idx === notificationId ? { ...n, isRead: true } : n)
       );
@@ -201,10 +196,9 @@ const Navigation = ({ activeTab, setActiveTab, user, onNavigateToBoard }) => {
 
   // 모든 알림 읽음 처리
   const handleMarkAllAsRead = async () => {
-    const userId = user?.idx || user?.id;
-    if (!userId) return;
+    if (!user) return;
     try {
-      await notificationApi.markAllAsRead(userId);
+      await notificationApi.markAllAsRead();
       setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
       setUnreadCount(0);
     } catch (err) {
