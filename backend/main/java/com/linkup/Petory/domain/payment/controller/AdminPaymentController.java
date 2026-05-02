@@ -5,13 +5,18 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import com.linkup.Petory.domain.payment.dto.PetCoinBalanceResponse;
-import com.linkup.Petory.domain.payment.exception.PaymentValidationException;
 import com.linkup.Petory.domain.payment.dto.PetCoinChargeRequest;
 import com.linkup.Petory.domain.payment.dto.PetCoinTransactionDTO;
 import com.linkup.Petory.domain.payment.entity.PetCoinTransaction;
+import com.linkup.Petory.domain.payment.exception.PaymentValidationException;
 import com.linkup.Petory.domain.payment.repository.PetCoinTransactionRepository;
 import com.linkup.Petory.domain.payment.service.PetCoinService;
 import com.linkup.Petory.domain.user.entity.Users;
@@ -25,7 +30,8 @@ import lombok.RequiredArgsConstructor;
  * - ADMIN과 MASTER만 접근 가능
  * - 사용자에게 코인을 직접 지급할 수 있는 기능 제공
  *
- * [리팩토링] SpringDataJpaPetCoinTransactionRepository → PetCoinTransactionRepository (도메인 인터페이스) 사용
+ * [리팩토링] SpringDataJpaPetCoinTransactionRepository →
+ * PetCoinTransactionRepository (도메인 인터페이스) 사용
  */
 @RestController
 @RequestMapping("/api/admin/payment")

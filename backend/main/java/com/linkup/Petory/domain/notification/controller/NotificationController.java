@@ -9,13 +9,13 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import com.linkup.Petory.domain.notification.dto.NotificationDTO;
 import com.linkup.Petory.domain.notification.service.NotificationService;
 import com.linkup.Petory.domain.notification.service.NotificationSseService;
+import com.linkup.Petory.global.security.AuthenticatedUserIdResolver;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,13 +28,15 @@ public class NotificationController {
 
     private final NotificationService notificationService;
     private final NotificationSseService sseService;
+    private final AuthenticatedUserIdResolver authenticatedUserIdResolver;
 
     /**
      * 현재 사용자의 알림 목록 조회
      */
     @PreAuthorize("isAuthenticated()")
     @GetMapping
-    public ResponseEntity<List<NotificationDTO>> getNotifications(@RequestParam Long userId) {
+    public ResponseEntity<List<NotificationDTO>> getNotifications() {
+        long userId = authenticatedUserIdResolver.requireCurrentUserIdx();
         List<NotificationDTO> notifications = notificationService.getUserNotifications(userId);
         return ResponseEntity.ok(notifications);
     }
@@ -44,7 +46,8 @@ public class NotificationController {
      */
     @PreAuthorize("isAuthenticated()")
     @GetMapping("/unread")
-    public ResponseEntity<List<NotificationDTO>> getUnreadNotifications(@RequestParam Long userId) {
+    public ResponseEntity<List<NotificationDTO>> getUnreadNotifications() {
+        long userId = authenticatedUserIdResolver.requireCurrentUserIdx();
         List<NotificationDTO> notifications = notificationService.getUnreadNotifications(userId);
         return ResponseEntity.ok(notifications);
     }
@@ -54,7 +57,8 @@ public class NotificationController {
      */
     @PreAuthorize("isAuthenticated()")
     @GetMapping("/unread/count")
-    public ResponseEntity<Long> getUnreadCount(@RequestParam Long userId) {
+    public ResponseEntity<Long> getUnreadCount() {
+        long userId = authenticatedUserIdResolver.requireCurrentUserIdx();
         Long count = notificationService.getUnreadCount(userId);
         return ResponseEntity.ok(count);
     }
@@ -64,7 +68,8 @@ public class NotificationController {
      */
     @PreAuthorize("isAuthenticated()")
     @PutMapping("/{notificationId}/read")
-    public ResponseEntity<Void> markAsRead(@PathVariable Long notificationId, @RequestParam Long userId) {
+    public ResponseEntity<Void> markAsRead(@PathVariable Long notificationId) {
+        long userId = authenticatedUserIdResolver.requireCurrentUserIdx();
         notificationService.markAsRead(notificationId, userId);
         return ResponseEntity.ok().build();
     }
@@ -74,7 +79,8 @@ public class NotificationController {
      */
     @PreAuthorize("isAuthenticated()")
     @PutMapping("/read-all")
-    public ResponseEntity<Void> markAllAsRead(@RequestParam Long userId) {
+    public ResponseEntity<Void> markAllAsRead() {
+        long userId = authenticatedUserIdResolver.requireCurrentUserIdx();
         notificationService.markAllAsRead(userId);
         return ResponseEntity.ok().build();
     }
@@ -86,8 +92,10 @@ public class NotificationController {
      * SecurityConfig에서 이 엔드포인트는 쿼리 파라미터의 토큰으로 인증하도록 설정됨
      */
     @SuppressWarnings({ "null", "UseSpecificCatch" })
+    @PreAuthorize("isAuthenticated()")
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter streamNotifications(@RequestParam Long userId) {
+    public SseEmitter streamNotifications() {
+        long userId = authenticatedUserIdResolver.requireCurrentUserIdx();
         log.info("SSE 연결 요청: userId={}", userId);
         SseEmitter emitter = sseService.createConnection(userId);
 
@@ -96,7 +104,7 @@ public class NotificationController {
             Long unreadCount = notificationService.getUnreadCount(userId);
             emitter.send(SseEmitter.event()
                     .name("unreadCount")
-                    .data(unreadCount));
+                    .data(String.valueOf(unreadCount), MediaType.TEXT_PLAIN));
         } catch (Exception e) {
             log.error("초기 알림 개수 전송 실패: userId={}", userId, e);
         }

@@ -39,7 +39,6 @@ import com.linkup.Petory.domain.care.repository.CareRequestRepository;
 import com.linkup.Petory.domain.payment.service.PetCoinEscrowService;
 import com.linkup.Petory.domain.user.entity.Role;
 import com.linkup.Petory.domain.user.entity.Users;
-import com.linkup.Petory.domain.user.repository.PetRepository;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -53,13 +52,12 @@ class CareRequestServiceTest {
     @Mock
     private UsersRepository usersRepository;
     @Mock
-    private PetRepository petRepository;
-    @Mock
     private CareRequestConverter careRequestConverter;
     @Mock
     private PetCoinEscrowService petCoinEscrowService;
 
     @AfterEach
+    @SuppressWarnings("unused")
     void tearDown() {
         SecurityContextHolder.clearContext();
     }
@@ -249,6 +247,7 @@ class CareRequestServiceTest {
 
     // ===== searchCareRequestsWithPaging =====
 
+    @SuppressWarnings("null")
     @Test
     @DisplayName("경계: 검색 키워드 공백만이면 전체 페이징으로 위임하고 searchWithPaging 미호출")
     void 경계_검색키워드_공백_전체페이징() {

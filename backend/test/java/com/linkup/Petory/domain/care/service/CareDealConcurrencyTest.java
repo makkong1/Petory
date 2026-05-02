@@ -1,13 +1,12 @@
 package com.linkup.Petory.domain.care.service;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -18,7 +17,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import com.linkup.Petory.domain.care.entity.CareRequest;
 import com.linkup.Petory.domain.care.entity.CareRequestStatus;
 import com.linkup.Petory.domain.care.repository.CareRequestRepository;
-import com.linkup.Petory.domain.care.repository.CareReviewRepository;
 import com.linkup.Petory.domain.chat.entity.Conversation;
 import com.linkup.Petory.domain.chat.entity.ConversationParticipant;
 import com.linkup.Petory.domain.chat.entity.ConversationStatus;
@@ -46,9 +44,6 @@ class CareDealConcurrencyTest {
     private CareRequestRepository careRequestRepository;
 
     @Autowired
-    private CareReviewRepository careReviewRepository;
-
-    @Autowired
     private ConversationRepository conversationRepository;
 
     @Autowired
@@ -60,6 +55,7 @@ class CareDealConcurrencyTest {
     private Conversation conversation;
 
     @BeforeEach
+    @SuppressWarnings("unused")
     void setup() {
         // 매번 고유한 ID 생성하여 중복 에러 완전 방지
         long uniqueId = System.currentTimeMillis();
@@ -121,6 +117,7 @@ class CareDealConcurrencyTest {
     }
 
     @AfterEach
+    @SuppressWarnings("unused")
     void tearDown() {
         // 이 테스트에서 생성한 데이터만 명시적으로 삭제 (순서 중요)
 
@@ -152,6 +149,7 @@ class CareDealConcurrencyTest {
 
     @Test
     @DisplayName("동시 거래 확정 시도 시 Stuck State 없이 정상적으로 상태가 변경되어야 한다")
+    @SuppressWarnings("CallToPrintStackTrace")
     void confirmCareDeal_Concurrency() throws InterruptedException {
         // Given
         int threadCount = 2;

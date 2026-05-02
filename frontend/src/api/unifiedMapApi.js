@@ -71,10 +71,11 @@ const getLimitForLevel = (type, level) => {
  */
 export const fetchActiveMapItems = async ({ type, lat, lng, radius, keyword, category, mapLevel = 7 }) => {
   if (type === 'location') {
+    const radiusKm = typeof radius === 'number' && Number.isFinite(radius) ? radius : 5;
     const res = await locationServiceApi.searchPlaces({
       latitude: lat,
       longitude: lng,
-      radius: radius * 1000, // km → m
+      radius: radiusKm * 1000, // km → m
       ...(keyword && { keyword }),
       ...(category && { category }),
       size: getLimitForLevel('location', mapLevel),

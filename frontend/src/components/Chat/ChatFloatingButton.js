@@ -3,7 +3,7 @@ import styled from 'styled-components';
 
 const ChatFloatingButton = ({ onClick, unreadCount = 0 }) => {
   return (
-    <FloatingButton onClick={onClick} unreadCount={unreadCount}>
+    <FloatingButton type="button" onClick={onClick}>
       <ChatIcon>💬</ChatIcon>
       {unreadCount > 0 && <Badge>{unreadCount > 99 ? '99+' : unreadCount}</Badge>}
     </FloatingButton>

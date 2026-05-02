@@ -1,21 +1,20 @@
-import { createAuthAxios } from './apiClient';
+import { API_ROOT, createAuthAxios } from './apiClient';
 
-const api = createAuthAxios('http://localhost:8080/api/notifications');
+const api = createAuthAxios(`${API_ROOT}/notifications`);
 
 export const notificationApi = {
-  // 사용자의 알림 목록 조회
-  getUserNotifications: (userId) => api.get('', { params: { userId } }),
-  
-  // 읽지 않은 알림 목록 조회
-  getUnreadNotifications: (userId) => api.get('/unread', { params: { userId } }),
-  
-  // 읽지 않은 알림 개수 조회
-  getUnreadCount: (userId) => api.get('/unread/count', { params: { userId } }),
-  
-  // 알림 읽음 처리
-  markAsRead: (notificationId, userId) => api.put(`/${notificationId}/read`, null, { params: { userId } }),
-  
-  // 모든 알림 읽음 처리
-  markAllAsRead: (userId) => api.put('/read-all', null, { params: { userId } }),
-};
+  // 사용자의 알림 목록 조회 (PK는 JWT에서만 해석)
+  getUserNotifications: () => api.get(''),
 
+  // 읽지 않은 알림 목록 조회
+  getUnreadNotifications: () => api.get('/unread'),
+
+  // 읽지 않은 알림 개수 조회
+  getUnreadCount: () => api.get('/unread/count'),
+
+  // 알림 읽음 처리
+  markAsRead: (notificationId) => api.put(`/${notificationId}/read`),
+
+  // 모든 알림 읽음 처리
+  markAllAsRead: () => api.put('/read-all'),
+};
