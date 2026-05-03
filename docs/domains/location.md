@@ -663,6 +663,8 @@ erDiagram
 
 ### 4.4 API 설계
 
+> **로드맵 (폐기 예정 가능)**: `GET /api/location-services/recommend`는 사용자 관점에서 `GET /api/recommend`(Pet Data API 프록시)와 **목적이 겹친다**. Python 데이터 서버가 기대 형태로 **연결·검증된 뒤** 본 엔드포인트와 `LocationRecommendAgentService` 기반 플로우는 **통합 또는 제거**할 예정이다. 당분간 유지한다. [`recommendation.md`](./recommendation.md) §1.4.
+
 #### REST API
 **참고**: 리뷰 관련 API는 클래스 레벨에 `@PreAuthorize("isAuthenticated()")` 적용되어 인증 필요
 

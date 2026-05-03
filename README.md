@@ -79,6 +79,7 @@
 - **응답**: 시설 목록(이름, 거리 m, 주소, 좌표), 트렌드 키워드·점수, 자연어 추천 문구, 생성 시각(`generated_at`)
 - **가용성**: 외부 API를 사용할 수 없을 때 `503 Service Unavailable`으로 응답 (서비스 레이어에서 `null` 반환 시)
 - **설정**: `app.pet-data-api.base-url`, `app.pet-data-api.api-key` (`application.properties`에 정의; 로컬/운영에서 Pet Data API URL·키를 맞출 것)
+- **로드맵(중복 추천)**: Location의 `GET /api/location-services/recommend`(DB+Spring AI 재순위)와 기능 목적이 겹친다. **Pet Data API 연결·품질 검증이 끝나면 후자를 폐기하고 단일 추천 경로로 통합**할 예정이며, 당분간은 둘 다 유지한다. 상세: [`docs/domains/recommendation.md`](./docs/domains/recommendation.md) §1.4.
 
 ### 커뮤니티 & 실종 제보
 - **블라인드 처리**: 신고 누적 시 자동으로 콘텐츠를 가리는 유해 콘텐츠 필터링 로직

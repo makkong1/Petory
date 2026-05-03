@@ -1,5 +1,10 @@
 # Petory (페토리) - Agent Instructions
 
+### Agent behavioral spec (Claude · Cursor 공통)
+
+- **Root contract:** Repo root **`CLAUDE.md`** — read the 「최상위: 기본 작업 규격」block first for coding style (simplicity, surgical diffs, verifiable goals). User instructions override conflicts.
+- **Mirrors:** `docs/AGENT_TOOLING.md` (mapping + English §2), **Cursor:** `.cursor/rules/karpathy-guidelines.mdc` (project rule, `alwaysApply: true`), **Claude Code:** **`/karpathy-guidelines`** (`.claude/commands/karpathy-guidelines.md`).
+
 ## Cursor Cloud specific instructions
 
 ### Project overview
