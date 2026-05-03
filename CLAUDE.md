@@ -1,5 +1,28 @@
 # CLAUDE.md
 
+## 최상위: 기본 작업 규격
+
+이 저장소에서 에이전트가 코드를 작성·수정·리뷰·리팩터링할 때 적용하는 **행동 규격의 근원**은 이 파일이다. **사용자가 명시한 요청과 충돌하면 사용자 요청이 우선**한다. 펫토리 도메인·기술 스택 요구(DB 인덱스, 트랜잭션, 보안 등)는 아래 각 절과 **함께** 만족해야 한다.
+
+- **영어 원문 미러(Cursor Rules):** `.cursor/rules/karpathy-guidelines.mdc` (`alwaysApply: true`)
+- **슬래시 리마인더(Claude Code):** `/karpathy-guidelines` → `.claude/commands/karpathy-guidelines.md`
+
+규격이 서로 비교되면 **`CLAUDE.md`가 우선**한다. 채널 간 매핑과 원문은 **`docs/AGENT_TOOLING.md`** 참고.
+
+### 에이전트 행동 가이드 (`docs/AGENT_TOOLING.md` §2와 동일 철학)
+
+**1. 코딩 전에 생각하기** — 추측으로 진행하지 말 것. 불확실하면 가정을 말하고 질문할 것. 해석이 여러 개면 조용히 한 가지를 고르지 말고 제시할 것. 더 단순한 방법이 있으면 말하고, 필요하면 과잉 설계를 거절할 것.
+
+**2. 단순함 우선** — 문제를 푸는 최소 코드만 쓸 것. 요청받지 않은 기능·추상화·설정 가능성·불가능한 시나리오용 과잉 에러 처리를 넣지 말 것. “시니어가 과하다고 할까?”에 예라면 줄일 것.
+
+**3. 외과적 변경** — 손대야 할 줄만 수정할 것. 인접한 “개선”, 무관한 리포맷·리팩터는 하지 말 것. 기존 스타일에 맞출 것. 무관해 보이는 죽은 코드는 삭제하지 말고 언급만 할 것. **내 변경 때문에** 불필요해진 import·변수·함수만 제거할 것.
+
+**4. 목표 기준 실행** — 작업을 검증 가능한 목표로 바꿀 것(예: 버그 수정 → 재현 테스트 후 통과). 다단계일 때 짧은 계획과 각 단계의 검증 기준을 둘 것. 완료 주장 전에 이 문서의 **빌드·테스트**로 근거를 남길 것(환경 불가 등은 명시).
+
+**워크플로 슬래시**(`/review`, `/test`, `workflow` 등)는 위 규격을 지키는 **순서·체크리스트 레이어**이며, 기본 태도 정의는 여전히 위 네 가지다.
+
+---
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## 필수 기술 역량
@@ -123,6 +146,7 @@ frontend/src/
 
 | Skill | 파일 | 핵심 기능 |
 |-------|------|----------|
+| **기본 작업 규격** | `CLAUDE.md` 상단 · `.cursor/rules/karpathy-guidelines.mdc` · `/karpathy-guidelines` | 과잉 변경 방지·단순함·외과식 수정·검증 가능 목표 (`docs/AGENT_TOOLING.md`) |
 | 코드 리뷰 | `.claude/skills/review.md` | 룰 기반 체크리스트(JPA/트랜잭션/보안) + [문제→원인→개선코드] 형식 + 점수판 |
 | 커밋+푸시 | `.claude/skills/commit.md` | 파일 필터링(민감파일 자동제외) → type/scope 자동분류 → 도메인별 커밋 분리 제안 |
 | 문서화 | `.claude/skills/docs-sync.md` | 변경 파일 기반 영향 문서 자동 탐지 → 코드 사실 확인 → 문서 현행화 |

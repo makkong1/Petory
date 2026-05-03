@@ -20,6 +20,13 @@ Petory 백엔드는 **추천 점수·트렌드·시설 후보**를 직접 계산
 - **전용 JPA 엔티티 없음**: 추천 결과를 Petory MySQL에 영속하지 않음
 - **반려동물은 User 도메인 `Pet`에서 조회**: `findByUserIdAndNotDeleted` 첫 항목만 사용
 
+### 1.4 로드맵 — Location AI 추천과의 통합·폐기 예정
+
+사용자 경험상 **“주변 서비스 추천”**은 Location 도메인의 `GET /api/location-services/recommend`(MySQL 검색 후 `LocationRecommendAgentService`/`Ollama`로 재순위·이유)과 **동일 목적 영역에서 겹친다.**
+
+- **현재**: 두 경로 모두 유지(회귀·프론트 의존성 방지).
+- **향후**: **Pet Data API(Python)가 `GET /api/recommend` 기준으로 기대 동작까지 안정 검증된 뒤**, Location **`/api/location-services/recommend`(및 해당 에이전트)·통합 지도 AI 모드**를 Pet Data 계약 한쪽으로 합치고 **코드/API 제거**할 예정이다. 시행 시점 확정 후 `docs/domains/location.md`·본 문서에 상태를 업데이트한다.
+
 ---
 
 ## 2. API

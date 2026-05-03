@@ -1,5 +1,9 @@
 # 개발 역량 및 기술 스택 규칙
 
+## 에이전트 기본 규격 (Cursor)
+
+코딩·리뷰·리팩터링 시 **Project Rules**: `.cursor/rules/karpathy-guidelines.mdc` (`alwaysApply: true`)와 본 파일의 나머지 도메인 규칙을 따른다. 규격 전체 매핑·원문 배경은 **`docs/AGENT_TOOLING.md`**. **사용자가 채팅에서 명시한 지시와 충돌하면 사용자 지시가 우선**한다.
+
 ## 필수 기술 역량
 
 ### 데이터베이스
