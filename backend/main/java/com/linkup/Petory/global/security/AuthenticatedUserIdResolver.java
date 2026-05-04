@@ -6,7 +6,6 @@ import org.springframework.stereotype.Component;
 
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.exception.UnauthenticatedException;
-import com.linkup.Petory.domain.user.exception.UserNotFoundException;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -27,8 +26,8 @@ public class AuthenticatedUserIdResolver {
             throw new UnauthenticatedException("인증되지 않은 사용자입니다.");
         }
         String loginId = authentication.getName();
-        Users user = usersRepository.findByIdString(loginId)
-                .orElseThrow(UserNotFoundException::new);
+        Users user = usersRepository.findActiveByIdString(loginId)
+                .orElseThrow(() -> new UnauthenticatedException("유효하지 않은 인증 사용자입니다."));
         return user.getIdx();
     }
 }

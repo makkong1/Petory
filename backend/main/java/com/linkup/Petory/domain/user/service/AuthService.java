@@ -32,7 +32,7 @@ public class AuthService {
      */
     @Transactional
     public TokenResponse login(String id, String password) {
-        Users user = usersRepository.findByIdString(id)
+        Users user = usersRepository.findActiveByIdString(id)
                 .orElseThrow(UserNotFoundException::new);
 
         // 제재 상태 확인
@@ -86,7 +86,7 @@ public class AuthService {
         }
 
         // DB에서 Refresh Token 확인
-        Users user = usersRepository.findByRefreshToken(refreshToken)
+        Users user = usersRepository.findActiveByRefreshToken(refreshToken)
                 .orElseThrow(() -> {
                     log.warn("❌ Refresh Token을 DB에서 찾을 수 없음");
                     return InvalidRefreshTokenException.notFound();
@@ -122,7 +122,7 @@ public class AuthService {
      */
     @Transactional
     public void logout(String userId) {
-        Users user = usersRepository.findByIdString(userId)
+        Users user = usersRepository.findActiveByIdString(userId)
                 .orElseThrow(UserNotFoundException::new);
 
         // DB에서 Refresh Token 제거
@@ -144,7 +144,7 @@ public class AuthService {
             }
 
             // DB에서 Refresh Token 확인
-            Users user = usersRepository.findByRefreshToken(refreshToken)
+            Users user = usersRepository.findActiveByRefreshToken(refreshToken)
                     .orElse(null);
 
             if (user == null) {

@@ -240,6 +240,8 @@ public class UsersService {
                 .orElseThrow(UserNotFoundException::new);
         user.setIsDeleted(true);
         user.setDeletedAt(java.time.LocalDateTime.now());
+        user.setRefreshToken(null);
+        user.setRefreshExpiration(null);
         usersRepository.save(user);
     }
 

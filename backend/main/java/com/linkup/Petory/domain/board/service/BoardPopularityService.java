@@ -1,5 +1,18 @@
 package com.linkup.Petory.domain.board.service;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
+
+import org.springframework.data.domain.Sort;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.linkup.Petory.domain.board.converter.BoardPopularitySnapshotConverter;
 import com.linkup.Petory.domain.board.dto.BoardPopularitySnapshotDTO;
 import com.linkup.Petory.domain.board.entity.Board;
@@ -12,20 +25,8 @@ import com.linkup.Petory.domain.board.repository.BoardReactionRepository;
 import com.linkup.Petory.domain.board.repository.BoardRepository;
 import com.linkup.Petory.domain.board.repository.BoardViewLogRepository;
 import com.linkup.Petory.domain.board.repository.CommentRepository;
+
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Sort;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.stream.Collectors;
-
 import lombok.extern.slf4j.Slf4j;
 
 @Service
@@ -179,13 +180,23 @@ public class BoardPopularityService {
      * [리팩토링] 3개 배치 조회를 병렬 실행 후 Map<Long, BoardCounts>로 통합
      *
      * <p>
-     * 동작: 좋아요/댓글/조회수 3개 쿼리를 supplyAsync로 동시 실행 → allOf로 대기 → 결과를 BoardCounts로 합침
+     * 동작: 좋아요/댓글/조회수 3개 쿼리를 supplyAsync로 동시(병렬) 실행 → allOf로 대기
+     * → 결과를 BoardCounts로 합침
      */
     private Map<Long, BoardCounts> fetchBoardCountsInParallel(List<Long> boardIds) {
         if (boardIds.isEmpty()) {
             return Map.of();
         }
 
+        /*
+         * CompletableFuture<Map<Long, Integer>>
+         * "나중에 Map<Long, Integer> 결과가 들어올 비동기 작업 객체"
+         * supplyAsync()
+         * = 값을 반환하는 작업을 별도 스레드에서 비동기로 실행한다.
+         * 아래 3개 줄이 실행되면 좋아요/댓글/조회수 조회가 각각 시작된다.
+         * 즉, allOf()가 실행을 시작시키는 것이 아니라,
+         * supplyAsync() 호출 시점에 이미 작업이 시작된다.
+         */
         CompletableFuture<Map<Long, Integer>> likesFuture = CompletableFuture
                 .supplyAsync(() -> getLikeCountsBatch(boardIds));
         CompletableFuture<Map<Long, Integer>> commentsFuture = CompletableFuture
@@ -193,6 +204,14 @@ public class BoardPopularityService {
         CompletableFuture<Map<Long, Integer>> viewsFuture = CompletableFuture
                 .supplyAsync(() -> getViewCountsBatch(boardIds));
 
+        /*
+         * allOf()
+         * = 이미 시작된 3개 Future가 모두 완료될 때까지 기다리는 Future를 만든다.
+         * thenApply()
+         * = allOf()가 완료된 뒤, 즉 3개 조회가 모두 끝난 뒤 실행되는 후속 작업이다.
+         * 여기서 allOf()는 조회를 다시 실행하지 않는다.
+         * 단지 "3개가 전부 끝났는지"를 기다리는 역할이다.
+         */
         CompletableFuture<Map<Long, BoardCounts>> combined = CompletableFuture
                 .allOf(likesFuture, commentsFuture, viewsFuture)
                 .thenApply(v -> {
@@ -201,6 +220,11 @@ public class BoardPopularityService {
                     Map<Long, Integer> views = viewsFuture.join();
 
                     Map<Long, BoardCounts> result = new HashMap<>();
+                    /*
+                     * 조회 결과 Map에 특정 boardId가 없을 수 있다.
+                     * 예: 좋아요가 0개인 게시글은 likes Map에 없을 수 있음.
+                     * 그래서 getOrDefault(boardId, 0)으로 기본값 0을 넣는다.
+                     */
                     for (Long boardId : boardIds) {
                         result.put(boardId, new BoardCounts(
                                 likes.getOrDefault(boardId, 0),
@@ -210,6 +234,13 @@ public class BoardPopularityService {
                     return result;
                 });
 
+        /*
+         * 
+         * combined.join()
+         * = 최종 통합 결과가 완성될 때까지 기다린 뒤 Map<Long, BoardCounts>를 반환한다.
+         * 즉, 내부적으로는 병렬 조회를 사용하지만
+         * 이 메서드 자체는 호출자에게 최종 결과를 반환하는 동기 메서드다.
+         */
         return combined.join();
     }
 

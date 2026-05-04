@@ -90,6 +90,11 @@ public class JpaUsersAdapter implements UsersRepository {
     }
 
     @Override
+    public Optional<Users> findActiveByIdString(String id) {
+        return jpaRepository.findActiveByIdString(id);
+    }
+
+    @Override
     public Optional<Long> findIdxByIdString(String id) {
         return jpaRepository.findIdxByIdString(id);
     }
@@ -97,6 +102,11 @@ public class JpaUsersAdapter implements UsersRepository {
     @Override
     public Optional<Users> findByRefreshToken(String refreshToken) {
         return jpaRepository.findByRefreshToken(refreshToken);
+    }
+
+    @Override
+    public Optional<Users> findActiveByRefreshToken(String refreshToken) {
+        return jpaRepository.findActiveByRefreshToken(refreshToken);
     }
 
     @Override
