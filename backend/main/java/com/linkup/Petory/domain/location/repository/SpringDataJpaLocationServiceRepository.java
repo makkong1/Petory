@@ -60,9 +60,12 @@ public interface SpringDataJpaLocationServiceRepository extends JpaRepository<Lo
                         "(ls.isDeleted IS NULL OR ls.isDeleted = false)")
         boolean existsByNameAndAddress(@Param("name") String name, @Param("address") String address);
 
+        // spatial index를 실제로 잘 타고 있음
+        // ST_Within + ST_Distance_Sphere 조합이 망하지 않음
+        // LIKE '%??%'가 인덱스를 못 타더라도, 이미 반경 후보가 줄어든 뒤라 피해가 제한적임
         @RepositoryMethod("장소 서비스: 반경 검색 (keyword·category 필터)")
-        @Query(value = "SELECT * FROM locationservice WHERE " +
-                        "ST_Within(location, ST_GeomFromText(" +
+        @Query(value = "SELECT * FROM locationservice ls WHERE " +
+                        "ST_Within(ls.location, ST_GeomFromText(" +
                         "CONCAT('POLYGON((', " +
                         ":latitude - (:radiusInMeters / 111000.0), ' ', :longitude - (:radiusInMeters / (111000.0 * COS(RADIANS(:latitude)))), ', ', "
                         +
@@ -75,20 +78,29 @@ public interface SpringDataJpaLocationServiceRepository extends JpaRepository<Lo
                         ":latitude - (:radiusInMeters / 111000.0), ' ', :longitude - (:radiusInMeters / (111000.0 * COS(RADIANS(:latitude)))), '))'), "
                         +
                         "4326)) AND " +
-                        "ST_Distance_Sphere(location, ST_GeomFromText(" +
+                        "ST_Distance_Sphere(ls.location, ST_GeomFromText(" +
                         "CONCAT('POINT(', :latitude, ' ', :longitude, ')'), 4326)) <= :radiusInMeters AND " +
-                        "is_deleted = 0 " +
-                        "AND (:keyword IS NULL OR name LIKE CONCAT('%', :keyword, '%')) " +
+                        "ls.is_deleted = 0 " +
+                        "AND (:keyword IS NULL OR ls.name LIKE CONCAT('%', :keyword, '%')) " +
                         "AND (:category IS NULL " +
-                        "     OR category3 = :category " +
-                        "     OR category2 = :category " +
-                        "     OR category1 = :category) " +
-                        "ORDER BY rating DESC", nativeQuery = true)
+                        "     OR ls.category3 = :category " +
+                        "     OR ls.category2 = :category " +
+                        "     OR ls.category1 = :category) " +
+                        "ORDER BY " +
+                        "CASE WHEN :sort = 'reviews' THEN (" +
+                        "    SELECT COUNT(*) FROM locationservicereview r " +
+                        "    WHERE r.service_idx = ls.idx AND (r.is_deleted IS NULL OR r.is_deleted = 0)" +
+                        ") END DESC, " +
+                        "CASE WHEN :sort = 'rating' THEN ls.rating END DESC, " +
+                        "ST_Distance_Sphere(ls.location, ST_GeomFromText(" +
+                        "CONCAT('POINT(', :latitude, ' ', :longitude, ')'), 4326)) ASC, " +
+                        "ls.rating DESC, ls.idx ASC", nativeQuery = true)
         List<LocationService> findByRadius(@Param("latitude") Double latitude,
                         @Param("longitude") Double longitude,
                         @Param("radiusInMeters") Double radiusInMeters,
                         @Param("keyword") String keyword,
-                        @Param("category") String category);
+                        @Param("category") String category,
+                        @Param("sort") String sort);
 
         @RepositoryMethod("장소 서비스: 시군구별 조회 (keyword·category 필터)")
         @Query(value = "SELECT * FROM locationservice USE INDEX (idx_locationservice_sigungu_deleted_rating) " +

@@ -69,7 +69,7 @@ const getLimitForLevel = (type, level) => {
  * 활성 탭 1개의 데이터만 조회해 공통 mapItem 배열로 반환
  * @param {number} mapLevel - 카카오맵 기준 줌 레벨 (1=최대확대, 14=전국). 기본값 7
  */
-export const fetchActiveMapItems = async ({ type, lat, lng, radius, keyword, category, mapLevel = 7 }) => {
+export const fetchActiveMapItems = async ({ type, lat, lng, radius, keyword, category, sort, mapLevel = 7 }) => {
   if (type === 'location') {
     const radiusKm = typeof radius === 'number' && Number.isFinite(radius) ? radius : 5;
     const res = await locationServiceApi.searchPlaces({
@@ -78,6 +78,7 @@ export const fetchActiveMapItems = async ({ type, lat, lng, radius, keyword, cat
       radius: radiusKm * 1000, // km → m
       ...(keyword && { keyword }),
       ...(category && { category }),
+      ...(sort && { sort }),
       size: getLimitForLevel('location', mapLevel),
     });
     const services = res?.data?.services ?? [];

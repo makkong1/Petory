@@ -47,7 +47,7 @@ public interface LocationServiceRepository {
      * 반경 검색 (ST_Distance_Sphere 사용, keyword·category 필터 포함)
      */
     List<LocationService> findByRadius(Double latitude, Double longitude, Double radiusInMeters,
-            String keyword, String category);
+            String keyword, String category, String sort);
 
     /**
      * 시군구별 조회 (keyword·category 필터 포함)

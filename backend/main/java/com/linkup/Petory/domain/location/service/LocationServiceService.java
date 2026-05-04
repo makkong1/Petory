@@ -23,6 +23,7 @@ import java.util.stream.Collectors;
 public class LocationServiceService {
 
     private static final int DEFAULT_RADIUS_METERS = 10_000;
+    private static final String DEFAULT_RADIUS_SORT = "distance";
 
     private final LocationServiceConverter locationServiceConverter;
     private final LocationServiceRepository locationServiceRepository;
@@ -47,6 +48,7 @@ public class LocationServiceService {
             String eupmyeondong,
             String roadName,
             String category,
+            String sort,
             Integer maxResults) {
 
         // 빈 문자열("")을 null로 정규화 — SQL의 :param IS NULL 조건이 올바르게 작동하도록
@@ -56,6 +58,7 @@ public class LocationServiceService {
         sigungu      = normalize(sigungu);
         eupmyeondong = normalize(eupmyeondong);
         roadName     = normalize(roadName);
+        sort         = normalizeSort(sort);
 
         boolean hasLocation = latitude != null && longitude != null;
         boolean hasRegion = StringUtils.hasText(sido) || StringUtils.hasText(sigungu)
@@ -66,7 +69,7 @@ public class LocationServiceService {
         if (hasLocation) {
             int radiusInMeters = (radius != null && radius > 0) ? radius : DEFAULT_RADIUS_METERS;
             return searchLocationServicesByLocation(latitude, longitude, radiusInMeters,
-                    keyword, category, maxResults);
+                    keyword, category, sort, maxResults);
         }
 
         // 2순위: 지역 계층
@@ -174,10 +177,12 @@ public class LocationServiceService {
             Integer radiusInMeters,
             String keyword,
             String category,
+            String sort,
             Integer maxResults) {
 
         keyword  = normalize(keyword);
         category = normalize(category);
+        sort     = normalizeSort(sort);
 
         long methodStartTime = System.currentTimeMillis();
         log.info("[위치 기반 검색] 시작 - lat={}, lng={}, radius={}m, keyword={}, category={}",
@@ -186,7 +191,7 @@ public class LocationServiceService {
         // 반경 검색 (keyword·category 포함)
         long queryStartTime = System.currentTimeMillis();
         List<LocationService> services = locationServiceRepository
-                .findByRadius(latitude, longitude, (double) radiusInMeters, keyword, category);
+                .findByRadius(latitude, longitude, (double) radiusInMeters, keyword, category, sort);
         long queryTime = System.currentTimeMillis() - queryStartTime;
         log.info("[성능 측정] 위치 기반 DB 쿼리 실행 시간: {}ms, 조회된 레코드 수: {}개", queryTime, services.size());
 
@@ -266,6 +271,16 @@ public class LocationServiceService {
      */
     private static String normalize(String value) {
         return StringUtils.hasText(value) ? value.trim() : null;
+    }
+
+    private static String normalizeSort(String sort) {
+        if (!StringUtils.hasText(sort)) {
+            return DEFAULT_RADIUS_SORT;
+        }
+        return switch (sort.trim().toLowerCase()) {
+            case "distance", "rating", "reviews" -> sort.trim().toLowerCase();
+            default -> DEFAULT_RADIUS_SORT;
+        };
     }
 
     /**
