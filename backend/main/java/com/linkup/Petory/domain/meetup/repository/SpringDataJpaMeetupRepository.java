@@ -128,6 +128,18 @@ public interface SpringDataJpaMeetupRepository extends JpaRepository<Meetup, Lon
     @Query("SELECT m FROM Meetup m WHERE (m.isDeleted = false OR m.isDeleted IS NULL)")
     Page<Meetup> findAllNotDeleted(Pageable pageable);
 
+    @EntityGraph(attributePaths = {"organizer"})
+    @RepositoryMethod("모임: 관리자 필터 페이징 조회")
+    @Query("SELECT m FROM Meetup m WHERE " +
+            "(m.isDeleted = false OR m.isDeleted IS NULL) AND " +
+            "(:status IS NULL OR CAST(m.status AS string) = :status) AND " +
+            "(:keyword IS NULL OR m.title LIKE %:keyword% OR m.description LIKE %:keyword% OR m.location LIKE %:keyword%) " +
+            "ORDER BY m.createdAt DESC")
+    Page<Meetup> findAllForAdmin(
+            @Param("status") String status,
+            @Param("keyword") String keyword,
+            Pageable pageable);
+
     @RepositoryMethod("모임: 단건 상세 조회 (참여자 포함)")
     @Query("SELECT DISTINCT m FROM Meetup m " +
             "LEFT JOIN FETCH m.organizer " +
@@ -153,4 +165,3 @@ public interface SpringDataJpaMeetupRepository extends JpaRepository<Meetup, Lon
     @RepositoryMethod("모임: 기간별 통계")
     long countByCreatedAtBetween(LocalDateTime start, LocalDateTime end);
 }
-

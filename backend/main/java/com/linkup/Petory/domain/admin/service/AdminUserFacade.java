@@ -134,6 +134,8 @@ public class AdminUserFacade {
         }
         user.setIsDeleted(true);
         user.setDeletedAt(java.time.LocalDateTime.now());
+        user.setRefreshToken(null);
+        user.setRefreshExpiration(null);
         usersRepository.save(user);
         log.warn("MASTER({}) ADMIN 계정 삭제: userId={}", masterIdx, targetId);
         auditService.log(masterIdx, "ADMIN_DELETE", "USER", targetId, "username=" + user.getUsername());

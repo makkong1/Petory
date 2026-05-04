@@ -102,6 +102,11 @@ public class JpaMeetupAdapter implements MeetupRepository {
     }
 
     @Override
+    public Page<Meetup> findAllForAdmin(String status, String keyword, Pageable pageable) {
+        return jpaRepository.findAllForAdmin(status, keyword, pageable);
+    }
+
+    @Override
     public Optional<Meetup> findByIdWithDetails(Long idx) {
         return jpaRepository.findByIdWithDetails(idx);
     }

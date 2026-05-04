@@ -60,6 +60,11 @@ public interface UsersRepository {
     Optional<Users> findByIdString(String id);
 
     /**
+     * 로그인/인증용: 소프트 삭제되지 않은 사용자만 로그인 아이디(String)로 조회
+     */
+    Optional<Users> findActiveByIdString(String id);
+
+    /**
      * 로그인 아이디(String)로 idx 스칼라만 조회 (Users 전체 로딩 없는 경량 버전)
      */
     Optional<Long> findIdxByIdString(String id);
@@ -68,6 +73,11 @@ public interface UsersRepository {
      * Refresh Token으로 사용자 조회
      */
     Optional<Users> findByRefreshToken(String refreshToken);
+
+    /**
+     * Refresh Token으로 소프트 삭제되지 않은 사용자 조회
+     */
+    Optional<Users> findActiveByRefreshToken(String refreshToken);
 
     /**
      * 통계용: 특정 기간 동안 생성된 사용자 수

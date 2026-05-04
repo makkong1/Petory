@@ -40,6 +40,9 @@ public class AdminSystemFacade {
                         .description(description)
                         .build());
         config.setConfigValue(value);
+        if (description != null) {
+            config.setDescription(description);
+        }
         configRepository.save(config);
         log.info("시스템 설정 변경: key={}, adminIdx={}", key, adminIdx);
         auditService.log(adminIdx, "SYSTEM_CONFIG_UPDATE", "SYSTEM", null, key + "=" + value);

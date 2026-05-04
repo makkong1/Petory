@@ -96,6 +96,11 @@ public interface MeetupRepository {
     Page<Meetup> findAllNotDeleted(Pageable pageable);
 
     /**
+     * 관리자용 모임 목록 페이징 (status / keyword 필터, 소프트 삭제 제외)
+     */
+    Page<Meetup> findAllForAdmin(String status, String keyword, Pageable pageable);
+
+    /**
      * 특정 모임 조회 (organizer와 participants 포함) - JOIN FETCH로 N+1 문제 해결
      */
     Optional<Meetup> findByIdWithDetails(Long idx);
