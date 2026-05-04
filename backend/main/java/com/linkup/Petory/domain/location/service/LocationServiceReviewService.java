@@ -66,7 +66,7 @@ public class LocationServiceReviewService {
         LocationServiceReview savedReview = reviewRepository.save(review);
 
         // 서비스 평점 업데이트
-        updateServiceRating(service.getIdx());
+        updateServiceReviewStats(service.getIdx());
 
         return converter.toDTO(savedReview);
     }
@@ -99,7 +99,7 @@ public class LocationServiceReviewService {
         LocationServiceReview savedReview = reviewRepository.save(review);
 
         // 서비스 평점 업데이트
-        updateServiceRating(review.getService().getIdx());
+        updateServiceReviewStats(review.getService().getIdx());
 
         return converter.toDTO(savedReview);
     }
@@ -137,7 +137,7 @@ public class LocationServiceReviewService {
 
         // 서비스 평점 업데이트
         Long serviceIdx = review.getService().getIdx();
-        updateServiceRating(serviceIdx);
+        updateServiceReviewStats(serviceIdx);
     }
 
     // 특정 서비스의 리뷰 목록 조회
@@ -156,11 +156,11 @@ public class LocationServiceReviewService {
                 .collect(Collectors.toList());
     }
 
-    // [FIX] 서비스 평점 원자적 갱신 — DB 단일 UPDATE로 Lost Update 제거.
+    // [FIX] 서비스 평점·리뷰수 원자적 갱신 — DB 단일 UPDATE로 Lost Update 제거.
     // 기존: findAverageRatingByServiceIdx → findById → setRating → save (비원자적 read-modify-write)
-    // 변경: UPDATE locationservice SET rating = (SELECT AVG ...) WHERE idx = :serviceIdx
+    // 변경: UPDATE locationservice SET rating = (SELECT AVG ...), review_count = (SELECT COUNT ...)
     @Transactional
-    public void updateServiceRating(Long serviceIdx) {
-        serviceRepository.updateRatingByAvg(serviceIdx);
+    public void updateServiceReviewStats(Long serviceIdx) {
+        serviceRepository.updateReviewStats(serviceIdx);
     }
 }

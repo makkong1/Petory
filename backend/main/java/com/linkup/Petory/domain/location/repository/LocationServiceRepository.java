@@ -70,7 +70,7 @@ public interface LocationServiceRepository {
     List<LocationService> findByRoadName(String roadName, String keyword, String category);
 
     /**
-     * [FIX] 서비스 평점을 리뷰 평균으로 원자적 갱신 (DB 단일 UPDATE)
+     * [FIX] 서비스 평점과 리뷰 수를 리뷰 집계 기준으로 원자적 갱신 (DB 단일 UPDATE)
      */
-    void updateRatingByAvg(Long serviceIdx);
+    void updateReviewStats(Long serviceIdx);
 }
