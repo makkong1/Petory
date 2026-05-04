@@ -22,6 +22,7 @@ export const locationServiceApi = {
    * @param {string} params.roadName 도로명 (선택, 예: "상계로", "동세로")
    * @param {string} params.category 카테고리 (선택, 예: "동물약국", "미술관")
    * @param {string} params.keyword 키워드 (선택, 이름/설명/카테고리 검색, 예: "동물병원", "카페")
+   * @param {string} params.sort 정렬 기준 (선택, distance|rating|reviews, 기본값: distance)
    * @param {number} params.size 최대 결과 수 (선택, 기본값: 500)
    * @returns {Promise} 검색 결과
    */
@@ -35,6 +36,7 @@ export const locationServiceApi = {
     roadName,
     category,
     keyword,
+    sort,
     size
   } = {}) => {
     if (isDemoMode()) {
@@ -51,6 +53,7 @@ export const locationServiceApi = {
         ...(roadName && { roadName }),
         ...(category && { category }),
         ...(keyword && { keyword }),
+        ...(sort && { sort }),
         ...(typeof size === 'number' && { size }),
       },
     });
@@ -71,6 +74,7 @@ export const locationServiceApi = {
     roadName,
     category,
     keyword,
+    sort,
   } = {}) => {
     if (isDemoMode()) {
       return mockResolve({ services: DEMO_LOCATION_SERVICES });
@@ -86,6 +90,7 @@ export const locationServiceApi = {
         ...(roadName && { roadName }),
         ...(category && { category }),
         ...(keyword && { keyword }),
+        ...(sort && { sort }),
       },
     });
   },

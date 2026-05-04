@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import styled from 'styled-components';
 
 const KEYWORD_CATEGORIES = [
@@ -14,8 +14,29 @@ const KEYWORD_CATEGORIES = [
   { value: '호텔', label: '호텔' },
 ];
 
-const LocationControls = ({ keyword, category, isAiMode, onSearch, onCategoryChange, onAiToggle }) => {
+const SORT_OPTIONS = [
+  { value: 'distance', label: '거리순' },
+  { value: 'rating', label: '평점순' },
+  { value: 'reviews', label: '리뷰순' },
+];
+
+const LocationControls = ({
+  keyword,
+  category,
+  sort = 'distance',
+  isAiMode,
+  hasPendingAreaChange = false,
+  onSearch,
+  onCategoryChange,
+  onSortChange,
+  onSearchThisArea,
+  onAiToggle,
+}) => {
   const [inputValue, setInputValue] = useState(keyword || '');
+
+  useEffect(() => {
+    setInputValue(keyword || '');
+  }, [keyword]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -59,6 +80,33 @@ const LocationControls = ({ keyword, category, isAiMode, onSearch, onCategoryCha
           </CategoryChip>
         ))}
       </CategoryRow>
+
+      <FilterRow>
+        <FilterGroup>
+          <FilterLabel>정렬</FilterLabel>
+          <SortSelect
+            value={sort}
+            onChange={e => onSortChange?.(e.target.value)}
+            aria-label="정렬 기준"
+          >
+            {SORT_OPTIONS.map(option => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </SortSelect>
+        </FilterGroup>
+
+        {hasPendingAreaChange && (
+          <SearchAreaButton type="button" onClick={onSearchThisArea}>
+            이 지역 검색
+          </SearchAreaButton>
+        )}
+      </FilterRow>
+
+      {hasPendingAreaChange && (
+        <SearchHint $pending>
+          지도를 움직였습니다. 현재 화면 기준 결과를 다시 불러옵니다.
+        </SearchHint>
+      )}
     </Wrapper>
   );
 };
@@ -185,5 +233,67 @@ const CategoryChip = styled.button`
   &:hover {
     border-color: ${props => props.theme.colors.domain.location};
     color: ${props => props.$active ? 'white' : props.theme.colors.domain.location};
+  }
+`;
+
+const SearchHint = styled.p`
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: ${props => props.$pending
+    ? props.theme.colors.primary
+    : props.theme.colors.textMuted};
+`;
+
+const FilterRow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+`;
+
+const FilterGroup = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+`;
+
+const FilterLabel = styled.span`
+  font-size: 12px;
+  font-weight: 700;
+  color: ${props => props.theme.colors.textSecondary};
+`;
+
+const SortSelect = styled.select`
+  height: 34px;
+  border-radius: 12px;
+  border: 1px solid ${props => props.theme.colors.border};
+  background: ${props => props.theme.colors.background};
+  color: ${props => props.theme.colors.text};
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 600;
+  outline: none;
+
+  &:focus {
+    border-color: ${props => props.theme.colors.primary};
+  }
+`;
+
+const SearchAreaButton = styled.button`
+  height: 34px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 999px;
+  background: ${props => props.theme.colors.primary};
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.14);
+
+  &:hover {
+    background: ${props => props.theme.colors.primaryDark};
   }
 `;

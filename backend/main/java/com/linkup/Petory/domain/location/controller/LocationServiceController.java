@@ -41,6 +41,7 @@ public class LocationServiceController {
      * @param roadName     도로명 (선택, 예: "상계로", "동세로")
      * @param category     카테고리 (선택, 예: "동물약국", "미술관")
      * @param keyword      키워드 (선택, 이름/설명/카테고리 검색, 예: "동물병원", "카페")
+     * @param sort         반경 검색 정렬 기준 (선택, distance|rating|reviews, 기본값: distance)
      * @param size         최대 결과 수 (선택, 기본값: 100, 0 이하이면 전체)
      * @return 검색 결과
      */
@@ -55,6 +56,7 @@ public class LocationServiceController {
             @RequestParam(value = "roadName", required = false) String roadName,
             @RequestParam(value = "category", required = false) String category,
             @RequestParam(value = "keyword", required = false) String keyword,
+            @RequestParam(value = "sort", required = false) String sort,
             @RequestParam(value = "size", required = false) Integer size) {
         try {
             // ========== 성능 측정 시작 ==========
@@ -70,8 +72,8 @@ public class LocationServiceController {
             }
 
             log.info(
-                    "🚀 [성능 측정] 위치 서비스 검색 시작 - latitude={}, longitude={}, radius={}, sido={}, sigungu={}, eupmyeondong={}, category={}, keyword={}, size={} (effectiveSize={})",
-                    latitude, longitude, radius, sido, sigungu, eupmyeondong, category, keyword, size, effectiveSize);
+                    "🚀 [성능 측정] 위치 서비스 검색 시작 - latitude={}, longitude={}, radius={}, sido={}, sigungu={}, eupmyeondong={}, category={}, keyword={}, sort={}, size={} (effectiveSize={})",
+                    latitude, longitude, radius, sido, sigungu, eupmyeondong, category, keyword, sort, size, effectiveSize);
 
             List<LocationServiceDTO> services = locationServiceService.searchLocationServices(
                     keyword,
@@ -83,6 +85,7 @@ public class LocationServiceController {
                     eupmyeondong,
                     roadName,
                     category,
+                    sort,
                     effectiveSize);
 
             long queryTime = System.currentTimeMillis() - startTime;
@@ -136,7 +139,8 @@ public class LocationServiceController {
             @RequestParam(value = "eupmyeondong", required = false) String eupmyeondong,
             @RequestParam(value = "roadName", required = false) String roadName,
             @RequestParam(value = "category", required = false) String category,
-            @RequestParam(value = "keyword", required = false) String keyword) {
+            @RequestParam(value = "keyword", required = false) String keyword,
+            @RequestParam(value = "sort", required = false) String sort) {
         try {
             int effectiveSize = 30; // AI에 넘길 후보 수
             List<LocationServiceDTO> services = locationServiceService.searchLocationServices(
@@ -149,6 +153,7 @@ public class LocationServiceController {
                     eupmyeondong,
                     roadName,
                     category,
+                    sort,
                     effectiveSize);
 
             List<LocationServiceDTO> recommended = locationRecommendAgentService.enrichWithRecommendations(
