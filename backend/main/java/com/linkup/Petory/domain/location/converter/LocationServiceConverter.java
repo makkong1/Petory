@@ -30,6 +30,7 @@ public class LocationServiceConverter {
                 .latitude(service.getLatitude())
                 .longitude(service.getLongitude())
                 .rating(service.getRating())
+                .reviewCount(service.getReviewCount())
                 .description(service.getDescription())
                 .phone(service.getPhone())
                 .website(service.getWebsite())
@@ -78,6 +79,7 @@ public class LocationServiceConverter {
                 .latitude(dto.getLatitude())
                 .longitude(dto.getLongitude())
                 .rating(dto.getRating())
+                .reviewCount(dto.getReviewCount() != null ? dto.getReviewCount() : 0)
                 .description(cleanDescription(dto.getDescription(), categoryValue)) // category와 중복 제거
                 .phone(dto.getPhone())
                 .website(dto.getWebsite())

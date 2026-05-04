@@ -85,7 +85,7 @@ public class JpaLocationServiceAdapter implements LocationServiceRepository {
     }
 
     @Override
-    public void updateRatingByAvg(Long serviceIdx) {
-        jpaRepository.updateRatingByAvg(serviceIdx);
+    public void updateReviewStats(Long serviceIdx) {
+        jpaRepository.updateReviewStats(serviceIdx);
     }
 }
