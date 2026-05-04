@@ -2,6 +2,7 @@ package com.linkup.Petory.domain.admin.service;
 
 import com.linkup.Petory.domain.care.converter.CareRequestConverter;
 import com.linkup.Petory.domain.care.dto.CareRequestDTO;
+import com.linkup.Petory.domain.care.exception.CareRequestNotFoundException;
 import com.linkup.Petory.domain.care.repository.CareRequestRepository;
 import com.linkup.Petory.domain.care.service.CareRequestService;
 import com.linkup.Petory.domain.meetup.dto.MeetupDTO;
@@ -37,7 +38,9 @@ public class AdminCareAndMeetupFacade {
     }
 
     public CareRequestDTO getCareRequest(Long id) {
-        return careRequestService.getCareRequest(id);
+        return careRequestRepository.findByIdWithApplications(id)
+                .map(careRequestConverter::toDTO)
+                .orElseThrow(CareRequestNotFoundException::new);
     }
 
     @Transactional
@@ -63,8 +66,7 @@ public class AdminCareAndMeetupFacade {
     // ── 모임 ─────────────────────────────────────────────────────────────
 
     public Page<MeetupDTO> getMeetups(String status, String keyword, int page, int size) {
-        // TODO: status/keyword DB-level filter 추가 예정 (MeetupRepository 쿼리 확장 후 교체)
-        return meetupService.getAllMeetups(PageRequest.of(page, size));
+        return meetupService.getMeetupsForAdmin(status, keyword, PageRequest.of(page, size));
     }
 
     public MeetupDTO getMeetup(Long id) {

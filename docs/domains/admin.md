@@ -2,9 +2,9 @@
 
 ## 개요
 
-Petory 서비스의 운영 관리 도메인. ADMIN / MASTER 권한 사용자가 사용자·케어·모임·파일·시스템 설정을 관리한다.
+Petory 서비스의 운영 관리 도메인. ADMIN / MASTER 권한 사용자가 사용자·케어·모임·파일·신고·시스템 설정을 관리한다.
 
-**아키텍처 특징**: Controller는 각 AdminXxxFacade를 통해서만 도메인에 접근한다. Facade가 여러 도메인 서비스·레포지토리를 조합하고, 모든 쓰기 행위는 `AdminAuditService`로 DB에 비동기 기록한다.
+**아키텍처 특징**: 사용자/케어·모임/파일/신고/시스템 설정의 핵심 admin API는 각 `AdminXxxFacade`를 통해 도메인 서비스·레포지토리를 조합한다. 이 facade가 담당하는 쓰기 행위는 `AdminAuditService`로 DB에 비동기 기록한다.
 
 ---
 
@@ -76,7 +76,7 @@ Petory 서비스의 운영 관리 도메인. ADMIN / MASTER 권한 사용자가 
 | 메서드 | 설명 | 감사 로그 |
 |--------|------|-----------|
 | `getCareRequests(status, deleted, keyword, page, size)` | 케어 요청 필터+페이징 | — |
-| `getCareRequest(id)` | 단건 조회 | — |
+| `getCareRequest(id)` | 단건 조회 (삭제된 요청도 관리자 조회 가능) | — |
 | `updateCareStatus(id, status, adminIdx)` | 상태 변경 | `CARE_STATUS_UPDATE` |
 | `deleteCareRequest(id, adminIdx)` | 소프트 삭제 | `CARE_DELETE` |
 | `restoreCareRequest(id, adminIdx)` | 삭제 복구 | `CARE_RESTORE` |
@@ -84,6 +84,32 @@ Petory 서비스의 운영 관리 도메인. ADMIN / MASTER 권한 사용자가 
 | `getMeetup(id)` | 단건 조회 | — |
 | `deleteMeetup(id, adminIdx)` | 소프트 삭제 | `MEETUP_DELETE` |
 | `getMeetupParticipants(id)` | 참여자 목록 | — |
+
+---
+
+### AdminFileFacade
+
+파일 관리 Facade.
+
+| 메서드 | 설명 | 감사 로그 |
+|--------|------|-----------|
+| `getFiles(targetType, keyword, page, size)` | 파일 목록 페이징 | — |
+| `getFilesByTarget(targetType, targetIdx)` | 대상별 파일 조회 | — |
+| `deleteFile(id, adminIdx)` | 단건 삭제 | `FILE_DELETE` |
+| `deleteFilesByTarget(targetType, targetIdx, adminIdx)` | 대상 전체 삭제 | `FILE_BULK_DELETE` |
+
+---
+
+### AdminReportFacade
+
+신고 관리 Facade.
+
+| 메서드 | 설명 | 감사 로그 |
+|--------|------|-----------|
+| `getReports(targetType, status)` | 신고 목록 조회 | — |
+| `getReportDetail(id)` | 신고 상세 조회 | — |
+| `getReportAssist(id)` | AI 보조 제안 조회 | — |
+| `handleReport(id, request, adminIdx)` | 신고 처리 | `REPORT_HANDLE` |
 
 ---
 
@@ -175,6 +201,17 @@ public void log(Long adminIdx, String action, String targetType, Long targetIdx,
 
 ---
 
+### `/api/admin/reports` — 신고 관리 (ADMIN, MASTER)
+
+| Method | URL | 설명 | Request | Response |
+|--------|-----|------|---------|----------|
+| GET | `/api/admin/reports` | 신고 목록 | `?targetType&status` | `List<ReportDTO>` |
+| GET | `/api/admin/reports/{id}` | 신고 상세 | — | `ReportDetailDTO` |
+| GET | `/api/admin/reports/{id}/assist` | AI 보조 제안 | — | `ReportAssistSuggestion` |
+| POST | `/api/admin/reports/{id}/handle` | 신고 처리 | `ReportHandleRequest` body | `ReportDTO` |
+
+---
+
 ### `/api/master/system` — 시스템 설정 (MASTER 전용)
 
 | Method | URL | 설명 | Request | Response |
@@ -189,10 +226,11 @@ public void log(Long adminIdx, String action, String targetType, Long targetIdx,
 ## 비즈니스 로직 핵심 규칙
 
 1. **ADMIN/MASTER 삭제 분리**: 일반 사용자 삭제(`/api/admin/users/{id} DELETE`)는 ADMIN/MASTER 계정에 적용 불가. ADMIN 계정 삭제는 `/api/master/admin-users/{id} DELETE`만 사용.
-2. **소프트 삭제 일관성**: 모든 삭제는 `isDeleted=true`, `deletedAt=LocalDateTime.now()` 소프트 삭제.
-3. **감사 로그 비동기**: 쓰기 작업마다 `AdminAuditService.log()` 호출. 로그 실패가 본 트랜잭션을 중단시키지 않음.
-4. **시스템 설정 Upsert**: `SystemConfig`는 `configKey` 기준 Insert-or-Update. DB UNIQUE 제약으로 보호.
-5. **promoteToAdmin 멱등성**: 이미 ADMIN인 사용자는 감사 로그 없이 즉시 반환.
+2. **삭제 계정 인증 차단**: 소프트 삭제된 계정은 로그인/`UserDetailsService`/refresh token 검증/관리자 식별 해석 경로에서 활성 사용자로 취급되지 않는다.
+3. **소프트 삭제 일관성**: 사용자·관리자 삭제 시 `isDeleted=true`, `deletedAt=LocalDateTime.now()`를 기록하고 refresh token도 함께 제거한다.
+4. **감사 로그 비동기**: facade가 담당하는 관리자 쓰기 작업은 `AdminAuditService.log()`를 호출한다. 로그 실패가 본 트랜잭션을 중단시키지 않음.
+5. **시스템 설정 Upsert**: `SystemConfig`는 `configKey` 기준 Insert-or-Update. DB UNIQUE 제약으로 보호하며, 단건 수정 시 `description`도 함께 갱신할 수 있다.
+6. **promoteToAdmin 멱등성**: 이미 ADMIN인 사용자는 감사 로그 없이 즉시 반환.
 
 ---
 
@@ -200,3 +238,4 @@ public void log(Long adminIdx, String action, String targetType, Long targetIdx,
 
 - 아키텍처: `docs/architecture/관리자 대시보드 & 통계 시스템 아키텍처.md`
 - 리팩토링 기록: `docs/refactoring/admin/2026-04-18-admin-domain-redesign.md`
+- 인증/계약 경계 강화: `docs/refactoring/admin/2026-05-04-admin-auth-contract-hardening.md`

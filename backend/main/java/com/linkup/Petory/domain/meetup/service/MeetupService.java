@@ -232,6 +232,10 @@ public class MeetupService {
         return meetupRepository.findAllNotDeleted(pageable).map(converter::toDTO);
     }
 
+    public Page<MeetupDTO> getMeetupsForAdmin(String status, String keyword, Pageable pageable) {
+        return meetupRepository.findAllForAdmin(status, keyword, pageable).map(converter::toDTO);
+    }
+
     // 특정 모임 조회 (참가자 목록 포함) - JOIN FETCH로 N+1 문제 해결
     public MeetupDTO getMeetupById(Long meetupIdx) {
         Meetup meetup = meetupRepository.findByIdWithDetails(meetupIdx)
