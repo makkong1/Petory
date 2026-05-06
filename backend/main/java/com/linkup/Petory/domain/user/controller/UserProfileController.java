@@ -1,14 +1,28 @@
 package com.linkup.Petory.domain.user.controller;
 
+import java.util.List;
+import java.util.Map;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import com.linkup.Petory.domain.care.dto.CareReviewDTO;
 import com.linkup.Petory.domain.care.service.CareReviewService;
-import com.linkup.Petory.domain.user.dto.UsersDTO;
+import com.linkup.Petory.domain.location.service.LocationServiceReviewService;
+import com.linkup.Petory.domain.meetup.dto.MeetupHistoryDTO;
+import com.linkup.Petory.domain.meetup.service.MeetupService;
 import com.linkup.Petory.domain.user.dto.UserProfileWithReviewsDTO;
+import com.linkup.Petory.domain.user.dto.UsersDTO;
 import com.linkup.Petory.domain.user.entity.EmailVerificationPurpose;
 import com.linkup.Petory.domain.user.exception.InvalidPasswordException;
 import com.linkup.Petory.domain.user.exception.UnauthenticatedException;
@@ -19,9 +33,6 @@ import com.linkup.Petory.util.JwtUtil;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-
-import java.util.List;
-import java.util.Map;
 
 /**
  * 일반 사용자용 프로필 관리 컨트롤러
@@ -35,6 +46,8 @@ public class UserProfileController {
 
     private final UsersService usersService;
     private final CareReviewService careReviewService;
+    private final LocationServiceReviewService locationServiceReviewService;
+    private final MeetupService meetupService;
     private final EmailVerificationService emailVerificationService;
     private final JwtUtil jwtUtil;
 
@@ -50,6 +63,17 @@ public class UserProfileController {
         return authentication.getName();
     }
 
+
+    private boolean isServiceProvider(UsersDTO user) {
+        return "SERVICE_PROVIDER".equals(user.getRole());
+    }
+
+    private long countLikedMeetups(List<MeetupHistoryDTO> histories) {
+        return histories.stream()
+                .filter(history -> Boolean.TRUE.equals(history.getLiked()))
+                .count();
+    }
+
     /**
      * 자신의 프로필 조회 (리뷰 포함)
      * [리팩토링] getReviewsByReviewee + getAverageRating 2회 → getReviewsWithAverage 1회
@@ -60,16 +84,26 @@ public class UserProfileController {
         UsersDTO user = usersService.getMyProfile(userId);
 
         Long userIdx = user.getIdx();
-        var reviewSummary = careReviewService.getReviewsWithAverage(userIdx);
+        boolean serviceProvider = isServiceProvider(user);
+        var careReviewSummary = serviceProvider
+                ? careReviewService.getReviewsWithAverage(userIdx)
+                : careReviewService.getWrittenReviewsWithAverage(userIdx);
+        var locationServiceReviewSummary = locationServiceReviewService.getReviewsWithAverage(userIdx);
+        List<MeetupHistoryDTO> meetupHistories = meetupService.getMeetupHistory(userIdx);
 
-        UserProfileWithReviewsDTO profile = UserProfileWithReviewsDTO.builder()
+        return ResponseEntity.ok(UserProfileWithReviewsDTO.builder()
                 .user(user)
-                .reviews(reviewSummary.getReviews())
-                .averageRating(reviewSummary.getAverageRating())
-                .reviewCount(reviewSummary.getReviewCount())
-                .build();
-
-        return ResponseEntity.ok(profile);
+                .reviews(careReviewSummary.getReviews())
+                .careReviewMode(serviceProvider ? "RECEIVED" : "WRITTEN")
+                .locationServiceReviews(locationServiceReviewSummary.getReviews())
+                .averageRating(careReviewSummary.getAverageRating())
+                .locationServiceAverageRating(locationServiceReviewSummary.getAverageRating())
+                .reviewCount(careReviewSummary.getReviewCount())
+                .locationServiceReviewCount(locationServiceReviewSummary.getReviewCount())
+                .meetupHistories(meetupHistories)
+                .meetupHistoryCount(meetupHistories.size())
+                .meetupLikedCount((int) countLikedMeetups(meetupHistories))
+                .build());
     }
 
     /**
@@ -265,13 +299,25 @@ public class UserProfileController {
     @GetMapping("/{userId}/profile")
     public ResponseEntity<UserProfileWithReviewsDTO> getUserProfile(@PathVariable Long userId) {
         UsersDTO user = usersService.getUser(userId);
-        var reviewSummary = careReviewService.getReviewsWithAverage(userId);
+        boolean serviceProvider = isServiceProvider(user);
+        var careReviewSummary = serviceProvider
+                ? careReviewService.getReviewsWithAverage(userId)
+                : careReviewService.getWrittenReviewsWithAverage(userId);
+        var locationServiceReviewSummary = locationServiceReviewService.getReviewsWithAverage(userId);
+        List<MeetupHistoryDTO> meetupHistories = meetupService.getMeetupHistory(userId);
 
         UserProfileWithReviewsDTO profile = UserProfileWithReviewsDTO.builder()
                 .user(user)
-                .reviews(reviewSummary.getReviews())
-                .averageRating(reviewSummary.getAverageRating())
-                .reviewCount(reviewSummary.getReviewCount())
+                .reviews(careReviewSummary.getReviews())
+                .careReviewMode(serviceProvider ? "RECEIVED" : "WRITTEN")
+                .locationServiceReviews(locationServiceReviewSummary.getReviews())
+                .averageRating(careReviewSummary.getAverageRating())
+                .locationServiceAverageRating(locationServiceReviewSummary.getAverageRating())
+                .reviewCount(careReviewSummary.getReviewCount())
+                .locationServiceReviewCount(locationServiceReviewSummary.getReviewCount())
+                .meetupHistories(meetupHistories)
+                .meetupHistoryCount(meetupHistories.size())
+                .meetupLikedCount((int) countLikedMeetups(meetupHistories))
                 .build();
 
         return ResponseEntity.ok(profile);

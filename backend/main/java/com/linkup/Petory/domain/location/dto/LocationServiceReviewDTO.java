@@ -12,6 +12,7 @@ public class LocationServiceReviewDTO {
 
     private Long idx;
     private Long serviceIdx;
+    private String serviceName;
     private Long userIdx;
     private String username; // 사용자명
     private Integer rating;

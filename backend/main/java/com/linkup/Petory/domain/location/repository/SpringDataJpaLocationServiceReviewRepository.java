@@ -23,7 +23,7 @@ public interface SpringDataJpaLocationServiceReviewRepository extends JpaReposit
     List<LocationServiceReview> findByServiceIdxOrderByCreatedAtDesc(@Param("serviceIdx") Long serviceIdx);
 
     @RepositoryMethod("장소 리뷰: 사용자별 목록 조회")
-    @Query("SELECT r FROM LocationServiceReview r JOIN FETCH r.service WHERE " +
+    @Query("SELECT r FROM LocationServiceReview r JOIN FETCH r.service JOIN FETCH r.user WHERE " +
             "r.user.idx = :userIdx AND " +
             "(r.isDeleted IS NULL OR r.isDeleted = false) " +
             "ORDER BY r.createdAt DESC")

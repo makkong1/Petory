@@ -24,8 +24,9 @@ public interface SpringDataJpaMeetupParticipantsRepository extends JpaRepository
     @RepositoryMethod("모임 참여자: 사용자별 참여 모임 목록")
     @Query("SELECT mp FROM MeetupParticipants mp " +
            "JOIN FETCH mp.meetup m " +
+           "JOIN FETCH m.organizer o " +
            "JOIN FETCH mp.user u " +
-           "WHERE mp.user.idx = :userIdx " +
+           "WHERE mp.user.idx = :userIdx AND (m.isDeleted = false OR m.isDeleted IS NULL) " +
            "ORDER BY mp.joinedAt DESC")
     List<MeetupParticipants> findByUserIdxOrderByJoinedAtDesc(@Param("userIdx") Long userIdx);
 
@@ -37,6 +38,16 @@ public interface SpringDataJpaMeetupParticipantsRepository extends JpaRepository
 
     @RepositoryMethod("모임 참여자: 모임+사용자로 조회")
     Optional<MeetupParticipants> findByMeetupIdxAndUserIdx(Long meetupIdx, Long userIdx);
+
+    @RepositoryMethod("모임 참여자: 모임+사용자로 조회 (모임/사용자 페치)")
+    @Query("SELECT mp FROM MeetupParticipants mp " +
+            "JOIN FETCH mp.meetup m " +
+            "JOIN FETCH m.organizer " +
+            "JOIN FETCH mp.user " +
+            "WHERE m.idx = :meetupIdx AND mp.user.idx = :userIdx " +
+            "AND (m.isDeleted = false OR m.isDeleted IS NULL)")
+    Optional<MeetupParticipants> findByMeetupIdxAndUserIdxWithDetails(@Param("meetupIdx") Long meetupIdx,
+            @Param("userIdx") Long userIdx);
 
     @RepositoryMethod("모임 참여자: 사용자별 예정 모임 목록")
     @Query("SELECT mp FROM MeetupParticipants mp " +

@@ -1,6 +1,7 @@
 package com.linkup.Petory.domain.meetup.controller;
 
 import com.linkup.Petory.domain.meetup.dto.MeetupDTO;
+import com.linkup.Petory.domain.meetup.dto.MeetupHistoryDTO;
 import com.linkup.Petory.domain.meetup.dto.MeetupParticipantsDTO;
 import com.linkup.Petory.domain.meetup.service.MeetupService;
 import com.linkup.Petory.domain.user.exception.UnauthenticatedException;
@@ -246,11 +247,33 @@ public class MeetupController {
             throw new UnauthenticatedException("인증된 사용자 정보를 찾을 수 없습니다.");
         }
 
-        boolean isParticipating = meetupService.isUserParticipating(meetupIdx, userId);
+        MeetupHistoryDTO participation = meetupService.getMyMeetupParticipation(meetupIdx, userId);
 
         Map<String, Object> response = new HashMap<>();
-        response.put("isParticipating", isParticipating);
+        response.put("isParticipating", participation != null);
+        response.put("liked", participation != null && Boolean.TRUE.equals(participation.getLiked()));
 
         return ResponseEntity.ok(response);
     }
+
+    // 내 모임 히스토리 좋아요 표시/해제
+    @PatchMapping("/{meetupIdx}/history/like")
+    public ResponseEntity<Map<String, Object>> updateMyMeetupLike(
+            @PathVariable Long meetupIdx,
+            @RequestParam(value = "liked") boolean liked,
+            Authentication authentication) {
+        String userId = authentication != null ? authentication.getName() : null;
+        if (userId == null) {
+            throw new UnauthenticatedException("인증된 사용자 정보를 찾을 수 없습니다.");
+        }
+
+        MeetupHistoryDTO history = meetupService.updateMyMeetupLike(meetupIdx, userId, liked);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("history", history);
+        response.put("message", liked ? "모임 기록에 좋아요를 표시했습니다." : "모임 기록 좋아요를 해제했습니다.");
+
+        return ResponseEntity.ok(response);
+    }
+
 }
