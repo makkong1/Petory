@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.linkup.Petory.domain.location.converter.LocationServiceReviewConverter;
 import com.linkup.Petory.domain.location.dto.LocationServiceReviewDTO;
+import com.linkup.Petory.domain.location.dto.LocationServiceReviewSummaryDTO;
 import com.linkup.Petory.domain.location.entity.LocationService;
 import com.linkup.Petory.domain.location.entity.LocationServiceReview;
 import com.linkup.Petory.domain.location.exception.LocationReviewAlreadyDeletedException;
@@ -141,6 +142,7 @@ public class LocationServiceReviewService {
     }
 
     // 특정 서비스의 리뷰 목록 조회
+    @Transactional(readOnly = true)
     public List<LocationServiceReviewDTO> getReviewsByService(Long serviceIdx) {
         return reviewRepository.findByServiceIdxOrderByCreatedAtDesc(serviceIdx)
                 .stream()
@@ -149,11 +151,29 @@ public class LocationServiceReviewService {
     }
 
     // 특정 사용자의 리뷰 목록 조회
+    @Transactional(readOnly = true)
     public List<LocationServiceReviewDTO> getReviewsByUser(Long userIdx) {
         return reviewRepository.findByUserIdxOrderByCreatedAtDesc(userIdx)
                 .stream()
                 .map(converter::toDTO)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * 특정 사용자가 작성한 리뷰 목록 + 평균 평점 + 개수를 한 번의 조회로 가져온다.
+     * 프로필 화면에서 작성 리뷰 요약을 만들 때 getReviewsByUser + 별도 집계를 나누지 않기 위한 메서드다.
+     */
+    @Transactional(readOnly = true)
+    public LocationServiceReviewSummaryDTO getReviewsWithAverage(Long userIdx) {
+        List<LocationServiceReview> reviews = reviewRepository.findByUserIdxOrderByCreatedAtDesc(userIdx);
+        Double avg = reviews.isEmpty() ? null
+                : reviews.stream().mapToInt(LocationServiceReview::getRating).average().orElse(0);
+
+        return LocationServiceReviewSummaryDTO.builder()
+                .reviews(reviews.stream().map(converter::toDTO).collect(Collectors.toList()))
+                .averageRating(avg)
+                .reviewCount(reviews.size())
+                .build();
     }
 
     // [FIX] 서비스 평점·리뷰수 원자적 갱신 — DB 단일 UPDATE로 Lost Update 제거.

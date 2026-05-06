@@ -75,6 +75,21 @@ public class CareReviewService {
     }
 
     /**
+     * 특정 사용자(reviewer)가 작성한 리뷰 목록 + 평균 평점 + 개수 요약
+     */
+    @Transactional(readOnly = true)
+    public ReviewSummaryDTO getWrittenReviewsWithAverage(Long reviewerIdx) {
+        List<CareReview> reviews = reviewRepository.findByReviewerIdxOrderByCreatedAtDesc(reviewerIdx);
+        Double avg = reviews.isEmpty() ? null
+                : reviews.stream().mapToInt(CareReview::getRating).average().orElse(0);
+        return ReviewSummaryDTO.builder()
+                .reviews(reviews.stream().map(reviewConverter::toDTO).collect(Collectors.toList()))
+                .averageRating(avg)
+                .reviewCount(reviews.size())
+                .build();
+    }
+
+    /**
      * 특정 사용자의 평균 평점 계산
      */
     @Transactional(readOnly = true)

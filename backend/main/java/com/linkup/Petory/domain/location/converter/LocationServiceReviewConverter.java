@@ -17,6 +17,7 @@ public class LocationServiceReviewConverter {
         return LocationServiceReviewDTO.builder()
                 .idx(review.getIdx())
                 .serviceIdx(review.getService() != null ? review.getService().getIdx() : null)
+                .serviceName(review.getService() != null ? review.getService().getName() : null)
                 .userIdx(review.getUser() != null ? review.getUser().getIdx() : null)
                 .username(review.getUser() != null ? review.getUser().getUsername() : null)
                 .rating(review.getRating())

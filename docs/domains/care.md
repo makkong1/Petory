@@ -286,7 +286,7 @@ public CareRequestCommentDTO addComment(Long careRequestId, CareRequestCommentDT
 | `createCareRequest()` | 펫케어 요청 생성 | 이메일 인증 확인, offeredCoins 유효성(>0), 잔액 확인, 펫 소유자 확인 |
 | `getNearby()` | 반경 기반 근처 요청 (지도) | `radiusKm`, `limit` — 서비스에서 `limit`을 1~500으로 클램프 (`CareRequestController` 기본 `radius`=5km, `limit`=200) |
 | `getCareRequestsWithPaging()` | 요청 목록 조회 (페이징) | 상태/위치 필터링, 작성자 활성 상태 확인 |
-| `getAllCareRequests()` | 요청 목록 조회 (관리자용) | 페이징 없음 |
+| `getAllCareRequests()` | 요청 목록 조회 (비페이징) | 레거시/내부용 — 현재 REST 컨트롤러 미연결 |
 | `getCareRequest()` | 단일 요청 조회 | `findByIdWithApplications`, **`isDeleted`면 NotFound** (단건과 동일 정책) |
 | `updateCareRequest()` | 요청 수정 | 작성자 확인 (관리자 우회), 펫 정보 업데이트/연결 해제 지원, 펫 소유자 확인 |
 | `deleteCareRequest()` | 요청 삭제 | 작성자 확인 (관리자 우회), Soft Delete |
@@ -294,6 +294,7 @@ public CareRequestCommentDTO addComment(Long careRequestId, CareRequestCommentDT
 | `updateStatus()` | 상태 변경 | **삭제된 요청 거부**, 작성자 또는 승인된 제공자 확인 (관리자 우회), `COMPLETED`/`CANCELLED` 시 에스크로 |
 | `searchCareRequestsWithPaging()` | 요청 검색 (페이징) | `searchWithPaging` (제목·설명, 활성 작성자만) |
 | `searchCareRequests()` | 요청 검색 (비페이징) | 레거시/내부용 — REST 컨트롤러 미연결 |
+| `restoreForAdmin()` | 요청 복구 (관리자용) | `findById()` → `isDeleted=false`, `AdminCareAndMeetupFacade.restoreCareRequest()` 경유 |
 
 #### CareRequestCommentService
 | 메서드 | 설명 | 주요 로직 |
@@ -509,7 +510,7 @@ erDiagram
 | `/api/care-requests/{id}` | PUT | 요청 수정 (작성자만 가능, 관리자 우회), **`@PreAuthorize`**, `getCurrentUserId()` |
 | `/api/care-requests/{id}` | DELETE | 요청 삭제 (작성자만 가능, 관리자 우회), **`@PreAuthorize`**, `getCurrentUserId()` |
 | `/api/care-requests/my-requests` | GET | 내 요청 목록 — **쿼리 파라미터 없음**, `SecurityContext` → `getCurrentUserId()` 후 서비스 호출 |
-| `/api/care-requests/{id}/status` | PATCH | 상태 변경, **`@PreAuthorize`**, `getCurrentUserId()` + 서비스 권한·삭제 여부 검증 |
+| `/api/care-requests/{id}/status` | PATCH | 상태 변경 (`status` **쿼리 파라미터**, JSON body 아님), **`@PreAuthorize`**, `getCurrentUserId()` + 서비스 권한·삭제 여부 검증 |
 | `/api/care-requests/search` | GET | 요청 검색 (페이징, `keyword` 필수, `page`, `size`) → `CareRequestPageResponseDTO` |
 | `/api/care-requests/{careRequestId}/comments` | GET | 댓글 목록 조회 |
 | `/api/care-requests/{careRequestId}/comments` | POST | 댓글 작성 (SERVICE_PROVIDER만 가능, 파일 첨부 지원 - 첫 번째 파일만 저장, 작성자가 요청자가 아닌 경우에만 알림 발송) |
@@ -527,13 +528,15 @@ erDiagram
 - `getCurrentUserId()`는 `Authentication.getName()`을 **숫자 user idx(Long)** 로 파싱하는 전제(프로젝트 JWT 설정과 일치).
 
 ### 관리자 (Admin) - domain/admin/controller/AdminCareRequestController
+`AdminCareAndMeetupFacade`를 경유하며, 모든 조작에 `auditService.log()` 감사 기록. `@PreAuthorize("hasAnyRole('ADMIN','MASTER')")`.
+
 | 엔드포인트 | Method | 설명 |
 |-----------|--------|------|
-| `/api/admin/care-requests` | GET | 요청 목록 (`status`, `location`, `deleted`, `q`) — `deleted=true` 시 삭제분 포함은 서비스 미구현(TODO), `q`는 메모리 필터 |
-| `/api/admin/care-requests/{id}` | GET | 단일 요청 조회 |
-| `/api/admin/care-requests/{id}/status` | PATCH | 상태 변경 (관리자 우회) |
-| `/api/admin/care-requests/{id}/delete` | POST | 요청 삭제 (소프트 삭제) |
-| `/api/admin/care-requests/{id}/restore` | POST | 요청 복구 — `UnsupportedOperationException` (서비스 미구현) |
+| `/api/admin/care-requests` | GET | 요청 목록 (`status`, `deleted`, `q`, `page`/`size` 기본 0·20) — DB 레벨 필터 (`careRequestRepository.findAllForAdmin`), 응답 `Page<CareRequestDTO>` |
+| `/api/admin/care-requests/{id}` | GET | 단일 요청 조회 (삭제된 요청 포함) |
+| `/api/admin/care-requests/{id}/status` | PATCH | 상태 변경 (`status` 쿼리 파라미터) — 관리자 권한 우회 |
+| `/api/admin/care-requests/{id}/delete` | POST | 요청 소프트 삭제 — `204 No Content` |
+| `/api/admin/care-requests/{id}/restore` | POST | 요청 복구 — `careRequestService.restoreForAdmin()` (구현됨) |
 
 ---
 

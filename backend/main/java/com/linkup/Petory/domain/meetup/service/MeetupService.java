@@ -21,6 +21,7 @@ import com.linkup.Petory.domain.meetup.annotation.Timed;
 import com.linkup.Petory.domain.meetup.converter.MeetupConverter;
 import com.linkup.Petory.domain.meetup.converter.MeetupParticipantsConverter;
 import com.linkup.Petory.domain.meetup.dto.MeetupDTO;
+import com.linkup.Petory.domain.meetup.dto.MeetupHistoryDTO;
 import com.linkup.Petory.domain.meetup.dto.MeetupParticipantsDTO;
 import com.linkup.Petory.domain.meetup.entity.Meetup;
 import com.linkup.Petory.domain.meetup.entity.MeetupParticipants;
@@ -396,6 +397,62 @@ public class MeetupService {
         Long userIdx = usersRepository.findIdxByIdString(userId)
                 .orElseThrow(UserNotFoundException::new);
         return meetupParticipantsRepository.existsByMeetupIdxAndUserIdx(meetupIdx, userIdx);
+    }
+
+    /**
+     * 사용자의 모임 히스토리 조회.
+     * participants → meetup → organizer를 fetch join한 단일 목록 조회를 사용해 카드 변환 중 N+1을 막는다.
+     */
+    public List<MeetupHistoryDTO> getMeetupHistory(Long userIdx) {
+        List<MeetupParticipants> histories = meetupParticipantsRepository.findByUserIdxOrderByJoinedAtDesc(userIdx);
+        return histories.stream()
+                .map(this::toHistoryDTO)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 로그인 사용자의 모임 히스토리 좋아요 상태 변경.
+     * 이미 참가/주최자로 기록된 모임에만 표시할 수 있으므로 별도 동시성 제어 없이 단건 행만 갱신한다.
+     */
+    @Transactional
+    public MeetupHistoryDTO updateMyMeetupLike(Long meetupIdx, String userId, boolean liked) {
+        Long userIdx = usersRepository.findIdxByIdString(userId)
+                .orElseThrow(UserNotFoundException::new);
+        MeetupParticipants participant = meetupParticipantsRepository
+                .findByMeetupIdxAndUserIdxWithDetails(meetupIdx, userIdx)
+                .orElseThrow(MeetupParticipantNotFoundException::new);
+
+        participant.setLiked(liked);
+        MeetupParticipants saved = meetupParticipantsRepository.save(participant);
+        return toHistoryDTO(saved);
+    }
+
+    public MeetupHistoryDTO getMyMeetupParticipation(Long meetupIdx, String userId) {
+        Long userIdx = usersRepository.findIdxByIdString(userId)
+                .orElseThrow(UserNotFoundException::new);
+        return meetupParticipantsRepository.findByMeetupIdxAndUserIdxWithDetails(meetupIdx, userIdx)
+                .map(this::toHistoryDTO)
+                .orElse(null);
+    }
+
+    private MeetupHistoryDTO toHistoryDTO(MeetupParticipants participant) {
+        Meetup meetup = participant.getMeetup();
+        Users organizer = meetup.getOrganizer();
+        Long organizerIdx = organizer != null ? organizer.getIdx() : null;
+        boolean isOrganizer = organizerIdx != null && organizerIdx.equals(participant.getUser().getIdx());
+
+        return MeetupHistoryDTO.builder()
+                .meetupIdx(meetup.getIdx())
+                .title(meetup.getTitle())
+                .location(meetup.getLocation())
+                .date(meetup.getDate())
+                .status(meetup.getStatus() != null ? meetup.getStatus().name() : null)
+                .organizerIdx(organizerIdx)
+                .organizerName(organizer != null ? organizer.getUsername() : null)
+                .joinedAt(participant.getJoinedAt())
+                .participationRole(isOrganizer ? "ORGANIZER" : "PARTICIPANT")
+                .liked(participant.getLiked() != null ? participant.getLiked() : false)
+                .build();
     }
 
     // 지역별 모임 조회

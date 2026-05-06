@@ -28,8 +28,15 @@ public class MeetupParticipants {
 
     private LocalDateTime joinedAt;
 
+    @Builder.Default
+    @Column(nullable = false)
+    private Boolean liked = false;
+
     @PrePersist
     protected void onCreate() {
         this.joinedAt = LocalDateTime.now();
+        if (this.liked == null) {
+            this.liked = false;
+        }
     }
 }

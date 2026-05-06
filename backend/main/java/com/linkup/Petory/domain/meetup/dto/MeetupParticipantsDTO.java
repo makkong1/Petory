@@ -10,5 +10,6 @@ public record MeetupParticipantsDTO(
     Long meetupIdx,
     Long userIdx,
     String username,        // 참여자명
-    LocalDateTime joinedAt
+    LocalDateTime joinedAt,
+    Boolean liked
 ) {}

@@ -48,6 +48,11 @@ public interface MeetupParticipantsRepository {
     Optional<MeetupParticipants> findByMeetupIdxAndUserIdx(Long meetupIdx, Long userIdx);
 
     /**
+     * 특정 모임의 참여자 조회 (히스토리/좋아요 응답용 fetch join)
+     */
+    Optional<MeetupParticipants> findByMeetupIdxAndUserIdxWithDetails(Long meetupIdx, Long userIdx);
+
+    /**
      * 특정 사용자가 참여한 모임 중 진행 예정인 모임들
      */
     List<MeetupParticipants> findUpcomingMeetupsByUser(Long userIdx);

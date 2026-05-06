@@ -19,7 +19,8 @@ public class MeetupParticipantsConverter {
                 participants.getMeetup().getIdx(),
                 participants.getUser().getIdx(),
                 participants.getUser().getUsername(),
-                participants.getJoinedAt()
+                participants.getJoinedAt(),
+                participants.getLiked() != null ? participants.getLiked() : false
         );
     }
 
@@ -36,6 +37,7 @@ public class MeetupParticipantsConverter {
 
         return MeetupParticipants.builder()
                 .joinedAt(dto.joinedAt())
+                .liked(dto.liked() != null ? dto.liked() : false)
                 .build();
     }
 }

@@ -54,6 +54,12 @@ export const meetupApi = {
 
   // 참가 여부 확인
   checkParticipation: (meetupIdx) =>
-    isDemoMode() ? mockResolve({ participating: false }) : api.get(`/${meetupIdx}/participants/check`),
+    isDemoMode() ? mockResolve({ isParticipating: false, liked: false }) : api.get(`/${meetupIdx}/participants/check`),
+
+  // 내 모임 히스토리 좋아요 표시/해제
+  updateHistoryLike: (meetupIdx, liked) =>
+    isDemoMode()
+      ? mockResolve({ history: { meetupIdx, liked } })
+      : api.patch(`/${meetupIdx}/history/like`, null, { params: { liked } }),
 };
 

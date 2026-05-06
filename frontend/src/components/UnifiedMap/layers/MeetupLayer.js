@@ -12,6 +12,7 @@ const MeetupLayer = ({ selectedItem, onClose, onRefresh }) => {
   const { user } = useAuth();
   const [participants, setParticipants] = useState([]);
   const [isParticipating, setIsParticipating] = useState(false);
+  const [liked, setLiked] = useState(false);
   const [participantLoading, setParticipantLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState(null);
@@ -31,6 +32,7 @@ const MeetupLayer = ({ selectedItem, onClose, onRefresh }) => {
     ]).then(([pRes, cRes]) => {
       setParticipants(pRes.data?.participants || []);
       setIsParticipating(cRes.data?.isParticipating || false);
+      setLiked(cRes.data?.liked || false);
     }).finally(() => setParticipantLoading(false));
   }, [selectedItem]);
 
@@ -51,6 +53,7 @@ const MeetupLayer = ({ selectedItem, onClose, onRefresh }) => {
     try {
       await meetupApi.joinMeetup(r.idx);
       setIsParticipating(true);
+      setLiked(false);
       setActionError(null);
       const [pRes, mRes] = await Promise.all([
         meetupApi.getParticipants(r.idx),
@@ -71,6 +74,7 @@ const MeetupLayer = ({ selectedItem, onClose, onRefresh }) => {
     try {
       await meetupApi.cancelParticipation(r.idx);
       setIsParticipating(false);
+      setLiked(false);
       setActionError(null);
       const [pRes, mRes] = await Promise.all([
         meetupApi.getParticipants(r.idx),
@@ -81,6 +85,20 @@ const MeetupLayer = ({ selectedItem, onClose, onRefresh }) => {
       onRefresh?.();
     } catch (err) {
       setActionError(err.response?.data?.error || '취소에 실패했습니다.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleToggleLike = async () => {
+    setActionLoading(true);
+    try {
+      const nextLiked = !liked;
+      await meetupApi.updateHistoryLike(r.idx, nextLiked);
+      setLiked(nextLiked);
+      setActionError(null);
+    } catch (err) {
+      setActionError(err.response?.data?.error || '좋아요 변경에 실패했습니다.');
     } finally {
       setActionLoading(false);
     }
@@ -117,9 +135,14 @@ const MeetupLayer = ({ selectedItem, onClose, onRefresh }) => {
       {user && !isOrganizer && (
         <ActionRow>
           {isParticipating ? (
-            <LeaveButton onClick={handleLeave} disabled={actionLoading}>
-              {actionLoading ? '처리 중...' : '참가 취소'}
-            </LeaveButton>
+            <>
+              <LikeButton onClick={handleToggleLike} disabled={actionLoading} $liked={liked}>
+                {liked ? '❤️ 좋아요 기록됨' : '🤍 좋아요로 기록'}
+              </LikeButton>
+              <LeaveButton onClick={handleLeave} disabled={actionLoading}>
+                {actionLoading ? '처리 중...' : '참가 취소'}
+              </LeaveButton>
+            </>
           ) : (
             <JoinButton onClick={handleJoin} disabled={actionLoading || isFull}>
               {actionLoading ? '처리 중...' : isFull ? '마감됨' : '참가하기'}
@@ -186,6 +209,22 @@ const JoinButton = styled.button`
   cursor: pointer;
   &:disabled { opacity: 0.5; cursor: not-allowed; }
   &:hover:not(:disabled) { opacity: 0.9; }
+`;
+
+
+const LikeButton = styled.button`
+  width: 100%;
+  padding: 9px;
+  border-radius: 8px;
+  border: 1px solid ${props => props.$liked ? props.theme.colors.domain.meetup : props.theme.colors.border};
+  background: ${props => props.$liked ? `${props.theme.colors.domain.meetup}18` : 'none'};
+  color: ${props => props.$liked ? props.theme.colors.domain.meetup : props.theme.colors.textSecondary};
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-bottom: 8px;
+  &:disabled { opacity: 0.5; }
+  &:hover:not(:disabled) { background: ${props => props.theme.colors.surfaceHover}; }
 `;
 
 const LeaveButton = styled.button`
