@@ -23,7 +23,7 @@ public class ActivityController {
 
     // 기존 API (하위 호환성 유지)
     @GetMapping("/my")
-    public ResponseEntity<List<ActivityDTO>> getMyActivities(@RequestParam Long userId) {
+    public ResponseEntity<List<ActivityDTO>> getMyActivities(@RequestParam("userId") Long userId) {
         System.out.println("=== [ActivityController] /api/activities/my 호출됨 - userId: " + userId + " ===");
         return ResponseEntity.ok(activityService.getUserActivities(userId));
     }
@@ -31,10 +31,10 @@ public class ActivityController {
     // 페이징 지원 API
     @GetMapping("/my/paging")
     public ResponseEntity<ActivityPageResponseDTO> getMyActivitiesWithPaging(
-            @RequestParam Long userId,
-            @RequestParam(required = false, defaultValue = "ALL") String filter,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam("userId") Long userId,
+            @RequestParam(value = "filter", required = false, defaultValue = "ALL") String filter,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "20") int size) {
         System.out.println("=== [ActivityController] /api/activities/my/paging 호출됨 - userId: " + userId 
                 + ", filter: " + filter + ", page: " + page + ", size: " + size + " ===");
         return ResponseEntity.ok(activityService.getUserActivitiesWithPaging(userId, filter, page, size));

@@ -128,7 +128,7 @@ public class AdminLocationController {
     @PostMapping("/import-public-data-path")
     @PreAuthorize("hasRole('MASTER')")
     public ResponseEntity<BatchImportResult> importPublicDataByPath(
-            @RequestParam String csvFilePath) {
+            @RequestParam("csvFilePath") String csvFilePath) {
 
         log.info("공공데이터 CSV 경로 임포트 요청: {}", csvFilePath);
 
@@ -144,4 +144,3 @@ public class AdminLocationController {
         }
     }
 }
-

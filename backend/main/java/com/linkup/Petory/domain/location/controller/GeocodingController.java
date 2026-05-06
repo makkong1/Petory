@@ -27,7 +27,8 @@ public class GeocodingController {
      * GET /api/geocoding/address?address=서울시 강남구
      */
     @GetMapping("/address")
-    public ResponseEntity<Map<String, Object>> addressToCoordinates(@RequestParam String address) {
+    public ResponseEntity<Map<String, Object>> addressToCoordinates(
+            @RequestParam("address") String address) {
         // URL 디코딩 및 + 문자를 공백으로 변환
         if (address != null) {
             // + 문자가 있으면 공백으로 변환 (URL 인코딩에서 +는 공백을 의미)
@@ -76,7 +77,8 @@ public class GeocodingController {
      * GET /api/geocoding/search?query=서울시 강남구
      */
     @GetMapping("/search")
-    public ResponseEntity<Map<String, Object>> searchAddresses(@RequestParam String query) {
+    public ResponseEntity<Map<String, Object>> searchAddresses(
+            @RequestParam("query") String query) {
         log.info("[주소 검색] query={}", query);
         Map<String, Object> response = new HashMap<>();
         try {
@@ -99,9 +101,9 @@ public class GeocodingController {
      */
     @GetMapping("/directions")
     public ResponseEntity<Map<String, Object>> getDirections(
-            @RequestParam String start, // 경도,위도 형식
-            @RequestParam String goal, // 경도,위도 형식
-            @RequestParam(required = false, defaultValue = "traoptimal") String option) {
+            @RequestParam("start") String start, // 경도,위도 형식
+            @RequestParam("goal") String goal, // 경도,위도 형식
+            @RequestParam(value = "option", required = false, defaultValue = "traoptimal") String option) {
         try {
             // start와 goal 파싱 (경도,위도 형식)
             String[] startCoords = start.split(",");
@@ -145,8 +147,8 @@ public class GeocodingController {
      */
     @GetMapping("/coordinates")
     public ResponseEntity<Map<String, Object>> coordinatesToAddress(
-            @RequestParam double lat,
-            @RequestParam double lng) {
+            @RequestParam("lat") double lat,
+            @RequestParam("lng") double lng) {
         try {
             Map<String, Object> result = naverMapService.coordinatesToAddress(lat, lng);
             return ResponseEntity.ok(result);

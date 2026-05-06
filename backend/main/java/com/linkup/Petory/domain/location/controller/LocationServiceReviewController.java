@@ -58,7 +58,7 @@ public class LocationServiceReviewController {
 
     // 리뷰 수정
     @PutMapping("/{reviewIdx}")
-    public ResponseEntity<Map<String, Object>> updateReview(@PathVariable Long reviewIdx,
+    public ResponseEntity<Map<String, Object>> updateReview(@PathVariable("reviewIdx") Long reviewIdx,
             @RequestBody LocationServiceReviewDTO reviewDTO) {
         try {
             LocationServiceReviewDTO updatedReview = reviewService.updateReview(reviewIdx, reviewDTO,
@@ -81,7 +81,7 @@ public class LocationServiceReviewController {
 
     // 리뷰 삭제
     @DeleteMapping("/{reviewIdx}")
-    public ResponseEntity<Map<String, Object>> deleteReview(@PathVariable Long reviewIdx) {
+    public ResponseEntity<Map<String, Object>> deleteReview(@PathVariable("reviewIdx") Long reviewIdx) {
         try {
             reviewService.deleteReview(reviewIdx, getCurrentUserLoginId());
 
@@ -101,7 +101,7 @@ public class LocationServiceReviewController {
 
     // 특정 서비스의 리뷰 목록 조회
     @GetMapping("/service/{serviceIdx}")
-    public ResponseEntity<Map<String, Object>> getReviewsByService(@PathVariable Long serviceIdx) {
+    public ResponseEntity<Map<String, Object>> getReviewsByService(@PathVariable("serviceIdx") Long serviceIdx) {
         try {
             List<LocationServiceReviewDTO> reviews = reviewService.getReviewsByService(serviceIdx);
 
@@ -120,7 +120,7 @@ public class LocationServiceReviewController {
 
     // 특정 사용자의 리뷰 목록 조회
     @GetMapping("/user/{userIdx}")
-    public ResponseEntity<Map<String, Object>> getReviewsByUser(@PathVariable Long userIdx) {
+    public ResponseEntity<Map<String, Object>> getReviewsByUser(@PathVariable("userIdx") Long userIdx) {
         try {
             List<LocationServiceReviewDTO> reviews = reviewService.getReviewsByUser(userIdx);
 

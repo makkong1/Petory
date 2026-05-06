@@ -29,27 +29,27 @@ public class AdminCareRequestController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<CareRequestDTO> getCareRequest(@PathVariable Long id) {
+    public ResponseEntity<CareRequestDTO> getCareRequest(@PathVariable("id") Long id) {
         return ResponseEntity.ok(facade.getCareRequest(id));
     }
 
     @PatchMapping("/{id}/status")
     public ResponseEntity<CareRequestDTO> updateStatus(
-            @PathVariable Long id,
-            @RequestParam String status) {
+            @PathVariable("id") Long id,
+            @RequestParam("status") String status) {
         Long adminIdx = userIdResolver.requireCurrentUserIdx();
         return ResponseEntity.ok(facade.updateCareStatus(id, status, adminIdx));
     }
 
     @PostMapping("/{id}/delete")
-    public ResponseEntity<Void> deleteCareRequest(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteCareRequest(@PathVariable("id") Long id) {
         Long adminIdx = userIdResolver.requireCurrentUserIdx();
         facade.deleteCareRequest(id, adminIdx);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{id}/restore")
-    public ResponseEntity<CareRequestDTO> restoreCareRequest(@PathVariable Long id) {
+    public ResponseEntity<CareRequestDTO> restoreCareRequest(@PathVariable("id") Long id) {
         Long adminIdx = userIdResolver.requireCurrentUserIdx();
         return ResponseEntity.ok(facade.restoreCareRequest(id, adminIdx));
     }

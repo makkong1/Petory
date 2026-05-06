@@ -31,7 +31,7 @@ public class AdminSystemController {
     }
 
     @GetMapping("/settings/{key}")
-    public ResponseEntity<Map<String, String>> getSetting(@PathVariable String key) {
+    public ResponseEntity<Map<String, String>> getSetting(@PathVariable("key") String key) {
         String value = systemFacade.getConfig(key, null);
         if (value == null) {
             return ResponseEntity.notFound().build();
@@ -41,7 +41,7 @@ public class AdminSystemController {
 
     @PutMapping("/settings/{key}")
     public ResponseEntity<Void> upsertSetting(
-            @PathVariable String key,
+            @PathVariable("key") String key,
             @RequestBody Map<String, String> body) {
         Long masterIdx = userIdResolver.requireCurrentUserIdx();
         systemFacade.upsertConfig(key, body.get("value"), body.get("description"), masterIdx);

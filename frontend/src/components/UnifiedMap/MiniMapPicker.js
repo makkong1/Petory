@@ -14,13 +14,15 @@ const NAVER_KEY_ID =
  *
  * Props:
  *   lat, lng        - 현재 선택된 좌표 (null이면 핀 없음)
- *   onSelect(lat, lng, address) - 지도 클릭 시 역지오코딩 결과 반환
+ *   selectedLabel   - 현재 선택된 주소 라벨
+ *   onSelect(lat, lng, address, details) - 지도 클릭 시 역지오코딩 결과 반환
  */
-const MiniMapPicker = ({ lat, lng, onSelect }) => {
+const MiniMapPicker = ({ lat, lng, selectedLabel, onSelect }) => {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markerRef = useRef(null);
   const [loading, setLoading] = useState(false);
+  const [mapReady, setMapReady] = useState(false);
   const [hint, setHint] = useState('지도를 클릭하면 장소가 설정됩니다');
 
   // 지도 초기화
@@ -42,6 +44,7 @@ const MiniMapPicker = ({ lat, lng, onSelect }) => {
         scaleControl: false,
       });
       mapInstanceRef.current = map;
+      setMapReady(true);
 
       // 초기 핀
       if (lat && lng) {
@@ -58,8 +61,8 @@ const MiniMapPicker = ({ lat, lng, onSelect }) => {
         setHint('주소 가져오는 중...');
         try {
           const result = await geocodingApi.coordinatesToAddress(coord.lat(), coord.lng());
-          const address = result?.address || result?.roadAddress || '';
-          onSelect?.(coord.lat(), coord.lng(), address);
+          const address = result?.address || result?.roadAddress || result?.jibunAddress || '';
+          onSelect?.(coord.lat(), coord.lng(), address, result);
           setHint(address || '선택된 위치');
         } catch {
           onSelect?.(coord.lat(), coord.lng(), '');
@@ -107,9 +110,28 @@ const MiniMapPicker = ({ lat, lng, onSelect }) => {
     mapInstanceRef.current.setCenter(coord);
     mapInstanceRef.current.setZoom(DEFAULT_ZOOM);
     placeMarker(coord);
-    setHint(`${lat.toFixed(5)}, ${lng.toFixed(5)}`);
+    setHint(selectedLabel || '선택된 위치');
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lat, lng]);
+  }, [lat, lng, selectedLabel]);
+
+  useEffect(() => {
+    if (!mapReady || lat || lng || !navigator.geolocation || !mapInstanceRef.current) return;
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const nextCenter = new window.naver.maps.LatLng(
+          position.coords.latitude,
+          position.coords.longitude
+        );
+        mapInstanceRef.current?.setCenter(nextCenter);
+        setHint('내 위치 주변에서 장소를 선택하세요');
+      },
+      () => {
+        setHint('지도를 클릭하면 장소가 설정됩니다');
+      },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+    );
+  }, [mapReady, lat, lng]);
 
   const placeMarker = (coord) => {
     if (!mapInstanceRef.current || !window.naver?.maps) return;
@@ -152,8 +174,7 @@ const Hint = styled.div`
   color: #fff;
   font-size: 11px;
   padding: 5px 10px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  line-height: 1.4;
   opacity: ${p => p.$loading ? 0.7 : 1};
 `;

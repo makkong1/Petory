@@ -52,7 +52,7 @@ public class PetController {
      * 펫 상세 조회
      */
     @GetMapping("/{petIdx}")
-    public ResponseEntity<PetDTO> getPet(@PathVariable Long petIdx) {
+    public ResponseEntity<PetDTO> getPet(@PathVariable("petIdx") Long petIdx) {
         PetDTO pet = petService.getPet(petIdx);
         return ResponseEntity.ok(pet);
     }
@@ -71,7 +71,7 @@ public class PetController {
      * 펫 수정
      */
     @PutMapping("/{petIdx}")
-    public ResponseEntity<PetDTO> updatePet(@PathVariable Long petIdx, @RequestBody PetDTO dto) {
+    public ResponseEntity<PetDTO> updatePet(@PathVariable("petIdx") Long petIdx, @RequestBody PetDTO dto) {
         PetDTO updated = petService.updatePet(petIdx, dto);
         return ResponseEntity.ok(updated);
     }
@@ -80,7 +80,7 @@ public class PetController {
      * 펫 삭제 (소프트 삭제)
      */
     @DeleteMapping("/{petIdx}")
-    public ResponseEntity<Map<String, String>> deletePet(@PathVariable Long petIdx) {
+    public ResponseEntity<Map<String, String>> deletePet(@PathVariable("petIdx") Long petIdx) {
         petService.deletePet(petIdx);
         return ResponseEntity.ok(Map.of("message", "펫이 삭제되었습니다."));
     }
@@ -89,7 +89,7 @@ public class PetController {
      * 펫 복구
      */
     @PostMapping("/{petIdx}/restore")
-    public ResponseEntity<PetDTO> restorePet(@PathVariable Long petIdx) {
+    public ResponseEntity<PetDTO> restorePet(@PathVariable("petIdx") Long petIdx) {
         PetDTO restored = petService.restorePet(petIdx);
         return ResponseEntity.ok(restored);
     }
@@ -98,9 +98,8 @@ public class PetController {
      * 펫 타입별 조회
      */
     @GetMapping("/type/{petType}")
-    public ResponseEntity<List<PetDTO>> getPetsByType(@PathVariable String petType) {
+    public ResponseEntity<List<PetDTO>> getPetsByType(@PathVariable("petType") String petType) {
         List<PetDTO> pets = petService.getPetsByType(petType);
         return ResponseEntity.ok(pets);
     }
 }
-

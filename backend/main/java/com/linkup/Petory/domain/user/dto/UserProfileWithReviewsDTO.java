@@ -23,6 +23,7 @@ public class UserProfileWithReviewsDTO {
     private Double averageRating;
     private Double locationServiceAverageRating;
     private Integer reviewCount;
+    private Integer completedCareCount;
     private Integer locationServiceReviewCount;
     private List<MeetupHistoryDTO> meetupHistories;
     private Integer meetupHistoryCount;

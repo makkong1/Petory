@@ -51,7 +51,8 @@ public class MeetupController {
     // 모임 수정
     // [FIX] Authentication 추가 → 서비스 레벨 주최자 검증 연동
     @PutMapping("/{meetupIdx}")
-    public ResponseEntity<Map<String, Object>> updateMeetup(@PathVariable Long meetupIdx,
+    public ResponseEntity<Map<String, Object>> updateMeetup(
+            @PathVariable("meetupIdx") Long meetupIdx,
             @RequestBody MeetupDTO meetupDTO,
             Authentication authentication) {
         String userId = authentication != null ? authentication.getName() : null;
@@ -70,7 +71,8 @@ public class MeetupController {
     // 모임 삭제
     // [FIX] Authentication 추가 → 서비스 레벨 주최자 검증 연동
     @DeleteMapping("/{meetupIdx}")
-    public ResponseEntity<Map<String, Object>> deleteMeetup(@PathVariable Long meetupIdx,
+    public ResponseEntity<Map<String, Object>> deleteMeetup(
+            @PathVariable("meetupIdx") Long meetupIdx,
             Authentication authentication) {
         String userId = authentication != null ? authentication.getName() : null;
         if (userId == null) {
@@ -105,7 +107,8 @@ public class MeetupController {
 
     // 특정 모임 조회
     @GetMapping("/{meetupIdx}")
-    public ResponseEntity<Map<String, Object>> getMeetupById(@PathVariable Long meetupIdx) {
+    public ResponseEntity<Map<String, Object>> getMeetupById(
+            @PathVariable("meetupIdx") Long meetupIdx) {
         MeetupDTO meetup = meetupService.getMeetupById(meetupIdx);
 
         Map<String, Object> response = new HashMap<>();
@@ -162,7 +165,8 @@ public class MeetupController {
 
     // 주최자별 모임 조회
     @GetMapping("/organizer/{organizerIdx}")
-    public ResponseEntity<Map<String, Object>> getMeetupsByOrganizer(@PathVariable Long organizerIdx) {
+    public ResponseEntity<Map<String, Object>> getMeetupsByOrganizer(
+            @PathVariable("organizerIdx") Long organizerIdx) {
         List<MeetupDTO> meetups = meetupService.getMeetupsByOrganizer(organizerIdx);
 
         Map<String, Object> response = new HashMap<>();
@@ -190,7 +194,8 @@ public class MeetupController {
 
     // 특정 모임의 참가자 목록 조회
     @GetMapping("/{meetupIdx}/participants")
-    public ResponseEntity<Map<String, Object>> getMeetupParticipants(@PathVariable Long meetupIdx) {
+    public ResponseEntity<Map<String, Object>> getMeetupParticipants(
+            @PathVariable("meetupIdx") Long meetupIdx) {
         List<MeetupParticipantsDTO> participants = meetupService.getMeetupParticipants(meetupIdx);
 
         Map<String, Object> response = new HashMap<>();
@@ -203,7 +208,7 @@ public class MeetupController {
     // 모임 참가
     @PostMapping("/{meetupIdx}/participants")
     public ResponseEntity<Map<String, Object>> joinMeetup(
-            @PathVariable Long meetupIdx,
+            @PathVariable("meetupIdx") Long meetupIdx,
             Authentication authentication) {
         String userId = authentication != null ? authentication.getName() : null;
         if (userId == null) {
@@ -222,7 +227,7 @@ public class MeetupController {
     // 모임 참가 취소
     @DeleteMapping("/{meetupIdx}/participants")
     public ResponseEntity<Map<String, Object>> cancelMeetupParticipation(
-            @PathVariable Long meetupIdx,
+            @PathVariable("meetupIdx") Long meetupIdx,
             Authentication authentication) {
         String userId = authentication != null ? authentication.getName() : null;
         if (userId == null) {
@@ -240,7 +245,7 @@ public class MeetupController {
     // 사용자가 특정 모임에 참가했는지 확인
     @GetMapping("/{meetupIdx}/participants/check")
     public ResponseEntity<Map<String, Object>> checkParticipation(
-            @PathVariable Long meetupIdx,
+            @PathVariable("meetupIdx") Long meetupIdx,
             Authentication authentication) {
         String userId = authentication != null ? authentication.getName() : null;
         if (userId == null) {
@@ -259,7 +264,7 @@ public class MeetupController {
     // 내 모임 히스토리 좋아요 표시/해제
     @PatchMapping("/{meetupIdx}/history/like")
     public ResponseEntity<Map<String, Object>> updateMyMeetupLike(
-            @PathVariable Long meetupIdx,
+            @PathVariable("meetupIdx") Long meetupIdx,
             @RequestParam(value = "liked") boolean liked,
             Authentication authentication) {
         String userId = authentication != null ? authentication.getName() : null;

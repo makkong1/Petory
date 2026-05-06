@@ -31,19 +31,19 @@ public class AdminMeetupController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<MeetupDTO> getMeetup(@PathVariable Long id) {
+    public ResponseEntity<MeetupDTO> getMeetup(@PathVariable("id") Long id) {
         return ResponseEntity.ok(facade.getMeetup(id));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteMeetup(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteMeetup(@PathVariable("id") Long id) {
         Long adminIdx = userIdResolver.requireCurrentUserIdx();
         facade.deleteMeetup(id, adminIdx);
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{id}/participants")
-    public ResponseEntity<List<MeetupParticipantsDTO>> getParticipants(@PathVariable Long id) {
+    public ResponseEntity<List<MeetupParticipantsDTO>> getParticipants(@PathVariable("id") Long id) {
         return ResponseEntity.ok(facade.getMeetupParticipants(id));
     }
 }

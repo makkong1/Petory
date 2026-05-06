@@ -56,9 +56,9 @@ public class ChatMessageController {
     @GetMapping("/conversation/{conversationIdx}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Page<ChatMessageDTO>> getMessages(
-            @PathVariable Long conversationIdx,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "50") int size) {
+            @PathVariable("conversationIdx") Long conversationIdx,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "50") int size) {
         return ResponseEntity.ok(chatMessageService.getMessages(conversationIdx, getCurrentUserId(), page, size));
     }
 
@@ -68,9 +68,9 @@ public class ChatMessageController {
     @GetMapping("/conversation/{conversationIdx}/before")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<ChatMessageDTO>> getMessagesBefore(
-            @PathVariable Long conversationIdx,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime beforeDate,
-            @RequestParam(defaultValue = "50") int size) {
+            @PathVariable("conversationIdx") Long conversationIdx,
+            @RequestParam("beforeDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime beforeDate,
+            @RequestParam(value = "size", defaultValue = "50") int size) {
         return ResponseEntity.ok(chatMessageService.getMessagesBefore(
                 conversationIdx, getCurrentUserId(), beforeDate, size));
     }
@@ -81,8 +81,8 @@ public class ChatMessageController {
     @PostMapping("/conversation/{conversationIdx}/read")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Void> markAsRead(
-            @PathVariable Long conversationIdx,
-            @RequestParam(required = false) Long lastMessageIdx) {
+            @PathVariable("conversationIdx") Long conversationIdx,
+            @RequestParam(value = "lastMessageIdx", required = false) Long lastMessageIdx) {
         chatMessageService.markAsRead(conversationIdx, getCurrentUserId(), lastMessageIdx);
         return ResponseEntity.noContent().build();
     }
@@ -92,7 +92,7 @@ public class ChatMessageController {
      */
     @DeleteMapping("/{messageIdx}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Void> deleteMessage(@PathVariable Long messageIdx) {
+    public ResponseEntity<Void> deleteMessage(@PathVariable("messageIdx") Long messageIdx) {
         chatMessageService.deleteMessage(messageIdx, getCurrentUserId());
         return ResponseEntity.noContent().build();
     }
@@ -103,8 +103,8 @@ public class ChatMessageController {
     @GetMapping("/conversation/{conversationIdx}/search")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<ChatMessageDTO>> searchMessages(
-            @PathVariable Long conversationIdx,
-            @RequestParam String keyword) {
+            @PathVariable("conversationIdx") Long conversationIdx,
+            @RequestParam("keyword") String keyword) {
         return ResponseEntity.ok(chatMessageService.searchMessages(
                 conversationIdx, getCurrentUserId(), keyword));
     }
@@ -114,7 +114,7 @@ public class ChatMessageController {
      */
     @GetMapping("/conversation/{conversationIdx}/unread-count")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Long> getUnreadCount(@PathVariable Long conversationIdx) {
+    public ResponseEntity<Long> getUnreadCount(@PathVariable("conversationIdx") Long conversationIdx) {
         return ResponseEntity.ok(chatMessageService.getUnreadCount(conversationIdx, getCurrentUserId()));
     }
 }

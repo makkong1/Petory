@@ -29,25 +29,25 @@ public class AdminUserController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<UsersDTO> getUser(@PathVariable Long id) {
+    public ResponseEntity<UsersDTO> getUser(@PathVariable("id") Long id) {
         return ResponseEntity.ok(adminUserFacade.getUser(id));
     }
 
     @PatchMapping("/{id}/status")
-    public ResponseEntity<UsersDTO> updateStatus(@PathVariable Long id, @RequestBody UsersDTO dto) {
+    public ResponseEntity<UsersDTO> updateStatus(@PathVariable("id") Long id, @RequestBody UsersDTO dto) {
         Long adminIdx = userIdResolver.requireCurrentUserIdx();
         return ResponseEntity.ok(adminUserFacade.updateStatus(id, dto, adminIdx));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteUser(@PathVariable("id") Long id) {
         Long adminIdx = userIdResolver.requireCurrentUserIdx();
         adminUserFacade.deleteUser(id, adminIdx);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{id}/restore")
-    public ResponseEntity<UsersDTO> restoreUser(@PathVariable Long id) {
+    public ResponseEntity<UsersDTO> restoreUser(@PathVariable("id") Long id) {
         Long adminIdx = userIdResolver.requireCurrentUserIdx();
         return ResponseEntity.ok(adminUserFacade.restoreUser(id, adminIdx));
     }

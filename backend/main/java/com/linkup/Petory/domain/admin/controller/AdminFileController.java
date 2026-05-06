@@ -33,13 +33,13 @@ public class AdminFileController {
 
     @GetMapping("/target")
     public ResponseEntity<List<FileDTO>> getFilesByTarget(
-            @RequestParam String targetType,
-            @RequestParam Long targetIdx) {
+            @RequestParam("targetType") String targetType,
+            @RequestParam("targetIdx") Long targetIdx) {
         return ResponseEntity.ok(adminFileFacade.getFilesByTarget(targetType, targetIdx));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteFile(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteFile(@PathVariable("id") Long id) {
         Long adminIdx = userIdResolver.requireCurrentUserIdx();
         adminFileFacade.deleteFile(id, adminIdx);
         return ResponseEntity.noContent().build();
@@ -47,8 +47,8 @@ public class AdminFileController {
 
     @DeleteMapping("/target")
     public ResponseEntity<Void> deleteFilesByTarget(
-            @RequestParam String targetType,
-            @RequestParam Long targetIdx) {
+            @RequestParam("targetType") String targetType,
+            @RequestParam("targetIdx") Long targetIdx) {
         Long adminIdx = userIdResolver.requireCurrentUserIdx();
         adminFileFacade.deleteFilesByTarget(targetType, targetIdx, adminIdx);
         return ResponseEntity.noContent().build();

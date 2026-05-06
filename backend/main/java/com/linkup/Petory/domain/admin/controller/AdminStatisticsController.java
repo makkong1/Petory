@@ -49,8 +49,8 @@ public class AdminStatisticsController {
 
     @PostMapping("/backfill")
     public ResponseEntity<String> backfill(
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+            @RequestParam("startDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam("endDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
         statisticsService.backfill(startDate, endDate);
         return ResponseEntity.ok(startDate + " ~ " + endDate + " 통계 집계가 완료되었습니다.");
     }

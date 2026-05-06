@@ -53,7 +53,7 @@ public class AdminMissingPetController {
      * 실종 제보 상세 조회
      */
     @GetMapping("/{id}")
-    public ResponseEntity<MissingPetBoardDTO> getMissingPet(@PathVariable Long id) {
+    public ResponseEntity<MissingPetBoardDTO> getMissingPet(@PathVariable("id") Long id) {
         // 관리자 페이지에서는 댓글 불필요하므로 null 전달
         return ResponseEntity.ok(missingPetBoardService.getBoard(id, null, null));
     }
@@ -63,7 +63,7 @@ public class AdminMissingPetController {
      */
     @PatchMapping("/{id}/status")
     public ResponseEntity<MissingPetBoardDTO> updateStatus(
-            @PathVariable Long id,
+            @PathVariable("id") Long id,
             @RequestBody Map<String, String> body) {
         String statusValue = body.get("status");
         if (statusValue == null) {
@@ -84,7 +84,7 @@ public class AdminMissingPetController {
      * 실종 제보 삭제 (소프트 삭제)
      */
     @PostMapping("/{id}/delete")
-    public ResponseEntity<Void> deleteMissingPet(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteMissingPet(@PathVariable("id") Long id) {
         missingPetBoardService.deleteBoard(id);
         return ResponseEntity.noContent().build();
     }
@@ -94,7 +94,7 @@ public class AdminMissingPetController {
      * 서비스: MissingPetBoardService.restoreBoard()
      */
     @PostMapping("/{id}/restore")
-    public ResponseEntity<MissingPetBoardDTO> restoreMissingPet(@PathVariable Long id) {
+    public ResponseEntity<MissingPetBoardDTO> restoreMissingPet(@PathVariable("id") Long id) {
         return ResponseEntity.ok(missingPetBoardService.restoreBoard(id));
     }
 
@@ -104,7 +104,7 @@ public class AdminMissingPetController {
      */
     @GetMapping("/{boardId}/comments")
     public ResponseEntity<List<MissingPetCommentDTO>> listComments(
-            @PathVariable Long boardId,
+            @PathVariable("boardId") Long boardId,
             @RequestParam(value = "deleted", required = false) Boolean deleted) {
         List<MissingPetCommentDTO> comments = missingPetCommentService.getComments(boardId);
 
@@ -125,8 +125,8 @@ public class AdminMissingPetController {
      */
     @PostMapping("/{boardId}/comments/{commentId}/delete")
     public ResponseEntity<Void> deleteComment(
-            @PathVariable Long boardId,
-            @PathVariable Long commentId) {
+            @PathVariable("boardId") Long boardId,
+            @PathVariable("commentId") Long commentId) {
         missingPetCommentService.deleteComment(boardId, commentId);
         return ResponseEntity.noContent().build();
     }

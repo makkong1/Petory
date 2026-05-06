@@ -381,7 +381,13 @@ public class NaverMapService {
                         @SuppressWarnings("unchecked")
                         List<Map<String, Object>> results = (List<Map<String, Object>>) resultsList;
 
-                        Map<String, Object> firstResult = results.get(0);
+                        Map<String, Object> firstResult = results.stream()
+                                .filter(item -> "roadaddr".equals(item.get("name")))
+                                .findFirst()
+                                .orElseGet(() -> results.stream()
+                                        .filter(item -> "addr".equals(item.get("name")))
+                                        .findFirst()
+                                        .orElse(results.get(0)));
                         @SuppressWarnings("unchecked")
                         Map<String, Object> region = (Map<String, Object>) firstResult.get("region");
 
@@ -430,10 +436,16 @@ public class NaverMapService {
                             }
                         }
 
+                        String regionAddress = addressBuilder.toString().trim();
+                        String detailedAddress = roadAddress != null && !roadAddress.isBlank()
+                                ? (regionAddress.isBlank() ? roadAddress : regionAddress + " " + roadAddress)
+                                : regionAddress;
+
                         result.put("success", true);
-                        result.put("address", roadAddress != null ? roadAddress : addressBuilder.toString());
+                        result.put("address", detailedAddress);
+                        result.put("displayAddress", detailedAddress);
                         result.put("roadAddress", roadAddress);
-                        result.put("jibunAddress", addressBuilder.toString());
+                        result.put("jibunAddress", regionAddress);
 
                         log.info("네이버맵 역지오코딩 성공 - 주소: {}", result.get("address"));
                     } else {

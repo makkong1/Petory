@@ -108,6 +108,11 @@ public class CareReviewService {
         return sum / reviews.size();
     }
 
+    @Transactional(readOnly = true)
+    public int getCompletedCareCount(Long providerId) {
+        return Math.toIntExact(careApplicationRepository.countCompletedByProviderId(providerId));
+    }
+
     /**
      * 리뷰 작성 (요청자가 제공자에게 리뷰 작성)
      */

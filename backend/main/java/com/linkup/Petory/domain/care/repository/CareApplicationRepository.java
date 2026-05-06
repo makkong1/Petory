@@ -12,4 +12,6 @@ public interface CareApplicationRepository {
     CareApplication saveAndFlush(CareApplication careApplication);
 
     Optional<CareApplication> findById(Long id);
+
+    long countCompletedByProviderId(Long providerId);
 }
