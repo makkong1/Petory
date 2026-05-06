@@ -88,6 +88,7 @@ public class UserProfileController {
         var careReviewSummary = serviceProvider
                 ? careReviewService.getReviewsWithAverage(userIdx)
                 : careReviewService.getWrittenReviewsWithAverage(userIdx);
+        int completedCareCount = serviceProvider ? careReviewService.getCompletedCareCount(userIdx) : 0;
         var locationServiceReviewSummary = locationServiceReviewService.getReviewsWithAverage(userIdx);
         List<MeetupHistoryDTO> meetupHistories = meetupService.getMeetupHistory(userIdx);
 
@@ -99,6 +100,7 @@ public class UserProfileController {
                 .averageRating(careReviewSummary.getAverageRating())
                 .locationServiceAverageRating(locationServiceReviewSummary.getAverageRating())
                 .reviewCount(careReviewSummary.getReviewCount())
+                .completedCareCount(completedCareCount)
                 .locationServiceReviewCount(locationServiceReviewSummary.getReviewCount())
                 .meetupHistories(meetupHistories)
                 .meetupHistoryCount(meetupHistories.size())
@@ -171,7 +173,7 @@ public class UserProfileController {
      * 닉네임 중복 검사
      */
     @GetMapping("/nickname/check")
-    public ResponseEntity<Map<String, Object>> checkNicknameAvailability(@RequestParam String nickname) {
+    public ResponseEntity<Map<String, Object>> checkNicknameAvailability(@RequestParam("nickname") String nickname) {
         boolean available = usersService.checkNicknameAvailability(nickname);
         return ResponseEntity.ok(Map.of(
                 "available", available,
@@ -182,7 +184,7 @@ public class UserProfileController {
      * 아이디 중복 검사
      */
     @GetMapping("/id/check")
-    public ResponseEntity<Map<String, Object>> checkIdAvailability(@RequestParam String id) {
+    public ResponseEntity<Map<String, Object>> checkIdAvailability(@RequestParam("id") String id) {
         boolean available = usersService.checkIdAvailability(id);
         return ResponseEntity.ok(Map.of(
                 "available", available,
@@ -237,7 +239,7 @@ public class UserProfileController {
      * 회원가입 전 이메일 인증 완료 여부 확인 (인증 불필요)
      */
     @GetMapping("/email/verify/pre-registration/check")
-    public ResponseEntity<Map<String, Object>> checkPreRegistrationVerification(@RequestParam String email) {
+    public ResponseEntity<Map<String, Object>> checkPreRegistrationVerification(@RequestParam("email") String email) {
         boolean verified = emailVerificationService.isPreRegistrationEmailVerified(email);
 
         return ResponseEntity.ok(Map.of(
@@ -249,7 +251,7 @@ public class UserProfileController {
      * 이메일 인증 처리
      */
     @GetMapping("/email/verify/{token}")
-    public ResponseEntity<Map<String, Object>> verifyEmail(@PathVariable String token) {
+    public ResponseEntity<Map<String, Object>> verifyEmail(@PathVariable("token") String token) {
         EmailVerificationPurpose purpose = emailVerificationService.verifyEmail(token);
 
         // 회원가입 전 인증인 경우 이메일 추출
@@ -297,12 +299,13 @@ public class UserProfileController {
      * - 인증된 사용자는 다른 사용자의 프로필을 조회할 수 있음
      */
     @GetMapping("/{userId}/profile")
-    public ResponseEntity<UserProfileWithReviewsDTO> getUserProfile(@PathVariable Long userId) {
+    public ResponseEntity<UserProfileWithReviewsDTO> getUserProfile(@PathVariable("userId") Long userId) {
         UsersDTO user = usersService.getUser(userId);
         boolean serviceProvider = isServiceProvider(user);
         var careReviewSummary = serviceProvider
                 ? careReviewService.getReviewsWithAverage(userId)
                 : careReviewService.getWrittenReviewsWithAverage(userId);
+        int completedCareCount = serviceProvider ? careReviewService.getCompletedCareCount(userId) : 0;
         var locationServiceReviewSummary = locationServiceReviewService.getReviewsWithAverage(userId);
         List<MeetupHistoryDTO> meetupHistories = meetupService.getMeetupHistory(userId);
 
@@ -314,6 +317,7 @@ public class UserProfileController {
                 .averageRating(careReviewSummary.getAverageRating())
                 .locationServiceAverageRating(locationServiceReviewSummary.getAverageRating())
                 .reviewCount(careReviewSummary.getReviewCount())
+                .completedCareCount(completedCareCount)
                 .locationServiceReviewCount(locationServiceReviewSummary.getReviewCount())
                 .meetupHistories(meetupHistories)
                 .meetupHistoryCount(meetupHistories.size())
@@ -327,7 +331,7 @@ public class UserProfileController {
      * 특정 사용자의 리뷰 목록 조회
      */
     @GetMapping("/{userId}/reviews")
-    public ResponseEntity<List<CareReviewDTO>> getUserReviews(@PathVariable Long userId) {
+    public ResponseEntity<List<CareReviewDTO>> getUserReviews(@PathVariable("userId") Long userId) {
         List<CareReviewDTO> reviews = careReviewService.getReviewsByReviewee(userId);
         return ResponseEntity.ok(reviews);
     }

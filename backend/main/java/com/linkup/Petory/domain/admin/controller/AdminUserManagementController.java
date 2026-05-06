@@ -32,13 +32,13 @@ public class AdminUserManagementController {
     }
 
     @PatchMapping("/{id}/promote-to-admin")
-    public ResponseEntity<UsersDTO> promoteToAdmin(@PathVariable Long id) {
+    public ResponseEntity<UsersDTO> promoteToAdmin(@PathVariable("id") Long id) {
         Long masterIdx = userIdResolver.requireCurrentUserIdx();
         return ResponseEntity.ok(adminUserFacade.promoteToAdmin(id, masterIdx));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteAdminUser(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteAdminUser(@PathVariable("id") Long id) {
         Long masterIdx = userIdResolver.requireCurrentUserIdx();
         adminUserFacade.deleteAdminUser(id, masterIdx);
         return ResponseEntity.noContent().build();
@@ -46,7 +46,7 @@ public class AdminUserManagementController {
 
     @PatchMapping("/{id}/password")
     public ResponseEntity<Void> changeAdminPassword(
-            @PathVariable Long id,
+            @PathVariable("id") Long id,
             @RequestBody Map<String, String> body) {
         Long masterIdx = userIdResolver.requireCurrentUserIdx();
         adminUserFacade.changeAdminPassword(id, body.get("newPassword"), masterIdx);

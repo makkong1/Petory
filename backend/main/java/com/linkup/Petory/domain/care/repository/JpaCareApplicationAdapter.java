@@ -30,4 +30,9 @@ public class JpaCareApplicationAdapter implements CareApplicationRepository {
     public Optional<CareApplication> findById(Long id) {
         return jpaRepository.findById(id);
     }
+
+    @Override
+    public long countCompletedByProviderId(Long providerId) {
+        return jpaRepository.countCompletedByProviderId(providerId);
+    }
 }

@@ -49,7 +49,7 @@ public class CareRequestController {
 
     // 단일 케어 요청 조회
     @GetMapping("/{id}")
-    public ResponseEntity<CareRequestDTO> getCareRequest(@PathVariable Long id) {
+    public ResponseEntity<CareRequestDTO> getCareRequest(@PathVariable("id") Long id) {
         return ResponseEntity.ok(careRequestService.getCareRequest(id));
     }
 
@@ -61,14 +61,14 @@ public class CareRequestController {
 
     @PutMapping("/{id}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<CareRequestDTO> updateCareRequest(@PathVariable Long id, @RequestBody CareRequestDTO dto) {
+    public ResponseEntity<CareRequestDTO> updateCareRequest(@PathVariable("id") Long id, @RequestBody CareRequestDTO dto) {
         Long currentUserId = getCurrentUserId();
         return ResponseEntity.ok(careRequestService.updateCareRequest(id, dto, currentUserId));
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Void> deleteCareRequest(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteCareRequest(@PathVariable("id") Long id) {
         Long currentUserId = getCurrentUserId();
         careRequestService.deleteCareRequest(id, currentUserId);
         return ResponseEntity.noContent().build();
@@ -83,7 +83,7 @@ public class CareRequestController {
 
     @PatchMapping("/{id}/status")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<CareRequestDTO> updateStatus(@PathVariable Long id,
+    public ResponseEntity<CareRequestDTO> updateStatus(@PathVariable("id") Long id,
             @RequestParam(value = "status") String status) {
         Long currentUserId = getCurrentUserId();
         return ResponseEntity.ok(careRequestService.updateStatus(id, status, currentUserId));

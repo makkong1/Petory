@@ -31,7 +31,7 @@ public class CareReviewController {
      * 특정 사용자(reviewee)에 대한 리뷰 목록 조회
      */
     @GetMapping("/reviewee/{revieweeIdx}")
-    public ResponseEntity<List<CareReviewDTO>> getReviewsByReviewee(@PathVariable Long revieweeIdx) {
+    public ResponseEntity<List<CareReviewDTO>> getReviewsByReviewee(@PathVariable("revieweeIdx") Long revieweeIdx) {
         return ResponseEntity.ok(careReviewService.getReviewsByReviewee(revieweeIdx));
     }
 
@@ -39,7 +39,7 @@ public class CareReviewController {
      * 특정 사용자(reviewer)가 작성한 리뷰 목록 조회
      */
     @GetMapping("/reviewer/{reviewerIdx}")
-    public ResponseEntity<List<CareReviewDTO>> getReviewsByReviewer(@PathVariable Long reviewerIdx) {
+    public ResponseEntity<List<CareReviewDTO>> getReviewsByReviewer(@PathVariable("reviewerIdx") Long reviewerIdx) {
         return ResponseEntity.ok(careReviewService.getReviewsByReviewer(reviewerIdx));
     }
 
@@ -47,7 +47,7 @@ public class CareReviewController {
      * 특정 사용자의 평균 평점 조회
      */
     @GetMapping("/average-rating/{revieweeIdx}")
-    public ResponseEntity<Double> getAverageRating(@PathVariable Long revieweeIdx) {
+    public ResponseEntity<Double> getAverageRating(@PathVariable("revieweeIdx") Long revieweeIdx) {
         Double average = careReviewService.getAverageRating(revieweeIdx);
         return ResponseEntity.ok(average);
     }

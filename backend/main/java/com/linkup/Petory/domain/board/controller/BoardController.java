@@ -54,8 +54,8 @@ public class BoardController {
     @PreAuthorize("permitAll()")
     @GetMapping("/{id}")
     public ResponseEntity<BoardDTO> getBoard(
-            @PathVariable Long id,
-            @RequestParam(required = false) Long viewerId) {
+            @PathVariable("id") Long id,
+            @RequestParam(value = "viewerId", required = false) Long viewerId) {
         return ResponseEntity.ok(boardService.getBoard(id, viewerId));
     }
 
@@ -76,14 +76,14 @@ public class BoardController {
     // 게시글 수정 (로그인 필요)
     @PutMapping("/{id}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<BoardDTO> updateBoard(@PathVariable Long id, @RequestBody BoardDTO dto) {
+    public ResponseEntity<BoardDTO> updateBoard(@PathVariable("id") Long id, @RequestBody BoardDTO dto) {
         return ResponseEntity.ok(boardService.updateBoard(id, dto));
     }
 
     // 게시글 삭제 (로그인 필요)
     @DeleteMapping("/{id}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Void> deleteBoard(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteBoard(@PathVariable("id") Long id) {
         boardService.deleteBoard(id);
         return ResponseEntity.noContent().build();
     }
@@ -91,7 +91,7 @@ public class BoardController {
     // 내 게시글 조회
     @GetMapping("/my-posts")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<List<BoardDTO>> getMyBoards(@RequestParam Long userId) {
+    public ResponseEntity<List<BoardDTO>> getMyBoards(@RequestParam("userId") Long userId) {
         return ResponseEntity.ok(boardService.getMyBoards(userId));
     }
 
@@ -99,10 +99,10 @@ public class BoardController {
     @GetMapping("/search")
     @PreAuthorize("permitAll()")
     public ResponseEntity<BoardPageResponseDTO> searchBoards(
-            @RequestParam String keyword,
-            @RequestParam(required = false, defaultValue = "TITLE_CONTENT") String searchType,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam("keyword") String keyword,
+            @RequestParam(value = "searchType", required = false, defaultValue = "TITLE_CONTENT") String searchType,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "20") int size) {
         return ResponseEntity.ok(boardService.searchBoardsWithPaging(keyword, searchType, page, size));
     }
 
@@ -114,23 +114,25 @@ public class BoardController {
     @PreAuthorize("permitAll()")
     @GetMapping("/{boardId}/comments")
     public ResponseEntity<CommentPageResponseDTO> getComments(
-            @PathVariable Long boardId,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @PathVariable("boardId") Long boardId,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "20") int size) {
         return ResponseEntity.ok(commentService.getCommentsWithPaging(boardId, page, size));
     }
 
     @PreAuthorize("isAuthenticated()")
     @PostMapping("/{boardId}/comments")
     public ResponseEntity<CommentDTO> addComment(
-            @PathVariable Long boardId,
+            @PathVariable("boardId") Long boardId,
             @RequestBody CommentDTO dto) {
         return ResponseEntity.ok(commentService.addComment(boardId, dto));
     }
 
     @PreAuthorize("isAuthenticated()")
     @DeleteMapping("/{boardId}/comments/{commentId}")
-    public ResponseEntity<Void> deleteComment(@PathVariable Long boardId, @PathVariable Long commentId) {
+    public ResponseEntity<Void> deleteComment(
+            @PathVariable("boardId") Long boardId,
+            @PathVariable("commentId") Long commentId) {
         commentService.deleteComment(boardId, commentId);
         return ResponseEntity.noContent().build();
     }
@@ -138,7 +140,7 @@ public class BoardController {
     @PreAuthorize("isAuthenticated()")
     @PostMapping("/{boardId}/reactions")
     public ResponseEntity<ReactionSummaryDTO> reactToBoard(
-            @PathVariable Long boardId,
+            @PathVariable("boardId") Long boardId,
             @RequestBody ReactionRequest request) {
         if (request.userId() == null || request.reactionType() == null) {
             throw BoardValidationException.reactionParamsRequired();
@@ -151,8 +153,8 @@ public class BoardController {
     @PreAuthorize("isAuthenticated()")
     @PostMapping("/{boardId}/comments/{commentId}/reactions")
     public ResponseEntity<ReactionSummaryDTO> reactToComment(
-            @PathVariable Long boardId,
-            @PathVariable Long commentId,
+            @PathVariable("boardId") Long boardId,
+            @PathVariable("commentId") Long commentId,
             @RequestBody ReactionRequest request) {
         if (request.userId() == null || request.reactionType() == null) {
             throw BoardValidationException.reactionParamsRequired();

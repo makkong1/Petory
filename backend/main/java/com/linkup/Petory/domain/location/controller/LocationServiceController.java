@@ -179,7 +179,7 @@ public class LocationServiceController {
      */
     @DeleteMapping("/{serviceIdx}")
     @PreAuthorize("hasAnyRole('ADMIN', 'MASTER')")
-    public ResponseEntity<Map<String, Object>> deleteService(@PathVariable Long serviceIdx) {
+    public ResponseEntity<Map<String, Object>> deleteService(@PathVariable("serviceIdx") Long serviceIdx) {
         try {
             locationServiceService.deleteService(serviceIdx);
 

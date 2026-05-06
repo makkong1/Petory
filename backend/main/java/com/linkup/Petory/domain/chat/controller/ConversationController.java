@@ -42,7 +42,7 @@ public class ConversationController {
      */
     @GetMapping("/{conversationIdx}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ConversationDTO> getConversation(@PathVariable Long conversationIdx) {
+    public ResponseEntity<ConversationDTO> getConversation(@PathVariable("conversationIdx") Long conversationIdx) {
         return ResponseEntity.ok(conversationService.getConversation(conversationIdx, getCurrentUserId()));
     }
 
@@ -74,7 +74,7 @@ public class ConversationController {
     @PostMapping("/care-request")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ConversationDTO> createCareRequestConversation(
-            @RequestParam Long careApplicationIdx) {
+            @RequestParam("careApplicationIdx") Long careApplicationIdx) {
         return ResponseEntity.ok(conversationService.createCareRequestConversation(
                 careApplicationIdx, getCurrentUserId()));
     }
@@ -84,7 +84,8 @@ public class ConversationController {
      */
     @PostMapping("/direct")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ConversationDTO> getOrCreateDirectConversation(@RequestParam Long otherUserId) {
+    public ResponseEntity<ConversationDTO> getOrCreateDirectConversation(
+            @RequestParam("otherUserId") Long otherUserId) {
         return ResponseEntity.ok(conversationService.getOrCreateDirectConversation(
                 getCurrentUserId(), otherUserId));
     }
@@ -94,7 +95,7 @@ public class ConversationController {
      */
     @PostMapping("/{conversationIdx}/leave")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Void> leaveConversation(@PathVariable Long conversationIdx) {
+    public ResponseEntity<Void> leaveConversation(@PathVariable("conversationIdx") Long conversationIdx) {
         conversationService.leaveConversation(conversationIdx, getCurrentUserId());
         return ResponseEntity.noContent().build();
     }
@@ -104,7 +105,7 @@ public class ConversationController {
      */
     @DeleteMapping("/{conversationIdx}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Void> deleteConversation(@PathVariable Long conversationIdx) {
+    public ResponseEntity<Void> deleteConversation(@PathVariable("conversationIdx") Long conversationIdx) {
         conversationService.deleteConversation(conversationIdx, getCurrentUserId());
         return ResponseEntity.noContent().build();
     }
@@ -115,8 +116,8 @@ public class ConversationController {
     @PatchMapping("/{conversationIdx}/status")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ConversationDTO> updateConversationStatus(
-            @PathVariable Long conversationIdx,
-            @RequestParam String status) {
+            @PathVariable("conversationIdx") Long conversationIdx,
+            @RequestParam("status") String status) {
         ConversationStatus conversationStatus = ConversationStatus.valueOf(status);
         return ResponseEntity.ok(conversationService.updateConversationStatus(
                 conversationIdx, conversationStatus, getCurrentUserId()));
@@ -127,7 +128,8 @@ public class ConversationController {
      */
     @PostMapping("/meetup/{meetupIdx}/join")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ConversationDTO> joinMeetupChat(@PathVariable Long meetupIdx) {
+    public ResponseEntity<ConversationDTO> joinMeetupChat(
+            @PathVariable("meetupIdx") Long meetupIdx) {
         return ResponseEntity.ok(conversationService.joinMeetupChat(meetupIdx, getCurrentUserId()));
     }
 
@@ -136,7 +138,8 @@ public class ConversationController {
      */
     @GetMapping("/meetup/{meetupIdx}/participant-count")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Integer> getMeetupChatParticipantCount(@PathVariable Long meetupIdx) {
+    public ResponseEntity<Integer> getMeetupChatParticipantCount(
+            @PathVariable("meetupIdx") Long meetupIdx) {
         return ResponseEntity.ok(conversationService.getMeetupChatParticipantCount(meetupIdx));
     }
 
@@ -145,7 +148,7 @@ public class ConversationController {
      */
     @PostMapping("/{conversationIdx}/confirm-deal")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Void> confirmCareDeal(@PathVariable Long conversationIdx) {
+    public ResponseEntity<Void> confirmCareDeal(@PathVariable("conversationIdx") Long conversationIdx) {
         conversationService.confirmCareDeal(conversationIdx, getCurrentUserId());
         return ResponseEntity.noContent().build();
     }

@@ -97,28 +97,27 @@ public class AdminBoardController {
     }
 
     @PatchMapping("/{boardId}/comments/{commentId}/blind")
-    public ResponseEntity<CommentDTO> blindComment(@PathVariable Long boardId, @PathVariable Long commentId,
+    public ResponseEntity<CommentDTO> blindComment(@PathVariable("boardId") Long boardId, @PathVariable("commentId") Long commentId,
             @RequestBody(required = false) Map<String, Object> body) {
         return ResponseEntity.ok(commentService.updateCommentStatus(boardId, commentId, ContentStatus.BLINDED));
     }
 
     @PatchMapping("/{boardId}/comments/{commentId}/unblind")
-    public ResponseEntity<CommentDTO> unblindComment(@PathVariable Long boardId, @PathVariable Long commentId,
+    public ResponseEntity<CommentDTO> unblindComment(@PathVariable("boardId") Long boardId, @PathVariable("commentId") Long commentId,
             @RequestBody(required = false) Map<String, Object> body) {
         return ResponseEntity.ok(commentService.updateCommentStatus(boardId, commentId, ContentStatus.ACTIVE));
     }
 
     @PostMapping("/{boardId}/comments/{commentId}/delete")
-    public ResponseEntity<Void> softDeleteComment(@PathVariable Long boardId, @PathVariable Long commentId,
+    public ResponseEntity<Void> softDeleteComment(@PathVariable("boardId") Long boardId, @PathVariable("commentId") Long commentId,
             @RequestBody(required = false) Map<String, Object> body) {
         commentService.deleteComment(boardId, commentId);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{boardId}/comments/{commentId}/restore")
-    public ResponseEntity<CommentDTO> restoreComment(@PathVariable Long boardId, @PathVariable Long commentId,
+    public ResponseEntity<CommentDTO> restoreComment(@PathVariable("boardId") Long boardId, @PathVariable("commentId") Long commentId,
             @RequestBody(required = false) Map<String, Object> body) {
         return ResponseEntity.ok(commentService.restoreComment(boardId, commentId));
     }
 }
-

@@ -79,9 +79,9 @@ public class MissingPetBoardController {
      */
     @GetMapping("/{id}")
     public ResponseEntity<MissingPetBoardDTO> getBoard(
-            @PathVariable Long id,
-            @RequestParam(defaultValue = "0") int commentPage,
-            @RequestParam(defaultValue = "20") int commentSize) {
+            @PathVariable("id") Long id,
+            @RequestParam(value = "commentPage", defaultValue = "0") int commentPage,
+            @RequestParam(value = "commentSize", defaultValue = "20") int commentSize) {
         // commentSize가 0이면 댓글 제외
         Integer page = commentSize > 0 ? commentPage : null;
         Integer size = commentSize > 0 ? commentSize : null;
@@ -105,7 +105,7 @@ public class MissingPetBoardController {
      */
     @PutMapping("/{id}")
     public ResponseEntity<MissingPetBoardDTO> updateBoard(
-            @PathVariable Long id,
+            @PathVariable("id") Long id,
             @RequestBody MissingPetBoardDTO request) {
         MissingPetBoardDTO updated = missingPetBoardService.updateBoard(id, request);
         return ResponseEntity.ok(updated);
@@ -118,7 +118,7 @@ public class MissingPetBoardController {
      */
     @PatchMapping("/{id}/status")
     public ResponseEntity<MissingPetBoardDTO> updateStatus(
-            @PathVariable Long id,
+            @PathVariable("id") Long id,
             @RequestBody Map<String, String> body) {
         String statusValue = body.get("status");
         if (statusValue == null) {
@@ -143,7 +143,7 @@ public class MissingPetBoardController {
      * 참고: 관련 댓글도 함께 소프트 삭제됨 (MissingPetCommentService.deleteAllCommentsByBoard())
      */
     @DeleteMapping("/{id}")
-    public ResponseEntity<Map<String, Object>> deleteBoard(@PathVariable Long id) {
+    public ResponseEntity<Map<String, Object>> deleteBoard(@PathVariable("id") Long id) {
         missingPetBoardService.deleteBoard(id);
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
@@ -159,9 +159,9 @@ public class MissingPetBoardController {
      */
     @GetMapping("/{id}/comments")
     public ResponseEntity<MissingPetCommentPageResponseDTO> getComments(
-            @PathVariable Long id,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @PathVariable("id") Long id,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "20") int size) {
         return ResponseEntity.ok(missingPetCommentService.getCommentsWithPaging(id, page, size));
     }
 
@@ -172,7 +172,7 @@ public class MissingPetBoardController {
      */
     @PostMapping("/{id}/comments")
     public ResponseEntity<MissingPetCommentDTO> addComment(
-            @PathVariable Long id,
+            @PathVariable("id") Long id,
             @RequestBody MissingPetCommentDTO request) {
         MissingPetCommentDTO created = missingPetCommentService.addComment(id, request);
         return ResponseEntity.ok(created);
@@ -185,8 +185,8 @@ public class MissingPetBoardController {
      */
     @DeleteMapping("/{boardId}/comments/{commentId}")
     public ResponseEntity<Map<String, Object>> deleteComment(
-            @PathVariable Long boardId,
-            @PathVariable Long commentId) {
+            @PathVariable("boardId") Long boardId,
+            @PathVariable("commentId") Long commentId) {
         missingPetCommentService.deleteComment(boardId, commentId);
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
@@ -204,7 +204,7 @@ public class MissingPetBoardController {
      */
     @PostMapping("/{boardIdx}/start-chat")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ConversationDTO> startMissingPetChat(@PathVariable Long boardIdx) {
+    public ResponseEntity<ConversationDTO> startMissingPetChat(@PathVariable("boardIdx") Long boardIdx) {
         Long reporterId = missingPetBoardService.getUserIdByBoardIdx(boardIdx);
         Long witnessId = getCurrentUserId();
 

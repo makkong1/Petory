@@ -77,7 +77,7 @@ public class PetCoinController {
          * GET /api/payment/transactions/{id}
          */
         @GetMapping("/transactions/{id}")
-        public ResponseEntity<PetCoinTransactionDetailDTO> getTransactionDetail(@PathVariable Long id) {
+        public ResponseEntity<PetCoinTransactionDetailDTO> getTransactionDetail(@PathVariable("id") Long id) {
                 Users user = getCurrentUser();
                 PetCoinTransactionDetailDTO detail = petCoinService.getTransactionDetail(id, user);
                 return ResponseEntity.ok(detail);

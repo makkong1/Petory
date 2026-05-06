@@ -18,21 +18,21 @@ public class CareRequestCommentController {
     private final CareRequestCommentService commentService;
 
     @GetMapping
-    public ResponseEntity<List<CareRequestCommentDTO>> getComments(@PathVariable Long careRequestId) {
+    public ResponseEntity<List<CareRequestCommentDTO>> getComments(@PathVariable("careRequestId") Long careRequestId) {
         return ResponseEntity.ok(commentService.getComments(careRequestId));
     }
 
     @PostMapping
     public ResponseEntity<CareRequestCommentDTO> addComment(
-            @PathVariable Long careRequestId,
+            @PathVariable("careRequestId") Long careRequestId,
             @RequestBody CareRequestCommentDTO dto) {
         return ResponseEntity.ok(commentService.addComment(careRequestId, dto));
     }
 
     @DeleteMapping("/{commentId}")
     public ResponseEntity<Void> deleteComment(
-            @PathVariable Long careRequestId,
-            @PathVariable Long commentId) {
+            @PathVariable("careRequestId") Long careRequestId,
+            @PathVariable("commentId") Long commentId) {
         commentService.deleteComment(careRequestId, commentId);
         return ResponseEntity.noContent().build();
     }

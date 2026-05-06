@@ -72,7 +72,7 @@ public class AdminPaymentController {
          * 사용자 코인 잔액 조회 (관리자용)
          */
         @GetMapping("/balance/{userId}")
-        public ResponseEntity<PetCoinBalanceResponse> getUserBalance(@PathVariable Long userId) {
+        public ResponseEntity<PetCoinBalanceResponse> getUserBalance(@PathVariable("userId") Long userId) {
                 Users user = usersRepository.findById(userId)
                                 .orElseThrow(() -> new UserNotFoundException());
 
@@ -86,7 +86,7 @@ public class AdminPaymentController {
          */
         @GetMapping("/transactions/{userId}")
         public ResponseEntity<Page<PetCoinTransactionDTO>> getUserTransactions(
-                        @PathVariable Long userId,
+                        @PathVariable("userId") Long userId,
                         @PageableDefault(size = 20) Pageable pageable) {
                 Users user = usersRepository.findById(userId)
                                 .orElseThrow(() -> new UserNotFoundException());
