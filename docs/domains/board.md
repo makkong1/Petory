@@ -435,6 +435,7 @@ public BoardPageResponseDTO searchBoardsWithPaging(String keyword, String search
 | `getAllBoards()` | 게시글 목록 조회 | 배치 조회로 N+1 문제 해결 |
 | `getAllBoardsWithPaging()` | 게시글 목록 조회 (페이징) | 배치 조회로 N+1 문제 해결 |
 | `getAdminBoardsWithPagingOptimized()` | 게시글 목록 조회 (관리자용) | Specification + DB 페이징, status/deleted/category/q 필터 |
+| `getBoardForAdmin()` | 관리자용 단일 게시글 조회 | `findByIdWithUser()`, 조회수 증가 없음, 삭제된 게시글 포함 — `AdminBoardController` 전용 |
 | `getBoard()` | 게시글 상세 조회 | 조회수 증가 (중복 방지), 상세는 `@Cacheable` 미사용(조회수 실시간 반영) |
 | `getMyBoards()` | 내 게시글 조회 | 사용자별 게시글 조회 |
 | `createBoard()` | 게시글 생성 | 파일 첨부 처리, 캐시 무효화 |

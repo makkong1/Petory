@@ -323,6 +323,7 @@ domain/chat/
   │   └── ChatWebSocketController.java
   ├── service/
   │   ├── ConversationService.java
+  │   ├── ConversationCreatorService.java
   │   └── ChatMessageService.java
   ├── entity/
   │   ├── Conversation.java
@@ -490,12 +491,12 @@ graph TD
 ## 5. 트랜잭션 처리
 
 ### 5.1 트랜잭션 전략
-- **채팅방 생성**: `createConversation()`에 `@Transactional(propagation = Propagation.REQUIRES_NEW)`가 선언되어 있으나, **`ConversationService` 내부의 `this.createConversation(...)` 호출(self-invocation)은 Spring AOP 프록시를 거치지 않아 `REQUIRES_NEW`가 적용되지 않을 수 있음** — 의도(별도 트랜잭션)와 실제가 다를 수 있음. 개선은 별도 `@Service` 분리 등(`chat-code-review` Critical §4).
-- **채팅방 생성(의도 문구)**: 주석상으로는 실패해도 호출한 트랜잭션에 영향 없도록 설계
+- **채팅방 생성**: `ConversationService.createConversation()`은 실제 생성을 **`ConversationCreatorService.createConversation()`**에 위임한다. `ConversationCreatorService`는 별도 `@Service` 빈이므로 `@Transactional(propagation = Propagation.REQUIRES_NEW)`가 프록시를 통해 정상 적용됨 — self-invocation 문제 없음.
+- **채팅방 생성**: 실패해도 호출한 트랜잭션에 영향 없음 (REQUIRES_NEW 격리)
 - **메시지 전송**: `@Transactional` - 메시지 저장, 원자적 unreadCount 증가, 메타데이터 업데이트를 원자적으로 처리
 - **읽음 처리**: `@Transactional` - unreadCount 초기화, lastReadMessage 저장을 원자적으로 처리 (Repository의 markAsRead() 미사용, Service에서 직접 업데이트)
 - **거래 확정**: `@Transactional` - 양쪽 모두 확정 확인, CareApplication 생성/승인, CareRequest 상태 변경을 원자적으로 처리
-- **조회 메서드**: `ChatMessageService`는 클래스 레벨 `@Transactional(readOnly = true)`. `ConversationService`는 클래스 레벨 readOnly가 없고 메서드별로 상이함(리뷰 Warning 참고).
+- **조회 메서드**: `ChatMessageService`와 `ConversationService` 모두 클래스 레벨 `@Transactional(readOnly = true)`. 쓰기 메서드에는 `@Transactional`로 오버라이드.
 
 ### 5.2 동시성 제어
 - **읽지 않은 메시지 수 증가**: `@Modifying @Query`로 DB 레벨 원자적 증가 (`incrementUnreadCount()`)
@@ -624,7 +625,7 @@ CREATE INDEX reply_to_message_idx ON chatmessage(reply_to_message_idx);
 - **인덱스 전략**: 자주 조회되는 컬럼 조합 인덱싱
 - **원자적 증가**: `incrementUnreadCount()`로 DB 레벨에서 읽지 않은 메시지 수 증가하여 Lost Update 문제 해결
 - **재참여 최적화**: `joinedAt` 이후 메시지만 조회하여 불필요한 데이터 로딩 방지
-- **트랜잭션 분리(의도)**: 채팅방 생성에 `REQUIRES_NEW` 선언 — **실효 여부는 self-invocation 여부에 따라 달라질 수 있음**(위 5.1 참고)
+- **트랜잭션 분리(구현)**: `ConversationCreatorService` 별도 빈 분리로 `REQUIRES_NEW` 정상 적용 — self-invocation 문제 없음
 - **알려진 N+1**: `createMissingPetChat()` 기존 방 탐색 루프에서 참가자 조회 반복 가능
 
 ### 8.5 엔티티 설계 특징

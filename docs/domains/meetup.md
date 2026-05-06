@@ -349,6 +349,8 @@ public void handleMeetupCreated(MeetupCreatedEvent event) {
 | `cancelMeetupParticipation()` | 모임 참여 취소        | 주최자 보호, MeetupParticipantNotFoundException, 채팅방 나가기(ApiException/Exception 분리 catch)                         |
 | `getMeetupParticipants()`     | 참가자 목록 조회      | `findByIdWithOrganizer`로 모임 존재·삭제 여부 선확인 후 참가자 조회                                                                            |
 | `isUserParticipating()`       | 참여 여부 확인        | `findIdxByIdString` 경량 쿼리(Users 전체 로딩 없음), `existsByMeetupIdxAndUserIdx()`                                                           |
+| `deleteMeetupForAdmin()`      | 관리자용 모임 삭제    | `findById()` → Soft Delete. 사용자 검증 없음 — `AdminMeetupController` 전용                                                                    |
+| `getMeetupsForAdmin()`        | 관리자용 모임 목록    | `findAllForAdmin(status, keyword, pageable)` — `Page<MeetupDTO>` 반환                                                                          |
 
 ### 3.3 트랜잭션 처리
 
@@ -555,6 +557,17 @@ erDiagram
 | `/api/meetups/{meetupIdx}/participants`       | POST   | 모임 참여 (MeetupConflictException, MeetupNotFoundException, UserNotFoundException)              | `{"participant": {...}, "message": "..."}` |
 | `/api/meetups/{meetupIdx}/participants`       | DELETE | 모임 참여 취소 (MeetupForbiddenException, MeetupParticipantNotFoundException)                    | `{"message": "..."}`                       |
 | `/api/meetups/{meetupIdx}/participants/check` | GET    | 참여 여부 확인                                                                                   | `{"isParticipating": true/false}`          |
+
+#### 관리자 API (`/api/admin/meetups`, `@PreAuthorize("hasAnyRole('ADMIN','MASTER')")`)
+
+`AdminMeetupController` — `AdminCareAndMeetupFacade`를 경유해 서비스를 호출한다.
+
+| 엔드포인트 | Method | 설명 | 응답 |
+|-----------|--------|------|------|
+| `/api/admin/meetups` | GET | 모임 목록 (`status`, `q`, `page`/`size` 기본 0·20) — `getMeetupsForAdmin()` | `Page<MeetupDTO>` |
+| `/api/admin/meetups/{id}` | GET | 모임 상세 — `getMeetupById()` | `MeetupDTO` |
+| `/api/admin/meetups/{id}` | DELETE | 소프트 삭제 (`204 No Content`) — `deleteMeetupForAdmin()` (사용자 검증 없음) | `204 No Content` |
+| `/api/admin/meetups/{id}/participants` | GET | 참가자 목록 | `List<MeetupParticipantsDTO>` |
 
 #### 채팅 (Chat 도메인) — 모임과 별도 호출
 

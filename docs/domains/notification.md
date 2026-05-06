@@ -19,7 +19,7 @@ Notification 도메인은 사용자 알림 시스템으로, 다양한 이벤트 
 ### 2.1 실시간 알림 (SSE)
 
 **SSE 연결 프로세스**:
-1. 클라이언트에서 SSE 연결 요청 (`GET /api/notifications/stream?userId={userId}&token={JWT}` — `EventSource`는 헤더에 `Authorization`을 붙이기 어려워 **`token` 쿼리로 JWT 전달**, `JwtAuthenticationFilter`가 처리)
+1. 클라이언트에서 SSE 연결 요청 (`GET /api/notifications/stream?token={JWT}` — `EventSource`는 헤더에 `Authorization`을 붙이기 어려워 **`token` 쿼리로 JWT 전달**, `JwtAuthenticationFilter`가 처리. `userId`는 JWT principal에서 자동 추출)
 2. `SecurityConfig`에서 `/api/**`는 인증 필요 → 스트림도 **로그인(JWT 유효)** 없이는 401
 3. 서버에서 `SseEmitter` 생성 및 연결 저장
 4. 연결 즉시 읽지 않은 알림 개수 전송 (`event: unreadCount`)

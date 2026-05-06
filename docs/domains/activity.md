@@ -1,258 +1,44 @@
-# Activity 도메인 - 포트폴리오 상세 설명
+# Activity 도메인
 
 ## 1. 기능 설명
 
 ### 1.1 도메인 개요
-- **역할**: 사용자 활동 로그 통합 조회 도메인으로, 여러 도메인(펫케어, 커뮤니티, 실종 제보 등)의 활동을 통합하여 사용자별 활동 이력을 제공합니다.
-- **주요 기능**: 
+- **역할**: 사용자 활동 로그 통합 조회 도메인. 여러 도메인(펫케어, 커뮤니티, 실종 제보)의 활동을 단일 타임라인으로 제공한다.
+- **주요 기능**:
   - 사용자별 활동 통합 조회 (게시글, 댓글 등)
-  - 활동 타입별 필터링 (전체, 게시글, 댓글, 리뷰)
+  - 활동 타입별 필터링 (`ALL` / `POSTS` / `COMMENTS` / `REVIEWS`)
   - 페이징 지원
-  - 최신순 정렬
-  - Soft Delete 필터링 (삭제된 활동 제외)
+  - `createdAt` 기준 최신순 정렬 (null-safe)
+  - Soft Delete 필터링 (`isDeleted = false` 인 활동만 조회)
 
 ### 1.2 기능 시연
-> **스크린샷/영상 링크**: [기능 작동 영상 또는 스크린샷 추가]
 
 #### 주요 기능 1: 활동 통합 조회
-- **설명**: 사용자가 작성한 모든 활동(게시글, 댓글 등)을 한 곳에서 조회할 수 있습니다.
-- **사용자 시나리오**: 
-  1. 마이페이지에서 "내 활동" 메뉴 클릭
-  2. 펫케어 요청, 커뮤니티 게시글, 실종 제보, 댓글 등 모든 활동이 최신순으로 표시
-  3. 필터링으로 게시글만, 댓글만 조회 가능
-  4. 페이징으로 활동 목록 탐색
-- **스크린샷/영상**: 
+- **설명**: 사용자가 작성한 모든 활동을 한 곳에서 최신순으로 조회
+- **사용자 시나리오**:
+  1. 마이페이지 "내 활동" 클릭
+  2. 펫케어 요청, 커뮤니티 게시글, 실종 제보, 댓글 등 모든 활동이 최신순 표시
+  3. 필터로 게시글만 / 댓글만 조회 가능
+  4. 페이징으로 목록 탐색
 
 #### 주요 기능 2: 활동 타입별 필터링
-- **설명**: 활동을 타입별로 필터링하여 조회할 수 있습니다.
+- **설명**: 활동 타입별로 필터링하여 조회
 - **사용자 시나리오**:
-  1. "전체" 필터: 모든 활동 표시
-  2. "게시글" 필터: 펫케어 요청, 커뮤니티 게시글, 실종 제보만 표시
-  3. "댓글" 필터: 펫케어 댓글, 커뮤니티 댓글, 실종 제보 댓글만 표시
-  4. "리뷰"(`REVIEWS`) 필터: `LOCATION_REVIEW` 타입만 남기나, **수집 로직이 없어** 실질적으로 빈 목록에 가깝다(§3.5)
-- **스크린샷/영상**: 
+  1. `ALL`: 모든 활동 표시
+  2. `POSTS`: 펫케어 요청, 커뮤니티 게시글, 실종 제보만 표시
+  3. `COMMENTS`: 펫케어 댓글, 커뮤니티 댓글, 실종 제보 댓글만 표시
+  4. `REVIEWS`: `LOCATION_REVIEW` 타입만 — **`getUserActivities()`에서 수집하지 않아 항상 0** (미구현)
 
 ---
 
-## 2. 서비스 로직 설명
-
-### 2.1 핵심 비즈니스 로직
-
-**트랜잭션**: `ActivityService`에 `@Transactional(readOnly = true)`(클래스 레벨).
-
-**구현 참고**: 코드에 `System.out.println` 디버그 출력이 다수 포함되어 있음(운영 전 제거·로거 전환 권장).
-
-#### 로직 1: 사용자 활동 통합 조회
-**구현 위치**: `ActivityService.getUserActivities()`
-
-**핵심 로직**:
-- **다양한 도메인에서 활동 수집**:
-  1. **펫케어 요청** (`CARE_REQUEST`): `CareRequestRepository.findByUserAndIsDeletedFalseOrderByCreatedAtDesc()`
-  2. **커뮤니티 게시글** (`BOARD`): `BoardRepository.findByUserAndIsDeletedFalseOrderByCreatedAtDesc()`
-  3. **실종 제보 게시글** (`MISSING_PET`): `MissingPetBoardRepository.findByUserAndIsDeletedFalseOrderByCreatedAtDesc()`
-  4. **펫케어 댓글** (`CARE_COMMENT`): `CareRequestCommentRepository.findByUserAndIsDeletedFalseOrderByCreatedAtDesc()`
-  5. **커뮤니티 댓글** (`COMMENT`): `CommentRepository.findByUserAndIsDeletedFalseOrderByCreatedAtDesc()`
-  6. **실종 제보 댓글** (`MISSING_COMMENT`): `MissingPetCommentRepository.findByUserAndIsDeletedFalseOrderByCreatedAtDesc()`
-
-- **ActivityDTO 변환**:
-  - 각 엔티티를 `ActivityDTO`로 변환
-  - 게시글 타입: `title`, `content`, `status` 포함
-  - 댓글 타입: `content`, `relatedId`, `relatedTitle` 포함 (관련 게시글 정보)
-  - `deleted`, `deletedAt` 필드 포함 (Soft Delete 정보)
-
-- **최신순 정렬**: `createdAt` 기준 내림차순 정렬 (null-safe)
-- **Soft Delete 필터링**: `isDeleted = false`인 활동만 조회
-
-**코드 예시**:
-```java
-public List<ActivityDTO> getUserActivities(long userId) {
-    Users user = usersRepository.findById(userId)
-        .orElseThrow(UserNotFoundException::new);
-    
-    List<ActivityDTO> activities = new ArrayList<>();
-    
-    // 1. 펫케어 요청 조회
-    List<CareRequest> careRequests = careRequestRepository
-        .findByUserAndIsDeletedFalseOrderByCreatedAtDesc(user);
-    activities.addAll(careRequests.stream()
-        .map(cr -> ActivityDTO.builder()
-            .idx(cr.getIdx())
-            .type("CARE_REQUEST")
-            .title(cr.getTitle())
-            .content(cr.getDescription())
-            .createdAt(cr.getCreatedAt())
-            .status(cr.getStatus() != null ? cr.getStatus().name() : null)
-            .deleted(cr.getIsDeleted())
-            .deletedAt(cr.getDeletedAt())
-            .build())
-        .collect(Collectors.toList()));
-    
-    // 2. 커뮤니티 게시글 조회
-    List<Board> boards = boardRepository
-        .findByUserAndIsDeletedFalseOrderByCreatedAtDesc(user);
-    activities.addAll(boards.stream()
-        .map(b -> ActivityDTO.builder()
-            .idx(b.getIdx())
-            .type("BOARD")
-            .title(b.getTitle())
-            .content(b.getContent())
-            .createdAt(b.getCreatedAt())
-            .status(b.getStatus() != null ? b.getStatus().name() : null)
-            .deleted(b.getIsDeleted())
-            .deletedAt(b.getDeletedAt())
-            .build())
-        .collect(Collectors.toList()));
-    
-    // 3. 실종 제보 게시글 조회
-    // ... (동일한 패턴)
-    
-    // 4. 펫케어 댓글 조회 (관련 게시글 정보 포함)
-    List<CareRequestComment> careComments = careRequestCommentRepository
-        .findByUserAndIsDeletedFalseOrderByCreatedAtDesc(user);
-    activities.addAll(careComments.stream()
-        .map(cc -> {
-            CareRequest cr = cc.getCareRequest();
-            return ActivityDTO.builder()
-                .idx(cc.getIdx())
-                .type("CARE_COMMENT")
-                .title(null)
-                .content(cc.getContent())
-                .createdAt(cc.getCreatedAt())
-                .status(cc.getIsDeleted() ? "DELETED" : "ACTIVE")
-                .deleted(cc.getIsDeleted())
-                .deletedAt(cc.getDeletedAt())
-                .relatedId(cr != null ? cr.getIdx() : null)
-                .relatedTitle(cr != null ? cr.getTitle() : null)
-                .build();
-        })
-        .collect(Collectors.toList()));
-    
-    // 5. 커뮤니티 댓글 조회
-    // 6. 실종 제보 댓글 조회
-    // ... (동일한 패턴)
-    
-    // 7. 최신순 정렬 (null-safe)
-    activities.sort((a, b) -> {
-        if (a.getCreatedAt() == null && b.getCreatedAt() == null) return 0;
-        if (a.getCreatedAt() == null) return 1; // null은 뒤로
-        if (b.getCreatedAt() == null) return -1; // null은 뒤로
-        return b.getCreatedAt().compareTo(a.getCreatedAt());
-    });
-    
-    return activities;
-}
-```
-
-#### 로직 2: 활동 조회 (페이징 및 필터링)
-**구현 위치**: `ActivityService.getUserActivitiesWithPaging()`
-
-**핵심 로직**:
-- **전체 활동 조회**: `getUserActivities()` 호출하여 모든 활동 수집
-- **필터링 적용**: `filterActivities()` 메서드로 필터링
-  - `ALL`: 모든 활동 반환
-  - `POSTS`: 게시글 타입만 (`CARE_REQUEST`, `BOARD`, `MISSING_PET`)
-  - `COMMENTS`: 댓글 타입만 (`CARE_COMMENT`, `COMMENT`, `MISSING_COMMENT`)
-  - `REVIEWS`: 리뷰 타입만 (`LOCATION_REVIEW` - 현재 미구현)
-
-- **필터별 개수 계산**: 전체, 게시글, 댓글, 리뷰 개수 제공 (필터 버튼에 표시용)
-- **페이징 적용**: Spring Data `PageRequest` 사용하여 페이징 처리
-- **응답 DTO 생성**: `ActivityPageResponseDTO`에 활동 목록, 페이징 정보, 필터별 개수 포함
-
-**코드 예시**:
-```java
-public ActivityPageResponseDTO getUserActivitiesWithPaging(
-        long userId, String filter, int page, int size) {
-    
-    // 1. 전체 활동 가져오기
-    List<ActivityDTO> allActivities = getUserActivities(userId);
-    
-    // 2. 필터링 적용
-    List<ActivityDTO> filteredActivities = filterActivities(allActivities, filter);
-    
-    // 3. 필터별 개수 계산
-    long allCount = allActivities.size();
-    long postsCount = allActivities.stream()
-        .filter(a -> isPostType(a.getType()))
-        .count();
-    long commentsCount = allActivities.stream()
-        .filter(a -> isCommentType(a.getType()))
-        .count();
-    long reviewsCount = allActivities.stream()
-        .filter(a -> "LOCATION_REVIEW".equals(a.getType()))
-        .count();
-    
-    // 4. 페이징 적용
-    Pageable pageable = PageRequest.of(page, size);
-    int start = (int) pageable.getOffset();
-    int end = Math.min((start + pageable.getPageSize()), filteredActivities.size());
-    
-    List<ActivityDTO> pageContent = filteredActivities.subList(start, end);
-    Page<ActivityDTO> activityPage = new PageImpl<>(
-        pageContent, pageable, filteredActivities.size());
-    
-    // 5. 응답 DTO 생성
-    return ActivityPageResponseDTO.builder()
-        .activities(activityPage.getContent())
-        .totalCount(activityPage.getTotalElements())
-        .totalPages(activityPage.getTotalPages())
-        .currentPage(page)
-        .pageSize(size)
-        .hasNext(activityPage.hasNext())
-        .hasPrevious(activityPage.hasPrevious())
-        .allCount(allCount)
-        .postsCount(postsCount)
-        .commentsCount(commentsCount)
-        .reviewsCount(reviewsCount)
-        .build();
-}
-
-private List<ActivityDTO> filterActivities(List<ActivityDTO> activities, String filter) {
-    if (filter == null || "ALL".equals(filter)) {
-        return activities;
-    }
-    
-    switch (filter) {
-        case "POSTS":
-            return activities.stream()
-                .filter(a -> isPostType(a.getType()))
-                .collect(Collectors.toList());
-        case "COMMENTS":
-            return activities.stream()
-                .filter(a -> isCommentType(a.getType()))
-                .collect(Collectors.toList());
-        case "REVIEWS":
-            return activities.stream()
-                .filter(a -> "LOCATION_REVIEW".equals(a.getType()))
-                .collect(Collectors.toList());
-        default:
-            return activities;
-    }
-}
-
-private boolean isPostType(String type) {
-    return "CARE_REQUEST".equals(type) 
-        || "BOARD".equals(type) 
-        || "MISSING_PET".equals(type);
-}
-
-private boolean isCommentType(String type) {
-    return "CARE_COMMENT".equals(type) 
-        || "COMMENT".equals(type) 
-        || "MISSING_COMMENT".equals(type);
-}
-```
-
----
-
-## 3. 아키텍처 설명
-
-### 3.1 도메인 구조
-**참고**: Activity 도메인은 별도의 Activity 엔티티를 사용하지 않고, 각 도메인의 엔티티를 직접 조회하여 통합합니다.
+## 2. 도메인 구조
 
 ```
 domain/activity/
   ├── controller/
   │   └── ActivityController.java
+  ├── converter/
+  │   └── ActivityConverter.java        ← 엔티티 → ActivityDTO 변환 담당
   ├── service/
   │   └── ActivityService.java
   └── dto/
@@ -260,154 +46,156 @@ domain/activity/
       └── ActivityPageResponseDTO.java
 ```
 
-**의존성**: `UserNotFoundException`은 `domain/user/exception/`에서 제공됩니다.
+**핵심 설계**: Activity 전용 엔티티·테이블 없음. 각 도메인 엔티티를 직접 조회해서 `ActivityConverter`가 `ActivityDTO`로 변환한다.
 
-### 3.2 예외 처리
+**의존 도메인**: `board`, `care`, `user`
 
-| 예외 | HTTP 상태 | 발생 시점 |
-|------|----------|----------|
-| `UserNotFoundException` | 404 Not Found | `usersRepository.findById(userId)` 실패 시 (`userId`는 **Long `idx`**) |
-| (인증) | 401 | `SecurityConfig`의 `/api/**` — 클래스 단 `@PreAuthorize` 없음, 미로그인 시 |
-| (페이징) | 500 등 | 필터 결과보다 큰 `page`로 `subList` 시 **범위 초과 예외 가능**(현재 구현 한계) |
+---
 
-**보안**: `userId`는 쿼리 파라미터로만 받으며 **JWT 주체와 일치 여부는 검증하지 않음** — 클라이언트는 본인 `idx`로 호출해야 함.
+## 3. 서비스 로직
 
-### 3.3 ActivityDTO 구조
+### 3.1 `ActivityService`
+
+**트랜잭션**: 클래스 레벨 `@Transactional(readOnly = true)`.
+
+**참고**: Controller·Service 양쪽에 `System.out.println` 디버그 출력이 남아 있음 — 운영 전 로거 전환 필요.
+
+#### `getUserActivities(long userId)`
+
+6개 리포지토리에서 각각 `isDeleted=false` 데이터를 가져와 `ActivityConverter`로 변환 후 Stream으로 합쳐 `createdAt` 내림차순 정렬.
+
+```java
+return Stream.of(
+        careRequestRepository.findByUserAndIsDeletedFalseOrderByCreatedAtDesc(user).stream()
+                .map(activityConverter::toActivityDto),
+        boardRepository.findByUserAndIsDeletedFalseOrderByCreatedAtDesc(user).stream()
+                .map(activityConverter::toActivityDto),
+        missingPetBoardRepository.findByUserAndIsDeletedFalseOrderByCreatedAtDesc(user).stream()
+                .map(activityConverter::toActivityDto),
+        careRequestCommentRepository.findByUserAndIsDeletedFalseOrderByCreatedAtDesc(user)
+                .stream().map(activityConverter::toActivityDto),
+        commentRepository.findByUserAndIsDeletedFalseOrderByCreatedAtDesc(user).stream()
+                .map(activityConverter::toActivityDto),
+        missingPetCommentRepository.findByUserAndIsDeletedFalseOrderByCreatedAtDesc(user)
+                .stream().map(activityConverter::toActivityDto))
+        .flatMap(s -> s)
+        .sorted(Comparator.comparing(ActivityDTO::getCreatedAt,
+                Comparator.nullsLast(Comparator.reverseOrder())))
+        .toList();
+```
+
+#### `getUserActivitiesWithPaging(long userId, String filter, int page, int size)`
+
+1. `getUserActivities()` 호출로 전체 활동 수집
+2. `filterActivities()` 로 필터 적용
+3. for-loop 순회로 `postsCount` / `commentsCount` / `reviewsCount` 산출
+4. `Math.min` 가드로 안전한 `subList` 페이징 (`start >= end` 이면 `Collections.emptyList()` 반환)
+
+```java
+int start = Math.min((int) pageable.getOffset(), totalFiltered);
+int end = Math.min(start + pageable.getPageSize(), totalFiltered);
+List<ActivityDTO> pageContent = start >= end
+        ? Collections.emptyList()
+        : filteredActivities.subList(start, end);
+```
+
+#### `filterActivities(List<ActivityDTO>, String filter)` — private
+
+Java switch expression 사용.
+
+| filter 값 | 통과 타입 |
+|----------|---------|
+| `null` / `ALL` | 전체 |
+| `POSTS` | `CARE_REQUEST`, `BOARD`, `MISSING_PET` |
+| `COMMENTS` | `CARE_COMMENT`, `COMMENT`, `MISSING_COMMENT` |
+| `REVIEWS` | `LOCATION_REVIEW` |
+| 그 외 | 전체 |
+
+---
+
+## 4. ActivityConverter
+
+각 도메인 엔티티를 `ActivityDTO`로 변환하는 `@Component`. 변환 규칙:
+
+| 엔티티 | type 값 | title | status | relatedId / relatedTitle |
+|--------|---------|-------|--------|--------------------------|
+| `CareRequest` | `CARE_REQUEST` | `cr.getTitle()` | `status` enum name (null 가능) | — |
+| `Board` | `BOARD` | `b.getTitle()` | `status` enum name (null 가능) | — |
+| `MissingPetBoard` | `MISSING_PET` | `mb.getTitle()` | `status` enum name (null 가능) | — |
+| `CareRequestComment` | `CARE_COMMENT` | `null` | `"DELETED"` / `"ACTIVE"` | `CareRequest` idx, title |
+| `Comment` | `COMMENT` | `null` | `status` enum name (null 가능) | `Board` idx, title |
+| `MissingPetComment` | `MISSING_COMMENT` | `null` | `"DELETED"` / `"ACTIVE"` | `MissingPetBoard` idx, title |
+
+**status 일관성 주의**: `CARE_COMMENT` / `MISSING_COMMENT`는 문자열 `"DELETED"`/`"ACTIVE"`, 나머지는 enum `.name()`.
+
+---
+
+## 5. DTO 구조
+
+### ActivityDTO
+
 ```java
 public class ActivityDTO {
-    private Long idx;                    // 활동 ID
-    private String type;                 // 활동 타입 (CARE_REQUEST, BOARD, MISSING_PET, CARE_COMMENT, COMMENT, MISSING_COMMENT, LOCATION_REVIEW)
-    private String title;                // 제목 (게시글 타입에만 존재)
-    private String content;              // 내용
-    private LocalDateTime createdAt;     // 생성 시간
-    private String status;               // 상태 (게시글/댓글의 상태)
-    private Boolean deleted;             // 삭제 여부
-    private LocalDateTime deletedAt;     // 삭제 시간
-    
-    // 관련 정보 (댓글 타입에만 존재)
-    private Long relatedId;             // 관련 게시글 ID
-    private String relatedTitle;         // 관련 게시글 제목
+    Long idx;
+    String type;          // CARE_REQUEST | BOARD | MISSING_PET | CARE_COMMENT | COMMENT | MISSING_COMMENT | LOCATION_REVIEW
+    String title;         // 게시글 타입에만 존재, 댓글은 null
+    String content;
+    LocalDateTime createdAt;
+    String status;
+    Boolean deleted;
+    LocalDateTime deletedAt;
+    Long relatedId;       // 댓글 타입: 관련 게시글 idx
+    String relatedTitle;  // 댓글 타입: 관련 게시글 제목
 }
 ```
 
-### 3.4 ActivityPageResponseDTO 구조
+### ActivityPageResponseDTO
+
 ```java
 public class ActivityPageResponseDTO {
-    private List<ActivityDTO> activities;  // 활동 목록
-    private long totalCount;               // 필터링된 전체 개수
-    private int totalPages;                // 전체 페이지 수
-    private int currentPage;               // 현재 페이지
-    private int pageSize;                  // 페이지 크기
-    private boolean hasNext;               // 다음 페이지 존재 여부
-    private boolean hasPrevious;           // 이전 페이지 존재 여부
-    
-    // 필터별 개수 (필터 버튼에 표시용)
-    private long allCount;                 // 전체 개수
-    private long postsCount;               // 게시글 개수
-    private long commentsCount;            // 댓글 개수
-    private long reviewsCount;             // 리뷰 개수
+    List<ActivityDTO> activities;
+    long totalCount;      // 필터링된 전체 개수
+    int totalPages;
+    int currentPage;
+    int pageSize;
+    boolean hasNext;
+    boolean hasPrevious;
+    long allCount;        // 전체(필터 전) 개수
+    long postsCount;
+    long commentsCount;
+    long reviewsCount;
 }
 ```
 
-### 3.5 활동 타입 분류
+---
 
-#### 게시글 타입 (`isPostType()`)
-- `CARE_REQUEST`: 펫케어 요청
-- `BOARD`: 커뮤니티 게시글
-- `MISSING_PET`: 실종 제보 게시글
+## 6. API
 
-#### 댓글 타입 (`isCommentType()`)
-- `CARE_COMMENT`: 펫케어 요청 댓글
-- `COMMENT`: 커뮤니티 게시글 댓글
-- `MISSING_COMMENT`: 실종 제보 게시글 댓글
+| Method | URL | 파라미터 | 응답 | 인증 |
+|--------|-----|----------|------|------|
+| GET | `/api/activities/my` | `userId` (Long, 필수) | `List<ActivityDTO>` | 필요 (`/api/**`) |
+| GET | `/api/activities/my/paging` | `userId` (Long, 필수), `filter` (기본 `ALL`), `page` (기본 `0`), `size` (기본 `20`) | `ActivityPageResponseDTO` | 필요 |
 
-#### 리뷰 타입
-- `LOCATION_REVIEW`: 필터·`reviewsCount`용 문자열만 존재 — **`getUserActivities()`에서 수집하지 않아** 목록에 나타나지 않음(항상 0에 가깝게 동작)
+**보안**: `userId`는 쿼리 파라미터로만 받으며 **JWT 주체와 일치 여부를 검증하지 않음**. 클라이언트가 본인 `idx`를 전달해야 한다.
 
-### 3.6 댓글 `status` 문자열 (구현 차이)
-- **`CARE_COMMENT`**, **`MISSING_COMMENT`**: `isDeleted`에 따라 `"DELETED"` / `"ACTIVE"` (enum이 아님)
-- **`COMMENT`**: `Comment` 엔티티 `status` enum 이름 문자열(또는 예외 시 `null`)
+| 예외 | HTTP | 발생 조건 |
+|------|------|----------|
+| `UserNotFoundException` | 404 | `usersRepository.findById(userId)` 실패 |
+| (인증 오류) | 401 | 비로그인 상태 (`SecurityConfig` `/api/**` 규칙) |
 
 ---
 
-## 4. 트러블슈팅
+## 7. 알려진 한계 및 개선 여지
 
-### 4.1 N+1 문제
-**문제**: 각 도메인에서 활동을 조회할 때 N+1 문제 발생 가능
+### 7.1 메모리 기반 페이징
+전체 활동을 메모리에 로드한 뒤 필터링·페이징 처리. 활동 수가 많아지면 메모리 부하 발생 가능.
+- 향후 개선: DB 레벨 필터링 + 페이징으로 전환
 
-**해결**: 
-- 각 도메인별로 별도의 Repository 메서드 사용 (`findByUserAndIsDeletedFalseOrderByCreatedAtDesc`)
-- Soft Delete 필터링을 Repository 레벨에서 처리
-- 최신순 정렬을 Repository 레벨에서 처리
+### 7.2 N+1 잠재 위험
+6개 리포지토리 쿼리 자체는 최적화되어 있으나, 댓글 변환 시 관련 게시글(`getCareRequest()`, `getBoard()` 등) 접근 — 연관 엔티티 Lazy 로딩 설정에 따라 N+1 발생 가능. Fetch join 또는 `@EntityGraph` 검토 권장.
 
-**효과**: 
-- 각 도메인별로 최적화된 쿼리 실행
-- 불필요한 데이터 조회 방지
+### 7.3 `LOCATION_REVIEW` 미수집
+`reviewsCount`·`REVIEWS` 필터 코드는 존재하지만, `getUserActivities()`에서 수집하지 않아 항상 0. 수집 로직 구현 필요.
 
-### 4.2 메모리 사용량
-**문제**: 모든 활동을 메모리에 로드한 후 필터링 및 페이징 처리
-
-**해결**: 
-- 현재는 메모리 기반 필터링 및 페이징 사용
-- 향후 개선: DB 레벨에서 필터링 및 페이징 처리 (각 도메인별 쿼리 최적화)
-
-**페이징 경계**: `filteredActivities.subList(start, end)` 사용 — **요청 `page`가 결과 길이를 넘으면 예외**가 날 수 있음(클라이언트에서 페이지 범위 제어 또는 서버 가드 필요).
-
-**효과**: 
-- 구현 단순성 유지
-- 향후 확장 가능
-
----
-
-## 5. 성능 최적화
-
-### 5.1 DB 최적화
-
-#### 인덱스 전략
-각 도메인 엔티티·실제 스키마 기준으로 `(user, is_deleted, created_at)` 조합 인덱스를 검토할 수 있음. **Activity 도메인은 전용 테이블이 없으므로** 아래 SQL은 참고용이며, 마이그레이션에 반영 여부는 별도 확인.
-
-```sql
--- 예시(도메인별 테이블명·컬럼은 스키마에 맞출 것)
--- care_request, board, missing_pet_board, care_request_comment, comment, missing_pet_comment 등
-```
-
-**선정 이유**:
-- `findByUserAndIsDeletedFalseOrderByCreatedAtDesc` 패턴에 맞는 조회·정렬 부하 완화
-
-### 5.2 애플리케이션 레벨 최적화
-
-#### 병렬 처리 (향후 개선)
-- 각 도메인별 활동 조회를 병렬로 처리하여 성능 향상 가능
-- `CompletableFuture` 또는 `@Async` 활용
-
-#### 캐싱 전략 (향후 개선)
-- 사용자별 활동 목록을 Redis에 캐싱
-- TTL: 5분 (활동이 자주 변경되지 않으므로)
-- 활동 생성/수정/삭제 시 캐시 무효화
-
----
-
-## 6. 핵심 포인트 요약
-
-### 기술적 하이라이트
-1. **통합 활동 조회**: 여러 도메인(펫케어, 커뮤니티, 실종 제보)의 활동을 통합하여 조회
-2. **별도 엔티티 없음**: Activity 엔티티 없이 각 도메인의 엔티티를 직접 조회
-3. **필터링**: 활동 타입별 필터링 지원 (전체, 게시글, 댓글, 리뷰)
-4. **페이징**: Spring Data 페이징 지원
-5. **최신순 정렬**: `createdAt` 기준 내림차순 정렬 (null-safe)
-6. **Soft Delete 필터링**: 삭제된 활동은 제외 (`isDeleted = false`)
-7. **관련 정보 포함**: 댓글 타입의 경우 관련 게시글 정보(`relatedId`, `relatedTitle`) 포함
-
-### 활동 타입
-- **게시글**: `CARE_REQUEST`, `BOARD`, `MISSING_PET`
-- **댓글**: `CARE_COMMENT`, `COMMENT`, `MISSING_COMMENT`
-- **리뷰**: `LOCATION_REVIEW` (현재 미구현)
-
-### API 엔드포인트
-
-| 엔드포인트 | Method | 설명 | 예외 |
-|-----------|--------|------|------|
-| `/api/activities/my` | GET | `userId`(필수, Long `idx`) | `UserNotFoundException` (404) |
-| `/api/activities/my/paging` | GET | `userId`(필수), `filter`(기본 `ALL`: `ALL` \| `POSTS` \| `COMMENTS` \| `REVIEWS`), `page`(기본 `0`), `size`(기본 `20`) | 동일 + 페이징 범위 주의(§3.2) |
-
-**인증**: `ActivityController`에 메서드 단 보안 어노테이션 없음 → **`/api/**` 인증 규칙** 적용(로그인 필요).
+### 7.4 디버그 출력
+`ActivityController` 양 엔드포인트에 `System.out.println` 잔존. 운영 전 SLF4J 로거로 교체 필요.

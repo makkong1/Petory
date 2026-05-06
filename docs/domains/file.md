@@ -296,11 +296,10 @@ erDiagram
 #### REST API (AdminFileController, `@PreAuthorize("hasAnyRole('ADMIN','MASTER')")`)
 | 엔드포인트 | Method | 설명 | 비고 |
 |-----------|--------|------|------|
-| `/api/admin/files` | GET | 목록 (`targetType`+`targetIdx` 동시 지정 시 DB 필터, `q`로 경로/MIME 부분 검색). 잘못된 `targetType`은 빈 목록 처리 | - |
-| `/api/admin/files/target` | GET | 타겟별 첨부 (`AttachmentFileService.getAttachments`) | 잘못된 enum → **400** 빈 본문 |
-| `/api/admin/files/{id}` | DELETE | DB 행 삭제 | **204** |
-| `/api/admin/files/target` | DELETE | `deleteAll` | 잘못된 enum → **400** 빈 본문 |
-| `/api/admin/files/statistics` | GET | `totalFiles`, `filesByType` | - |
+| `/api/admin/files` | GET | 목록 (`targetType`으로 필터, `q`로 경로/MIME 부분 검색, `page`/`size` 기본 0/20). `AdminFileFacade.getFiles()` 경유 | - |
+| `/api/admin/files/target` | GET | 타겟별 첨부 (`targetType`+`targetIdx` 필수, `AttachmentFileService.getAttachments`) | 잘못된 enum → **400** |
+| `/api/admin/files/{id}` | DELETE | DB 행 삭제 (Hard Delete). `auditService.log()` 호출 | **204** |
+| `/api/admin/files/target` | DELETE | 대상 파일 전체 삭제 (`deleteAll`). `auditService.log()` 호출 | **204**. 잘못된 enum → **400** |
 
 **파일 업로드 요청 예시**:
 ```http
