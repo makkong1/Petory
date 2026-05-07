@@ -355,7 +355,7 @@ const UnifiedPetMapPage = () => {
     );
   };
 
-  const renderLayerControls = () => {
+  const renderLayerControls = (showRadius = false) => {
     if (activeLayer === 'location') {
       return (
         <LocationControls
@@ -364,6 +364,7 @@ const UnifiedPetMapPage = () => {
           sort={locationSort}
           isAiMode={isAiMode}
           hasPendingAreaChange={hasPendingAreaChange}
+          radius={showRadius ? radius : undefined}
           onSearch={(kw) => {
             setLocationKeyword(kw);
             cacheRef.current = {};
@@ -383,6 +384,7 @@ const UnifiedPetMapPage = () => {
           }}
           onSearchThisArea={handleSearchThisArea}
           onAiToggle={handleAiToggle}
+          onRadiusChange={showRadius ? handleRadiusChange : undefined}
         />
       );
     }
@@ -425,8 +427,11 @@ const UnifiedPetMapPage = () => {
         {/* ── 데스크톱 전용 좌측 패널 ── */}
         <LeftPanel>
           <LeftPanelTop>
-            <RadiusFilter radius={radius} onRadiusChange={handleRadiusChange} />
-            {renderLayerControls()}
+            {/* location 탭: 반경 필터가 LocationControls 내부 CompactFilterRow에 통합 */}
+            {activeLayer !== 'location' && (
+              <RadiusFilter radius={radius} onRadiusChange={handleRadiusChange} />
+            )}
+            {renderLayerControls(activeLayer === 'location')}
           </LeftPanelTop>
 
           {/* location 탭: 결과 목록 */}
@@ -527,12 +532,12 @@ const UnifiedPetMapPage = () => {
             <MapInitLoading>🗺️ 위치 정보를 가져오는 중...</MapInitLoading>
           )}
 
-          {/* 모바일 전용 컨트롤 오버레이 */}
+          {/* 모바일 전용 컨트롤 오버레이 (radius는 별도 RadiusFilter 사용) */}
           <ControlsOverlay>
             <OverlayRow>
               <RadiusFilter radius={radius} onRadiusChange={handleRadiusChange} />
             </OverlayRow>
-            {renderLayerControls()}
+            {renderLayerControls(false)}
           </ControlsOverlay>
 
           <MyLocationFAB
