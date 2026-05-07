@@ -12,13 +12,18 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.linkup.Petory.domain.care.entity.CareApplication;
+import com.linkup.Petory.domain.care.entity.CareApplicationStatus;
+import com.linkup.Petory.domain.care.entity.CareRequest;
+import com.linkup.Petory.domain.care.entity.CareRequestStatus;
+import com.linkup.Petory.domain.care.exception.CareApplicationNotFoundException;
+import com.linkup.Petory.domain.care.exception.CareRequestNotFoundException;
+import com.linkup.Petory.domain.care.repository.CareApplicationRepository;
+import com.linkup.Petory.domain.care.repository.CareRequestRepository;
+import com.linkup.Petory.domain.chat.converter.ChatMessageConverter;
 import com.linkup.Petory.domain.chat.converter.ConversationConverter;
 import com.linkup.Petory.domain.chat.converter.ConversationParticipantConverter;
-import com.linkup.Petory.domain.chat.converter.ChatMessageConverter;
 import com.linkup.Petory.domain.chat.dto.ConversationDTO;
-import com.linkup.Petory.domain.chat.exception.ChatForbiddenException;
-import com.linkup.Petory.domain.chat.exception.ChatValidationException;
-import com.linkup.Petory.domain.chat.exception.ConversationNotFoundException;
 import com.linkup.Petory.domain.chat.entity.ChatMessage;
 import com.linkup.Petory.domain.chat.entity.Conversation;
 import com.linkup.Petory.domain.chat.entity.ConversationParticipant;
@@ -27,21 +32,16 @@ import com.linkup.Petory.domain.chat.entity.ConversationType;
 import com.linkup.Petory.domain.chat.entity.ParticipantRole;
 import com.linkup.Petory.domain.chat.entity.ParticipantStatus;
 import com.linkup.Petory.domain.chat.entity.RelatedType;
+import com.linkup.Petory.domain.chat.exception.ChatForbiddenException;
+import com.linkup.Petory.domain.chat.exception.ChatValidationException;
+import com.linkup.Petory.domain.chat.exception.ConversationNotFoundException;
 import com.linkup.Petory.domain.chat.repository.ChatMessageRepository;
 import com.linkup.Petory.domain.chat.repository.ConversationParticipantRepository;
 import com.linkup.Petory.domain.chat.repository.ConversationRepository;
+import com.linkup.Petory.domain.payment.service.PetCoinEscrowService;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.exception.UserNotFoundException;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
-import com.linkup.Petory.domain.care.entity.CareRequest;
-import com.linkup.Petory.domain.care.entity.CareApplication;
-import com.linkup.Petory.domain.care.exception.CareApplicationNotFoundException;
-import com.linkup.Petory.domain.care.exception.CareRequestNotFoundException;
-import com.linkup.Petory.domain.care.entity.CareApplicationStatus;
-import com.linkup.Petory.domain.care.entity.CareRequestStatus;
-import com.linkup.Petory.domain.care.repository.CareRequestRepository;
-import com.linkup.Petory.domain.care.repository.CareApplicationRepository;
-import com.linkup.Petory.domain.payment.service.PetCoinEscrowService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -117,10 +117,11 @@ public class ConversationService {
                                                 dto.setUnreadCount(myParticipant.getUnreadCount());
                                         }
 
-                                        // 참여자 정보 추가
+                                        // 참여자 정보 추가 (배치 로드 데이터 사용 — lazy load 방지)
                                         List<ConversationParticipant> participants = participantsMap.getOrDefault(
                                                         conv.getIdx(),
                                                         new ArrayList<>());
+                                        dto.setParticipantCount(participants.size());
                                         if (!participants.isEmpty()) {
                                                 dto.setParticipants(participantConverter.toDTOList(participants));
                                         }
@@ -149,21 +150,19 @@ public class ConversationService {
                                                 && !Boolean.TRUE.equals(p.getIsDeleted()))
                                 .orElseThrow(ChatForbiddenException::notParticipant);
 
-                // 탈퇴한 사용자가 포함된 채팅방인지 확인
                 List<ConversationParticipant> participants = participantRepository
                                 .findByConversationIdxAndStatus(conversationIdx, ParticipantStatus.ACTIVE);
 
                 boolean hasDeletedUser = participants.stream()
                                 .anyMatch(p -> Boolean.TRUE.equals(p.getUser().getIsDeleted()));
-
                 if (hasDeletedUser) {
                         throw ChatValidationException.invalidConversation();
                 }
 
                 ConversationDTO dto = conversationConverter.toDTO(conversation);
+                dto.setParticipantCount(participants.size());
                 dto.setParticipants(participantConverter.toDTOList(participants));
                 dto.setUnreadCount(participant.getUnreadCount());
-
                 return dto;
         }
 

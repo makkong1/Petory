@@ -694,7 +694,7 @@ const CommunityBoard = () => {
             key={category.key}
             active={activeCategory === category.key}
             onClick={() => setActiveCategory(category.key)}
-            categoryColor={category.color}
+            $categoryColor={category.color}
           >
             <CategoryIcon>{category.icon}</CategoryIcon>
             {category.label}
@@ -836,7 +836,7 @@ const CommunityBoard = () => {
                         <PostTitle>{post.title}</PostTitle>
                         <PostNumber>#{post.idx}</PostNumber>
                       </PostTitleRow>
-                      <CategoryBadge categoryColor={categoryInfo.color}>
+                      <CategoryBadge $categoryColor={categoryInfo.color}>
                         <CategoryBadgeIcon>{categoryInfo.icon}</CategoryBadgeIcon>
                         {categoryInfo.label}
                       </CategoryBadge>
@@ -915,7 +915,7 @@ const CommunityBoard = () => {
                         <PostTitle>{post.title}</PostTitle>
                         <PostNumber>#{post.idx}</PostNumber>
                       </PostTitleRow>
-                      <CategoryBadge categoryColor={categoryInfo.color}>
+                      <CategoryBadge $categoryColor={categoryInfo.color}>
                         <CategoryBadgeIcon>{categoryInfo.icon}</CategoryBadgeIcon>
                         {categoryInfo.label}
                       </CategoryBadge>
@@ -994,7 +994,7 @@ const CommunityBoard = () => {
                         <PostTitle>{post.title}</PostTitle>
                         <PostNumber>#{post.idx}</PostNumber>
                       </PostTitleRow>
-                      <CategoryBadge categoryColor={categoryInfo.color}>
+                      <CategoryBadge $categoryColor={categoryInfo.color}>
                         <CategoryBadgeIcon>{categoryInfo.icon}</CategoryBadgeIcon>
                         {categoryInfo.label}
                       </CategoryBadge>
@@ -1189,10 +1189,10 @@ const CategoryTabs = styled.div`
 
 const CategoryTab = styled.button`
   background: ${props => props.active
-    ? `linear-gradient(135deg, ${props.categoryColor} 0%, ${props.categoryColor}dd 100%)`
+    ? `linear-gradient(135deg, ${props.$categoryColor} 0%, ${props.$categoryColor}dd 100%)`
     : props.theme.colors.surface};
   color: ${props => props.active ? props.theme.colors.textInverse : props.theme.colors.text};
-  border: 2px solid ${props => props.active ? props.categoryColor : props.theme.colors.border};
+  border: 2px solid ${props => props.active ? props.$categoryColor : props.theme.colors.border};
   padding: ${props => props.theme.spacing.sm} ${props => props.theme.spacing.lg};
   border-radius: ${props => props.theme.borderRadius.full};
   cursor: pointer;
@@ -1203,16 +1203,16 @@ const CategoryTab = styled.button`
   align-items: center;
   gap: ${props => props.theme.spacing.xs};
   box-shadow: ${props => props.active
-    ? `0 4px 12px ${props.categoryColor}40`
+    ? `0 4px 12px ${props.$categoryColor}40`
     : 'none'};
   
   &:hover {
     background: ${props => props.active
-    ? `linear-gradient(135deg, ${props.categoryColor}dd 0%, ${props.categoryColor}cc 100%)`
+    ? `linear-gradient(135deg, ${props.$categoryColor}dd 0%, ${props.$categoryColor}cc 100%)`
     : props.theme.colors.surfaceHover};
     transform: translateY(-2px);
     box-shadow: ${props => props.active
-    ? `0 6px 16px ${props.categoryColor}50`
+    ? `0 6px 16px ${props.$categoryColor}50`
     : `0 4px 8px ${props.theme.colors.shadow}`};
   }
 `;
@@ -1370,7 +1370,7 @@ const PostNumber = styled.span`
 `;
 
 const CategoryBadge = styled.span`
-  background: ${props => `linear-gradient(135deg, ${props.categoryColor} 0%, ${props.categoryColor}dd 100%)`};
+  background: ${props => `linear-gradient(135deg, ${props.$categoryColor} 0%, ${props.$categoryColor}dd 100%)`};
   color: ${props => props.theme.colors.textInverse};
   padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.md};
   border-radius: ${props => props.theme.borderRadius.md};
@@ -1380,7 +1380,7 @@ const CategoryBadge = styled.span`
   align-items: center;
   gap: ${props => props.theme.spacing.xs};
   width: fit-content;
-  box-shadow: 0 2px 8px ${props => `${props.categoryColor}40`};
+  box-shadow: 0 2px 8px ${props => `${props.$categoryColor}40`};
 `;
 
 const CategoryBadgeIcon = styled.span`

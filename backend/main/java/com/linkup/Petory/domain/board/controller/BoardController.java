@@ -44,9 +44,9 @@ public class BoardController {
     @PreAuthorize("permitAll()")
     @GetMapping
     public ResponseEntity<BoardPageResponseDTO> getAllBoards(
-            @RequestParam(required = false) String category,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(name = "category", required = false) String category,
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "20") int size) {
         return ResponseEntity.ok(boardService.getAllBoardsWithPaging(category, page, size));
     }
 
