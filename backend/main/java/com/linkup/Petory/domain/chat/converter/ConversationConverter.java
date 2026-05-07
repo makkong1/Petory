@@ -32,8 +32,7 @@ public class ConversationConverter {
                 .deletedAt(conversation.getDeletedAt())
                 .createdAt(conversation.getCreatedAt())
                 .updatedAt(conversation.getUpdatedAt())
-                .participantCount(conversation.getParticipants() != null 
-                    ? conversation.getParticipants().size() : 0);
+                .participantCount(0); // service 레이어에서 배치 로드 후 setParticipantCount()로 덮어씀
 
         // 참여자 정보와 마지막 메시지는 Service 레이어에서 별도로 채워넣기
         // 순환 참조 방지를 위해 Converter 간 의존성 제거
