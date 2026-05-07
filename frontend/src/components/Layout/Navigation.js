@@ -327,10 +327,9 @@ const Navigation = ({ activeTab, setActiveTab, user, onNavigateToBoard }) => {
             <span>{isDarkMode ? '다크모드' : '라이트모드'}</span>
           </SidebarActionButton>
 
-          {/* 프로필 & 로그아웃 영역 */}
+          {/* 프로필 영역 */}
           {user && (
             <ProfileSection ref={profileRef}>
-              <Divider />
               <ProfileButton
                 type="button"
                 onClick={() => {
@@ -342,7 +341,7 @@ const Navigation = ({ activeTab, setActiveTab, user, onNavigateToBoard }) => {
                 <span>👤</span>
                 <ProfileInfo>
                   <ProfileNicknameText>{user.nickname || '내 정보'}</ProfileNicknameText>
-                  <ProfileCoinText>💰 {(user.petCoinBalance ?? 0).toLocaleString()} 코인</ProfileCoinText>
+                  <ProfileCoinText>💰 {(user.petCoinBalance ?? 0).toLocaleString()}</ProfileCoinText>
                 </ProfileInfo>
               </ProfileButton>
               {isProfileDropdownOpen && (
@@ -379,11 +378,14 @@ const Navigation = ({ activeTab, setActiveTab, user, onNavigateToBoard }) => {
                   >
                     📌 내활동보기
                   </ProfileMenuItem>
+                  <ProfileMenuItem
+                    onClick={logout}
+                    style={{ borderTop: '1px solid rgba(120,113,108,0.2)', marginTop: 4, paddingTop: 8 }}
+                  >
+                    ↩ 로그아웃
+                  </ProfileMenuItem>
                 </SidebarProfileDropdown>
               )}
-              <LogoutButton type="button" onClick={logout}>
-                로그아웃
-              </LogoutButton>
             </ProfileSection>
           )}
         </BottomSection>
@@ -446,15 +448,17 @@ const Sidebar = styled.nav`
   position: fixed;
   left: 0;
   top: 0;
-  width: 240px;
-  height: 100vh;
+  right: 0;
+  height: 60px;
   background: ${props => props.theme.colors.surface};
-  border-right: 1px solid ${props => props.theme.colors.border};
+  border-bottom: 1px solid ${props => props.theme.colors.border};
   z-index: 100;
   display: flex;
-  flex-direction: column;
-  overflow-y: auto;
-  overflow-x: hidden;
+  flex-direction: row;
+  align-items: center;
+  padding: 0 16px;
+  gap: 8px;
+  overflow: visible;
 
   @media (max-width: 768px) {
     display: none;
@@ -464,46 +468,47 @@ const Sidebar = styled.nav`
 const LogoArea = styled.div`
   display: flex;
   align-items: center;
-  gap: ${props => props.theme.spacing.sm};
-  padding: 24px 20px 16px;
-  font-size: ${props => props.theme.typography.h3.fontSize};
-  font-weight: ${props => props.theme.typography.h3.fontWeight};
+  gap: 6px;
+  padding: 0 12px 0 0;
+  font-size: 17px;
+  font-weight: 700;
   color: ${props => props.theme.colors.primary};
   cursor: pointer;
   flex-shrink: 0;
+  white-space: nowrap;
 
   .icon {
-    font-size: 22px;
+    font-size: 20px;
   }
 `;
 
 const MenuList = styled.div`
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 0 12px;
+  flex-direction: row;
+  gap: 4px;
+  padding: 0;
   flex: 1;
+  justify-content: center;
+  align-items: center;
 `;
 
 const MenuItem = styled.button`
   display: flex;
   align-items: center;
-  gap: ${props => props.theme.spacing.sm};
-  width: 100%;
-  padding: 10px 16px;
+  gap: 6px;
+  padding: 8px 14px;
   border: none;
   border-radius: ${props => props.theme.borderRadius.md};
   cursor: pointer;
   transition: all 0.2s ease;
-  text-align: left;
-  font-size: ${props => props.theme.typography.body1.fontSize};
-  border-left: 3px solid ${props => props.$active ? props.theme.colors.primary : 'transparent'};
+  font-size: ${props => props.theme.typography.body2.fontSize};
   background: ${props => props.$active ? props.theme.colors.primarySoft : 'transparent'};
   color: ${props => props.$active ? props.theme.colors.primary : props.theme.colors.text};
   font-weight: ${props => props.$active ? '600' : '400'};
+  white-space: nowrap;
 
   .menu-icon {
-    font-size: 18px;
+    font-size: 16px;
     flex-shrink: 0;
   }
 
@@ -514,27 +519,27 @@ const MenuItem = styled.button`
 
 const BottomSection = styled.div`
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 8px 12px 16px;
+  flex-direction: row;
+  gap: 4px;
+  padding: 0;
   flex-shrink: 0;
+  align-items: center;
 `;
 
 const SidebarActionButton = styled.button`
   display: flex;
   align-items: center;
-  gap: ${props => props.theme.spacing.sm};
-  width: 100%;
-  padding: 10px 16px;
+  gap: 4px;
+  padding: 8px 10px;
   border: none;
   border-radius: ${props => props.theme.borderRadius.md};
   background: transparent;
   color: ${props => props.theme.colors.text};
-  font-size: ${props => props.theme.typography.body1.fontSize};
+  font-size: ${props => props.theme.typography.body2.fontSize};
   cursor: pointer;
   transition: all 0.2s ease;
-  text-align: left;
   position: relative;
+  white-space: nowrap;
 
   &:hover {
     background: ${props => props.theme.colors.surfaceHover};
@@ -543,8 +548,8 @@ const SidebarActionButton = styled.button`
 
 const SidebarBadge = styled.span`
   position: absolute;
-  top: 6px;
-  left: 26px;
+  top: 4px;
+  right: 4px;
   background: ${props => props.theme.colors.error || '#ef4444'};
   color: white;
   border-radius: ${props => props.theme.borderRadius.full};
@@ -558,23 +563,25 @@ const SidebarBadge = styled.span`
   padding: 0 4px;
 `;
 
-const slideInLeft = keyframes`
+const slideInDown = keyframes`
   from {
     opacity: 0;
-    transform: translateX(-8px);
+    transform: translateY(-8px);
   }
   to {
     opacity: 1;
-    transform: translateX(0);
+    transform: translateY(0);
   }
 `;
 
 const SidebarNotificationDropdown = styled.div`
   position: fixed;
-  left: 240px;
-  top: auto;
+  top: 60px;
+  right: 0;
+  left: auto;
+  bottom: auto;
   width: 360px;
-  max-width: calc(100vw - 240px);
+  max-width: calc(100vw - 16px);
   max-height: 450px;
   background: ${props => props.theme.colors.surface || '#ffffff'};
   border: 1px solid ${props => props.theme.colors.border || '#e0e0e0'};
@@ -584,8 +591,7 @@ const SidebarNotificationDropdown = styled.div`
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  animation: ${slideInLeft} 0.2s ease-out;
-  bottom: 120px;
+  animation: ${slideInDown} 0.2s ease-out;
 `;
 
 const Divider = styled.div`
@@ -596,26 +602,26 @@ const Divider = styled.div`
 
 const ProfileSection = styled.div`
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  border-top: 1px solid ${props => props.theme.colors.border};
-  padding-top: 8px;
+  flex-direction: row;
+  align-items: center;
+  gap: 0;
+  border-left: 1px solid ${props => props.theme.colors.border};
+  padding-left: 8px;
   position: relative;
 `;
 
 const ProfileButton = styled.button`
   display: flex;
   align-items: center;
-  gap: ${props => props.theme.spacing.sm};
-  width: 100%;
-  padding: 10px 16px;
+  gap: 6px;
+  padding: 8px 10px;
   border: none;
   border-radius: ${props => props.theme.borderRadius.md};
   background: ${props => props.$active ? props.theme.colors.surfaceHover : 'transparent'};
   color: ${props => props.theme.colors.text};
   cursor: pointer;
   transition: all 0.2s ease;
-  text-align: left;
+  white-space: nowrap;
 
   &:hover {
     background: ${props => props.theme.colors.surfaceHover};
@@ -625,8 +631,9 @@ const ProfileButton = styled.button`
 const ProfileInfo = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
   overflow: hidden;
+  max-width: 90px;
 `;
 
 const ProfileNicknameText = styled.div`
@@ -645,7 +652,10 @@ const ProfileCoinText = styled.div`
 
 const SidebarProfileDropdown = styled.div`
   position: fixed;
-  left: 240px;
+  top: 60px;
+  right: 0;
+  left: auto;
+  bottom: auto;
   width: 220px;
   background: ${props => props.theme.colors.surface || '#ffffff'};
   border: 1px solid ${props => props.theme.colors.border || '#e0e0e0'};
@@ -653,8 +663,7 @@ const SidebarProfileDropdown = styled.div`
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
   z-index: 200;
   overflow: hidden;
-  animation: ${slideInLeft} 0.2s ease-out;
-  bottom: 60px;
+  animation: ${slideInDown} 0.2s ease-out;
 `;
 
 const ProfileMenuItem = styled.button`
