@@ -22,6 +22,8 @@ const SORT_OPTIONS = [
 
 const RADIUS_OPTIONS = [1, 3, 5, 10];
 
+const FILTER_PANEL_ID = 'location-filter-panel';
+
 const LocationControls = ({
   keyword,
   category,
@@ -37,6 +39,7 @@ const LocationControls = ({
   onRadiusChange,
 }) => {
   const [inputValue, setInputValue] = useState(keyword || '');
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   useEffect(() => {
     setInputValue(keyword || '');
@@ -47,10 +50,12 @@ const LocationControls = ({
     onSearch(inputValue.trim());
   };
 
+  const selectedCategory = KEYWORD_CATEGORIES.find(cat => cat.value === category)?.label || '전체';
+  const selectedSort = SORT_OPTIONS.find(option => option.value === sort)?.label || '거리순';
+
   return (
     <Wrapper>
       <SearchRow>
-        {/* 검색 pill: input + 검색 버튼 합체 */}
         <SearchPill onSubmit={handleSubmit}>
           <SearchIcon aria-hidden="true">🔍</SearchIcon>
           <SearchInput
@@ -72,46 +77,82 @@ const LocationControls = ({
         </AiButton>
       </SearchRow>
 
-      <CategoryRow role="group" aria-label="카테고리 필터">
-        {KEYWORD_CATEGORIES.map(cat => (
-          <CategoryChip
-            key={cat.value}
+      {/* 현재 조건 요약 + 필터 토글 */}
+      <SummaryRow>
+        <SummaryChips aria-label="적용된 검색 조건">
+          <SummaryChip>{selectedCategory}</SummaryChip>
+          {radius != null && <SummaryChip>{radius}km</SummaryChip>}
+          <SummaryChip>{selectedSort}</SummaryChip>
+        </SummaryChips>
+        <SummaryActions>
+          {hasPendingAreaChange && (
+            <SearchAreaButton type="button" onClick={onSearchThisArea}>
+              이 지역 검색
+            </SearchAreaButton>
+          )}
+          <FilterToggle
             type="button"
-            $active={category === cat.value}
-            onClick={() => onCategoryChange(cat.value)}
+            onClick={() => setIsFilterOpen(open => !open)}
+            aria-expanded={isFilterOpen}
+            aria-controls={FILTER_PANEL_ID}
+            $active={isFilterOpen}
           >
-            {cat.label}
-          </CategoryChip>
-        ))}
-      </CategoryRow>
+            필터 {isFilterOpen ? '▲' : '▼'}
+          </FilterToggle>
+        </SummaryActions>
+      </SummaryRow>
 
-      <CompactFilterRow>
-        {onRadiusChange && RADIUS_OPTIONS.map(r => (
-          <RadiusChip
-            key={r}
-            type="button"
-            $active={radius === r}
-            onClick={() => onRadiusChange(r)}
-          >
-            {r}km
-          </RadiusChip>
-        ))}
-        <FilterSpacer />
-        <SortSelect
-          value={sort}
-          onChange={e => onSortChange?.(e.target.value)}
-          aria-label="정렬 기준"
-        >
-          {SORT_OPTIONS.map(option => (
-            <option key={option.value} value={option.value}>{option.label}</option>
-          ))}
-        </SortSelect>
-        {hasPendingAreaChange && (
-          <SearchAreaButton type="button" onClick={onSearchThisArea}>
-            이 지역 검색
-          </SearchAreaButton>
-        )}
-      </CompactFilterRow>
+      {/* 접을 수 있는 필터 패널 */}
+      {isFilterOpen && (
+        <FilterPanel id={FILTER_PANEL_ID}>
+          <FilterSection>
+            <FilterLabel>카테고리</FilterLabel>
+            <CategoryRow role="group" aria-label="카테고리 필터">
+              {KEYWORD_CATEGORIES.map(cat => (
+                <CategoryChip
+                  key={cat.value}
+                  type="button"
+                  $active={category === cat.value}
+                  onClick={() => onCategoryChange(cat.value)}
+                >
+                  {cat.label}
+                </CategoryChip>
+              ))}
+            </CategoryRow>
+          </FilterSection>
+
+          {onRadiusChange && (
+            <FilterSection>
+              <FilterLabel>반경</FilterLabel>
+              <RadiusRow>
+                {RADIUS_OPTIONS.map(r => (
+                  <RadiusChip
+                    key={r}
+                    type="button"
+                    $active={radius === r}
+                    onClick={() => onRadiusChange(r)}
+                  >
+                    {r}km
+                  </RadiusChip>
+                ))}
+              </RadiusRow>
+            </FilterSection>
+          )}
+
+          <FilterSection>
+            <FilterLabel>정렬</FilterLabel>
+            <SortSelect
+              value={sort}
+              onChange={e => onSortChange?.(e.target.value)}
+              aria-label="정렬 기준"
+            >
+              {SORT_OPTIONS.map(option => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </SortSelect>
+          </FilterSection>
+        </FilterPanel>
+      )}
 
       {hasPendingAreaChange && (
         <SearchHint $pending>
@@ -125,7 +166,7 @@ const LocationControls = ({
 export default LocationControls;
 
 const Wrapper = styled.div`
-  padding: 10px 12px;
+  padding: 10px 12px 12px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -137,7 +178,6 @@ const SearchRow = styled.div`
   align-items: center;
 `;
 
-/* 검색창 전체를 하나의 pill로 */
 const SearchPill = styled.form`
   flex: 1;
   display: flex;
@@ -164,7 +204,7 @@ const SearchIcon = styled.span`
 
 const SearchInput = styled.input`
   flex: 1;
-  height: 38px;
+  height: 40px;
   padding: 0 6px;
   border: none;
   background: transparent;
@@ -177,8 +217,8 @@ const SearchInput = styled.input`
 `;
 
 const SearchButton = styled.button`
-  height: 38px;
-  padding: 0 18px;
+  height: 40px;
+  padding: 0 14px;
   border: none;
   border-radius: 0 999px 999px 0;
   background: ${props => props.theme.colors.primary};
@@ -193,7 +233,7 @@ const SearchButton = styled.button`
 `;
 
 const AiButton = styled.button`
-  height: 38px;
+  height: 40px;
   padding: 0 14px;
   border-radius: 999px;
   border: 1.5px solid ${props => props.$active
@@ -218,13 +258,93 @@ const AiButton = styled.button`
   }
 `;
 
+const SummaryRow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+`;
+
+const SummaryChips = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  overflow: hidden;
+`;
+
+const SummaryChip = styled.span`
+  max-width: 96px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: rgba(74, 144, 217, 0.10);
+  color: ${props => props.theme.colors.domain.location};
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+`;
+
+const SummaryActions = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+`;
+
+const FilterToggle = styled.button`
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1.5px solid ${props => props.$active
+    ? props.theme.colors.primary
+    : props.theme.colors.border};
+  background: ${props => props.$active
+    ? props.theme.colors.primarySoft
+    : props.theme.colors.surface};
+  color: ${props => props.$active
+    ? props.theme.colors.primary
+    : props.theme.colors.textSecondary};
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+
+  &:hover {
+    border-color: ${props => props.theme.colors.primary};
+    color: ${props => props.theme.colors.primary};
+  }
+`;
+
+const FilterPanel = styled.div`
+  padding: 12px;
+  border: 1.5px solid ${props => props.theme.colors.border};
+  border-radius: 18px;
+  background: ${props => props.theme.colors.background};
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+`;
+
+const FilterSection = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+`;
+
+const FilterLabel = styled.span`
+  font-size: 11px;
+  font-weight: 700;
+  color: ${props => props.theme.colors.textSecondary};
+  letter-spacing: 0.02em;
+`;
+
 const CategoryRow = styled.div`
   display: flex;
   gap: 5px;
-  overflow-x: auto;
-  padding-bottom: 2px;
-  scrollbar-width: none;
-  &::-webkit-scrollbar { display: none; }
+  flex-wrap: wrap;
 `;
 
 const CategoryChip = styled.button`
@@ -253,23 +373,13 @@ const CategoryChip = styled.button`
   }
 `;
 
-const SearchHint = styled.p`
-  margin: 0;
-  font-size: 11px;
-  line-height: 1.4;
-  color: ${props => props.$pending
-    ? props.theme.colors.primary
-    : props.theme.colors.textMuted};
-`;
-
-const CompactFilterRow = styled.div`
+const RadiusRow = styled.div`
   display: flex;
-  align-items: center;
   gap: 5px;
 `;
 
 const RadiusChip = styled.button`
-  padding: 4px 10px;
+  padding: 4px 14px;
   border-radius: 999px;
   border: 1.5px solid ${props => props.$active ? props.theme.colors.primary : props.theme.colors.border};
   background: ${props => props.$active ? props.theme.colors.primary + '18' : 'transparent'};
@@ -287,23 +397,20 @@ const RadiusChip = styled.button`
   }
 `;
 
-const FilterSpacer = styled.div`
-  flex: 1;
-`;
-
 const SortSelect = styled.select`
-  height: 30px;
+  height: 34px;
   border-radius: 999px;
   border: 1.5px solid ${props => props.theme.colors.border};
   background: ${props => props.theme.colors.background};
   color: ${props => props.theme.colors.text};
-  padding: 0 10px;
+  padding: 0 12px;
   font-size: 12px;
   font-weight: 600;
   outline: none;
   flex-shrink: 0;
   cursor: pointer;
   transition: border-color 0.15s;
+  align-self: flex-start;
 
   &:focus, &:hover {
     border-color: ${props => props.theme.colors.primary};
@@ -311,8 +418,8 @@ const SortSelect = styled.select`
 `;
 
 const SearchAreaButton = styled.button`
-  height: 34px;
-  padding: 0 14px;
+  height: 30px;
+  padding: 0 11px;
   border: none;
   border-radius: 999px;
   background: ${props => props.theme.colors.primary};
@@ -321,9 +428,19 @@ const SearchAreaButton = styled.button`
   font-weight: 700;
   cursor: pointer;
   white-space: nowrap;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.14);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  transition: background 0.15s;
 
   &:hover {
     background: ${props => props.theme.colors.primaryDark};
   }
+`;
+
+const SearchHint = styled.p`
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: ${props => props.$pending
+    ? props.theme.colors.primary
+    : props.theme.colors.textMuted};
 `;
