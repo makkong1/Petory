@@ -7,6 +7,10 @@
     {
       "dir": "meetup-backend-refactor",
       "status": "completed"
+    },
+    {
+      "dir": "map-layout-redesign",
+      "status": "pending"
     }
   ]
 }

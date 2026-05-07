@@ -1,0 +1,30 @@
+{
+  "task": "map-layout-redesign",
+  "description": "\ud0d0\uc0c9\ud0ed UI \ub808\uc774\uc544\uc6c3 \uc7ac\uc124\uacc4. \ub370\uc2a4\ud06c\ud1b1 \uc0ac\uc774\ub4dc\ubc14 \ub124\ube44\uac8c\uc774\uc158\uc744 \uc0c1\ub2e8 TopBar\ub85c \uc804\ud658\ud558\uace0, \uc9c0\ub3c4 \uc704\uc5d0 \uacb9\uccd0\uc788\ub358 \uac80\uc0c9 \ucee8\ud2b8\ub864\uacfc \uacb0\uacfc \uc2dc\ud2b8\ub97c \ud1b5\ud569 LeftPanel\ub85c \ubd84\ub9ac. \uc9c0\ub3c4 \uc2e4\uc0ac\uc6a9 \uc601\uc5ed \uadf9\ub300\ud654.",
+  "steps": [
+    {
+      "step": 1,
+      "name": "Navigation.js \u2014 \ub370\uc2a4\ud06c\ud1b1 \uc0ac\uc774\ub4dc\ubc14\ub97c \uc0c1\ub2e8 TopBar\ub85c \uc804\ud658",
+      "file": "step1.md",
+      "priority": "Critical",
+      "status": "completed",
+      "summary": "Sidebar(240px col) \u2192 TopBar(60px row), slideInLeft\u2192slideInDown, \ub4dc\ub86d\ub2e4\uc6b4 \uc704\uce58 top:60px right:0, \ub85c\uadf8\uc544\uc6c3 \ud504\ub85c\ud544 \ub4dc\ub86d\ub2e4\uc6b4\uc73c\ub85c \uc774\ub3d9"
+    },
+    {
+      "step": 2,
+      "name": "App.js \u2014 ContentArea margin-left \uc81c\uac70, margin-top \uc801\uc6a9",
+      "file": "step2.md",
+      "priority": "High",
+      "status": "completed",
+      "summary": "ContentArea: margin-left:240px \u2192 margin-top:60px, min-height:calc(100vh-60px), \ubaa8\ubc14\uc77c margin-top:0 \uc720\uc9c0"
+    },
+    {
+      "step": 3,
+      "name": "UnifiedPetMapPage.js \u2014 ContentRow + LeftPanel \ud1b5\ud569 \ubc0f \uc624\ubc84\ub808\uc774 \ubaa8\ubc14\uc77c \uc804\uc6a9\ud654",
+      "file": "step3.md",
+      "priority": "High",
+      "status": "completed",
+      "summary": "ContentRow(flex-row)+LeftPanel(320px) \ucd94\uac00, ControlsOverlay/LocationResultSheet \ubaa8\ubc14\uc77c \uc804\uc6a9\ud654, \uacb0\uacfc\ubaa9\ub85d\u00b7RecommendCard\ub97c LeftPanel\ub85c \uc774\ub3d9"
+    }
+  ]
+}

@@ -267,14 +267,16 @@ const AppLayout = styled.div`
 `;
 
 const ContentArea = styled.main`
-  margin-left: 240px;
+  margin-left: 0;
+  margin-top: 60px;
   flex: 1;
-  min-height: 100vh;
+  min-height: calc(100vh - 60px);
   background: ${props => props.theme.colors.background};
 
   @media (max-width: 768px) {
-    margin-left: 0;
+    margin-top: 0;
     padding-bottom: 60px;
+    min-height: calc(100vh - 60px);
   }
 `;
 

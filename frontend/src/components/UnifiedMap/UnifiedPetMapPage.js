@@ -421,83 +421,150 @@ const UnifiedPetMapPage = () => {
     <PageWrapper>
       <DomainTabHeader activeLayer={activeLayer} onTabChange={handleTabChange} />
 
-      <MapWrapper>
-        {mapViewportCenter ? (
-          <MapContainer
-            services={[
-              ...items,
-              ...aiRecommendFacilities.map((f, i) => ({
-                id: `ai-${i}`,
-                type: 'ai_recommend',
-                latitude: f.lat,
-                longitude: f.lng,
-                name: f.name,
-                title: f.name,
-                subtitle: f.address,
-                distanceM: f.distance_m,
-                markerColor: '#FFD700',
-              })),
-            ]}
-            onServiceClick={setSelectedItem}
-            userLocation={userLocation}
-            mapCenter={mapViewportCenter}
-            mapLevel={mapLevel}
-            selectedService={selectedItem}
-            hoveredService={hoveredLocationItem}
-            recommendedServiceIdxs={recommendedMap}
-            onMapIdle={handleMapIdle}
-          />
-        ) : (
-          <MapInitLoading>🗺️ 위치 정보를 가져오는 중...</MapInitLoading>
-        )}
-
-        {/* 컨트롤 오버레이 — 지도 위에 float, backdrop blur */}
-        <ControlsOverlay>
-          <OverlayRow>
+      <ContentRow>
+        {/* ── 데스크톱 전용 좌측 패널 ── */}
+        <LeftPanel>
+          <LeftPanelTop>
             <RadiusFilter radius={radius} onRadiusChange={handleRadiusChange} />
-          </OverlayRow>
-          {renderLayerControls()}
-        </ControlsOverlay>
+            {renderLayerControls()}
+          </LeftPanelTop>
 
-        {/* 내 위치 FAB — 지도 우하단 독립 부동 버튼 */}
-        <MyLocationFAB
-          onClick={handleMoveToMyLocation}
-          disabled={locating}
-          title="내 위치로 이동"
-          aria-label="내 위치로 이동"
-        >
-          <span aria-hidden="true">{locating ? '⏳' : '📍'}</span>
-        </MyLocationFAB>
+          {/* location 탭: 결과 목록 */}
+          {activeLayer === 'location' && (
+            <LeftPanelResults>
+              {loading && <PanelStatusMsg>검색 중...</PanelStatusMsg>}
+              {!loading && !error && items.length === 0 && mapViewportCenter && (
+                <PanelStatusMsg>반경 {radius}km 내 결과가 없습니다.</PanelStatusMsg>
+              )}
+              {!loading && !error && items.length > 0 && (
+                <>
+                  <PanelResultHeader>
+                    <div>
+                      <PanelResultTitle>주변 시설</PanelResultTitle>
+                      <PanelResultSubtitle>
+                        {searchMode === 'initial' ? '초기 검색' : '현재 검색 기준'} · 반경 {radius}km · {SORT_LABELS[locationSort]}
+                      </PanelResultSubtitle>
+                    </div>
+                    <PanelResultCount>{items.length}개</PanelResultCount>
+                  </PanelResultHeader>
+                  <PanelResultList>
+                    {items.map((item, index) => {
+                      const isSelected = selectedItem?.id === item.id;
+                      const isRecommended = recommendedMap?.has(item.idx);
+                      return (
+                        <ResultCard
+                          key={item.id}
+                          type="button"
+                          $selected={isSelected}
+                          onClick={() => handleLocationResultClick(item)}
+                          onMouseEnter={() => setHoveredLocationItem(item)}
+                          onMouseLeave={() => setHoveredLocationItem(current =>
+                            current?.id === item.id ? null : current
+                          )}
+                        >
+                          <ResultCardTop>
+                            <ResultCardTitle>
+                              {isRecommended && (
+                                <ResultRankBadge>TOP {recommendedMap.get(item.idx)}</ResultRankBadge>
+                              )}
+                              {item.title || item.name || `시설 ${index + 1}`}
+                            </ResultCardTitle>
+                            {item.raw?.distance != null && (
+                              <ResultDistance>{Math.round(item.raw.distance)}m</ResultDistance>
+                            )}
+                          </ResultCardTop>
+                          <ResultCardSubtitle>
+                            {item.subtitle || item.raw?.address || '주소 정보 없음'}
+                          </ResultCardSubtitle>
+                        </ResultCard>
+                      );
+                    })}
+                  </PanelResultList>
+                </>
+              )}
+            </LeftPanelResults>
+          )}
 
-        {/* 로딩 — 얇은 프로그레스 바 */}
-        {loading && <LoadingBar aria-label={isAiMode ? 'AI 추천 중' : '데이터 조회 중'} />}
+          {/* AI 추천 카드 */}
+          {activeLayer === 'location' && userLocation && CATEGORY_TO_CONTEXT[locationCategory] && (
+            <RecommendCard
+              lat={userLocation.lat}
+              lng={userLocation.lng}
+              context={CATEGORY_TO_CONTEXT[locationCategory]}
+              onFacilitiesLoaded={setAiRecommendFacilities}
+            />
+          )}
+        </LeftPanel>
 
-        {/* 결과 수 칩 */}
-        {!loading && mapViewportCenter && activeLayer !== 'location' && (
-          <CountChip>
-            {isAiMode && <AiBadge>✨ AI</AiBadge>}
-            반경 <strong>{radius}km</strong> · <strong>{items.length}</strong>개
-          </CountChip>
-        )}
+        {/* ── 지도 영역 ── */}
+        <MapWrapper>
+          {mapViewportCenter ? (
+            <MapContainer
+              services={[
+                ...items,
+                ...aiRecommendFacilities.map((f, i) => ({
+                  id: `ai-${i}`,
+                  type: 'ai_recommend',
+                  latitude: f.lat,
+                  longitude: f.lng,
+                  name: f.name,
+                  title: f.name,
+                  subtitle: f.address,
+                  distanceM: f.distance_m,
+                  markerColor: '#FFD700',
+                })),
+              ]}
+              onServiceClick={setSelectedItem}
+              userLocation={userLocation}
+              mapCenter={mapViewportCenter}
+              mapLevel={mapLevel}
+              selectedService={selectedItem}
+              hoveredService={hoveredLocationItem}
+              recommendedServiceIdxs={recommendedMap}
+              onMapIdle={handleMapIdle}
+            />
+          ) : (
+            <MapInitLoading>🗺️ 위치 정보를 가져오는 중...</MapInitLoading>
+          )}
 
-        {error && !loading && <ErrorBanner onClick={() => setError(null)}>{error} ✕</ErrorBanner>}
+          {/* 모바일 전용 컨트롤 오버레이 */}
+          <ControlsOverlay>
+            <OverlayRow>
+              <RadiusFilter radius={radius} onRadiusChange={handleRadiusChange} />
+            </OverlayRow>
+            {renderLayerControls()}
+          </ControlsOverlay>
 
-        {!loading && !error && items.length === 0 && mapViewportCenter && (
-          <EmptyBanner>반경 {radius}km 내 결과가 없습니다.</EmptyBanner>
-        )}
+          <MyLocationFAB
+            onClick={handleMoveToMyLocation}
+            disabled={locating}
+            title="내 위치로 이동"
+            aria-label="내 위치로 이동"
+          >
+            <span aria-hidden="true">{locating ? '⏳' : '📍'}</span>
+          </MyLocationFAB>
 
-        {renderInfoPanel()}
-        {renderLocationResults()}
-      </MapWrapper>
+          {loading && <LoadingBar aria-label={isAiMode ? 'AI 추천 중' : '데이터 조회 중'} />}
 
-      {activeLayer === 'location' && userLocation && CATEGORY_TO_CONTEXT[locationCategory] && (
-        <RecommendCard
-          lat={userLocation.lat}
-          lng={userLocation.lng}
-          context={CATEGORY_TO_CONTEXT[locationCategory]}
-          onFacilitiesLoaded={setAiRecommendFacilities}
-        />
-      )}
+          {!loading && mapViewportCenter && activeLayer !== 'location' && (
+            <CountChip>
+              {isAiMode && <AiBadge>✨ AI</AiBadge>}
+              반경 <strong>{radius}km</strong> · <strong>{items.length}</strong>개
+            </CountChip>
+          )}
+
+          {error && !loading && (
+            <ErrorBanner onClick={() => setError(null)}>{error} ✕</ErrorBanner>
+          )}
+
+          {!loading && !error && items.length === 0 && mapViewportCenter && (
+            <EmptyBanner>반경 {radius}km 내 결과가 없습니다.</EmptyBanner>
+          )}
+
+          {renderInfoPanel()}
+          {renderLocationResults()}
+        </MapWrapper>
+      </ContentRow>
 
       {showMeetupCreateModal && (
         <MeetupCreateModal
@@ -553,8 +620,12 @@ const MapInitLoading = styled.div`
   z-index: 10;
 `;
 
-/* 컨트롤을 지도 위에 float — backdrop blur로 map이 살짝 비침 */
+/* 모바일 전용 컨트롤 오버레이 — 데스크톱은 LeftPanel이 대체 */
 const ControlsOverlay = styled.div`
+  @media (min-width: 769px) {
+    display: none;
+  }
+
   position: absolute;
   top: 0;
   left: 0;
@@ -696,6 +767,11 @@ const EmptyBanner = styled.div`
 `;
 
 const LocationResultSheet = styled.section`
+  /* 모바일 전용 — 데스크톱은 LeftPanel 내 결과 목록이 대체 */
+  @media (min-width: 769px) {
+    display: none !important;
+  }
+
   position: absolute;
   left: 16px;
   width: 392px;
@@ -898,4 +974,86 @@ const AiInfoMeta = styled.p`
   font-size: 12px;
   color: ${props => props.theme.colors.textSecondary};
   margin: 2px 0 0;
+`;
+
+/* ── 데스크톱 2단 레이아웃 ── */
+
+const ContentRow = styled.div`
+  display: flex;
+  flex-direction: row;
+  flex: 1;
+  overflow: hidden;
+`;
+
+const LeftPanel = styled.aside`
+  width: 320px;
+  flex-shrink: 0;
+  border-right: 1px solid ${props => props.theme.colors.border};
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: ${props => props.theme.colors.surface};
+
+  @media (max-width: 768px) {
+    display: none;
+  }
+`;
+
+const LeftPanelTop = styled.div`
+  flex-shrink: 0;
+  border-bottom: 1px solid ${props => props.theme.colors.border};
+`;
+
+const LeftPanelResults = styled.div`
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+`;
+
+const PanelResultHeader = styled.div`
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid rgba(120, 113, 108, 0.14);
+  flex-shrink: 0;
+`;
+
+const PanelResultTitle = styled.h3`
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: ${props => props.theme.colors.text};
+`;
+
+const PanelResultSubtitle = styled.p`
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: ${props => props.theme.colors.textSecondary};
+`;
+
+const PanelResultCount = styled.span`
+  font-size: 12px;
+  font-weight: 700;
+  color: ${props => props.theme.colors.textSecondary};
+  flex-shrink: 0;
+`;
+
+const PanelResultList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 14px 16px;
+`;
+
+const PanelStatusMsg = styled.div`
+  padding: 28px 16px;
+  text-align: center;
+  color: ${props => props.theme.colors.textSecondary};
+  font-size: 13px;
 `;
