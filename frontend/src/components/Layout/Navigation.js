@@ -592,6 +592,14 @@ const SidebarNotificationDropdown = styled.div`
   flex-direction: column;
   overflow: hidden;
   animation: ${slideInDown} 0.2s ease-out;
+
+  @media (max-width: 768px) {
+    left: 8px;
+    right: 8px;
+    width: auto;
+    top: 56px;
+    border-radius: ${props => props.theme.borderRadius?.lg || '8px'};
+  }
 `;
 
 const Divider = styled.div`
