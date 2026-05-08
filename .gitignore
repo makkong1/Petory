@@ -48,6 +48,9 @@ out/
 # =====================
 application.yml
 application.properties
+application-prod.properties
+.env
+nginx/ssl/
 
 # =====================
 # React / Frontend

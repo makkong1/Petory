@@ -10,6 +10,7 @@ import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.web.filter.HiddenHttpMethodFilter;
+
 import de.codecentric.boot.admin.server.config.EnableAdminServer;
 
 @SpringBootApplication
