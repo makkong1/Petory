@@ -14,3 +14,6 @@ App/App/config.xml
 
 # Firebase (민감 정보 — 절대 커밋 금지)
 App/App/GoogleService-Info.plist
+
+# Xcode SPM (자동 생성)
+App/App.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
