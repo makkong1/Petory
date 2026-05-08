@@ -13,6 +13,7 @@ const config: CapacitorConfig = {
   android: {
     allowMixedContent: false,
     captureInput: true,
+    // TODO(릴리즈): 앱스토어 배포 전 반드시 false로 변경할 것 — true 상태로 APK 빌드 시 USB/ADB로 WebView 원격 디버깅 가능
     webContentsDebuggingEnabled: true,
   },
   plugins: {
