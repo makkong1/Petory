@@ -1,7 +1,7 @@
 # 🐾 Petory (페토리)
 > **데이터 기반의 반려동물 케어 & 커뮤니티 통합 플랫폼**
 
-![Project Status](https://img.shields.io/badge/Status-Active-success) ![Java](https://img.shields.io/badge/Java-17-orange) ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.7-green) ![React](https://img.shields.io/badge/React-19-blue)
+![Project Status](https://img.shields.io/badge/Status-Active-success) ![Java](https://img.shields.io/badge/Java-17-orange) ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.7-green) ![React](https://img.shields.io/badge/React-19-blue) ![Capacitor](https://img.shields.io/badge/Capacitor-8-blueviolet)
 
 ---
 
@@ -24,12 +24,19 @@
 - **Build**: Gradle
 - **Scheduling**: Spring Scheduler (@Scheduled)
 - **Async**: Spring Async (@Async)
+- **푸시 알림**: Firebase Admin SDK 9.3.0 (FCM)
 
 ### Frontend
 - **Framework**: React 19
 - **Styling**: Styled-components
 - **HTTP Client**: Axios
 - **Visualization**: Recharts (Admin Dashboard)
+
+### Mobile
+- **Framework**: Capacitor 8 (Android / iOS WebView 래핑)
+- **토큰 저장**: `@capacitor/preferences` (앱) + localStorage (웹) 하이브리드
+- **푸시 알림**: `@capacitor/push-notifications` + Firebase FCM
+- **빌드**: 동일한 React 코드베이스 → 웹 / Android APK / iOS IPA 동시 지원
 
 ---
 
@@ -99,7 +106,11 @@
     - **MySQL**: 모든 알림을 영구 저장하여 이력 관리 및 안정성 보장
     - **병합 전략**: Redis와 DB 데이터를 병합하여 중복 제거 후 최신순 정렬
 - **다양한 알림 유형**: 댓글, 케어 요청, 실종 제보 등 도메인별 이벤트 트리거 구현
-- **실시간 알림**: SSE(Server-Sent Events)를 통한 실시간 알림 푸시
+- **실시간 알림**: SSE(Server-Sent Events)를 통한 실시간 알림 푸시 (앱 열려있을 때)
+- **푸시 알림**: FCM(Firebase Cloud Messaging)을 통한 푸시 알림 (앱 꺼져있을 때)
+  - 백엔드: Firebase Admin SDK → `FcmService.sendToUser()`
+  - 프론트/앱: `@capacitor/push-notifications`로 FCM 토큰 등록 → `POST /api/fcm/token`
+  - DB: `fcm_token` 테이블에 디바이스별 토큰 저장 (ANDROID / IOS)
 
 ### 신고 및 제재 시스템 (Report & Sanction System)
 - **다양한 신고 타입**: 게시글, 댓글, 실종 제보, 유저 신고 지원
@@ -172,72 +183,46 @@
 
 ```
 Petory/
+├── android/                          # Capacitor Android 프로젝트 (cap sync로 생성)
+├── ios/                              # Capacitor iOS 프로젝트 (cap sync로 생성)
+├── capacitor.config.json             # Capacitor 설정 (appId, webDir 등)
 ├── backend/
 │   └── main/
 │       ├── java/com/linkup/Petory/
 │       │   ├── domain/              # 도메인별 패키지
 │       │   │   ├── activity/        # 활동 통계
 │       │   │   ├── board/           # 커뮤니티 게시판
-│       │   │   │   ├── controller/  # BoardController, MissingPetBoardController
-│       │   │   │   ├── service/     # BoardService, CommentService, ReactionService
-│       │   │   │   ├── entity/      # Board, Comment, BoardReaction 등
-│       │   │   │   └── repository/  # JPA Repository
 │       │   │   ├── care/            # 펫 케어 서비스
-│       │   │   │   ├── controller/  # CareRequestController
-│       │   │   │   ├── service/     # CareRequestService
-│       │   │   │   └── entity/      # CareRequest, CareApplication, CareReview
 │       │   │   ├── chat/            # 채팅 시스템
-│       │   │   │   ├── controller/  # ChatController, ConversationController
-│       │   │   │   ├── service/     # ConversationService, ChatMessageService
-│       │   │   │   ├── entity/      # Conversation, ChatMessage, ConversationParticipant
-│       │   │   │   └── repository/  # JPA Repository
 │       │   │   ├── location/        # 위치 기반 서비스
-│       │   │   │   ├── controller/  # LocationServiceController, GeocodingController
-│       │   │   │   └── service/     # LocationServiceService
 │       │   │   ├── meetup/          # 모임 서비스
-│       │   │   │   ├── controller/  # MeetupController
-│       │   │   │   ├── service/     # MeetupService
-│       │   │   │   └── entity/      # Meetup, MeetupParticipants
 │       │   │   ├── recommendation/  # 맞춤 추천 (외부 Pet Data API 프록시)
-│       │   │   │   ├── controller/  # RecommendController
-│       │   │   │   ├── service/     # RecommendService
-│       │   │   │   ├── client/      # PetDataApiClient
-│       │   │   │   └── dto/         # RecommendRequest, RecommendResponse
 │       │   │   ├── notification/    # 알림 시스템
-│       │   │   │   ├── controller/  # NotificationController
-│       │   │   │   ├── service/     # NotificationService, NotificationSseService
-│       │   │   │   └── entity/      # Notification
+│       │   │   │   ├── controller/  # NotificationController, FcmTokenController
+│       │   │   │   ├── service/     # NotificationService, FcmService, NotificationSseService
+│       │   │   │   └── entity/      # Notification, FcmToken
 │       │   │   ├── report/          # 신고 관리
-│       │   │   │   ├── controller/  # ReportController
-│       │   │   │   ├── service/     # ReportService
-│       │   │   │   └── entity/      # Report
 │       │   │   ├── payment/         # 펫코인 결제
-│       │   │   │   ├── controller/  # PetCoinController, AdminPaymentController
-│       │   │   │   ├── service/     # PetCoinService, PetCoinEscrowService
-│       │   │   │   ├── entity/      # PetCoinTransaction, PetCoinEscrow
-│       │   │   │   └── repository/  # JPA Repository
 │       │   │   ├── statistics/      # 통계/대시보드
-│       │   │   │   ├── service/     # StatisticsService, StatisticsScheduler
-│       │   │   │   └── entity/      # DailyStatistics
 │       │   │   ├── user/            # 유저 관리
-│       │   │   │   ├── controller/  # AuthController, UsersController
-│       │   │   │   ├── service/     # AuthService, UsersService, UserSanctionService
-│       │   │   │   ├── entity/      # Users, UserSanction
-│       │   │   │   └── scheduler/   # UserSanctionScheduler
 │       │   │   └── file/            # 파일 관리
 │       │   ├── filter/              # JwtAuthenticationFilter
 │       │   ├── global/              # 전역 설정
-│       │   │   ├── security/        # SecurityConfig
+│       │   │   ├── config/          # FirebaseConfig, SecurityConfig 등
 │       │   │   ├── exception/       # GlobalExceptionHandler
 │       │   │   └── common/          # 공통 응답 DTO
 │       │   └── util/                # JwtUtil 등 유틸리티
 │       └── resources/
 │           ├── application.properties
-│           └── db/                   # SQL 스크립트
+│           ├── firebase-service-account.json  # gitignore — 로컬에만 보관
+│           └── sql/migration/               # SQL 마이그레이션 스크립트
 └── frontend/
     └── src/
         ├── components/               # React 컴포넌트
         ├── api/                      # Axios API 모듈
+        │   ├── apiClient.js          # Axios 인스턴스, API_ROOT
+        │   ├── tokenStorage.js       # 하이브리드 토큰 저장 (웹/앱)
+        │   └── pushNotifications.js  # FCM 토큰 등록
         ├── contexts/                 # React Context (Auth, Theme)
         └── styles/                   # 테마 설정
 ```
@@ -259,6 +244,7 @@ Petory/
 - **Chat/Conversation**: 채팅 대화방 및 메시지
 - **PetCoinTransaction / PetCoinEscrow**: 펫코인 거래 내역, 에스크로 (거래 확정 시 HOLD → 완료 시 RELEASED / 취소 시 REFUNDED)
 - **Notification**: 알림 (타입별 분류, 읽음 상태)
+- **FcmToken**: FCM 디바이스 토큰 (ANDROID/IOS, UNIQUE, 유저별 다중 디바이스)
 - **Report**: 신고 (타입별 분류, 처리 상태)
 - **DailyStatistics**: 일별 통계 요약 (배치 작업으로 집계)
 - **AdminAuditLog** (`admin_audit_log`): 관리자 감사 로그 (행위 코드, 대상 타입·idx, 시각순 조회용 인덱스)
@@ -344,6 +330,22 @@ Petory/
 - Redis 6.0+
 - Gradle 7.0+
 
+### 모바일 빌드
+```bash
+# 프론트엔드 빌드 후 앱에 동기화
+cd frontend && npm run build
+npx --prefix frontend cap sync android
+npx --prefix frontend cap sync ios
+
+# 또는 루트 스크립트로
+npm run cap:sync:android
+npm run cap:sync:ios
+```
+
+- Android: `npm run cap:open:android` → Android Studio에서 빌드/실행
+- iOS: `npm run cap:open:ios` → Xcode에서 빌드/실행
+- FCM 사용 시: `backend/main/resources/firebase-service-account.json` 필요 (Firebase Console에서 발급)
+
 ---
 
 ## 📚 상세 문서
@@ -385,6 +387,7 @@ Petory/
 ### 공통 인프라 문서
 - [Redis 캐싱 전략](./docs/architecture/Redis_캐싱_전략.md)
 - [위치서비스 공공데이터 CSV 배치 임포트](./docs/architecture/위치서비스_공공데이터_CSV_배치_임포트_구현.md)
+- [모바일 앱 & FCM 가이드](./docs/deployment/09-mobile-capacitor.md) - Capacitor 구조, FCM 설정, 빌드/배포, 보안
 
 ---
 
