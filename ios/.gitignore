@@ -11,3 +11,6 @@ capacitor-cordova-ios-plugins
 # Generated Config files
 App/App/capacitor.config.json
 App/App/config.xml
+
+# Firebase (민감 정보 — 절대 커밋 금지)
+App/App/GoogleService-Info.plist
