@@ -23,6 +23,8 @@
 - **Security**: Spring Security + JWT
 - **Scheduling**: Spring Scheduler
 - **실시간**: WebSocket (STOMP)
+- **모바일**: Capacitor (Android / iOS WebView 래핑)
+- **푸시 알림**: Firebase Cloud Messaging (FCM)
 
 ### 핵심 기능
 
@@ -33,8 +35,9 @@
 - 위치 기반 서비스 (병원, 카페 등)
 - 오프라인 모임
 - 사용자 신고 및 제재 시스템
-- 알림 시스템
+- 알림 시스템 (SSE 실시간 + FCM 푸시)
 - 통계 수집
+- Android / iOS 네이티브 앱 (Capacitor)
 
 ## 도메인별 상세 문서
 
@@ -141,4 +144,8 @@
 
 - [도메인 간 연관관계](./architecture/domain-relationships.md)
 - [데이터베이스 ERD](./architecture/erd.md)
+
+## 모바일 앱
+
+- [Capacitor 모바일 앱 & FCM 가이드](./deployment/09-mobile-capacitor.md)
 
