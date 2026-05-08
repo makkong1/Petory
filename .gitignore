@@ -50,6 +50,7 @@ application.yml
 application.properties
 application-prod.properties
 .env
+firebase-service-account.json
 frontend/.env.capacitor
 nginx/ssl/
 

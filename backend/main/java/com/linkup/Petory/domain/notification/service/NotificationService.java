@@ -32,18 +32,21 @@ public class NotificationService {
     private final NotificationConverter notificationConverter;
     private final RedisTemplate<String, Object> notificationRedisTemplate;
     private final NotificationSseService sseService;
+    private final FcmService fcmService;
 
     public NotificationService(
             NotificationRepository notificationRepository,
             UsersRepository usersRepository,
             NotificationConverter notificationConverter,
             @Qualifier("notificationRedisTemplate") RedisTemplate<String, Object> notificationRedisTemplate,
-            NotificationSseService sseService) {
+            NotificationSseService sseService,
+            FcmService fcmService) {
         this.notificationRepository = notificationRepository;
         this.usersRepository = usersRepository;
         this.notificationConverter = notificationConverter;
         this.notificationRedisTemplate = notificationRedisTemplate;
         this.sseService = sseService;
+        this.fcmService = fcmService;
     }
 
     private static final String REDIS_KEY_PREFIX = "notification:";
@@ -81,8 +84,11 @@ public class NotificationService {
         // Redis에 실시간 알림 저장 (최신 알림 목록 관리)
         saveToRedis(userId, dto);
 
-        // SSE를 통해 실시간 알림 전송 (연결된 경우)
+        // SSE를 통해 실시간 알림 전송 (앱 열려있을 때)
         sseService.sendNotification(userId, dto);
+
+        // FCM 푸시 알림 발송 (앱 꺼져있을 때)
+        fcmService.sendToUser(userId, title, content);
 
         return dto;
     }

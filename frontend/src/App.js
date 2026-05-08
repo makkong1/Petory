@@ -18,6 +18,8 @@ import UnifiedPetMapPage from './components/UnifiedMap/UnifiedPetMapPage';
 import ChatWidget from './components/Chat/ChatWidget';
 import EmailVerificationPage from './components/Auth/EmailVerificationPage';
 import EmailVerificationPrompt from './components/Common/EmailVerificationPrompt.js';
+import { initPushNotifications } from './api/pushNotifications';
+
 function AppContent() {
   const { user, loading, isAuthenticated } = useAuth();
   const [activeTab, setActiveTab] = useState('home');
@@ -26,6 +28,13 @@ function AppContent() {
   const [showGlobalPermissionModal, setShowGlobalPermissionModal] = useState(false);
   const [showGlobalEmailVerificationPrompt, setShowGlobalEmailVerificationPrompt] = useState(false);
   const [emailVerificationPurpose, setEmailVerificationPurpose] = useState(null);
+
+  // 로그인 시 FCM 푸시 알림 초기화 (Capacitor 앱 전용, 웹은 no-op)
+  useEffect(() => {
+    if (isAuthenticated) {
+      initPushNotifications();
+    }
+  }, [isAuthenticated]);
 
   // 로그인 페이지로 리다이렉트
   useEffect(() => {
