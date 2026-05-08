@@ -99,7 +99,16 @@ private List<MeetupParticipants> participants;
 
 ### 어필 포인트
 
-**meetup 테이블 인덱스** (실제 docs/domains/meetup.md 7.1 인덱스 전략 기준):
+**meetup 테이블 인덱스** (SHOW INDEX 실측 결과):
+
+| 인덱스명 | 컬럼 | 타입 | 용도 |
+|---|---|---|---|
+| PRIMARY | (idx) | BTREE | 기본키 |
+| organizer_idx | (organizer_idx) | BTREE | 주최자 기준 조회 |
+| idx_meetup_status | (status) | BTREE | 상태 필터링 |
+| idx_meetup_date | (date) | BTREE | 날짜 범위 조회 |
+| idx_meetup_date_status | (date, status) | BTREE | 날짜+상태 복합 필터 |
+| idx_meetup_location | (latitude, longitude) | BTREE | 위치 기반 Bounding Box 거리 검색 |
 
 ```sql
 CREATE INDEX idx_meetup_date ON meetup(date);
@@ -109,13 +118,19 @@ CREATE INDEX idx_meetup_status ON meetup(status);
 CREATE INDEX organizer_idx ON meetup(organizer_idx);
 ```
 
-**meetupparticipants 테이블**:
-```sql
-CREATE INDEX user_idx ON meetupparticipants(user_idx);
--- PRIMARY KEY (meetup_idx, user_idx) — 중복 참여 방지 이중 장치
-```
+**meetupparticipants 테이블** (SHOW INDEX 실측 결과):
 
-**위치 기반 검색 Bounding Box 최적화** — 3단계 리팩토링 실측:
+| 인덱스명 | 컬럼 | 타입 | 비고 |
+|---|---|---|---|
+| PRIMARY | (meetup_idx, user_idx) | BTREE | 복합 PK — @IdClass 패턴, 중복 참여 DB 레벨 차단 |
+| user_idx | (user_idx) | BTREE | 사용자별 참가 모임 역방향 조회 |
+| idx_meetupparticipants_user_liked_joined | (user_idx, liked, joined_at) | BTREE | 특정 사용자의 좋아요 여부·참가일 복합 필터 |
+
+`PRIMARY KEY (meetup_idx, user_idx)`는 `@IdClass(MeetupParticipantsId.class)`로 선언한 복합 기본키와 직접 매핑된다. DB PK 제약이 중복 참여 최종 방어선이며, 서비스 레이어에서 `existsByMeetupIdxAndUserIdx`로 선검사를 추가해 이중 방어한다.
+
+`idx_meetupparticipants_user_liked_joined (user_idx, liked, joined_at)` 복합 인덱스는 "특정 사용자가 좋아요한 모임을 참가일 순으로 조회"하는 패턴에 최적화된 커버링 인덱스 후보다 — `WHERE user_idx = ? AND liked = ?` 조건에서 두 선행 컬럼이 고정값이고 `joined_at`이 정렬/범위 필터로 동작한다.
+
+**위치 기반 검색 Bounding Box 최적화** — `idx_meetup_location (latitude, longitude)` 활용, 3단계 리팩토링 실측:
 - 1단계 (인메모리 필터링): `idx_meetup_location` 미사용, 스캔 행 2958개
 - 2단계 (DB 쿼리, `IS NOT NULL` 조건): 인덱스 여전히 미사용, 스캔 행 동일
 - 3단계 (BETWEEN 조건으로 변경): 인덱스 활용, 스캔 행 117개 (96% 감소)
@@ -130,7 +145,7 @@ AND m.longitude BETWEEN (:lng - :radius / (111.0 * cos(radians(:lat))))
 - 최종 성과: 전체 실행 시간 43.8% 감소 (486ms→273ms), DB 쿼리 40.7% 감소, 메모리 85.8% 감소
 
 ### 말할 내용
-> "위치 기반 검색을 처음에는 전체 모임을 메모리에 올려서 Java로 거리 계산을 했습니다. DB 쿼리로 옮겼는데도 IS NOT NULL 조건 때문에 인덱스가 사용되지 않아 2958행을 전부 스캔했습니다. BETWEEN 조건으로 Bounding Box를 만들면 복합 인덱스(latitude, longitude)가 range 스캔으로 동작해서 117행으로 줄었습니다. 인덱스가 사용되는지 여부는 조건 작성 방식에 따라 완전히 달라진다는 걸 직접 확인했습니다."
+> "위치 기반 검색을 처음에는 전체 모임을 메모리에 올려서 Java로 거리 계산을 했습니다. DB 쿼리로 옮겼는데도 IS NOT NULL 조건 때문에 `idx_meetup_location (latitude, longitude)` 복합 인덱스가 사용되지 않아 2958행을 전부 스캔했습니다. BETWEEN 조건으로 Bounding Box를 구성하면 두 컬럼이 range 스캔으로 동작해서 117행으로 줄었습니다. 인덱스가 사용되는지 여부는 조건 작성 방식에 따라 완전히 달라진다는 걸 직접 확인했습니다. 참가자 테이블은 `(meetup_idx, user_idx)` 복합 PK와 `(user_idx, liked, joined_at)` 복합 인덱스를 별도로 두어 역방향 조회와 좋아요 필터 패턴도 인덱스로 처리합니다."
 
 ---
 

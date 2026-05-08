@@ -270,6 +270,33 @@ public void sendMissingPetCommentNotificationAsync(...) {
 
 ---
 
+## 인덱스 설계
+
+### missing_pet_board 테이블
+
+| 인덱스명 | 컬럼(순서) | 타입 | 설계 근거 |
+|---|---|---|---|
+| `PRIMARY` | `idx` | BTREE | PK — 단건 조회·FK 참조 기준 |
+| `FKrid0u1qvm8e07etghggxnu1b1` | `user_idx` | BTREE | FK — 작성자별 게시글 조회, `idx_missing_pet_user`와 협력 |
+| `idx_missing_pet_location` | `latitude, longitude` | BTREE | 반경 검색 시 위도·경도 범위 스캔. 복합 순서(위도→경도)는 위도 범위 필터 후 경도 범위 좁히기에 최적 |
+| `idx_missing_pet_status` | `status, is_deleted, created_at` | BTREE | 상태·삭제 여부 필터 후 생성일 정렬. 관리자 목록 조회(`getAdminBoardsWithPaging`) 및 상태별 조회에 사용 |
+| `idx_missing_pet_user` | `user_idx, is_deleted, created_at` | BTREE | 특정 사용자의 활성 게시글을 최신순 조회할 때 인덱스 전체를 커버(커버링 인덱스 효과) |
+
+**설계 포인트**: `idx_missing_pet_status`와 `idx_missing_pet_user` 모두 `is_deleted` 컬럼을 포함해 Soft Delete 필터가 인덱스 레벨에서 처리된다. `idx_missing_pet_location`은 `(latitude, longitude)` 복합 인덱스로 위도 범위를 먼저 좁히고 경도를 필터링하는 2단계 범위 스캔을 지원한다.
+
+### missing_pet_comment 테이블
+
+| 인덱스명 | 컬럼(순서) | 타입 | 설계 근거 |
+|---|---|---|---|
+| `PRIMARY` | `idx` | BTREE | PK |
+| `FKe3sca61815j9cxi608oxmrfjt` | `user_idx` | BTREE | FK — 작성자 JOIN 시 사용 |
+| `FKpodx5stuchr73mrjgffir72ii` | `board_idx` | BTREE | FK — 게시글별 댓글 조회 기본 경로 |
+| `idx_missing_pet_comment_board_is_deleted` | `board_idx, is_deleted` | BTREE | 게시글 삭제 시 댓글 소프트 삭제(`softDeleteAllByBoardIdx`) 및 배치 댓글 수 조회(`countCommentsByBoardIds`)에서 `board_idx IN (...)` + `is_deleted = false` 조건을 인덱스 레벨에서 처리 |
+
+**설계 포인트**: `idx_missing_pet_comment_board_is_deleted`의 선두 컬럼이 `board_idx`이므로 `IN (boardIds)` 배치 조회와 `softDeleteAllByBoardIdx` 배치 UPDATE 모두 인덱스를 활용한다. 단순 FK 인덱스(`FKpodx5stuchr73mrjgffir72ii`)와 복합 인덱스가 공존하지만, 삭제 여부 필터가 없는 순수 JOIN 경로는 FK 인덱스를 사용해 중복을 최소화했다.
+
+---
+
 ## 핵심 키워드
 
 - **N+1 문제 해결** (Converter 분리 + 배치 조회)
@@ -282,6 +309,7 @@ public void sendMissingPetCommentNotificationAsync(...) {
 - **@Async 트랜잭션 분리** (알림 발송)
 - **IN 절 + GROUP BY** 배치 댓글 수 조회
 - **COUNT 쿼리 최적화** (전체 로드 → countByBoardAndIsDeletedFalse)
+- **복합 인덱스** (status+is_deleted+created_at, user_idx+is_deleted+created_at, latitude+longitude)
 
 ---
 

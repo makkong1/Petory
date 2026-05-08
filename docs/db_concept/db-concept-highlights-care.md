@@ -143,25 +143,36 @@ if (oldStatus != CareRequestStatus.COMPLETED && newStatus == CareRequestStatus.C
 
 ### 어필 포인트
 
-실제 DDL(`docs/domains/care.md` §5.1 인덱스 전략)에서 확인된 인덱스:
+실제 DB SHOW INDEX 결과 기준 인덱스:
 
-| 테이블 | 인덱스 | 용도 |
-|--------|--------|------|
-| `carerequest` | `user_idx` | 사용자별 요청 조회 (`getMyCareRequests`) |
-| `carerequest` | `fk_carerequest_pet` (`pet_idx`) | 외래키 JOIN |
-| `careapplication` | `care_request_idx` | 요청별 지원 조회 |
-| `careapplication` | `provider_idx` | 제공자별 지원 조회 |
-| `carerequest_comment` | `fk_care_request_comment_request` (`care_request_idx`) | 요청별 댓글 조회 |
-| `carerequest_comment` | `fk_care_request_comment_user` (`user_idx`) | 사용자별 댓글 조회 |
-| `carereview` | `care_application_idx` | 지원별 리뷰 조회 |
-| `carereview` | `reviewee_idx` | 대상자별 리뷰 조회 |
-| `carereview` | `reviewer_idx` | 작성자별 리뷰 조회 |
+| 테이블 | 인덱스명 | 컬럼 | 종류 | 용도 |
+|--------|----------|------|------|------|
+| `carerequest` | `user_idx` | `user_idx` | BTREE | 사용자별 요청 조회 (`getMyCareRequests`) |
+| `carerequest` | `fk_carerequest_pet` | `pet_idx` | BTREE | 외래키 JOIN |
+| `careapplication` | `care_request_idx` | `care_request_idx` | BTREE | 요청별 지원 조회 |
+| `careapplication` | `provider_idx` | `provider_idx` | BTREE | 제공자별 지원 조회 |
+| `carerequest_comment` | `fk_care_request_comment_request` | `care_request_idx` | BTREE | 요청별 댓글 조회 |
+| `carerequest_comment` | `fk_care_request_comment_user` | `user_idx` | BTREE | 사용자별 댓글 조회 |
+| `carereview` | `care_application_idx` | `care_application_idx` | BTREE | 지원별 리뷰 조회 |
+| `carereview` | `reviewee_idx` | `reviewee_idx` | BTREE | 대상자별 리뷰 조회 |
+| `carereview` | `reviewer_idx` | `reviewer_idx` | BTREE | 작성자별 리뷰 조회 |
+| `pet_coin_escrow` | `care_application_idx` | `care_application_idx` | BTREE | 지원별 에스크로 조회 |
+| `pet_coin_escrow` | `idx_created_at` | `created_at` | BTREE | 생성일 범위 조회·통계 |
+| `pet_coin_escrow` | `idx_provider` | `provider_idx` | BTREE | 제공자별 에스크로 조회 |
+| `pet_coin_escrow` | `idx_requester` | `requester_idx` | BTREE | 요청자별 에스크로 조회 |
+| `pet_coin_escrow` | `idx_status` | `status` | BTREE | 상태별 필터링 |
+| `pet_coin_escrow` | `uk_care_request` | `care_request_idx` | UNIQUE | 케어 요청당 에스크로 1건 보장 |
+| `pet_coin_transaction` | `idx_created_at` | `created_at` | BTREE | 생성일 범위 조회·통계 |
+| `pet_coin_transaction` | `idx_related` | `related_type, related_idx` | BTREE | 관련 엔티티별 트랜잭션 조회 |
+| `pet_coin_transaction` | `idx_status` | `status` | BTREE | 상태별 필터링 |
+| `pet_coin_transaction` | `idx_transaction_type` | `transaction_type` | BTREE | 거래 유형별 필터링 |
+| `pet_coin_transaction` | `idx_user_idx` | `user_idx` | BTREE | 사용자별 거래 내역 조회 |
 
 - **위치 필터 설계**: `users.location LIKE CONCAT(:location, '%')` — 접두사 일치만 허용하여 B-tree 인덱스 활용. 중간 일치(`LIKE '%값%'`)는 인덱스 사용 불가라 의도적으로 제외
-- **FULLTEXT 검색**: `carerequest(title, description)`에 FULLTEXT 인덱스 생성, `MATCH ... AGAINST ... IN NATURAL LANGUAGE MODE` 사용 (`searchWithPaging`, `findIdxByFulltextKeyword`)
+- **에스크로 UNIQUE 제약**: `uk_care_request`(실제 인덱스명)가 `care_request_idx`에 UNIQUE 제약을 두어 동일 케어 요청에 에스크로가 중복 생성되는 것을 DB 레벨에서 방지
 
 ### 말할 내용
-> "조회 패턴을 기준으로 인덱스를 설계했습니다. 위치 필터는 중간 일치 LIKE를 쓰면 인덱스를 타지 않아서 접두사 일치로 제한했고, 키워드 검색은 LIKE 대신 FULLTEXT 인덱스와 MATCH-AGAINST를 사용했습니다."
+> "조회 패턴을 기준으로 인덱스를 설계했습니다. 위치 필터는 중간 일치 LIKE를 쓰면 인덱스를 타지 않아서 접두사 일치로 제한했습니다. 에스크로 테이블은 케어 요청·제공자·요청자·상태·생성일 각각에 단일 인덱스를 두고, care_request_idx에 UNIQUE 제약을 걸어 요청당 에스크로 1건을 DB 레벨에서 보장했습니다. 펫코인 거래 내역은 사용자·상태·거래 유형·(관련 엔티티 타입 + idx) 복합 인덱스로 다양한 필터 조회를 지원합니다."
 
 ---
 

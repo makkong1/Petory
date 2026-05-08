@@ -161,7 +161,7 @@ List<ChatMessage> findLatestMessagesByConversationIdxs(@Param("conversationIdxs"
 
 메시지 검색을 `LIKE '%keyword%'` 양방향으로 처리하면 B-tree 인덱스를 전혀 사용하지 못해 테이블 풀 스캔이 발생한다.
 
-실제 인덱스 (`docs/domains/chat.md` § 7.1):
+실제 인덱스 (DB SHOW INDEX 기준):
 ```sql
 CREATE FULLTEXT INDEX idx_chat_message_content ON chatmessage(content) WITH PARSER ngram;
 ```
@@ -262,7 +262,7 @@ if (readFrom != null) {
 
 ### 어필 포인트
 
-실제 코드에서 확인된 인덱스 설계 (`docs/domains/chat.md` § 7.1):
+실제 DB SHOW INDEX 결과 기준 인덱스 설계:
 
 **conversation 테이블**:
 ```sql

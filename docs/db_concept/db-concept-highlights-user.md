@@ -258,6 +258,58 @@ return new TokenResponse(accessToken, refreshToken, userDTO);
 
 ---
 
+## 인덱스 설계
+
+### users 테이블
+
+| 인덱스명 | 컬럼 | 타입 | 설계 근거 |
+|---|---|---|---|
+| `PRIMARY` | `idx` | BTREE | PK — 내부 FK 참조 기준 |
+| `email` | `email` | UNIQUE | 중복 계정 방지 + 로그인·OAuth2 사용자 조회 최적화. §6·§7 소프트 삭제 닉네임 재사용 버그의 최후 방어선이기도 함 |
+| `id` | `id` | UNIQUE | 사용자 ID(문자열) 중복 방지 + `findActiveByIdString` 로그인 조회 최적화 |
+| `uk_users_nickname` | `nickname` | UNIQUE | 닉네임 중복 방지. `findByNicknameOrUsernameOrEmail` 통합 쿼리가 OR 조건에서 이 인덱스를 활용 |
+| `username` | `username` | UNIQUE | 사용자명 중복 방지 + 검색 최적화. 회원가입 중복 검사 3→1 쿼리 통합(§4)에서 OR 브랜치로 사용 |
+
+**설계 포인트**: 4개 UNIQUE 인덱스(`email`, `id`, `uk_users_nickname`, `username`)는 (1) 동시 가입 Race Condition 시 DB 레벨 최후 방어선, (2) 로그인·조회 경로별 인덱스 히트, (3) `findByNicknameOrUsernameOrEmail` OR 조건에서 각 브랜치가 독립 인덱스를 타는 구조를 동시에 달성한다. §7 OAuth2 동시 로그인에서는 `email` UNIQUE가 트랜잭션 롤백 트리거로 동작한다.
+
+### socialuser 테이블
+
+| 인덱스명 | 컬럼 | 타입 | 설계 근거 |
+|---|---|---|---|
+| `PRIMARY` | `idx` | BTREE | PK |
+| `users_idx` | `users_idx` | BTREE | FK — `@BatchSize` IN 절 배치 조회(§4)에서 `WHERE user_idx IN (...)` 스캔 경로 |
+
+### user_sanctions 테이블
+
+| 인덱스명 | 컬럼 | 타입 | 설계 근거 |
+|---|---|---|---|
+| `PRIMARY` | `idx` | BTREE | PK |
+| `admin_idx` | `admin_idx` | BTREE | FK — 관리자별 제재 이력 조회 |
+| `idx_user_idx` | `user_idx` | BTREE | 사용자별 활성 제재 조회. §2 원자적 경고 증가 후 자동 이용제한 부여 시 해당 사용자 제재 조회 경로 |
+| `idx_ends_at` | `ends_at` | BTREE | **제재 만료 스케줄러 전용 인덱스**. 매일 자정 배치 잡이 `WHERE ends_at <= NOW() AND status = 'ACTIVE'` 형태로 만료 제재를 스캔할 때 `ends_at` 범위 조건을 인덱스 레벨에서 처리해 전체 테이블 스캔을 차단 |
+
+**설계 포인트**: `idx_ends_at`은 만료 스케줄러(`@Scheduled`)가 실행될 때 만료 대상 제재를 빠르게 찾기 위한 전용 인덱스다. 제재 건수가 누적될수록 `ends_at` 범위 스캔의 효과가 커진다.
+
+### fcm_token 테이블
+
+| 인덱스명 | 컬럼 | 타입 | 설계 근거 |
+|---|---|---|---|
+| `PRIMARY` | `idx` | BTREE | PK |
+| `fk_fcm_token_user` | `user_idx` | BTREE | FK — 사용자별 FCM 토큰 조회. 푸시 알림 발송 시 `WHERE user_idx = ?` 경로 |
+| `uk_fcm_token_token` | `token` | UNIQUE | 토큰 중복 등록 방지. 동일 디바이스 토큰이 여러 사용자에게 중복 연결되는 이상 상태를 DB 레벨에서 차단 |
+
+### pets 테이블 (User 도메인 연관)
+
+| 인덱스명 | 컬럼 | 타입 | 설계 근거 |
+|---|---|---|---|
+| `PRIMARY` | `idx` | BTREE | PK |
+| `idx_pets_user` | `user_idx` | BTREE | 사용자별 반려동물 목록 조회. 가장 빈번한 접근 경로 |
+| `idx_pets_deleted` | `is_deleted` | BTREE | Soft Delete 필터 전용. `is_deleted = false` 조건이 자주 사용됨 |
+| `idx_pets_type` | `pet_type` | BTREE | 종류별(강아지·고양이 등) 검색 필터 |
+| `idx_pets_breed` | `breed` | BTREE | 품종별 검색 필터 |
+
+---
+
 ## 핵심 키워드
 
 - Refresh Token DB 저장 + 이중 검증 (JWT + DB)
@@ -270,6 +322,9 @@ return new TokenResponse(accessToken, refreshToken, userDTO);
 - DB UNIQUE 제약조건 — OAuth2 동시 로그인 Race Condition 방어
 - 프로젝션 쿼리 (`findRoleByIdx`) — 불필요한 컬럼 제거
 - `findByNicknameOrUsernameOrEmail` — 중복 검사 3 쿼리 → 1 쿼리
+- **복합 인덱스 없음 → 단일 컬럼 UNIQUE 4개** — users 테이블 중복 방지 + 검색 최적화
+- **`idx_ends_at`** — 제재 만료 스케줄러 전용 범위 스캔 인덱스
+- **`uk_fcm_token_token`** — FCM 토큰 중복 등록 DB 레벨 차단
 
 ---
 

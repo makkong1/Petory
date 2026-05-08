@@ -77,21 +77,32 @@ private static String normalize(String value) {
 
 ---
 
-## 3. 인덱스 전략 — 지역별 복합 인덱스 + FULLTEXT + review_count 캐시 컬럼
+## 3. 인덱스 전략 — 지역별 복합 인덱스 + SPATIAL + FULLTEXT + review_count 캐시 컬럼
 
 ### 어필 포인트
 
+#### locationservice 테이블 인덱스 (SHOW INDEX 실측)
+
+**SPATIAL 인덱스** (R-Tree):
+
+| 인덱스명 | 타입 | 컬럼 | 용도 |
+|---------|------|------|------|
+| `idx_locationservice_location_spatial` | SPATIAL | (location) | ST_Within 바운딩박스 1차 필터 — 공간 인덱스를 타게 해 풀스캔 방지 |
+
 **지역별 복합 인덱스** (USE INDEX 힌트로 명시 지정):
 
-| 인덱스명 | 컬럼 | 사용 쿼리 |
-|---------|------|---------|
-| `idx_locationservice_sigungu_deleted_rating` | (sigungu, is_deleted, rating DESC) | `findBySigungu` |
-| `idx_locationservice_sido_deleted_rating` | (sido, is_deleted, rating DESC) | `findBySido` |
-| `idx_locationservice_eupmyeondong_deleted_rating` | (eupmyeondong, is_deleted, rating DESC) | `findByEupmyeondong` |
-| `idx_road_name_deleted_rating` | (road_name, is_deleted, rating DESC) | `findByRoadName` |
+| 인덱스명 | 타입 | 컬럼 | 사용 쿼리 |
+|---------|------|------|---------|
+| `idx_locationservice_sido_deleted_rating` | BTREE | (sido, is_deleted, rating) | `findBySido` |
+| `idx_locationservice_sigungu_deleted_rating` | BTREE | (sigungu, is_deleted, rating) | `findBySigungu` |
+| `idx_locationservice_eupmyeondong_deleted_rating` | BTREE | (eupmyeondong, is_deleted, rating) | `findByEupmyeondong` |
+| `idx_road_name_deleted_rating` | BTREE | (road_name, is_deleted, rating) | `findByRoadName` |
+| `idx_locationservice_deleted_rating` | BTREE | (is_deleted, rating) | 전체 평점순 fallback 조회 |
+| `idx_category3_deleted_rating` | BTREE | (category3, is_deleted, rating) | 카테고리별 필터 조회 |
+| `idx_name_address` | BTREE | (name, address) | 이름·주소 복합 조회 |
 
-- 각 쿼리에서 `USE INDEX` 힌트로 옵티마이저가 다른 인덱스를 선택하지 않도록 강제한다.
-- `rating DESC`를 인덱스에 포함시켜 정렬을 위한 별도 정렬 연산을 제거했다.
+- 각 지역 쿼리에서 `USE INDEX` 힌트로 옵티마이저가 다른 인덱스를 선택하지 않도록 강제한다.
+- `rating`을 인덱스에 포함시켜 `ORDER BY rating DESC` 를 인덱스 순회만으로 처리한다.
 - 중복 인덱스 제거: `idx_lat_lng`(latitude, longitude)는 공간 인덱스와 중복·미사용으로 삭제, `idx_address_detail`도 `idx_name_address`에 커버되어 삭제했다.
 
 **FULLTEXT 인덱스**:
@@ -104,6 +115,17 @@ AGAINST(CONCAT(:keyword, '*') IN BOOLEAN MODE)
 - 위치·지역 없이 keyword만 있는 fallback 경로에서만 사용한다.
 - Boolean Mode + 접두사 와일드카드(`*`)로 부분 일치 검색을 지원한다.
 
+#### locationservicereview 테이블 인덱스 (SHOW INDEX 실측)
+
+| 인덱스명 | 타입 | 컬럼 | 비고 |
+|---------|------|------|------|
+| `idx_locationservicereview_service_deleted` | BTREE | (service_idx, is_deleted) | Soft Delete 포함 서비스별 조회 |
+| `idx_locationservicereview_user_deleted` | BTREE | (user_idx, is_deleted) | Soft Delete 포함 사용자별 조회 |
+| `service_idx` | BTREE | (service_idx) | **레거시/중복** — 복합 인덱스 `idx_locationservicereview_service_deleted`에 커버됨 |
+| `user_idx` | BTREE | (user_idx) | **레거시/중복** — 복합 인덱스 `idx_locationservicereview_user_deleted`에 커버됨 |
+
+- `service_idx`, `user_idx` 단일 인덱스는 각각 복합 인덱스의 선두 컬럼으로 커버되므로 실질적으로 중복이다. 향후 DROP INDEX로 정리 가능하다.
+
 **review_count 캐시 컬럼**:
 ```sql
 ALTER TABLE locationservice
@@ -115,7 +137,7 @@ ALTER TABLE locationservice
 
 ### 말할 내용
 
-> "지역 검색 쿼리에는 (sigungu, is_deleted, rating DESC) 같은 복합 인덱스를 만들고 USE INDEX 힌트를 명시했습니다. 옵티마이저가 다른 인덱스를 잘못 선택하는 경우가 있어서입니다. rating을 인덱스에 포함시킨 건 ORDER BY rating DESC를 인덱스로 처리하기 위해서입니다. 또 반경 검색에서 reviews 정렬이 필요한데, 서브쿼리로 리뷰 수를 매번 세는 건 후보 행마다 비용이 반복돼서 review_count 캐시 컬럼을 추가했습니다."
+> "공간 인덱스(`idx_locationservice_location_spatial`)는 SPATIAL 타입 R-Tree 인덱스로, `ST_Within` 바운딩박스 1차 필터에서 활용합니다. `ST_Distance_Sphere`만 단독으로 쓰면 공간 인덱스를 타지 않아 풀스캔이 발생합니다. 지역 검색 쿼리에는 (sigungu, is_deleted, rating) 같은 복합 인덱스를 만들고 USE INDEX 힌트를 명시했습니다. rating을 인덱스에 포함시킨 건 ORDER BY rating DESC를 인덱스 순회만으로 처리하기 위해서입니다. 또 반경 검색에서 reviews 정렬이 필요한데, 서브쿼리로 리뷰 수를 매번 세는 건 후보 행마다 비용이 반복돼서 review_count 캐시 컬럼을 추가했습니다. locationservicereview 테이블에는 (service_idx, is_deleted), (user_idx, is_deleted) 복합 인덱스가 있는데, 단일 인덱스 service_idx·user_idx는 복합 인덱스에 커버되는 중복 인덱스입니다."
 
 ---
 

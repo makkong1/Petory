@@ -64,43 +64,72 @@ List<Object[]> countByBoardsGroupByReactionType(@Param("boardIds") List<Long> bo
 
 **board 테이블**
 ```sql
+-- 복합 인덱스: 카테고리별 삭제 여부 + 생성일 정렬
 CREATE INDEX idx_board_category_deleted_created ON board(category, is_deleted, created_at);
+-- 생성일 내림차순 정렬 전용
+CREATE INDEX idx_board_created_at_desc ON board(created_at);
+-- 삭제 여부 + 생성일 (카테고리 미지정 목록 조회)
 CREATE INDEX idx_board_deleted_created ON board(is_deleted, created_at);
-CREATE INDEX idx_board_user_deleted_created ON board(user_idx, is_deleted, created_at);
+-- 상태 필터링
 CREATE INDEX idx_board_status ON board(status);
+-- 제목·본문 FULLTEXT 검색 (ngram 파서, 한글 지원)
 CREATE FULLTEXT INDEX idx_board_title_content ON board(title, content) WITH PARSER ngram;
+-- 사용자별 게시글 + 삭제 여부 + 생성일
+CREATE INDEX idx_board_user_deleted_created ON board(user_idx, is_deleted, created_at);
+```
+
+**board_popularity_snapshot 테이블**
+```sql
+-- 게시글별 스냅샷 조회
+CREATE INDEX idx_snapshot_board_id ON board_popularity_snapshot(board_id);
+-- 기간 범위 조회
+CREATE INDEX idx_snapshot_range ON board_popularity_snapshot(period_type, period_start_date, period_end_date);
+-- 최신 스냅샷 + 랭킹 조회
+CREATE INDEX idx_snapshot_recent ON board_popularity_snapshot(period_type, period_end_date, ranking);
 ```
 
 **board_reaction 테이블**
 ```sql
-CREATE UNIQUE INDEX uk_board_reaction ON board_reaction(board_idx, user_idx);
-CREATE INDEX idx_board_reaction_board_type ON board_reaction(board_idx, reaction_type);
+-- 사용자 FK 인덱스 (FKag3ixpa53bjp1p5s79myoscpr)
+CREATE INDEX FKag3ixpa53bjp1p5s79myoscpr ON board_reaction(user_idx);
+-- 게시글+사용자 중복 방지 Unique (UKaymqx4hghgrqitkbplgp553u0)
+CREATE UNIQUE INDEX UKaymqx4hghgrqitkbplgp553u0 ON board_reaction(board_idx, user_idx);
 ```
 
 **board_view_log 테이블**
 ```sql
+-- 사용자 FK 인덱스 (FKemjj96yrflacv5mtek2nipy22)
+CREATE INDEX FKemjj96yrflacv5mtek2nipy22 ON board_view_log(user_id);
+-- 게시글+사용자 중복 방지 Unique
 CREATE UNIQUE INDEX uk_board_view_log_board_user ON board_view_log(board_id, user_id);
 ```
 
 **comment 테이블**
 ```sql
-CREATE INDEX idx_comment_board_deleted_created ON comment(board_idx, is_deleted, created_at ASC);
-CREATE UNIQUE INDEX uk_comment_reaction ON comment_reaction(comment_idx, user_idx);
+-- 게시글별 댓글 조회 FK 인덱스
+CREATE INDEX board_idx ON comment(board_idx);
+-- 댓글 상태 필터링
+CREATE INDEX idx_comment_status ON comment(status);
+-- 사용자별 댓글 조회 FK 인덱스
+CREATE INDEX user_idx ON comment(user_idx);
 ```
 
-**board_popularity_snapshot 테이블**
+**comment_reaction 테이블**
 ```sql
-CREATE INDEX idx_snapshot_range ON board_popularity_snapshot(period_type, period_start_date, period_end_date);
-CREATE INDEX idx_snapshot_recent ON board_popularity_snapshot(period_type, period_end_date, ranking);
+-- 사용자 FK 인덱스 (FK24cjwe1ksjmeujkgoa6f2pya)
+CREATE INDEX FK24cjwe1ksjmeujkgoa6f2pya ON comment_reaction(user_idx);
+-- 댓글+사용자 중복 방지 Unique (UKbes4ghhrkss5cdpx28ugh86gh)
+CREATE UNIQUE INDEX UKbes4ghhrkss5cdpx28ugh86gh ON comment_reaction(comment_idx, user_idx);
 ```
 
 **설계 근거**
-- **복합 인덱스 순서**: 카디널리티 높은 것 → 낮은 것 (category, is_deleted, created_at)
+- **복합 인덱스 순서**: 등치 조건(category, is_deleted) 먼저, 범위·정렬(created_at) 마지막
 - **Unique 제약조건**: board_reaction, board_view_log, comment_reaction — 중복 방지 + 조회 성능
-- **FULLTEXT ngram**: LIKE 검색 대비 10배 이상 성능, 한글 형태소 분석
+- **FULLTEXT ngram**: LIKE 검색 대비 고성능, 한글 n-gram 분할로 형태소 분석 없이 부분 검색 지원
+- **board_reaction**: `(board_idx, reaction_type)` 복합 인덱스는 실제 미존재 — GROUP BY 배치 쿼리는 `UKaymqx4hghgrqitkbplgp553u0(board_idx, user_idx)` Unique 인덱스를 활용
 
 ### 말할 내용
-> "배치 IN 조회 성능을 위해 `(board_idx, reaction_type)` 복합 인덱스를 설계했습니다. WHERE board_idx IN (…) GROUP BY board_idx, reaction_type 쿼리가 인덱스를 풀로 활용합니다. 또한 `board_reaction`과 `board_view_log`에 Unique 제약조건을 걸어 중복 저장을 DB 레벨에서 차단하고, 이를 인덱스로도 활용합니다."
+> "`board_reaction`에는 `(board_idx, user_idx)` Unique 제약조건(UKaymqx4hghgrqitkbplgp553u0)이 있어 중복 저장을 DB 레벨에서 차단하고, 배치 집계 쿼리(WHERE board_idx IN … GROUP BY board_idx, reaction_type)도 이 인덱스를 통해 빠르게 처리됩니다. `board_view_log`의 `uk_board_view_log_board_user`도 같은 방식입니다. `board` 테이블에는 조회 패턴에 따라 복합 인덱스를 3개로 나눠 설계했으며, 등치 조건 컬럼을 앞에 두고 범위·정렬 컬럼을 뒤에 두는 순서를 지켰습니다."
 
 ---
 
