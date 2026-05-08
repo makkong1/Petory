@@ -597,8 +597,6 @@ const SidebarNotificationDropdown = styled.div`
     left: 8px;
     right: 8px;
     width: auto;
-    top: 56px;
-    border-radius: ${props => props.theme.borderRadius?.lg || '8px'};
   }
 `;
 
