@@ -592,6 +592,12 @@ const SidebarNotificationDropdown = styled.div`
   flex-direction: column;
   overflow: hidden;
   animation: ${slideInDown} 0.2s ease-out;
+
+  @media (max-width: 768px) {
+    left: 8px;
+    right: 8px;
+    width: auto;
+  }
 `;
 
 const Divider = styled.div`
@@ -726,7 +732,8 @@ const BottomNav = styled.nav`
     bottom: 0;
     left: 0;
     right: 0;
-    height: 60px;
+    height: calc(60px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
     background: ${props => props.theme.colors.surface};
     border-top: 1px solid ${props => props.theme.colors.border};
     z-index: 100;

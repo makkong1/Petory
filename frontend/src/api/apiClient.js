@@ -7,8 +7,11 @@ import {
   removeAllTokens,
 } from './tokenStorage';
 
-/** 백엔드 API 루트 (환경변수 없으면 로컬) */
-export const API_ROOT = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8080/api';
+/** 백엔드 API 루트
+ *  - 개발 웹:    REACT_APP_API_BASE_URL 없으면 프록시(/api) 사용
+ *  - Capacitor:  반드시 REACT_APP_API_BASE_URL=https://your-server.com/api 설정 필요
+ */
+export const API_ROOT = process.env.REACT_APP_API_BASE_URL || '/api';
 
 let isRefreshing = false;
 let failedQueue = [];

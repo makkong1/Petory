@@ -21,17 +21,20 @@ const SpinnerIcon = styled.span`
 // ── Size 스타일 ───────────────────────────────────────────────
 const sizeStyles = {
   sm: css`
-    padding: 8px 16px;
+    padding: 10px 16px;
+    min-height: 36px;
     font-size: ${({ theme }) => theme.typography.body2.fontSize};
     gap: 4px;
   `,
   md: css`
-    padding: 10px 20px;
+    padding: 12px 20px;
+    min-height: 44px;
     font-size: ${({ theme }) => theme.typography.body1.fontSize};
     gap: 6px;
   `,
   lg: css`
-    padding: 12px 24px;
+    padding: 14px 24px;
+    min-height: 48px;
     font-size: ${({ theme }) => theme.typography.body1.fontSize};
     gap: 8px;
   `,

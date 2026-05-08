@@ -4,7 +4,8 @@ import styled, { css } from 'styled-components';
 // ── 기본 Input 스타일 ─────────────────────────────────────────
 const baseInputStyles = css`
   width: 100%;
-  padding: 10px 14px;
+  padding: 12px 14px;
+  min-height: 44px;
   font-size: ${({ theme }) => theme.typography.body1.fontSize};
   line-height: ${({ theme }) => theme.typography.lineHeight.normal};
   border-radius: ${({ theme }) => theme.borderRadius.md};
