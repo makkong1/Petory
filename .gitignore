@@ -70,3 +70,10 @@ nginx/ssl/
 **/.DS_Store
 # Worktrees
 .worktrees/
+
+# =====================
+# Capacitor / Android
+# =====================
+android/.gradle/
+android/app/build/
+/node_modules/

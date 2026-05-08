@@ -1,0 +1,33 @@
+{
+  "name": "petory",
+  "version": "1.0.0",
+  "description": "> **데이터 기반의 반려동물 케어 & 커뮤니티 통합 플랫폼**",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/makkong1/Petory.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/makkong1/Petory/issues"
+  },
+  "homepage": "https://github.com/makkong1/Petory#readme",
+  "devDependencies": {
+    "@capacitor/cli": "^8.3.2",
+    "typescript": "^6.0.3"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.3.2",
+    "@capacitor/core": "^8.3.2",
+    "@capacitor/preferences": "^8.0.1"
+  }
+}
