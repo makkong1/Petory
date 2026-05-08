@@ -108,6 +108,11 @@ public class SecurityConfig {
     public org.springframework.web.cors.CorsConfigurationSource corsConfigurationSource() {
         org.springframework.web.cors.CorsConfiguration configuration = new org.springframework.web.cors.CorsConfiguration();
         configuration.setAllowedOriginPatterns(java.util.Arrays.asList("*")); // 모든 origin 허용
+        // TODO(운영): 아래 주석 해제 후 위 줄 제거
+        // configuration.setAllowedOriginPatterns(java.util.Arrays.asList(
+        //     "https://your-domain.com",
+        //     "https://www.your-domain.com"
+        // ));
         configuration.setAllowedMethods(java.util.Arrays.asList("*")); // 모든 HTTP 메서드 허용
         configuration.setAllowedHeaders(java.util.Arrays.asList("*")); // 모든 헤더 허용
         configuration.setAllowCredentials(true); // 인증 정보 허용
