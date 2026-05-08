@@ -22,7 +22,6 @@ import com.linkup.Petory.domain.care.entity.CareApplicationStatus;
 import com.linkup.Petory.domain.care.entity.CareRequest;
 import com.linkup.Petory.domain.care.entity.CareRequestStatus;
 import com.linkup.Petory.domain.care.exception.CareForbiddenException;
-import com.linkup.Petory.domain.care.exception.CarePaymentException;
 import com.linkup.Petory.domain.care.exception.CareRequestNotFoundException;
 import com.linkup.Petory.domain.care.exception.CareValidationException;
 import com.linkup.Petory.domain.care.repository.CareRequestRepository;
@@ -316,19 +315,13 @@ public class CareRequestService {
 
         // 상태가 COMPLETED로 변경될 때 에스크로에서 제공자에게 코인 지급
         if (oldStatus != CareRequestStatus.COMPLETED && newStatus == CareRequestStatus.COMPLETED) {
-            // 비관적 락으로 에스크로 조회 (동시 요청 시 중복 지급 방지)
-            PetCoinEscrow escrow = petCoinEscrowService.findByCareRequestForUpdate(request);
+            // 비관적 락은 releaseToProvider() 내부에서만 수행 — 여기서 이중 락 잡으면 같은 TX 내에서
+            // rollback-only 마킹 타이밍 충돌로 UnexpectedRollbackException 발생
+            PetCoinEscrow escrow = petCoinEscrowService.findByCareRequest(request);
             if (escrow != null && escrow.getStatus() == EscrowStatus.HOLD) {
-                try {
-                    petCoinEscrowService.releaseToProvider(escrow);
-                    log.info("거래 완료 시 제공자에게 코인 지급 완료: careRequestIdx={}, escrowIdx={}, amount={}",
-                            request.getIdx(), escrow.getIdx(), escrow.getAmount());
-                } catch (Exception e) {
-                    log.error("거래 완료 시 제공자에게 코인 지급 실패: careRequestIdx={}, error={}",
-                            request.getIdx(), e.getMessage(), e);
-                    // 코인 지급 실패 시 상태 변경 롤백
-                    throw CarePaymentException.paymentFailed(e);
-                }
+                petCoinEscrowService.releaseToProvider(escrow);
+                log.info("거래 완료 시 제공자에게 코인 지급 완료: careRequestIdx={}, escrowIdx={}, amount={}",
+                        request.getIdx(), escrow.getIdx(), escrow.getAmount());
             } else {
                 log.warn("에스크로를 찾을 수 없거나 이미 처리됨: careRequestIdx={}", request.getIdx());
             }
@@ -336,19 +329,11 @@ public class CareRequestService {
 
         // 상태가 CANCELLED로 변경될 때 에스크로에서 요청자에게 코인 환불
         if (newStatus == CareRequestStatus.CANCELLED) {
-            // 비관적 락으로 에스크로 조회 (동시 요청 시 중복 환불 방지)
-            PetCoinEscrow escrow = petCoinEscrowService.findByCareRequestForUpdate(request);
+            PetCoinEscrow escrow = petCoinEscrowService.findByCareRequest(request);
             if (escrow != null && escrow.getStatus() == EscrowStatus.HOLD) {
-                try {
-                    petCoinEscrowService.refundToRequester(escrow);
-                    log.info("거래 취소 시 요청자에게 코인 환불 완료: careRequestIdx={}, escrowIdx={}, amount={}",
-                            request.getIdx(), escrow.getIdx(), escrow.getAmount());
-                } catch (Exception e) {
-                    log.error("거래 취소 시 요청자에게 코인 환불 실패: careRequestIdx={}, error={}",
-                            request.getIdx(), e.getMessage(), e);
-                    // 환불 실패 시 상태 변경 롤백
-                    throw CarePaymentException.refundFailed(e);
-                }
+                petCoinEscrowService.refundToRequester(escrow);
+                log.info("거래 취소 시 요청자에게 코인 환불 완료: careRequestIdx={}, escrowIdx={}, amount={}",
+                        request.getIdx(), escrow.getIdx(), escrow.getAmount());
             } else {
                 log.warn("에스크로를 찾을 수 없거나 이미 처리됨: careRequestIdx={}", request.getIdx());
             }
