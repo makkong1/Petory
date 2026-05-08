@@ -275,8 +275,8 @@ const ContentArea = styled.main`
 
   @media (max-width: 768px) {
     margin-top: 0;
-    padding-bottom: 60px;
-    min-height: calc(100vh - 60px);
+    padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px));
+    min-height: 100dvh;
   }
 `;
 
