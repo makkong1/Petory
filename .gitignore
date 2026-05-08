@@ -79,3 +79,11 @@ android/.gradle/
 android/app/build/
 android/local.properties
 /node_modules/
+
+# =====================
+# Capacitor / iOS
+# =====================
+ios/.DS_Store
+ios/App/Pods/
+ios/App/App/public/
+ios/.build/
