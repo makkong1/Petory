@@ -12,7 +12,6 @@ const DOMAIN_BADGE_MAP = {
 
 const ConversationItem = ({ conversation, onClick }) => {
   const {
-    idx,
     conversationType,
     title,
     lastMessagePreview,

@@ -11,6 +11,10 @@
     {
       "dir": "map-layout-redesign",
       "status": "pending"
+    },
+    {
+      "dir": "meetup-db-fixes",
+      "status": "pending"
     }
   ]
 }

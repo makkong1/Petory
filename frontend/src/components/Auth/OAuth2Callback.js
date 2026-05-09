@@ -8,7 +8,6 @@ const OAuth2Callback = () => {
   const { updateUserProfile } = useAuth();
   const [status, setStatus] = useState('processing'); // 'processing', 'success', 'error', 'nickname-setup'
   const [message, setMessage] = useState('로그인 처리 중...');
-  const [needsNickname, setNeedsNickname] = useState(false);
 
   useEffect(() => {
     const handleCallback = async () => {
@@ -38,7 +37,6 @@ const OAuth2Callback = () => {
 
           // 닉네임 설정이 필요한지 확인
           if (needsNicknameParam === 'true') {
-            setNeedsNickname(true);
             setStatus('nickname-setup');
             return;
           }
@@ -49,7 +47,6 @@ const OAuth2Callback = () => {
             if (response.valid && response.user) {
               // 닉네임이 없으면 닉네임 설정 페이지로
               if (!response.user.nickname || response.user.nickname.trim().length === 0) {
-                setNeedsNickname(true);
                 setStatus('nickname-setup');
                 return;
               }

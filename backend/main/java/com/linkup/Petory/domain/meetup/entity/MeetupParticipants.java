@@ -1,13 +1,24 @@
 package com.linkup.Petory.domain.meetup.entity;
 
-import jakarta.persistence.*;
-import lombok.*;
 import java.time.LocalDateTime;
 
 import com.linkup.Petory.domain.user.entity.Users;
 
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Id;
+import jakarta.persistence.IdClass;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PrePersist;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
 @Entity
-@Table(name = "meetupparticipants")
 @IdClass(MeetupParticipantsId.class)
 @Getter
 @Setter
@@ -17,12 +28,12 @@ import com.linkup.Petory.domain.user.entity.Users;
 public class MeetupParticipants {
 
     @Id
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "meetup_idx", nullable = false)
     private Meetup meetup;
 
     @Id
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_idx", nullable = false)
     private Users user;
 

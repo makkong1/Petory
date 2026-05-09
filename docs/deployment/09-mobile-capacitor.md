@@ -28,12 +28,12 @@ capacitor.config.ts    ← Capacitor 공통 설정
 
 ## 환경 설정 파일 (민감 정보 — gitignore)
 
-| 파일 | 용도 | 위치 |
-|------|------|------|
-| `firebase-service-account.json` | 백엔드 FCM 발송 인증 | `backend/main/resources/` |
-| `google-services.json` | Android Firebase 연동 | `android/app/` |
-| `GoogleService-Info.plist` | iOS Firebase 연동 | `ios/App/App/` |
-| `frontend/.env.capacitor` | Capacitor 빌드용 환경변수 | `frontend/` |
+| 파일                            | 용도                      | 위치                      |
+| ------------------------------- | ------------------------- | ------------------------- |
+| `firebase-service-account.json` | 백엔드 FCM 발송 인증      | `backend/main/resources/` |
+| `google-services.json`          | Android Firebase 연동     | `android/app/`            |
+| `GoogleService-Info.plist`      | iOS Firebase 연동         | `ios/App/App/`            |
+| `frontend/.env.capacitor`       | Capacitor 빌드용 환경변수 | `frontend/`               |
 
 > **절대 git에 커밋하면 안 됨.** 모두 `.gitignore`에 등록되어 있음.
 
@@ -57,14 +57,14 @@ capacitor.config.ts    ← Capacitor 공통 설정
 
 ### 관련 코드
 
-| 역할 | 파일 |
-|------|------|
-| Firebase 초기화 | `global/config/FirebaseConfig.java` |
-| FCM 토큰 저장/발송 | `domain/notification/service/FcmService.java` |
-| 알림 생성 훅 | `domain/notification/service/NotificationService.java` |
-| 토큰 등록 API | `domain/notification/controller/FcmTokenController.java` |
-| 프론트 FCM 초기화 | `frontend/src/api/pushNotifications.js` |
-| iOS AppDelegate | `ios/App/App/AppDelegate.swift` |
+| 역할               | 파일                                                     |
+| ------------------ | -------------------------------------------------------- |
+| Firebase 초기화    | `global/config/FirebaseConfig.java`                      |
+| FCM 토큰 저장/발송 | `domain/notification/service/FcmService.java`            |
+| 알림 생성 훅       | `domain/notification/service/NotificationService.java`   |
+| 토큰 등록 API      | `domain/notification/controller/FcmTokenController.java` |
+| 프론트 FCM 초기화  | `frontend/src/api/pushNotifications.js`                  |
+| iOS AppDelegate    | `ios/App/App/AppDelegate.swift`                          |
 
 ### API 엔드포인트
 
@@ -85,7 +85,11 @@ cd frontend && npm run build && cd ..
 
 # 2. 네이티브 프로젝트에 동기화
 npx cap sync android   # Android
-npx cap sync ios       # iOS
+ # 2. 동기화 (루트에서)
+  npm run cap:sync:ios
+
+  # 3. Xcode 열기 (루트에서)
+  npm run cap:open:ios
 ```
 
 ### Android 실행
@@ -150,9 +154,9 @@ server: {
 
 ## 알려진 한계 (후속 작업)
 
-| 항목 | 내용 |
-|------|------|
-| iOS APNs | Apple Developer 계정 + APNs 키 등록 필요 |
-| API URL 하드코딩 | `chatApi.js` 등 일부 모듈이 `http://localhost:8080` 직접 참조 — `API_ROOT` 로 마이그레이션 필요 |
-| SSE 알림 | 앱 백그라운드 시 SSE 연결 끊김 — FCM으로 대체됨 |
-| Play Store / App Store 배포 | 서명 키, 개발자 계정 별도 필요 |
+| 항목                        | 내용                                                                                            |
+| --------------------------- | ----------------------------------------------------------------------------------------------- |
+| iOS APNs                    | Apple Developer 계정 + APNs 키 등록 필요                                                        |
+| API URL 하드코딩            | `chatApi.js` 등 일부 모듈이 `http://localhost:8080` 직접 참조 — `API_ROOT` 로 마이그레이션 필요 |
+| SSE 알림                    | 앱 백그라운드 시 SSE 연결 끊김 — FCM으로 대체됨                                                 |
+| Play Store / App Store 배포 | 서명 키, 개발자 계정 별도 필요                                                                  |

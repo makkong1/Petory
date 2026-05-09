@@ -21,6 +21,7 @@ const PetCoinTransactionDetailModal = ({ transactionId, onClose }) => {
       fetchDetail();
     }
     return () => {};
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transactionId]);
 
   const fetchDetail = async () => {
@@ -62,7 +63,7 @@ const PetCoinTransactionDetailModal = ({ transactionId, onClose }) => {
 
   const getCounterpartyDescription = () => {
     if (!detail) return null;
-    const { transactionType, counterpartyUsername, amount, relatedTitle } = detail;
+    const { transactionType, counterpartyUsername, amount } = detail;
     if (!counterpartyUsername) return null;
 
     switch (transactionType) {

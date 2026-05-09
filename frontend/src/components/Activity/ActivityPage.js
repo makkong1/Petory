@@ -9,9 +9,8 @@ const ActivityPage = () => {
   
   // 서버 사이드 페이징 상태
   const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(20);
+  const [pageSize] = useState(20);
   const [totalCount, setTotalCount] = useState(0);
-  const [hasNext, setHasNext] = useState(false);
   
   // Map + Array 조합: Map으로 빠른 조회/업데이트, Array로 순서 유지
   const [activitiesData, setActivitiesData] = useState({ map: {}, order: [] });
@@ -47,30 +46,12 @@ const ActivityPage = () => {
     return { map, order };
   }, []);
 
-  // 게시글 추가 (중복 체크 포함)
-  const addActivitiesToMap = useCallback((existingData, newActivities) => {
-    const map = { ...existingData.map };
-    const order = [...existingData.order];
-    newActivities.forEach(activity => {
-      if (activity?.idx) {
-        const key = `${activity.type}-${activity.idx}`;
-        if (!map[key]) {
-          map[key] = activity;
-          order.push(key);
-        } else {
-          // 이미 있으면 업데이트
-          map[key] = activity;
-        }
-      }
-    });
-    return { map, order };
-  }, []);
-
   // 필터 변경 시 첫 페이지부터 다시 로드
   useEffect(() => {
     if (user && user.idx) {
       fetchActivities(0);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, activeFilter]);
 
   const fetchActivities = useCallback(async (pageNum = 0) => {
@@ -97,7 +78,6 @@ const ActivityPage = () => {
       setActivitiesData(newData);
 
       setTotalCount(pageData.totalCount || 0);
-      setHasNext(pageData.hasNext || false);
       setPage(pageNum);
       
       // 필터별 개수 업데이트

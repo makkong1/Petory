@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { useAuth } from '../../contexts/AuthContext';
 import { userProfileApi, petApiClient } from '../../api/userApi';
@@ -41,10 +41,6 @@ const UserProfileModal = ({ isOpen, userId, onClose, onUpdated }) => {
   });
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(null);
-  const [datePickerPosition, setDatePickerPosition] = useState({ top: 0, left: 0 });
-  const datePickerButtonRef = useRef(null);
 
   const isMyProfile = user && (user.idx === userId || user.id === userId);
 
@@ -60,6 +56,7 @@ const UserProfileModal = ({ isOpen, userId, onClose, onUpdated }) => {
       setIsEditMode(false);
       setPets([]);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, userId, isMyProfile]);
 
   const fetchProfile = async () => {

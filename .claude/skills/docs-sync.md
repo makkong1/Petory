@@ -92,8 +92,11 @@ docs/
 ```
 
 #### 리팩토링 문서 (`docs/refactoring/`)
+
+파일명에 날짜를 포함한다: `{제목}-YYYY-MM-DD.md` (오늘 날짜 기준)
+
 ```markdown
-# {제목}
+# {제목} — YYYY-MM-DD
 
 ## 문제
 ## 원인

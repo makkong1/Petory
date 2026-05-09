@@ -70,7 +70,7 @@ function AppContent() {
   // 전역 이메일 인증 필요 이벤트 리스너 (서버 예외 발생 시 백업용)
   useEffect(() => {
     const handleEmailVerificationRequired = (event) => {
-      const { purpose, currentUrl } = event.detail;
+      const { purpose } = event.detail;
       setEmailVerificationPurpose(purpose);
       setShowGlobalEmailVerificationPrompt(true);
     };
@@ -105,7 +105,7 @@ function AppContent() {
   }, []);
 
   // OAuth2 콜백 페이지 체크 (useState로 관리)
-  const [isOAuth2Callback, setIsOAuth2Callback] = useState(() => {
+  const [isOAuth2Callback] = useState(() => {
     if (typeof window === 'undefined') return false;
     const urlParams = new URLSearchParams(window.location.search);
     return window.location.pathname.includes('oauth2/callback') ||
@@ -114,7 +114,7 @@ function AppContent() {
   });
 
   // 이메일 인증 페이지 체크
-  const [isEmailVerificationPage, setIsEmailVerificationPage] = useState(() => {
+  const [isEmailVerificationPage] = useState(() => {
     if (typeof window === 'undefined') return false;
     const urlParams = new URLSearchParams(window.location.search);
     return window.location.pathname.includes('email-verification') ||

@@ -1,15 +1,34 @@
 package com.linkup.Petory.domain.meetup.entity;
 
-import com.linkup.Petory.domain.common.BaseTimeEntity;
-import com.linkup.Petory.domain.user.entity.Users;
-import jakarta.persistence.*;
-import org.hibernate.annotations.BatchSize;
-import lombok.*;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import org.hibernate.annotations.BatchSize;
+
+import com.linkup.Petory.domain.common.BaseTimeEntity;
+import com.linkup.Petory.domain.user.entity.Users;
+
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.Lob;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.PrePersist;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
 @Entity
-@Table(name = "meetup")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -36,7 +55,7 @@ public class Meetup extends BaseTimeEntity {
     @Column(nullable = false)
     private LocalDateTime date; // 모임 일시
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "organizer_idx", nullable = false)
     private Users organizer; // 모임 주최자
 
@@ -61,7 +80,7 @@ public class Meetup extends BaseTimeEntity {
     private LocalDateTime deletedAt;
 
     @OneToMany(mappedBy = "meetup", cascade = CascadeType.ALL)
-    @BatchSize(size = 50)  // 목록 조회 시 participants N+1 방지
+    @BatchSize(size = 50) // 목록 조회 시 participants N+1 방지
     private List<MeetupParticipants> participants;
 
     @PrePersist

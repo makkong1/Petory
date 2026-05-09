@@ -36,8 +36,8 @@ const LoginForm = ({ onSwitchToRegister }) => {
     setSuccess('');
 
     try {
-      const response = await login(formData.id, formData.password);
-      
+      await login(formData.id, formData.password);
+
       setSuccess('로그인 성공!');
       
     } catch (error) {
@@ -66,13 +66,13 @@ const LoginForm = ({ onSwitchToRegister }) => {
 
     try {
       // 비밀번호 재설정 이메일 발송
-      const response = await authApi.forgotPassword(forgotPasswordEmail);
-      
-      if (response.success) {
-        setForgotPasswordSuccess(response.message || '비밀번호 재설정 링크가 이메일로 발송되었습니다. 이메일을 확인해주세요.');
+      const forgotResponse = await authApi.forgotPassword(forgotPasswordEmail);
+
+      if (forgotResponse.success) {
+        setForgotPasswordSuccess(forgotResponse.message || '비밀번호 재설정 링크가 이메일로 발송되었습니다. 이메일을 확인해주세요.');
         setForgotPasswordEmail('');
       } else {
-        setForgotPasswordError(response.message || '비밀번호 재설정 이메일 발송에 실패했습니다.');
+        setForgotPasswordError(forgotResponse.message || '비밀번호 재설정 이메일 발송에 실패했습니다.');
       }
     } catch (error) {
       console.error('비밀번호 찾기 실패:', error);
@@ -116,12 +116,9 @@ const LoginForm = ({ onSwitchToRegister }) => {
         </InputGroup>
 
         <ForgotPasswordLink>
-          <a href="#" onClick={(e) => {
-            e.preventDefault();
-            setShowForgotPassword(true);
-          }}>
+          <button type="button" onClick={() => setShowForgotPassword(true)}>
             비밀번호 찾기
-          </a>
+          </button>
         </ForgotPasswordLink>
 
         {error && <ErrorMessage>{error}</ErrorMessage>}
@@ -164,12 +161,9 @@ const LoginForm = ({ onSwitchToRegister }) => {
 
       <LinkText>
         계정이 없으신가요?{' '}
-        <a href="#" onClick={(e) => {
-          e.preventDefault();
-          if (onSwitchToRegister) onSwitchToRegister();
-        }}>
+        <button type="button" onClick={() => { if (onSwitchToRegister) onSwitchToRegister(); }}>
           회원가입
-        </a>
+        </button>
       </LinkText>
 
       {showForgotPassword && (
