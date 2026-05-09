@@ -13,6 +13,7 @@ App/App/capacitor.config.json
 App/App/config.xml
 
 # Firebase (민감 정보 — 절대 커밋 금지)
+App/GoogleService-Info.plist
 App/App/GoogleService-Info.plist
 
 # Xcode SPM (자동 생성)
