@@ -1,7 +1,7 @@
 {
   "appId": "com.petory.app",
   "appName": "Petory",
-  "webDir": "frontend/build",
+  "webDir": "build",
   "android": {
     "allowMixedContent": false,
     "captureInput": true,

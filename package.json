@@ -3,10 +3,11 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "cap": "frontend/node_modules/.bin/cap",
-    "cap:sync:android": "frontend/node_modules/.bin/cap sync android",
-    "cap:sync:ios": "frontend/node_modules/.bin/cap sync ios",
-    "cap:open:android": "frontend/node_modules/.bin/cap open android",
-    "cap:open:ios": "frontend/node_modules/.bin/cap open ios"
+    "cap:sync:android": "cd frontend && npx cap sync android",
+    "cap:sync:ios": "cd frontend && npx cap sync ios",
+    "cap:open:android": "cd frontend && npx cap open android",
+    "cap:open:ios": "cd frontend && npx cap open ios",
+    "build:ios": "cd frontend && npm run build && npx cap sync ios",
+    "build:android": "cd frontend && npm run build && npx cap sync android"
   }
 }
