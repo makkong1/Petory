@@ -2,6 +2,8 @@ package com.linkup.Petory.domain.care.controller;
 
 import java.util.List;
 
+import jakarta.validation.Valid;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -55,7 +57,7 @@ public class CareRequestController {
 
     @PostMapping
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<CareRequestDTO> createCareRequest(@RequestBody CareRequestDTO dto) {
+    public ResponseEntity<CareRequestDTO> createCareRequest(@Valid @RequestBody CareRequestDTO dto) {
         return ResponseEntity.ok(careRequestService.createCareRequest(dto));
     }
 

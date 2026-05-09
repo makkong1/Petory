@@ -2,6 +2,8 @@ package com.linkup.Petory.domain.chat.controller;
 
 import java.util.List;
 
+import jakarta.validation.Valid;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -51,7 +53,7 @@ public class ConversationController {
      */
     @PostMapping
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ConversationDTO> createConversation(@RequestBody CreateConversationRequest request) {
+    public ResponseEntity<ConversationDTO> createConversation(@Valid @RequestBody CreateConversationRequest request) {
         ConversationType conversationType = ConversationType.valueOf(request.conversationType());
         RelatedType relatedType = request.relatedType() != null
                 ? RelatedType.valueOf(request.relatedType())

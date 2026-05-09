@@ -3,6 +3,10 @@ package com.linkup.Petory.domain.care.dto;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+
 import com.linkup.Petory.domain.user.dto.PetDTO;
 
 import lombok.Data;
@@ -16,10 +20,10 @@ import lombok.Builder;
 @Builder
 public class CareRequestDTO {
     private Long idx;
-    private String title;
-    private String description;
-    private LocalDateTime date;
-    private Integer offeredCoins; // 제시한 코인 가격
+    @NotBlank private String title;
+    @NotBlank private String description;
+    @NotNull private LocalDateTime date;
+    @NotNull @Min(1) private Integer offeredCoins;
     private String status; // OPEN, IN_PROGRESS, COMPLETED, CANCELLED
     private LocalDateTime createdAt;
     private Boolean deleted;

@@ -1,5 +1,7 @@
 package com.linkup.Petory.domain.payment.controller;
 
+import jakarta.validation.Valid;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
@@ -20,7 +22,6 @@ import com.linkup.Petory.domain.payment.dto.PetCoinChargeRequest;
 import com.linkup.Petory.domain.payment.dto.PetCoinTransactionDTO;
 import com.linkup.Petory.domain.payment.dto.PetCoinTransactionDetailDTO;
 import com.linkup.Petory.domain.payment.entity.PetCoinTransaction;
-import com.linkup.Petory.domain.payment.exception.PaymentValidationException;
 import com.linkup.Petory.domain.payment.repository.PetCoinTransactionRepository;
 import com.linkup.Petory.domain.payment.service.PetCoinService;
 import com.linkup.Petory.domain.user.entity.Users;
@@ -93,12 +94,8 @@ public class PetCoinController {
         @PostMapping("/charge")
         @PreAuthorize("isAuthenticated()")
         public ResponseEntity<PetCoinTransactionDTO> chargeCoins(
-                        @RequestBody PetCoinChargeRequest request) {
+                        @Valid @RequestBody PetCoinChargeRequest request) {
                 Users user = getCurrentUser();
-
-                if (request.amount() == null || request.amount() <= 0) {
-                        throw PaymentValidationException.chargeAmountInvalid();
-                }
 
                 PetCoinTransaction transaction = petCoinService.chargeCoins(
                                 user,

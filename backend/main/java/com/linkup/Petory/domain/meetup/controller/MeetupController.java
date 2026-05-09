@@ -12,6 +12,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.Sort;
+import jakarta.validation.Valid;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -32,7 +34,7 @@ public class MeetupController {
     // 모임 생성
     @PostMapping
     public ResponseEntity<Map<String, Object>> createMeetup(
-            @RequestBody MeetupDTO meetupDTO,
+            @Valid @RequestBody MeetupDTO meetupDTO,
             Authentication authentication) {
         String userId = authentication != null ? authentication.getName() : null;
         if (userId == null) {

@@ -1,5 +1,8 @@
 package com.linkup.Petory.domain.chat.dto;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
+
 import java.util.List;
 
 /**
@@ -7,9 +10,9 @@ import java.util.List;
  * - 불변 객체로 요청 데이터의 의도치 않은 변경 방지
  */
 public record CreateConversationRequest(
-        String conversationType, // DIRECT, GROUP, CARE_REQUEST, etc.
-        String relatedType, // CARE_APPLICATION, MEETUP, etc.
+        @NotBlank String conversationType,
+        String relatedType,
         Long relatedIdx,
-        String title, // 그룹 채팅용
-        List<Long> participantUserIds) {
+        String title,
+        @NotEmpty List<Long> participantUserIds) {
 }

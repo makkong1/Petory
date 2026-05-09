@@ -5,6 +5,8 @@ import com.linkup.Petory.domain.location.service.LocationServiceReviewService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import jakarta.validation.Valid;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -37,7 +39,7 @@ public class LocationServiceReviewController {
 
     // 리뷰 생성
     @PostMapping
-    public ResponseEntity<Map<String, Object>> createReview(@RequestBody LocationServiceReviewDTO reviewDTO) {
+    public ResponseEntity<Map<String, Object>> createReview(@Valid @RequestBody LocationServiceReviewDTO reviewDTO) {
         try {
             LocationServiceReviewDTO createdReview = reviewService.createReview(reviewDTO, getCurrentUserLoginId());
 
@@ -59,7 +61,7 @@ public class LocationServiceReviewController {
     // 리뷰 수정
     @PutMapping("/{reviewIdx}")
     public ResponseEntity<Map<String, Object>> updateReview(@PathVariable("reviewIdx") Long reviewIdx,
-            @RequestBody LocationServiceReviewDTO reviewDTO) {
+            @Valid @RequestBody LocationServiceReviewDTO reviewDTO) {
         try {
             LocationServiceReviewDTO updatedReview = reviewService.updateReview(reviewIdx, reviewDTO,
                     getCurrentUserLoginId());

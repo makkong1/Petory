@@ -1,5 +1,7 @@
 package com.linkup.Petory.domain.user.dto;
 
+import jakarta.validation.constraints.NotBlank;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -19,9 +21,9 @@ import java.util.List;
 @Builder
 public class PetDTO {
     private Long idx;
-    private Long userIdx; // 소유자 ID
-    private String petName;
-    private String petType; // DOG, CAT, BIRD, RABBIT, HAMSTER, ETC
+    private Long userIdx;
+    @NotBlank private String petName;
+    @NotBlank private String petType;
     private String breed;
     private String gender; // M, F, UNKNOWN
     private String age;

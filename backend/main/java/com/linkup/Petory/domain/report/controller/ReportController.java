@@ -1,5 +1,7 @@
 package com.linkup.Petory.domain.report.controller;
 
+import jakarta.validation.Valid;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -27,7 +29,7 @@ public class ReportController {
      */
     @PostMapping
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ReportDTO> createReport(@RequestBody ReportRequestDTO request) {
+    public ResponseEntity<ReportDTO> createReport(@Valid @RequestBody ReportRequestDTO request) {
         return ResponseEntity.ok(reportService.createReport(request));
     }
 }

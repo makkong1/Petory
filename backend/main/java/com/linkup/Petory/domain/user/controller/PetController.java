@@ -3,6 +3,8 @@ package com.linkup.Petory.domain.user.controller;
 import java.util.List;
 import java.util.Map;
 
+import jakarta.validation.Valid;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -61,7 +63,7 @@ public class PetController {
      * 펫 생성
      */
     @PostMapping
-    public ResponseEntity<PetDTO> createPet(@RequestBody PetDTO dto) {
+    public ResponseEntity<PetDTO> createPet(@Valid @RequestBody PetDTO dto) {
         String userId = getCurrentUserId();
         PetDTO created = petService.createPet(userId, dto);
         return ResponseEntity.ok(created);

@@ -1,5 +1,7 @@
 package com.linkup.Petory.domain.payment.controller;
 
+import jakarta.validation.Valid;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
@@ -49,12 +51,9 @@ public class AdminPaymentController {
          */
         @PostMapping("/charge")
         public ResponseEntity<PetCoinTransactionDTO> chargeCoins(
-                        @RequestBody PetCoinChargeRequest request) {
+                        @Valid @RequestBody PetCoinChargeRequest request) {
                 if (request.userId() == null) {
                         throw PaymentValidationException.userIdRequired();
-                }
-                if (request.amount() == null || request.amount() <= 0) {
-                        throw PaymentValidationException.chargeAmountInvalid();
                 }
 
                 Users user = usersRepository.findById(request.userId())
