@@ -9,6 +9,7 @@ import com.google.firebase.FirebaseApp;
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.FirebaseMessagingException;
 import com.google.firebase.messaging.Message;
+import com.google.firebase.messaging.MessagingErrorCode;
 import com.google.firebase.messaging.Notification;
 import com.linkup.Petory.domain.notification.entity.FcmToken;
 import com.linkup.Petory.domain.notification.repository.FcmTokenRepository;
@@ -32,20 +33,27 @@ public class FcmService {
         Users user = usersRepository.findById(userId)
                 .orElseThrow(UserNotFoundException::new);
 
-        // 이미 존재하면 사용자 정보만 갱신 (토큰은 unique)
         fcmTokenRepository.findByToken(token).ifPresentOrElse(
-                existing -> log.debug("FCM 토큰 이미 등록됨: userId={}", userId),
+                existing -> {
+                    if (!existing.getUser().getIdx().equals(userId)) {
+                        // 다른 사용자 소유 토큰 → 기존 삭제 후 새 사용자에게 귀속
+                        fcmTokenRepository.delete(existing);
+                        fcmTokenRepository.save(FcmToken.builder()
+                                .user(user).token(token).deviceType(deviceType).build());
+                    }
+                },
                 () -> fcmTokenRepository.save(FcmToken.builder()
-                        .user(user)
-                        .token(token)
-                        .deviceType(deviceType)
-                        .build())
+                        .user(user).token(token).deviceType(deviceType).build())
         );
     }
 
     @Transactional
-    public void removeToken(String token) {
-        fcmTokenRepository.deleteByToken(token);
+    public void removeToken(Long userId, String token) {
+        fcmTokenRepository.findByToken(token).ifPresent(fcmToken -> {
+            if (fcmToken.getUser().getIdx().equals(userId)) {
+                fcmTokenRepository.delete(fcmToken);
+            }
+        });
     }
 
     @Transactional
@@ -83,9 +91,11 @@ public class FcmService {
                 FirebaseMessaging.getInstance().send(message);
                 log.debug("FCM 발송 완료: userId={}, deviceType={}", userId, fcmToken.getDeviceType());
             } catch (FirebaseMessagingException e) {
-                log.warn("FCM 발송 실패 (토큰 만료 가능): userId={}, error={}", userId, e.getMessage());
-                // 토큰이 유효하지 않으면 삭제
-                if ("UNREGISTERED".equals(e.getMessagingErrorCode().name())) {
+                log.warn("FCM 발송 실패: userId={}, error={}", userId, e.getMessage());
+                MessagingErrorCode errorCode = e.getMessagingErrorCode();
+                if (errorCode == MessagingErrorCode.UNREGISTERED
+                        || errorCode == MessagingErrorCode.INVALID_ARGUMENT
+                        || errorCode == MessagingErrorCode.SENDER_ID_MISMATCH) {
                     fcmTokenRepository.deleteByToken(fcmToken.getToken());
                 }
             }
