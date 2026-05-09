@@ -3,6 +3,8 @@ package com.linkup.Petory.domain.board.dto;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import jakarta.validation.constraints.NotBlank;
+
 import com.linkup.Petory.domain.file.dto.FileDTO;
 
 import lombok.Data;
@@ -16,9 +18,9 @@ import lombok.Builder;
 @Builder
 public class BoardDTO {
     private Long idx;
-    private String title;
-    private String content;
-    private String category;
+    @NotBlank private String title;
+    @NotBlank private String content;
+    @NotBlank private String category;
     private String status;          // ACTIVE / BLINDED / DELETED
     private LocalDateTime createdAt;
     private Boolean deleted;

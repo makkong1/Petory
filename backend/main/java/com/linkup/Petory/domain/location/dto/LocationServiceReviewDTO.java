@@ -1,5 +1,9 @@
 package com.linkup.Petory.domain.location.dto;
 
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
+
 import lombok.*;
 
 import java.time.LocalDateTime;
@@ -14,8 +18,8 @@ public class LocationServiceReviewDTO {
     private Long serviceIdx;
     private String serviceName;
     private Long userIdx;
-    private String username; // 사용자명
-    private Integer rating;
+    private String username;
+    @NotNull @Min(1) @Max(5) private Integer rating;
     private String comment;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

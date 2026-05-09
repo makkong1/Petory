@@ -178,11 +178,6 @@ public class CareRequestService {
                     EmailVerificationPurpose.PET_CARE);
         }
 
-        // 제공 코인 유효성 검증
-        if (dto.getOfferedCoins() == null || dto.getOfferedCoins() <= 0) {
-            throw CareValidationException.coinMustBePositive();
-        }
-
         // 사용자 잔액 확인
         if (user.getPetCoinBalance() < dto.getOfferedCoins()) {
             throw CareValidationException.insufficientBalance();

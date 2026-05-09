@@ -4,6 +4,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.authorization.AuthorizationDeniedException;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.async.AsyncRequestTimeoutException;
@@ -51,6 +53,21 @@ public class GlobalExceptionHandler {
         // SSE 타임아웃은 정상적인 동작이므로 DEBUG 레벨로만 로깅
         log.debug("비동기 요청 타임아웃 (SSE 연결 종료): {}", e.getMessage());
         // 응답이 이미 커밋되었을 수 있으므로 void 반환
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<Map<String, Object>> handleValidationException(MethodArgumentNotValidException e) {
+        Map<String, String> fieldErrors = new HashMap<>();
+        for (FieldError error : e.getBindingResult().getFieldErrors()) {
+            fieldErrors.put(error.getField(), error.getDefaultMessage());
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("error", "입력값이 올바르지 않습니다.");
+        response.put("fieldErrors", fieldErrors);
+        response.put("status", HttpStatus.BAD_REQUEST.value());
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 
     /**

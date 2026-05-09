@@ -2,6 +2,8 @@ package com.linkup.Petory.domain.care.controller;
 
 import java.util.List;
 
+import jakarta.validation.Valid;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -25,7 +27,7 @@ public class CareRequestCommentController {
     @PostMapping
     public ResponseEntity<CareRequestCommentDTO> addComment(
             @PathVariable("careRequestId") Long careRequestId,
-            @RequestBody CareRequestCommentDTO dto) {
+            @Valid @RequestBody CareRequestCommentDTO dto) {
         return ResponseEntity.ok(commentService.addComment(careRequestId, dto));
     }
 

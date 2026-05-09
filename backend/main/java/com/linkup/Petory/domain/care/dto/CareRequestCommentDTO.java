@@ -3,6 +3,8 @@ package com.linkup.Petory.domain.care.dto;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import jakarta.validation.constraints.NotBlank;
+
 import com.linkup.Petory.domain.file.dto.FileDTO;
 
 import lombok.Data;
@@ -16,7 +18,7 @@ import lombok.Builder;
 @Builder
 public class CareRequestCommentDTO {
     private Long idx;
-    private String content;
+    @NotBlank private String content;
     private LocalDateTime createdAt;
     private String status; // ACTIVE / BLINDED / DELETED
     private Boolean deleted;

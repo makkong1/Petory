@@ -2,6 +2,8 @@ package com.linkup.Petory.domain.board.controller;
 
 import java.util.List;
 
+import jakarta.validation.Valid;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -19,7 +21,6 @@ import com.linkup.Petory.domain.board.dto.BoardPageResponseDTO;
 import com.linkup.Petory.domain.board.dto.CommentDTO;
 import com.linkup.Petory.domain.board.dto.CommentPageResponseDTO;
 import com.linkup.Petory.domain.board.dto.ReactionRequest;
-import com.linkup.Petory.domain.board.exception.BoardValidationException;
 import com.linkup.Petory.domain.board.dto.ReactionSummaryDTO;
 import com.linkup.Petory.domain.board.dto.BoardPopularitySnapshotDTO;
 import com.linkup.Petory.domain.board.service.ReactionService;
@@ -69,7 +70,7 @@ public class BoardController {
     // 게시글 생성 (로그인 필요)
     @PostMapping
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<BoardDTO> createBoard(@RequestBody BoardDTO dto) {
+    public ResponseEntity<BoardDTO> createBoard(@Valid @RequestBody BoardDTO dto) {
         return ResponseEntity.ok(boardService.createBoard(dto));
     }
 
@@ -124,7 +125,7 @@ public class BoardController {
     @PostMapping("/{boardId}/comments")
     public ResponseEntity<CommentDTO> addComment(
             @PathVariable("boardId") Long boardId,
-            @RequestBody CommentDTO dto) {
+            @Valid @RequestBody CommentDTO dto) {
         return ResponseEntity.ok(commentService.addComment(boardId, dto));
     }
 
@@ -141,10 +142,7 @@ public class BoardController {
     @PostMapping("/{boardId}/reactions")
     public ResponseEntity<ReactionSummaryDTO> reactToBoard(
             @PathVariable("boardId") Long boardId,
-            @RequestBody ReactionRequest request) {
-        if (request.userId() == null || request.reactionType() == null) {
-            throw BoardValidationException.reactionParamsRequired();
-        }
+            @Valid @RequestBody ReactionRequest request) {
         ReactionSummaryDTO summary = reactionService.reactToBoard(boardId, request.userId(),
                 request.reactionType());
         return ResponseEntity.ok(summary);
@@ -155,10 +153,7 @@ public class BoardController {
     public ResponseEntity<ReactionSummaryDTO> reactToComment(
             @PathVariable("boardId") Long boardId,
             @PathVariable("commentId") Long commentId,
-            @RequestBody ReactionRequest request) {
-        if (request.userId() == null || request.reactionType() == null) {
-            throw BoardValidationException.reactionParamsRequired();
-        }
+            @Valid @RequestBody ReactionRequest request) {
         ReactionSummaryDTO summary = reactionService.reactToComment(commentId, request.userId(),
                 request.reactionType());
         return ResponseEntity.ok(summary);

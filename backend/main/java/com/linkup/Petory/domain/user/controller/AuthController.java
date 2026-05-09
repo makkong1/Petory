@@ -10,6 +10,8 @@ import com.linkup.Petory.domain.user.service.UsersService;
 import com.linkup.Petory.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import jakarta.validation.Valid;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -37,7 +39,7 @@ public class AuthController {
      * [리팩토링] try-catch 제거 → GlobalExceptionHandler로 예외 위임
      */
     @PostMapping("/login")
-    public ResponseEntity<Map<String, Object>> login(@RequestBody LoginRequest loginRequest) {
+    public ResponseEntity<Map<String, Object>> login(@Valid @RequestBody LoginRequest loginRequest) {
         // Spring Security 인증 처리 (id로 인증)
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
