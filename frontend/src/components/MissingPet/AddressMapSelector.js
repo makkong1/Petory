@@ -4,17 +4,7 @@ import { geocodingApi } from '../../api/geocodingApi';
 
 const AddressMapSelector = ({ onAddressSelect, initialAddress, initialLat, initialLng }) => {
   const [selectedAddress, setSelectedAddress] = useState(initialAddress || '');
-  const [selectedLat, setSelectedLat] = useState(initialLat || null);
-  const [selectedLng, setSelectedLng] = useState(initialLng || null);
   const [isLoading, setIsLoading] = useState(false);
-
-  // initialLat, initialLng가 변경되면 주소만 업데이트
-  useEffect(() => {
-    if (initialLat && initialLng) {
-      setSelectedLat(initialLat);
-      setSelectedLng(initialLng);
-    }
-  }, [initialLat, initialLng]);
 
   const handleAddressSearch = async () => {
     if (!selectedAddress.trim()) return;
@@ -33,8 +23,6 @@ const AddressMapSelector = ({ onAddressSelect, initialAddress, initialLat, initi
         const address = response.address || searchQuery;
 
         setSelectedAddress(address);
-        setSelectedLat(lat);
-        setSelectedLng(lng);
 
         if (onAddressSelect) {
           onAddressSelect({

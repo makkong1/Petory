@@ -178,6 +178,7 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
       fetchConversation();
       fetchMessages();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationIdx, user?.idx]);
 
   // WebSocket 연결 및 구독

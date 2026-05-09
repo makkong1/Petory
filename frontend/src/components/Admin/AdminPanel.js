@@ -19,7 +19,7 @@ const AdminPanel = () => {
   const [activeMenu, setActiveMenu] = useState('dashboard');
   // 권한 확인
   useEffect(() => {
-    const { isAdmin, requiresModal } = requireAdmin();
+    const { requiresModal } = requireAdmin();
     if (requiresModal) {
       setShowPermissionModal(true);
     }
@@ -161,40 +161,4 @@ const Subtitle = styled.p`
   font-size: ${props => props.theme.typography.body1.fontSize};
 `;
 
-const Card = styled.div`
-  background: ${props => props.theme.colors.surface};
-  border: 1px solid ${props => props.theme.colors.border};
-  border-radius: ${props => props.theme.borderRadius.xl};
-  padding: ${props => props.theme.spacing.xl};
-  margin-bottom: ${props => props.theme.spacing.xl};
-  box-shadow: 0 4px 6px ${props => props.theme.colors.shadow};
-`;
-
-const SectionTitle = styled.h2`
-  color: ${props => props.theme.colors.text};
-  font-size: ${props => props.theme.typography.h3.fontSize};
-  font-weight: ${props => props.theme.typography.h3.fontWeight};
-  margin-bottom: ${props => props.theme.spacing.lg};
-`;
-
-const InfoCard = styled(Card)`
-  background: ${props => props.theme.colors.surface};
-`;
-
-const InfoTitle = styled.h3`
-  color: ${props => props.theme.colors.text};
-  font-size: ${props => props.theme.typography.h4.fontSize};
-  font-weight: ${props => props.theme.typography.h4.fontWeight};
-  margin-bottom: ${props => props.theme.spacing.md};
-`;
-
-const InfoList = styled.ul`
-  color: ${props => props.theme.colors.textSecondary};
-  line-height: 1.8;
-  padding-left: ${props => props.theme.spacing.lg};
-  
-  li {
-    margin-bottom: ${props => props.theme.spacing.sm};
-  }
-`;
 

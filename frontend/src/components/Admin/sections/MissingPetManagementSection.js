@@ -10,7 +10,6 @@ const MissingPetManagementSection = () => {
   const [page, setPage] = useState(0);
   const [pageSize] = useState(20);
   const [totalCount, setTotalCount] = useState(0);
-  const [hasNext, setHasNext] = useState(false);
   const [missingPets, setMissingPets] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -29,7 +28,6 @@ const MissingPetManagementSection = () => {
       const data = res.data || {};
       setMissingPets(data.boards || []);
       setTotalCount(data.totalCount || 0);
-      setHasNext(data.hasNext || false);
       setPage(pageNum);
     } catch (e) {
       console.error('실종 제보 목록 조회 실패:', e);
@@ -41,7 +39,7 @@ const MissingPetManagementSection = () => {
 
   useEffect(() => {
     fetchMissingPets(0);
-  }, [status, deleted, q]);
+  }, [fetchMissingPets]);
 
   const handlePageChange = (newPage) => {
     const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));

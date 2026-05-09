@@ -42,7 +42,6 @@ const MapContainer = React.forwardRef(
     const mapReadyRef = useRef(false);
     const [mapReady, setMapReady] = useState(false);
     const userZoomedRef = useRef(false); // 사용자가 직접 줌 조정했는지 여부
-    const clustererReadyRef = useRef(false); // MarkerClusterer 로드 여부
     // GeoJSON 관련 ref 제거됨
 
     // 카카오맵 레벨을 네이버맵 줌으로 변환
@@ -216,6 +215,7 @@ const MapContainer = React.forwardRef(
         console.error('3. 네이버 클라우드 플랫폼 > Application > Web Service URL에 현재 URL을 등록하세요.');
         console.error('   현재 URL:', window.location.origin);
       }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [mapCenter, mapLevel, mapLevelToZoom, zoomToMapLevel, onMapDragStart, onMapIdle]);
 
     // 네이버맵 스크립트 로드
@@ -328,7 +328,6 @@ const MapContainer = React.forwardRef(
       try {
         const currentServices = servicesRef.current;
         const currentSelectedService = selectedServiceRef.current;
-        const currentHoveredService = hoverMarkerRef.current?.service || hoveredService; // props.hoveredService -> hoveredService 수정
         const currentZoom = mapInstanceRef.current.getZoom();
         const currentBounds = mapInstanceRef.current.getBounds();
 
@@ -487,6 +486,7 @@ const MapContainer = React.forwardRef(
       } catch (error) {
         console.error('마커 업데이트 중 오류:', error);
       }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [onServiceClick, clearMarkers, mapCenter, hoveredService]); // props.hoveredService -> hoveredService 수정
 
     // 마커 업데이트 실행 (서비스 변경 시)
@@ -724,20 +724,6 @@ const MapLoading = styled.div`
   box-shadow: 0 10px 25px rgba(15, 23, 42, 0.15);
   font-weight: 600;
   color: #2563eb;
-`;
-
-const MapError = styled.div`
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  padding: 1rem 1.5rem;
-  border-radius: 8px;
-  background: rgba(239, 68, 68, 0.1);
-  color: #dc2626;
-  font-weight: 600;
-  text-align: center;
-  max-width: 400px;
 `;
 
 const ZoomControls = styled.div`

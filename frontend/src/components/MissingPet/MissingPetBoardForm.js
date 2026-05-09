@@ -269,15 +269,6 @@ const MissingPetBoardForm = ({ isOpen, onClose, onSubmit, initialData, loading, 
     }
   };
 
-  const handleNumberChange = (e) => {
-    const { name, value } = e.target;
-    const numericValue = value.replace(/[^0-9.\-]/g, '');
-    setForm((prev) => ({
-      ...prev,
-      [name]: numericValue,
-    }));
-  };
-
   const handleFileSelect = async (e) => {
     const file = e.target.files?.[0];
     if (!file) {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import styled from 'styled-components';
 import { missingPetApi } from '../../api/missingPetApi';
 import { reportApi } from '../../api/reportApi';
@@ -53,9 +53,8 @@ const MissingPetBoardDetail = ({
   // 댓글 페이징 상태
   const [comments, setComments] = useState([]);
   const [commentPage, setCommentPage] = useState(0);
-  const [commentPageSize, setCommentPageSize] = useState(20);
+  const [commentPageSize] = useState(20);
   const [commentTotalCount, setCommentTotalCount] = useState(0);
-  const [commentHasNext, setCommentHasNext] = useState(false);
   const [loadingComments, setLoadingComments] = useState(false);
 
   const handleViewProfile = (userId) => {
@@ -75,7 +74,6 @@ const MissingPetBoardDetail = ({
       setComments(commentsData);
 
       setCommentTotalCount(pageData.totalCount || 0);
-      setCommentHasNext(pageData.hasNext || false);
       setCommentPage(pageNum);
     } catch (err) {
       console.error('댓글 조회 실패:', err);
@@ -98,7 +96,6 @@ const MissingPetBoardDetail = ({
       if (board.comments && Array.isArray(board.comments)) {
         setComments(board.comments);
         setCommentTotalCount(board.commentCount || board.comments.length);
-        setCommentHasNext((board.commentCount || 0) > (board.comments.length || 0));
       } else {
         // board.comments가 없으면 별도 API로 로드
         fetchComments(0);
@@ -694,18 +691,6 @@ const DetailTitle = styled.h2`
   line-height: 1.4;
   flex: 1;
   min-width: 0;
-`;
-
-const CloseButton = styled.button`
-  border: none;
-  background: transparent;
-  font-size: ${(props) => props.theme.typography.h3.fontSize};
-  color: ${(props) => props.theme.colors.textSecondary};
-  cursor: pointer;
-
-  &:hover {
-    color: ${(props) => props.theme.colors.text};
-  }
 `;
 
 const DeleteBoardButton = styled.button`

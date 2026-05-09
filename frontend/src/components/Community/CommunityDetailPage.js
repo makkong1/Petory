@@ -43,9 +43,8 @@ const CommunityDetailPage = ({
 
   // 댓글 페이징 상태
   const [commentPage, setCommentPage] = useState(0);
-  const [commentPageSize, setCommentPageSize] = useState(20);
+  const [commentPageSize] = useState(20);
   const [commentTotalCount, setCommentTotalCount] = useState(0);
-  const [commentHasNext, setCommentHasNext] = useState(false);
 
   const categoryInfo = useMemo(() => {
     if (!board?.category) {
@@ -113,7 +112,6 @@ const CommunityDetailPage = ({
     setUploadError('');
     setCommentPage(0);
     setCommentTotalCount(0);
-    setCommentHasNext(false);
   }, []);
 
   const fetchBoard = useCallback(async () => {
@@ -151,7 +149,6 @@ const CommunityDetailPage = ({
       setComments(commentsData);
 
       setCommentTotalCount(pageData.totalCount || 0);
-      setCommentHasNext(pageData.hasNext || false);
       setCommentPage(pageNum);
     } catch (err) {
       const message = err.response?.data?.error || err.message || '댓글을 불러오지 못했습니다.';
@@ -450,7 +447,7 @@ const CommunityDetailPage = ({
         setCommentError(message);
       }
     },
-    [boardId, currentUser, onCommentAdded]
+    [boardId, currentUser, fetchComments, onCommentAdded]
   );
 
   const handleViewProfile = useCallback((userId) => {

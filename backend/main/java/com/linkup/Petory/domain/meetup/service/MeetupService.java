@@ -89,6 +89,11 @@ public class MeetupService {
             throw MeetupValidationException.dateMustBeFuture();
         }
 
+        Integer maxParticipantsOrDefault = meetupDTO.getMaxParticipants();
+        if (maxParticipantsOrDefault == null) {
+            maxParticipantsOrDefault = 10;
+        }
+
         Meetup meetup = Meetup.builder()
                 .title(meetupDTO.getTitle())
                 .description(meetupDTO.getDescription())
@@ -97,7 +102,7 @@ public class MeetupService {
                 .longitude(meetupDTO.getLongitude())
                 .date(meetupDTO.getDate())
                 .organizer(organizer)
-                .maxParticipants(meetupDTO.getMaxParticipants() != null ? meetupDTO.getMaxParticipants() : 10)
+                .maxParticipants(maxParticipantsOrDefault)
                 .currentParticipants(1)
                 .status(MeetupStatus.RECRUITING)
                 .build();
@@ -461,7 +466,7 @@ public class MeetupService {
                 .organizerName(organizer != null ? organizer.getUsername() : null)
                 .joinedAt(participant.getJoinedAt())
                 .participationRole(isOrganizer ? "ORGANIZER" : "PARTICIPANT")
-                .liked(participant.getLiked() != null ? participant.getLiked() : false)
+                .liked(Boolean.TRUE.equals(participant.getLiked()))
                 .build();
     }
 
