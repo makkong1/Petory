@@ -9,7 +9,13 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Entity
-@Table(name = "meetup")
+@Table(name = "meetup", indexes = {
+    @Index(name = "organizer_idx",             columnList = "organizer_idx"),
+    @Index(name = "idx_meetup_status",          columnList = "status"),
+    @Index(name = "idx_meetup_date",            columnList = "date"),
+    @Index(name = "idx_meetup_date_status",     columnList = "date, status"),
+    @Index(name = "idx_meetup_location",        columnList = "latitude, longitude")
+})
 @Getter
 @Setter
 @NoArgsConstructor
