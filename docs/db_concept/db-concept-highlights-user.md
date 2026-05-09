@@ -1,180 +1,370 @@
-# DB 개념 어필 포인트 (SQL 제외)
+# DB 개념 어필 포인트 — User 도메인
 
-## 1. N+1 문제 이해 및 해결 전략
-
-### 어필 포인트
-- **문제 인식**: N+1 문제의 근본 원인을 이해하고, 쿼리 실행 계획을 분석하여 문제를 발견
-- **해결 전략**: 배치 조회 패턴을 통해 쿼리 수를 21개 → 4개로 감소 (80.95% 개선)
-- **DB 관점**: 
-  - 데이터베이스 연결 풀 부하 감소
-  - 네트워크 라운드트립 최소화
-  - DB 서버 부하 분산
-
-### 말할 내용
-> "N+1 문제를 발견하고 해결한 경험이 있습니다. 채팅방 목록 조회 시 각 채팅방마다 개별 쿼리가 실행되어 21개의 쿼리가 발생했는데, 이를 배치 조회 패턴으로 변경하여 4개로 줄였습니다. 이 과정에서 데이터베이스 연결 풀의 부하를 크게 줄이고, 네트워크 라운드트립을 최소화했습니다."
+> 코드베이스 실측 데이터 기준 (실제 파일 확인)
+> 참고 파일: `domain/user/`, `filter/JwtAuthenticationFilter.java`, `docs/refactoring/user/`, `docs/troubleshooting/users/`
 
 ---
 
-## 2. 인덱스 활용 전략
+## 1. Refresh Token DB 저장 + 이중 검증 (JWT + DB)
 
 ### 어필 포인트
-- **인덱스 이해**: `WHERE conversation_idx IN (...)` 쿼리에서 인덱스 활용
-- **복합 인덱스 설계**: `(conversation_idx, user_idx)`, `(conversation_idx, status)` 같은 복합 인덱스 고려
-- **쿼리 최적화**: IN 절을 사용한 배치 조회 시 인덱스 효율성 이해
+- Refresh Token을 `users` 테이블의 `refresh_token`, `refresh_expiration` 컬럼에 직접 저장
+- 갱신 요청 시 JWT 서명 검증 후 DB에서 토큰 존재 여부와 만료 시각을 재확인하는 이중 검증
+- 로그아웃 시 DB에서 토큰을 null로 삭제 → 서버 측 무효화(revocation) 가능
+
+```java
+// AuthService.java — 로그인 시
+user.setRefreshToken(refreshToken);
+user.setRefreshExpiration(LocalDateTime.now().plusDays(1));
+usersRepository.save(user);
+
+// AuthService.java — 갱신 시 이중 검증
+if (!jwtUtil.validateToken(refreshToken)) throw InvalidRefreshTokenException.invalid();
+Users user = usersRepository.findActiveByRefreshToken(refreshToken)
+        .orElseThrow(() -> InvalidRefreshTokenException.notFound());
+if (user.getRefreshExpiration().isBefore(LocalDateTime.now()))
+    throw InvalidRefreshTokenException.expired();
+```
 
 ### 말할 내용
-> "배치 조회를 위해 IN 절을 사용할 때, 데이터베이스가 인덱스를 효율적으로 활용할 수 있도록 복합 인덱스를 설계했습니다. `conversation_idx`와 `user_idx`를 함께 사용하는 쿼리의 경우, 복합 인덱스를 통해 조회 성능을 향상시켰습니다."
+> "Refresh Token을 stateless JWT로만 관리하면 탈취 시 만료 전까지 무효화가 불가능합니다. 그래서 users 테이블에 refresh_token, refresh_expiration 컬럼을 두고, 갱신 요청마다 JWT 서명 검증과 DB 조회를 순서대로 수행합니다. 로그아웃 시 DB 값을 null로 초기화해 즉시 무효화가 가능하고, 탈취된 토큰으로 갱신을 시도해도 DB에서 차단됩니다."
 
 ---
 
-## 3. ORM 최적화 (JPA/Hibernate)
+## 2. 동시성 제어 — 경고 횟수 원자적 증가 (DB 레벨 UPDATE)
 
 ### 어필 포인트
-- **LAZY/EAGER 로딩 전략**: 필요한 데이터만 로드하는 전략 수립
-- **Fetch Join 활용**: `JOIN FETCH`를 사용하여 N+1 문제 해결
-- **엔티티 설계**: 연관 관계 설계 시 성능 고려
+- `warningCount` 증가를 애플리케이션 레벨이 아닌 DB `UPDATE ... SET count = count + 1`로 처리
+- Lost Update 방지: 여러 관리자가 동시에 경고 부여 시에도 카운터 정확 보장
+- 경고 3회 도달 시 자동 이용제한 3일 로직이 이 원자적 증가에 의존
+
+```java
+// SpringDataJpaUsersRepository.java
+@Modifying
+@Query("UPDATE Users u SET u.warningCount = u.warningCount + 1 WHERE u.idx = :userId")
+int incrementWarningCount(@Param("userId") Long userId);
+
+// UserSanctionService.java
+usersRepository.incrementWarningCount(userId);          // 원자적 증가
+user = usersRepository.findById(userId).orElseThrow();  // 업데이트된 값 재조회
+if (user.getWarningCount() >= WARNING_THRESHOLD) {       // >= 3
+    addSuspension(userId, ..., AUTO_SUSPENSION_DAYS);    // 자동 이용제한 3일
+}
+```
 
 ### 말할 내용
-> "JPA의 LAZY 로딩으로 인해 모든 메시지가 메모리에 로드되는 문제를 발견했습니다. 이를 해결하기 위해 Fetch Join을 활용하고, 필요한 데이터만 조회하는 Repository 메서드를 설계했습니다. 또한 연관 엔티티를 함께 조회하여 추가 쿼리를 방지했습니다."
+> "경고 횟수를 user.getWarningCount() + 1 로 저장하면 두 스레드가 동시에 읽은 값이 같아 한 번이 누락됩니다. 이를 막기 위해 'UPDATE users SET warning_count = warning_count + 1'로 DB 원자적 증가 쿼리를 사용했습니다. 이 방식은 행 레벨에서 직렬화되어 동시 요청에도 카운터가 정확히 올라가고, 경고 3회 자동 이용제한 트리거가 항상 정확하게 동작합니다."
 
 ---
 
-## 4. 데이터베이스 연결 풀 관리
+## 3. 비관적 락(PESSIMISTIC_WRITE) — PetCoin 차감
 
 ### 어필 포인트
-- **연결 풀 부하 인식**: N+1 문제로 인한 연결 풀 고갈 위험 이해
-- **해결 효과**: 쿼리 수 감소로 연결 풀 사용량 대폭 감소
-- **동시성 고려**: 동시 로그인 시나리오에서도 안정적인 성능 유지
+- `pet_coin_balance` 컬럼을 가진 `users` 테이블에서 코인 차감 시 `SELECT ... FOR UPDATE` 적용
+- Race Condition 방지: 동시 결제 요청이 들어와도 잔액 이중 차감 방지
+
+```java
+// SpringDataJpaUsersRepository.java
+@Lock(LockModeType.PESSIMISTIC_WRITE)
+@Query("SELECT u FROM Users u WHERE u.idx = :idx")
+Optional<Users> findByIdForUpdate(@Param("idx") Long idx);
+```
 
 ### 말할 내용
-> "N+1 문제로 인해 단일 요청당 21개의 쿼리가 발생하면서 데이터베이스 연결 풀의 부하가 증가했습니다. 이를 4개로 줄임으로써 연결 풀 사용량을 약 80% 감소시켰고, 동시 사용자 증가 시에도 안정적인 성능을 유지할 수 있게 되었습니다."
+> "펫코인 차감은 잔액을 읽고 확인 후 저장하는 read-modify-write 패턴이라 동시 요청 시 이중 차감이 발생할 수 있습니다. JPA의 PESSIMISTIC_WRITE를 사용해 'SELECT ... FOR UPDATE'를 실행하면, 락을 획득한 트랜잭션이 완료될 때까지 다른 요청이 해당 행을 수정할 수 없어 정확한 잔액 관리가 가능합니다."
 
 ---
 
-## 5. 트랜잭션 관리 및 성능
+## 4. N+1 해결 — socialUsers @BatchSize + 회원가입 중복 검사 쿼리 통합
 
 ### 어필 포인트
-- **트랜잭션 범위 이해**: 배치 조회는 트랜잭션 내에서 실행되어야 함
-- **트랜잭션 격리 수준**: 읽기 작업의 일관성 보장
-- **성능 최적화**: 트랜잭션 범위 최소화
+**socialUsers N+1 (@BatchSize)**
+- `Users.socialUsers`가 기본 LAZY 로딩이라 사용자 목록 조회 시 N+1 발생 (100명 → 101 쿼리)
+- `@BatchSize(size = 50)` 추가로 Hibernate가 `WHERE user_idx IN (...)` 배치 조회 → 3 쿼리로 감소
+
+```java
+// Users.java
+@OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+@BatchSize(size = 50)  // [리팩토링] 101 쿼리 → 3 쿼리 (100명 기준)
+private List<SocialUser> socialUsers;
+```
+
+**회원가입 중복 검사 3회 → 1회**
+- 기존: `findByNickname`, `findByUsername`, `findByEmail` 각각 1회 = 3 round-trip
+- 개선: `findByNicknameOrUsernameOrEmail()` 단일 쿼리로 통합
+
+```java
+// SpringDataJpaUsersRepository.java
+@Query("SELECT u FROM Users u WHERE (u.nickname = :nickname OR u.username = :username OR u.email = :email) AND (u.isDeleted = false OR u.isDeleted IS NULL)")
+List<Users> findByNicknameOrUsernameOrEmail(...);
+```
 
 ### 말할 내용
-> "배치 조회를 트랜잭션 내에서 실행하여 데이터 일관성을 보장했습니다. 또한 트랜잭션 범위를 최소화하여 락 경합을 줄이고 성능을 최적화했습니다."
+> "사용자 목록 페이지에서 소셜 로그인 정보를 함께 표시할 때, 각 사용자마다 SocialUser 쿼리가 별도로 실행되어 N+1 문제가 발생했습니다. @BatchSize(size=50)를 적용해 Hibernate가 IN 절 배치 조회를 하도록 했고, 100명 기준 101 쿼리에서 3 쿼리로 줄었습니다. 같은 맥락에서 회원가입 중복 검사도 3개 개별 쿼리를 OR 조건 하나로 통합해 round-trip을 3배 줄였습니다."
 
 ---
 
-## 6. 쿼리 실행 계획 분석
+## 5. 로그인 시 N+1 해결 — 채팅방 배치 조회 (실측 측정 완료)
 
 ### 어필 포인트
-- **성능 측정**: Hibernate Statistics를 활용한 쿼리 수 측정
-- **실행 시간 분석**: 377ms → 69ms로 개선 (81.70%)
-- **모니터링**: 실제 운영 환경에서의 성능 모니터링 경험
+- 로그인 후 채팅방 목록 조회 시 채팅방마다 참여자·메시지 쿼리 개별 실행 → N+1
+- IN 절 배치 조회 + Fetch Join + 최신 메시지만 조회로 해결
+- 실측: 채팅방 10개 기준 21 쿼리 → 4 쿼리, 305ms → 55ms, 메모리 0.58MB → 0.13MB
+
+```
+Before: SELECT * FROM conversation ...          (1)
+        SELECT * FROM conversationparticipant WHERE conversation_idx = 1 AND user_idx = ?
+        SELECT * FROM conversationparticipant WHERE conversation_idx = 1 AND status = 'ACTIVE'
+        SELECT * FROM chatmessage WHERE conversation_idx = 1  ← 전체 메시지 로드
+        ... (채팅방마다 반복) = 21 쿼리
+
+After:  SELECT * FROM conversation ...                               (1)
+        SELECT * FROM conversationparticipant WHERE conversation_idx IN (...)  (1)
+        SELECT * FROM conversationparticipant WHERE conversation_idx IN (...)  (1)
+        SELECT * FROM chatmessage WHERE idx IN (SELECT MAX(idx) ...) (1) ← 최신만
+        = 4 쿼리 (채팅방 수와 무관하게 일정)
+```
+
+**실측 성능 개선**:
+| 항목 | Before | After | 개선율 |
+|------|--------|-------|--------|
+| 쿼리 수 | 21개 | 4개 | 80.95% |
+| 실행 시간 | 305ms | 55ms | 81.97% |
+| 메모리 사용량 | 607,968 bytes | 138,384 bytes | 77.24% |
 
 ### 말할 내용
-> "Hibernate Statistics를 활용하여 실제 쿼리 실행 수를 측정하고, 성능 개선 효과를 정량적으로 확인했습니다. 실행 시간을 377ms에서 69ms로 줄여 약 5.5배의 성능 향상을 달성했습니다."
+> "로그인 시 채팅방 목록을 조회할 때 N+1 문제가 발생해 채팅방 10개 기준 21개 쿼리가 실행되고 응답 시간이 305ms나 걸렸습니다. 채팅방 ID 목록을 먼저 추출하고 IN 절로 배치 조회하도록 변경했고, 최신 메시지 1건만 서브쿼리로 가져오도록 바꿨습니다. 결과적으로 쿼리는 4개로 고정되고 응답 시간은 55ms로 줄었습니다. 채팅방이 100개로 늘어도 쿼리는 4개로 유지됩니다."
 
 ---
 
-## 7. 데이터베이스 설계 원칙
+## 6. 소프트 삭제(Soft Delete) + 탈퇴 사용자 닉네임 재사용 트러블슈팅
 
 ### 어필 포인트
-- **정규화**: 엔티티 간 관계 설계
-- **역정규화 고려**: 성능 최적화를 위한 조회 패턴 고려
-- **인덱스 설계**: 조회 패턴에 맞는 인덱스 설계
+- 회원 탈퇴 시 `is_deleted = true`, `deleted_at` 설정으로 데이터 보존
+- 탈퇴한 사용자의 닉네임/username/email을 다른 사용자가 재사용할 수 없는 버그 발견 → Repository JPQL에 `isDeleted = false OR isDeleted IS NULL` 조건 추가로 해결
+- Race Condition 대비: `DataIntegrityViolationException` catch 후 필드별 명확한 에러 메시지 반환
+
+```java
+// SpringDataJpaUsersRepository.java — 수정 후
+@Query("SELECT u FROM Users u WHERE u.nickname = :nickname AND (u.isDeleted = false OR u.isDeleted IS NULL)")
+Optional<Users> findByNickname(@Param("nickname") String nickname);
+```
+
+```java
+// UsersService.java — Race Condition 처리
+try {
+    saved = usersRepository.save(user);
+} catch (DataIntegrityViolationException e) {
+    if (errorMessage.contains("nickname")) throw new RuntimeException("이미 사용 중인 닉네임입니다.");
+    // email, username 등 필드별 처리
+}
+```
 
 ### 말할 내용
-> "채팅방, 참여자, 메시지 간의 관계를 설계할 때, 조회 패턴을 고려하여 인덱스를 설계했습니다. 특히 배치 조회를 위한 복합 인덱스를 설계하여 조회 성능을 최적화했습니다."
+> "소프트 삭제를 적용하면 DB에 데이터가 남아있어, 탈퇴한 사용자의 닉네임으로 신규 가입 시도 시 중복 체크가 탈퇴 사용자를 잡아 가입이 실패하는 버그가 있었습니다. Repository의 JPQL 쿼리에 is_deleted = false 조건을 추가해 활성 사용자만 체크하도록 수정했습니다. 또한 체크와 저장 사이에 발생할 수 있는 Race Condition에 대비해 DB Unique 제약조건 위반 예외를 잡아 사용자 친화적 에러 메시지로 변환했습니다."
 
 ---
 
-## 8. 메모리 관리 및 GC 최적화
+## 7. OAuth2 소셜 로그인 동시성 — DB UNIQUE 제약조건으로 Race Condition 방지
 
 ### 어필 포인트
-- **메모리 사용량 측정**: 571,360 bytes → 150,888 bytes (73.59% 감소)
-- **불필요한 데이터 로드 방지**: 모든 메시지 대신 최신 메시지만 조회
-- **GC 부하 감소**: 메모리 사용량 감소로 GC 부하 감소
+- 같은 소셜 계정 동시 로그인 시도 시 `findByProviderAndProviderId()` 조회가 모두 null을 반환해 중복 계정 생성 가능성
+- `users.email` UNIQUE 제약조건 + `socialuser.(provider, provider_id)` UNIQUE 제약조건으로 DB 레벨에서 차단
+- 트랜잭션 롤백으로 한 계정만 생성 보장
+
+```java
+// OAuth2Service.java — 사용자 생성 시도
+// DB UNIQUE 제약조건이 최후 방어선 역할
+// email UNIQUE: 같은 이메일로 중복 계정 방지
+// socialuser (provider + providerId) UNIQUE: 같은 소셜 계정 중복 SocialUser 방지
+```
 
 ### 말할 내용
-> "LAZY 로딩으로 인해 불필요한 데이터가 메모리에 로드되는 문제를 발견하고, 필요한 데이터만 조회하도록 최적화했습니다. 이를 통해 메모리 사용량을 73.59% 감소시켰고, GC 부하를 줄여 서버 안정성을 향상시켰습니다."
+> "소셜 로그인에서 같은 계정으로 동시에 두 번 로그인 시도가 들어오면 두 스레드 모두 신규 사용자로 판단해 계정을 생성할 수 있습니다. 낙관적 락보다 단순하게, DB의 UNIQUE 제약조건을 최후 방어선으로 사용했습니다. 이메일 컬럼과 socialuser 테이블의 (provider, provider_id) 복합 유니크 제약조건이 위반되면 예외가 발생하고 트랜잭션이 롤백되어 중복 계정 생성을 막습니다."
 
 ---
 
-## 9. 확장성 고려한 설계
+## 8. 이메일 인증 — Redis 임시 저장 (TTL 활용)
 
 ### 어필 포인트
-- **선형 확장성**: 채팅방 수가 증가해도 쿼리 수는 일정하게 유지
-- **확장성 테스트**: 채팅방 10개 기준으로 테스트, 100개여도 동일한 쿼리 수
-- **성능 예측**: 데이터 증가에 따른 성능 저하 최소화
+- 회원가입 전 이메일 인증 상태를 Redis에 저장, TTL 24시간 자동 만료
+- 키 형식: `email_verification:pre_registration:{email}`
+- 가입 완료 후 명시적 삭제 (`stringRedisTemplate.delete(redisKey)`)
+- 기존 사용자 인증은 `users.email_verified` 컬럼 직접 업데이트로 처리 (단일 통합 상태)
+
+```java
+// EmailVerificationService.java
+private static final String PRE_REGISTRATION_VERIFICATION_KEY_PREFIX = "email_verification:pre_registration:";
+private static final long PRE_REGISTRATION_VERIFICATION_EXPIRE_HOURS = 24;
+
+// 인증 완료 시 Redis에 저장
+stringRedisTemplate.opsForValue().set(
+    redisKey, "verified",
+    PRE_REGISTRATION_VERIFICATION_EXPIRE_HOURS, TimeUnit.HOURS);
+
+// 가입 완료 후 명시적 삭제
+stringRedisTemplate.delete(redisKey);
+```
 
 ### 말할 내용
-> "배치 조회 패턴을 적용하여 채팅방 수가 증가해도 쿼리 수는 일정하게 유지되도록 설계했습니다. 채팅방 10개든 100개든 동일하게 4개의 쿼리만 실행되어, 서비스 확장에 유리한 구조를 만들었습니다."
+> "회원가입 전 이메일 인증 상태는 아직 DB 사용자 레코드가 없어 users 테이블에 저장할 수 없습니다. Redis의 TTL 기능을 활용해 24시간 동안만 인증 상태를 유지하고 자동 만료되도록 설계했습니다. 가입이 완료되면 users.email_verified 컬럼을 true로 업데이트하고 Redis 키는 명시적으로 삭제합니다. 이 방식은 미인증 이메일 데이터가 DB를 오염시키지 않고 자동 정리됩니다."
 
 ---
 
-## 10. 실제 운영 경험
+## 9. 역할 계층 기반 권한 + 경량 쿼리 최적화
 
 ### 어필 포인트
-- **성능 측정**: 실제 테스트 환경에서 성능 측정
-- **문제 해결 과정**: 문제 발견 → 분석 → 해결 → 검증의 전체 과정
-- **문서화**: 트러블슈팅 문서를 통한 지식 공유
+- `Role` enum: `USER < SERVICE_PROVIDER < ADMIN < MASTER` 4단계 계층
+- 삭제 권한 검증 시 `Users` 전체 + `Pet` JOIN 조회 대신 `role` 스칼라 프로젝션만 조회하는 경량 메서드 도입
+
+```java
+// SpringDataJpaUsersRepository.java
+@Query("SELECT u.role FROM Users u WHERE u.idx = :idx")
+Optional<Role> findRoleByIdx(@Param("idx") Long idx);
+// [리팩토링] Users+Pet 전체 조회 → role 1개 컬럼만 SELECT
+```
+
+```java
+// Role.java
+public enum Role { USER, SERVICE_PROVIDER, ADMIN, MASTER }
+```
 
 ### 말할 내용
-> "실제 운영 중인 서비스에서 성능 문제를 발견하고, Hibernate Statistics를 활용하여 정량적으로 측정한 후, 배치 조회 패턴으로 해결했습니다. 또한 전체 과정을 문서화하여 팀 내 지식 공유를 했습니다."
+> "권한 검증을 위해 매번 Users 전체와 연관 Pet까지 조회하는 것은 낭비입니다. role 컬럼 하나만 필요한 경우 프로젝션 쿼리로 해당 컬럼만 가져오도록 리팩토링했습니다. 이처럼 실제로 필요한 데이터만 SELECT하는 습관이 불필요한 네트워크 I/O와 메모리 할당을 줄여줍니다."
 
 ---
 
-## 면접 대답 구성 예시
+## 10. 트랜잭션 관리 + 로그인 중복 쿼리 제거 리팩토링
 
-### 질문: "DB 관련 경험이 있나요?"
+### 어필 포인트
+- 로그인 시 `getUserById()` 호출이 내부에서 `findByIdString`을 한 번 더 실행 → 동일 User 2회 조회
+- `usersConverter.toDTO(user)`로 이미 로드된 엔티티를 직접 변환 → DB 조회 1회 감소
 
-**대답 구조:**
-1. **문제 발견** (30초)
-   - "실제 운영 중인 채팅 서비스에서 로그인 시 성능 저하를 발견했습니다."
-   - "Hibernate Statistics로 측정한 결과 21개의 쿼리가 발생하고 있었습니다."
+```java
+// AuthService.java — 리팩토링 후
+Users user = usersRepository.findActiveByIdString(id).orElseThrow(...);
+// ... save ...
+// [리팩토링] usersService.getUserById() → usersConverter.toDTO(user) (User 1회 조회)
+UsersDTO userDTO = usersConverter.toDTO(user);
+return new TokenResponse(accessToken, refreshToken, userDTO);
+```
 
-2. **원인 분석** (1분)
-   - "N+1 문제였습니다. 채팅방 목록을 조회한 후, 각 채팅방마다 참여자 정보와 메시지를 개별 쿼리로 조회하고 있었습니다."
-   - "또한 LAZY 로딩으로 인해 필요한 최신 메시지 1개만 필요한데 모든 메시지를 메모리에 로드하고 있었습니다."
+- 쓰기 메서드 (`login`, `logout`, `refreshAccessToken`): `@Transactional`
+- 읽기 메서드: `@Transactional(readOnly = true)` (read-only 최적화)
+- 기본 격리 수준: READ_COMMITTED
 
-3. **해결 방법** (1분)
-   - "배치 조회 패턴을 적용했습니다. 채팅방 ID 목록을 추출한 후, IN 절을 사용하여 한 번에 조회하도록 변경했습니다."
-   - "Fetch Join을 활용하여 연관 엔티티도 함께 조회하여 추가 쿼리를 방지했습니다."
-   - "최신 메시지만 조회하는 Repository 메서드를 추가하여 메모리 사용량을 줄였습니다."
+### 말할 내용
+> "로그인 로직을 프로파일링하다 이미 조회한 User 객체를 두 번째로 조회하는 불필요한 쿼리를 발견했습니다. 서비스 메서드 경계를 재정리하고 컨버터를 직접 호출하도록 바꿔 로그인과 토큰 갱신 각각 1회씩 DB 호출을 줄였습니다. 작은 수치지만 MAU가 높은 서비스에서 로그인은 빈도가 높은 API라 누적 효과가 큽니다."
 
-4. **결과 및 학습** (30초)
-   - "쿼리 수를 21개에서 4개로 줄여 80.95% 개선했고, 실행 시간도 377ms에서 69ms로 81.70% 개선했습니다."
-   - "이 과정에서 데이터베이스 연결 풀 관리, 인덱스 활용, ORM 최적화 등 DB 관련 개념을 깊이 이해하게 되었습니다."
+---
+
+## 인덱스 설계
+
+### users 테이블
+
+| 인덱스명 | 컬럼 | 타입 | 설계 근거 |
+|---|---|---|---|
+| `PRIMARY` | `idx` | BTREE | PK — 내부 FK 참조 기준 |
+| `email` | `email` | UNIQUE | 중복 계정 방지 + 로그인·OAuth2 사용자 조회 최적화. §6·§7 소프트 삭제 닉네임 재사용 버그의 최후 방어선이기도 함 |
+| `id` | `id` | UNIQUE | 사용자 ID(문자열) 중복 방지 + `findActiveByIdString` 로그인 조회 최적화 |
+| `uk_users_nickname` | `nickname` | UNIQUE | 닉네임 중복 방지. `findByNicknameOrUsernameOrEmail` 통합 쿼리가 OR 조건에서 이 인덱스를 활용 |
+| `username` | `username` | UNIQUE | 사용자명 중복 방지 + 검색 최적화. 회원가입 중복 검사 3→1 쿼리 통합(§4)에서 OR 브랜치로 사용 |
+
+**설계 포인트**: 4개 UNIQUE 인덱스(`email`, `id`, `uk_users_nickname`, `username`)는 (1) 동시 가입 Race Condition 시 DB 레벨 최후 방어선, (2) 로그인·조회 경로별 인덱스 히트, (3) `findByNicknameOrUsernameOrEmail` OR 조건에서 각 브랜치가 독립 인덱스를 타는 구조를 동시에 달성한다. §7 OAuth2 동시 로그인에서는 `email` UNIQUE가 트랜잭션 롤백 트리거로 동작한다.
+
+### socialuser 테이블
+
+| 인덱스명 | 컬럼 | 타입 | 설계 근거 |
+|---|---|---|---|
+| `PRIMARY` | `idx` | BTREE | PK |
+| `users_idx` | `users_idx` | BTREE | FK — `@BatchSize` IN 절 배치 조회(§4)에서 `WHERE user_idx IN (...)` 스캔 경로 |
+
+### user_sanctions 테이블
+
+| 인덱스명 | 컬럼 | 타입 | 설계 근거 |
+|---|---|---|---|
+| `PRIMARY` | `idx` | BTREE | PK |
+| `admin_idx` | `admin_idx` | BTREE | FK — 관리자별 제재 이력 조회 |
+| `idx_user_idx` | `user_idx` | BTREE | 사용자별 활성 제재 조회. §2 원자적 경고 증가 후 자동 이용제한 부여 시 해당 사용자 제재 조회 경로 |
+| `idx_ends_at` | `ends_at` | BTREE | **제재 만료 스케줄러 전용 인덱스**. 매일 자정 배치 잡이 `WHERE ends_at <= NOW() AND status = 'ACTIVE'` 형태로 만료 제재를 스캔할 때 `ends_at` 범위 조건을 인덱스 레벨에서 처리해 전체 테이블 스캔을 차단 |
+
+**설계 포인트**: `idx_ends_at`은 만료 스케줄러(`@Scheduled`)가 실행될 때 만료 대상 제재를 빠르게 찾기 위한 전용 인덱스다. 제재 건수가 누적될수록 `ends_at` 범위 스캔의 효과가 커진다.
+
+### fcm_token 테이블
+
+| 인덱스명 | 컬럼 | 타입 | 설계 근거 |
+|---|---|---|---|
+| `PRIMARY` | `idx` | BTREE | PK |
+| `fk_fcm_token_user` | `user_idx` | BTREE | FK — 사용자별 FCM 토큰 조회. 푸시 알림 발송 시 `WHERE user_idx = ?` 경로 |
+| `uk_fcm_token_token` | `token` | UNIQUE | 토큰 중복 등록 방지. 동일 디바이스 토큰이 여러 사용자에게 중복 연결되는 이상 상태를 DB 레벨에서 차단 |
+
+### pets 테이블 (User 도메인 연관)
+
+| 인덱스명 | 컬럼 | 타입 | 설계 근거 |
+|---|---|---|---|
+| `PRIMARY` | `idx` | BTREE | PK |
+| `idx_pets_user` | `user_idx` | BTREE | 사용자별 반려동물 목록 조회. 가장 빈번한 접근 경로 |
+| `idx_pets_deleted` | `is_deleted` | BTREE | Soft Delete 필터 전용. `is_deleted = false` 조건이 자주 사용됨 |
+| `idx_pets_type` | `pet_type` | BTREE | 종류별(강아지·고양이 등) 검색 필터 |
+| `idx_pets_breed` | `breed` | BTREE | 품종별 검색 필터 |
 
 ---
 
 ## 핵심 키워드
 
-- **N+1 문제 해결**
-- **배치 조회 패턴**
-- **인덱스 활용**
-- **ORM 최적화 (JPA/Hibernate)**
-- **데이터베이스 연결 풀 관리**
-- **트랜잭션 관리**
-- **LAZY/EAGER 로딩 전략**
-- **성능 측정 및 모니터링**
-- **확장성 고려한 설계**
-- **실제 운영 경험**
+- Refresh Token DB 저장 + 이중 검증 (JWT + DB)
+- 비관적 락 (`PESSIMISTIC_WRITE`) — PetCoin 차감
+- DB 레벨 원자적 UPDATE — 경고 횟수 동시성 제어
+- `@BatchSize` — socialUsers N+1 해결
+- IN 절 배치 조회 + Fetch Join — 채팅방 목록 N+1 해결 (실측 80.95%)
+- Soft Delete + isDeleted 필터링 — 탈퇴 사용자 닉네임 재사용 버그 해결
+- Redis TTL — 이메일 인증 임시 저장 (24h)
+- DB UNIQUE 제약조건 — OAuth2 동시 로그인 Race Condition 방어
+- 프로젝션 쿼리 (`findRoleByIdx`) — 불필요한 컬럼 제거
+- `findByNicknameOrUsernameOrEmail` — 중복 검사 3 쿼리 → 1 쿼리
+- **복합 인덱스 없음 → 단일 컬럼 UNIQUE 4개** — users 테이블 중복 방지 + 검색 최적화
+- **`idx_ends_at`** — 제재 만료 스케줄러 전용 범위 스캔 인덱스
+- **`uk_fcm_token_token`** — FCM 토큰 중복 등록 DB 레벨 차단
 
 ---
 
-## 추가 어필 포인트
+## 관련 문서
 
-### 1. 데이터베이스 성능 모니터링
-- Hibernate Statistics 활용
-- 쿼리 실행 시간 측정
-- 메모리 사용량 측정
+- `docs/domains/user.md` — 전체 도메인 상세 (엔티티, API, 서비스 메서드)
+- `docs/refactoring/user/user-backend-performance-optimization.md` — 리팩토링 항목 체크리스트
+- `docs/troubleshooting/users/login-n-plus-one-issue.md` — 채팅방 N+1 실측 데이터
+- `docs/troubleshooting/users/soft-delete-nickname-reuse.md` — 소프트 삭제 닉네임 재사용 버그
 
-### 2. 데이터베이스 설계
-- 복합 인덱스 설계
-- 조회 패턴 고려한 인덱스 설계
-- 엔티티 간 관계 설계
+---
 
-### 3. 문제 해결 프로세스
-- 문제 발견 → 분석 → 해결 → 검증
-- 정량적 측정을 통한 검증
-- 문서화를 통한 지식 공유
+## 면접 대답 구성
+
+### 질문: "DB 동시성 이슈를 경험한 적이 있나요?"
+
+1. **상황** (20초)
+   - "경고 누적 시 자동 이용제한을 적용하는 로직에서 동시성 문제를 발견했습니다."
+
+2. **문제 원인** (40초)
+   - "여러 관리자가 동시에 같은 사용자에게 경고를 부여할 때, 각 스레드가 동일한 warningCount를 읽고 +1해서 저장하면 Lost Update가 발생합니다. 경고 2회 상태에서 2명이 동시에 경고를 부여하면 결과가 3이 아닌 2가 될 수 있습니다."
+
+3. **해결** (40초)
+   - "'UPDATE users SET warning_count = warning_count + 1'을 JPA @Modifying 쿼리로 실행해 DB 레벨에서 원자적으로 증가시켰습니다. DB가 행 레벨에서 직렬화하므로 동시 요청에도 카운터가 정확합니다."
+
+4. **결과** (20초)
+   - "자동 이용제한이 정확히 한 번만 적용되고, 경고 누락이나 중복 적용 없이 안정적으로 동작합니다."
+
+---
+
+### 질문: "N+1 문제를 해결한 경험이 있나요?"
+
+1. **문제 발견** (20초)
+   - "로그인 시 채팅방 목록 API에서 채팅방 10개 기준 21개 쿼리와 305ms 응답 시간을 측정했습니다."
+
+2. **원인** (40초)
+   - "채팅방마다 참여자 정보와 메시지를 개별 쿼리로 조회했고, LAZY 로딩으로 최신 메시지 1건을 위해 모든 메시지를 메모리에 로드하고 있었습니다."
+
+3. **해결** (40초)
+   - "채팅방 ID 목록을 먼저 추출하고, 참여자와 메시지를 IN 절 배치 조회로 변경했습니다. 메시지는 서브쿼리로 각 채팅방의 MAX(idx)만 가져왔습니다."
+
+4. **결과** (20초)
+   - "쿼리 4개로 고정, 응답 시간 55ms(81.97% 개선), 메모리 77.24% 감소. 채팅방이 100개로 늘어도 쿼리 수는 동일합니다."
