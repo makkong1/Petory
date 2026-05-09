@@ -1,0 +1,23 @@
+{
+  "task": "meetup-db-fixes",
+  "description": "DB Review(2026-05-09) \uae30\ubc18 \uc218\uc815. joinMeetup TOCTOU \ub3d9\uc2dc\uc131 \ubc84\uadf8(Critical) + @Table \uc778\ub371\uc2a4 \uc120\uc5b8 + findUpcomingMeetupsByUser N+1 \uc9c0\ub8b0 \uc81c\uac70(Medium).",
+  "source_doc": "docs/refactoring/meetup/db-review-2026-05-09.md",
+  "steps": [
+    {
+      "step": 1,
+      "name": "Critical \u2014 joinMeetup TOCTOU \uc218\uc815 (findByIdWithLock + DataIntegrityViolationException \ubcf4\uc0c1)",
+      "file": "step1.md",
+      "priority": "Critical",
+      "status": "completed",
+      "summary": "findByIdWithOrganizer→findByIdWithLock 교체, DataIntegrityViolationException catch+보상(decrement+alreadyJoined) 추가"
+    },
+    {
+      "step": 2,
+      "name": "Medium \u2014 @Table \uc778\ub371\uc2a4 \uc120\uc5b8 \ucd94\uac00 + findUpcomingMeetupsByUser JOIN FETCH \uc218\uc815",
+      "file": "step2.md",
+      "priority": "Medium",
+      "status": "completed",
+      "summary": "Meetup @Table 5개 인덱스 선언, MeetupParticipants @Table 2개 인덱스 선언, findUpcomingMeetupsByUser JOIN FETCH 3개 추가"
+    }
+  ]
+}
