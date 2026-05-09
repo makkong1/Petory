@@ -3,7 +3,6 @@ import styled from 'styled-components';
 import { userProfileApi } from '../../api/userApi';
 
 const EmailVerificationPage = () => {
-  const [token, setToken] = useState(null);
   const [purpose, setPurpose] = useState(null);
   const [sendingEmail, setSendingEmail] = useState(false);
 
@@ -18,7 +17,6 @@ const EmailVerificationPage = () => {
     const purposeFromUrl = urlParams.get('purpose');
     const redirectFromUrl = urlParams.get('redirect');
     
-    setToken(tokenFromUrl);
     setPurpose(purposeFromUrl);
     
     // URL 파라미터의 redirect를 우선 사용, 없으면 sessionStorage에서 확인, 둘 다 없으면 기본값 '/'

@@ -48,7 +48,8 @@ const ChatWidget = () => {
     }, 30000); // 30초
 
     return () => clearInterval(interval);
-  }, [isAuthenticated, user?.idx]); // user?.id → user?.idx 수정
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, user?.idx]);
 
   // 채팅방 클릭 핸들러
   const handleConversationClick = (conversation) => {

@@ -13,7 +13,6 @@ const CommunityManagementSection = () => {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(20);
   const [totalCount, setTotalCount] = useState(0);
-  const [hasNext, setHasNext] = useState(false);
   
   // Map + Array 조합: Map으로 빠른 조회/업데이트, Array로 순서 유지
   const [boardsData, setBoardsData] = useState({ map: {}, order: [] });
@@ -81,7 +80,6 @@ const CommunityManagementSection = () => {
       }
 
       setTotalCount(pageData.totalCount || 0);
-      setHasNext(pageData.hasNext || false);
       setPage(pageNum);
     } catch (e) {
       console.error('게시글 목록 조회 실패:', e);

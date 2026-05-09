@@ -32,14 +32,12 @@ const CommunityBoard = () => {
   const { user, redirectToLogin } = useAuth();
   const theme = useTheme();
 
-  const [posts, setPosts] = useState([]); // 레거시 호환 (점진적 제거 예정)
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [activeCategory, setActiveCategory] = useState('ALL');
   const [isPostModalOpen, setIsPostModalOpen] = useState(false);
   const [isSubmittingPost, setIsSubmittingPost] = useState(false);
   const [selectedBoard, setSelectedBoard] = useState(null);
-  const [isCommentDrawerOpen, setIsCommentDrawerOpen] = useState(false);
   const [selectedBoardId, setSelectedBoardId] = useState(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [popularPosts, setPopularPosts] = useState([]);
@@ -51,7 +49,6 @@ const CommunityBoard = () => {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(20);
   const [totalCount, setTotalCount] = useState(0);
-  const [hasNext, setHasNext] = useState(false);
   // Map + Array 조합: Map으로 빠른 조회/업데이트, Array로 순서 유지
   // React 상태에서 Map을 직접 사용하기 어려우므로 객체로 관리
   const [postsData, setPostsData] = useState({ map: {}, order: [] }); // { map: {[id]: BoardDTO}, order: [id, ...] }
@@ -63,7 +60,6 @@ const CommunityBoard = () => {
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchPage, setSearchPage] = useState(0);
   const [searchTotalCount, setSearchTotalCount] = useState(0);
-  const [searchHasNext, setSearchHasNext] = useState(false);
   // 검색 결과도 동일한 구조 사용
   const [searchPostsData, setSearchPostsData] = useState({ map: {}, order: [] });
 
@@ -82,24 +78,6 @@ const CommunityBoard = () => {
       if (board?.idx && !map[board.idx]) {
         map[board.idx] = board;
         order.push(board.idx);
-      }
-    });
-    return { map, order };
-  }, []);
-
-  // 게시글 추가 (중복 체크 포함)
-  const addPostsToMap = useCallback((existingData, newBoards) => {
-    const map = { ...existingData.map };
-    const order = [...existingData.order];
-    newBoards.forEach(board => {
-      if (board?.idx) {
-        if (!map[board.idx]) {
-          map[board.idx] = board;
-          order.push(board.idx);
-        } else {
-          // 이미 있으면 업데이트
-          map[board.idx] = board;
-        }
       }
     });
     return { map, order };
@@ -178,7 +156,6 @@ const CommunityBoard = () => {
       setPostsData(newData);
 
       setTotalCount(pageData.totalCount || 0);
-      setHasNext(pageData.hasNext || false);
       setPage(pageNum);
     } catch (err) {
       console.error('❌ [CommunityBoard] 게시글 조회 실패:', err);
@@ -335,7 +312,6 @@ const CommunityBoard = () => {
       setSearchPostsData(newData);
 
       setSearchTotalCount(pageData.totalCount || 0);
-      setSearchHasNext(pageData.hasNext || false);
       setSearchPage(pageNum);
     } catch (err) {
       console.error('❌ 검색 실패:', err);
@@ -354,7 +330,6 @@ const CommunityBoard = () => {
     setSearchType('TITLE_CONTENT');
     setSearchPage(0);
     setSearchTotalCount(0);
-    setSearchHasNext(false);
   }, []);
 
   const handleSearchPageChange = useCallback((newPage) => {
@@ -399,7 +374,7 @@ const CommunityBoard = () => {
         boardFilePath: form.boardFilePath || null,
         userId: user.idx,
       };
-      const response = await boardApi.createBoard(payload);
+      await boardApi.createBoard(payload);
       setIsPostModalOpen(false);
       // 게시글 작성 후 첫 페이지부터 다시 로드
       await fetchBoards(0);
@@ -415,7 +390,6 @@ const CommunityBoard = () => {
   const handleDetailClose = () => {
     setIsDetailOpen(false);
     setSelectedBoardId(null);
-    setIsCommentDrawerOpen(false);
     setSelectedBoard(null);
   };
 
@@ -475,7 +449,6 @@ const CommunityBoard = () => {
   };
 
   const handleCommentDrawerClose = () => {
-    setIsCommentDrawerOpen(false);
     setSelectedBoard(null);
   };
 

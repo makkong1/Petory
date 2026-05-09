@@ -8,7 +8,6 @@ const MeetupManagementSection = () => {
   const [meetups, setMeetups] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [selectedMeetup, setSelectedMeetup] = useState(null);
   const [participants, setParticipants] = useState([]);
   const [showParticipants, setShowParticipants] = useState(false);
   const [page, setPage] = useState(0);
@@ -52,7 +51,6 @@ const MeetupManagementSection = () => {
     try {
       const res = await meetupAdminApi.getParticipants(id);
       setParticipants(res.data || []);
-      setSelectedMeetup(id);
       setShowParticipants(true);
     } catch (e) {
       alert(e.response?.data?.message || '참가자 목록 조회 실패');

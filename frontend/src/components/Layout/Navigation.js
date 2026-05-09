@@ -107,7 +107,6 @@ const Navigation = ({ activeTab, setActiveTab, user, onNavigateToBoard }) => {
 
     let eventSource = null;
     let fallbackInterval = null;
-    let isConnected = false;
 
     const connectSSE = () => {
       if (eventSource) {
@@ -121,7 +120,6 @@ const Navigation = ({ activeTab, setActiveTab, user, onNavigateToBoard }) => {
 
       eventSource.onopen = () => {
         console.log('SSE 연결 성공');
-        isConnected = true;
         if (fallbackInterval) {
           clearInterval(fallbackInterval);
           fallbackInterval = null;
@@ -156,8 +154,6 @@ const Navigation = ({ activeTab, setActiveTab, user, onNavigateToBoard }) => {
 
       eventSource.onerror = (error) => {
         console.error('SSE 연결 오류:', error);
-        isConnected = false;
-
         if (!fallbackInterval) {
           console.log('SSE 연결 실패, 폴백 폴링 시작');
           fallbackInterval = setInterval(() => {
@@ -600,12 +596,6 @@ const SidebarNotificationDropdown = styled.div`
   }
 `;
 
-const Divider = styled.div`
-  height: 1px;
-  background: ${props => props.theme.colors.border};
-  margin: 8px 0;
-`;
-
 const ProfileSection = styled.div`
   display: flex;
   flex-direction: row;
@@ -693,31 +683,6 @@ const ProfileMenuItem = styled.button`
   }
 `;
 
-const LogoutButton = styled.button`
-  display: flex;
-  align-items: center;
-  gap: ${props => props.theme.spacing.sm};
-  width: 100%;
-  padding: 10px 16px;
-  border: none;
-  border-radius: ${props => props.theme.borderRadius.md};
-  background: transparent;
-  color: ${props => props.theme.colors.textSecondary};
-  font-size: ${props => props.theme.typography.body2.fontSize};
-  cursor: pointer;
-  transition: all 0.2s ease;
-  text-align: left;
-
-  &:hover {
-    background: ${props => props.theme.colors.surfaceHover};
-    color: ${props => props.theme.colors.error};
-  }
-
-  &::before {
-    content: '↩';
-    font-size: 14px;
-  }
-`;
 
 /* ─────────────────────────────────────────────
    모바일 하단 탭바

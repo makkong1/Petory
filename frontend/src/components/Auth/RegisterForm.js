@@ -56,6 +56,7 @@ const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
         }
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleChange = (e) => {
@@ -787,12 +788,9 @@ const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
 
       <LinkText>
         이미 계정이 있으신가요?{' '}
-        <a href="#" onClick={(e) => {
-          e.preventDefault();
-          if (onSwitchToLogin) onSwitchToLogin();
-        }}>
+        <button type="button" onClick={() => { if (onSwitchToLogin) onSwitchToLogin(); }}>
           로그인
-        </a>
+        </button>
       </LinkText>
     </RegisterContainer>
   );

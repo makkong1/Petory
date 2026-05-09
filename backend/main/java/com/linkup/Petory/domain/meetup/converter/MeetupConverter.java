@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Component
@@ -33,6 +34,9 @@ public class MeetupConverter {
 
         Users organizer = meetup.getOrganizer();
 
+        Integer maxParticipants = meetup.getMaxParticipants();
+        Integer currentParticipants = meetup.getCurrentParticipants();
+
         return MeetupDTO.builder()
                 .idx(meetup.getIdx())
                 .title(meetup.getTitle())
@@ -43,8 +47,8 @@ public class MeetupConverter {
                 .date(meetup.getDate())
                 .organizerIdx(organizer != null ? organizer.getIdx() : null)
                 .organizerName(organizer != null ? organizer.getUsername() : null)
-                .maxParticipants(meetup.getMaxParticipants())
-                .currentParticipants(meetup.getCurrentParticipants() != null ? meetup.getCurrentParticipants() : 0)
+                .maxParticipants(Objects.requireNonNullElse(maxParticipants, 10))
+                .currentParticipants(Objects.requireNonNullElse(currentParticipants, 0))
                 .status(meetup.getStatus() != null ? meetup.getStatus().name() : MeetupStatus.RECRUITING.name())
                 .createdAt(meetup.getCreatedAt())
                 .updatedAt(meetup.getUpdatedAt())
@@ -75,6 +79,9 @@ public class MeetupConverter {
             }
         }
 
+        Integer dtoMaxParticipants = dto.getMaxParticipants();
+        Integer dtoCurrentParticipants = dto.getCurrentParticipants();
+
         return Meetup.builder()
                 .idx(dto.getIdx())
                 .title(dto.getTitle())
@@ -83,8 +90,8 @@ public class MeetupConverter {
                 .latitude(dto.getLatitude())
                 .longitude(dto.getLongitude())
                 .date(dto.getDate())
-                .maxParticipants(dto.getMaxParticipants())
-                .currentParticipants(dto.getCurrentParticipants() != null ? dto.getCurrentParticipants() : 0)
+                .maxParticipants(Objects.requireNonNullElse(dtoMaxParticipants, 10))
+                .currentParticipants(Objects.requireNonNullElse(dtoCurrentParticipants, 0))
                 .status(status)
                 .isDeleted(dto.getIsDeleted())
                 .deletedAt(dto.getDeletedAt())

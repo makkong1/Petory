@@ -57,7 +57,6 @@ const MissingPetBoardPage = () => {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(20);
   const [totalCount, setTotalCount] = useState(0);
-  const [hasNext, setHasNext] = useState(false);
 
   // 서버 사이드 페이징으로 게시글 가져오기
   const fetchBoards = useCallback(async (pageNum = 0) => {
@@ -78,7 +77,6 @@ const MissingPetBoardPage = () => {
       setBoards(boardsData);
 
       setTotalCount(pageData.totalCount || 0);
-      setHasNext(pageData.hasNext || false);
       setPage(pageNum);
       setLastUpdated(new Date());
     } catch (err) {
