@@ -42,7 +42,7 @@ public class Meetup extends BaseTimeEntity {
     @Column(nullable = false)
     private LocalDateTime date; // 모임 일시
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "organizer_idx", nullable = false)
     private Users organizer; // 모임 주최자
 

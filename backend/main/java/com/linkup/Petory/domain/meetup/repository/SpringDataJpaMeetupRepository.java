@@ -95,7 +95,7 @@ public interface SpringDataJpaMeetupRepository extends JpaRepository<Meetup, Lon
 
     @RepositoryMethod("모임: 비관적 락 조회 (동시성 제어, 소프트 삭제 제외)")
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("SELECT m FROM Meetup m WHERE m.idx = :idx AND (m.isDeleted = false OR m.isDeleted IS NULL)")
+    @Query("SELECT m FROM Meetup m JOIN FETCH m.organizer WHERE m.idx = :idx AND (m.isDeleted = false OR m.isDeleted IS NULL)")
     Optional<Meetup> findByIdWithLock(@Param("idx") Long idx);
 
     @RepositoryMethod("모임: 참여자 수 원자적 증가 (RECRUITING 상태 + 인원 미달 조건)")

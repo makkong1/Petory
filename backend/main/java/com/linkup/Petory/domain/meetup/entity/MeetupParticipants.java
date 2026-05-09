@@ -20,12 +20,12 @@ import com.linkup.Petory.domain.user.entity.Users;
 public class MeetupParticipants {
 
     @Id
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "meetup_idx", nullable = false)
     private Meetup meetup;
 
     @Id
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_idx", nullable = false)
     private Users user;
 
