@@ -47,9 +47,11 @@ export async function removePushToken() {
   if (!isCapacitor()) return;
   try {
     const { PushNotifications } = await import('@capacitor/push-notifications');
-    const token = await PushNotifications.getDeliveredNotifications();
+    const { value: token } = await PushNotifications.getToken();
     if (token) {
       await api.delete('/fcm/token', { data: { token } });
     }
-  } catch (_) {}
+  } catch (error) {
+    console.warn('FCM 토큰 삭제 실패:', error);
+  }
 }

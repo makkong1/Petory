@@ -12,7 +12,9 @@ const saveToPreferences = async (key, value) => {
   try {
     const { Preferences } = await import('@capacitor/preferences');
     await Preferences.set({ key, value });
-  } catch (_) {}
+  } catch (error) {
+    console.warn('Capacitor Preferences 저장 실패:', key, error);
+  }
 };
 
 const removeFromPreferences = async (key) => {
@@ -20,7 +22,9 @@ const removeFromPreferences = async (key) => {
   try {
     const { Preferences } = await import('@capacitor/preferences');
     await Preferences.remove({ key });
-  } catch (_) {}
+  } catch (error) {
+    console.warn('Capacitor Preferences 삭제 실패:', key, error);
+  }
 };
 
 export const getToken = () =>
