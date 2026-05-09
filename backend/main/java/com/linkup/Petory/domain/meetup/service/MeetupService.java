@@ -40,6 +40,7 @@ import com.linkup.Petory.domain.user.exception.EmailVerificationRequiredExceptio
 import com.linkup.Petory.domain.user.exception.UserNotFoundException;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 import com.linkup.Petory.global.exception.ApiException;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -291,8 +292,8 @@ public class MeetupService {
     // 모임 참가 (원자적 UPDATE 쿼리 방식 - 권장)
     @Transactional
     public MeetupParticipantsDTO joinMeetup(Long meetupIdx, String userId) {
-        // 모임 조회 (organizer fetch로 N+1 방지)
-        Meetup meetup = meetupRepository.findByIdWithOrganizer(meetupIdx)
+        // 비관적 락으로 조회 — 동시 참가 요청 직렬화 (TOCTOU 방지)
+        Meetup meetup = meetupRepository.findByIdWithLock(meetupIdx)
                 .orElseThrow(MeetupNotFoundException::new);
 
         // 사용자 확인
@@ -341,7 +342,14 @@ public class MeetupService {
                 .joinedAt(LocalDateTime.now())
                 .build();
 
-        MeetupParticipants savedParticipant = meetupParticipantsRepository.save(participant);
+        MeetupParticipants savedParticipant;
+        try {
+            savedParticipant = meetupParticipantsRepository.save(participant);
+        } catch (DataIntegrityViolationException e) {
+            meetupRepository.decrementParticipantsIfPositive(meetupIdx);
+            log.warn("중복 참가 시도 감지 (PK 충돌): meetupIdx={}, userIdx={}", meetupIdx, userIdx);
+            throw MeetupConflictException.alreadyJoined();
+        }
 
         log.info("모임 참가 완료. meetupIdx={}, userId={}, 현재인원={}, 최대인원={}",
                 meetupIdx, userId, meetup.getCurrentParticipants(), meetup.getMaxParticipants());

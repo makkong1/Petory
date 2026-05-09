@@ -7,7 +7,10 @@ import java.time.LocalDateTime;
 import com.linkup.Petory.domain.user.entity.Users;
 
 @Entity
-@Table(name = "meetupparticipants")
+@Table(name = "meetupparticipants", indexes = {
+    @Index(name = "user_idx",                                 columnList = "user_idx"),
+    @Index(name = "idx_meetupparticipants_user_liked_joined", columnList = "user_idx, liked, joined_at")
+})
 @IdClass(MeetupParticipantsId.class)
 @Getter
 @Setter
