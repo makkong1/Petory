@@ -220,6 +220,8 @@ public class MeetupService {
     }
 
     // 모든 모임 조회 (소프트 삭제 제외)
+    /** @deprecated 컨트롤러는 {@link #getAllMeetups(Pageable)}를 사용하세요. */
+    @Deprecated(forRemoval = true)
     @Timed("getAllMeetups")
     public List<MeetupDTO> getAllMeetups() {
         List<Meetup> meetups = meetupRepository.findAllNotDeleted(); // 원래는 여기에서 n+1문제가 발생했지만 join fetch로 해결
