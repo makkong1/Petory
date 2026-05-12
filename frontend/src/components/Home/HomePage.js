@@ -72,7 +72,24 @@ const HomePage = ({ setActiveTab }) => {
           </HeaderLeft>
           <NotificationBtn>🔔</NotificationBtn>
         </Header>
-        {/* SearchBar, Tabs, Content - Tasks 3-7 */}
+        <SearchBarWrap>
+          <SearchIcon>🔍</SearchIcon>
+          <SearchInput placeholder="반려동물·케어·모임 검색..." readOnly />
+          <FilterBtn>⚙️</FilterBtn>
+        </SearchBarWrap>
+        <TabsWrap>
+          {TABS.map(tab => (
+            <TabBtn
+              key={tab.key}
+              $active={activeTab === tab.key}
+              $color={tab.domainColor}
+              onClick={() => setActiveTabLocal(tab.key)}
+            >
+              {tab.label}
+            </TabBtn>
+          ))}
+        </TabsWrap>
+        {/* Content - Tasks 5-7 */}
       </PageContainer>
     </PageWrapper>
   );
@@ -151,4 +168,66 @@ const NotificationBtn = styled.button`
   cursor: pointer;
   padding: 4px;
   line-height: 1;
+`;
+
+/* ── SearchBar ───────────────────────────────────────────────── */
+
+const SearchBarWrap = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 20px 20px;
+  padding: 12px 16px;
+  border: 1.5px solid ${props => props.theme.colors.border};
+  border-radius: 9999px;
+  background: ${props => props.theme.colors.surface};
+`;
+
+const SearchIcon = styled.span`
+  font-size: 16px;
+  flex-shrink: 0;
+`;
+
+const SearchInput = styled.input`
+  flex: 1;
+  border: none;
+  background: none;
+  outline: none;
+  font-size: 14px;
+  color: ${props => props.theme.colors.textMuted};
+  cursor: pointer;
+  &::placeholder { color: ${props => props.theme.colors.textMuted}; }
+`;
+
+const FilterBtn = styled.button`
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+`;
+
+/* ── CategoryTabs ────────────────────────────────────────────── */
+
+const TabsWrap = styled.div`
+  display: flex;
+  gap: 8px;
+  padding: 0 20px 20px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+`;
+
+const TabBtn = styled.button`
+  flex-shrink: 0;
+  padding: 8px 16px;
+  border-radius: 9999px;
+  border: 1.5px solid ${props => props.$active ? props.$color : props.theme.colors.border};
+  background: ${props => props.$active ? props.$color : props.theme.colors.surface};
+  color: ${props => props.$active ? '#fff' : props.theme.colors.textSecondary};
+  font-size: 13px;
+  font-weight: ${props => props.$active ? 600 : 400};
+  cursor: pointer;
+  transition: all 150ms ease;
 `;
