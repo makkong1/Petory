@@ -13,6 +13,109 @@ const TABS = [
   { key: 'community', label: '커뮤니티',   domainColor: '#8B5CF6' },
 ];
 
+const getHeroItem = (tabKey, items) => {
+  if (!items || items.length === 0) return null;
+  const item = items[0];
+  if (tabKey === 'service') {
+    return {
+      title: item.name,
+      subtitle: item.category,
+      badge: item.averageRating ? `⭐ ${item.averageRating}` : null,
+      image: item.imageUrl || null,
+    };
+  }
+  if (tabKey === 'meetup') {
+    return {
+      title: item.title,
+      subtitle: `${item.location || ''} · ${item.currentParticipants || 0}/${item.maxParticipants || 0}명`,
+      badge: item.status === 'RECRUITING' ? '모집중' : null,
+      image: item.imageUrl || null,
+    };
+  }
+  if (tabKey === 'missing') {
+    return {
+      title: item.petName || item.title,
+      subtitle: `${item.breed || ''} · ${item.lostDate || ''}`,
+      badge: '실종',
+      image: item.imageUrl || null,
+    };
+  }
+  if (tabKey === 'community') {
+    return {
+      title: item.title,
+      subtitle: `❤️ ${item.likes || 0}  👁 ${item.views || 0}`,
+      badge: item.category || null,
+      image: item.boardFilePath || null,
+    };
+  }
+  return null;
+};
+
+const TabContent = ({ tab, items, loading, error, onViewAll }) => {
+  const hero = getHeroItem(tab.key, items);
+
+  if (loading) {
+    return (
+      <ContentArea>
+        <SkeletonHero />
+        <SectionHeader>
+          <SkeletonText $w="120px" />
+          <SkeletonText $w="60px" />
+        </SectionHeader>
+        <HorizontalScroll>
+          {[1, 2, 3].map(i => <SkeletonSmallCard key={i} />)}
+        </HorizontalScroll>
+      </ContentArea>
+    );
+  }
+
+  return (
+    <ContentArea>
+      {hero ? (
+        <HeroCard $color={tab.domainColor} $image={hero.image}>
+          <HeroOverlay />
+          <HeroGlassPanel>
+            <HeroTitle>{hero.title}</HeroTitle>
+            <HeroSub>{hero.subtitle}</HeroSub>
+            {hero.badge && <HeroBadge $color={tab.domainColor}>{hero.badge}</HeroBadge>}
+          </HeroGlassPanel>
+        </HeroCard>
+      ) : (
+        !error && <EmptyHero $color={tab.domainColor}>아직 등록된 항목이 없어요</EmptyHero>
+      )}
+
+      <SectionHeader>
+        <SectionLabel>인기 {tab.label}</SectionLabel>
+        <ViewAllBtn onClick={onViewAll}>전체보기 →</ViewAllBtn>
+      </SectionHeader>
+
+      {items.length > 1 ? (
+        <HorizontalScroll>
+          {items.slice(1).map((item, idx) => (
+            <SmallCard key={idx} $color={tab.domainColor}>
+              <SmallCardImg $color={tab.domainColor} />
+              <SmallCardTitle>{
+                tab.key === 'service' ? item.name :
+                tab.key === 'meetup' ? item.title :
+                tab.key === 'missing' ? (item.petName || item.title) :
+                item.title
+              }</SmallCardTitle>
+              <SmallCardSub>{
+                tab.key === 'service' ? item.category :
+                tab.key === 'meetup' ? `${item.currentParticipants || 0}/${item.maxParticipants || 0}명` :
+                tab.key === 'missing' ? (item.breed || '') :
+                (item.category || '')
+              }</SmallCardSub>
+            </SmallCard>
+          ))}
+        </HorizontalScroll>
+      ) : (
+        !loading && <EmptyList>더 많은 항목을 불러오는 중이에요</EmptyList>
+      )}
+    </ContentArea>
+  );
+};
+
 const HomePage = ({ setActiveTab }) => {
   const { user } = useAuth();
   const isAdmin = user && (user.role === 'ADMIN' || user.role === 'MASTER');
@@ -89,7 +192,22 @@ const HomePage = ({ setActiveTab }) => {
             </TabBtn>
           ))}
         </TabsWrap>
-        {/* Content - Tasks 5-7 */}
+        <TabContent
+          tab={TABS.find(t => t.key === activeTab)}
+          items={tabData[activeTab] || []}
+          loading={tabLoading[activeTab]}
+          error={tabError[activeTab]}
+          onViewAll={() => {
+            const tabToAppTab = {
+              service: 'unified-map',
+              meetup: 'unified-map',
+              missing: 'missing-pets',
+              community: 'community',
+            };
+            setActiveTab(tabToAppTab[activeTab]);
+          }}
+        />
+        {/* Admin - Task 7 */}
       </PageContainer>
     </PageWrapper>
   );
@@ -230,4 +348,207 @@ const TabBtn = styled.button`
   font-weight: ${props => props.$active ? 600 : 400};
   cursor: pointer;
   transition: all 150ms ease;
+`;
+
+/* ── ContentArea & HeroCard ──────────────────────────────────── */
+
+const ContentArea = styled.div`
+  padding: 0 20px;
+`;
+
+const HeroCard = styled.div`
+  position: relative;
+  width: 100%;
+  height: 280px;
+  border-radius: 24px;
+  overflow: hidden;
+  margin-bottom: 24px;
+  background: ${props => props.$image
+    ? `url(${props.$image}) center/cover no-repeat`
+    : `linear-gradient(135deg, ${props.$color}cc 0%, ${props.$color}44 100%)`
+  };
+`;
+
+const HeroOverlay = styled.div`
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, transparent 30%, rgba(0,0,0,0.55) 100%);
+`;
+
+const HeroGlassPanel = styled.div`
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  right: 16px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(29, 29, 29, 0.45);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+`;
+
+const HeroTitle = styled.div`
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+`;
+
+const HeroSub = styled.div`
+  font-size: 13px;
+  color: rgba(255,255,255,0.75);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+`;
+
+const HeroBadge = styled.span`
+  display: inline-block;
+  margin-top: 8px;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  background: ${props => props.$color};
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+`;
+
+const EmptyHero = styled.div`
+  height: 100px;
+  border-radius: 24px;
+  background: ${props => `${props.$color}22`};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: ${props => props.theme.colors.textMuted};
+  font-size: 14px;
+  margin-bottom: 24px;
+`;
+
+const SectionHeader = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+`;
+
+const SectionLabel = styled.span`
+  font-size: 17px;
+  font-weight: 700;
+  color: ${props => props.theme.colors.text};
+`;
+
+const ViewAllBtn = styled.button`
+  background: none;
+  border: none;
+  font-size: 13px;
+  color: ${props => props.theme.colors.textSecondary};
+  cursor: pointer;
+  padding: 0;
+`;
+
+const HorizontalScroll = styled.div`
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  margin: 0 -20px;
+  padding-left: 20px;
+  padding-right: 20px;
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+`;
+
+const SmallCard = styled.div`
+  flex-shrink: 0;
+  width: 150px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: ${props => props.theme.colors.surface};
+  box-shadow: ${props => props.theme.shadows.sm};
+  cursor: pointer;
+  transition: transform 150ms ease;
+  &:hover { transform: translateY(-2px); }
+`;
+
+const SmallCardImg = styled.div`
+  height: 110px;
+  background: linear-gradient(135deg, ${props => props.$color}99 0%, ${props => props.$color}44 100%);
+`;
+
+const SmallCardTitle = styled.div`
+  font-size: 13px;
+  font-weight: 600;
+  color: ${props => props.theme.colors.text};
+  padding: 10px 10px 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+`;
+
+const SmallCardSub = styled.div`
+  font-size: 11px;
+  color: ${props => props.theme.colors.textSecondary};
+  padding: 0 10px 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+`;
+
+const EmptyList = styled.div`
+  font-size: 13px;
+  color: ${props => props.theme.colors.textMuted};
+  text-align: center;
+  padding: 20px 0;
+`;
+
+/* ── Skeletons ───────────────────────────────────────────────── */
+
+const SkeletonHero = styled.div`
+  width: 100%;
+  height: 280px;
+  border-radius: 24px;
+  margin-bottom: 24px;
+  background: linear-gradient(90deg,
+    ${props => props.theme.colors.border} 25%,
+    ${props => props.theme.colors.borderLight} 50%,
+    ${props => props.theme.colors.border} 75%
+  );
+  background-size: 200px 100%;
+  animation: shimmer 1.2s infinite;
+
+  @keyframes shimmer {
+    0% { background-position: -200px 0; }
+    100% { background-position: calc(200px + 100%) 0; }
+  }
+`;
+
+const SkeletonSmallCard = styled.div`
+  flex-shrink: 0;
+  width: 150px;
+  height: 160px;
+  border-radius: 16px;
+  background: linear-gradient(90deg,
+    ${props => props.theme.colors.border} 25%,
+    ${props => props.theme.colors.borderLight} 50%,
+    ${props => props.theme.colors.border} 75%
+  );
+  background-size: 200px 100%;
+  animation: shimmer 1.2s infinite;
+`;
+
+const SkeletonText = styled.div`
+  height: 16px;
+  border-radius: 8px;
+  width: ${props => props.$w || '100px'};
+  background: linear-gradient(90deg,
+    ${props => props.theme.colors.border} 25%,
+    ${props => props.theme.colors.borderLight} 50%,
+    ${props => props.theme.colors.border} 75%
+  );
+  background-size: 200px 100%;
+  animation: shimmer 1.2s infinite;
 `;
