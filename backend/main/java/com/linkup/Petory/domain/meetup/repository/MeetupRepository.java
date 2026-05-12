@@ -119,4 +119,9 @@ public interface MeetupRepository {
      * 일시가 지난 모임 → COMPLETED
      */
     int completePastMeetups(LocalDateTime now);
+
+    /**
+     * 채팅방이 없는 모임 조회 — 복구 스케줄러용
+     */
+    List<Meetup> findWithoutChatRoom();
 }

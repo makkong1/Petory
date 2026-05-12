@@ -164,4 +164,12 @@ public interface SpringDataJpaMeetupRepository extends JpaRepository<Meetup, Lon
 
     @RepositoryMethod("모임: 기간별 통계")
     long countByCreatedAtBetween(LocalDateTime start, LocalDateTime end);
+
+    @Query(value = "SELECT m.* FROM meetup m " +
+            "JOIN users u ON u.idx = m.organizer_idx " +
+            "WHERE (m.is_deleted = false OR m.is_deleted IS NULL) " +
+            "AND NOT EXISTS (SELECT 1 FROM conversation c " +
+            "WHERE c.related_type = 'MEETUP' AND c.related_idx = m.idx AND c.is_deleted = false)",
+            nativeQuery = true)
+    List<Meetup> findWithoutChatRoom();
 }
