@@ -62,7 +62,17 @@ const HomePage = ({ setActiveTab }) => {
   return (
     <PageWrapper>
       <PageContainer>
-        {/* Tasks 2-7 will fill this in */}
+        <Header>
+          <HeaderLeft>
+            <Avatar>{nickname.charAt(0)}</Avatar>
+            <HeaderText>
+              <Greeting>안녕하세요, {nickname}님! 🐾</Greeting>
+              <SubGreeting>오늘도 함께해서 행복해요</SubGreeting>
+            </HeaderText>
+          </HeaderLeft>
+          <NotificationBtn>🔔</NotificationBtn>
+        </Header>
+        {/* SearchBar, Tabs, Content - Tasks 3-7 */}
       </PageContainer>
     </PageWrapper>
   );
@@ -86,4 +96,59 @@ const PageContainer = styled.div`
   background: ${props => props.theme.colors.background};
   overflow-x: hidden;
   padding-bottom: 24px;
+`;
+
+const Header = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 20px 12px;
+`;
+
+const HeaderLeft = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 12px;
+`;
+
+const Avatar = styled.div`
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: ${props => props.theme.colors.primary};
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 700;
+  flex-shrink: 0;
+`;
+
+const HeaderText = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+`;
+
+const Greeting = styled.span`
+  font-size: 16px;
+  font-weight: 700;
+  color: ${props => props.theme.colors.text};
+  line-height: 1.2;
+`;
+
+const SubGreeting = styled.span`
+  font-size: 13px;
+  color: ${props => props.theme.colors.textSecondary};
+  line-height: 1.2;
+`;
+
+const NotificationBtn = styled.button`
+  background: none;
+  border: none;
+  font-size: 22px;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
 `;
