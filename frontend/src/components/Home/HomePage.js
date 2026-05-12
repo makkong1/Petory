@@ -207,7 +207,21 @@ const HomePage = ({ setActiveTab }) => {
             setActiveTab(tabToAppTab[activeTab]);
           }}
         />
-        {/* Admin - Task 7 */}
+        {isAdmin && (
+          <AdminSection>
+            <AdminSectionTitle>🔧 관리자 기능</AdminSectionTitle>
+            <AdminGrid>
+              <AdminCard onClick={() => setActiveTab('admin')}>
+                <AdminCardIcon>📥</AdminCardIcon>
+                <AdminCardName>초기 데이터 로딩</AdminCardName>
+              </AdminCard>
+              <AdminCard onClick={() => setActiveTab('users')}>
+                <AdminCardIcon>👥</AdminCardIcon>
+                <AdminCardName>사용자 관리</AdminCardName>
+              </AdminCard>
+            </AdminGrid>
+          </AdminSection>
+        )}
       </PageContainer>
     </PageWrapper>
   );
@@ -551,4 +565,47 @@ const SkeletonText = styled.div`
   );
   background-size: 200px 100%;
   animation: shimmer 1.2s infinite;
+`;
+
+/* ── Admin Section ───────────────────────────────────────────── */
+
+const AdminSection = styled.div`
+  margin: 32px 20px 0;
+  padding-top: 24px;
+  border-top: 1px solid ${props => props.theme.colors.border};
+`;
+
+const AdminSectionTitle = styled.div`
+  font-size: 15px;
+  font-weight: 700;
+  color: ${props => props.theme.colors.textSecondary};
+  margin-bottom: 14px;
+`;
+
+const AdminGrid = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+`;
+
+const AdminCard = styled.div`
+  background: ${props => props.theme.colors.surface};
+  border: 1.5px solid ${props => props.theme.colors.border};
+  border-radius: 16px;
+  padding: 16px;
+  cursor: pointer;
+  text-align: center;
+  transition: border-color 150ms ease;
+  &:hover { border-color: ${props => props.theme.colors.primary}; }
+`;
+
+const AdminCardIcon = styled.div`
+  font-size: 24px;
+  margin-bottom: 8px;
+`;
+
+const AdminCardName = styled.div`
+  font-size: 13px;
+  font-weight: 600;
+  color: ${props => props.theme.colors.text};
 `;
