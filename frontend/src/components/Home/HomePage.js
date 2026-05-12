@@ -110,7 +110,7 @@ const TabContent = ({ tab, items, loading, error, onViewAll }) => {
           ))}
         </HorizontalScroll>
       ) : (
-        !loading && <EmptyList>더 많은 항목을 불러오는 중이에요</EmptyList>
+        <EmptyList>등록된 항목이 없어요</EmptyList>
       )}
     </ContentArea>
   );
@@ -123,7 +123,7 @@ const HomePage = ({ setActiveTab }) => {
 
   const [activeTab, setActiveTabLocal] = useState('service');
   const [tabData, setTabData] = useState({});
-  const [tabLoading, setTabLoading] = useState({});
+  const [tabLoading, setTabLoading] = useState({ service: true });
   const [tabError, setTabError] = useState({});
 
   const fetchedTabsRef = React.useRef(new Set());
