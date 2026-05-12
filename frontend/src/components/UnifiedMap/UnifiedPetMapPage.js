@@ -100,26 +100,47 @@ const UnifiedPetMapPage = () => {
     setSearchMode(mode);
   }, []);
 
-  // 위치 취득
+  // 위치 취득 (iOS WebView·시뮬에서 콜백이 안 오는 경우 방지: 시간 지나면 서울 중심으로 진행)
   useEffect(() => {
+    let cancelled = false;
+    const applyDefaultCenter = () => {
+      if (cancelled) return;
+      setMapViewportCenter((prev) => (hasValidCenter(prev) ? prev : DEFAULT_CENTER));
+      setSearchCenter((prev) => (hasValidCenter(prev) ? prev : DEFAULT_CENTER));
+    };
+
+    const fallbackMs = 10000;
+    const fallbackTimer = window.setTimeout(applyDefaultCenter, fallbackMs);
+
     if (!navigator.geolocation) {
-      setMapViewportCenter(DEFAULT_CENTER);
-      setSearchCenter(DEFAULT_CENTER);
-      return;
+      window.clearTimeout(fallbackTimer);
+      applyDefaultCenter();
+      return () => {
+        cancelled = true;
+        window.clearTimeout(fallbackTimer);
+      };
     }
+
     navigator.geolocation.getCurrentPosition(
       (pos) => {
+        window.clearTimeout(fallbackTimer);
+        if (cancelled) return;
         const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setUserLocation(loc);
         setMapViewportCenter(loc);
         setSearchCenter(loc);
       },
       () => {
-        setMapViewportCenter(prev => prev || DEFAULT_CENTER);
-        setSearchCenter(prev => prev || DEFAULT_CENTER);
+        window.clearTimeout(fallbackTimer);
+        applyDefaultCenter();
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
     );
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(fallbackTimer);
+    };
   }, []);
 
   // 데이터 조회 (디바운스 300ms)

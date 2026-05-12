@@ -62,9 +62,9 @@ public class MissingPetBoardController {
      */
     @GetMapping
     public ResponseEntity<MissingPetBoardPageResponseDTO> listBoards(
-            @RequestParam(required = false) MissingPetStatus status,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(name = "status", required = false) MissingPetStatus status,
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "20") int size) {
         return ResponseEntity.ok(missingPetBoardService.getBoardsWithPaging(status, page, size));
     }
 

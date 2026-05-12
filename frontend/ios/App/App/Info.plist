@@ -47,5 +47,54 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<!-- 네이버 지도(JS)가 타일 스타일 JSON 등을 HTTP로 요청함 → ATS 차단 해제 (해당 호스트 한정) -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<!-- Capacitor WKWebView 안에서만 HTTP 허용: 네이버 지도가 여러 CDN에 http 자산(커서·로고 등)을 뿌림 -->
+		<key>NSAllowsArbitraryLoadsInWebContent</key>
+		<true/>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>map.naver.com</key>
+			<dict>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+			</dict>
+			<key>map.naver.net</key>
+			<dict>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+			</dict>
+			<key>openapi.map.naver.com</key>
+			<dict>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+			</dict>
+			<key>oapi.map.naver.com</key>
+			<dict>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+			</dict>
+			<key>nr.map.naver.com</key>
+			<dict>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+			</dict>
+		</dict>
+	</dict>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>주변 펫케어 시설·모임·지도 검색을 위해 현재 위치가 필요합니다.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>주변 펫케어 시설·모임·지도 검색을 위해 현재 위치가 필요합니다.</string>
 </dict>
 </plist>

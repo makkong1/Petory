@@ -7,6 +7,7 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
@@ -40,7 +41,6 @@ import com.linkup.Petory.domain.user.exception.EmailVerificationRequiredExceptio
 import com.linkup.Petory.domain.user.exception.UserNotFoundException;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 import com.linkup.Petory.global.exception.ApiException;
-import org.springframework.dao.DataIntegrityViolationException;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -120,6 +120,7 @@ public class MeetupService {
         // 모임 생성 완료 이벤트 발행 (트랜잭션 커밋 후 비동기로 채팅방 생성 처리)
         // 핵심 도메인(모임)과 파생 도메인(채팅방) 분리: 채팅방 생성 실패가 모임 생성까지 롤백하지 않음
         // TransactionSynchronization을 사용하여 트랜잭션 커밋 후 이벤트 발행 보장
+        // "트랜잭션이 성공적으로 commit되면 그때 이 코드를 실행해줘" 이란 의미
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
@@ -416,7 +417,8 @@ public class MeetupService {
 
     /**
      * 사용자의 모임 히스토리 조회.
-     * participants → meetup → organizer를 fetch join한 단일 목록 조회를 사용해 카드 변환 중 N+1을 막는다.
+     * participants → meetup → organizer를 fetch join한 단일 목록 조회를 사용해 카드 변환 중 N+1을
+     * 막는다.
      */
     public List<MeetupHistoryDTO> getMeetupHistory(Long userIdx) {
         List<MeetupParticipants> histories = meetupParticipantsRepository.findByUserIdxOrderByJoinedAtDesc(userIdx);
