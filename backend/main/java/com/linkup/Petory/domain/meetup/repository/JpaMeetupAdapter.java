@@ -125,4 +125,9 @@ public class JpaMeetupAdapter implements MeetupRepository {
     public int completePastMeetups(LocalDateTime now) {
         return jpaRepository.completePastMeetups(now, MeetupStatus.COMPLETED);
     }
+
+    @Override
+    public List<Meetup> findWithoutChatRoom() {
+        return jpaRepository.findWithoutChatRoom();
+    }
 }

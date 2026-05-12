@@ -6,6 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
 import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
+import org.springframework.retry.annotation.EnableRetry;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -18,6 +19,7 @@ import de.codecentric.boot.admin.server.config.EnableAdminServer;
 // @ServletComponentScan // 이 어노테이션을 추가하여 Servlet 리스너와 필터 자동 등록
 @EnableScheduling // 주기적 작업을 활성화+
 @EnableAsync
+@EnableRetry
 @EnableCaching
 @EnableAdminServer
 @EnableJpaAuditing // JPA Auditing 활성화
