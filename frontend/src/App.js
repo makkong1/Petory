@@ -276,11 +276,15 @@ const AppLayout = styled.div`
 `;
 
 const ContentArea = styled.main`
-  margin-left: 0;
-  margin-top: 60px;
   flex: 1;
-  min-height: calc(100vh - 60px);
+  min-height: 100vh;
   background: ${props => props.theme.colors.background};
+
+  @media (min-width: 769px) {
+    margin-left: 240px;
+    margin-top: 0;
+    min-height: 100vh;
+  }
 
   @media (max-width: 768px) {
     margin-top: 0;
