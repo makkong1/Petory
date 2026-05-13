@@ -639,21 +639,6 @@ const ImageStatusBadge = styled.span`
     : props.theme.colors.error + '44'};
 `;
 
-const CardImage = styled.div`
-  width: 100%;
-  height: 180px;
-  background: ${(props) => props.theme.colors.surfaceHover};
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  img {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-  }
-`;
 
 const CardInfo = styled.div`
   padding: 14px 16px;
@@ -681,58 +666,8 @@ const CardBody = styled.div`
   gap: ${(props) => props.theme.spacing.sm};
 `;
 
-const CardHeader = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: ${(props) => props.theme.spacing.sm};
-`;
 
-const StatusBadge = styled.span.withConfig({
-  shouldForwardProp: (prop) => prop !== 'status',
-})`
-  padding: ${(props) => props.theme.spacing.xs} ${(props) => props.theme.spacing.sm};
-  border-radius: ${(props) => props.theme.borderRadius.md};
-  font-size: ${(props) => props.theme.typography.body2.fontSize};
-  font-weight: 700;
-  color: ${(props) => props.theme.colors.textInverse};
-  background: ${(props) => {
-    switch (props.status) {
-      case 'FOUND':
-        return props.theme.colors.status.found;
-      case 'RESOLVED':
-        return props.theme.colors.status.resolved;
-      case 'MISSING':
-      default:
-        return props.theme.colors.status.missing;
-    }
-  }};
-`;
 
-const UrgencyBadge = styled.span.withConfig({
-  shouldForwardProp: (prop) => prop !== 'level',
-})`
-  padding: ${(props) => props.theme.spacing.xs} ${(props) => props.theme.spacing.sm};
-  border-radius: ${(props) => props.theme.borderRadius.pill};
-  font-size: ${(props) => props.theme.typography.caption.fontSize};
-  font-weight: 700;
-  white-space: nowrap;
-  animation: ${(props) => props.level === 'critical' ? 'urgencyPulse 2s infinite' : 'none'};
-  color: ${(props) => props.theme.colors.textInverse};
-  background: ${(props) => {
-    switch (props.level) {
-      case 'critical': return props.theme.colors.error;
-      case 'urgent': return props.theme.colors.warning;
-      case 'warning': return props.theme.colors.info;
-      default: return props.theme.colors.textMuted;
-    }
-  }};
-
-  @keyframes urgencyPulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.7; }
-  }
-`;
 
 const LostDate = styled.span`
   font-size: ${(props) => props.theme.typography.body2.fontSize};
@@ -762,19 +697,6 @@ const CardNumber = styled.span`
   white-space: nowrap;
 `;
 
-const MetaRow = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  gap: ${(props) => props.theme.spacing.xs};
-  font-size: ${(props) => props.theme.typography.body2.fontSize};
-  color: ${(props) => props.theme.colors.textSecondary};
-`;
-
-const MetaItem = styled.span`
-  background: ${(props) => props.theme.colors.surfaceHover};
-  border-radius: ${(props) => props.theme.borderRadius.sm};
-  padding: ${(props) => props.theme.spacing.xs} ${(props) => props.theme.spacing.sm};
-`;
 
 const LostLocation = styled.div`
   font-weight: 600;
