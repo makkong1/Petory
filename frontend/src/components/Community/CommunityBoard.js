@@ -655,11 +655,11 @@ const CommunityBoard = () => {
           <Title>커뮤니티</Title>
           <Subtitle>반려동물과 함께하는 따뜻한 이야기</Subtitle>
         </TitleSection>
-        <WriteButton onClick={handleWriteClick}>
-          <WriteIcon>✏️</WriteIcon>
-          글쓰기
-        </WriteButton>
       </Header>
+
+      <WriteFAB onClick={handleWriteClick}>
+        +
+      </WriteFAB>
 
       <CategoryTabs>
         {categories.map((category) => (
@@ -1124,33 +1124,39 @@ const Subtitle = styled.p`
 `;
 
 const WriteButton = styled.button`
-  background: ${props => props.theme.colors.gradient};
-  color: ${props => props.theme.colors.textInverse};
+  display: none;
+`;
+
+const WriteFAB = styled.button`
+  position: fixed;
+  bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  right: 20px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #E8714A 0%, #C9573A 100%);
+  color: white;
   border: none;
-  padding: ${props => props.theme.spacing.md} ${props => props.theme.spacing.xl};
-  border-radius: ${props => props.theme.borderRadius.xl};
-  font-size: ${props => props.theme.typography.body1.fontSize};
-  font-weight: 600;
+  font-size: 24px;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 16px rgba(232, 113, 74, 0.4);
   display: flex;
   align-items: center;
-  gap: ${props => props.theme.spacing.sm};
-  box-shadow: ${props => props.theme.shadows.md};
-  
+  justify-content: center;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  z-index: 50;
+
   &:hover {
-    transform: translateY(-2px);
-    box-shadow: ${props => props.theme.shadows.lg};
+    transform: scale(1.1);
+    box-shadow: 0 6px 20px rgba(232, 113, 74, 0.5);
   }
-  
-  &:active {
-    transform: translateY(0);
+
+  @media (min-width: 769px) {
+    bottom: 32px;
+    right: 32px;
   }
 `;
 
-const WriteIcon = styled.span`
-  font-size: ${props => props.theme.typography.body1.fontSize};
-`;
 
 const CategoryTabs = styled.div`
   display: flex;
@@ -1161,32 +1167,24 @@ const CategoryTabs = styled.div`
 `;
 
 const CategoryTab = styled.button`
-  background: ${props => props.active
-    ? `linear-gradient(135deg, ${props.$categoryColor} 0%, ${props.$categoryColor}dd 100%)`
-    : props.theme.colors.surface};
-  color: ${props => props.active ? props.theme.colors.textInverse : props.theme.colors.text};
-  border: 2px solid ${props => props.active ? props.$categoryColor : props.theme.colors.border};
-  padding: ${props => props.theme.spacing.sm} ${props => props.theme.spacing.lg};
-  border-radius: ${props => props.theme.borderRadius.full};
+  padding: 8px 16px;
+  border-radius: 50px;
+  border: 1.5px solid ${props => props.active ? props.theme.colors.primary : props.theme.colors.border};
+  background: ${props => props.active ? props.theme.colors.primary : 'transparent'};
+  color: ${props => props.active ? 'white' : props.theme.colors.textSecondary};
+  font-size: 13px;
+  font-weight: ${props => props.active ? '600' : '400'};
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  font-size: ${props => props.theme.typography.body2.fontSize};
-  font-weight: 500;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: ${props => props.theme.spacing.xs};
-  box-shadow: ${props => props.active
-    ? `0 4px 12px ${props.$categoryColor}40`
-    : 'none'};
-  
+
   &:hover {
-    background: ${props => props.active
-    ? `linear-gradient(135deg, ${props.$categoryColor}dd 0%, ${props.$categoryColor}cc 100%)`
-    : props.theme.colors.surfaceHover};
-    transform: translateY(-2px);
-    box-shadow: ${props => props.active
-    ? `0 6px 16px ${props.$categoryColor}50`
-    : `0 4px 8px ${props.theme.colors.shadow}`};
+    border-color: ${props => props.theme.colors.primary};
+    color: ${props => props.theme.colors.primary};
   }
 `;
 
@@ -1195,19 +1193,18 @@ const CategoryIcon = styled.span`
 `;
 
 const PostGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(12, 1fr);
-  gap: ${(props) => props.theme.spacing.lg};
-  grid-auto-flow: row dense;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
 
-  @media (max-width: 1024px) {
-    grid-template-columns: repeat(4, 1fr);
-  }
-
-  @media (max-width: 768px) {
-    grid-template-columns: 1fr;
-    gap: ${(props) => props.theme.spacing.md};
-    grid-auto-flow: row;
+  @media (min-width: 769px) {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    padding: 24px;
+    max-width: 1200px;
+    margin: 0 auto;
   }
 `;
 
@@ -1225,61 +1222,20 @@ const ErrorBanner = styled.div`
 const PostCard = styled.div.withConfig({
   shouldForwardProp: (prop) => prop !== 'size',
 })`
-  background: ${(props) => props.theme.colors.surface};
+  background: ${(props) => props.theme.colors.surfaceElevated};
   border: 1px solid ${(props) => props.theme.colors.borderLight};
-  border-radius: ${(props) => props.theme.borderRadius.xl};
-  padding: ${(props) => props.theme.spacing.xl};
-  transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 2px 12px ${(props) => props.theme.colors.shadow};
   cursor: pointer;
   display: flex;
   flex-direction: column;
   gap: ${(props) => props.theme.spacing.md};
-  background-image: linear-gradient(135deg, ${(props) =>
-    props.theme.colors.surface} 0%, ${(props) => props.theme.colors.surfaceElevated} 100%);
-
-  /* 대형 카드: 전체 너비 (12칸) — 태블릿(4열 그리드)에서는 span 4로 맞춤 */
-  ${(props) => props.size === 'large' && `
-    grid-column: span 12;
-    min-height: 350px;
-
-    @media (max-width: 1024px) {
-      grid-column: span 4;
-      min-height: 320px;
-    }
-  `}
-
-  /* 중간 카드: PC에서 6칸 (2개씩), Tablet에서 2칸 (2개씩) */
-  ${(props) => props.size === 'medium' && `
-    grid-column: span 6;
-    min-height: 300px;
-
-    @media (max-width: 1024px) {
-      grid-column: span 2;
-      min-height: 280px;
-    }
-  `}
-
-  /* 작은 카드: PC에서 3칸 (4개씩), Tablet에서 2칸 (2개씩) */
-  ${(props) => props.size === 'small' && `
-    grid-column: span 3;
-    min-height: 250px;
-
-    @media (max-width: 1024px) {
-      grid-column: span 2;
-      min-height: 230px;
-    }
-  `}
-
-  /* Mobile: 모든 카드 1열 */
-  @media (max-width: 768px) {
-    grid-column: span 1 !important;
-    min-height: auto;
-  }
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 
   &:hover {
-    transform: translateY(-8px);
-    box-shadow: 0 16px 36px ${(props) => props.theme.colors.shadow};
-    border-color: ${(props) => props.theme.colors.primary}55;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px ${(props) => props.theme.colors.shadowHover};
   }
 `;
 

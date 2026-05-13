@@ -16,20 +16,21 @@ export const InfoPanel = styled.div`
   right: 0;
   width: ${props => props.$width || '300px'};
   max-height: ${props => props.$maxHeight || '65vh'};
-  background: ${props => props.theme.colors.surface};
-  border-left: 1px solid ${props => props.theme.colors.border};
-  border-top: 1px solid ${props => props.theme.colors.border};
-  border-radius: 12px 0 0 0;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 20px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   z-index: 500;
-  box-shadow: -4px -2px 16px rgba(0,0,0,0.12);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 8px 32px rgba(28, 25, 23, 0.15);
   animation: ${slideInRight} 0.25s cubic-bezier(0, 0, 0.2, 1);
 
   @media (max-width: 600px) {
     width: 100%;
-    border-radius: 12px 12px 0 0;
+    border-radius: 20px;
     max-height: 60vh;
     animation: ${slideInUp} 0.25s cubic-bezier(0, 0, 0.2, 1);
   }

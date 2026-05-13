@@ -83,12 +83,19 @@ const LoginForm = ({ onSwitchToRegister }) => {
   };
 
   return (
-    <LoginContainer>
-      <Title>로그인</Title>
-      {isDemoMode() && (
-        <DemoHint>데모 모드: 아무 아이디/비밀번호로 로그인 가능</DemoHint>
-      )}
-      <Form onSubmit={handleSubmit}>
+    <AuthPageWrapper>
+      <GlassCard>
+        <BrandHeader>
+          <BrandIcon>🐾</BrandIcon>
+          <BrandTitle>Petory</BrandTitle>
+          <BrandSubtitle>반려동물과 함께하는 커뮤니티</BrandSubtitle>
+        </BrandHeader>
+
+        <Title>로그인</Title>
+        {isDemoMode() && (
+          <DemoHint>데모 모드: 아무 아이디/비밀번호로 로그인 가능</DemoHint>
+        )}
+        <Form onSubmit={handleSubmit}>
         <InputGroup>
           <Label htmlFor="id">아이디</Label>
           <Input
@@ -159,77 +166,108 @@ const LoginForm = ({ onSwitchToRegister }) => {
         </>
       )}
 
-      <LinkText>
-        계정이 없으신가요?{' '}
-        <button type="button" onClick={() => { if (onSwitchToRegister) onSwitchToRegister(); }}>
+      <LinkTextContainer>
+        <LinkText>계정이 없으신가요?</LinkText>
+        <SecondaryButton type="button" onClick={() => { if (onSwitchToRegister) onSwitchToRegister(); }}>
           회원가입
-        </button>
-      </LinkText>
+        </SecondaryButton>
+      </LinkTextContainer>
 
       {showForgotPassword && (
-        <ForgotPasswordModal aria-hidden="true">
-          <ForgotPasswordContent role="dialog" aria-modal="true" aria-label="비밀번호 찾기">
-            <ForgotPasswordTitle>비밀번호 찾기</ForgotPasswordTitle>
-            <ForgotPasswordForm onSubmit={handleForgotPassword}>
-              <InputGroup>
-                <Label htmlFor="forgotPasswordEmail">이메일</Label>
-                <Input
-                  type="email"
-                  id="forgotPasswordEmail"
-                  value={forgotPasswordEmail}
-                  onChange={(e) => {
-                    setForgotPasswordEmail(e.target.value);
-                    setForgotPasswordError('');
-                  }}
-                  placeholder="가입하신 이메일을 입력하세요"
-                  required
-                  disabled={forgotPasswordLoading}
-                />
-              </InputGroup>
+        <ForgotSection>
+          <ForgotTitle>비밀번호 찾기</ForgotTitle>
+          <ForgotPasswordForm onSubmit={handleForgotPassword}>
+            <InputGroup>
+              <Label htmlFor="forgotPasswordEmail">이메일</Label>
+              <Input
+                type="email"
+                id="forgotPasswordEmail"
+                value={forgotPasswordEmail}
+                onChange={(e) => {
+                  setForgotPasswordEmail(e.target.value);
+                  setForgotPasswordError('');
+                }}
+                placeholder="가입하신 이메일을 입력하세요"
+                required
+                disabled={forgotPasswordLoading}
+              />
+            </InputGroup>
 
-              {forgotPasswordError && <ErrorMessage>{forgotPasswordError}</ErrorMessage>}
-              {forgotPasswordSuccess && <SuccessMessage>{forgotPasswordSuccess}</SuccessMessage>}
+            {forgotPasswordError && <ErrorMessage>{forgotPasswordError}</ErrorMessage>}
+            {forgotPasswordSuccess && <SuccessMessage>{forgotPasswordSuccess}</SuccessMessage>}
 
-              <ButtonGroup>
-                <Button type="submit" disabled={forgotPasswordLoading}>
-                  {forgotPasswordLoading ? '발송 중...' : '비밀번호 재설정 링크 보내기'}
-                </Button>
-                <CancelButton
-                  type="button"
-                  onClick={() => {
-                    setShowForgotPassword(false);
-                    setForgotPasswordEmail('');
-                    setForgotPasswordError('');
-                    setForgotPasswordSuccess('');
-                  }}
-                  disabled={forgotPasswordLoading}
-                >
-                  취소
-                </CancelButton>
-              </ButtonGroup>
-            </ForgotPasswordForm>
-          </ForgotPasswordContent>
-        </ForgotPasswordModal>
+            <ButtonGroup>
+              <Button type="submit" disabled={forgotPasswordLoading}>
+                {forgotPasswordLoading ? '발송 중...' : '비밀번호 재설정 링크 보내기'}
+              </Button>
+              <CancelButton
+                type="button"
+                onClick={() => {
+                  setShowForgotPassword(false);
+                  setForgotPasswordEmail('');
+                  setForgotPasswordError('');
+                  setForgotPasswordSuccess('');
+                }}
+                disabled={forgotPasswordLoading}
+              >
+                뒤로
+              </CancelButton>
+            </ButtonGroup>
+          </ForgotPasswordForm>
+        </ForgotSection>
       )}
-    </LoginContainer>
+      </GlassCard>
+    </AuthPageWrapper>
   );
 };
 
 export default LoginForm;
 
-const LoginContainer = styled.div`
-  max-width: 500px;
-  width: 100%;
-  margin: 0 auto;
-  padding: 2.5rem;
-  background: ${({ theme }) => theme.colors.background};
-  border-radius: ${({ theme }) => theme.borderRadius.xl};
-  box-shadow: ${({ theme }) => theme.shadows.lg};
+const AuthPageWrapper = styled.div`
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #E8714A 0%, #C9573A 40%, #3D8B7A 100%);
+  padding: 24px 16px;
+`;
 
-  @media (max-width: 768px) {
-    max-width: 90%;
-    padding: 1.5rem;
+const GlassCard = styled.div`
+  width: 100%;
+  max-width: 440px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 24px;
+  padding: 40px 32px;
+  box-shadow: 0 20px 60px rgba(28, 25, 23, 0.2);
+
+  @media (prefers-color-scheme: dark) {
+    background: rgba(29, 29, 29, 0.92);
   }
+`;
+
+const BrandHeader = styled.div`
+  text-align: center;
+  margin-bottom: 32px;
+`;
+
+const BrandIcon = styled.div`
+  font-size: 48px;
+  margin-bottom: 8px;
+`;
+
+const BrandTitle = styled.h1`
+  font-size: 28px;
+  font-weight: 700;
+  color: ${props => props.theme.colors.primary};
+  margin: 0 0 4px;
+`;
+
+const BrandSubtitle = styled.p`
+  font-size: 14px;
+  color: ${props => props.theme.colors.textSecondary};
+  margin: 0;
 `;
 
 const Title = styled.h2`
@@ -269,26 +307,23 @@ const Label = styled.label`
 `;
 
 const Input = styled.input`
-  padding: 10px 14px;
-  border: 1.5px solid ${({ theme }) => theme.colors.border};
-  border-radius: ${({ theme }) => theme.borderRadius.lg};
-  font-size: 14px;
-  background: ${({ theme }) => theme.colors.background};
-  color: ${({ theme }) => theme.colors.text};
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-
-  &::placeholder {
-    color: ${({ theme }) => theme.colors.textLight};
-  }
+  width: 100%;
+  padding: 14px 18px;
+  border: 1.5px solid ${props => props.theme.colors.border};
+  border-radius: 50px;
+  font-size: 15px;
+  background: ${props => props.theme.colors.background};
+  color: ${props => props.theme.colors.text};
+  outline: none;
+  transition: border-color 0.2s ease;
+  box-sizing: border-box;
 
   &:focus {
-    outline: none;
-    border-color: ${({ theme }) => theme.colors.primary};
-    box-shadow: 0 0 0 3px ${({ theme }) => theme.colors.primary}25;
+    border-color: ${props => props.theme.colors.primary};
   }
 
-  &:hover:not(:focus):not(:disabled) {
-    border-color: ${({ theme }) => theme.colors.borderDark};
+  &::placeholder {
+    color: ${props => props.theme.colors.textMuted};
   }
 
   &:disabled {
@@ -299,32 +334,29 @@ const Input = styled.input`
 `;
 
 const Button = styled.button`
-  padding: 11px 20px;
-  background: ${({ theme }) => theme.colors.primary};
-  color: #fff;
+  width: 100%;
+  padding: 14px;
+  background: linear-gradient(135deg, #E8714A 0%, #C9573A 100%);
+  color: white;
   border: none;
-  border-radius: ${({ theme }) => theme.borderRadius.lg};
-  font-size: 15px;
+  border-radius: 50px;
+  font-size: 16px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: opacity 0.2s ease, transform 0.1s ease;
+  margin-top: 8px;
 
-  &:hover:not(:disabled) {
-    background: ${({ theme }) => theme.colors.primaryDark};
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px ${({ theme }) => theme.colors.primary}40;
+  &:hover {
+    opacity: 0.9;
   }
 
-  &:active:not(:disabled) {
-    transform: translateY(0);
+  &:active {
+    transform: scale(0.98);
   }
 
   &:disabled {
-    background: ${({ theme }) => theme.colors.surfaceHover};
-    color: ${({ theme }) => theme.colors.textLight};
+    opacity: 0.5;
     cursor: not-allowed;
-    transform: none;
-    box-shadow: none;
   }
 `;
 
@@ -411,20 +443,35 @@ const SocialIcon = styled.span`
   font-size: 13px;
 `;
 
+const LinkTextContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: ${({ theme }) => theme.spacing.lg};
+  gap: 8px;
+`;
+
 const LinkText = styled.p`
   text-align: center;
-  margin-top: ${({ theme }) => theme.spacing.lg};
   color: ${({ theme }) => theme.colors.textSecondary};
   font-size: 14px;
+  margin: 0;
+`;
 
-  a {
-    color: ${({ theme }) => theme.colors.primary};
-    text-decoration: none;
-    font-weight: 600;
+const SecondaryButton = styled.button`
+  width: 100%;
+  padding: 12px;
+  background: transparent;
+  color: ${props => props.theme.colors.primary};
+  border: 1.5px solid ${props => props.theme.colors.primary};
+  border-radius: 50px;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
 
-    &:hover {
-      text-decoration: underline;
-    }
+  &:hover {
+    background: ${props => props.theme.colors.primarySoft};
   }
 `;
 
@@ -433,10 +480,14 @@ const ForgotPasswordLink = styled.div`
   margin-top: -4px;
   margin-bottom: 4px;
 
-  a {
+  button {
+    background: none;
+    border: none;
     color: ${({ theme }) => theme.colors.textSecondary};
     font-size: 13px;
     text-decoration: none;
+    cursor: pointer;
+    padding: 0;
 
     &:hover {
       color: ${({ theme }) => theme.colors.primary};
@@ -445,34 +496,17 @@ const ForgotPasswordLink = styled.div`
   }
 `;
 
-const ForgotPasswordModal = styled.div`
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: ${({ theme }) => theme.colors.overlay};
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
+const ForgotSection = styled.div`
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid ${props => props.theme.colors.border};
 `;
 
-const ForgotPasswordContent = styled.div`
-  background: ${({ theme }) => theme.colors.background};
-  border-radius: ${({ theme }) => theme.borderRadius.xl};
-  padding: 2rem;
-  max-width: 500px;
-  width: 90%;
-  box-shadow: ${({ theme }) => theme.shadows.xl};
-`;
-
-const ForgotPasswordTitle = styled.h3`
-  text-align: center;
-  margin-bottom: 1.5rem;
-  color: ${({ theme }) => theme.colors.text};
-  font-size: ${({ theme }) => theme.typography.h3.fontSize};
-  font-weight: ${({ theme }) => theme.typography.h3.fontWeight};
+const ForgotTitle = styled.h3`
+  font-size: 16px;
+  font-weight: 600;
+  color: ${props => props.theme.colors.text};
+  margin: 0 0 16px;
 `;
 
 const ForgotPasswordForm = styled.form`

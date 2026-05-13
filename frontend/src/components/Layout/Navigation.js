@@ -444,16 +444,14 @@ const Sidebar = styled.nav`
   position: fixed;
   left: 0;
   top: 0;
-  right: 0;
-  height: 60px;
+  width: 240px;
+  height: 100vh;
   background: ${props => props.theme.colors.surface};
-  border-bottom: 1px solid ${props => props.theme.colors.border};
+  border-right: 1px solid ${props => props.theme.colors.border};
   z-index: 100;
   display: flex;
-  flex-direction: row;
-  align-items: center;
-  padding: 0 16px;
-  gap: 8px;
+  flex-direction: column;
+  padding: 0;
   overflow: visible;
 
   @media (max-width: 768px) {
@@ -464,35 +462,34 @@ const Sidebar = styled.nav`
 const LogoArea = styled.div`
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 12px 0 0;
-  font-size: 17px;
+  gap: 8px;
+  padding: 20px 16px 16px;
+  font-size: 18px;
   font-weight: 700;
   color: ${props => props.theme.colors.primary};
   cursor: pointer;
+  border-bottom: 1px solid ${props => props.theme.colors.border};
   flex-shrink: 0;
-  white-space: nowrap;
 
   .icon {
-    font-size: 20px;
+    font-size: 22px;
   }
 `;
 
 const MenuList = styled.div`
   display: flex;
-  flex-direction: row;
-  gap: 4px;
-  padding: 0;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px;
   flex: 1;
-  justify-content: center;
-  align-items: center;
 `;
 
 const MenuItem = styled.button`
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 14px;
+  gap: 10px;
+  padding: 10px 12px;
+  width: 100%;
   border: none;
   border-radius: ${props => props.theme.borderRadius.md};
   cursor: pointer;
@@ -501,11 +498,13 @@ const MenuItem = styled.button`
   background: ${props => props.$active ? props.theme.colors.primarySoft : 'transparent'};
   color: ${props => props.$active ? props.theme.colors.primary : props.theme.colors.text};
   font-weight: ${props => props.$active ? '600' : '400'};
-  white-space: nowrap;
+  text-align: left;
 
   .menu-icon {
-    font-size: 16px;
+    font-size: 18px;
     flex-shrink: 0;
+    width: 22px;
+    text-align: center;
   }
 
   &:hover {
@@ -515,18 +514,19 @@ const MenuItem = styled.button`
 
 const BottomSection = styled.div`
   display: flex;
-  flex-direction: row;
-  gap: 4px;
-  padding: 0;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px;
   flex-shrink: 0;
-  align-items: center;
+  border-top: 1px solid ${props => props.theme.colors.border};
 `;
 
 const SidebarActionButton = styled.button`
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 8px 10px;
+  gap: 10px;
+  padding: 10px 12px;
+  width: 100%;
   border: none;
   border-radius: ${props => props.theme.borderRadius.md};
   background: transparent;
@@ -535,7 +535,7 @@ const SidebarActionButton = styled.button`
   cursor: pointer;
   transition: all 0.2s ease;
   position: relative;
-  white-space: nowrap;
+  text-align: left;
 
   &:hover {
     background: ${props => props.theme.colors.surfaceHover};
@@ -572,12 +572,12 @@ const slideInDown = keyframes`
 
 const SidebarNotificationDropdown = styled.div`
   position: fixed;
-  top: 60px;
-  right: 0;
-  left: auto;
+  top: 0;
+  left: 240px;
   bottom: auto;
+  right: auto;
   width: 360px;
-  max-width: calc(100vw - 16px);
+  max-width: calc(100vw - 256px);
   max-height: 450px;
   background: ${props => props.theme.colors.surface || '#ffffff'};
   border: 1px solid ${props => props.theme.colors.border || '#e0e0e0'};
@@ -590,34 +590,34 @@ const SidebarNotificationDropdown = styled.div`
   animation: ${slideInDown} 0.2s ease-out;
 
   @media (max-width: 768px) {
+    top: auto;
     left: 8px;
     right: 8px;
+    bottom: calc(60px + env(safe-area-inset-bottom, 0px) + 8px);
     width: auto;
   }
 `;
 
 const ProfileSection = styled.div`
   display: flex;
-  flex-direction: row;
-  align-items: center;
+  flex-direction: column;
   gap: 0;
-  border-left: 1px solid ${props => props.theme.colors.border};
-  padding-left: 8px;
   position: relative;
 `;
 
 const ProfileButton = styled.button`
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 10px;
+  gap: 10px;
+  padding: 10px 12px;
+  width: 100%;
   border: none;
   border-radius: ${props => props.theme.borderRadius.md};
   background: ${props => props.$active ? props.theme.colors.surfaceHover : 'transparent'};
   color: ${props => props.theme.colors.text};
   cursor: pointer;
   transition: all 0.2s ease;
-  white-space: nowrap;
+  text-align: left;
 
   &:hover {
     background: ${props => props.theme.colors.surfaceHover};
@@ -627,9 +627,9 @@ const ProfileButton = styled.button`
 const ProfileInfo = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 2px;
   overflow: hidden;
-  max-width: 90px;
+  flex: 1;
 `;
 
 const ProfileNicknameText = styled.div`
@@ -648,10 +648,10 @@ const ProfileCoinText = styled.div`
 
 const SidebarProfileDropdown = styled.div`
   position: fixed;
-  top: 60px;
-  right: 0;
-  left: auto;
-  bottom: auto;
+  bottom: 8px;
+  left: 248px;
+  top: auto;
+  right: auto;
   width: 220px;
   background: ${props => props.theme.colors.surface || '#ffffff'};
   border: 1px solid ${props => props.theme.colors.border || '#e0e0e0'};
@@ -660,6 +660,14 @@ const SidebarProfileDropdown = styled.div`
   z-index: 200;
   overflow: hidden;
   animation: ${slideInDown} 0.2s ease-out;
+
+  @media (max-width: 768px) {
+    bottom: calc(60px + env(safe-area-inset-bottom, 0px) + 8px);
+    left: 8px;
+    right: 8px;
+    width: auto;
+    top: auto;
+  }
 `;
 
 const ProfileMenuItem = styled.button`
