@@ -395,10 +395,16 @@ const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
   };
 
   return (
-    <RegisterContainer>
-      <Title>회원가입</Title>
+    <AuthPageWrapper>
+      <GlassCard>
+        <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+          <div style={{ fontSize: '40px', marginBottom: '8px' }}>🐾</div>
+          <div style={{ fontSize: '24px', fontWeight: 700, color: '#E8714A' }}>Petory 가입</div>
+        </div>
 
-      <Form onSubmit={handleSubmit}>
+        <Title>회원가입</Title>
+
+        <Form onSubmit={handleSubmit}>
         <InputGroup>
           <Label htmlFor="id">아이디 *</Label>
           <NicknameInputGroup>
@@ -792,7 +798,8 @@ const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
           로그인
         </button>
       </LinkText>
-    </RegisterContainer>
+      </GlassCard>
+    </AuthPageWrapper>
   );
 };
 
@@ -818,6 +825,30 @@ const sharedInputStyles = ({ theme }) => `
     background: ${theme.colors.surfaceSoft};
     color: ${theme.colors.textLight};
     cursor: not-allowed;
+  }
+`;
+
+const AuthPageWrapper = styled.div`
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #E8714A 0%, #C9573A 40%, #3D8B7A 100%);
+  padding: 24px 16px;
+`;
+
+const GlassCard = styled.div`
+  width: 100%;
+  max-width: 440px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 24px;
+  padding: 40px 32px;
+  box-shadow: 0 20px 60px rgba(28, 25, 23, 0.2);
+
+  @media (prefers-color-scheme: dark) {
+    background: rgba(29, 29, 29, 0.92);
   }
 `;
 
@@ -863,39 +894,80 @@ const Label = styled.label`
 `;
 
 const Input = styled.input`
-  ${sharedInputStyles}
+  border: 1.5px solid ${props => props.theme.colors.border};
+  border-radius: 50px;
+  padding: 14px 18px;
+  outline: none;
+  transition: border-color 0.2s ease;
+  box-sizing: border-box;
+  width: 100%;
+  font-size: 15px;
+  background: ${props => props.theme.colors.background};
+  color: ${props => props.theme.colors.text};
+
+  &:focus {
+    border-color: ${props => props.theme.colors.primary};
+  }
+
+  &::placeholder {
+    color: ${props => props.theme.colors.textMuted};
+  }
+
+  &:disabled {
+    background: ${({ theme }) => theme.colors.surfaceSoft};
+    color: ${({ theme }) => theme.colors.textLight};
+    cursor: not-allowed;
+  }
 `;
 
 const Select = styled.select`
-  ${sharedInputStyles}
+  border: 1.5px solid ${props => props.theme.colors.border};
+  border-radius: 50px;
+  padding: 14px 18px;
+  outline: none;
+  transition: border-color 0.2s ease;
+  box-sizing: border-box;
+  width: 100%;
+  font-size: 15px;
+  background: ${props => props.theme.colors.background};
+  color: ${props => props.theme.colors.text};
   cursor: pointer;
+
+  &:focus {
+    border-color: ${props => props.theme.colors.primary};
+  }
+
+  &:disabled {
+    background: ${({ theme }) => theme.colors.surfaceSoft};
+    color: ${({ theme }) => theme.colors.textLight};
+    cursor: not-allowed;
+  }
 `;
 
 const Button = styled.button`
-  padding: 11px 20px;
-  background: ${({ theme }) => theme.colors.primary};
-  color: #fff;
+  width: 100%;
+  padding: 14px;
+  background: linear-gradient(135deg, #E8714A 0%, #C9573A 100%);
+  color: white;
   border: none;
-  border-radius: ${({ theme }) => theme.borderRadius.lg};
-  font-size: 15px;
+  border-radius: 50px;
+  font-size: 16px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: opacity 0.2s ease, transform 0.1s ease;
+  margin-top: 8px;
 
   &:hover:not(:disabled) {
-    background: ${({ theme }) => theme.colors.primaryDark};
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px ${({ theme }) => theme.colors.primary}40;
+    opacity: 0.9;
   }
 
-  &:active:not(:disabled) { transform: translateY(0); }
+  &:active:not(:disabled) {
+    transform: scale(0.98);
+  }
 
   &:disabled {
-    background: ${({ theme }) => theme.colors.surfaceHover};
-    color: ${({ theme }) => theme.colors.textLight};
+    opacity: 0.5;
     cursor: not-allowed;
-    transform: none;
-    box-shadow: none;
   }
 `;
 
@@ -917,11 +989,18 @@ const LinkText = styled.p`
   color: ${({ theme }) => theme.colors.textSecondary};
   font-size: 14px;
 
-  a {
+  button {
+    background: none;
+    border: none;
     color: ${({ theme }) => theme.colors.primary};
     text-decoration: none;
     font-weight: 600;
-    &:hover { text-decoration: underline; }
+    cursor: pointer;
+    padding: 0;
+
+    &:hover {
+      text-decoration: underline;
+    }
   }
 `;
 
@@ -932,27 +1011,24 @@ const NicknameInputGroup = styled.div`
 `;
 
 const CheckButton = styled.button`
-  padding: 10px 14px;
-  background: ${({ theme }) => theme.colors.primary};
-  color: #fff;
+  padding: 14px 18px;
+  background: linear-gradient(135deg, #E8714A 0%, #C9573A 100%);
+  color: white;
   border: none;
-  border-radius: ${({ theme }) => theme.borderRadius.lg};
+  border-radius: 50px;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
-  transition: all 0.2s ease;
+  transition: opacity 0.2s ease;
 
   &:hover:not(:disabled) {
-    background: ${({ theme }) => theme.colors.primaryDark};
-    transform: translateY(-1px);
+    opacity: 0.9;
   }
 
   &:disabled {
-    background: ${({ theme }) => theme.colors.surfaceHover};
-    color: ${({ theme }) => theme.colors.textLight};
+    opacity: 0.5;
     cursor: not-allowed;
-    transform: none;
   }
 `;
 
@@ -1093,25 +1169,23 @@ const PetSelect = styled.select`
 `;
 
 const AddPetButton = styled.button`
-  padding: 11px;
-  background: ${({ theme }) => theme.colors.surface};
-  border: 2px dashed ${({ theme }) => theme.colors.border};
-  border-radius: ${({ theme }) => theme.borderRadius.xl};
-  color: ${({ theme }) => theme.colors.textSecondary};
+  width: 100%;
+  padding: 14px;
+  background: linear-gradient(135deg, #E8714A 0%, #C9573A 100%);
+  border: none;
+  border-radius: 50px;
+  color: white;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: opacity 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: ${({ theme }) => theme.spacing.sm};
 
   &:hover:not(:disabled) {
-    background: ${({ theme }) => theme.colors.surfaceHover};
-    border-color: ${({ theme }) => theme.colors.primary};
-    color: ${({ theme }) => theme.colors.primary};
-    transform: translateY(-1px);
+    opacity: 0.9;
   }
 
   &:disabled {
@@ -1163,7 +1237,29 @@ const EmailInputGroup = styled.div`
 const EmailIdInput = styled.input`
   flex: 1;
   min-width: 120px;
-  ${sharedInputStyles}
+  border: 1.5px solid ${props => props.theme.colors.border};
+  border-radius: 50px;
+  padding: 14px 18px;
+  outline: none;
+  transition: border-color 0.2s ease;
+  box-sizing: border-box;
+  font-size: 14px;
+  background: ${props => props.theme.colors.background};
+  color: ${props => props.theme.colors.text};
+
+  &:focus {
+    border-color: ${props => props.theme.colors.primary};
+  }
+
+  &::placeholder {
+    color: ${props => props.theme.colors.textMuted};
+  }
+
+  &:disabled {
+    background: ${({ theme }) => theme.colors.surfaceSoft};
+    color: ${({ theme }) => theme.colors.textLight};
+    cursor: not-allowed;
+  }
 `;
 
 const EmailAt = styled.span`
@@ -1176,8 +1272,26 @@ const EmailAt = styled.span`
 const EmailDomainSelect = styled.select`
   flex: 1;
   min-width: 150px;
-  ${sharedInputStyles}
+  border: 1.5px solid ${props => props.theme.colors.border};
+  border-radius: 50px;
+  padding: 14px 18px;
+  outline: none;
+  transition: border-color 0.2s ease;
+  box-sizing: border-box;
+  font-size: 14px;
+  background: ${props => props.theme.colors.background};
+  color: ${props => props.theme.colors.text};
   cursor: pointer;
+
+  &:focus {
+    border-color: ${props => props.theme.colors.primary};
+  }
+
+  &:disabled {
+    background: ${({ theme }) => theme.colors.surfaceSoft};
+    color: ${({ theme }) => theme.colors.textLight};
+    cursor: not-allowed;
+  }
 `;
 
 const EmailVerificationErrorMessage = styled.div`
@@ -1200,26 +1314,25 @@ const EmailVerificationStatus = styled.div`
 `;
 
 const EmailVerificationButton = styled.button`
+  width: 100%;
   margin-top: ${({ theme }) => theme.spacing.sm};
-  padding: 8px 16px;
-  background: ${({ theme }) => theme.colors.primary};
-  color: #fff;
+  padding: 12px;
+  background: linear-gradient(135deg, #E8714A 0%, #C9573A 100%);
+  color: white;
   border: none;
-  border-radius: ${({ theme }) => theme.borderRadius.lg};
+  border-radius: 50px;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: opacity 0.2s ease;
 
   &:hover:not(:disabled) {
-    background: ${({ theme }) => theme.colors.primaryDark};
-    transform: translateY(-1px);
+    opacity: 0.9;
   }
 
   &:disabled {
     opacity: 0.5;
     cursor: not-allowed;
-    transform: none;
   }
 `;
 
@@ -1237,5 +1350,27 @@ const EmailVerificationInfo = styled.div`
 const EmailCustomInput = styled.input`
   flex: 1;
   min-width: 150px;
-  ${sharedInputStyles}
+  border: 1.5px solid ${props => props.theme.colors.border};
+  border-radius: 50px;
+  padding: 14px 18px;
+  outline: none;
+  transition: border-color 0.2s ease;
+  box-sizing: border-box;
+  font-size: 14px;
+  background: ${props => props.theme.colors.background};
+  color: ${props => props.theme.colors.text};
+
+  &:focus {
+    border-color: ${props => props.theme.colors.primary};
+  }
+
+  &::placeholder {
+    color: ${props => props.theme.colors.textMuted};
+  }
+
+  &:disabled {
+    background: ${({ theme }) => theme.colors.surfaceSoft};
+    color: ${({ theme }) => theme.colors.textLight};
+    cursor: not-allowed;
+  }
 `;
