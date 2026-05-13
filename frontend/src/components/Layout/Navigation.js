@@ -660,6 +660,14 @@ const SidebarProfileDropdown = styled.div`
   z-index: 200;
   overflow: hidden;
   animation: ${slideInDown} 0.2s ease-out;
+
+  @media (max-width: 768px) {
+    bottom: calc(60px + env(safe-area-inset-bottom, 0px) + 8px);
+    left: 8px;
+    right: 8px;
+    width: auto;
+    top: auto;
+  }
 `;
 
 const ProfileMenuItem = styled.button`
