@@ -37,15 +37,19 @@ export default DomainTabHeader;
 
 const TabBar = styled.div`
   display: flex;
-  align-items: stretch;
-  padding: 0 4px;
-  background: ${props => props.theme.colors.surface};
-  border-bottom: 1px solid ${props => props.theme.colors.border};
+  align-items: center;
+  padding: 10px 16px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 50px;
+  box-shadow: 0 4px 16px rgba(28, 25, 23, 0.12);
 `;
 
 const TabsGroup = styled.div`
   display: flex;
-  align-items: stretch;
+  gap: 8px;
+  align-items: center;
   overflow-x: auto;
   scrollbar-width: none;
   &::-webkit-scrollbar { display: none; }
@@ -55,25 +59,25 @@ const TabButton = styled.button`
   display: flex;
   align-items: center;
   gap: 5px;
-  padding: 10px 14px;
-  border: none;
-  border-bottom: 2.5px solid ${props => props.$active
-    ? props.theme.colors.domain[props.$domain]
-    : 'transparent'};
-  background: transparent;
-  color: ${props => props.$active
-    ? props.theme.colors.domain[props.$domain]
-    : props.theme.colors.textSecondary};
-  font-size: 14px;
-  font-weight: ${props => props.$active ? 600 : 400};
+  padding: 8px 16px;
+  border-radius: 50px;
+  border: 1.5px solid ${props => props.$active
+    ? props.theme.colors.domain[props.$domain] || props.theme.colors.primary
+    : props.theme.colors.border};
+  background: ${props => props.$active
+    ? props.theme.colors.domain[props.$domain] || props.theme.colors.primary
+    : 'rgba(255,255,255,0.85)'};
+  color: ${props => props.$active ? 'white' : props.theme.colors.textSecondary};
+  font-size: 13px;
+  font-weight: ${props => props.$active ? '600' : '400'};
   cursor: ${props => props.$disabled ? 'not-allowed' : 'pointer'};
   opacity: ${props => props.$disabled ? 0.4 : 1};
-  transition: color 0.15s, border-color 0.15s;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(8px);
   white-space: nowrap;
-  margin-bottom: -1px;
 
   &:hover:not([disabled]) {
-    color: ${props => props.theme.colors.domain[props.$domain]};
+    border-color: ${props => props.theme.colors.domain[props.$domain] || props.theme.colors.primary};
   }
 `;
 
