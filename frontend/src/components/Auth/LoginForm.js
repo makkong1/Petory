@@ -172,53 +172,51 @@ const LoginForm = ({ onSwitchToRegister }) => {
           회원가입
         </SecondaryButton>
       </LinkTextContainer>
-      </GlassCard>
 
       {showForgotPassword && (
-        <ForgotPasswordModal aria-hidden="true">
-          <GlassCard as="div" role="dialog" aria-modal="true" aria-label="비밀번호 찾기">
-            <ForgotPasswordTitle>비밀번호 찾기</ForgotPasswordTitle>
-            <ForgotPasswordForm onSubmit={handleForgotPassword}>
-              <InputGroup>
-                <Label htmlFor="forgotPasswordEmail">이메일</Label>
-                <Input
-                  type="email"
-                  id="forgotPasswordEmail"
-                  value={forgotPasswordEmail}
-                  onChange={(e) => {
-                    setForgotPasswordEmail(e.target.value);
-                    setForgotPasswordError('');
-                  }}
-                  placeholder="가입하신 이메일을 입력하세요"
-                  required
-                  disabled={forgotPasswordLoading}
-                />
-              </InputGroup>
+        <ForgotSection>
+          <ForgotTitle>비밀번호 찾기</ForgotTitle>
+          <ForgotPasswordForm onSubmit={handleForgotPassword}>
+            <InputGroup>
+              <Label htmlFor="forgotPasswordEmail">이메일</Label>
+              <Input
+                type="email"
+                id="forgotPasswordEmail"
+                value={forgotPasswordEmail}
+                onChange={(e) => {
+                  setForgotPasswordEmail(e.target.value);
+                  setForgotPasswordError('');
+                }}
+                placeholder="가입하신 이메일을 입력하세요"
+                required
+                disabled={forgotPasswordLoading}
+              />
+            </InputGroup>
 
-              {forgotPasswordError && <ErrorMessage>{forgotPasswordError}</ErrorMessage>}
-              {forgotPasswordSuccess && <SuccessMessage>{forgotPasswordSuccess}</SuccessMessage>}
+            {forgotPasswordError && <ErrorMessage>{forgotPasswordError}</ErrorMessage>}
+            {forgotPasswordSuccess && <SuccessMessage>{forgotPasswordSuccess}</SuccessMessage>}
 
-              <ButtonGroup>
-                <Button type="submit" disabled={forgotPasswordLoading}>
-                  {forgotPasswordLoading ? '발송 중...' : '비밀번호 재설정 링크 보내기'}
-                </Button>
-                <CancelButton
-                  type="button"
-                  onClick={() => {
-                    setShowForgotPassword(false);
-                    setForgotPasswordEmail('');
-                    setForgotPasswordError('');
-                    setForgotPasswordSuccess('');
-                  }}
-                  disabled={forgotPasswordLoading}
-                >
-                  취소
-                </CancelButton>
-              </ButtonGroup>
-            </ForgotPasswordForm>
-          </GlassCard>
-        </ForgotPasswordModal>
+            <ButtonGroup>
+              <Button type="submit" disabled={forgotPasswordLoading}>
+                {forgotPasswordLoading ? '발송 중...' : '비밀번호 재설정 링크 보내기'}
+              </Button>
+              <CancelButton
+                type="button"
+                onClick={() => {
+                  setShowForgotPassword(false);
+                  setForgotPasswordEmail('');
+                  setForgotPasswordError('');
+                  setForgotPasswordSuccess('');
+                }}
+                disabled={forgotPasswordLoading}
+              >
+                뒤로
+              </CancelButton>
+            </ButtonGroup>
+          </ForgotPasswordForm>
+        </ForgotSection>
       )}
+      </GlassCard>
     </AuthPageWrapper>
   );
 };
@@ -498,25 +496,17 @@ const ForgotPasswordLink = styled.div`
   }
 `;
 
-const ForgotPasswordModal = styled.div`
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
+const ForgotSection = styled.div`
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid ${props => props.theme.colors.border};
 `;
 
-const ForgotPasswordTitle = styled.h3`
-  text-align: center;
-  margin-bottom: 1.5rem;
-  color: ${({ theme }) => theme.colors.text};
-  font-size: ${({ theme }) => theme.typography.h3.fontSize};
-  font-weight: ${({ theme }) => theme.typography.h3.fontWeight};
+const ForgotTitle = styled.h3`
+  font-size: 16px;
+  font-weight: 600;
+  color: ${props => props.theme.colors.text};
+  margin: 0 0 16px;
 `;
 
 const ForgotPasswordForm = styled.form`
