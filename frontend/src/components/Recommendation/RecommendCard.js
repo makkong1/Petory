@@ -18,11 +18,42 @@ const Title = styled.p`
   margin: 0 0 8px;
 `;
 
-const RecommendText = styled.p`
-  font-size: 14px;
-  color: ${({ theme }) => theme.colors.text};
+// LLM 카피는 추천 카드의 핵심 메시지. 좌측 컬러 바 + 폰트/라인하이트 ↑ 로 prominent.
+const RecommendQuote = styled.blockquote`
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border-left: 3px solid ${({ theme }) => theme.colors.primary};
+  background: ${({ theme }) => theme.colors.primaryLight || '#eef2ff'};
+  border-radius: 6px;
+  font-size: 15px;
   line-height: 1.6;
+  color: ${({ theme }) => theme.colors.text};
+`;
+
+const CopyLoading = styled.p`
+  font-size: 13px;
+  color: ${({ theme }) => theme.colors.textSecondary};
+  font-style: italic;
   margin: 0 0 12px;
+`;
+
+const TrendHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+`;
+
+const MoreLink = styled.button`
+  background: none;
+  border: none;
+  font-size: 12px;
+  color: ${({ theme }) => theme.colors.primary};
+  cursor: pointer;
+  padding: 0;
+  &:hover {
+    text-decoration: underline;
+  }
 `;
 
 const TagRow = styled.div`
@@ -48,51 +79,250 @@ const FacilityList = styled.ul`
 const FacilityItem = styled.li`
   font-size: 13px;
   color: ${({ theme }) => theme.colors.text};
-  padding: 4px 0;
+  padding: 8px 0;
   border-bottom: 1px solid ${({ theme }) => theme.colors.border};
+  cursor: ${({ $clickable }) => ($clickable ? 'pointer' : 'default')};
+  transition: background-color 0.15s ease;
+  &:hover {
+    background-color: ${({ theme, $clickable }) =>
+      $clickable ? (theme.colors.background || '#fafafa') : 'transparent'};
+  }
   &:last-child { border-bottom: none; }
 `;
 
+const FacilityHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+`;
+
+const FacilityName = styled.span`
+  font-weight: 600;
+  font-size: 14px;
+`;
+
+const FacilityScore = styled.span`
+  font-size: 12px;
+  font-weight: 500;
+  color: ${({ theme }) => theme.colors.primary};
+  white-space: nowrap;
+`;
+
+// 거리 · source · mention 같은 보조 정보를 한 줄로 정렬.
+const FacilityMeta = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin-top: 3px;
+  font-size: 12px;
+  color: ${({ theme }) => theme.colors.textSecondary};
+`;
+
+const MetaDot = styled.span`
+  color: ${({ theme }) => theme.colors.border};
+`;
+
+const SourceBadge = styled.span`
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: ${({ theme }) => theme.colors.background || '#f5f5f7'};
+  color: ${({ theme }) => theme.colors.textSecondary};
+`;
+
+const MentionInline = styled.span`
+  color: ${({ theme }) => theme.colors.text};
+  font-weight: 500;
+`;
+
+const ReasonRow = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+`;
+
+// trend_match 칩은 상단 트렌드 키워드 칩(Tag) 과 같은 색으로 시각적 연결.
+// 그 외 라벨(가까워요/블로그 후기 등)은 중성 색.
+const ReasonChip = styled.span`
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: ${({ theme, $primary }) => $primary
+    ? (theme.colors.primaryLight || '#eef2ff')
+    : (theme.colors.background || '#f5f5f7')};
+  color: ${({ theme, $primary }) => $primary
+    ? theme.colors.primary
+    : theme.colors.textSecondary};
+`;
+
+// pet-data-api v3 가이드 §2.5 의 라벨 매핑.
+function reasonLabel(reason) {
+  if (!reason) return null;
+  if (reason.startsWith('trend_match:')) {
+    return `${reason.slice('trend_match:'.length)} 인기`;
+  }
+  switch (reason) {
+    case 'distance': return '가까워요';
+    case 'mention': return '블로그 후기';
+    case 'history': return '많이 보는 곳';
+    case 'pet_species_match': return '종 전문';
+    case 'pet_breed_match': return '품종 케어';
+    default: return reason;
+  }
+}
+
+function isTrendReason(reason) {
+  return typeof reason === 'string' && reason.startsWith('trend_match:');
+}
+
+function sourceLabel(source) {
+  if (!source) return null;
+  switch (source) {
+    case 'public': return '공공';
+    case 'kakao': return '카카오';
+    case 'public+kakao': return '공공+카카오';
+    default: return null;
+  }
+}
+
+// 콜백 이벤트 전송 헬퍼. fire-and-forget — 실패해도 무시.
+function sendRecommendEvents(requestId, eventList) {
+  if (!requestId || !eventList || eventList.length === 0) return;
+  // facility_id 또는 source_id 가 있는 이벤트만 보냄 (가이드 §6)
+  const usable = eventList.filter(
+    (e) => e.facility_id != null || e.source_id != null
+  );
+  if (usable.length === 0) return;
+  recommendApi.sendEvents({ requestId, events: usable }).catch(() => {});
+}
+
 function RecommendCard({ lat, lng, context, onFacilitiesLoaded }) {
   const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loadingMain, setLoadingMain] = useState(true);
+  const [copy, setCopy] = useState(null);
+  const [loadingCopy, setLoadingCopy] = useState(false);
+
+  // 추천 카드가 마운트되고 데이터가 도착했을 때 view 이벤트 배치 1콜 전송.
+  // request_id 가 바뀔 때만 (= 새 추천 결과가 도착했을 때만) 한 번 발송.
+  useEffect(() => {
+    const requestId = data?.request_id;
+    const facilities = data?.facilities ?? [];
+    if (!requestId || facilities.length === 0) return;
+
+    const occurredAt = new Date().toISOString();
+    const events = facilities.map((f) => ({
+      facility_id: f.id ?? null,
+      source_id: f.source_id ?? null,
+      event: 'view',
+      occurred_at: occurredAt,
+    }));
+    sendRecommendEvents(requestId, events);
+  }, [data?.request_id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleFacilityClick = (f) => {
+    const requestId = data?.request_id;
+    sendRecommendEvents(requestId, [{
+      facility_id: f.id ?? null,
+      source_id: f.source_id ?? null,
+      event: 'click',
+      occurred_at: new Date().toISOString(),
+    }]);
+  };
 
   useEffect(() => {
     if (!lat || !lng || !context) return;
 
-    setLoading(true);
+    let cancelled = false;
+    setLoadingMain(true);
+    setCopy(null);
+    setLoadingCopy(false);
+
     recommendApi
       .getRecommendation({ lat, lng, context })
       .then((res) => {
-        setData(res.data);
+        if (cancelled) return;
+        const main = res.data;
+        setData(main);
         if (onFacilitiesLoaded) {
-          const withCoords = (res.data?.facilities ?? []).filter(
+          const withCoords = (main?.facilities ?? []).filter(
             (f) => f.lat != null && f.lng != null
           );
           onFacilitiesLoaded(withCoords);
         }
+
+        // v3 카피 분리: 본 추천이 비어 있지 않으면 LLM 카피를 두 번째 콜로 요청.
+        const requestId = main?.request_id;
+        const facilities = main?.facilities ?? [];
+        if (requestId && facilities.length > 0) {
+          setLoadingCopy(true);
+          recommendApi
+            .getCopy({
+              requestId,
+              context,
+              facilities: facilities.map((f) => ({
+                name: f.name,
+                distance_m: f.distance_m,
+              })),
+              trends: main?.trends ?? [],
+            })
+            .then((copyRes) => {
+              if (cancelled) return;
+              setCopy(copyRes.data);
+            })
+            .catch(() => {
+              if (cancelled) return;
+              setCopy(null);
+            })
+            .finally(() => {
+              if (cancelled) return;
+              setLoadingCopy(false);
+            });
+        }
       })
       .catch(() => {
+        if (cancelled) return;
         setData(null);
         onFacilitiesLoaded?.([]);
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (cancelled) return;
+        setLoadingMain(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [lat, lng, context]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (loading) return <Spinner text="추천 정보 불러오는 중..." />;
-  if (!data || (!data.recommendation && !data.trends?.length)) return null;
+  if (loadingMain) return <Spinner text="추천 정보 불러오는 중..." />;
+  if (!data || (!data.recommendation && !data.trends?.length && !data.facilities?.length)) return null;
+
+  // 카피 우선순위: LLM/rule 카피(/recommend/copy) → 본 추천 응답의 recommendation 폴백.
+  const displayedCopy = copy?.recommendation || data.recommendation;
 
   return (
     <Card>
       <Title>AI 추천</Title>
 
-      {data.recommendation && (
-        <RecommendText>{data.recommendation}</RecommendText>
+      {displayedCopy && <RecommendQuote>{displayedCopy}</RecommendQuote>}
+      {!copy && loadingCopy && (
+        <CopyLoading>추천 코멘트 생성 중...</CopyLoading>
       )}
 
       {data.trends?.length > 0 && (
         <>
-          <Title>요즘 인기 키워드</Title>
+          <TrendHeader>
+            <Title style={{ margin: 0 }}>요즘 인기 키워드</Title>
+            <MoreLink
+              type="button"
+              onClick={() => window.setActiveTab && window.setActiveTab('trends')}
+            >
+              트렌드 자세히 보기 →
+            </MoreLink>
+          </TrendHeader>
           <TagRow>
             {data.trends.map((t) => (
               <Tag key={t.keyword}># {t.keyword}</Tag>
@@ -103,13 +333,57 @@ function RecommendCard({ lat, lng, context, onFacilitiesLoaded }) {
 
       {data.facilities?.length > 0 && (
         <>
-          <Title style={{ marginTop: 12 }}>주변 시설</Title>
+          <Title style={{ marginTop: 14 }}>주변 시설</Title>
           <FacilityList>
-            {data.facilities.map((f) => (
-              <FacilityItem key={f.name}>
-                {f.name} · {f.distance_m}m
-              </FacilityItem>
-            ))}
+            {data.facilities.map((f) => {
+              const srcLabel = sourceLabel(f.source);
+              const scorePct = typeof f.score === 'number'
+                ? Math.round(f.score * 100)
+                : null;
+              const clickable = f.id != null || f.source_id != null;
+              return (
+                <FacilityItem
+                  key={f.name}
+                  $clickable={clickable}
+                  onClick={clickable ? () => handleFacilityClick(f) : undefined}
+                >
+                  <FacilityHeader>
+                    <FacilityName>{f.name}</FacilityName>
+                    {scorePct != null && (
+                      <FacilityScore>추천도 {scorePct}%</FacilityScore>
+                    )}
+                  </FacilityHeader>
+                  <FacilityMeta>
+                    <span>{f.distance_m}m</span>
+                    {srcLabel && (
+                      <>
+                        <MetaDot>·</MetaDot>
+                        <SourceBadge>{srcLabel}</SourceBadge>
+                      </>
+                    )}
+                    {typeof f.mention_count === 'number' && f.mention_count > 0 && (
+                      <>
+                        <MetaDot>·</MetaDot>
+                        <MentionInline>블로그 언급 {f.mention_count}건</MentionInline>
+                      </>
+                    )}
+                  </FacilityMeta>
+                  {f.reasons?.length > 0 && (
+                    <ReasonRow>
+                      {f.reasons.map((r, i) => {
+                        const label = reasonLabel(r);
+                        if (!label) return null;
+                        return (
+                          <ReasonChip key={`${r}-${i}`} $primary={isTrendReason(r)}>
+                            {label}
+                          </ReasonChip>
+                        );
+                      })}
+                    </ReasonRow>
+                  )}
+                </FacilityItem>
+              );
+            })}
           </FacilityList>
         </>
       )}
