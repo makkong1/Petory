@@ -43,6 +43,6 @@ const RadiusButton = styled.button`
 
   &:hover {
     border-color: ${props => props.theme.colors.primary};
-    color: ${props => props.$active ? props.theme.colors.primary : props.theme.colors.primary};
+    color: ${props => props.theme.colors.primary};
   }
 `;
