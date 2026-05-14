@@ -3,15 +3,6 @@ import styled from 'styled-components';
 import { useAuth } from '../../contexts/AuthContext';
 import { userProfileApi } from '../../api/userApi';
 import {
-  AuthPageWrapper,
-  BrandPanel,
-  BrandWordmark,
-  BrandFloatingArea,
-  FloatingGlassCard,
-  BrandSloganGroup,
-  BrandSlogan,
-  FormPanel,
-  FormInner,
   FormHeader,
   FormHeaderLogo,
   FormTitle,
@@ -415,29 +406,14 @@ const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
   };
 
   return (
-    <AuthPageWrapper>
-      <BrandPanel>
-        <BrandWordmark>PETORY</BrandWordmark>
-        <BrandFloatingArea>
-          <FloatingGlassCard $size={80} $top="10%" $left="18%" $rotate={-8}>🐶</FloatingGlassCard>
-          <FloatingGlassCard $size={68} $top="38%" $right="14%" $rotate={6}>🐱</FloatingGlassCard>
-          <FloatingGlassCard $size={92} $top="58%" $left="8%" $rotate={-4}>🐾</FloatingGlassCard>
-          <FloatingGlassCard $size={60} $bottom="12%" $right="22%" $rotate={10}>🦴</FloatingGlassCard>
-        </BrandFloatingArea>
-        <BrandSloganGroup>
-          <BrandSlogan>{'반려동물과 함께하는\n모든 순간'}</BrandSlogan>
-        </BrandSloganGroup>
-      </BrandPanel>
+    <>
+      <FormHeader>
+        <FormHeaderLogo>🐾 Petory</FormHeaderLogo>
+        <FormTitle>회원가입</FormTitle>
+        <FormSubtitle>몇 가지 정보만 입력하면 시작할 수 있어요</FormSubtitle>
+      </FormHeader>
 
-      <FormPanel>
-        <FormInner>
-          <FormHeader>
-            <FormHeaderLogo>🐾 Petory</FormHeaderLogo>
-            <FormTitle>회원가입</FormTitle>
-            <FormSubtitle>몇 가지 정보만 입력하면 시작할 수 있어요</FormSubtitle>
-          </FormHeader>
-
-        <Form onSubmit={handleSubmit}>
+      <Form onSubmit={handleSubmit}>
         <InputGroup>
           <Label htmlFor="id">아이디 *</Label>
           <NicknameInputGroup>
@@ -834,9 +810,7 @@ const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
           로그인
         </button>
       </FormSwitchLink>
-        </FormInner>
-      </FormPanel>
-    </AuthPageWrapper>
+    </>
   );
 };
 

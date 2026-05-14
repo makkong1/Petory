@@ -4,15 +4,6 @@ import { useAuth } from '../../contexts/AuthContext';
 import { authApi } from '../../api/authApi';
 import { isDemoMode } from '../../mock/isDemoMode';
 import {
-  AuthPageWrapper,
-  BrandPanel,
-  BrandWordmark,
-  BrandFloatingArea,
-  FloatingGlassCard,
-  BrandSloganGroup,
-  BrandSlogan,
-  FormPanel,
-  FormInner,
   FormHeader,
   FormHeaderLogo,
   FormTitle,
@@ -104,144 +95,127 @@ const LoginForm = ({ onSwitchToRegister }) => {
   };
 
   return (
-    <AuthPageWrapper>
-      <BrandPanel>
-        <BrandWordmark>PETORY</BrandWordmark>
-        <BrandFloatingArea>
-          <FloatingGlassCard $size={80} $top="10%" $left="18%" $rotate={-8}>🐶</FloatingGlassCard>
-          <FloatingGlassCard $size={68} $top="38%" $right="14%" $rotate={6}>🐱</FloatingGlassCard>
-          <FloatingGlassCard $size={92} $top="58%" $left="8%" $rotate={-4}>🐾</FloatingGlassCard>
-          <FloatingGlassCard $size={60} $bottom="12%" $right="22%" $rotate={10}>🦴</FloatingGlassCard>
-        </BrandFloatingArea>
-        <BrandSloganGroup>
-          <BrandSlogan>{'반려동물과 함께하는\n모든 순간'}</BrandSlogan>
-        </BrandSloganGroup>
-      </BrandPanel>
+    <>
+      <FormHeader>
+        <FormHeaderLogo>🐾 Petory</FormHeaderLogo>
+        <FormTitle>로그인</FormTitle>
+        <FormSubtitle>반려동물과 함께하는 커뮤니티</FormSubtitle>
+      </FormHeader>
 
-      <FormPanel>
-        <FormInner>
-          <FormHeader>
-            <FormHeaderLogo>🐾 Petory</FormHeaderLogo>
-            <FormTitle>로그인</FormTitle>
-            <FormSubtitle>반려동물과 함께하는 커뮤니티</FormSubtitle>
-          </FormHeader>
+      {isDemoMode() && (
+        <DemoHint>데모 모드: 아무 아이디/비밀번호로 로그인 가능</DemoHint>
+      )}
 
-          {isDemoMode() && (
-            <DemoHint>데모 모드: 아무 아이디/비밀번호로 로그인 가능</DemoHint>
-          )}
+      <Form onSubmit={handleSubmit}>
+        <InputGroup>
+          <Label htmlFor="id">아이디</Label>
+          <PillInput
+            type="text"
+            id="id"
+            name="id"
+            value={formData.id}
+            onChange={handleChange}
+            required
+            disabled={loading}
+          />
+        </InputGroup>
 
-          <Form onSubmit={handleSubmit}>
+        <InputGroup>
+          <Label htmlFor="password">비밀번호</Label>
+          <PillInput
+            type="password"
+            id="password"
+            name="password"
+            value={formData.password}
+            onChange={handleChange}
+            required
+            disabled={loading}
+          />
+        </InputGroup>
+
+        <ForgotPasswordLink>
+          <button type="button" onClick={() => setShowForgotPassword(true)}>
+            비밀번호 찾기
+          </button>
+        </ForgotPasswordLink>
+
+        {error && <ErrorMessage>{error}</ErrorMessage>}
+        {success && <SuccessMessage>{success}</SuccessMessage>}
+
+        <GradientButton type="submit" disabled={loading}>
+          {loading ? '로그인 중...' : '로그인'}
+        </GradientButton>
+      </Form>
+
+      {!isDemoMode() && (
+        <>
+          <Divider><span>또는</span></Divider>
+
+          <SocialLoginContainer>
+            <SocialButton type="button" onClick={() => handleSocialLogin('google')}>
+              <SocialIcon $provider="google">G</SocialIcon>
+              Google 로 로그인
+            </SocialButton>
+
+            <SocialButton type="button" onClick={() => handleSocialLogin('naver')}>
+              <SocialIcon $provider="naver">N</SocialIcon>
+              Naver 로 로그인
+            </SocialButton>
+          </SocialLoginContainer>
+        </>
+      )}
+
+      <FormSwitchLink>
+        계정이 없으신가요?
+        <button type="button" onClick={() => { if (onSwitchToRegister) onSwitchToRegister(); }}>
+          회원가입
+        </button>
+      </FormSwitchLink>
+
+      {showForgotPassword && (
+        <ForgotSection>
+          <ForgotTitle>비밀번호 찾기</ForgotTitle>
+          <ForgotPasswordForm onSubmit={handleForgotPassword}>
             <InputGroup>
-              <Label htmlFor="id">아이디</Label>
+              <Label htmlFor="forgotPasswordEmail">이메일</Label>
               <PillInput
-                type="text"
-                id="id"
-                name="id"
-                value={formData.id}
-                onChange={handleChange}
+                type="email"
+                id="forgotPasswordEmail"
+                value={forgotPasswordEmail}
+                onChange={(e) => {
+                  setForgotPasswordEmail(e.target.value);
+                  setForgotPasswordError('');
+                }}
+                placeholder="가입하신 이메일을 입력하세요"
                 required
-                disabled={loading}
+                disabled={forgotPasswordLoading}
               />
             </InputGroup>
 
-            <InputGroup>
-              <Label htmlFor="password">비밀번호</Label>
-              <PillInput
-                type="password"
-                id="password"
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                required
-                disabled={loading}
-              />
-            </InputGroup>
+            {forgotPasswordError && <ErrorMessage>{forgotPasswordError}</ErrorMessage>}
+            {forgotPasswordSuccess && <SuccessMessage>{forgotPasswordSuccess}</SuccessMessage>}
 
-            <ForgotPasswordLink>
-              <button type="button" onClick={() => setShowForgotPassword(true)}>
-                비밀번호 찾기
-              </button>
-            </ForgotPasswordLink>
-
-            {error && <ErrorMessage>{error}</ErrorMessage>}
-            {success && <SuccessMessage>{success}</SuccessMessage>}
-
-            <GradientButton type="submit" disabled={loading}>
-              {loading ? '로그인 중...' : '로그인'}
-            </GradientButton>
-          </Form>
-
-          {!isDemoMode() && (
-            <>
-              <Divider><span>또는</span></Divider>
-
-              <SocialLoginContainer>
-                <SocialButton type="button" onClick={() => handleSocialLogin('google')}>
-                  <SocialIcon $provider="google">G</SocialIcon>
-                  Google 로 로그인
-                </SocialButton>
-
-                <SocialButton type="button" onClick={() => handleSocialLogin('naver')}>
-                  <SocialIcon $provider="naver">N</SocialIcon>
-                  Naver 로 로그인
-                </SocialButton>
-              </SocialLoginContainer>
-            </>
-          )}
-
-          <FormSwitchLink>
-            계정이 없으신가요?
-            <button type="button" onClick={() => { if (onSwitchToRegister) onSwitchToRegister(); }}>
-              회원가입
-            </button>
-          </FormSwitchLink>
-
-          {showForgotPassword && (
-            <ForgotSection>
-              <ForgotTitle>비밀번호 찾기</ForgotTitle>
-              <ForgotPasswordForm onSubmit={handleForgotPassword}>
-                <InputGroup>
-                  <Label htmlFor="forgotPasswordEmail">이메일</Label>
-                  <PillInput
-                    type="email"
-                    id="forgotPasswordEmail"
-                    value={forgotPasswordEmail}
-                    onChange={(e) => {
-                      setForgotPasswordEmail(e.target.value);
-                      setForgotPasswordError('');
-                    }}
-                    placeholder="가입하신 이메일을 입력하세요"
-                    required
-                    disabled={forgotPasswordLoading}
-                  />
-                </InputGroup>
-
-                {forgotPasswordError && <ErrorMessage>{forgotPasswordError}</ErrorMessage>}
-                {forgotPasswordSuccess && <SuccessMessage>{forgotPasswordSuccess}</SuccessMessage>}
-
-                <ButtonGroup>
-                  <GradientButton type="submit" disabled={forgotPasswordLoading}>
-                    {forgotPasswordLoading ? '발송 중...' : '비밀번호 재설정 링크 보내기'}
-                  </GradientButton>
-                  <CancelButton
-                    type="button"
-                    onClick={() => {
-                      setShowForgotPassword(false);
-                      setForgotPasswordEmail('');
-                      setForgotPasswordError('');
-                      setForgotPasswordSuccess('');
-                    }}
-                    disabled={forgotPasswordLoading}
-                  >
-                    뒤로
-                  </CancelButton>
-                </ButtonGroup>
-              </ForgotPasswordForm>
-            </ForgotSection>
-          )}
-        </FormInner>
-      </FormPanel>
-    </AuthPageWrapper>
+            <ButtonGroup>
+              <GradientButton type="submit" disabled={forgotPasswordLoading}>
+                {forgotPasswordLoading ? '발송 중...' : '비밀번호 재설정 링크 보내기'}
+              </GradientButton>
+              <CancelButton
+                type="button"
+                onClick={() => {
+                  setShowForgotPassword(false);
+                  setForgotPasswordEmail('');
+                  setForgotPasswordError('');
+                  setForgotPasswordSuccess('');
+                }}
+                disabled={forgotPasswordLoading}
+              >
+                뒤로
+              </CancelButton>
+            </ButtonGroup>
+          </ForgotPasswordForm>
+        </ForgotSection>
+      )}
+    </>
   );
 };
 
