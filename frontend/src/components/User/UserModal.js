@@ -256,7 +256,7 @@ const ModalOverlay = styled.div`
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: ${({ theme }) => theme.colors.overlay};
   display: flex;
   align-items: center;
   justify-content: center;
@@ -264,13 +264,14 @@ const ModalOverlay = styled.div`
 `;
 
 const ModalContent = styled.div`
-  background: white;
+  background: ${({ theme }) => theme.colors.surfaceElevated};
   padding: 30px;
   border-radius: 12px;
   width: 90%;
   max-width: 500px;
   max-height: 80vh;
   overflow-y: auto;
+  box-shadow: ${({ theme }) => theme.shadows.xl};
 `;
 
 const ModalHeader = styled.div`
@@ -281,7 +282,7 @@ const ModalHeader = styled.div`
 `;
 
 const ModalTitle = styled.h2`
-  color: #333;
+  color: ${({ theme }) => theme.colors.text};
   margin: 0;
 `;
 
@@ -290,10 +291,10 @@ const CloseButton = styled.button`
   border: none;
   font-size: 24px;
   cursor: pointer;
-  color: #666;
-  
+  color: ${({ theme }) => theme.colors.textSecondary};
+
   &:hover {
-    color: #333;
+    color: ${({ theme }) => theme.colors.text};
   }
 `;
 
@@ -309,51 +310,56 @@ const FormGroup = styled.div`
 `;
 
 const Label = styled.label`
-  color: #333;
+  color: ${({ theme }) => theme.colors.text};
   margin-bottom: 4px;
   font-weight: 500;
 `;
 
 const Input = styled.input`
   padding: 10px;
-  border: 1px solid #ddd;
+  border: 1px solid ${({ theme }) => theme.colors.border};
   border-radius: 6px;
   font-size: 16px;
-  
+  background: ${({ theme }) => theme.colors.background};
+  color: ${({ theme }) => theme.colors.text};
+
   &:focus {
     outline: none;
-    border-color: #4a90e2;
-    box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
+    border-color: ${({ theme }) => theme.colors.borderFocus};
+    box-shadow: ${({ theme }) => theme.shadows.focus};
   }
 `;
 
 const Select = styled.select`
   padding: 10px;
-  border: 1px solid #ddd;
+  border: 1px solid ${({ theme }) => theme.colors.border};
   border-radius: 6px;
   font-size: 16px;
-  background: white;
-  
+  background: ${({ theme }) => theme.colors.background};
+  color: ${({ theme }) => theme.colors.text};
+
   &:focus {
     outline: none;
-    border-color: #4a90e2;
-    box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
+    border-color: ${({ theme }) => theme.colors.borderFocus};
+    box-shadow: ${({ theme }) => theme.shadows.focus};
   }
 `;
 
 const TextArea = styled.textarea`
   padding: 10px;
-  border: 1px solid #ddd;
+  border: 1px solid ${({ theme }) => theme.colors.border};
   border-radius: 6px;
   font-size: 16px;
   min-height: 80px;
   resize: vertical;
   font-family: inherit;
-  
+  background: ${({ theme }) => theme.colors.background};
+  color: ${({ theme }) => theme.colors.text};
+
   &:focus {
     outline: none;
-    border-color: #4a90e2;
-    box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
+    border-color: ${({ theme }) => theme.colors.borderFocus};
+    box-shadow: ${({ theme }) => theme.shadows.focus};
   }
 `;
 
@@ -371,39 +377,39 @@ const Button = styled.button`
   font-size: 16px;
   cursor: pointer;
   transition: background-color 0.3s ease;
-  
+
   ${props => props.variant === 'primary' && `
-    background: #4a90e2;
-    color: white;
-    
+    background: ${props.theme.colors.primary};
+    color: ${props.theme.colors.textInverse};
+
     &:hover {
-      background: #357abd;
+      background: ${props.theme.colors.primaryDark};
     }
-    
+
     &:disabled {
-      background: #ccc;
+      background: ${props.theme.colors.borderDark};
       cursor: not-allowed;
     }
   `}
-  
+
   ${props => props.variant === 'secondary' && `
-    background: #f5f5f5;
-    color: #333;
-    
+    background: ${props.theme.colors.surfaceSoft};
+    color: ${props.theme.colors.text};
+
     &:hover {
-      background: #e0e0e0;
+      background: ${props.theme.colors.surfaceHover};
     }
   `}
 `;
 
 const ErrorMessage = styled.div`
-  color: #e74c3c;
+  color: ${({ theme }) => theme.colors.error};
   font-size: 14px;
   margin-top: 4px;
 `;
 
 const HelperText = styled.div`
-  color: #666;
+  color: ${({ theme }) => theme.colors.textSecondary};
   font-size: 12px;
   margin-top: 4px;
   font-style: italic;
