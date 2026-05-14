@@ -79,33 +79,55 @@ DELETE /api/fcm/token   { token: string }
 
 ### 코드 수정 후 앱 반영
 
+루트 `package.json` 에 정의된 npm 스크립트를 권장 (내부적으로 `cd frontend && npx cap ...` 실행 → cwd 혼동 방지).
+
 ```bash
-# 1. React 빌드
-cd frontend && npm run build && cd ..
+# 모두 프로젝트 루트(Petory/)에서 실행
 
-# 2. 네이티브 프로젝트에 동기화
-npx cap sync android   # Android
- # 2. 동기화 (루트에서)
-  npm run cap:sync:ios
+# Android: React 빌드 + sync
+npm run build:android
+npm run cap:open:android   # Android Studio 열기
 
-  # 3. Xcode 열기 (루트에서)
-  npm run cap:open:ios
+# iOS: React 빌드 + sync
+npm run build:ios
+npm run cap:open:ios       # Xcode 열기 (App.xcworkspace)
 ```
+
+> `npx cap ...` 직접 실행은 반드시 `frontend/` 디렉토리에서. `Petory/` 루트에서 실행하면 `frontend/frontend/...` 로 경로가 꼬임.
 
 ### Android 실행
 
 ```bash
-npx cap open android
+npm run cap:open:android
 # Android Studio 열림 → ▶ Run
 ```
 
 ### iOS 실행
 
 ```bash
-npx cap sync ios       # CocoaPods 포함 동기화
-npx cap open ios
-# Xcode 열림 → Signing & Capabilities → Team 설정 → ▶ Run
+npm run build:ios          # React 빌드 + cap sync (CocoaPods 포함)
+npm run cap:open:ios       # Xcode 가 App.xcworkspace 를 엶
+# → Signing & Capabilities → Team 설정 → ▶ Run
 ```
+
+> **중요**: Xcode 는 반드시 `App.xcworkspace` 로 열어야 함. `App.xcodeproj` 를 직접 열면 CocoaPods 가 링크되지 않아 `Unable to resolve module dependency: 'FirebaseCore'` 같은 import 에러 발생.
+
+#### iOS 트러블슈팅
+
+**증상**: Xcode 에서 `Unable to resolve module dependency: 'FirebaseCore'` (또는 다른 Pod 의존성 미해결)
+
+**원인**: `Podfile.lock` 은 있는데 `frontend/ios/App/Pods/` 폴더가 실제로는 없음 (sync 중단 / 다른 머신에서 lock 만 커밋된 상태).
+
+**복구**:
+
+```bash
+cd /Users/maknkkong/project/Petory/frontend/ios/App
+pod --version              # 없으면: brew install cocoapods
+pod install
+open /Users/maknkkong/project/Petory/frontend/ios/App/App.xcworkspace
+```
+
+Xcode 메뉴 → Product → Clean Build Folder (`⇧⌘K`) 후 다시 빌드.
 
 ### 핫리로드 개발 (선택)
 

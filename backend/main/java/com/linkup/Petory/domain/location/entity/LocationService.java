@@ -120,6 +120,10 @@ public class LocationService {
     @Builder.Default
     private Integer reviewCount = 0; // soft delete 제외 리뷰 수 캐시
 
+    @Builder.Default
+    @Column(name = "score")
+    private Double score = 0.0;
+
     @Column(name = "last_updated")
     private LocalDate lastUpdated; // 최종작성일
 

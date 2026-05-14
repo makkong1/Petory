@@ -19,6 +19,7 @@ public class LocationServiceDTO {
     private Double latitude;
     private Double longitude;
     private Double rating;
+    private Double score;
     private String phone;
     private String website;
     private String placeUrl;

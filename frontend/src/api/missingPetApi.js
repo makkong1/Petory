@@ -7,6 +7,13 @@ const api = createAuthAxios('http://localhost:8080/api/missing-pets');
 const mockResolve = (data) => Promise.resolve({ data });
 
 export const missingPetApi = {
+  getHomeMissing: (lat, lng, size = 6) => {
+    if (isDemoMode()) return mockResolve(DEMO_MISSING_PETS.slice(0, size));
+    const params = { size };
+    if (lat != null && lng != null) { params.lat = lat; params.lng = lng; }
+    return api.get('/home', { params });
+  },
+
   list: (params) => {
     if (isDemoMode()) {
       const { page = 0, size = 20, status } = params || {};

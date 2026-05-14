@@ -13,10 +13,12 @@ import com.linkup.Petory.domain.activity.dto.ActivityPageResponseDTO;
 import com.linkup.Petory.domain.activity.service.ActivityService;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @RestController
 @RequestMapping("/api/activities")
 @RequiredArgsConstructor
+@Slf4j
 public class ActivityController {
 
     private final ActivityService activityService;
@@ -24,7 +26,7 @@ public class ActivityController {
     // 기존 API (하위 호환성 유지)
     @GetMapping("/my")
     public ResponseEntity<List<ActivityDTO>> getMyActivities(@RequestParam("userId") Long userId) {
-        System.out.println("=== [ActivityController] /api/activities/my 호출됨 - userId: " + userId + " ===");
+        log.info("=== [ActivityController] /api/activities/my 호출됨 - userId: " + userId + " ===");
         return ResponseEntity.ok(activityService.getUserActivities(userId));
     }
 
@@ -35,7 +37,7 @@ public class ActivityController {
             @RequestParam(value = "filter", required = false, defaultValue = "ALL") String filter,
             @RequestParam(value = "page", defaultValue = "0") int page,
             @RequestParam(value = "size", defaultValue = "20") int size) {
-        System.out.println("=== [ActivityController] /api/activities/my/paging 호출됨 - userId: " + userId 
+        log.info("=== [ActivityController] /api/activities/my/paging 호출됨 - userId: " + userId
                 + ", filter: " + filter + ", page: " + page + ", size: " + size + " ===");
         return ResponseEntity.ok(activityService.getUserActivitiesWithPaging(userId, filter, page, size));
     }

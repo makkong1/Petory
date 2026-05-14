@@ -23,8 +23,8 @@ public class AdminStatisticsController {
 
     @GetMapping("/daily")
     public ResponseEntity<List<DailyStatisticsResponse>> getDailyStatistics(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+            @RequestParam(name = "startDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(name = "endDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
         if (endDate == null) endDate = LocalDate.now();
         if (startDate == null) startDate = endDate.minusDays(29);
         return ResponseEntity.ok(statisticsService.getDailyStatistics(startDate, endDate));

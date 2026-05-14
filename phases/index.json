@@ -15,6 +15,14 @@
     {
       "dir": "meetup-db-fixes",
       "status": "pending"
+    },
+    {
+      "dir": "homepage-live-data",
+      "status": "pending"
+    },
+    {
+      "dir": "homepage-ranking-algorithm",
+      "status": "pending"
     }
   ]
 }

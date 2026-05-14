@@ -17,6 +17,20 @@ export const meetupApi = {
     });
   },
 
+  // 참여 가능한 모임 조회 (위치 기반 fallback용)
+  getRecruitingMeetups: (size = 6) => {
+    if (isDemoMode()) return mockResolve(DEMO_MEETUPS.slice(0, size));
+    return api.get('/available', { params: { size, page: 0 } });
+  },
+
+  // 홈 화면 전용 모임 추천 (거리+긴급도+여유 스코어)
+  getHomeMeetups: (lat, lng, size = 6) => {
+    if (isDemoMode()) return mockResolve(DEMO_MEETUPS.slice(0, size));
+    const params = { size };
+    if (lat != null && lng != null) { params.lat = lat; params.lng = lng; }
+    return api.get('/home', { params });
+  },
+
   // 특정 모임 조회
   getMeetupById: (meetupIdx) => {
     if (isDemoMode()) {
