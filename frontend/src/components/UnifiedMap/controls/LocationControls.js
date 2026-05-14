@@ -187,11 +187,11 @@ const SearchPill = styled.form`
   border-radius: 999px;
   overflow: hidden;
   transition: border-color 0.2s, box-shadow 0.2s;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  box-shadow: ${props => props.theme.shadows.sm};
 
   &:focus-within {
     border-color: ${props => props.theme.colors.primary};
-    box-shadow: 0 0 0 3px rgba(232, 113, 74, 0.12), 0 1px 4px rgba(0, 0, 0, 0.06);
+    box-shadow: ${props => props.theme.shadows.focus}, ${props => props.theme.shadows.sm};
   }
 `;
 
@@ -222,7 +222,7 @@ const SearchButton = styled.button`
   border: none;
   border-radius: 0 999px 999px 0;
   background: ${props => props.theme.colors.primary};
-  color: white;
+  color: ${props => props.theme.colors.textInverse};
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -277,7 +277,7 @@ const SummaryChip = styled.span`
   max-width: 96px;
   padding: 4px 9px;
   border-radius: 999px;
-  background: rgba(74, 144, 217, 0.10);
+  background: ${props => props.theme.colors.domain.location + '1A'};
   color: ${props => props.theme.colors.domain.location};
   font-size: 11px;
   font-weight: 700;
@@ -423,12 +423,12 @@ const SearchAreaButton = styled.button`
   border: none;
   border-radius: 999px;
   background: ${props => props.theme.colors.primary};
-  color: white;
+  color: ${props => props.theme.colors.textInverse};
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
   white-space: nowrap;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  box-shadow: ${props => props.theme.shadows.md};
   transition: background 0.15s;
 
   &:hover {
