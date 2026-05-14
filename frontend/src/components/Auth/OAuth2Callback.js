@@ -147,9 +147,9 @@ const StatusCard = styled.div`
   align-items: center;
   gap: 1.5rem;
   padding: 3rem;
-  background: white;
+  background: ${({ theme }) => theme.colors.surfaceElevated};
   border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  box-shadow: ${({ theme }) => theme.shadows.lg};
   min-width: 300px;
 `;
 
@@ -172,7 +172,7 @@ const SuccessIcon = styled.div`
   height: 50px;
   border-radius: ${({ theme }) => theme.borderRadius.full};
   background: ${({ theme }) => theme.colors.success};
-  color: #fff;
+  color: ${({ theme }) => theme.colors.textInverse};
   display: flex;
   align-items: center;
   justify-content: center;
@@ -185,7 +185,7 @@ const ErrorIcon = styled.div`
   height: 50px;
   border-radius: ${({ theme }) => theme.borderRadius.full};
   background: ${({ theme }) => theme.colors.error};
-  color: #fff;
+  color: ${({ theme }) => theme.colors.textInverse};
   display: flex;
   align-items: center;
   justify-content: center;
