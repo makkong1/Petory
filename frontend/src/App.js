@@ -8,6 +8,7 @@ import UserList from './components/User/UserList';
 import CommunityBoard from './components/Community/CommunityBoard';
 import LoginForm from './components/Auth/LoginForm';
 import RegisterForm from './components/Auth/RegisterForm';
+import AuthLayout from './components/Auth/AuthLayout';
 import OAuth2Callback from './components/Auth/OAuth2Callback';
 import AdminPanel from './components/Admin/AdminPanel';
 import PermissionDeniedModal from './components/Common/PermissionDeniedModal';
@@ -146,19 +147,18 @@ function AppContent() {
   if (!isAuthenticated) {
     return (
       <AuthContainer>
-        {authMode === 'login' ? (
-          <LoginForm
-            onSwitchToRegister={() => setAuthMode('register')}
-          />
-        ) : (
-          <RegisterForm
-            onRegisterSuccess={() => {
-              // 회원가입 성공 시 로그인 모드로 전환
-              setAuthMode('login');
-            }}
-            onSwitchToLogin={() => setAuthMode('login')}
-          />
-        )}
+        <AuthLayout
+          mode={authMode}
+          loginContent={
+            <LoginForm onSwitchToRegister={() => setAuthMode('register')} />
+          }
+          registerContent={
+            <RegisterForm
+              onRegisterSuccess={() => setAuthMode('login')}
+              onSwitchToLogin={() => setAuthMode('login')}
+            />
+          }
+        />
       </AuthContainer>
     );
   }
@@ -291,6 +291,7 @@ const ContentArea = styled.main`
 
   @media (max-width: 768px) {
     margin-top: 0;
+    padding-top: env(safe-area-inset-top, 0px);
     padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px));
     min-height: 100dvh;
   }

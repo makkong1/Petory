@@ -3,6 +3,18 @@ import styled from 'styled-components';
 import { useAuth } from '../../contexts/AuthContext';
 import { authApi } from '../../api/authApi';
 import { isDemoMode } from '../../mock/isDemoMode';
+import {
+  FormHeader,
+  FormHeaderLogo,
+  FormTitle,
+  FormSubtitle,
+  PillInput,
+  GradientButton,
+  SocialButton,
+  SocialIcon,
+  Divider,
+  FormSwitchLink,
+} from './AuthShell';
 
 const LoginForm = ({ onSwitchToRegister }) => {
   const { login } = useAuth();
@@ -83,22 +95,21 @@ const LoginForm = ({ onSwitchToRegister }) => {
   };
 
   return (
-    <AuthPageWrapper>
-      <GlassCard>
-        <BrandHeader>
-          <BrandIcon>🐾</BrandIcon>
-          <BrandTitle>Petory</BrandTitle>
-          <BrandSubtitle>반려동물과 함께하는 커뮤니티</BrandSubtitle>
-        </BrandHeader>
+    <>
+      <FormHeader>
+        <FormHeaderLogo>🐾 Petory</FormHeaderLogo>
+        <FormTitle>로그인</FormTitle>
+        <FormSubtitle>반려동물과 함께하는 커뮤니티</FormSubtitle>
+      </FormHeader>
 
-        <Title>로그인</Title>
-        {isDemoMode() && (
-          <DemoHint>데모 모드: 아무 아이디/비밀번호로 로그인 가능</DemoHint>
-        )}
-        <Form onSubmit={handleSubmit}>
+      {isDemoMode() && (
+        <DemoHint>데모 모드: 아무 아이디/비밀번호로 로그인 가능</DemoHint>
+      )}
+
+      <Form onSubmit={handleSubmit}>
         <InputGroup>
           <Label htmlFor="id">아이디</Label>
-          <Input
+          <PillInput
             type="text"
             id="id"
             name="id"
@@ -111,7 +122,7 @@ const LoginForm = ({ onSwitchToRegister }) => {
 
         <InputGroup>
           <Label htmlFor="password">비밀번호</Label>
-          <Input
+          <PillInput
             type="password"
             id="password"
             name="password"
@@ -131,47 +142,35 @@ const LoginForm = ({ onSwitchToRegister }) => {
         {error && <ErrorMessage>{error}</ErrorMessage>}
         {success && <SuccessMessage>{success}</SuccessMessage>}
 
-        <Button type="submit" disabled={loading}>
+        <GradientButton type="submit" disabled={loading}>
           {loading ? '로그인 중...' : '로그인'}
-        </Button>
+        </GradientButton>
       </Form>
 
       {!isDemoMode() && (
         <>
-          <Divider>
-            <DividerLine />
-            <DividerText>또는</DividerText>
-            <DividerLine />
-          </Divider>
+          <Divider><span>또는</span></Divider>
 
           <SocialLoginContainer>
-            <SocialButton 
-              type="button"
-              onClick={() => handleSocialLogin('google')}
-              google
-            >
-              <SocialIcon>G</SocialIcon>
-              Google로 로그인
+            <SocialButton type="button" onClick={() => handleSocialLogin('google')}>
+              <SocialIcon $provider="google">G</SocialIcon>
+              Google 로 로그인
             </SocialButton>
-            
-            <SocialButton 
-              type="button"
-              onClick={() => handleSocialLogin('naver')}
-              naver
-            >
-              <SocialIcon>N</SocialIcon>
-              Naver로 로그인
+
+            <SocialButton type="button" onClick={() => handleSocialLogin('naver')}>
+              <SocialIcon $provider="naver">N</SocialIcon>
+              Naver 로 로그인
             </SocialButton>
           </SocialLoginContainer>
         </>
       )}
 
-      <LinkTextContainer>
-        <LinkText>계정이 없으신가요?</LinkText>
-        <SecondaryButton type="button" onClick={() => { if (onSwitchToRegister) onSwitchToRegister(); }}>
+      <FormSwitchLink>
+        계정이 없으신가요?
+        <button type="button" onClick={() => { if (onSwitchToRegister) onSwitchToRegister(); }}>
           회원가입
-        </SecondaryButton>
-      </LinkTextContainer>
+        </button>
+      </FormSwitchLink>
 
       {showForgotPassword && (
         <ForgotSection>
@@ -179,7 +178,7 @@ const LoginForm = ({ onSwitchToRegister }) => {
           <ForgotPasswordForm onSubmit={handleForgotPassword}>
             <InputGroup>
               <Label htmlFor="forgotPasswordEmail">이메일</Label>
-              <Input
+              <PillInput
                 type="email"
                 id="forgotPasswordEmail"
                 value={forgotPasswordEmail}
@@ -197,9 +196,9 @@ const LoginForm = ({ onSwitchToRegister }) => {
             {forgotPasswordSuccess && <SuccessMessage>{forgotPasswordSuccess}</SuccessMessage>}
 
             <ButtonGroup>
-              <Button type="submit" disabled={forgotPasswordLoading}>
+              <GradientButton type="submit" disabled={forgotPasswordLoading}>
                 {forgotPasswordLoading ? '발송 중...' : '비밀번호 재설정 링크 보내기'}
-              </Button>
+              </GradientButton>
               <CancelButton
                 type="button"
                 onClick={() => {
@@ -216,282 +215,68 @@ const LoginForm = ({ onSwitchToRegister }) => {
           </ForgotPasswordForm>
         </ForgotSection>
       )}
-      </GlassCard>
-    </AuthPageWrapper>
+    </>
   );
 };
 
 export default LoginForm;
 
-const AuthPageWrapper = styled.div`
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #E8714A 0%, #C9573A 40%, #3D8B7A 100%);
-  padding: 24px 16px;
-`;
-
-const GlassCard = styled.div`
-  width: 100%;
-  max-width: 440px;
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-radius: 24px;
-  padding: 40px 32px;
-  box-shadow: 0 20px 60px rgba(28, 25, 23, 0.2);
-
-  @media (prefers-color-scheme: dark) {
-    background: rgba(29, 29, 29, 0.92);
-  }
-`;
-
-const BrandHeader = styled.div`
-  text-align: center;
-  margin-bottom: 32px;
-`;
-
-const BrandIcon = styled.div`
-  font-size: 48px;
-  margin-bottom: 8px;
-`;
-
-const BrandTitle = styled.h1`
-  font-size: 28px;
-  font-weight: 700;
-  color: ${props => props.theme.colors.primary};
-  margin: 0 0 4px;
-`;
-
-const BrandSubtitle = styled.p`
-  font-size: 14px;
-  color: ${props => props.theme.colors.textSecondary};
-  margin: 0;
-`;
-
-const Title = styled.h2`
-  text-align: center;
-  margin-bottom: 2rem;
-  color: ${({ theme }) => theme.colors.text};
-  font-size: ${({ theme }) => theme.typography.h2.fontSize};
-  font-weight: ${({ theme }) => theme.typography.h2.fontWeight};
-`;
-
 const DemoHint = styled.div`
-  text-align: center;
-  margin-bottom: 1rem;
-  padding: 0.5rem;
-  background: ${({ theme }) => theme.colors.success}18;
-  color: ${({ theme }) => theme.colors.successDark};
-  border-radius: ${({ theme }) => theme.borderRadius.md};
-  font-size: 0.875rem;
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  background: #f0fdf4;
+  color: #166534;
+  border-radius: 8px;
+  font-size: 13px;
 `;
 
 const Form = styled.form`
   display: flex;
   flex-direction: column;
-  gap: ${({ theme }) => theme.spacing.lg};
+  gap: 16px;
 `;
 
 const InputGroup = styled.div`
   display: flex;
   flex-direction: column;
-  gap: ${({ theme }) => theme.spacing.sm};
+  gap: 6px;
 `;
 
 const Label = styled.label`
-  font-weight: 600;
   font-size: 13px;
-  color: ${({ theme }) => theme.colors.text};
-`;
-
-const Input = styled.input`
-  width: 100%;
-  padding: 14px 18px;
-  border: 1.5px solid ${props => props.theme.colors.border};
-  border-radius: 50px;
-  font-size: 15px;
-  background: ${props => props.theme.colors.background};
-  color: ${props => props.theme.colors.text};
-  outline: none;
-  transition: border-color 0.2s ease;
-  box-sizing: border-box;
-
-  &:focus {
-    border-color: ${props => props.theme.colors.primary};
-  }
-
-  &::placeholder {
-    color: ${props => props.theme.colors.textMuted};
-  }
-
-  &:disabled {
-    background: ${({ theme }) => theme.colors.surfaceSoft};
-    color: ${({ theme }) => theme.colors.textLight};
-    cursor: not-allowed;
-  }
-`;
-
-const Button = styled.button`
-  width: 100%;
-  padding: 14px;
-  background: linear-gradient(135deg, #E8714A 0%, #C9573A 100%);
-  color: white;
-  border: none;
-  border-radius: 50px;
-  font-size: 16px;
   font-weight: 600;
-  cursor: pointer;
-  transition: opacity 0.2s ease, transform 0.1s ease;
-  margin-top: 8px;
-
-  &:hover {
-    opacity: 0.9;
-  }
-
-  &:active {
-    transform: scale(0.98);
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
+  color: #57534e;
 `;
 
 const ErrorMessage = styled.div`
-  color: ${({ theme }) => theme.colors.error};
+  color: #dc2626;
   font-size: 13px;
-  margin-top: 4px;
 `;
 
 const SuccessMessage = styled.div`
-  color: ${({ theme }) => theme.colors.success};
-  font-size: 13px;
-  margin-top: 4px;
-`;
-
-const Divider = styled.div`
-  display: flex;
-  align-items: center;
-  margin: ${({ theme }) => theme.spacing.xl} 0;
-  gap: ${({ theme }) => theme.spacing.md};
-`;
-
-const DividerLine = styled.div`
-  flex: 1;
-  height: 1px;
-  background: ${({ theme }) => theme.colors.border};
-`;
-
-const DividerText = styled.span`
-  color: ${({ theme }) => theme.colors.textLight};
+  color: #16a34a;
   font-size: 13px;
 `;
 
 const SocialLoginContainer = styled.div`
   display: flex;
   flex-direction: column;
-  gap: ${({ theme }) => theme.spacing.md};
-  margin-top: ${({ theme }) => theme.spacing.md};
-`;
-
-const SocialButton = styled.button`
-  display: flex;
-  align-items: center;
-  justify-content: center;
   gap: 10px;
-  padding: 11px 20px;
-  border: 2px solid ${props => {
-    if (props.google) return '#4285F4';
-    if (props.naver) return '#03C75A';
-    return props.theme.colors.border;
-  }};
-  background: ${props => {
-    if (props.google) return '#4285F4';
-    if (props.naver) return '#03C75A';
-    return props.theme.colors.background;
-  }};
-  color: #fff;
-  border-radius: ${({ theme }) => theme.borderRadius.lg};
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-
-  &:hover {
-    transform: translateY(-1px);
-    box-shadow: ${({ theme }) => theme.shadows.md};
-    opacity: 0.9;
-  }
-
-  &:active {
-    transform: translateY(0);
-  }
-`;
-
-const SocialIcon = styled.span`
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: ${({ theme }) => theme.borderRadius.sm};
-  font-weight: bold;
-  font-size: 13px;
-`;
-
-const LinkTextContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  margin-top: ${({ theme }) => theme.spacing.lg};
-  gap: 8px;
-`;
-
-const LinkText = styled.p`
-  text-align: center;
-  color: ${({ theme }) => theme.colors.textSecondary};
-  font-size: 14px;
-  margin: 0;
-`;
-
-const SecondaryButton = styled.button`
-  width: 100%;
-  padding: 12px;
-  background: transparent;
-  color: ${props => props.theme.colors.primary};
-  border: 1.5px solid ${props => props.theme.colors.primary};
-  border-radius: 50px;
-  font-size: 15px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-
-  &:hover {
-    background: ${props => props.theme.colors.primarySoft};
-  }
 `;
 
 const ForgotPasswordLink = styled.div`
   text-align: right;
-  margin-top: -4px;
-  margin-bottom: 4px;
 
   button {
     background: none;
     border: none;
-    color: ${({ theme }) => theme.colors.textSecondary};
+    color: #a8a29e;
     font-size: 13px;
-    text-decoration: none;
     cursor: pointer;
     padding: 0;
 
     &:hover {
-      color: ${({ theme }) => theme.colors.primary};
-      text-decoration: underline;
+      color: #E8714A;
     }
   }
 `;
@@ -499,49 +284,39 @@ const ForgotPasswordLink = styled.div`
 const ForgotSection = styled.div`
   margin-top: 24px;
   padding-top: 24px;
-  border-top: 1px solid ${props => props.theme.colors.border};
+  border-top: 1px solid #f0efed;
 `;
 
 const ForgotTitle = styled.h3`
   font-size: 16px;
   font-weight: 600;
-  color: ${props => props.theme.colors.text};
+  color: #1c1917;
   margin: 0 0 16px;
 `;
 
 const ForgotPasswordForm = styled.form`
   display: flex;
   flex-direction: column;
-  gap: ${({ theme }) => theme.spacing.lg};
+  gap: 16px;
 `;
 
 const ButtonGroup = styled.div`
   display: flex;
-  gap: ${({ theme }) => theme.spacing.md};
-  margin-top: 4px;
+  gap: 10px;
 `;
 
 const CancelButton = styled.button`
-  padding: 11px 20px;
-  background: ${({ theme }) => theme.colors.surface};
-  color: ${({ theme }) => theme.colors.text};
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  border-radius: ${({ theme }) => theme.borderRadius.lg};
-  font-size: 15px;
+  flex: 1;
+  padding: 12px;
+  background: #f5f5f4;
+  color: #57534e;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
-  flex: 1;
+  transition: background 0.15s ease;
 
-  &:hover:not(:disabled) {
-    background: ${({ theme }) => theme.colors.surfaceHover};
-    border-color: ${({ theme }) => theme.colors.borderDark};
-    transform: translateY(-1px);
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    transform: none;
-  }
+  &:hover:not(:disabled) { background: #e7e5e4; }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
 `;
