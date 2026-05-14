@@ -2,6 +2,26 @@ import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { useAuth } from '../../contexts/AuthContext';
 import { userProfileApi } from '../../api/userApi';
+import {
+  AuthPageWrapper,
+  BrandPanel,
+  BrandWordmark,
+  BrandFloatingArea,
+  FloatingGlassCard,
+  BrandSloganGroup,
+  BrandSlogan,
+  FormPanel,
+  FormInner,
+  FormHeader,
+  FormHeaderLogo,
+  FormTitle,
+  FormSubtitle,
+  PillInput,
+  PillSelect,
+  GradientButton,
+  OutlineButton,
+  FormSwitchLink,
+} from './AuthShell';
 
 const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
   const { register } = useAuth();
@@ -396,19 +416,32 @@ const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
 
   return (
     <AuthPageWrapper>
-      <GlassCard>
-        <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-          <div style={{ fontSize: '40px', marginBottom: '8px' }}>🐾</div>
-          <div style={{ fontSize: '24px', fontWeight: 700, color: '#E8714A' }}>Petory 가입</div>
-        </div>
+      <BrandPanel>
+        <BrandWordmark>PETORY</BrandWordmark>
+        <BrandFloatingArea>
+          <FloatingGlassCard $size={80} $top="10%" $left="18%" $rotate={-8}>🐶</FloatingGlassCard>
+          <FloatingGlassCard $size={68} $top="38%" $right="14%" $rotate={6}>🐱</FloatingGlassCard>
+          <FloatingGlassCard $size={92} $top="58%" $left="8%" $rotate={-4}>🐾</FloatingGlassCard>
+          <FloatingGlassCard $size={60} $bottom="12%" $right="22%" $rotate={10}>🦴</FloatingGlassCard>
+        </BrandFloatingArea>
+        <BrandSloganGroup>
+          <BrandSlogan>{'반려동물과 함께하는\n모든 순간'}</BrandSlogan>
+        </BrandSloganGroup>
+      </BrandPanel>
 
-        <Title>회원가입</Title>
+      <FormPanel>
+        <FormInner>
+          <FormHeader>
+            <FormHeaderLogo>🐾 Petory</FormHeaderLogo>
+            <FormTitle>회원가입</FormTitle>
+            <FormSubtitle>몇 가지 정보만 입력하면 시작할 수 있어요</FormSubtitle>
+          </FormHeader>
 
         <Form onSubmit={handleSubmit}>
         <InputGroup>
           <Label htmlFor="id">아이디 *</Label>
           <NicknameInputGroup>
-            <Input
+            <PillInput
               type="text"
               id="id"
               name="id"
@@ -418,13 +451,13 @@ const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
               disabled={loading}
               placeholder="아이디를 입력하세요"
             />
-            <CheckButton
+            <OutlineButton
               type="button"
               onClick={handleIdCheck}
               disabled={loading || idCheck.checking || !formData.id}
             >
               {idCheck.checking ? '확인 중...' : '중복 확인'}
-            </CheckButton>
+            </OutlineButton>
           </NicknameInputGroup>
           {idCheck.message && (
             <NicknameMessage available={idCheck.available}>
@@ -435,7 +468,7 @@ const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
 
         <InputGroup>
           <Label htmlFor="username">이름 *</Label>
-          <Input
+          <PillInput
             type="text"
             id="username"
             name="username"
@@ -449,7 +482,7 @@ const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
         <InputGroup>
           <Label htmlFor="nickname">닉네임 *</Label>
           <NicknameInputGroup>
-            <Input
+            <PillInput
               type="text"
               id="nickname"
               name="nickname"
@@ -460,13 +493,13 @@ const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
               placeholder="닉네임을 입력하세요"
               maxLength={50}
             />
-            <CheckButton
+            <OutlineButton
               type="button"
               onClick={handleNicknameCheck}
               disabled={loading || nicknameCheck.checking || !formData.nickname}
             >
               {nicknameCheck.checking ? '확인 중...' : '중복 확인'}
-            </CheckButton>
+            </OutlineButton>
           </NicknameInputGroup>
           {nicknameCheck.message && (
             <NicknameMessage available={nicknameCheck.available}>
@@ -477,7 +510,7 @@ const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
 
         <InputGroup>
           <Label htmlFor="password">비밀번호 *</Label>
-          <Input
+          <PillInput
             type="password"
             id="password"
             name="password"
@@ -491,7 +524,7 @@ const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
         <InputGroup>
           <Label htmlFor="email">이메일 *</Label>
           <EmailInputGroup>
-            <EmailIdInput
+            <PillInput
               type="text"
               id="emailId"
               name="emailId"
@@ -500,15 +533,17 @@ const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
               placeholder="이메일 아이디"
               required
               disabled={loading}
+              style={{ flex: 1, minWidth: 0 }}
             />
             <EmailAt>@</EmailAt>
-            <EmailDomainSelect
+            <PillSelect
               id="emailDomain"
               name="emailDomain"
               value={formData.emailDomain}
               onChange={handleChange}
               disabled={loading}
               required
+              style={{ flex: 1, minWidth: 0 }}
             >
               <option value="gmail.com">gmail.com</option>
               <option value="naver.com">naver.com</option>
@@ -519,9 +554,9 @@ const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
               <option value="outlook.com">outlook.com</option>
               <option value="yahoo.com">yahoo.com</option>
               <option value="custom">직접 입력</option>
-            </EmailDomainSelect>
+            </PillSelect>
             {formData.emailDomain === 'custom' && (
-              <EmailCustomInput
+              <PillInput
                 type="text"
                 name="customEmailDomain"
                 value={formData.customEmailDomain || ''}
@@ -536,6 +571,7 @@ const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
                 placeholder="도메인 입력 (예: example.com)"
                 disabled={loading}
                 required
+                style={{ flex: 1, minWidth: 0 }}
               />
             )}
           </EmailInputGroup>
@@ -553,13 +589,13 @@ const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
               <EmailVerificationStatus verified={false}>
                 ⚠ 이메일 인증을 완료하면 더 많은 기능을 이용할 수 있습니다
               </EmailVerificationStatus>
-              <EmailVerificationButton
+              <OutlineButton
                 type="button"
                 onClick={handleSendVerificationEmail}
                 disabled={loading || emailVerificationSending || !formData.emailId || !formData.emailDomain}
               >
                 {emailVerificationSending ? '발송 중...' : emailVerificationSent ? '인증 메일 재발송' : '이메일 인증 메일 발송'}
-              </EmailVerificationButton>
+              </OutlineButton>
               {emailVerificationSent && !emailVerified && (
                 <EmailVerificationInfo>
                   이메일 인증 메일이 발송되었습니다. 이메일을 확인하여 인증을 완료해주세요.
@@ -573,7 +609,7 @@ const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
 
         <InputGroup>
           <Label htmlFor="role">역할 *</Label>
-          <Select
+          <PillSelect
             id="role"
             name="role"
             value={formData.role}
@@ -583,12 +619,12 @@ const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
           >
             <option value="USER">🐾 일반 사용자 (펫케어 서비스 이용)</option>
             <option value="SERVICE_PROVIDER">🏥 서비스 제공자 (펫케어 서비스 제공)</option>
-          </Select>
+          </PillSelect>
         </InputGroup>
 
         <InputGroup>
           <Label htmlFor="location">지역</Label>
-          <Input
+          <PillInput
             type="text"
             id="location"
             name="location"
@@ -618,7 +654,7 @@ const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
                   <PetInputRow>
                     <PetInputGroup>
                       <PetLabel>이름 *</PetLabel>
-                      <PetInput
+                      <PillInput
                         type="text"
                         value={pet.petName}
                         onChange={(e) => handlePetChange(index, 'petName', e.target.value)}
@@ -630,7 +666,7 @@ const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
                     </PetInputGroup>
                     <PetInputGroup>
                       <PetLabel>종류 *</PetLabel>
-                      <PetSelect
+                      <PillSelect
                         value={pet.petType}
                         onChange={(e) => handlePetChange(index, 'petType', e.target.value)}
                         disabled={loading}
@@ -642,9 +678,9 @@ const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
                         <option value="RABBIT">토끼</option>
                         <option value="HAMSTER">햄스터</option>
                         <option value="ETC">기타</option>
-                      </PetSelect>
+                      </PillSelect>
                       {pet.petType === 'ETC' && (
-                        <PetInput
+                        <PillInput
                           type="text"
                           value={pet.customPetType}
                           onChange={(e) => handlePetChange(index, 'customPetType', e.target.value)}
@@ -660,7 +696,7 @@ const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
                   <PetInputRow>
                     <PetInputGroup>
                       <PetLabel>품종</PetLabel>
-                      <PetInput
+                      <PillInput
                         type="text"
                         value={pet.breed}
                         onChange={(e) => handlePetChange(index, 'breed', e.target.value)}
@@ -671,7 +707,7 @@ const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
                     </PetInputGroup>
                     <PetInputGroup>
                       <PetLabel>성별</PetLabel>
-                      <PetSelect
+                      <PillSelect
                         value={pet.gender}
                         onChange={(e) => handlePetChange(index, 'gender', e.target.value)}
                         disabled={loading}
@@ -679,14 +715,14 @@ const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
                         <option value="UNKNOWN">미확인</option>
                         <option value="M">수컷</option>
                         <option value="F">암컷</option>
-                      </PetSelect>
+                      </PillSelect>
                     </PetInputGroup>
                   </PetInputRow>
 
                   <PetInputRow>
                     <PetInputGroup>
                       <PetLabel>나이</PetLabel>
-                      <PetInput
+                      <PillInput
                         type="text"
                         value={pet.age}
                         onChange={(e) => handlePetChange(index, 'age', e.target.value)}
@@ -697,7 +733,7 @@ const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
                     </PetInputGroup>
                     <PetInputGroup>
                       <PetLabel>색상/털색</PetLabel>
-                      <PetInput
+                      <PillInput
                         type="text"
                         value={pet.color}
                         onChange={(e) => handlePetChange(index, 'color', e.target.value)}
@@ -711,7 +747,7 @@ const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
                   <PetInputRow>
                     <PetInputGroup>
                       <PetLabel>몸무게 (kg)</PetLabel>
-                      <PetInput
+                      <PillInput
                         type="number"
                         step="0.1"
                         min="0"
@@ -723,7 +759,7 @@ const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
                     </PetInputGroup>
                     <PetInputGroup>
                       <PetLabel>생년월일</PetLabel>
-                      <PetInput
+                      <PillInput
                         type="date"
                         value={pet.birthDate}
                         onChange={(e) => handlePetChange(index, 'birthDate', e.target.value)}
@@ -787,93 +823,24 @@ const RegisterForm = ({ onRegisterSuccess, onSwitchToLogin }) => {
         {error && <ErrorMessage>{error}</ErrorMessage>}
         {success && <SuccessMessage>{success}</SuccessMessage>}
 
-        <Button type="submit" disabled={loading}>
+        <GradientButton type="submit" disabled={loading}>
           {loading ? '회원가입 중...' : '회원가입'}
-        </Button>
+        </GradientButton>
       </Form>
 
-      <LinkText>
-        이미 계정이 있으신가요?{' '}
+      <FormSwitchLink>
+        이미 계정이 있으신가요?
         <button type="button" onClick={() => { if (onSwitchToLogin) onSwitchToLogin(); }}>
           로그인
         </button>
-      </LinkText>
-      </GlassCard>
+      </FormSwitchLink>
+        </FormInner>
+      </FormPanel>
     </AuthPageWrapper>
   );
 };
 
 export default RegisterForm;
-
-const sharedInputStyles = ({ theme }) => `
-  padding: 10px 14px;
-  border: 1.5px solid ${theme.colors.border};
-  border-radius: ${theme.borderRadius.lg};
-  font-size: 14px;
-  background: ${theme.colors.background};
-  color: ${theme.colors.text};
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-  outline: none;
-
-  &::placeholder { color: ${theme.colors.textLight}; }
-  &:focus {
-    border-color: ${theme.colors.primary};
-    box-shadow: 0 0 0 3px ${theme.colors.primary}25;
-  }
-  &:hover:not(:focus):not(:disabled) { border-color: ${theme.colors.borderDark}; }
-  &:disabled {
-    background: ${theme.colors.surfaceSoft};
-    color: ${theme.colors.textLight};
-    cursor: not-allowed;
-  }
-`;
-
-const AuthPageWrapper = styled.div`
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #E8714A 0%, #C9573A 40%, #3D8B7A 100%);
-  padding: 24px 16px;
-`;
-
-const GlassCard = styled.div`
-  width: 100%;
-  max-width: 440px;
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-radius: 24px;
-  padding: 40px 32px;
-  box-shadow: 0 20px 60px rgba(28, 25, 23, 0.2);
-
-  @media (prefers-color-scheme: dark) {
-    background: rgba(29, 29, 29, 0.92);
-  }
-`;
-
-const RegisterContainer = styled.div`
-  max-width: 600px;
-  width: 100%;
-  margin: 0 auto;
-  padding: 2.5rem;
-  background: ${({ theme }) => theme.colors.background};
-  border-radius: ${({ theme }) => theme.borderRadius.xl};
-  box-shadow: ${({ theme }) => theme.shadows.lg};
-
-  @media (max-width: 768px) {
-    max-width: 90%;
-    padding: 1.5rem;
-  }
-`;
-
-const Title = styled.h2`
-  text-align: center;
-  margin-bottom: 2rem;
-  color: ${({ theme }) => theme.colors.text};
-  font-size: ${({ theme }) => theme.typography.h2.fontSize};
-  font-weight: ${({ theme }) => theme.typography.h2.fontWeight};
-`;
 
 const Form = styled.form`
   display: flex;
@@ -893,84 +860,6 @@ const Label = styled.label`
   color: ${({ theme }) => theme.colors.text};
 `;
 
-const Input = styled.input`
-  border: 1.5px solid ${props => props.theme.colors.border};
-  border-radius: 50px;
-  padding: 14px 18px;
-  outline: none;
-  transition: border-color 0.2s ease;
-  box-sizing: border-box;
-  width: 100%;
-  font-size: 15px;
-  background: ${props => props.theme.colors.background};
-  color: ${props => props.theme.colors.text};
-
-  &:focus {
-    border-color: ${props => props.theme.colors.primary};
-  }
-
-  &::placeholder {
-    color: ${props => props.theme.colors.textMuted};
-  }
-
-  &:disabled {
-    background: ${({ theme }) => theme.colors.surfaceSoft};
-    color: ${({ theme }) => theme.colors.textLight};
-    cursor: not-allowed;
-  }
-`;
-
-const Select = styled.select`
-  border: 1.5px solid ${props => props.theme.colors.border};
-  border-radius: 50px;
-  padding: 14px 18px;
-  outline: none;
-  transition: border-color 0.2s ease;
-  box-sizing: border-box;
-  width: 100%;
-  font-size: 15px;
-  background: ${props => props.theme.colors.background};
-  color: ${props => props.theme.colors.text};
-  cursor: pointer;
-
-  &:focus {
-    border-color: ${props => props.theme.colors.primary};
-  }
-
-  &:disabled {
-    background: ${({ theme }) => theme.colors.surfaceSoft};
-    color: ${({ theme }) => theme.colors.textLight};
-    cursor: not-allowed;
-  }
-`;
-
-const Button = styled.button`
-  width: 100%;
-  padding: 14px;
-  background: linear-gradient(135deg, #E8714A 0%, #C9573A 100%);
-  color: white;
-  border: none;
-  border-radius: 50px;
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity 0.2s ease, transform 0.1s ease;
-  margin-top: 8px;
-
-  &:hover:not(:disabled) {
-    opacity: 0.9;
-  }
-
-  &:active:not(:disabled) {
-    transform: scale(0.98);
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-`;
-
 const ErrorMessage = styled.div`
   color: ${({ theme }) => theme.colors.error};
   font-size: 13px;
@@ -983,53 +872,10 @@ const SuccessMessage = styled.div`
   margin-top: 4px;
 `;
 
-const LinkText = styled.p`
-  text-align: center;
-  margin-top: ${({ theme }) => theme.spacing.lg};
-  color: ${({ theme }) => theme.colors.textSecondary};
-  font-size: 14px;
-
-  button {
-    background: none;
-    border: none;
-    color: ${({ theme }) => theme.colors.primary};
-    text-decoration: none;
-    font-weight: 600;
-    cursor: pointer;
-    padding: 0;
-
-    &:hover {
-      text-decoration: underline;
-    }
-  }
-`;
-
 const NicknameInputGroup = styled.div`
   display: flex;
   gap: ${({ theme }) => theme.spacing.sm};
   align-items: flex-start;
-`;
-
-const CheckButton = styled.button`
-  padding: 14px 18px;
-  background: linear-gradient(135deg, #E8714A 0%, #C9573A 100%);
-  color: white;
-  border: none;
-  border-radius: 50px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: opacity 0.2s ease;
-
-  &:hover:not(:disabled) {
-    opacity: 0.9;
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
 `;
 
 const NicknameMessage = styled.div`
@@ -1125,49 +971,6 @@ const PetLabel = styled.label`
   color: ${({ theme }) => theme.colors.text};
 `;
 
-const PetInput = styled.input`
-  padding: 8px 12px;
-  border: 1.5px solid ${({ theme }) => theme.colors.border};
-  border-radius: ${({ theme }) => theme.borderRadius.md};
-  font-size: 13px;
-  background: ${({ theme }) => theme.colors.background};
-  color: ${({ theme }) => theme.colors.text};
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-  outline: none;
-
-  &:focus {
-    border-color: ${({ theme }) => theme.colors.primary};
-    box-shadow: 0 0 0 3px ${({ theme }) => theme.colors.primary}20;
-  }
-
-  &:disabled {
-    background: ${({ theme }) => theme.colors.surfaceSoft};
-    cursor: not-allowed;
-  }
-`;
-
-const PetSelect = styled.select`
-  padding: 8px 12px;
-  border: 1.5px solid ${({ theme }) => theme.colors.border};
-  border-radius: ${({ theme }) => theme.borderRadius.md};
-  font-size: 13px;
-  background: ${({ theme }) => theme.colors.background};
-  color: ${({ theme }) => theme.colors.text};
-  transition: border-color 0.2s ease;
-  outline: none;
-  cursor: pointer;
-
-  &:focus {
-    border-color: ${({ theme }) => theme.colors.primary};
-    box-shadow: 0 0 0 3px ${({ theme }) => theme.colors.primary}20;
-  }
-
-  &:disabled {
-    background: ${({ theme }) => theme.colors.surfaceSoft};
-    cursor: not-allowed;
-  }
-`;
-
 const AddPetButton = styled.button`
   width: 100%;
   padding: 14px;
@@ -1234,64 +1037,11 @@ const EmailInputGroup = styled.div`
   flex-wrap: wrap;
 `;
 
-const EmailIdInput = styled.input`
-  flex: 1;
-  min-width: 120px;
-  border: 1.5px solid ${props => props.theme.colors.border};
-  border-radius: 50px;
-  padding: 14px 18px;
-  outline: none;
-  transition: border-color 0.2s ease;
-  box-sizing: border-box;
-  font-size: 14px;
-  background: ${props => props.theme.colors.background};
-  color: ${props => props.theme.colors.text};
-
-  &:focus {
-    border-color: ${props => props.theme.colors.primary};
-  }
-
-  &::placeholder {
-    color: ${props => props.theme.colors.textMuted};
-  }
-
-  &:disabled {
-    background: ${({ theme }) => theme.colors.surfaceSoft};
-    color: ${({ theme }) => theme.colors.textLight};
-    cursor: not-allowed;
-  }
-`;
-
 const EmailAt = styled.span`
   font-size: 14px;
   font-weight: 600;
   color: ${({ theme }) => theme.colors.textSecondary};
   white-space: nowrap;
-`;
-
-const EmailDomainSelect = styled.select`
-  flex: 1;
-  min-width: 150px;
-  border: 1.5px solid ${props => props.theme.colors.border};
-  border-radius: 50px;
-  padding: 14px 18px;
-  outline: none;
-  transition: border-color 0.2s ease;
-  box-sizing: border-box;
-  font-size: 14px;
-  background: ${props => props.theme.colors.background};
-  color: ${props => props.theme.colors.text};
-  cursor: pointer;
-
-  &:focus {
-    border-color: ${props => props.theme.colors.primary};
-  }
-
-  &:disabled {
-    background: ${({ theme }) => theme.colors.surfaceSoft};
-    color: ${({ theme }) => theme.colors.textLight};
-    cursor: not-allowed;
-  }
 `;
 
 const EmailVerificationErrorMessage = styled.div`
@@ -1313,29 +1063,6 @@ const EmailVerificationStatus = styled.div`
   font-weight: ${({ verified }) => verified ? '600' : '500'};
 `;
 
-const EmailVerificationButton = styled.button`
-  width: 100%;
-  margin-top: ${({ theme }) => theme.spacing.sm};
-  padding: 12px;
-  background: linear-gradient(135deg, #E8714A 0%, #C9573A 100%);
-  color: white;
-  border: none;
-  border-radius: 50px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity 0.2s ease;
-
-  &:hover:not(:disabled) {
-    opacity: 0.9;
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-`;
-
 const EmailVerificationInfo = styled.div`
   margin-top: ${({ theme }) => theme.spacing.sm};
   padding: ${({ theme }) => theme.spacing.md};
@@ -1345,32 +1072,4 @@ const EmailVerificationInfo = styled.div`
   font-size: 13px;
   color: ${({ theme }) => theme.colors.infoDark};
   line-height: 1.5;
-`;
-
-const EmailCustomInput = styled.input`
-  flex: 1;
-  min-width: 150px;
-  border: 1.5px solid ${props => props.theme.colors.border};
-  border-radius: 50px;
-  padding: 14px 18px;
-  outline: none;
-  transition: border-color 0.2s ease;
-  box-sizing: border-box;
-  font-size: 14px;
-  background: ${props => props.theme.colors.background};
-  color: ${props => props.theme.colors.text};
-
-  &:focus {
-    border-color: ${props => props.theme.colors.primary};
-  }
-
-  &::placeholder {
-    color: ${props => props.theme.colors.textMuted};
-  }
-
-  &:disabled {
-    background: ${({ theme }) => theme.colors.surfaceSoft};
-    color: ${({ theme }) => theme.colors.textLight};
-    cursor: not-allowed;
-  }
 `;
