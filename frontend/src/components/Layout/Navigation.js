@@ -446,6 +446,7 @@ const Sidebar = styled.nav`
   top: 0;
   width: 240px;
   height: 100vh;
+  padding-top: env(safe-area-inset-top, 0px);
   background: ${props => props.theme.colors.surface};
   border-right: 1px solid ${props => props.theme.colors.border};
   z-index: 100;

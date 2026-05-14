@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -71,6 +72,11 @@ public class BoardPopularityService {
         // 4. 모든 시도가 실패하면 새로 생성
         if (snapshots.isEmpty()) {
             snapshots = generateSnapshots(periodType, range);
+        }
+
+        // 5. 스냅샷 생성도 실패(게시글 없음)하면 최신 게시글로 대체
+        if (snapshots.isEmpty()) {
+            return buildRecentBoardFallback(periodType, range);
         }
 
         return snapshotConverter.toDTOList(snapshots);
@@ -375,5 +381,30 @@ public class BoardPopularityService {
      * @param views    조회수
      */
     private record BoardScore(Board board, int score, int likes, int comments, int views) {
+    }
+
+    private List<BoardPopularitySnapshotDTO> buildRecentBoardFallback(
+            PopularityPeriodType periodType, PeriodRange range) {
+        log.info("인기 스냅샷 없음 — 최신 게시글 10개로 대체");
+        List<Board> recent = boardRepository.findAllByIsDeletedFalseOrderByCreatedAtDesc(
+                PageRequest.of(0, 10)).getContent();
+        int[] rank = {1};
+        return recent.stream()
+                .map(b -> new BoardPopularitySnapshotDTO(
+                        null,
+                        b.getIdx(),
+                        periodType,
+                        range.periodStart(),
+                        range.periodEnd(),
+                        rank[0]++,
+                        0,
+                        0,
+                        0,
+                        b.getViewCount() != null ? b.getViewCount() : 0,
+                        b.getTitle(),
+                        b.getCategory(),
+                        null,
+                        b.getCreatedAt()))
+                .collect(Collectors.toList());
     }
 }

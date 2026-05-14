@@ -1,0 +1,24 @@
+{
+  "task": "homepage-live-data",
+  "description": "홈 화면 4개 탭(주변서비스/모임/실종/커뮤니티) 실데이터 연동 — 폴백 + 유저 위치",
+  "steps": [
+    {
+      "step": 1,
+      "name": "Backend: BoardPopularityService 최신 게시글 폴백",
+      "status": "completed",
+      "summary": "스냅샷 없을 때 최신 게시글 10개로 대체 (getViewCount/null filePath 수정)"
+    },
+    {
+      "step": 2,
+      "name": "Frontend: HomePage 브라우저 Geolocation 연동",
+      "status": "completed",
+      "summary": "navigator.geolocation으로 좌표 취득 → service/meetup API에 전달, coords 변경 시 캐시 리셋"
+    },
+    {
+      "step": 3,
+      "name": "Frontend: 모임 탭 nearby 빈값 시 전체모임 폴백",
+      "status": "completed",
+      "summary": "getNearbyMeetups 빈 배열 → getRecruitingMeetups(6) 폴백 추가"
+    }
+  ]
+}

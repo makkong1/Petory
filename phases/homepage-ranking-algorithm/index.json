@@ -1,0 +1,30 @@
+{
+  "task": "homepage-ranking-algorithm",
+  "description": "홈 화면 4개 탭 랭킹 알고리즘 설계 및 구현 — 주변서비스 복합스코어, 모임/실종 전용 홈 엔드포인트",
+  "steps": [
+    {
+      "step": 1,
+      "name": "Backend: 주변서비스 score 컬럼 + 배치 계산",
+      "status": "completed",
+      "summary": "LocationService에 score 컬럼 추가, 복합스코어 post-sort, 자정 배치 스케줄러 생성"
+    },
+    {
+      "step": 2,
+      "name": "Backend: 모임 홈 전용 엔드포인트 (거리+긴급도+여유 스코어)",
+      "status": "completed",
+      "summary": "GET /api/meetups/home — 거리0.4+긴급도0.4+여유0.2 스코어, 폴백 /available"
+    },
+    {
+      "step": 3,
+      "name": "Backend: 실종신고 홈 전용 엔드포인트 (최신성+거리 스코어)",
+      "status": "completed",
+      "summary": "GET /api/missing-pets/home — 최신성0.6+거리0.4 스코어, 폴백 lostDate DESC"
+    },
+    {
+      "step": 4,
+      "name": "Frontend: HomePage API 연동 업데이트",
+      "status": "completed",
+      "summary": "getHomeMeetups/getHomeMissing API 추가, HomePage sort=score + 새 엔드포인트 연결"
+    }
+  ]
+}

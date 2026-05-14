@@ -437,6 +437,68 @@ public class MissingPetBoardService {
      * 게시글 DTO 매핑 (파일 정보 포함)
      * 단일 게시글 조회 시 사용
      */
+    /**
+     * 홈 화면 실종신고 추천.
+     * score = 0.6 * recencyScore + 0.4 * distScore
+     * recencyScore = max(0, 1 - daysSinceLost / 14)
+     * distScore    = max(0, 1 - distKm / 20)
+     * 좌표 없으면 lostDate DESC LIMIT size
+     */
+    public List<MissingPetBoardDTO> getHomeMissing(Double lat, Double lng, int size) {
+        Pageable page = PageRequest.of(0, size, org.springframework.data.domain.Sort.by(
+                Direction.DESC, "lostDate"));
+
+        if (lat == null || lng == null) {
+            return missingPetBoardRepository
+                    .findByStatusOrderByCreatedAtDesc(MissingPetStatus.MISSING, page)
+                    .getContent()
+                    .stream()
+                    .map(missingPetConverter::toBoardDTOWithoutComments)
+                    .collect(Collectors.toList());
+        }
+
+        Pageable bigPage = PageRequest.of(0, 50, org.springframework.data.domain.Sort.by(
+                Direction.DESC, "lostDate"));
+        List<MissingPetBoard> candidates = missingPetBoardRepository
+                .findByStatusOrderByCreatedAtDesc(MissingPetStatus.MISSING, bigPage)
+                .getContent();
+
+        java.time.LocalDate today = java.time.LocalDate.now();
+
+        return candidates.stream()
+                .map(board -> {
+                    long daysSinceLost = board.getLostDate() != null
+                            ? java.time.temporal.ChronoUnit.DAYS.between(board.getLostDate(), today)
+                            : 14;
+                    double recencyScore = Math.max(0, 1.0 - daysSinceLost / 14.0);
+
+                    double distScore = 0.0;
+                    if (board.getLatitude() != null && board.getLongitude() != null) {
+                        double distKm = haversineKm(lat, lng,
+                                board.getLatitude().doubleValue(),
+                                board.getLongitude().doubleValue());
+                        distScore = Math.max(0, 1.0 - distKm / 20.0);
+                    }
+
+                    double score = 0.6 * recencyScore + 0.4 * distScore;
+                    return new java.util.AbstractMap.SimpleEntry<>(board, score);
+                })
+                .sorted(java.util.Map.Entry.<MissingPetBoard, Double>comparingByValue().reversed())
+                .limit(size)
+                .map(e -> missingPetConverter.toBoardDTOWithoutComments(e.getKey()))
+                .collect(Collectors.toList());
+    }
+
+    private double haversineKm(double lat1, double lng1, double lat2, double lng2) {
+        final int R = 6371;
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLng = Math.toRadians(lng2 - lng1);
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
     private MissingPetBoardDTO mapBoardWithAttachments(MissingPetBoard board) {
         MissingPetBoardDTO dto = missingPetConverter.toBoardDTO(board);
         List<FileDTO> attachments = attachmentFileService.getAttachments(FileTargetType.MISSING_PET, board.getIdx());
