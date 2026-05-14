@@ -32,7 +32,7 @@ const RadiusButton = styled.button`
   padding: 6px 14px;
   border-radius: 50px;
   border: 1.5px solid ${props => props.$active ? props.theme.colors.primary : props.theme.colors.border};
-  background: ${props => props.$active ? props.theme.colors.primarySoft : 'rgba(255,255,255,0.85)'};
+  background: ${props => props.$active ? props.theme.colors.primarySoft : props.theme.colors.surfaceElevated + 'D9'};
   color: ${props => props.$active ? props.theme.colors.primary : props.theme.colors.textSecondary};
   font-size: 12px;
   font-weight: ${props => props.$active ? '600' : '400'};

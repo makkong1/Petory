@@ -684,7 +684,7 @@ const MyLocationFAB = styled.button`
   background: ${props => props.theme.colors.surface};
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  box-shadow: 0 10px 24px rgba(28, 25, 23, 0.18);
+  box-shadow: ${props => props.theme.shadows.lg};
   font-size: 18px;
   cursor: pointer;
   display: flex;
@@ -694,7 +694,7 @@ const MyLocationFAB = styled.button`
 
   &:hover:not(:disabled) {
     transform: translateY(-1px);
-    box-shadow: 0 14px 28px rgba(28, 25, 23, 0.22);
+    box-shadow: ${props => props.theme.shadows.xl};
   }
   &:disabled { opacity: 0.6; cursor: not-allowed; }
 
@@ -732,18 +732,18 @@ const CountChip = styled.div`
   bottom: 20px;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(28, 25, 23, 0.72);
+  background: ${props => props.theme.colors.overlay};
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  color: rgba(255, 255, 255, 0.92);
+  color: ${props => props.theme.colors.textInverse};
   padding: 5px 16px;
   border-radius: 999px;
   font-size: 12px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  box-shadow: ${props => props.theme.shadows.md};
   z-index: 200;
   white-space: nowrap;
   pointer-events: none;
-  strong { color: white; font-weight: 600; }
+  strong { color: ${props => props.theme.colors.textInverse}; font-weight: 600; }
 
   @media (max-width: 768px) {
     bottom: calc(72px + env(safe-area-inset-bottom, 0px));
@@ -768,7 +768,7 @@ const ErrorBanner = styled.div`
   left: 50%;
   transform: translateX(-50%);
   background: ${props => props.theme.colors.error};
-  color: white;
+  color: ${props => props.theme.colors.textInverse};
   padding: 8px 16px;
   border-radius: 8px;
   font-size: 13px;
@@ -809,7 +809,7 @@ const LocationResultSheet = styled.section`
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid ${props => props.theme.colors.border};
-  box-shadow: 0 20px 44px rgba(28, 25, 23, 0.18);
+  box-shadow: ${props => props.theme.shadows.xl};
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -836,14 +836,14 @@ const ResultSheetHeader = styled.div`
   align-items: flex-start;
   justify-content: space-between;
   padding: 18px 18px 12px;
-  border-bottom: 1px solid rgba(120, 113, 108, 0.14);
+  border-bottom: 1px solid ${props => props.theme.colors.borderLight};
 `;
 
 const ResultSheetHandle = styled.div`
   width: 52px;
   height: 5px;
   border-radius: 999px;
-  background: rgba(120, 113, 108, 0.24);
+  background: ${props => props.theme.colors.border};
   margin: 10px auto 2px;
 
   @media (min-width: 769px) {
@@ -891,7 +891,7 @@ const ResultCard = styled.button`
     ? props.theme.colors.domain.location
     : props.theme.colors.border};
   background: ${props => props.$selected
-    ? 'rgba(74, 144, 217, 0.10)'
+    ? props.theme.colors.domain.location + '1A'
     : props.theme.colors.background};
   border-radius: 18px;
   padding: 14px 14px 13px;
@@ -901,7 +901,7 @@ const ResultCard = styled.button`
   &:hover {
     border-color: ${props => props.theme.colors.domain.location};
     transform: translateY(-1px);
-    box-shadow: 0 12px 24px rgba(74, 144, 217, 0.14);
+    box-shadow: ${props => props.theme.shadows.lg};
   }
 `;
 
@@ -935,7 +935,7 @@ const ResultDistance = styled.span`
   font-size: 12px;
   font-weight: 700;
   color: ${props => props.theme.colors.domain.location};
-  background: rgba(74, 144, 217, 0.10);
+  background: ${props => props.theme.colors.domain.location + '1A'};
   padding: 4px 8px;
   border-radius: 999px;
 `;
@@ -945,8 +945,8 @@ const ResultRankBadge = styled.span`
   align-items: center;
   padding: 2px 6px;
   border-radius: 999px;
-  background: rgba(245, 158, 11, 0.14);
-  color: #b45309;
+  background: ${props => props.theme.colors.warningSoft};
+  color: ${props => props.theme.colors.warningDark};
   font-size: 10px;
   font-weight: 800;
 `;
@@ -957,13 +957,13 @@ const AiInfoPanel = styled.div`
   left: 50%;
   transform: translateX(-50%);
   background: ${props => props.theme.colors.surface};
-  border: 1.5px solid #FFD700;
+  border: 1.5px solid ${props => props.theme.colors.ai.accent};
   border-radius: 12px;
   padding: 14px 18px;
   min-width: 220px;
   max-width: 320px;
   z-index: 500;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  box-shadow: ${props => props.theme.shadows.lg};
 `;
 
 const AiInfoClose = styled.button`
@@ -980,8 +980,8 @@ const AiInfoClose = styled.button`
 
 const AiInfoBadge = styled.span`
   display: inline-block;
-  background: #FFF9C4;
-  color: #B8860B;
+  background: ${props => props.theme.colors.ai.bg};
+  color: ${props => props.theme.colors.ai.text};
   font-size: 11px;
   font-weight: 600;
   padding: 2px 8px;
@@ -1043,7 +1043,7 @@ const PanelResultHeader = styled.div`
   align-items: flex-start;
   justify-content: space-between;
   padding: 14px 16px 10px;
-  border-bottom: 1px solid rgba(120, 113, 108, 0.14);
+  border-bottom: 1px solid ${props => props.theme.colors.borderLight};
   flex-shrink: 0;
 `;
 

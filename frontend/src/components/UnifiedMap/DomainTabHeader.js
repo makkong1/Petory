@@ -39,11 +39,11 @@ const TabBar = styled.div`
   display: flex;
   align-items: center;
   padding: 10px 16px;
-  background: rgba(255, 255, 255, 0.85);
+  background: ${props => props.theme.colors.surfaceElevated + 'D9'};
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-radius: 50px;
-  box-shadow: 0 4px 16px rgba(28, 25, 23, 0.12);
+  box-shadow: ${props => props.theme.shadows.md};
 `;
 
 const TabsGroup = styled.div`
@@ -66,8 +66,8 @@ const TabButton = styled.button`
     : props.theme.colors.border};
   background: ${props => props.$active
     ? props.theme.colors.domain[props.$domain] || props.theme.colors.primary
-    : 'rgba(255,255,255,0.85)'};
-  color: ${props => props.$active ? 'white' : props.theme.colors.textSecondary};
+    : props.theme.colors.surfaceElevated + 'D9'};
+  color: ${props => props.$active ? props.theme.colors.textInverse : props.theme.colors.textSecondary};
   font-size: 13px;
   font-weight: ${props => props.$active ? '600' : '400'};
   cursor: ${props => props.$disabled ? 'not-allowed' : 'pointer'};

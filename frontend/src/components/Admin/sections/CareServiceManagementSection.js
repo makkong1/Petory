@@ -309,6 +309,7 @@ const PageBtn = styled.button`
   padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.sm};
   border: 1px solid ${props => props.theme.colors.border};
   border-radius: 4px;
-  background: ${props => props.disabled ? props.theme.colors.backgroundSecondary : 'white'};
+  background: ${props => props.disabled ? props.theme.colors.surfaceSoft : props.theme.colors.surface};
+  color: ${props => props.disabled ? props.theme.colors.textLight : props.theme.colors.text};
   cursor: ${props => props.disabled ? 'not-allowed' : 'pointer'};
 `;

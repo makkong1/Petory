@@ -16,7 +16,7 @@ export const InfoPanel = styled.div`
   right: 0;
   width: ${props => props.$width || '300px'};
   max-height: ${props => props.$maxHeight || '65vh'};
-  background: rgba(255, 255, 255, 0.92);
+  background: ${props => props.theme.colors.surfaceElevated + 'EB'};
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-radius: 20px;
@@ -24,8 +24,8 @@ export const InfoPanel = styled.div`
   flex-direction: column;
   overflow: hidden;
   z-index: 500;
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  box-shadow: 0 8px 32px rgba(28, 25, 23, 0.15);
+  border: 1px solid ${props => props.theme.colors.border};
+  box-shadow: ${props => props.theme.shadows.xl};
   animation: ${slideInRight} 0.25s cubic-bezier(0, 0, 0.2, 1);
 
   @media (max-width: 600px) {
