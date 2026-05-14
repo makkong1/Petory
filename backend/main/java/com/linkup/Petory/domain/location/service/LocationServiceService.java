@@ -14,6 +14,7 @@ import com.linkup.Petory.domain.location.exception.LocationServiceAlreadyDeleted
 import com.linkup.Petory.domain.location.exception.LocationServiceNotFoundException;
 import com.linkup.Petory.domain.location.repository.LocationServiceRepository;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -64,28 +65,38 @@ public class LocationServiceService {
         boolean hasRegion = StringUtils.hasText(sido) || StringUtils.hasText(sigungu)
                 || StringUtils.hasText(eupmyeondong) || StringUtils.hasText(roadName);
         boolean hasKeyword = StringUtils.hasText(keyword);
+        boolean sortByScore = "score".equals(sort);
+        String dbSort = sortByScore ? "rating" : sort; // score는 DB 쿼리에서 rating으로 대체 후 post-sort
+
+        List<LocationServiceDTO> results;
 
         // 1순위: 위치(반경) 우선
         if (hasLocation) {
             int radiusInMeters = (radius != null && radius > 0) ? radius : DEFAULT_RADIUS_METERS;
-            return searchLocationServicesByLocation(latitude, longitude, radiusInMeters,
-                    keyword, category, sort, maxResults);
-        }
-
-        // 2순위: 지역 계층
-        if (hasRegion) {
-            return searchLocationServicesByRegion(sido, sigungu, eupmyeondong, roadName,
+            results = searchLocationServicesByLocation(latitude, longitude, radiusInMeters,
+                    keyword, category, dbSort, maxResults);
+        } else if (hasRegion) {
+            // 2순위: 지역 계층
+            results = searchLocationServicesByRegion(sido, sigungu, eupmyeondong, roadName,
                     keyword, category, maxResults);
+        } else if (hasKeyword) {
+            // 3순위: 위치 없을 때 키워드 단독 FULLTEXT (fallback)
+            results = searchLocationServicesByKeyword(keyword, category, maxResults);
+        } else {
+            // 4순위: 전체 평점순
+            results = searchLocationServicesByRegion(null, null, null, null,
+                    null, category, maxResults);
         }
 
-        // 3순위: 위치 없을 때 키워드 단독 FULLTEXT (fallback)
-        if (hasKeyword) {
-            return searchLocationServicesByKeyword(keyword, category, maxResults);
+        // score 정렬 post-processing
+        if (sortByScore) {
+            results = new java.util.ArrayList<>(results);
+            results.sort(Comparator.comparingDouble(
+                    (LocationServiceDTO dto) -> dto.getScore() != null ? dto.getScore() : 0.0
+            ).reversed());
         }
 
-        // 4순위: 전체 평점순
-        return searchLocationServicesByRegion(null, null, null, null,
-                null, category, maxResults);
+        return results;
     }
 
     /**
@@ -278,7 +289,7 @@ public class LocationServiceService {
             return DEFAULT_RADIUS_SORT;
         }
         return switch (sort.trim().toLowerCase()) {
-            case "distance", "rating", "reviews" -> sort.trim().toLowerCase();
+            case "distance", "rating", "reviews", "score" -> sort.trim().toLowerCase();
             default -> DEFAULT_RADIUS_SORT;
         };
     }

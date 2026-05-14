@@ -1,7 +1,15 @@
+require_relative '../../node_modules/@capacitor/ios/scripts/pods_helpers'
+
 platform :ios, '15.0'
-use_frameworks!
+use_frameworks! :linkage => :static
+
+install! 'cocoapods', :deterministic_uuids => false
 
 target 'App' do
   pod 'FirebaseCore'
   pod 'FirebaseMessaging'
+end
+
+post_install do |installer|
+  assertDeploymentTarget(installer)
 end

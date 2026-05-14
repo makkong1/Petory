@@ -42,9 +42,9 @@ const getHeroItem = (tabKey, items) => {
   }
   if (tabKey === 'community') {
     return {
-      title: item.title,
-      subtitle: `❤️ ${item.likes || 0}  👁 ${item.views || 0}`,
-      badge: item.category || null,
+      title: item.boardTitle || item.title,
+      subtitle: `❤️ ${item.likeCount ?? item.likes ?? 0}  👁 ${item.viewCount ?? item.views ?? 0}`,
+      badge: item.boardCategory || item.category || null,
       image: item.boardFilePath || null,
     };
   }
@@ -98,13 +98,13 @@ const TabContent = ({ tab, items, loading, error, onViewAll }) => {
                 tab.key === 'service' ? item.name :
                 tab.key === 'meetup' ? item.title :
                 tab.key === 'missing' ? (item.petName || item.title) :
-                item.title
+                (item.boardTitle || item.title)
               }</SmallCardTitle>
               <SmallCardSub>{
                 tab.key === 'service' ? item.category :
                 tab.key === 'meetup' ? `${item.currentParticipants || 0}/${item.maxParticipants || 0}명` :
                 tab.key === 'missing' ? (item.breed || '') :
-                (item.category || '')
+                (item.boardCategory || item.category || '')
               }</SmallCardSub>
             </SmallCard>
           ))}
@@ -125,28 +125,53 @@ const HomePage = ({ setActiveTab }) => {
   const [tabData, setTabData] = useState({});
   const [tabLoading, setTabLoading] = useState({ service: true });
   const [tabError, setTabError] = useState({});
+  const [userCoords, setUserCoords] = useState(null);
 
   const fetchedTabsRef = React.useRef(new Set());
+
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => setUserCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => setUserCoords(null),
+      { timeout: 5000, maximumAge: 60000 }
+    );
+  }, []);
 
   const fetchTabData = useCallback(async (tabKey) => {
     if (fetchedTabsRef.current.has(tabKey)) return;
     fetchedTabsRef.current.add(tabKey);
     setTabLoading(prev => ({ ...prev, [tabKey]: true }));
     setTabError(prev => ({ ...prev, [tabKey]: false }));
+    const toArr = (v) => Array.isArray(v) ? v : [];
     try {
       let items = [];
       if (tabKey === 'service') {
-        const res = await locationServiceApi.searchPlaces({ sort: 'rating', size: 6 });
-        items = res.data?.results || res.data || [];
+        const params = { sort: 'score', size: 6 };
+        if (userCoords) {
+          params.latitude = userCoords.lat;
+          params.longitude = userCoords.lng;
+          params.radius = 10000;
+        }
+        const res = await locationServiceApi.searchPlaces(params);
+        items = toArr(res.data?.services ?? res.data?.results ?? res.data);
       } else if (tabKey === 'meetup') {
-        const res = await meetupApi.getNearbyMeetups(37.5665, 126.9780, 50, 6);
-        items = res.data || [];
+        const res = await meetupApi.getHomeMeetups(
+          userCoords?.lat ?? null,
+          userCoords?.lng ?? null,
+          6
+        );
+        items = toArr(res.data?.meetups ?? res.data?.content ?? res.data);
       } else if (tabKey === 'missing') {
-        const res = await missingPetApi.list({ page: 0, size: 6, status: 'MISSING' });
-        items = res.data?.boards || res.data || [];
+        const res = await missingPetApi.getHomeMissing(
+          userCoords?.lat ?? null,
+          userCoords?.lng ?? null,
+          6
+        );
+        items = toArr(res.data?.boards ?? res.data);
       } else if (tabKey === 'community') {
         const res = await boardApi.getPopularBoards('WEEKLY');
-        items = res.data?.boards || res.data || [];
+        items = toArr(res.data?.boards ?? res.data?.content ?? res.data);
       }
       setTabData(prev => ({ ...prev, [tabKey]: items.slice(0, 6) }));
     } catch {
@@ -156,10 +181,15 @@ const HomePage = ({ setActiveTab }) => {
     } finally {
       setTabLoading(prev => ({ ...prev, [tabKey]: false }));
     }
-  }, []); // empty dep array — stable reference
+  }, [userCoords]);
 
   useEffect(() => {
-    fetchTabData(activeTab);
+    fetchedTabsRef.current = new Set();
+    fetchTabData('service');
+  }, [userCoords, fetchTabData]);
+
+  useEffect(() => {
+    if (activeTab !== 'service') fetchTabData(activeTab);
   }, [activeTab, fetchTabData]);
 
   return (
@@ -245,6 +275,10 @@ const PageContainer = styled.div`
   background: ${props => props.theme.colors.background};
   overflow-x: hidden;
   padding-bottom: 24px;
+
+  @media (min-width: 769px) {
+    max-width: 860px;
+  }
 `;
 
 const Header = styled.div`
@@ -474,6 +508,14 @@ const HorizontalScroll = styled.div`
   padding-right: 20px;
   scrollbar-width: none;
   &::-webkit-scrollbar { display: none; }
+
+  @media (min-width: 769px) {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    margin: 0;
+    padding-left: 0;
+    padding-right: 0;
+  }
 `;
 
 const SmallCard = styled.div`
@@ -486,6 +528,10 @@ const SmallCard = styled.div`
   cursor: pointer;
   transition: transform 150ms ease;
   &:hover { transform: translateY(-2px); }
+
+  @media (min-width: 769px) {
+    width: calc(25% - 9px);
+  }
 `;
 
 const SmallCardImg = styled.div`

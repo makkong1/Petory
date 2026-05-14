@@ -1,6 +1,7 @@
 package com.linkup.Petory.domain.board.controller;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.springframework.http.ResponseEntity;
@@ -60,6 +61,14 @@ public class MissingPetBoardController {
      * 쿼리: status, page, size.
      * 서비스: MissingPetBoardService.getBoardsWithPaging()
      */
+    @GetMapping("/home")
+    public ResponseEntity<List<MissingPetBoardDTO>> getHomeMissing(
+            @RequestParam(value = "lat", required = false) Double lat,
+            @RequestParam(value = "lng", required = false) Double lng,
+            @RequestParam(value = "size", defaultValue = "6") int size) {
+        return ResponseEntity.ok(missingPetBoardService.getHomeMissing(lat, lng, size));
+    }
+
     @GetMapping
     public ResponseEntity<MissingPetBoardPageResponseDTO> listBoards(
             @RequestParam(name = "status", required = false) MissingPetStatus status,

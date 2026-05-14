@@ -1,0 +1,89 @@
+<h2>웹(데스크탑)에서 어떻게 보여줄까요?</h2>
+<p class="subtitle">모바일(<768px)은 현재 스타일 유지. 데스크탑에서의 전략을 선택해주세요.</p>
+
+<div class="cards">
+
+  <!-- Option A -->
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#1a1a2e;padding:16px;font-family:monospace;">
+      <div style="display:flex;gap:8px;height:180px;">
+        <div style="background:#E8714A;width:80px;border-radius:8px;display:flex;flex-direction:column;gap:6px;padding:10px;font-size:10px;color:white;">
+          <div style="background:rgba(255,255,255,0.3);border-radius:4px;padding:4px;text-align:center;">🏠</div>
+          <div style="background:rgba(255,255,255,0.15);border-radius:4px;padding:4px;text-align:center;">💬</div>
+          <div style="background:rgba(255,255,255,0.15);border-radius:4px;padding:4px;text-align:center;">🗺</div>
+          <div style="background:rgba(255,255,255,0.15);border-radius:4px;padding:4px;text-align:center;">🐾</div>
+        </div>
+        <div style="flex:1;background:#0f0f23;border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:6px;">
+          <div style="background:#2a2a3e;border-radius:6px;height:60px;display:flex;align-items:center;justify-content:center;color:#aaa;font-size:11px;">히어로 카드</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;">
+            <div style="background:#2a2a3e;border-radius:4px;height:40px;"></div>
+            <div style="background:#2a2a3e;border-radius:4px;height:40px;"></div>
+            <div style="background:#2a2a3e;border-radius:4px;height:40px;"></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">
+            <div style="background:#2a2a3e;border-radius:4px;height:35px;"></div>
+            <div style="background:#2a2a3e;border-radius:4px;height:35px;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A. 진짜 웹 레이아웃</h3>
+      <p>좌측 사이드바 네비게이션 + 넓은 콘텐츠 영역. 카드 그리드, 멀티컬럼 레이아웃. 데스크탑 전용 UX 설계. Figma 모바일 디자인 참고용으로만 쓰고 웹은 따로 설계.</p>
+    </div>
+  </div>
+
+  <!-- Option B -->
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#1a1a2e;padding:16px;font-family:monospace;">
+      <div style="display:flex;justify-content:center;align-items:center;height:180px;gap:16px;">
+        <div style="background:#111;border-radius:8px;width:56px;height:160px;display:flex;flex-direction:column;align-items:center;padding:8px 0;gap:8px;opacity:0.3;font-size:18px;">
+          <div>🏠</div><div>💬</div><div>🗺</div><div>🐾</div>
+        </div>
+        <div style="background:#0f0f23;border-radius:12px;width:220px;height:160px;padding:10px;display:flex;flex-direction:column;gap:6px;border:2px solid #E8714A;">
+          <div style="background:#2a2a3e;border-radius:6px;height:55px;display:flex;align-items:center;justify-content:center;color:#aaa;font-size:10px;">히어로 카드 (430px)</div>
+          <div style="display:flex;gap:4px;">
+            <div style="background:#2a2a3e;border-radius:4px;height:40px;flex:1;"></div>
+            <div style="background:#2a2a3e;border-radius:4px;height:40px;flex:1;"></div>
+          </div>
+          <div style="background:#2a2a3e;border-radius:4px;height:25px;"></div>
+        </div>
+        <div style="background:#111;border-radius:8px;width:56px;height:160px;opacity:0.3;"></div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B. 모바일 앱 느낌 유지 (현재 방식)</h3>
+      <p>데스크탑에서도 max-width: 430px 컨테이너 중앙 정렬. 모바일 앱을 웹에서 미러링. 추가 설계 없음. Figma 디자인 그대로 활용.</p>
+    </div>
+  </div>
+
+  <!-- Option C -->
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#1a1a2e;padding:16px;font-family:monospace;">
+      <div style="display:flex;gap:8px;height:180px;">
+        <div style="background:#E8714A;width:70px;border-radius:8px;display:flex;flex-direction:column;gap:6px;padding:10px;font-size:10px;color:white;">
+          <div style="background:rgba(255,255,255,0.3);border-radius:4px;padding:4px;text-align:center;">🏠</div>
+          <div style="background:rgba(255,255,255,0.15);border-radius:4px;padding:4px;text-align:center;">💬</div>
+          <div style="background:rgba(255,255,255,0.15);border-radius:4px;padding:4px;text-align:center;">🗺</div>
+          <div style="background:rgba(255,255,255,0.15);border-radius:4px;padding:4px;text-align:center;">🐾</div>
+        </div>
+        <div style="flex:1;background:#0f0f23;border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:6px;">
+          <div style="background:#2a2a3e;border-radius:6px;height:60px;display:flex;align-items:center;justify-content:center;color:#aaa;font-size:11px;">히어로 (Figma 스타일 ↗)</div>
+          <div style="display:flex;gap:4px;">
+            <div style="background:#2a2a3e;border-radius:4px;flex:1;height:35px;"></div>
+            <div style="background:#2a2a3e;border-radius:4px;flex:1;height:35px;"></div>
+          </div>
+          <div style="display:flex;gap:4px;">
+            <div style="background:#2a2a3e;border-radius:4px;flex:1;height:35px;"></div>
+            <div style="background:#2a2a3e;border-radius:4px;flex:1;height:35px;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C. 하이브리드 (추천)</h3>
+      <p>좌측 사이드바 네비 + Figma 스타일의 카드/컴포넌트를 더 넓게 배치. 모바일은 하단 탭바. 한 컴포넌트에 CSS 미디어쿼리로 분기. 설계 공수 중간.</p>
+    </div>
+  </div>
+
+</div>

@@ -194,6 +194,18 @@ public class MeetupController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/home")
+    public ResponseEntity<Map<String, Object>> getHomeMeetups(
+            @RequestParam(value = "lat", required = false) Double lat,
+            @RequestParam(value = "lng", required = false) Double lng,
+            @RequestParam(value = "size", defaultValue = "6") int size) {
+        List<MeetupDTO> meetups = meetupService.getHomeMeetups(lat, lng, size);
+        Map<String, Object> response = new HashMap<>();
+        response.put("meetups", meetups);
+        response.put("count", meetups.size());
+        return ResponseEntity.ok(response);
+    }
+
     // 특정 모임의 참가자 목록 조회
     @GetMapping("/{meetupIdx}/participants")
     public ResponseEntity<Map<String, Object>> getMeetupParticipants(

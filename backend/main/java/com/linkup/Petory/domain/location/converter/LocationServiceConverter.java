@@ -30,6 +30,7 @@ public class LocationServiceConverter {
                 .latitude(service.getLatitude())
                 .longitude(service.getLongitude())
                 .rating(service.getRating())
+                .score(service.getScore())
                 .reviewCount(service.getReviewCount())
                 .description(service.getDescription())
                 .phone(service.getPhone())
