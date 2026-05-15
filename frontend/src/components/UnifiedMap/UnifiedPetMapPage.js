@@ -578,17 +578,19 @@ const UnifiedPetMapPage = () => {
             <MapContainer
               services={[
                 ...items,
-                ...aiRecommendFacilities.map((f, i) => ({
-                  id: `ai-${i}`,
-                  type: 'ai_recommend',
-                  latitude: f.lat,
-                  longitude: f.lng,
-                  name: f.name,
-                  title: f.name,
-                  subtitle: f.address,
-                  distanceM: f.distance_m,
-                  markerColor: '#FFD700',
-                })),
+                ...aiRecommendFacilities
+                  .filter((f) => f.lat != null && f.lng != null)
+                  .map((f, i) => ({
+                    id: `ai-map-${i}`,
+                    type: 'ai_recommend',
+                    latitude: f.lat,
+                    longitude: f.lng,
+                    name: f.name,
+                    title: f.name,
+                    subtitle: f.address,
+                    distanceM: f.distance_m,
+                    markerColor: '#FFD700',
+                  })),
               ]}
               onServiceClick={setSelectedItem}
               userLocation={userLocation}
