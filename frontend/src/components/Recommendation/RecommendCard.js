@@ -70,124 +70,6 @@ const Tag = styled.span`
   border-radius: 20px;
 `;
 
-const FacilityList = styled.ul`
-  margin: 8px 0 0;
-  padding: 0;
-  list-style: none;
-`;
-
-const FacilityItem = styled.li`
-  font-size: 13px;
-  color: ${({ theme }) => theme.colors.text};
-  padding: 8px 0;
-  border-bottom: 1px solid ${({ theme }) => theme.colors.border};
-  cursor: ${({ $clickable }) => ($clickable ? 'pointer' : 'default')};
-  transition: background-color 0.15s ease;
-  &:hover {
-    background-color: ${({ theme, $clickable }) =>
-      $clickable ? (theme.colors.background || '#fafafa') : 'transparent'};
-  }
-  &:last-child { border-bottom: none; }
-`;
-
-const FacilityHeader = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 8px;
-`;
-
-const FacilityName = styled.span`
-  font-weight: 600;
-  font-size: 14px;
-`;
-
-const FacilityScore = styled.span`
-  font-size: 12px;
-  font-weight: 500;
-  color: ${({ theme }) => theme.colors.primary};
-  white-space: nowrap;
-`;
-
-// 거리 · source · mention 같은 보조 정보를 한 줄로 정렬.
-const FacilityMeta = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
-  margin-top: 3px;
-  font-size: 12px;
-  color: ${({ theme }) => theme.colors.textSecondary};
-`;
-
-const MetaDot = styled.span`
-  color: ${({ theme }) => theme.colors.border};
-`;
-
-const SourceBadge = styled.span`
-  font-size: 11px;
-  padding: 1px 6px;
-  border-radius: 4px;
-  background: ${({ theme }) => theme.colors.background || '#f5f5f7'};
-  color: ${({ theme }) => theme.colors.textSecondary};
-`;
-
-const MentionInline = styled.span`
-  color: ${({ theme }) => theme.colors.text};
-  font-weight: 500;
-`;
-
-const ReasonRow = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-top: 6px;
-`;
-
-// trend_match 칩은 상단 트렌드 키워드 칩(Tag) 과 같은 색으로 시각적 연결.
-// 그 외 라벨(가까워요/블로그 후기 등)은 중성 색.
-const ReasonChip = styled.span`
-  font-size: 11px;
-  padding: 2px 7px;
-  border-radius: 4px;
-  background: ${({ theme, $primary }) => $primary
-    ? (theme.colors.primaryLight || '#eef2ff')
-    : (theme.colors.background || '#f5f5f7')};
-  color: ${({ theme, $primary }) => $primary
-    ? theme.colors.primary
-    : theme.colors.textSecondary};
-`;
-
-// pet-data-api v3 가이드 §2.5 의 라벨 매핑.
-function reasonLabel(reason) {
-  if (!reason) return null;
-  if (reason.startsWith('trend_match:')) {
-    return `${reason.slice('trend_match:'.length)} 인기`;
-  }
-  switch (reason) {
-    case 'distance': return '가까워요';
-    case 'mention': return '블로그 후기';
-    case 'history': return '많이 보는 곳';
-    case 'pet_species_match': return '종 전문';
-    case 'pet_breed_match': return '품종 케어';
-    default: return reason;
-  }
-}
-
-function isTrendReason(reason) {
-  return typeof reason === 'string' && reason.startsWith('trend_match:');
-}
-
-function sourceLabel(source) {
-  if (!source) return null;
-  switch (source) {
-    case 'public': return '공공';
-    case 'kakao': return '카카오';
-    case 'public+kakao': return '공공+카카오';
-    default: return null;
-  }
-}
-
 // 콜백 이벤트 전송 헬퍼. fire-and-forget — 실패해도 무시.
 function sendRecommendEvents(requestId, eventList) {
   if (!requestId || !eventList || eventList.length === 0) return;
@@ -222,16 +104,6 @@ function RecommendCard({ lat, lng, context, onFacilitiesLoaded }) {
     sendRecommendEvents(requestId, events);
   }, [data?.request_id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleFacilityClick = (f) => {
-    const requestId = data?.request_id;
-    sendRecommendEvents(requestId, [{
-      facility_id: f.id ?? null,
-      source_id: f.source_id ?? null,
-      event: 'click',
-      occurred_at: new Date().toISOString(),
-    }]);
-  };
-
   useEffect(() => {
     if (!lat || !lng || !context) return;
 
@@ -250,7 +122,7 @@ function RecommendCard({ lat, lng, context, onFacilitiesLoaded }) {
           const withCoords = (main?.facilities ?? []).filter(
             (f) => f.lat != null && f.lng != null
           );
-          onFacilitiesLoaded(withCoords);
+          onFacilitiesLoaded({ facilities: withCoords, requestId: main?.request_id ?? null });
         }
 
         // v3 카피 분리: 본 추천이 비어 있지 않으면 LLM 카피를 두 번째 콜로 요청.
@@ -285,7 +157,7 @@ function RecommendCard({ lat, lng, context, onFacilitiesLoaded }) {
       .catch(() => {
         if (cancelled) return;
         setData(null);
-        onFacilitiesLoaded?.([]);
+        onFacilitiesLoaded?.({ facilities: [], requestId: null });
       })
       .finally(() => {
         if (cancelled) return;
@@ -331,62 +203,7 @@ function RecommendCard({ lat, lng, context, onFacilitiesLoaded }) {
         </>
       )}
 
-      {data.facilities?.length > 0 && (
-        <>
-          <Title style={{ marginTop: 14 }}>주변 시설</Title>
-          <FacilityList>
-            {data.facilities.map((f) => {
-              const srcLabel = sourceLabel(f.source);
-              const scorePct = typeof f.score === 'number'
-                ? Math.round(f.score * 100)
-                : null;
-              const clickable = f.id != null || f.source_id != null;
-              return (
-                <FacilityItem
-                  key={f.name}
-                  $clickable={clickable}
-                  onClick={clickable ? () => handleFacilityClick(f) : undefined}
-                >
-                  <FacilityHeader>
-                    <FacilityName>{f.name}</FacilityName>
-                    {scorePct != null && (
-                      <FacilityScore>추천도 {scorePct}%</FacilityScore>
-                    )}
-                  </FacilityHeader>
-                  <FacilityMeta>
-                    <span>{f.distance_m}m</span>
-                    {srcLabel && (
-                      <>
-                        <MetaDot>·</MetaDot>
-                        <SourceBadge>{srcLabel}</SourceBadge>
-                      </>
-                    )}
-                    {typeof f.mention_count === 'number' && f.mention_count > 0 && (
-                      <>
-                        <MetaDot>·</MetaDot>
-                        <MentionInline>블로그 언급 {f.mention_count}건</MentionInline>
-                      </>
-                    )}
-                  </FacilityMeta>
-                  {f.reasons?.length > 0 && (
-                    <ReasonRow>
-                      {f.reasons.map((r, i) => {
-                        const label = reasonLabel(r);
-                        if (!label) return null;
-                        return (
-                          <ReasonChip key={`${r}-${i}`} $primary={isTrendReason(r)}>
-                            {label}
-                          </ReasonChip>
-                        );
-                      })}
-                    </ReasonRow>
-                  )}
-                </FacilityItem>
-              );
-            })}
-          </FacilityList>
-        </>
-      )}
+
     </Card>
   );
 }
