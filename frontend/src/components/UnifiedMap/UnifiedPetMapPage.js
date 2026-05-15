@@ -14,6 +14,7 @@ import CareLayer from './layers/CareLayer';
 import { fetchActiveMapItems, LAYER_CONFIG } from '../../api/unifiedMapApi';
 import { locationServiceApi } from '../../api/locationServiceApi';
 import RecommendCard from '../Recommendation/RecommendCard';
+import { recommendApi } from '../../api/recommendApi';
 
 const CATEGORY_TO_CONTEXT = {
   '미용': 'grooming',
@@ -80,6 +81,7 @@ const UnifiedPetMapPage = () => {
   const [searchMode, setSearchMode] = useState('initial');
   const [recommendedMap, setRecommendedMap] = useState(null);
   const [aiRecommendFacilities, setAiRecommendFacilities] = useState([]);
+  const [aiRequestId, setAiRequestId] = useState(null);
 
   // meetup 탭 전용
   const [showMeetupCreateModal, setShowMeetupCreateModal] = useState(false);
@@ -233,6 +235,7 @@ const UnifiedPetMapPage = () => {
     setIsAiMode(false);
     setRecommendedMap(null);
     setAiRecommendFacilities([]);
+    setAiRequestId(null);
     if (layer !== 'location') {
       setLocationKeyword('');
       setLocationCategory('');
@@ -318,6 +321,37 @@ const UnifiedPetMapPage = () => {
     fetchItems('care', mapViewportCenter, radius, '', '', undefined, mapLevel);
   };
 
+  const handleAiRecommendLoad = useCallback(({ facilities, requestId }) => {
+    setAiRecommendFacilities(facilities);
+    setAiRequestId(requestId);
+  }, []);
+
+  const handleAiItemClick = useCallback((rawFacility, requestId) => {
+    if (!requestId) return;
+    const event = {
+      facility_id: rawFacility.id ?? null,
+      source_id: rawFacility.source_id ?? null,
+      event: 'click',
+      occurred_at: new Date().toISOString(),
+    };
+    if (event.facility_id == null && event.source_id == null) return;
+    recommendApi.sendEvents({ requestId, events: [event] }).catch(() => {});
+  }, []);
+
+  const aiDisplayItems = aiRecommendFacilities.map((f, i) => ({
+    id: `ai-${i}`,
+    type: 'ai_recommend',
+    latitude: f.lat,
+    longitude: f.lng,
+    name: f.name,
+    title: f.name,
+    subtitle: f.address ?? '',
+    distanceM: f.distance_m,
+    isAiRecommend: true,
+    rawAiFacility: f,
+  }));
+  const displayItems = [...aiDisplayItems, ...items];
+
   const handleLocationResultClick = useCallback((item) => {
     setSelectedItem(item);
     setHoveredLocationItem(item);
@@ -394,12 +428,14 @@ const UnifiedPetMapPage = () => {
           onCategoryChange={(cat) => {
             setLocationCategory(cat);
             setAiRecommendFacilities([]);
+            setAiRequestId(null);
             cacheRef.current = {};
             commitLocationSearch(mapViewportCenter, cat ? 'category' : 'user-triggered');
           }}
           onSortChange={(sort) => {
             setLocationSort(sort);
             setAiRecommendFacilities([]);
+            setAiRequestId(null);
             cacheRef.current = {};
             commitLocationSearch(mapViewportCenter, 'user-triggered');
           }}
@@ -517,7 +553,7 @@ const UnifiedPetMapPage = () => {
               lat={userLocation.lat}
               lng={userLocation.lng}
               context={CATEGORY_TO_CONTEXT[locationCategory]}
-              onFacilitiesLoaded={setAiRecommendFacilities}
+              onFacilitiesLoaded={handleAiRecommendLoad}
             />
           )}
         </LeftPanel>
