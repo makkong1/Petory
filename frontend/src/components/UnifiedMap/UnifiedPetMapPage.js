@@ -196,6 +196,8 @@ const UnifiedPetMapPage = () => {
     if (isAiMode) {
       setIsAiMode(false);
       setRecommendedMap(null);
+      setAiRecommendFacilities([]);
+      setAiRequestId(null);
       fetchItems('location', aiCenter, radius, locationKeyword, locationCategory, locationSort);
       return;
     }
@@ -631,7 +633,7 @@ const UnifiedPetMapPage = () => {
             <ErrorBanner onClick={() => setError(null)}>{error} ✕</ErrorBanner>
           )}
 
-          {!loading && !error && items.length === 0 && mapViewportCenter && (
+          {!loading && !error && displayItems.length === 0 && mapViewportCenter && (
             <EmptyBanner>반경 {radius}km 내 결과가 없습니다.</EmptyBanner>
           )}
 
@@ -943,7 +945,7 @@ const ResultCard = styled.button`
     ? props.theme.colors.domain.location + '1A'
     : props.theme.colors.background};
   border-radius: 18px;
-  padding: 14px 14px 13px;
+  padding: 14px 14px 13px ${props => props.$isAiRecommend ? '11px' : '14px'};
   cursor: pointer;
   transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
 
