@@ -203,7 +203,6 @@ function RecommendCard({ lat, lng, context, onFacilitiesLoaded }) {
         </>
       )}
 
-
     </Card>
   );
 }
