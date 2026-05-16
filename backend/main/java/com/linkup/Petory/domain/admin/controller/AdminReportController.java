@@ -7,7 +7,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import com.linkup.Petory.domain.admin.service.AdminReportFacade;
-import com.linkup.Petory.domain.report.dto.ReportAssistSuggestion;
 import com.linkup.Petory.domain.report.dto.ReportDTO;
 import com.linkup.Petory.domain.report.dto.ReportDetailDTO;
 import com.linkup.Petory.domain.report.dto.ReportHandleRequest;
@@ -38,15 +37,6 @@ public class AdminReportController {
     @GetMapping("/{id}")
     public ResponseEntity<ReportDetailDTO> getReportDetail(@PathVariable("id") Long id) {
         return ResponseEntity.ok(adminReportFacade.getReportDetail(id));
-    }
-
-    /**
-     * 신고 보조 에이전트: 요약·심각도·조치 제안 (참고용, 자동 처리 아님)
-     * Ollama 연동. 실패 시 null 반환.
-     */
-    @GetMapping("/{id}/assist")
-    public ResponseEntity<ReportAssistSuggestion> getReportAssist(@PathVariable("id") Long id) {
-        return ResponseEntity.ok(adminReportFacade.getReportAssist(id));
     }
 
     /**
