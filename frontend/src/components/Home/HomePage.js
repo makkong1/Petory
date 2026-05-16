@@ -248,138 +248,29 @@ const NotificationBtn = styled.button`
 `;
 
 
-/* ── CategoryTabs ────────────────────────────────────────────── */
-
-const TabsWrap = styled.div`
-  display: flex;
-  gap: 8px;
-  padding: 0 20px 20px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  &::-webkit-scrollbar { display: none; }
-`;
-
-const TabBtn = styled.button`
-  flex-shrink: 0;
-  padding: 8px 16px;
-  border-radius: 9999px;
-  border: 1.5px solid ${props => props.$active ? props.$color : props.theme.colors.border};
-  background: ${props => props.$active ? props.$color : props.theme.colors.surface};
-  color: ${props => props.$active ? '#fff' : props.theme.colors.textSecondary};
-  font-size: 13px;
-  font-weight: ${props => props.$active ? 600 : 400};
-  cursor: pointer;
-  transition: all 150ms ease;
-`;
-
-/* ── ContentArea & Grid ──────────────────────────────────────── */
-
-const ContentArea = styled.div`
-  padding: 0 20px;
-`;
+/* ── SectionRow header ───────────────────────────────────────── */
 
 const SectionHeader = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 14px;
+  padding: 0 14px;
+  margin-bottom: 10px;
 `;
 
 const SectionLabel = styled.span`
-  font-size: 17px;
+  font-size: 15px;
   font-weight: 700;
-  color: ${props => props.theme.colors.text};
+  color: ${(p) => p.$color || p.theme.colors.text};
 `;
 
 const ViewAllBtn = styled.button`
   background: none;
   border: none;
   font-size: 13px;
-  color: ${props => props.theme.colors.textSecondary};
+  color: ${(p) => p.theme.colors.textSecondary};
   cursor: pointer;
   padding: 0;
-`;
-
-const CardGrid = styled.div`
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-`;
-
-const GridCard = styled.div`
-  border-radius: 16px;
-  overflow: hidden;
-  background: ${props => props.theme.colors.surface};
-  box-shadow: ${props => props.theme.shadows.sm};
-  cursor: pointer;
-  transition: transform 150ms ease;
-  &:hover { transform: translateY(-2px); }
-`;
-
-const GridCardImg = styled.div`
-  height: 100px;
-  background: linear-gradient(135deg, ${props => props.$color}99 0%, ${props => props.$color}33 100%);
-`;
-
-const GridCardBody = styled.div`
-  padding: 10px 12px 12px;
-`;
-
-const GridCardTitle = styled.div`
-  font-size: 13px;
-  font-weight: 600;
-  color: ${props => props.theme.colors.text};
-  margin-bottom: 3px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-`;
-
-const GridCardSub = styled.div`
-  font-size: 11px;
-  color: ${props => props.theme.colors.textSecondary};
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-`;
-
-const EmptyList = styled.div`
-  font-size: 13px;
-  color: ${props => props.theme.colors.textMuted};
-  text-align: center;
-  padding: 20px 0;
-`;
-
-/* ── Skeletons ───────────────────────────────────────────────── */
-
-const SkeletonSmallCard = styled.div`
-  height: 160px;
-  border-radius: 16px;
-  background: linear-gradient(90deg,
-    ${props => props.theme.colors.border} 25%,
-    ${props => props.theme.colors.borderLight} 50%,
-    ${props => props.theme.colors.border} 75%
-  );
-  background-size: 200px 100%;
-  animation: shimmer 1.2s infinite;
-
-  @keyframes shimmer {
-    0% { background-position: -200px 0; }
-    100% { background-position: calc(200px + 100%) 0; }
-  }
-`;
-
-const SkeletonText = styled.div`
-  height: 16px;
-  border-radius: 8px;
-  width: ${props => props.$w || '100px'};
-  background: linear-gradient(90deg,
-    ${props => props.theme.colors.border} 25%,
-    ${props => props.theme.colors.borderLight} 50%,
-    ${props => props.theme.colors.border} 75%
-  );
-  background-size: 200px 100%;
-  animation: shimmer 1.2s infinite;
 `;
 
 /* ── Admin Section ───────────────────────────────────────────── */
@@ -423,4 +314,91 @@ const AdminCardName = styled.div`
   font-size: 13px;
   font-weight: 600;
   color: ${props => props.theme.colors.text};
+`;
+
+/* ── SectionRow ─────────────────────────────────────────────── */
+
+const SectionWrap = styled.div`
+  background: ${(p) => p.theme.colors.surface};
+  border-radius: 16px;
+  margin: 8px 16px;
+  padding: 14px 0 14px;
+  box-shadow: ${(p) => p.theme.shadows.sm};
+`;
+
+const HScroll = styled.div`
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 0 14px;
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+`;
+
+const HCard = styled.div`
+  flex-shrink: 0;
+  width: 120px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: ${(p) => p.theme.colors.background};
+  border: 1px solid ${(p) => p.theme.colors.border};
+  cursor: pointer;
+  transition: transform 150ms ease;
+  &:hover { transform: translateY(-2px); }
+`;
+
+const HCardImg = styled.div`
+  height: 80px;
+  background: linear-gradient(
+    135deg,
+    ${(p) => p.$color}99 0%,
+    ${(p) => p.$color}33 100%
+  );
+`;
+
+const HCardBody = styled.div`
+  padding: 8px 9px 9px;
+`;
+
+const HCardTitle = styled.div`
+  font-size: 12px;
+  font-weight: 600;
+  color: ${(p) => p.theme.colors.text};
+  margin-bottom: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+`;
+
+const HCardSub = styled.div`
+  font-size: 10px;
+  color: ${(p) => p.theme.colors.textSecondary};
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+`;
+
+const EmptyRow = styled.div`
+  font-size: 13px;
+  color: ${(p) => p.theme.colors.textMuted};
+  padding: 16px 14px;
+`;
+
+const SkeletonCard = styled.div`
+  flex-shrink: 0;
+  width: 120px;
+  height: 130px;
+  border-radius: 12px;
+  background: linear-gradient(
+    90deg,
+    ${(p) => p.theme.colors.border} 25%,
+    ${(p) => p.theme.colors.borderLight} 50%,
+    ${(p) => p.theme.colors.border} 75%
+  );
+  background-size: 200px 100%;
+  animation: shimmer 1.2s infinite;
+  @keyframes shimmer {
+    0%   { background-position: -200px 0; }
+    100% { background-position: calc(200px + 100%) 0; }
+  }
 `;
