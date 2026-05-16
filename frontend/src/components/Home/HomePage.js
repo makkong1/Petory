@@ -6,64 +6,36 @@ import { meetupApi } from '../../api/meetupApi';
 import { missingPetApi } from '../../api/missingPetApi';
 import { boardApi } from '../../api/boardApi';
 
-const TABS = [
-  { key: 'service',   label: '주변서비스', domainColor: '#3B82F6' },
-  { key: 'meetup',    label: '모임',       domainColor: '#10B981' },
-  { key: 'missing',   label: '실종신고',   domainColor: '#EF4444' },
-  { key: 'community', label: '커뮤니티',   domainColor: '#8B5CF6' },
-];
-
-
-const getCardLabel = (tabKey, item) => {
-  if (tabKey === 'service') return { title: item.name, sub: item.category };
-  if (tabKey === 'meetup') return { title: item.title, sub: `${item.currentParticipants || 0}/${item.maxParticipants || 0}명` };
-  if (tabKey === 'missing') return { title: item.petName || item.title, sub: item.breed || '' };
-  return { title: item.boardTitle || item.title, sub: item.boardCategory || item.category || '' };
-};
-
-const TabContent = ({ tab, items, loading, error, onViewAll }) => {
-  if (loading) {
-    return (
-      <ContentArea>
-        <SectionHeader>
-          <SkeletonText $w="120px" />
-          <SkeletonText $w="60px" />
-        </SectionHeader>
-        <CardGrid>
-          {[1, 2, 3, 4].map(i => <SkeletonSmallCard key={i} />)}
-        </CardGrid>
-      </ContentArea>
-    );
-  }
-
-  return (
-    <ContentArea>
-      <SectionHeader>
-        <SectionLabel>인기 {tab.label}</SectionLabel>
-        <ViewAllBtn onClick={onViewAll}>전체보기 →</ViewAllBtn>
-      </SectionHeader>
-
-      {items.length > 0 ? (
-        <CardGrid>
-          {items.slice(0, 4).map((item, idx) => {
-            const { title, sub } = getCardLabel(tab.key, item);
-            return (
-              <GridCard key={idx} $color={tab.domainColor} onClick={onViewAll}>
-                <GridCardImg $color={tab.domainColor} />
-                <GridCardBody>
-                  <GridCardTitle>{title}</GridCardTitle>
-                  <GridCardSub>{sub}</GridCardSub>
-                </GridCardBody>
-              </GridCard>
-            );
-          })}
-        </CardGrid>
-      ) : (
-        !error && <EmptyList>아직 등록된 항목이 없어요</EmptyList>
-      )}
-    </ContentArea>
-  );
-};
+const SectionRow = ({ title, emoji, color, items, loading, onViewAll, getLabel }) => (
+  <SectionWrap>
+    <SectionHeader>
+      <SectionLabel $color={color}>{emoji} {title}</SectionLabel>
+      <ViewAllBtn onClick={onViewAll}>전체보기 →</ViewAllBtn>
+    </SectionHeader>
+    {loading ? (
+      <HScroll>
+        {[1, 2, 3, 4].map((i) => <SkeletonCard key={i} />)}
+      </HScroll>
+    ) : items.length === 0 ? (
+      <EmptyRow>등록된 항목이 없어요</EmptyRow>
+    ) : (
+      <HScroll>
+        {items.map((item, idx) => {
+          const { title: cardTitle, sub } = getLabel(item);
+          return (
+            <HCard key={idx} $color={color} onClick={onViewAll}>
+              <HCardImg $color={color} />
+              <HCardBody>
+                <HCardTitle>{cardTitle}</HCardTitle>
+                <HCardSub>{sub}</HCardSub>
+              </HCardBody>
+            </HCard>
+          );
+        })}
+      </HScroll>
+    )}
+  </SectionWrap>
+);
 
 const HomePage = ({ setActiveTab }) => {
   const { user } = useAuth();
@@ -77,11 +49,6 @@ const HomePage = ({ setActiveTab }) => {
     community: { items: [], loading: true, error: false },
   });
   const [userCoords, setUserCoords] = useState(null);
-  // Bridge vars for JSX — Task 2 will replace the JSX block
-  const [activeTab, setActiveTabLocal] = useState('service');
-  const tabData = Object.fromEntries(Object.entries(sections).map(([k, v]) => [k, v.items]));
-  const tabLoading = Object.fromEntries(Object.entries(sections).map(([k, v]) => [k, v.loading]));
-  const tabError = Object.fromEntries(Object.entries(sections).map(([k, v]) => [k, v.error]));
 
   useEffect(() => {
     if (!navigator.geolocation) return;
@@ -139,33 +106,48 @@ const HomePage = ({ setActiveTab }) => {
           </HeaderLeft>
           <NotificationBtn>🔔</NotificationBtn>
         </Header>
-        <TabsWrap>
-          {TABS.map(tab => (
-            <TabBtn
-              key={tab.key}
-              $active={activeTab === tab.key}
-              $color={tab.domainColor}
-              onClick={() => setActiveTabLocal(tab.key)}
-            >
-              {tab.label}
-            </TabBtn>
-          ))}
-        </TabsWrap>
-        <TabContent
-          tab={TABS.find(t => t.key === activeTab)}
-          items={tabData[activeTab] || []}
-          loading={tabLoading[activeTab]}
-          error={tabError[activeTab]}
-          onViewAll={() => {
-            const tabToAppTab = {
-              service: 'unified-map',
-              meetup: 'unified-map',
-              missing: 'missing-pets',
-              community: 'community',
-            };
-            setActiveTab(tabToAppTab[activeTab]);
-          }}
+
+        <SectionRow
+          title="실종신고" emoji="🔴" color="#EF4444"
+          items={sections.missing.items}
+          loading={sections.missing.loading}
+          onViewAll={() => setActiveTab('missing-pets')}
+          getLabel={(item) => ({
+            title: item.petName || item.title || '',
+            sub: [item.breed, item.lostDate].filter(Boolean).join(' · '),
+          })}
         />
+        <SectionRow
+          title="주변 서비스" emoji="📍" color="#3B82F6"
+          items={sections.service.items}
+          loading={sections.service.loading}
+          onViewAll={() => setActiveTab('unified-map')}
+          getLabel={(item) => ({
+            title: item.name || '',
+            sub: item.category || '',
+          })}
+        />
+        <SectionRow
+          title="모임" emoji="👥" color="#10B981"
+          items={sections.meetup.items}
+          loading={sections.meetup.loading}
+          onViewAll={() => setActiveTab('unified-map')}
+          getLabel={(item) => ({
+            title: item.title || '',
+            sub: `${item.currentParticipants ?? 0}/${item.maxParticipants ?? 0}명`,
+          })}
+        />
+        <SectionRow
+          title="커뮤니티" emoji="💬" color="#8B5CF6"
+          items={sections.community.items}
+          loading={sections.community.loading}
+          onViewAll={() => setActiveTab('community')}
+          getLabel={(item) => ({
+            title: item.boardTitle || item.title || '',
+            sub: `❤️ ${item.likeCount ?? 0}  👁 ${item.viewCount ?? 0}`,
+          })}
+        />
+
         {isAdmin && (
           <AdminSection>
             <AdminSectionTitle>🔧 관리자 기능</AdminSectionTitle>
