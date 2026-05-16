@@ -19,6 +19,13 @@ import { recommendApi } from '../../api/recommendApi';
 const CATEGORY_TO_CONTEXT = {
   '미용': 'grooming',
   '동물병원': 'hospital',
+  '동물약국': 'pharmacy',
+  '카페': 'cafe',
+  '펜션': 'pension',
+  '식당': 'restaurant',
+  '위탁관리': 'boarding',
+  '반려동물용품': 'supplies',
+  '호텔': 'hotel',
   '간식': 'snack',
   '사료': 'food',
   '의류': 'clothes',
