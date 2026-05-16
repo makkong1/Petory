@@ -19,6 +19,13 @@ import { recommendApi } from '../../api/recommendApi';
 const CATEGORY_TO_CONTEXT = {
   '미용': 'grooming',
   '동물병원': 'hospital',
+  '동물약국': 'pharmacy',
+  '카페': 'cafe',
+  '펜션': 'pension',
+  '식당': 'restaurant',
+  '위탁관리': 'boarding',
+  '반려동물용품': 'supplies',
+  '호텔': 'hotel',
   '간식': 'snack',
   '사료': 'food',
   '의류': 'clothes',
@@ -578,17 +585,19 @@ const UnifiedPetMapPage = () => {
             <MapContainer
               services={[
                 ...items,
-                ...aiRecommendFacilities.map((f, i) => ({
-                  id: `ai-${i}`,
-                  type: 'ai_recommend',
-                  latitude: f.lat,
-                  longitude: f.lng,
-                  name: f.name,
-                  title: f.name,
-                  subtitle: f.address,
-                  distanceM: f.distance_m,
-                  markerColor: '#FFD700',
-                })),
+                ...aiRecommendFacilities
+                  .filter((f) => f.lat != null && f.lng != null)
+                  .map((f, i) => ({
+                    id: `ai-map-${i}`,
+                    type: 'ai_recommend',
+                    latitude: f.lat,
+                    longitude: f.lng,
+                    name: f.name,
+                    title: f.name,
+                    subtitle: f.address,
+                    distanceM: f.distance_m,
+                    markerColor: '#FFD700',
+                  })),
               ]}
               onServiceClick={setSelectedItem}
               userLocation={userLocation}

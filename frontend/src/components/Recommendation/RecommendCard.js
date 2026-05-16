@@ -119,10 +119,10 @@ function RecommendCard({ lat, lng, context, onFacilitiesLoaded }) {
         const main = res.data;
         setData(main);
         if (onFacilitiesLoaded) {
-          const withCoords = (main?.facilities ?? []).filter(
-            (f) => f.lat != null && f.lng != null
-          );
-          onFacilitiesLoaded({ facilities: withCoords, requestId: main?.request_id ?? null });
+          onFacilitiesLoaded({
+            facilities: main?.facilities ?? [],
+            requestId: main?.request_id ?? null,
+          });
         }
 
         // v3 카피 분리: 본 추천이 비어 있지 않으면 LLM 카피를 두 번째 콜로 요청.
