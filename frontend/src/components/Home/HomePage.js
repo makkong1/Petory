@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { useAuth } from '../../contexts/AuthContext';
 import { locationServiceApi } from '../../api/locationServiceApi';
@@ -70,13 +70,18 @@ const HomePage = ({ setActiveTab }) => {
   const isAdmin = user && (user.role === 'ADMIN' || user.role === 'MASTER');
   const nickname = user?.nickname || '사용자';
 
-  const [activeTab, setActiveTabLocal] = useState('service');
-  const [tabData, setTabData] = useState({});
-  const [tabLoading, setTabLoading] = useState({ service: true });
-  const [tabError, setTabError] = useState({});
+  const [sections, setSections] = useState({
+    missing:   { items: [], loading: true, error: false },
+    service:   { items: [], loading: true, error: false },
+    meetup:    { items: [], loading: true, error: false },
+    community: { items: [], loading: true, error: false },
+  });
   const [userCoords, setUserCoords] = useState(null);
-
-  const fetchedTabsRef = React.useRef(new Set());
+  // Bridge vars for JSX — Task 2 will replace the JSX block
+  const [activeTab, setActiveTabLocal] = useState('service');
+  const tabData = Object.fromEntries(Object.entries(sections).map(([k, v]) => [k, v.items]));
+  const tabLoading = Object.fromEntries(Object.entries(sections).map(([k, v]) => [k, v.loading]));
+  const tabError = Object.fromEntries(Object.entries(sections).map(([k, v]) => [k, v.error]));
 
   useEffect(() => {
     if (!navigator.geolocation) return;
@@ -87,59 +92,39 @@ const HomePage = ({ setActiveTab }) => {
     );
   }, []);
 
-  const fetchTabData = useCallback(async (tabKey) => {
-    if (fetchedTabsRef.current.has(tabKey)) return;
-    fetchedTabsRef.current.add(tabKey);
-    setTabLoading(prev => ({ ...prev, [tabKey]: true }));
-    setTabError(prev => ({ ...prev, [tabKey]: false }));
-    const toArr = (v) => Array.isArray(v) ? v : [];
-    try {
-      let items = [];
-      if (tabKey === 'service') {
-        const params = { sort: 'score', size: 6 };
-        if (userCoords) {
-          params.latitude = userCoords.lat;
-          params.longitude = userCoords.lng;
-          params.radius = 10000;
-        }
-        const res = await locationServiceApi.searchPlaces(params);
-        items = toArr(res.data?.services ?? res.data?.results ?? res.data);
-      } else if (tabKey === 'meetup') {
-        const res = await meetupApi.getHomeMeetups(
-          userCoords?.lat ?? null,
-          userCoords?.lng ?? null,
-          6
-        );
-        items = toArr(res.data?.meetups ?? res.data?.content ?? res.data);
-      } else if (tabKey === 'missing') {
-        const res = await missingPetApi.getHomeMissing(
-          userCoords?.lat ?? null,
-          userCoords?.lng ?? null,
-          6
-        );
-        items = toArr(res.data?.boards ?? res.data);
-      } else if (tabKey === 'community') {
-        const res = await boardApi.getPopularBoards('WEEKLY');
-        items = toArr(res.data?.boards ?? res.data?.content ?? res.data);
-      }
-      setTabData(prev => ({ ...prev, [tabKey]: items.slice(0, 6) }));
-    } catch {
-      fetchedTabsRef.current.delete(tabKey); // allow retry on error
-      setTabError(prev => ({ ...prev, [tabKey]: true }));
-      setTabData(prev => ({ ...prev, [tabKey]: [] }));
-    } finally {
-      setTabLoading(prev => ({ ...prev, [tabKey]: false }));
+  useEffect(() => {
+    const toArr = (v) => (Array.isArray(v) ? v : []);
+    const setSection = (key, items) =>
+      setSections((prev) => ({ ...prev, [key]: { items: items.slice(0, 4), loading: false, error: false } }));
+    const setError = (key) =>
+      setSections((prev) => ({ ...prev, [key]: { items: [], loading: false, error: true } }));
+
+    missingPetApi
+      .getHomeMissing(userCoords?.lat ?? null, userCoords?.lng ?? null, 6)
+      .then((res) => setSection('missing', toArr(res.data?.boards ?? res.data)))
+      .catch(() => setError('missing'));
+
+    const serviceParams = { sort: 'score', size: 6 };
+    if (userCoords) {
+      serviceParams.latitude = userCoords.lat;
+      serviceParams.longitude = userCoords.lng;
+      serviceParams.radius = 10000;
     }
+    locationServiceApi
+      .searchPlaces(serviceParams)
+      .then((res) => setSection('service', toArr(res.data?.services ?? res.data?.results ?? res.data)))
+      .catch(() => setError('service'));
+
+    meetupApi
+      .getHomeMeetups(userCoords?.lat ?? null, userCoords?.lng ?? null, 6)
+      .then((res) => setSection('meetup', toArr(res.data?.meetups ?? res.data?.content ?? res.data)))
+      .catch(() => setError('meetup'));
+
+    boardApi
+      .getPopularBoards('WEEKLY')
+      .then((res) => setSection('community', toArr(res.data?.boards ?? res.data?.content ?? res.data)))
+      .catch(() => setError('community'));
   }, [userCoords]);
-
-  useEffect(() => {
-    fetchedTabsRef.current = new Set();
-    fetchTabData('service');
-  }, [userCoords, fetchTabData]);
-
-  useEffect(() => {
-    if (activeTab !== 'service') fetchTabData(activeTab);
-  }, [activeTab, fetchTabData]);
 
   return (
     <PageWrapper>
