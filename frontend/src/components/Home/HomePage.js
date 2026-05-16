@@ -13,104 +13,53 @@ const TABS = [
   { key: 'community', label: '커뮤니티',   domainColor: '#8B5CF6' },
 ];
 
-const getHeroItem = (tabKey, items) => {
-  if (!items || items.length === 0) return null;
-  const item = items[0];
-  if (tabKey === 'service') {
-    return {
-      title: item.name,
-      subtitle: item.category,
-      badge: item.averageRating ? `⭐ ${item.averageRating}` : null,
-      image: item.imageUrl || null,
-    };
-  }
-  if (tabKey === 'meetup') {
-    return {
-      title: item.title,
-      subtitle: `${item.location || ''} · ${item.currentParticipants || 0}/${item.maxParticipants || 0}명`,
-      badge: item.status === 'RECRUITING' ? '모집중' : null,
-      image: item.imageUrl || null,
-    };
-  }
-  if (tabKey === 'missing') {
-    return {
-      title: item.petName || item.title,
-      subtitle: `${item.breed || ''} · ${item.lostDate || ''}`,
-      badge: '실종',
-      image: item.imageUrl || null,
-    };
-  }
-  if (tabKey === 'community') {
-    return {
-      title: item.boardTitle || item.title,
-      subtitle: `❤️ ${item.likeCount ?? item.likes ?? 0}  👁 ${item.viewCount ?? item.views ?? 0}`,
-      badge: item.boardCategory || item.category || null,
-      image: item.boardFilePath || null,
-    };
-  }
-  return null;
+
+const getCardLabel = (tabKey, item) => {
+  if (tabKey === 'service') return { title: item.name, sub: item.category };
+  if (tabKey === 'meetup') return { title: item.title, sub: `${item.currentParticipants || 0}/${item.maxParticipants || 0}명` };
+  if (tabKey === 'missing') return { title: item.petName || item.title, sub: item.breed || '' };
+  return { title: item.boardTitle || item.title, sub: item.boardCategory || item.category || '' };
 };
 
 const TabContent = ({ tab, items, loading, error, onViewAll }) => {
-  const hero = getHeroItem(tab.key, items);
-
   if (loading) {
     return (
       <ContentArea>
-        <SkeletonHero />
         <SectionHeader>
           <SkeletonText $w="120px" />
           <SkeletonText $w="60px" />
         </SectionHeader>
-        <HorizontalScroll>
-          {[1, 2, 3].map(i => <SkeletonSmallCard key={i} />)}
-        </HorizontalScroll>
+        <CardGrid>
+          {[1, 2, 3, 4].map(i => <SkeletonSmallCard key={i} />)}
+        </CardGrid>
       </ContentArea>
     );
   }
 
   return (
     <ContentArea>
-      {hero ? (
-        <HeroCard $color={tab.domainColor} $image={hero.image}>
-          <HeroOverlay />
-          <HeroGlassPanel>
-            <HeroTitle>{hero.title}</HeroTitle>
-            <HeroSub>{hero.subtitle}</HeroSub>
-            {hero.badge && <HeroBadge $color={tab.domainColor}>{hero.badge}</HeroBadge>}
-          </HeroGlassPanel>
-        </HeroCard>
-      ) : (
-        !error && <EmptyHero $color={tab.domainColor}>아직 등록된 항목이 없어요</EmptyHero>
-      )}
-
       <SectionHeader>
         <SectionLabel>인기 {tab.label}</SectionLabel>
         <ViewAllBtn onClick={onViewAll}>전체보기 →</ViewAllBtn>
       </SectionHeader>
 
-      {items.length > 1 ? (
-        <HorizontalScroll>
-          {items.slice(1).map((item, idx) => (
-            <SmallCard key={idx} $color={tab.domainColor}>
-              <SmallCardImg $color={tab.domainColor} />
-              <SmallCardTitle>{
-                tab.key === 'service' ? item.name :
-                tab.key === 'meetup' ? item.title :
-                tab.key === 'missing' ? (item.petName || item.title) :
-                (item.boardTitle || item.title)
-              }</SmallCardTitle>
-              <SmallCardSub>{
-                tab.key === 'service' ? item.category :
-                tab.key === 'meetup' ? `${item.currentParticipants || 0}/${item.maxParticipants || 0}명` :
-                tab.key === 'missing' ? (item.breed || '') :
-                (item.boardCategory || item.category || '')
-              }</SmallCardSub>
-            </SmallCard>
-          ))}
-        </HorizontalScroll>
+      {items.length > 0 ? (
+        <CardGrid>
+          {items.slice(0, 4).map((item, idx) => {
+            const { title, sub } = getCardLabel(tab.key, item);
+            return (
+              <GridCard key={idx} $color={tab.domainColor} onClick={onViewAll}>
+                <GridCardImg $color={tab.domainColor} />
+                <GridCardBody>
+                  <GridCardTitle>{title}</GridCardTitle>
+                  <GridCardSub>{sub}</GridCardSub>
+                </GridCardBody>
+              </GridCard>
+            );
+          })}
+        </CardGrid>
       ) : (
-        <EmptyList>등록된 항목이 없어요</EmptyList>
+        !error && <EmptyList>아직 등록된 항목이 없어요</EmptyList>
       )}
     </ContentArea>
   );
@@ -205,11 +154,6 @@ const HomePage = ({ setActiveTab }) => {
           </HeaderLeft>
           <NotificationBtn>🔔</NotificationBtn>
         </Header>
-        <SearchBarWrap>
-          <SearchIcon>🔍</SearchIcon>
-          <SearchInput placeholder="반려동물·케어·모임 검색..." readOnly />
-          <FilterBtn>⚙️</FilterBtn>
-        </SearchBarWrap>
         <TabsWrap>
           {TABS.map(tab => (
             <TabBtn
@@ -336,43 +280,6 @@ const NotificationBtn = styled.button`
   line-height: 1;
 `;
 
-/* ── SearchBar ───────────────────────────────────────────────── */
-
-const SearchBarWrap = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 0 20px 20px;
-  padding: 12px 16px;
-  border: 1.5px solid ${props => props.theme.colors.border};
-  border-radius: 9999px;
-  background: ${props => props.theme.colors.surface};
-`;
-
-const SearchIcon = styled.span`
-  font-size: 16px;
-  flex-shrink: 0;
-`;
-
-const SearchInput = styled.input`
-  flex: 1;
-  border: none;
-  background: none;
-  outline: none;
-  font-size: 14px;
-  color: ${props => props.theme.colors.textMuted};
-  cursor: pointer;
-  &::placeholder { color: ${props => props.theme.colors.textMuted}; }
-`;
-
-const FilterBtn = styled.button`
-  background: none;
-  border: none;
-  font-size: 18px;
-  cursor: pointer;
-  padding: 0;
-  flex-shrink: 0;
-`;
 
 /* ── CategoryTabs ────────────────────────────────────────────── */
 
@@ -398,82 +305,10 @@ const TabBtn = styled.button`
   transition: all 150ms ease;
 `;
 
-/* ── ContentArea & HeroCard ──────────────────────────────────── */
+/* ── ContentArea & Grid ──────────────────────────────────────── */
 
 const ContentArea = styled.div`
   padding: 0 20px;
-`;
-
-const HeroCard = styled.div`
-  position: relative;
-  width: 100%;
-  height: 280px;
-  border-radius: 24px;
-  overflow: hidden;
-  margin-bottom: 24px;
-  background: ${props => props.$image
-    ? `url(${props.$image}) center/cover no-repeat`
-    : `linear-gradient(135deg, ${props.$color}cc 0%, ${props.$color}44 100%)`
-  };
-`;
-
-const HeroOverlay = styled.div`
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(to bottom, transparent 30%, rgba(0,0,0,0.55) 100%);
-`;
-
-const HeroGlassPanel = styled.div`
-  position: absolute;
-  bottom: 16px;
-  left: 16px;
-  right: 16px;
-  padding: 14px 16px;
-  border-radius: 16px;
-  background: rgba(29, 29, 29, 0.45);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-`;
-
-const HeroTitle = styled.div`
-  font-size: 18px;
-  font-weight: 700;
-  color: #fff;
-  margin-bottom: 4px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-`;
-
-const HeroSub = styled.div`
-  font-size: 13px;
-  color: rgba(255,255,255,0.75);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-`;
-
-const HeroBadge = styled.span`
-  display: inline-block;
-  margin-top: 8px;
-  padding: 3px 10px;
-  border-radius: 9999px;
-  background: ${props => props.$color};
-  color: #fff;
-  font-size: 11px;
-  font-weight: 600;
-`;
-
-const EmptyHero = styled.div`
-  height: 100px;
-  border-radius: 24px;
-  background: ${props => `${props.$color}22`};
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: ${props => props.theme.colors.textMuted};
-  font-size: 14px;
-  margin-bottom: 24px;
 `;
 
 const SectionHeader = styled.div`
@@ -498,29 +333,13 @@ const ViewAllBtn = styled.button`
   padding: 0;
 `;
 
-const HorizontalScroll = styled.div`
-  display: flex;
+const CardGrid = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 12px;
-  overflow-x: auto;
-  padding-bottom: 8px;
-  margin: 0 -20px;
-  padding-left: 20px;
-  padding-right: 20px;
-  scrollbar-width: none;
-  &::-webkit-scrollbar { display: none; }
-
-  @media (min-width: 769px) {
-    flex-wrap: wrap;
-    overflow-x: visible;
-    margin: 0;
-    padding-left: 0;
-    padding-right: 0;
-  }
 `;
 
-const SmallCard = styled.div`
-  flex-shrink: 0;
-  width: 150px;
+const GridCard = styled.div`
   border-radius: 16px;
   overflow: hidden;
   background: ${props => props.theme.colors.surface};
@@ -528,31 +347,30 @@ const SmallCard = styled.div`
   cursor: pointer;
   transition: transform 150ms ease;
   &:hover { transform: translateY(-2px); }
-
-  @media (min-width: 769px) {
-    width: calc(25% - 9px);
-  }
 `;
 
-const SmallCardImg = styled.div`
-  height: 110px;
-  background: linear-gradient(135deg, ${props => props.$color}99 0%, ${props => props.$color}44 100%);
+const GridCardImg = styled.div`
+  height: 100px;
+  background: linear-gradient(135deg, ${props => props.$color}99 0%, ${props => props.$color}33 100%);
 `;
 
-const SmallCardTitle = styled.div`
+const GridCardBody = styled.div`
+  padding: 10px 12px 12px;
+`;
+
+const GridCardTitle = styled.div`
   font-size: 13px;
   font-weight: 600;
   color: ${props => props.theme.colors.text};
-  padding: 10px 10px 2px;
+  margin-bottom: 3px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 `;
 
-const SmallCardSub = styled.div`
+const GridCardSub = styled.div`
   font-size: 11px;
   color: ${props => props.theme.colors.textSecondary};
-  padding: 0 10px 10px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -567,11 +385,9 @@ const EmptyList = styled.div`
 
 /* ── Skeletons ───────────────────────────────────────────────── */
 
-const SkeletonHero = styled.div`
-  width: 100%;
-  height: 280px;
-  border-radius: 24px;
-  margin-bottom: 24px;
+const SkeletonSmallCard = styled.div`
+  height: 160px;
+  border-radius: 16px;
   background: linear-gradient(90deg,
     ${props => props.theme.colors.border} 25%,
     ${props => props.theme.colors.borderLight} 50%,
@@ -584,20 +400,6 @@ const SkeletonHero = styled.div`
     0% { background-position: -200px 0; }
     100% { background-position: calc(200px + 100%) 0; }
   }
-`;
-
-const SkeletonSmallCard = styled.div`
-  flex-shrink: 0;
-  width: 150px;
-  height: 160px;
-  border-radius: 16px;
-  background: linear-gradient(90deg,
-    ${props => props.theme.colors.border} 25%,
-    ${props => props.theme.colors.borderLight} 50%,
-    ${props => props.theme.colors.border} 75%
-  );
-  background-size: 200px 100%;
-  animation: shimmer 1.2s infinite;
 `;
 
 const SkeletonText = styled.div`
