@@ -15,7 +15,6 @@ import com.linkup.Petory.domain.report.dto.ReportDTO;
 import com.linkup.Petory.domain.report.dto.ReportHandleRequest;
 import com.linkup.Petory.domain.report.entity.ReportActionType;
 import com.linkup.Petory.domain.report.entity.ReportStatus;
-import com.linkup.Petory.domain.report.service.ReportAssistAgentService;
 import com.linkup.Petory.domain.report.service.ReportService;
 
 @ExtendWith(MockitoExtension.class)
@@ -26,8 +25,6 @@ class AdminReportFacadeTest {
 
     @Mock
     private ReportService reportService;
-    @Mock
-    private ReportAssistAgentService reportAssistAgentService;
     @Mock
     private AdminAuditService auditService;
 

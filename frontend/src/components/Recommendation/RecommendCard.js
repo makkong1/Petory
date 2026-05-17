@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import styled from 'styled-components';
-import { recommendApi } from '../../api/recommendApi';
-import Spinner from '../Common/ui/Spinner';
+import React, { useEffect, useState } from "react";
+import styled from "styled-components";
+import { recommendApi } from "../../api/recommendApi";
+import Spinner from "../Common/ui/Spinner";
 
 const Card = styled.div`
   background: ${({ theme }) => theme.colors.surface};
@@ -23,7 +23,7 @@ const RecommendQuote = styled.blockquote`
   margin: 0 0 14px;
   padding: 10px 12px;
   border-left: 3px solid ${({ theme }) => theme.colors.primary};
-  background: ${({ theme }) => theme.colors.primaryLight || '#eef2ff'};
+  background: ${({ theme }) => theme.colors.primaryLight || "#eef2ff"};
   border-radius: 6px;
   font-size: 15px;
   line-height: 1.6;
@@ -63,7 +63,7 @@ const TagRow = styled.div`
 `;
 
 const Tag = styled.span`
-  background: ${({ theme }) => theme.colors.primaryLight || '#eef2ff'};
+  background: ${({ theme }) => theme.colors.primaryLight || "#eef2ff"};
   color: ${({ theme }) => theme.colors.primary};
   font-size: 12px;
   padding: 3px 8px;
@@ -98,7 +98,7 @@ function RecommendCard({ lat, lng, context, onFacilitiesLoaded }) {
     const events = facilities.map((f) => ({
       facility_id: f.id ?? null,
       source_id: f.source_id ?? null,
-      event: 'view',
+      event: "view",
       occurred_at: occurredAt,
     }));
     sendRecommendEvents(requestId, events);
@@ -170,7 +170,11 @@ function RecommendCard({ lat, lng, context, onFacilitiesLoaded }) {
   }, [lat, lng, context]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loadingMain) return <Spinner text="추천 정보 불러오는 중..." />;
-  if (!data || (!data.recommendation && !data.trends?.length && !data.facilities?.length)) return null;
+  if (
+    !data ||
+    (!data.recommendation && !data.trends?.length && !data.facilities?.length)
+  )
+    return null;
 
   // 카피 우선순위: LLM/rule 카피(/recommend/copy) → 본 추천 응답의 recommendation 폴백.
   const displayedCopy = copy?.recommendation || data.recommendation;
@@ -190,7 +194,9 @@ function RecommendCard({ lat, lng, context, onFacilitiesLoaded }) {
             <Title style={{ margin: 0 }}>요즘 인기 키워드</Title>
             <MoreLink
               type="button"
-              onClick={() => window.setActiveTab && window.setActiveTab('trends')}
+              onClick={() =>
+                window.setActiveTab && window.setActiveTab("trends")
+              }
             >
               트렌드 자세히 보기 →
             </MoreLink>
@@ -202,7 +208,6 @@ function RecommendCard({ lat, lng, context, onFacilitiesLoaded }) {
           </TagRow>
         </>
       )}
-
     </Card>
   );
 }

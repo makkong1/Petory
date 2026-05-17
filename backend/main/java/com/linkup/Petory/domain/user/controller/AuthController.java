@@ -1,5 +1,17 @@
 package com.linkup.Petory.domain.user.controller;
 
+import java.util.HashMap;
+import java.util.Map;
+
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
 import com.linkup.Petory.domain.user.dto.LoginRequest;
 import com.linkup.Petory.domain.user.dto.TokenResponse;
 import com.linkup.Petory.domain.user.dto.UsersDTO;
@@ -8,17 +20,10 @@ import com.linkup.Petory.domain.user.service.AuthService;
 import com.linkup.Petory.domain.user.service.EmailVerificationService;
 import com.linkup.Petory.domain.user.service.UsersService;
 import com.linkup.Petory.util.JwtUtil;
+
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import jakarta.validation.Valid;
-
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.web.bind.annotation.*;
-
-import java.util.HashMap;
-import java.util.Map;
 
 @Slf4j
 @RestController
@@ -41,11 +46,11 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<Map<String, Object>> login(@Valid @RequestBody LoginRequest loginRequest) {
         // Spring Security 인증 처리 (id로 인증)
+        log.info("loginRequest: {}", loginRequest.id());
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
                         loginRequest.id(),
                         loginRequest.password()));
-
         // AuthService를 통해 로그인 처리 (Access Token + Refresh Token 발급)
         TokenResponse tokenResponse = authService.login(loginRequest.id(), loginRequest.password());
 
