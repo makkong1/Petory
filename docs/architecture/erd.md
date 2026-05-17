@@ -249,7 +249,7 @@ erDiagram
         bigint care_request_idx FK
         bigint applicant_idx FK
         text message
-        enum status "PENDING,APPROVED,REJECTED"
+        enum status "PENDING,ACCEPTED,REJECTED"
         datetime created_at
         datetime updated_at
     }
@@ -284,7 +284,7 @@ erDiagram
         datetime date
         int max_participants
         int current_participants
-        enum status "RECRUITING,CONFIRMED,COMPLETED,CANCELLED"
+        enum status "RECRUITING,CLOSED,COMPLETED"
         datetime created_at
         datetime updated_at
     }
@@ -341,14 +341,14 @@ erDiagram
     
     report {
         bigint idx PK
-        enum target_type "BOARD,COMMENT,CARE_REQUEST,MISSING_PET,USER,LOCATION_SERVICE"
+        enum target_type "BOARD,COMMENT,MISSING_PET,PET_CARE_PROVIDER,CARE_REVIEW"
         bigint target_idx
         bigint reporter_idx FK
         text reason
         enum status "PENDING,REVIEWING,RESOLVED,REJECTED"
         bigint handled_by FK
         datetime handled_at
-        enum action_taken "NONE,WARNING,CONTENT_HIDE,CONTENT_DELETE,USER_SUSPEND,USER_BAN"
+        enum action_taken "NONE,DELETE_CONTENT,SUSPEND_USER,WARN_USER,OTHER"
         text admin_note
         datetime created_at
         datetime updated_at
@@ -402,7 +402,7 @@ UNIQUE KEY uk_report (target_type, target_idx, reporter_idx)
 UNIQUE KEY uk_view_log (board_idx, user_idx)
 
 -- care_application 테이블 (부분 인덱스, MySQL 8.0.13+)
-UNIQUE KEY uk_approved_application (care_request_idx) WHERE status = 'APPROVED'
+UNIQUE KEY uk_approved_application (care_request_idx) WHERE status = 'ACCEPTED'
 ```
 
 #### Foreign Key 제약
