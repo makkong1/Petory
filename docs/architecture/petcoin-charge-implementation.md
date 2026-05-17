@@ -25,47 +25,33 @@
 - 결제 검증 로직 추가
 - 결제 내역 저장
 
-## 📁 구현 구조
+## 📁 구현 구조 (현재 완료)
 
 ```
 backend/main/java/com/linkup/Petory/domain/payment/
 ├── entity/
 │   ├── PetCoinTransaction.java ✅
 │   ├── PetCoinEscrow.java ✅
-│   └── ...
+│   ├── EscrowStatus.java ✅
+│   ├── TransactionStatus.java ✅
+│   └── TransactionType.java ✅
 ├── repository/
-│   ├── PetCoinTransactionRepository.java (생성 필요)
-│   ├── PetCoinEscrowRepository.java (생성 필요)
-│   └── ...
+│   ├── PetCoinTransactionRepository.java ✅
+│   ├── PetCoinEscrowRepository.java ✅
+│   ├── JpaPetCoinTransactionAdapter.java ✅
+│   └── JpaPetCoinEscrowAdapter.java ✅
 ├── service/
-│   ├── PetCoinService.java (생성 필요)
-│   └── ...
+│   ├── PetCoinService.java ✅
+│   └── PetCoinEscrowService.java ✅
 ├── dto/
-│   ├── PetCoinChargeRequest.java (생성 필요)
-│   ├── PetCoinTransactionDTO.java (생성 필요)
-│   └── ...
+│   ├── PetCoinChargeRequest.java ✅
+│   ├── PetCoinTransactionDTO.java ✅
+│   ├── PetCoinTransactionDetailDTO.java ✅
+│   └── PetCoinBalanceResponse.java ✅
 └── controller/
-    ├── PetCoinController.java (생성 필요 - 일반 사용자용)
-    └── ...
+    ├── PetCoinController.java ✅  (일반 사용자용)
+    └── AdminPaymentController.java ✅ (관리자용)
 ```
-
-## 🔧 구현 단계
-
-### Step 1: Repository 생성
-- `PetCoinTransactionRepository`
-- `PetCoinEscrowRepository`
-
-### Step 2: Service 생성
-- `PetCoinService`: 코인 충전/차감/지급/환불 로직
-- 트랜잭션 관리 필수
-- 거래 내역 자동 기록
-
-### Step 3: Controller 생성
-- `AdminPaymentController`: 관리자용 코인 지급 API
-- `PetCoinController`: 일반 사용자용 충전 API (개발 환경)
-
-### Step 4: DTO 생성
-- 요청/응답 DTO
 
 ## 💡 핵심 로직
 

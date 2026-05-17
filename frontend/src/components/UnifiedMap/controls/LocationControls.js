@@ -28,14 +28,12 @@ const LocationControls = ({
   keyword,
   category,
   sort = 'distance',
-  isAiMode,
   hasPendingAreaChange = false,
   radius,
   onSearch,
   onCategoryChange,
   onSortChange,
   onSearchThisArea,
-  onAiToggle,
   onRadiusChange,
 }) => {
   const [inputValue, setInputValue] = useState(keyword || '');
@@ -67,14 +65,6 @@ const LocationControls = ({
           <SearchButton type="submit">검색</SearchButton>
         </SearchPill>
 
-        <AiButton
-          type="button"
-          $active={isAiMode}
-          onClick={onAiToggle}
-          title="AI 추천: 내 주변 최적 시설 TOP 10"
-        >
-          ✨ AI
-        </AiButton>
       </SearchRow>
 
       {/* 현재 조건 요약 + 필터 토글 */}
@@ -230,32 +220,6 @@ const SearchButton = styled.button`
   transition: background 0.15s;
 
   &:hover { background: ${props => props.theme.colors.primaryDark}; }
-`;
-
-const AiButton = styled.button`
-  height: 40px;
-  padding: 0 14px;
-  border-radius: 999px;
-  border: 1.5px solid ${props => props.$active
-    ? props.theme.colors.ai.accent
-    : props.theme.colors.border};
-  background: ${props => props.$active
-    ? props.theme.colors.ai.bg
-    : 'transparent'};
-  color: ${props => props.$active
-    ? props.theme.colors.ai.text
-    : props.theme.colors.textSecondary};
-  font-size: 13px;
-  font-weight: ${props => props.$active ? 700 : 400};
-  cursor: pointer;
-  white-space: nowrap;
-  flex-shrink: 0;
-  transition: all 0.15s ease;
-
-  &:hover {
-    border-color: ${props => props.theme.colors.ai.accent};
-    color: ${props => props.theme.colors.ai.text};
-  }
 `;
 
 const SummaryRow = styled.div`
