@@ -14,6 +14,9 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,7 +26,9 @@ import com.linkup.Petory.domain.board.dto.BoardPageResponseDTO;
 import com.linkup.Petory.domain.board.entity.Board;
 import com.linkup.Petory.domain.board.entity.BoardViewLog;
 import com.linkup.Petory.domain.board.entity.ReactionType;
+import com.linkup.Petory.domain.board.exception.BoardForbiddenException;
 import com.linkup.Petory.domain.board.exception.BoardNotFoundException;
+import com.linkup.Petory.global.security.RoleConstants;
 import com.linkup.Petory.domain.board.repository.BoardReactionRepository;
 import com.linkup.Petory.domain.board.repository.BoardRepository;
 import com.linkup.Petory.domain.board.repository.BoardViewLogRepository;
@@ -53,6 +58,21 @@ public class BoardService {
     private final BoardViewLogRepository boardViewLogRepository;
     private final AttachmentFileService attachmentFileService;
     private final BoardConverter boardConverter;
+
+    private boolean isAdmin() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || auth.getAuthorities() == null) return false;
+        return auth.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .anyMatch(a -> a.equals(RoleConstants.ROLE_ADMIN) || a.equals(RoleConstants.ROLE_MASTER));
+    }
+
+    private void assertBoardOwner(Users boardOwner) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (!isAdmin() && (auth == null || !auth.getName().equals(boardOwner.getId()))) {
+            throw BoardForbiddenException.boardOwnerOnly();
+        }
+    }
 
     // 전체 게시글 조회 (카테고리 필터링 포함)
     // 캐시 임시 비활성화 - 개발 중 데이터 동기화 문제 해결
@@ -233,11 +253,9 @@ public class BoardService {
     @CacheEvict(value = "boardList", allEntries = true) // 전체 리스트 캐시 무효화 (전체/카테고리 모두)
     @Transactional
     public BoardDTO createBoard(BoardDTO dto) {
-        Users user = usersRepository.findById(dto.getUserId())
-                .orElseThrow(() -> {
-                    log.error("❌ [BoardService.createBoard] User not found with userId: {}", dto.getUserId());
-                    return new UserNotFoundException("사용자를 찾을 수 없습니다. userId: " + dto.getUserId());
-                });
+        String loginId = SecurityContextHolder.getContext().getAuthentication().getName();
+        Users user = usersRepository.findActiveByIdString(loginId)
+                .orElseThrow(() -> new UserNotFoundException());
 
         Board board = Board.builder()
                 .title(dto.getTitle())
@@ -263,6 +281,9 @@ public class BoardService {
     public BoardDTO updateBoard(long idx, BoardDTO dto) {
         Board board = boardRepository.findByIdWithUser(idx)
                 .orElseThrow(() -> new BoardNotFoundException());
+
+        // 작성자 또는 관리자만 수정 가능
+        assertBoardOwner(board.getUser());
 
         // 이메일 인증 확인
         Users user = board.getUser();
@@ -299,7 +320,10 @@ public class BoardService {
         Board board = boardRepository.findByIdWithUser(idx)
                 .orElseThrow(() -> new BoardNotFoundException());
 
-        // 이메일 인증 확인
+        // 작성자 또는 관리자만 삭제 가능
+        assertBoardOwner(board.getUser());
+
+        // 이메일 인증 확인 (소유권 확인 후이므로 올바른 사용자 기준)
         Users user = board.getUser();
         if (user.getEmailVerified() == null || !user.getEmailVerified()) {
             throw new EmailVerificationRequiredException(

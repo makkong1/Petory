@@ -19,4 +19,8 @@ public class UserForbiddenException extends ApiException {
     public static UserForbiddenException ownProfileOnly() {
         return new UserForbiddenException("본인의 프로필만 수정할 수 있습니다.");
     }
+
+    public static UserForbiddenException ownPetOnly() {
+        return new UserForbiddenException("본인 소유의 반려동물만 관리할 수 있습니다.");
+    }
 }
