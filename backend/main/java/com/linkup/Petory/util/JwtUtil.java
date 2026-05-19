@@ -17,10 +17,10 @@ public class JwtUtil {
     @Value("${jwt.secret}")
     private String secret;
 
-    @Value("${jwt.expiration}") // 24시간 (밀리초)
-    private long expiration;
+    /** Access JWT TTL (밀리초). 기본 15분. */
+    @Value("${jwt.access-token-expiration-ms:900000}")
+    private long accessTokenExpirationMs;
 
-    private static final long ACCESS_TOKEN_EXPIRE_TIME = 15 * 60 * 1000L; // 15분 (짧게 설정)
     private static final long REFRESH_TOKEN_EXPIRE_TIME = 24 * 60 * 60 * 1000L; // 1일
     private static final long EMAIL_VERIFICATION_TOKEN_EXPIRE_TIME = 24 * 60 * 60 * 1000L; // 24시간
 
@@ -28,25 +28,10 @@ public class JwtUtil {
         return Keys.hmacShaKeyFor(secret.getBytes());
     }
 
-    /**
-     * JWT 토큰 생성
-     */
-    public String generateToken(String id) {
-        Date now = new Date();
-        Date expiryDate = new Date(now.getTime() + expiration);
-
-        return Jwts.builder()
-                .subject(id) // id를 subject로 저장
-                .issuedAt(now)
-                .expiration(expiryDate)
-                .signWith(getSigningKey())
-                .compact();
-    }
-
-    // Access Token 생성 (id 기준)
+    /** Access Token 생성 (subject = 로그인 ID 문자열). TTL은 {@code jwt.access-token-expiration-ms}. */
     public String createAccessToken(String id) {
         Date now = new Date();
-        Date expiryDate = new Date(now.getTime() + ACCESS_TOKEN_EXPIRE_TIME);
+        Date expiryDate = new Date(now.getTime() + accessTokenExpirationMs);
 
         return Jwts.builder()
                 .subject(id)
