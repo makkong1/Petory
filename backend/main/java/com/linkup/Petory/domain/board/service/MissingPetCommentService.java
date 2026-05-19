@@ -9,12 +9,17 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Async;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.linkup.Petory.domain.board.converter.MissingPetConverter;
 import com.linkup.Petory.domain.board.exception.CommentNotBelongToBoardException;
 import com.linkup.Petory.domain.board.exception.MissingPetBoardNotFoundException;
+import com.linkup.Petory.domain.board.exception.MissingPetForbiddenException;
+import com.linkup.Petory.global.security.RoleConstants;
 import com.linkup.Petory.domain.board.dto.MissingPetCommentDTO;
 import com.linkup.Petory.domain.board.dto.MissingPetCommentPageResponseDTO;
 import com.linkup.Petory.domain.board.entity.MissingPetBoard;
@@ -45,6 +50,21 @@ public class MissingPetCommentService {
         private final MissingPetConverter missingPetConverter;
         private final AttachmentFileService attachmentFileService;
         private final NotificationService notificationService;
+
+        private boolean isAdmin() {
+                Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+                if (auth == null || auth.getAuthorities() == null) return false;
+                return auth.getAuthorities().stream()
+                                .map(GrantedAuthority::getAuthority)
+                                .anyMatch(a -> a.equals(RoleConstants.ROLE_ADMIN) || a.equals(RoleConstants.ROLE_MASTER));
+        }
+
+        private void assertCommentOwner(Users commentOwner) {
+                Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+                if (!isAdmin() && (auth == null || !auth.getName().equals(commentOwner.getId()))) {
+                        throw MissingPetForbiddenException.commentOwnerOnly();
+                }
+        }
 
         /**
          * 댓글 목록 조회 (페이징 지원)
@@ -156,7 +176,8 @@ public class MissingPetCommentService {
         public MissingPetCommentDTO addComment(Long boardId, MissingPetCommentDTO dto) {
                 MissingPetBoard board = boardRepository.findById(boardId)
                                 .orElseThrow(() -> new MissingPetBoardNotFoundException());
-                Users user = usersRepository.findById(dto.getUserId())
+                String loginId = SecurityContextHolder.getContext().getAuthentication().getName();
+                Users user = usersRepository.findActiveByIdString(loginId)
                                 .orElseThrow(() -> new UserNotFoundException());
 
                 MissingPetComment comment = MissingPetComment.builder()
@@ -205,6 +226,7 @@ public class MissingPetCommentService {
                 if (!comment.getBoard().getIdx().equals(board.getIdx())) {
                         throw new CommentNotBelongToBoardException();
                 }
+                assertCommentOwner(comment.getUser());
                 // soft delete comment
                 comment.setIsDeleted(true);
                 comment.setDeletedAt(java.time.LocalDateTime.now());

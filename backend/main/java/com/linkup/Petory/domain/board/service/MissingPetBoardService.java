@@ -10,12 +10,17 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort.Direction;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import com.linkup.Petory.domain.board.converter.MissingPetConverter;
 import com.linkup.Petory.domain.board.exception.MissingPetBoardNotFoundException;
+import com.linkup.Petory.domain.board.exception.MissingPetForbiddenException;
+import com.linkup.Petory.global.security.RoleConstants;
 import com.linkup.Petory.domain.board.dto.MissingPetBoardDTO;
 import com.linkup.Petory.domain.board.dto.MissingPetBoardPageResponseDTO;
 import com.linkup.Petory.domain.board.dto.MissingPetCommentDTO;
@@ -48,6 +53,21 @@ public class MissingPetBoardService {
     private final UsersRepository usersRepository;
     private final MissingPetConverter missingPetConverter;
     private final AttachmentFileService attachmentFileService;
+
+    private boolean isAdmin() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || auth.getAuthorities() == null) return false;
+        return auth.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .anyMatch(a -> a.equals(RoleConstants.ROLE_ADMIN) || a.equals(RoleConstants.ROLE_MASTER));
+    }
+
+    private void assertOwner(Users boardOwner) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (!isAdmin() && (auth == null || !auth.getName().equals(boardOwner.getId()))) {
+            throw MissingPetForbiddenException.boardOwnerOnly();
+        }
+    }
 
     /**
      * 실종 제보 목록 조회 (페이징 지원)
@@ -173,7 +193,8 @@ public class MissingPetBoardService {
      */
     @Transactional
     public MissingPetBoardDTO createBoard(MissingPetBoardDTO dto) {
-        Users user = usersRepository.findById(dto.getUserId())
+        String loginId = SecurityContextHolder.getContext().getAuthentication().getName();
+        Users user = usersRepository.findActiveByIdString(loginId)
                 .orElseThrow(() -> new UserNotFoundException());
 
         // 이메일 인증 확인
@@ -219,6 +240,9 @@ public class MissingPetBoardService {
         // [리팩토링] findById → findByIdWithUser (이메일 인증 확인을 위해 User 필요)
         MissingPetBoard board = missingPetBoardRepository.findByIdWithUser(id)
                 .orElseThrow(() -> new MissingPetBoardNotFoundException());
+
+        // 작성자 또는 관리자만 수정 가능
+        assertOwner(board.getUser());
 
         // 이메일 인증 확인
         Users user = board.getUser();
@@ -291,8 +315,9 @@ public class MissingPetBoardService {
      */
     @Transactional
     public MissingPetBoardDTO updateStatus(Long id, MissingPetStatus status) {
-        MissingPetBoard board = missingPetBoardRepository.findById(id)
+        MissingPetBoard board = missingPetBoardRepository.findByIdWithUser(id)
                 .orElseThrow(() -> new MissingPetBoardNotFoundException());
+        assertOwner(board.getUser());
         board.setStatus(status);
         return mapBoardWithAttachments(board);
     }
@@ -308,7 +333,10 @@ public class MissingPetBoardService {
         MissingPetBoard board = missingPetBoardRepository.findByIdWithUser(id)
                 .orElseThrow(() -> new MissingPetBoardNotFoundException());
 
-        // 이메일 인증 확인
+        // 작성자 또는 관리자만 삭제 가능
+        assertOwner(board.getUser());
+
+        // 이메일 인증 확인 (소유권 확인 후이므로 올바른 사용자 기준)
         Users user = board.getUser();
         if (user.getEmailVerified() == null || !user.getEmailVerified()) {
             throw new com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException(

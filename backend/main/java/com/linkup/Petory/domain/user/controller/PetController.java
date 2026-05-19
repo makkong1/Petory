@@ -55,7 +55,8 @@ public class PetController {
      */
     @GetMapping("/{petIdx}")
     public ResponseEntity<PetDTO> getPet(@PathVariable("petIdx") Long petIdx) {
-        PetDTO pet = petService.getPet(petIdx);
+        String userId = getCurrentUserId();
+        PetDTO pet = petService.getPet(petIdx, userId);
         return ResponseEntity.ok(pet);
     }
 
@@ -74,7 +75,8 @@ public class PetController {
      */
     @PutMapping("/{petIdx}")
     public ResponseEntity<PetDTO> updatePet(@PathVariable("petIdx") Long petIdx, @RequestBody PetDTO dto) {
-        PetDTO updated = petService.updatePet(petIdx, dto);
+        String userId = getCurrentUserId();
+        PetDTO updated = petService.updatePet(petIdx, userId, dto);
         return ResponseEntity.ok(updated);
     }
 
@@ -83,7 +85,8 @@ public class PetController {
      */
     @DeleteMapping("/{petIdx}")
     public ResponseEntity<Map<String, String>> deletePet(@PathVariable("petIdx") Long petIdx) {
-        petService.deletePet(petIdx);
+        String userId = getCurrentUserId();
+        petService.deletePet(petIdx, userId);
         return ResponseEntity.ok(Map.of("message", "펫이 삭제되었습니다."));
     }
 
@@ -92,7 +95,8 @@ public class PetController {
      */
     @PostMapping("/{petIdx}/restore")
     public ResponseEntity<PetDTO> restorePet(@PathVariable("petIdx") Long petIdx) {
-        PetDTO restored = petService.restorePet(petIdx);
+        String userId = getCurrentUserId();
+        PetDTO restored = petService.restorePet(petIdx, userId);
         return ResponseEntity.ok(restored);
     }
 

@@ -20,7 +20,7 @@ See `README.md` for full feature list, architecture, and domain documentation li
 ### Configuration
 `backend/main/resources/application.properties` is **gitignored**. A working dev config must include:
 - DB connection (`spring.datasource.*`)
-- JWT secret/expiration (`jwt.secret`, `jwt.expiration`)
+- JWT (`jwt.secret` 필수, `jwt.access-token-expiration-ms` 선택 — Access TTL ms, 기본 15분)
 - OAuth2 client registrations (even dummy values) — without them the app fails on `ClientRegistrationRepository` bean
 - Redis uses legacy property names: `spring.redis.host` / `spring.redis.port` (not `spring.data.redis.*`)
 - Set `spring.profiles.active=dev` to skip email verification

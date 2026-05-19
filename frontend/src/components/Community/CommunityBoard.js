@@ -655,11 +655,10 @@ const CommunityBoard = () => {
           <Title>커뮤니티</Title>
           <Subtitle>반려동물과 함께하는 따뜻한 이야기</Subtitle>
         </TitleSection>
+        <HeaderWriteButton type="button" onClick={handleWriteClick}>
+          글쓰기
+        </HeaderWriteButton>
       </Header>
-
-      <WriteFAB onClick={handleWriteClick}>
-        +
-      </WriteFAB>
 
       <CategoryTabs>
         {categories.map((category) => (
@@ -1079,13 +1078,13 @@ const Header = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
+  gap: ${props => props.theme.spacing.md};
   margin-bottom: ${props => props.theme.spacing.xxl};
   padding-bottom: ${props => props.theme.spacing.xl};
   border-bottom: 2px solid ${props => props.theme.colors.borderLight};
   
   @media (max-width: 768px) {
     flex-direction: column;
-    gap: ${props => props.theme.spacing.md};
     align-items: stretch;
   }
 `;
@@ -1123,40 +1122,41 @@ const Subtitle = styled.p`
   margin-top: ${props => props.theme.spacing.xs};
 `;
 
-const WriteButton = styled.button`
-  display: none;
-`;
-
-const WriteFAB = styled.button`
-  position: fixed;
-  bottom: calc(72px + env(safe-area-inset-bottom, 0px));
-  right: 20px;
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #E8714A 0%, #C9573A 100%);
-  color: white;
-  border: none;
-  font-size: 24px;
-  cursor: pointer;
-  box-shadow: 0 4px 16px rgba(232, 113, 74, 0.4);
-  display: flex;
+const HeaderWriteButton = styled.button`
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
+  align-self: flex-start;
+  margin-top: ${props => props.theme.spacing.xs};
+  padding: ${props => props.theme.spacing.sm} ${props => props.theme.spacing.xl};
+  border: none;
+  border-radius: ${props => props.theme.borderRadius.full};
+  background: linear-gradient(135deg, #e8714a 0%, #c9573a 100%);
+  color: ${props => props.theme.colors.textInverse};
+  font-size: ${props => props.theme.typography.body1.fontSize};
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: ${props => props.theme.shadows.md};
   transition: transform 0.2s ease, box-shadow 0.2s ease;
-  z-index: 50;
 
   &:hover {
-    transform: scale(1.1);
-    box-shadow: 0 6px 20px rgba(232, 113, 74, 0.5);
+    transform: translateY(-1px);
+    box-shadow: ${props => props.theme.shadows.lg};
   }
 
-  @media (min-width: 769px) {
-    bottom: 32px;
-    right: 32px;
+  &:active {
+    transform: translateY(0);
+  }
+
+  @media (max-width: 768px) {
+    align-self: stretch;
+    margin-top: 0;
+    padding: ${props => props.theme.spacing.md} ${props => props.theme.spacing.lg};
+    text-align: center;
+    justify-content: center;
   }
 `;
-
 
 const CategoryTabs = styled.div`
   display: flex;

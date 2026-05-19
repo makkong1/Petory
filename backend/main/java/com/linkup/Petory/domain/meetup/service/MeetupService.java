@@ -2,7 +2,6 @@ package com.linkup.Petory.domain.meetup.service;
 
 import java.time.LocalDateTime;
 import java.util.AbstractMap;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -543,13 +542,14 @@ public class MeetupService {
 
                     double daysUntil = m.getDate() != null
                             ? (m.getDate().atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli() - nowMs)
-                              / 86_400_000.0
+                                    / 86_400_000.0
                             : 30;
                     double urgencyScore = Math.max(0, 1.0 - daysUntil / 30.0);
 
-                    int max = (m.getMaxParticipants() != null && m.getMaxParticipants() > 0)
-                            ? m.getMaxParticipants() : 1;
-                    int cur = m.getCurrentParticipants() != null ? m.getCurrentParticipants() : 0;
+                    Integer maxParticipants = m.getMaxParticipants();
+                    int max = (maxParticipants != null && maxParticipants > 0) ? maxParticipants : 1;
+                    Integer currentParticipants = m.getCurrentParticipants();
+                    int cur = currentParticipants != null ? currentParticipants : 0;
                     double capacityScore = 1.0 - (double) cur / max;
 
                     double score = 0.4 * distScore + 0.4 * urgencyScore + 0.2 * capacityScore;
@@ -569,7 +569,7 @@ public class MeetupService {
         double dLng = Math.toRadians(lng2 - lng1);
         double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
                 + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
-                * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+                        * Math.sin(dLng / 2) * Math.sin(dLng / 2);
         return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
 

@@ -100,7 +100,7 @@ npm test
 `backend/main/resources/application.properties`는 gitignore 처리됨. 직접 생성 필요:
 
 - `spring.datasource.*` — DB 연결
-- `jwt.secret`, `jwt.expiration` — JWT 설정
+- `jwt.secret`(필수), `jwt.access-token-expiration-ms`(선택, Access TTL 밀리초, 기본 `900000` = 15분)
 - OAuth2 클라이언트 등록 (더미값이라도 필수 — 없으면 `ClientRegistrationRepository` 빈 생성 실패)
 - Redis는 레거시 속성명 사용: `spring.redis.host` / `spring.redis.port` (`spring.data.redis.*` 아님)
 - `spring.profiles.active=dev` 설정 시 이메일 인증 스킵
@@ -125,7 +125,7 @@ frontend/src/
 
 ## 아키텍처 핵심 패턴
 
-- **인증**: JWT Access Token (15분) + Refresh Token (1일, DB 저장). `JwtAuthenticationFilter` → `SecurityConfig`.
+- **인증**: JWT Access Token(기본 15분, `jwt.access-token-expiration-ms`로 조정) + Refresh Token (1일, DB 저장). `JwtAuthenticationFilter` → `SecurityConfig`.
 - **권한**: `@PreAuthorize` 메서드 레벨 제어. Role 계층: USER < SERVICE_PROVIDER < ADMIN < MASTER.
 - **Redis 용도 3가지**: 알림 캐시 (최신 50개, TTL 24h) / 게시글 상세 캐시 (`@Cacheable`) / 이메일 인증 임시 저장 (TTL 24h).
 - **통계**: 실시간 쿼리 대신 매일 자정 배치로 `DailyStatistics` 테이블에 집계 (Daily Summary Pattern).

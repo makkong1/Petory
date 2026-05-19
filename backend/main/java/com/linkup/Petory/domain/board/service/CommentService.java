@@ -11,13 +11,18 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.linkup.Petory.domain.board.converter.CommentConverter;
+import com.linkup.Petory.domain.board.exception.BoardForbiddenException;
 import com.linkup.Petory.domain.board.exception.BoardNotFoundException;
 import com.linkup.Petory.domain.board.exception.CommentNotBelongToBoardException;
 import com.linkup.Petory.domain.board.exception.CommentNotFoundException;
+import com.linkup.Petory.global.security.RoleConstants;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException;
 import com.linkup.Petory.domain.user.exception.UserNotFoundException;
@@ -51,6 +56,21 @@ public class CommentService {
     private final CommentConverter commentConverter;
     private final AttachmentFileService attachmentFileService;
     private final NotificationService notificationService;
+
+    private boolean isAdmin() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || auth.getAuthorities() == null) return false;
+        return auth.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .anyMatch(a -> a.equals(RoleConstants.ROLE_ADMIN) || a.equals(RoleConstants.ROLE_MASTER));
+    }
+
+    private void assertCommentOwner(Users commentOwner) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (!isAdmin() && (auth == null || !auth.getName().equals(commentOwner.getId()))) {
+            throw BoardForbiddenException.commentOwnerOnly();
+        }
+    }
 
     /**
      * 댓글 목록 조회 (페이징 지원)
@@ -154,7 +174,8 @@ public class CommentService {
     public CommentDTO addComment(Long boardId, CommentDTO dto) {
         Board board = boardRepository.findById(boardId)
                 .orElseThrow(() -> new BoardNotFoundException());
-        Users user = usersRepository.findById(dto.getUserId())
+        String loginId = SecurityContextHolder.getContext().getAuthentication().getName();
+        Users user = usersRepository.findActiveByIdString(loginId)
                 .orElseThrow(() -> new UserNotFoundException());
 
         Comment comment = Comment.builder()
@@ -203,6 +224,9 @@ public class CommentService {
             throw new CommentNotBelongToBoardException();
         }
 
+        // 작성자 또는 관리자만 수정 가능
+        assertCommentOwner(comment.getUser());
+
         // 이메일 인증 확인
         Users user = comment.getUser();
         if (user.getEmailVerified() == null || !user.getEmailVerified()) {
@@ -239,7 +263,10 @@ public class CommentService {
             throw new CommentNotBelongToBoardException();
         }
 
-        // 이메일 인증 확인
+        // 작성자 또는 관리자만 삭제 가능
+        assertCommentOwner(comment.getUser());
+
+        // 이메일 인증 확인 (소유권 확인 후이므로 올바른 사용자 기준)
         Users user = comment.getUser();
         if (user.getEmailVerified() == null || !user.getEmailVerified()) {
             throw new EmailVerificationRequiredException(

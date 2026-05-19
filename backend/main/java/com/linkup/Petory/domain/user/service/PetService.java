@@ -13,6 +13,7 @@ import com.linkup.Petory.domain.user.entity.Pet;
 import com.linkup.Petory.domain.user.entity.PetType;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.exception.PetNotFoundException;
+import com.linkup.Petory.domain.user.exception.UserForbiddenException;
 import com.linkup.Petory.domain.user.exception.UserNotFoundException;
 import com.linkup.Petory.domain.user.exception.UserValidationException;
 import com.linkup.Petory.domain.user.repository.PetRepository;
@@ -54,13 +55,15 @@ public class PetService {
      * 펫 단일 조회
      */
     @Transactional(readOnly = true)
-    public PetDTO getPet(Long petIdx) {
+    public PetDTO getPet(Long petIdx, String ownerUserId) {
         Pet pet = petRepository.findById(petIdx)
                 .orElseThrow(PetNotFoundException::new);
         
         if (pet.getIsDeleted()) {
             throw new PetNotFoundException("삭제된 반려동물입니다.");
         }
+
+        assertPetOwnedBy(pet, ownerUserId);
         
         return petConverter.toDTO(pet);
     }
@@ -103,13 +106,15 @@ public class PetService {
     /**
      * 펫 수정
      */
-    public PetDTO updatePet(Long petIdx, PetDTO dto) {
+    public PetDTO updatePet(Long petIdx, String ownerUserId, PetDTO dto) {
         Pet pet = petRepository.findById(petIdx)
                 .orElseThrow(PetNotFoundException::new);
 
         if (pet.getIsDeleted()) {
             throw new PetNotFoundException("삭제된 반려동물입니다.");
         }
+
+        assertPetOwnedBy(pet, ownerUserId);
 
         // 필드 업데이트
         if (dto.getPetName() != null) {
@@ -190,9 +195,11 @@ public class PetService {
     /**
      * 펫 삭제 (소프트 삭제)
      */
-    public void deletePet(Long petIdx) {
+    public void deletePet(Long petIdx, String ownerUserId) {
         Pet pet = petRepository.findById(petIdx)
                 .orElseThrow(PetNotFoundException::new);
+
+        assertPetOwnedBy(pet, ownerUserId);
 
         pet.setIsDeleted(true);
         pet.setDeletedAt(java.time.LocalDateTime.now());
@@ -205,9 +212,11 @@ public class PetService {
     /**
      * 펫 복구
      */
-    public PetDTO restorePet(Long petIdx) {
+    public PetDTO restorePet(Long petIdx, String ownerUserId) {
         Pet pet = petRepository.findById(petIdx)
                 .orElseThrow(PetNotFoundException::new);
+
+        assertPetOwnedBy(pet, ownerUserId);
 
         pet.setIsDeleted(false);
         pet.setDeletedAt(null);
@@ -223,6 +232,15 @@ public class PetService {
         PetType type = PetType.valueOf(petType);
         List<Pet> pets = petRepository.findByPetTypeAndIsDeletedFalse(type);
         return petConverter.toDTOList(pets);
+    }
+
+    /** JWT subject(로그인 ID)와 펫 소유자 {@link Users#getId()} 일치 여부 */
+    private static void assertPetOwnedBy(Pet pet, String ownerUserId) {
+        Users owner = pet.getUser();
+        String ownerLoginId = owner != null ? owner.getId() : null;
+        if (ownerLoginId == null || !ownerLoginId.equals(ownerUserId)) {
+            throw UserForbiddenException.ownPetOnly();
+        }
     }
 }
 
