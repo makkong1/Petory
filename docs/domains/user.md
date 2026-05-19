@@ -721,7 +721,7 @@ erDiagram
 | `/api/admin/reports/{id}/handle` | POST | 신고 처리·제재 | Report 도메인 문서 참고 |
 | `/api/master/admin-users` | * | MASTER 전용 ADMIN 계정 | `AdminUserManagementController` |
 
-**반려동물 API 주의**: `getPet` / `updatePet` / `deletePet` 등은 **소유자 검증 없이 `petIdx`만**으로 동작한다(인증은 `/api/**` 수준).
+**반려동물 API 소유 검증**: `GET|PUT|DELETE /api/pets/{petIdx}` 및 `POST .../restore` 는 **JWT 로그인 ID**와 `Pet` 소유 `Users.id`가 일치할 때만 성공한다. 불일치 시 `USER_FORBIDDEN`(403). (`GET /api/pets/type/{petType}` 등 다른 경로는 별도.)
 
 **소셜 로그인 플로우 (요약)**:
 1. `/oauth2/authorization/{registrationId}` 로 시작
