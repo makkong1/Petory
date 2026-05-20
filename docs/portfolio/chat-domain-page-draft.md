@@ -143,7 +143,7 @@ Chat 도메인은 다음 액션들을 연결합니다.
 
 - Care 거래 확정: `CARE_REQUEST` 경로는 상태 변경과 후속 코인 처리 로직이 이어지지만, 에스크로 실패를 롤백하지는 않음
 - Care 거래 확정: `CARE_APPLICATION` 관련 채팅의 `confirmCareDeal()` 경로는 현재 로그 기록 중심이며 상태 전이가 완전히 구현된 구조는 아님
-- Meetup 채팅 참여: `joinMeetupChat()`은 현재 실제 모임 참여자 검증 없이 채팅 참여를 허용함
+- ~~Meetup 채팅 참여: `joinMeetupChat()`은 현재 실제 모임 참여자 검증 없이 채팅 참여를 허용함~~ → **[개선 완료]** `meetupParticipantsRepository.existsByMeetupIdxAndUserIdx()`로 모임 참여자 여부 검증 추가
 - 재참여 메시지 제한: 기본 메시지 조회는 `joinedAt` 이후만 보여주지만, 커서 기반 과거 조회는 별도 보완 여지가 있음
 - 채팅방 상태 변경: `updateConversationStatus()`는 활성 참여자 여부를 기준으로 동작해, 역할별 상태 변경 정책은 더 정교하게 다듬을 수 있음
 
