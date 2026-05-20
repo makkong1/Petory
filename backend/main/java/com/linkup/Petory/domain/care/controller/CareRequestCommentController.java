@@ -5,6 +5,7 @@ import java.util.List;
 import jakarta.validation.Valid;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import com.linkup.Petory.domain.care.dto.CareRequestCommentDTO;
@@ -34,8 +35,9 @@ public class CareRequestCommentController {
     @DeleteMapping("/{commentId}")
     public ResponseEntity<Void> deleteComment(
             @PathVariable("careRequestId") Long careRequestId,
-            @PathVariable("commentId") Long commentId) {
-        commentService.deleteComment(careRequestId, commentId);
+            @PathVariable("commentId") Long commentId,
+            Authentication authentication) {
+        commentService.deleteComment(careRequestId, commentId, authentication.getName());
         return ResponseEntity.noContent().build();
     }
 }

@@ -39,4 +39,8 @@ public class CareForbiddenException extends ApiException {
     public static CareForbiddenException petOwnerOnly() {
         return new CareForbiddenException("펫 소유자만 펫 정보를 연결할 수 있습니다.");
     }
+
+    public static CareForbiddenException commentOwnerOnly() {
+        return new CareForbiddenException("댓글 작성자 또는 관리자만 삭제할 수 있습니다.");
+    }
 }

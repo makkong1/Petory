@@ -39,4 +39,8 @@ public class ChatForbiddenException extends ApiException {
     public static ChatForbiddenException notCareApplicationParty() {
         return new ChatForbiddenException("해당 케어 지원의 요청자 또는 제공자만 채팅방을 생성할 수 있습니다.");
     }
+
+    public static ChatForbiddenException notMeetupParticipant() {
+        return new ChatForbiddenException("모임 참여자만 채팅방에 참여할 수 있습니다.");
+    }
 }
