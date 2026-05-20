@@ -38,6 +38,7 @@ import com.linkup.Petory.domain.chat.exception.ConversationNotFoundException;
 import com.linkup.Petory.domain.chat.repository.ChatMessageRepository;
 import com.linkup.Petory.domain.chat.repository.ConversationParticipantRepository;
 import com.linkup.Petory.domain.chat.repository.ConversationRepository;
+import com.linkup.Petory.domain.meetup.repository.MeetupParticipantsRepository;
 import com.linkup.Petory.domain.payment.service.PetCoinEscrowService;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.exception.UserNotFoundException;
@@ -63,6 +64,7 @@ public class ConversationService {
         private final CareApplicationRepository careApplicationRepository;
         private final PetCoinEscrowService petCoinEscrowService;
         private final ConversationCreatorService conversationCreatorService;
+        private final MeetupParticipantsRepository meetupParticipantsRepository;
 
         /**
          * 사용자별 활성 채팅방 목록 조회 (N+1 문제 최적화)
@@ -311,6 +313,11 @@ public class ConversationService {
          */
         @Transactional
         public ConversationDTO joinMeetupChat(Long meetupIdx, Long userId) {
+                // 모임 참여자인지 검증
+                if (!meetupParticipantsRepository.existsByMeetupIdxAndUserIdx(meetupIdx, userId)) {
+                        throw ChatForbiddenException.notMeetupParticipant();
+                }
+
                 // 모임의 채팅방 찾기
                 Conversation conversation = conversationRepository
                                 .findByRelatedTypeAndRelatedIdxAndIsDeletedFalse(RelatedType.MEETUP, meetupIdx)

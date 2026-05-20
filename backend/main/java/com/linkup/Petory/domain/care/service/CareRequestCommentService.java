@@ -104,7 +104,7 @@ public class CareRequestCommentService {
         }
 
         @Transactional
-        public void deleteComment(Long careRequestId, Long commentId) {
+        public void deleteComment(Long careRequestId, Long commentId, String userId) {
                 CareRequest careRequest = careRequestRepository.findById(careRequestId)
                                 .orElseThrow(() -> new CareRequestNotFoundException());
                 CareRequestComment comment = commentRepository.findById(commentId)
@@ -114,7 +114,17 @@ public class CareRequestCommentService {
                         throw new CareCommentNotBelongException();
                 }
 
-                // soft delete instead of physical delete
+                Users requestingUser = usersRepository.findByUsername(userId)
+                                .orElseThrow(() -> new UserNotFoundException());
+
+                boolean isOwner = comment.getUser().getIdx().equals(requestingUser.getIdx());
+                boolean isAdmin = requestingUser.getRole() == Role.ADMIN
+                                || requestingUser.getRole() == Role.MASTER;
+
+                if (!isOwner && !isAdmin) {
+                        throw CareForbiddenException.commentOwnerOnly();
+                }
+
                 comment.setIsDeleted(true);
                 comment.setDeletedAt(java.time.LocalDateTime.now());
                 commentRepository.save(comment);
