@@ -1,0 +1,24 @@
+{
+  "task": "facility-sync-petory",
+  "description": "pet-data-api\uc758 pet_facilities \ub370\uc774\ud130\ub97c Petory locationservice \ud14c\uc774\ube14\uc5d0 \uc911\ubcf5 \uc81c\uac70 \ud6c4 \ub3d9\uae30\ud654",
+  "steps": [
+    {
+      "step": 1,
+      "name": "PetDataApiClient \ud655\uc7a5: GET /facilities \ud398\uc774\uc9c0\ub124\uc774\uc158 + PetFacilityDto",
+      "status": "completed",
+      "summary": "PetFacilityDto/PetFacilityPageDto \uc2e0\uaddc, PetDataApiClient\uc5d0 facilityClient(30s) + fetchFacilitiesPage/fetchAllFacilities \ucd94\uac00"
+    },
+    {
+      "step": 2,
+      "name": "FacilitySyncService: \ubcc0\ud658 \ub9e4\ud551 + \uc911\ubcf5 \uccb4\ud06c + \ubc30\uce58 \uc800\uc7a5",
+      "status": "completed",
+      "summary": "FacilitySyncService \uc2e0\uaddc: fetchAllFacilities \u2192 isValid/toEntity/existsByNameAndAddress \uc911\ubcf5\uccb4\ud06c \u2192 batchWriter \ubc30\uce58 \uc800\uc7a5"
+    },
+    {
+      "step": 3,
+      "name": "Controller + Scheduler: POST /api/admin/location/sync + @Scheduled \uc790\uc815 \ubc30\uce58",
+      "status": "completed",
+      "summary": "LocationServiceAdminController(POST /api/admin/location/sync, ADMIN/MASTER) + FacilitySyncScheduler(\ub9e4\uc77c \uc0c8\ubcbd 1\uc2dc) \uc2e0\uaddc \ucd94\uac00"
+    }
+  ]
+}
