@@ -682,7 +682,7 @@ const UnifiedPetMapPage = () => {
             <MapInitLoading>🗺️ 위치 정보를 가져오는 중...</MapInitLoading>
           )}
 
-          {/* 모바일 전용 컨트롤 오버레이 (radius는 별도 RadiusFilter 사용) */}
+          {/* 모바일 전용 컨트롤 오버레이 */}
           <ControlsOverlay>
             {renderLayerControls(true)}
           </ControlsOverlay>
@@ -795,11 +795,6 @@ const ControlsOverlay = styled.div`
   > * {
     pointer-events: auto;
   }
-`;
-
-const OverlayRow = styled.div`
-  display: flex;
-  align-items: center;
 `;
 
 /* 지도 우하단 독립 FAB */
