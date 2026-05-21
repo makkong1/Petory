@@ -39,7 +39,7 @@ const LocationControls = ({
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSearch(inputValue.trim());
+    onSearch?.(inputValue.trim());
   };
 
   const handleSortCycle = () => {
@@ -72,6 +72,7 @@ const LocationControls = ({
           $active={isFilterOpen}
           onClick={() => setIsFilterOpen(o => !o)}
           aria-expanded={isFilterOpen}
+          aria-controls="radius-filter-panel"
           aria-label="반경 필터"
         >
           필터
@@ -84,7 +85,7 @@ const LocationControls = ({
             key={cat.value}
             type="button"
             $active={category === cat.value}
-            onClick={() => onCategoryChange(cat.value)}
+            onClick={() => onCategoryChange?.(cat.value)}
           >
             {cat.label}
           </CategoryChip>
@@ -92,7 +93,7 @@ const LocationControls = ({
       </CategoryScrollRow>
 
       {isFilterOpen && onRadiusChange && (
-        <RadiusPanel>
+        <RadiusPanel id="radius-filter-panel">
           <FilterLabel>반경</FilterLabel>
           <RadiusRow>
             {RADIUS_OPTIONS.map(r => (

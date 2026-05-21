@@ -80,3 +80,19 @@ test('"이 지역" 클릭 시 onSearchThisArea가 호출된다', () => {
   fireEvent.click(screen.getByText('이 지역'));
   expect(onSearchThisArea).toHaveBeenCalled();
 });
+
+test('정렬 버튼 클릭 시 평점순→리뷰순 순환한다', () => {
+  const onSortChange = jest.fn();
+  wrap({ sort: 'rating', onSortChange });
+  fireEvent.click(screen.getByLabelText('정렬 변경'));
+  expect(onSortChange).toHaveBeenCalledWith('reviews');
+});
+
+test('필터 버튼 재클릭 시 반경 패널이 닫힌다', () => {
+  wrap({});
+  const filterBtn = screen.getByLabelText('반경 필터');
+  fireEvent.click(filterBtn);
+  expect(screen.getByText('5km')).toBeInTheDocument();
+  fireEvent.click(filterBtn);
+  expect(screen.queryByText('5km')).not.toBeInTheDocument();
+});
