@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import styled from 'styled-components';
 import { locationServiceApi } from '../../../api/locationServiceApi';
+import { adminApi } from '../../../api/adminApi';
 
 const LocationServiceManagementSection = () => {
   const [sido, setSido] = useState('');
@@ -14,6 +15,9 @@ const LocationServiceManagementSection = () => {
   const [importLoading, setImportLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [importError, setImportError] = useState(null);
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [syncResult, setSyncResult] = useState(null);
+  const [syncError, setSyncError] = useState(null);
   const fileInputRef = useRef(null);
 
   const fetchServices = useCallback(async () => {
@@ -82,12 +86,52 @@ const LocationServiceManagementSection = () => {
     }
   };
 
+  const handleSync = async () => {
+    setSyncLoading(true);
+    setSyncError(null);
+    setSyncResult(null);
+    try {
+      const data = await adminApi.syncFacilitiesFromPetDataApi();
+      setSyncResult(data);
+      fetchServices();
+    } catch (err) {
+      setSyncError(err?.response?.data?.message || err.message || '동기화 실패');
+    } finally {
+      setSyncLoading(false);
+    }
+  };
+
   return (
     <Wrapper>
       <Header>
         <Title>지역 서비스 관리</Title>
         <Subtitle>등록된 장소, 리뷰, 외부 API 캐시를 관리합니다.</Subtitle>
       </Header>
+
+      <Card>
+        <CardTitle>pet-data-api 시설 동기화</CardTitle>
+        <CardDescription>
+          pet-data-api에서 수집된 시설 데이터(동물미용·동물병원·동물약국)를 가져와 중복 제거 후 저장합니다.
+          매일 새벽 1시 자동 실행되며, 여기서 수동으로 즉시 실행할 수 있습니다.
+        </CardDescription>
+        <ButtonGroup>
+          <SyncButton onClick={handleSync} disabled={syncLoading}>
+            {syncLoading ? '동기화 중...' : '지금 동기화'}
+          </SyncButton>
+        </ButtonGroup>
+        {syncError && <ErrorMessage>{syncError}</ErrorMessage>}
+        {syncResult && (
+          <ResultBox>
+            <ResultTitle>동기화 결과</ResultTitle>
+            <ResultList>
+              <ResultItem>수신 시설 수: <strong>{syncResult.total}</strong></ResultItem>
+              <ResultItem>저장된 개수: <strong>{syncResult.saved}</strong></ResultItem>
+              <ResultItem>중복 스킵: <strong>{syncResult.duplicate}</strong></ResultItem>
+              <ResultItem>검증 실패 스킵: <strong>{syncResult.skipped}</strong></ResultItem>
+            </ResultList>
+          </ResultBox>
+        )}
+      </Card>
 
       <Card>
         <CardTitle>공공데이터 CSV 임포트</CardTitle>
@@ -372,14 +416,22 @@ const ImportButton = styled.button`
   font-weight: 600;
   cursor: pointer;
   transition: background 0.2s;
-  
+
   &:hover:enabled {
     background: ${props => props.theme.colors.primaryDark || '#176dd1'};
   }
-  
+
   &:disabled {
     opacity: 0.6;
     cursor: not-allowed;
+  }
+`;
+
+const SyncButton = styled(ImportButton)`
+  background: #2e7d32;
+
+  &:hover:enabled {
+    background: #1b5e20;
   }
 `;
 

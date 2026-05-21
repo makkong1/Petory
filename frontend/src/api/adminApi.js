@@ -30,5 +30,11 @@ export const adminApi = {
     const response = await api.post(`/statistics/backfill?startDate=${startDate}&endDate=${endDate}`);
     return response.data;
   },
+
+  // pet-data-api 시설 데이터 수동 동기화
+  syncFacilitiesFromPetDataApi: async () => {
+    const response = await api.post('/location/sync');
+    return response.data;
+  },
 };
 
