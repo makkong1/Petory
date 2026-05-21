@@ -1,6 +1,8 @@
 package com.linkup.Petory.domain.recommendation.client;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -11,6 +13,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linkup.Petory.domain.recommendation.dto.PetFacilityDto;
+import com.linkup.Petory.domain.recommendation.dto.PetFacilityPageDto;
 import com.linkup.Petory.domain.recommendation.dto.RecommendCopyRequest;
 import com.linkup.Petory.domain.recommendation.dto.RecommendCopyResponse;
 import com.linkup.Petory.domain.recommendation.dto.RecommendEventRequest;
@@ -26,6 +30,7 @@ public class PetDataApiClient {
 
     private final RestClient recommendClient;
     private final RestClient copyClient;
+    private final RestClient facilityClient;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public PetDataApiClient(
@@ -40,6 +45,8 @@ public class PetDataApiClient {
         this.recommendClient = buildClient(baseUrl, apiKey, timeoutMs);
         // v3: /recommend/copy 는 Ollama 동기 대기. 길게.
         this.copyClient = buildClient(baseUrl, apiKey, copyTimeoutMs);
+        // facility sync용: 대용량 페이지 순회 → 30초
+        this.facilityClient = buildClient(baseUrl, apiKey, 30_000);
     }
 
     private RestClient buildClient(String baseUrl, String apiKey, int timeoutMs) {
@@ -158,6 +165,41 @@ public class PetDataApiClient {
                     requestId, e.getClass().getSimpleName(), e.getMessage(), e);
             throw new RuntimeException("트렌드 시계열 API 호출 실패: " + e.getMessage(), e);
         }
+    }
+
+    @SuppressWarnings("UseSpecificCatch")
+    public PetFacilityPageDto fetchFacilitiesPage(long cursor, int limit) {
+        try {
+            @SuppressWarnings("null")
+            String responseBody = facilityClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path("/facilities")
+                            .queryParam("cursor", cursor)
+                            .queryParam("limit", limit)
+                            .build())
+                    .retrieve()
+                    .body(String.class);
+            return objectMapper.readValue(responseBody, PetFacilityPageDto.class);
+        } catch (Exception e) {
+            log.error("[PetDataApiClient/facilities] 실패 cursor={} {} — {}",
+                    cursor, e.getClass().getSimpleName(), e.getMessage(), e);
+            throw new RuntimeException("시설 목록 API 호출 실패: " + e.getMessage(), e);
+        }
+    }
+
+    public List<PetFacilityDto> fetchAllFacilities(int pageSize) {
+        List<PetFacilityDto> all = new ArrayList<>();
+        long cursor = 0;
+        do {
+            PetFacilityPageDto page = fetchFacilitiesPage(cursor, pageSize);
+            if (page.getItems() != null) {
+                all.addAll(page.getItems());
+            }
+            if (!page.isHasNext() || page.getNextCursor() == null) break;
+            cursor = page.getNextCursor();
+        } while (true);
+        log.info("[PetDataApiClient/facilities] 전체 수집 완료 total={}", all.size());
+        return all;
     }
 
     private static String newRequestId() {
