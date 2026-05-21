@@ -81,7 +81,7 @@ function sendRecommendEvents(requestId, eventList) {
   recommendApi.sendEvents({ requestId, events: usable }).catch(() => {});
 }
 
-function RecommendCard({ lat, lng, context, onFacilitiesLoaded }) {
+function RecommendCard({ lat, lng, context, onFacilitiesLoaded, variant = 'card', onDismiss }) {
   const [data, setData] = useState(null);
   const [loadingMain, setLoadingMain] = useState(true);
   const [copy, setCopy] = useState(null);
@@ -179,6 +179,30 @@ function RecommendCard({ lat, lng, context, onFacilitiesLoaded }) {
   // 카피 우선순위: LLM/rule 카피(/recommend/copy) → 본 추천 응답의 recommendation 폴백.
   const displayedCopy = copy?.recommendation || data.recommendation;
 
+  if (variant === 'banner') {
+    if (!displayedCopy && !data.trends?.length) return null;
+    return (
+      <BannerWrapper>
+        <BannerContent>
+          <BannerBadge>AI</BannerBadge>
+          {displayedCopy && <BannerText>{displayedCopy}</BannerText>}
+          {data.trends?.length > 0 && (
+            <BannerTrendRow>
+              {data.trends.slice(0, 3).map(t => (
+                <BannerTag key={t.keyword}># {t.keyword}</BannerTag>
+              ))}
+            </BannerTrendRow>
+          )}
+        </BannerContent>
+        {onDismiss && (
+          <DismissBtn type="button" onClick={onDismiss} aria-label="AI 추천 닫기">
+            ✕
+          </DismissBtn>
+        )}
+      </BannerWrapper>
+    );
+  }
+
   return (
     <Card>
       <Title>AI 추천</Title>
@@ -211,5 +235,68 @@ function RecommendCard({ lat, lng, context, onFacilitiesLoaded }) {
     </Card>
   );
 }
+
+const BannerWrapper = styled.div`
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  background: ${({ theme }) => theme.colors.primarySoft};
+  border: 1px solid ${({ theme }) => theme.colors.primary + '33'};
+  border-radius: 10px;
+`;
+
+const BannerContent = styled.div`
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+`;
+
+const BannerBadge = styled.span`
+  align-self: flex-start;
+  background: ${({ theme }) => theme.colors.primary};
+  color: ${({ theme }) => theme.colors.textInverse};
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+`;
+
+const BannerText = styled.p`
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: ${({ theme }) => theme.colors.text};
+`;
+
+const BannerTrendRow = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+`;
+
+const BannerTag = styled.span`
+  background: ${({ theme }) => theme.colors.primary + '18'};
+  color: ${({ theme }) => theme.colors.primary};
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 999px;
+`;
+
+const DismissBtn = styled.button`
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  font-size: 14px;
+  cursor: pointer;
+  color: ${({ theme }) => theme.colors.textSecondary};
+  padding: 0;
+  line-height: 1;
+  opacity: 0.6;
+  &:hover { opacity: 1; }
+`;
 
 export default RecommendCard;

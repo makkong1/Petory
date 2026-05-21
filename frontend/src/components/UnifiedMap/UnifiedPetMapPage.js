@@ -86,6 +86,7 @@ const UnifiedPetMapPage = () => {
   const [searchMode, setSearchMode] = useState("initial");
   const [aiRecommendFacilities, setAiRecommendFacilities] = useState([]);
   const [aiRequestId, setAiRequestId] = useState(null);
+  const [aiDismissed, setAiDismissed] = useState(false);
 
   // meetup 탭 전용
   const [showMeetupCreateModal, setShowMeetupCreateModal] = useState(false);
@@ -223,6 +224,7 @@ const UnifiedPetMapPage = () => {
 
   const handleTabChange = (layer) => {
     setActiveLayer(layer);
+    setAiDismissed(false);
     setSelectedItem(null);
     setHoveredLocationItem(null);
     setAiRecommendFacilities([]);
@@ -401,6 +403,15 @@ const UnifiedPetMapPage = () => {
           </div>
           <ResultSheetMeta>{displayItems.length}개</ResultSheetMeta>
         </ResultSheetHeader>
+        {!aiDismissed && userLocation && CATEGORY_TO_CONTEXT[locationCategory] && (
+          <RecommendCard
+            lat={userLocation.lat}
+            lng={userLocation.lng}
+            context={CATEGORY_TO_CONTEXT[locationCategory]}
+            variant="banner"
+            onDismiss={() => setAiDismissed(true)}
+          />
+        )}
         <ResultList>
           {displayItems.map((item, index) => {
             const isSelected = selectedItem?.id === item.id;
@@ -467,6 +478,7 @@ const UnifiedPetMapPage = () => {
           }}
           onCategoryChange={(cat) => {
             setLocationCategory(cat);
+            setAiDismissed(false);
             setAiRecommendFacilities([]);
             setAiRequestId(null);
             cacheRef.current = {};
@@ -548,6 +560,16 @@ const UnifiedPetMapPage = () => {
           {/* location 탭: 결과 목록 */}
           {activeLayer === "location" && (
             <LeftPanelResults>
+              {!aiDismissed && userLocation && CATEGORY_TO_CONTEXT[locationCategory] && (
+                <RecommendCard
+                  lat={userLocation.lat}
+                  lng={userLocation.lng}
+                  context={CATEGORY_TO_CONTEXT[locationCategory]}
+                  onFacilitiesLoaded={handleAiRecommendLoad}
+                  variant="banner"
+                  onDismiss={() => setAiDismissed(true)}
+                />
+              )}
               {loading && <PanelStatusMsg>검색 중...</PanelStatusMsg>}
               {!loading &&
                 !error &&
@@ -626,17 +648,6 @@ const UnifiedPetMapPage = () => {
             </LeftPanelResults>
           )}
 
-          {/* AI 추천 카드 */}
-          {activeLayer === "location" &&
-            userLocation &&
-            CATEGORY_TO_CONTEXT[locationCategory] && (
-              <RecommendCard
-                lat={userLocation.lat}
-                lng={userLocation.lng}
-                context={CATEGORY_TO_CONTEXT[locationCategory]}
-                onFacilitiesLoaded={handleAiRecommendLoad}
-              />
-            )}
         </LeftPanel>
 
         {/* ── 지도 영역 ── */}
@@ -671,15 +682,9 @@ const UnifiedPetMapPage = () => {
             <MapInitLoading>🗺️ 위치 정보를 가져오는 중...</MapInitLoading>
           )}
 
-          {/* 모바일 전용 컨트롤 오버레이 (radius는 별도 RadiusFilter 사용) */}
+          {/* 모바일 전용 컨트롤 오버레이 */}
           <ControlsOverlay>
-            <OverlayRow>
-              <RadiusFilter
-                radius={radius}
-                onRadiusChange={handleRadiusChange}
-              />
-            </OverlayRow>
-            {renderLayerControls(false)}
+            {renderLayerControls(true)}
           </ControlsOverlay>
 
           <MyLocationFAB
@@ -790,11 +795,6 @@ const ControlsOverlay = styled.div`
   > * {
     pointer-events: auto;
   }
-`;
-
-const OverlayRow = styled.div`
-  display: flex;
-  align-items: center;
 `;
 
 /* 지도 우하단 독립 FAB */
