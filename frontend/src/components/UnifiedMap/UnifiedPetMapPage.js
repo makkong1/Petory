@@ -16,6 +16,7 @@ import { locationServiceApi } from "../../api/locationServiceApi";
 import RecommendCard from "../Recommendation/RecommendCard";
 import { recommendApi } from "../../api/recommendApi";
 
+/** pet-data 추천 API context — 소분류( category3 에 주로 해당) 이름과 매핑. 신규 유형 추가 시 여기 및 locationCategoryTree.js 동기화 */
 const CATEGORY_TO_CONTEXT = {
   미용: "grooming",
   동물병원: "hospital",
@@ -81,6 +82,8 @@ const UnifiedPetMapPage = () => {
   // location 탭 전용
   const [locationKeyword, setLocationKeyword] = useState("");
   const [locationCategory, setLocationCategory] = useState("");
+  /** 소분류(카페·미술관 등)가 여러 중분류에 있을 때 선택한 중분류 id */
+  const [locationCategoryGroupId, setLocationCategoryGroupId] = useState(null);
   const [locationSort, setLocationSort] = useState("distance");
   const [hasPendingAreaChange, setHasPendingAreaChange] = useState(false);
   const [searchMode, setSearchMode] = useState("initial");
@@ -232,6 +235,7 @@ const UnifiedPetMapPage = () => {
     if (layer !== "location") {
       setLocationKeyword("");
       setLocationCategory("");
+      setLocationCategoryGroupId(null);
       setLocationSort("distance");
     }
     if (
@@ -482,6 +486,7 @@ const UnifiedPetMapPage = () => {
         <LocationControls
           keyword={locationKeyword}
           category={locationCategory}
+          activeGroupId={locationCategoryGroupId}
           sort={locationSort}
           hasPendingAreaChange={hasPendingAreaChange}
           radius={showRadius ? radius : undefined}
@@ -493,8 +498,9 @@ const UnifiedPetMapPage = () => {
               kw ? "keyword" : "user-triggered"
             );
           }}
-          onCategoryChange={(cat) => {
-            setLocationCategory(cat);
+          onCategoryPick={({ category: cat, groupId }) => {
+            setLocationCategory(cat || "");
+            setLocationCategoryGroupId(cat ? groupId ?? null : null);
             setAiDismissed(false);
             setAiRecommendFacilities([]);
             setAiRequestId(null);
