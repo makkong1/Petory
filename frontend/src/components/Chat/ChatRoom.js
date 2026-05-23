@@ -156,11 +156,31 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
           setIsProvider(user?.idx === providerId);
 
           // 이미 리뷰를 작성했는지 확인
+          // CareApplicationDTO.reviews는 백엔드 변환 시 비어 있는 경우가 있어, 완료된 요청·요청자면 API로 교차 검증한다.
           if (acceptedApplication && user?.idx === requesterId) {
-            const hasExistingReview = acceptedApplication.reviews?.some(
-              review => review.reviewerId === user.idx
+            const appId = acceptedApplication.idx;
+            const embeddedMatch = acceptedApplication.reviews?.some(
+              (review) =>
+                Number(review?.reviewerId) === Number(user.idx) ||
+                Number(review?.reviewerIdx) === Number(user.idx),
             );
-            setHasReview(hasExistingReview || false);
+            if (embeddedMatch) {
+              setHasReview(true);
+            } else if (careRequestInfo?.status === 'COMPLETED') {
+              try {
+                const { data: reviewerReviews } = await careReviewApi.getReviewsByReviewer(user.idx);
+                const list = Array.isArray(reviewerReviews) ? reviewerReviews : [];
+                const matched = list.some(
+                  (r) => Number(r?.careApplicationId) === Number(appId),
+                );
+                setHasReview(matched);
+              } catch (e) {
+                console.warn('리뷰 작성 여부(작성 목록 조회) 실패:', e);
+                setHasReview(false);
+              }
+            } else {
+              setHasReview(false);
+            }
           } else {
             setHasReview(false);
           }
@@ -538,7 +558,15 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
       await fetchConversation();
     } catch (error) {
       console.error('리뷰 작성 실패:', error);
-      showToast(error.response?.data?.error || '리뷰 작성에 실패했습니다.');
+      const msg = error.response?.data?.error || error.response?.data?.message || '';
+      const status = error.response?.status;
+      if (status === 409 || (typeof msg === 'string' && msg.includes('이미 해당 서비스에 리뷰'))) {
+        setHasReview(true);
+        setShowReviewModal(false);
+        showToast(typeof msg === 'string' ? msg : '이미 해당 서비스에 리뷰를 작성하셨습니다.');
+      } else {
+        showToast(msg || '리뷰 작성에 실패했습니다.');
+      }
     } finally {
       setSubmittingReview(false);
     }

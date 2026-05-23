@@ -24,6 +24,17 @@ export const LAYER_CONFIG = {
   },
 };
 
+const careMapSubtitle = (raw) => {
+  const bits = [];
+  if (raw?.date) bits.push(String(raw.date).slice(0, 10));
+  if (raw?.estimatedDurationMinutes != null) bits.push(`~${raw.estimatedDurationMinutes}분`);
+  if (raw?.scheduleMode === 'FLEXIBLE_CHAT') bits.push('조율');
+  const pet = raw?.petName || raw?.pet?.name || '';
+  const head = bits.length ? bits.join(' · ') : '';
+  if (!head && !pet) return '';
+  return head && pet ? `${head} · ${pet}` : head || pet;
+};
+
 const toMapItem = (type, raw) => {
   const config = LAYER_CONFIG[type];
   const subtitle = {
@@ -31,9 +42,7 @@ const toMapItem = (type, raw) => {
     meetup: raw.meetupDate
       ? `${raw.meetupDate.slice(0, 10)} · ${raw.currentParticipants ?? 0}/${raw.maxParticipants ?? 0}명`
       : `${raw.currentParticipants ?? 0}/${raw.maxParticipants ?? 0}명`,
-    care: raw.date
-      ? `${String(raw.date).slice(0, 10)} · ${raw.petName || ''}`
-      : raw.petName || '',
+    care: careMapSubtitle(raw),
   }[type];
 
   return {

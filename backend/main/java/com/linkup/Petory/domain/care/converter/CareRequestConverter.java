@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 
 import com.linkup.Petory.domain.care.dto.CareRequestDTO;
 import com.linkup.Petory.domain.care.entity.CareRequest;
+import com.linkup.Petory.domain.care.entity.CareScheduleMode;
 import com.linkup.Petory.domain.user.converter.PetConverter;
 import com.linkup.Petory.domain.user.dto.PetDTO;
 import com.linkup.Petory.domain.user.entity.Pet;
@@ -35,6 +36,8 @@ public class CareRequestConverter {
                 .title(request.getTitle())
                 .description(request.getDescription())
                 .date(request.getDate())
+                .scheduleMode(request.getScheduleMode() != null ? request.getScheduleMode() : CareScheduleMode.FIXED)
+                .estimatedDurationMinutes(request.getEstimatedDurationMinutes())
                 .offeredCoins(request.getOfferedCoins())
                 .status(request.getStatus().name())
                 .createdAt(request.getCreatedAt())

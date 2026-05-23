@@ -58,6 +58,8 @@ public class CareRequestController {
     @PostMapping
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<CareRequestDTO> createCareRequest(@Valid @RequestBody CareRequestDTO dto) {
+        // 프론트는 userId 미전달(예: CareCreateModal) — 인증 사용자 PK로 채워야 한다. null 이면 JPA findById(null) 로 500 발생.
+        dto.setUserId(getCurrentUserId());
         return ResponseEntity.ok(careRequestService.createCareRequest(dto));
     }
 

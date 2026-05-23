@@ -47,6 +47,16 @@ public class CareRequest extends BaseTimeEntity {
 
     private LocalDateTime date;
 
+    /** 일정이 위 date에 고정되는지, 채팅 후 조율인지 */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "schedule_mode", nullable = false, length = 32)
+    @Builder.Default
+    private CareScheduleMode scheduleMode = CareScheduleMode.FIXED;
+
+    /** 예상 돌봄 소요 시간(분). 선택. */
+    @Column(name = "estimated_duration_minutes")
+    private Integer estimatedDurationMinutes;
+
     @Column(name = "offered_coins")
     private Integer offeredCoins; // 제시한 코인 가격 (요청자가 설정)
 

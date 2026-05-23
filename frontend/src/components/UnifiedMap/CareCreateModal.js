@@ -14,6 +14,8 @@ const defaultForm = () => ({
   latitude: null,
   longitude: null,
   date: '',
+  scheduleMode: 'FIXED',
+  estimatedDurationMinutes: '',
   offeredCoins: '',
   petIdx: '',
 });
@@ -30,6 +32,7 @@ const CareCreateModal = ({ onClose, onSuccess }) => {
   const [showMap, setShowMap] = useState(true);
   const [pets, setPets] = useState([]);
   const [coinBalance, setCoinBalance] = useState(null);
+  const [showScheduleHelp, setShowScheduleHelp] = useState(false);
   const locationInputRef = useRef(null);
   const resultsRef = useRef(null);
 
@@ -101,6 +104,12 @@ const CareCreateModal = ({ onClose, onSuccess }) => {
     if (!formData.date) e.date = '날짜/시간을 입력해주세요.';
     else if (new Date(formData.date) < new Date()) e.date = '현재 이후 시간을 입력해주세요.';
     if (formData.offeredCoins !== '' && Number(formData.offeredCoins) < 0) e.offeredCoins = '0 이상의 값을 입력해주세요.';
+    if (formData.estimatedDurationMinutes !== '') {
+      const mins = Number(formData.estimatedDurationMinutes);
+      if (!Number.isInteger(mins) || mins < 15 || mins > 1440) {
+        e.estimatedDurationMinutes = '15~1440분 사이 정수만 입력 가능합니다.';
+      }
+    }
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -118,6 +127,10 @@ const CareCreateModal = ({ onClose, onSuccess }) => {
         latitude: formData.latitude || undefined,
         longitude: formData.longitude || undefined,
         date: formData.date,
+        scheduleMode: formData.scheduleMode || 'FIXED',
+        estimatedDurationMinutes: formData.estimatedDurationMinutes !== ''
+          ? Number(formData.estimatedDurationMinutes)
+          : undefined,
         offeredCoins: formData.offeredCoins !== '' ? Number(formData.offeredCoins) : undefined,
         petIdx: formData.petIdx || undefined,
       });
@@ -156,7 +169,41 @@ const CareCreateModal = ({ onClose, onSuccess }) => {
               min={new Date().toISOString().slice(0, 16)}
             />
             {errors.date && <ErrorMsg>{errors.date}</ErrorMsg>}
+            <ScheduleHint type="button" onClick={() => setShowScheduleHelp(v => !v)}>
+              위 날짜·시간이 어떤 의미인지 안내 {showScheduleHelp ? '▼' : '▶'}
+            </ScheduleHint>
+            {showScheduleHelp && (
+              <ScheduleHelpText>
+                <strong>고정 일정:</strong> 날짜·시간을 약속(또는 희망) 시작 시각으로 봅니다.
+                <br />
+                <strong>채팅 후 조율:</strong> 날짜·시간은 참고용이며, 채팅으로 확정합니다.
+              </ScheduleHelpText>
+            )}
           </Field>
+
+          <Row>
+            <Field style={{ flex: 1 }}>
+              <Label>일정 유형</Label>
+              <Select name="scheduleMode" value={formData.scheduleMode} onChange={handleChange}>
+                <option value="FIXED">고정 일정</option>
+                <option value="FLEXIBLE_CHAT">채팅 후 조율</option>
+              </Select>
+            </Field>
+            <Field style={{ flex: 1 }}>
+              <Label>예상 소요(분)</Label>
+              <Input
+                type="number"
+                name="estimatedDurationMinutes"
+                value={formData.estimatedDurationMinutes}
+                onChange={handleChange}
+                placeholder="선택 · 15~1440"
+                min="15"
+                max="1440"
+                step="1"
+              />
+              {errors.estimatedDurationMinutes && <ErrorMsg>{errors.estimatedDurationMinutes}</ErrorMsg>}
+            </Field>
+          </Row>
 
           <Field>
             <LocationLabelRow>
@@ -321,6 +368,29 @@ const Row = styled.div`
 const Label = styled.label`
   font-size: 13px;
   font-weight: 600;
+  color: ${props => props.theme.colors.textSecondary};
+`;
+
+const ScheduleHint = styled.button`
+  margin-top: 6px;
+  align-self: flex-start;
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 12px;
+  color: ${props => props.theme.colors.domain?.care || props.theme.colors.primary};
+  cursor: pointer;
+  text-decoration: underline;
+  text-align: left;
+`;
+
+const ScheduleHelpText = styled.p`
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: ${props => props.theme.colors.surfaceHover};
+  font-size: 12px;
+  line-height: 1.55;
   color: ${props => props.theme.colors.textSecondary};
 `;
 

@@ -48,6 +48,11 @@ const CareLayer = ({ selectedItem, onClose }) => {
       })
     : '';
 
+  const SCHEDULE_LABELS = { FIXED: '고정 일정', FLEXIBLE_CHAT: '채팅 후 조율 (시각 참고)' };
+  const scheduleStr = SCHEDULE_LABELS[r?.scheduleMode] || '';
+
+  const durationStr = r?.estimatedDurationMinutes != null ? `${Number(r.estimatedDurationMinutes)}분 예상` : '';
+
   const statusLabel = { OPEN: '모집중', IN_PROGRESS: '진행중', COMPLETED: '완료', CANCELLED: '취소' }[r?.status] || r?.status;
 
   const loadProviderProfiles = useCallback(async (userIds, isCancelled = () => false) => {
@@ -204,6 +209,8 @@ const CareLayer = ({ selectedItem, onClose }) => {
           </InfoRow>
         )}
         {dateStr && <InfoRow><InfoLabel>일시</InfoLabel><InfoValue>{dateStr}</InfoValue></InfoRow>}
+        {scheduleStr && <InfoRow><InfoLabel>일정 유형</InfoLabel><InfoValue>{scheduleStr}</InfoValue></InfoRow>}
+        {durationStr && <InfoRow><InfoLabel>예상 소요</InfoLabel><InfoValue>{durationStr}</InfoValue></InfoRow>}
         {r.address && <InfoRow><InfoLabel>위치</InfoLabel><InfoValue>{r.address}</InfoValue></InfoRow>}
         {r.petName && <InfoRow><InfoLabel>반려동물</InfoLabel><InfoValue>{r.petName}</InfoValue></InfoRow>}
         {r.offeredCoins != null && (
