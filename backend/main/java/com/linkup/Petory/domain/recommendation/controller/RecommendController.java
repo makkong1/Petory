@@ -43,6 +43,12 @@ public class RecommendController {
         if (response == null) {
             return ResponseEntity.status(503).build();
         }
+        log.info(
+                "[RecommendController→FE] 사용자 응답 요약 request_id={} lat={} lng={} ctx={} facilities={} trends={} version={}",
+                response.requestId(), lat, lng, context,
+                response.facilities() != null ? response.facilities().size() : 0,
+                response.trends() != null ? response.trends().size() : 0,
+                response.recommendVersion());
         return ResponseEntity.ok(response);
     }
 

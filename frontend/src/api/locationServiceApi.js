@@ -20,7 +20,7 @@ export const locationServiceApi = {
    * @param {string} params.sigungu 시군구 (선택, 예: "노원구", "고양시 덕양구")
    * @param {string} params.eupmyeondong 읍면동 (선택, 예: "상계동", "동산동")
    * @param {string} params.roadName 도로명 (선택, 예: "상계로", "동세로")
-   * @param {string} params.category 카테고리 (선택, 예: "동물약국", "미술관")
+   * @param {string} params.category 카테고리 (선택). DB category1·2·3 중 하나와 문자열 동일해야 함. 예: "동물약국", "반려의료" (통합 지도 카테고리 트리는 `src/constants/locationCategoryTree.js` 참고)
    * @param {string} params.keyword 키워드 (선택, 이름/설명/카테고리 검색, 예: "동물병원", "카페")
    * @param {string} params.sort 정렬 기준 (선택, distance|rating|reviews, 기본값: distance)
    * @param {number} params.size 최대 결과 수 (선택, 기본값: 500)

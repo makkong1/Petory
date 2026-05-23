@@ -37,7 +37,8 @@ public class LocationServiceController {
      * @param sigungu      시군구 (선택, 예: "노원구", "고양시 덕양구")
      * @param eupmyeondong 읍면동 (선택, 예: "상계동", "동산동")
      * @param roadName     도로명 (선택, 예: "상계로", "동세로")
-     * @param category     카테고리 (선택, 예: "동물약국", "미술관")
+     * @param category     카테고리 (선택). DB의 category1·category2·category3 와 문자열 동일해야 매칭됨.
+     *                     소분류 예: "동물약국","동물병원","카페","미술관" / 중분류 예: "반려의료","반려동반여행","반려동물식당카페","반려동물 서비스","반려문화시설"
      * @param keyword      키워드 (선택, 이름/설명/카테고리 검색, 예: "동물병원", "카페")
      * @param sort         반경 검색 정렬 기준 (선택, distance|rating|reviews, 기본값: distance)
      * @param size         최대 결과 수 (선택, 기본값: 100, 0 이하이면 전체)

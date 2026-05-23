@@ -21,7 +21,9 @@ import com.linkup.Petory.domain.user.entity.Pet;
 import com.linkup.Petory.domain.user.repository.PetRepository;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class RecommendService {
@@ -41,7 +43,14 @@ public class RecommendService {
                 .pet(petInfo)
                 .build();
 
-        return petDataApiClient.recommend(request);
+        RecommendResponse response = petDataApiClient.recommend(request);
+        int nf = response.facilities() == null ? 0 : response.facilities().size();
+        int nt = response.trends() == null ? 0 : response.trends().size();
+        int nr = response.recommendation() == null ? 0 : response.recommendation().length();
+        log.info(
+                "[RecommendService→Petory 응답] request_id={} context={} facilities={} trends={} reco_chars={}",
+                response.requestId(), response.context(), nf, nt, nr);
+        return response;
     }
 
     public RecommendCopyResponse recommendCopy(String userId, RecommendCopyRequest body) {

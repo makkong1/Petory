@@ -25,7 +25,7 @@ import de.codecentric.boot.admin.server.config.EnableAdminServer;
 @EnableJpaAuditing // JPA Auditing 활성화
 @EnableMethodSecurity(prePostEnabled = true) // @PreAuthorize 작동 활성화
 // cd backend
-// ./gradlew bootRun --args='--spring.profiles.active=dev' 해야 이메일 인증 넘어갈수있음
+// ./gradlew bootRun --args='--spring.profiles.active=dev' 또는 application.properties 의 spring.profiles.active=dev
 public class PetoryApplication {
 
     public static void main(String[] args) {
