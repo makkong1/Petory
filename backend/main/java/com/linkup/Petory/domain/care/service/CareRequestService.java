@@ -21,6 +21,7 @@ import com.linkup.Petory.domain.care.dto.CareRequestPageResponseDTO;
 import com.linkup.Petory.domain.care.entity.CareApplicationStatus;
 import com.linkup.Petory.domain.care.entity.CareRequest;
 import com.linkup.Petory.domain.care.entity.CareRequestStatus;
+import com.linkup.Petory.domain.care.entity.CareScheduleMode;
 import com.linkup.Petory.domain.care.exception.CareForbiddenException;
 import com.linkup.Petory.domain.care.exception.CareRequestNotFoundException;
 import com.linkup.Petory.domain.care.exception.CareValidationException;
@@ -183,13 +184,21 @@ public class CareRequestService {
             throw CareValidationException.insufficientBalance();
         }
 
+        CareScheduleMode mode = dto.getScheduleMode() != null ? dto.getScheduleMode() : CareScheduleMode.FIXED;
+
         CareRequest.CareRequestBuilder builder = CareRequest.builder()
                 .title(dto.getTitle())
                 .description(dto.getDescription())
                 .date(dto.getDate())
+                .scheduleMode(mode)
+                .estimatedDurationMinutes(dto.getEstimatedDurationMinutes())
                 .user(user)
                 .status(CareRequestStatus.OPEN)
-                .offeredCoins(dto.getOfferedCoins());
+                .offeredCoins(dto.getOfferedCoins())
+                // 지도 근처 조회(findNearby)는 latitude IS NOT NULL 이어야 함 — 프론트가 보낸 좌표를 반드시 저장
+                .address(dto.getAddress())
+                .latitude(dto.getLatitude())
+                .longitude(dto.getLongitude());
 
         // 펫 정보 설정 (선택사항)
         if (dto.getPetIdx() != null) {
@@ -225,6 +234,21 @@ public class CareRequestService {
         }
         if (dto.getDate() != null) {
             request.setDate(dto.getDate());
+        }
+        if (dto.getScheduleMode() != null) {
+            request.setScheduleMode(dto.getScheduleMode());
+        }
+        if (dto.getEstimatedDurationMinutes() != null) {
+            request.setEstimatedDurationMinutes(dto.getEstimatedDurationMinutes());
+        }
+        if (dto.getAddress() != null) {
+            request.setAddress(dto.getAddress());
+        }
+        if (dto.getLatitude() != null) {
+            request.setLatitude(dto.getLatitude());
+        }
+        if (dto.getLongitude() != null) {
+            request.setLongitude(dto.getLongitude());
         }
 
         // 펫 정보 업데이트 (선택사항)

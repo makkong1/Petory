@@ -23,6 +23,10 @@
     {
       "dir": "homepage-ranking-algorithm",
       "status": "pending"
+    },
+    {
+      "dir": "facility-sync-petory",
+      "status": "pending"
     }
   ]
 }

@@ -1,10 +1,21 @@
+# GitHub에 코드를 올리거나 PR을 만들었을 때, GitHub 서버가 자동으로 실행할 작업 순서를 적어둔 파일
+# main 또는 dev 브랜치에 push되거나,
+# main 브랜치로 Pull Request가 생성/수정되면,
+
+# GitHub가 Ubuntu 가상 서버를 하나 만들고,
+# 그 안에서 프로젝트 코드를 내려받은 뒤,
+# JDK 17을 설치하고,
+# Gradle 캐시를 적용하고,
+# gradlew 실행 권한을 준 다음,
+# ./gradlew compileJava 명령으로 Java 코드가 컴파일되는지 검사한다.
 name: CI
 
 on:
   push:
     branches: [main, dev]
   pull_request:
-    branches: [main]
+    # feat-* → dev, dev → main 등 PR 모두 커버 (main만 두면 dev 대상 PR에서 CI 미실행)
+    branches: [main, dev]
 
 jobs:
   build:
@@ -16,8 +27,8 @@ jobs:
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
-          distribution: 'temurin'
+          java-version: "17"
+          distribution: "temurin"
 
       - name: Cache Gradle packages
         uses: actions/cache@v3

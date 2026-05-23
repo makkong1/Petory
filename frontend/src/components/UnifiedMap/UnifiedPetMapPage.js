@@ -380,13 +380,17 @@ const UnifiedPetMapPage = () => {
     }
   }, []);
 
-  const renderLocationResults = () => {
-    if (
-      activeLayer !== "location" ||
-      loading ||
-      error ||
-      displayItems.length === 0
-    ) {
+  const renderMobileBottomSheet = () => {
+    if (activeLayer !== "location" && activeLayer !== "meetup" && activeLayer !== "care") {
+      return null;
+    }
+    const sheetItems = activeLayer === "location" ? displayItems : items;
+    const locationSubtitle =
+      `${searchMode === "initial" ? "초기 검색" : "현재 검색 기준"} · 반경 ${radius}km · ${SORT_LABELS[locationSort]}`;
+    const domainTitle = activeLayer === "meetup" ? "주변 모임" : "주변 펫케어";
+    const domainSubtitle = `반경 ${radius}km · 지도 보는 위치 기준`;
+
+    if (loading || error || sheetItems.length === 0) {
       return null;
     }
 
@@ -395,36 +399,41 @@ const UnifiedPetMapPage = () => {
         <ResultSheetHandle aria-hidden="true" />
         <ResultSheetHeader>
           <div>
-            <ResultSheetTitle>주변 시설</ResultSheetTitle>
+            <ResultSheetTitle>
+              {activeLayer === "location" ? "주변 시설" : domainTitle}
+            </ResultSheetTitle>
             <ResultSheetSubtitle>
-              {searchMode === "initial" ? "초기 검색" : "현재 검색 기준"} · 반경{" "}
-              {radius}km · {SORT_LABELS[locationSort]}
+              {activeLayer === "location" ? locationSubtitle : domainSubtitle}
             </ResultSheetSubtitle>
           </div>
-          <ResultSheetMeta>{displayItems.length}개</ResultSheetMeta>
+          <ResultSheetMeta>{sheetItems.length}개</ResultSheetMeta>
         </ResultSheetHeader>
-        {!aiDismissed && userLocation && CATEGORY_TO_CONTEXT[locationCategory] && (
+        {!aiDismissed &&
+          activeLayer === "location" &&
+          userLocation &&
+          CATEGORY_TO_CONTEXT[locationCategory] && (
           <RecommendCard
             lat={userLocation.lat}
             lng={userLocation.lng}
             context={CATEGORY_TO_CONTEXT[locationCategory]}
+            onFacilitiesLoaded={handleAiRecommendLoad}
             variant="banner"
             onDismiss={() => setAiDismissed(true)}
           />
         )}
         <ResultList>
-          {displayItems.map((item, index) => {
+          {sheetItems.map((item, index) => {
             const isSelected = selectedItem?.id === item.id;
+            const isAi = Boolean(item?.isAiRecommend);
             return (
               <ResultCard
                 key={item.id}
                 type="button"
                 $selected={isSelected}
-                $isAiRecommend={item.isAiRecommend}
+                $isAiRecommend={isAi}
                 onClick={() => {
                   handleLocationResultClick(item);
-                  if (item.isAiRecommend)
-                    handleAiItemClick(item.rawAiFacility, aiRequestId);
+                  if (isAi) handleAiItemClick(item.rawAiFacility, aiRequestId);
                 }}
                 onMouseEnter={() => setHoveredLocationItem(item)}
                 onMouseLeave={() =>
@@ -435,8 +444,8 @@ const UnifiedPetMapPage = () => {
               >
                 <ResultCardTop>
                   <ResultCardTitle>
-                    {item.isAiRecommend && <AiItemBadge>AI</AiItemBadge>}
-                    {item.title || item.name || `시설 ${index + 1}`}
+                    {isAi && <AiItemBadge>AI</AiItemBadge>}
+                    {item.title || item.name || `${activeLayer === "meetup" ? "모임" : activeLayer === "care" ? "케어" : "항목"} ${index + 1}`}
                   </ResultCardTitle>
                   {item.distanceM != null ? (
                     <ResultDistance>{item.distanceM}m</ResultDistance>
@@ -449,7 +458,13 @@ const UnifiedPetMapPage = () => {
                   )}
                 </ResultCardTop>
                 <ResultCardSubtitle>
-                  {item.subtitle || item.raw?.address || "주소 정보 없음"}
+                  {activeLayer === "location"
+                    ? item.subtitle || item.raw?.address || "주소 정보 없음"
+                    : item.subtitle ||
+                      item.raw?.address ||
+                      (item.raw?.description
+                        ? String(item.raw.description).slice(0, 100).trim()
+                        : "상세는 항목을 눌러 확인")}
                 </ResultCardSubtitle>
               </ResultCard>
             );
@@ -458,6 +473,8 @@ const UnifiedPetMapPage = () => {
       </LocationResultSheet>
     );
   };
+
+  const renderLocationResults = () => renderMobileBottomSheet();
 
   const renderLayerControls = (showRadius = false) => {
     if (activeLayer === "location") {
@@ -648,6 +665,76 @@ const UnifiedPetMapPage = () => {
             </LeftPanelResults>
           )}
 
+          {(activeLayer === "meetup" || activeLayer === "care") && (
+            <LeftPanelResults>
+              {loading && <PanelStatusMsg>검색 중...</PanelStatusMsg>}
+              {!loading &&
+                !error &&
+                items.length === 0 &&
+                mapViewportCenter && (
+                  <PanelStatusMsg>
+                    반경 {radius}km 내 항목이 없습니다.
+                    펫케어·모임은 지도 반경 검색 시{" "}
+                    <strong>위도·경도가 저장된</strong> 것만 목록에 나옵니다.
+                  </PanelStatusMsg>
+                )}
+              {!loading && !error && items.length > 0 && (
+                <>
+                  <PanelResultHeader>
+                    <div>
+                      <PanelResultTitle>
+                        {activeLayer === "meetup" ? "주변 모임" : "주변 펫케어"}
+                      </PanelResultTitle>
+                      <PanelResultSubtitle>
+                        반경 {radius}km · 지도 중심 기준
+                      </PanelResultSubtitle>
+                    </div>
+                    <PanelResultCount>{items.length}개</PanelResultCount>
+                  </PanelResultHeader>
+                  <PanelResultList>
+                    {items.map((item, index) => {
+                      const isSelected = selectedItem?.id === item.id;
+                      const sub =
+                        item.subtitle ||
+                        item.raw?.address ||
+                        (item.raw?.description
+                          ? String(item.raw.description).slice(0, 100).trim()
+                          : "상세는 항목을 눌러 확인");
+                      return (
+                        <ResultCard
+                          key={item.id}
+                          type="button"
+                          $selected={isSelected}
+                          $isAiRecommend={false}
+                          onClick={() => handleLocationResultClick(item)}
+                          onMouseEnter={() => setHoveredLocationItem(item)}
+                          onMouseLeave={() =>
+                            setHoveredLocationItem((current) =>
+                              current?.id === item.id ? null : current
+                            )
+                          }
+                        >
+                          <ResultCardTop>
+                            <ResultCardTitle>
+                              {item.title ||
+                                item.name ||
+                                `${activeLayer === "meetup" ? "모임" : "케어"} ${index + 1}`}
+                            </ResultCardTitle>
+                            {item.raw?.distance != null && (
+                              <ResultDistance>
+                                {Math.round(item.raw.distance)}m
+                              </ResultDistance>
+                            )}
+                          </ResultCardTop>
+                          <ResultCardSubtitle>{sub}</ResultCardSubtitle>
+                        </ResultCard>
+                      );
+                    })}
+                  </PanelResultList>
+                </>
+              )}
+            </LeftPanelResults>
+          )}
         </LeftPanel>
 
         {/* ── 지도 영역 ── */}

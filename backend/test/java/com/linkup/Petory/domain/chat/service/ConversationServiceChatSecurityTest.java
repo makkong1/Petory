@@ -36,6 +36,7 @@ import com.linkup.Petory.domain.chat.exception.ChatValidationException;
 import com.linkup.Petory.domain.chat.repository.ChatMessageRepository;
 import com.linkup.Petory.domain.chat.repository.ConversationParticipantRepository;
 import com.linkup.Petory.domain.chat.repository.ConversationRepository;
+import com.linkup.Petory.domain.meetup.repository.MeetupParticipantsRepository;
 import com.linkup.Petory.domain.payment.service.PetCoinEscrowService;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
@@ -70,6 +71,8 @@ class ConversationServiceChatSecurityTest {
     private PetCoinEscrowService petCoinEscrowService;
     @Mock
     private ConversationCreatorService conversationCreatorService;
+    @Mock
+    private MeetupParticipantsRepository meetupParticipantsRepository;
 
     @InjectMocks
     private ConversationService conversationService;
@@ -194,5 +197,19 @@ class ConversationServiceChatSecurityTest {
 
         assertThat(conversationService.createMissingPetChat(boardIdx, reporterId, witnessId))
                 .isSameAs(created);
+    }
+
+    @Test
+    @DisplayName("예외: 모임 비참여자는 joinMeetupChat 불가")
+    void 예외_joinMeetupChat_모임비참여자() {
+        long meetupIdx = 77L;
+        long userId = 300L;
+
+        when(meetupParticipantsRepository.existsByMeetupIdxAndUserIdx(meetupIdx, userId))
+                .thenReturn(false);
+
+        assertThatThrownBy(() -> conversationService.joinMeetupChat(meetupIdx, userId))
+                .isInstanceOf(ChatForbiddenException.class)
+                .hasMessageContaining("모임 참여자");
     }
 }

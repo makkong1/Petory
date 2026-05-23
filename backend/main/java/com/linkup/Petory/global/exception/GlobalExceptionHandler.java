@@ -4,6 +4,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.authorization.AuthorizationDeniedException;
+import org.springframework.dao.InvalidDataAccessApiUsageException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -91,13 +92,28 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<Map<String, Object>> handleIllegalStateException(IllegalStateException e) {
         log.warn("상태 오류: {}", e.getMessage());
-        
+
         Map<String, Object> response = new HashMap<>();
         response.put("error", "요청을 처리할 수 없습니다.");
         response.put("message", e.getMessage());
         response.put("status", HttpStatus.CONFLICT.value());
-        
+
         return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+    }
+
+    /**
+     * JPA {@code Repository.findById(null)} 등 — 보통 클라이언트/상위 레이어가 PK를 채우지 않은 버그이다.
+     * (예: 케어 요청 등록 페이로드에 {@code userId} 누락)
+     */
+    @ExceptionHandler(InvalidDataAccessApiUsageException.class)
+    public ResponseEntity<Map<String, Object>> handleInvalidDataAccessApiUsageException(
+            InvalidDataAccessApiUsageException e) {
+        log.warn("영속 계층 null id 접근 가능성(DB PK 미설정 또는 findById(null)): {}", e.getMessage(), e);
+        Map<String, Object> response = new HashMap<>();
+        response.put("error", "요청 처리에 필요한 식별자가 올바르지 않습니다.");
+        response.put("message", "리소스 id가 설정되지 않았습니다. (서버 로그에 원인 검토용 메시지가 기록되었습니다.)");
+        response.put("status", HttpStatus.BAD_REQUEST.value());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 
     /**
