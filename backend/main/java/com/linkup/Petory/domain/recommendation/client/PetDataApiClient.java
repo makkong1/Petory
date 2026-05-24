@@ -65,6 +65,7 @@ public class PetDataApiClient {
         return RestClient.builder()
                 .baseUrl(baseUrl)
                 .defaultHeader("X-API-Key", apiKey)
+                .defaultHeader("X-Caller-Service", "petory")
                 .requestFactory(factory)
                 .build();
     }
@@ -200,14 +201,17 @@ public class PetDataApiClient {
             for (PopularEntryPayload p : parsed) {
                 if (p.name() == null || p.name().isBlank())
                     continue;
+                String addr = p.roadAddress() != null ? p.roadAddress() : p.address();
+                Double lat = parseCoord(p.mapY());
+                Double lng = parseCoord(p.mapX());
                 out.add(new RecommendResponse.FacilityItem(
                         null,
                         null,
                         p.name(),
                         0,
-                        null,
-                        null,
-                        null,
+                        addr,
+                        lat,
+                        lng,
                         p.mentionCount(),
                         p.score(),
                         "popular_blog",
@@ -402,6 +406,16 @@ public class PetDataApiClient {
         return all;
     }
 
+    private static Double parseCoord(String raw) {
+        if (raw == null || raw.isBlank())
+            return null;
+        try {
+            return Long.parseLong(raw.trim()) / 10_000_000.0;
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
     private static String newRequestId() {
         return UUID.randomUUID().toString().replace("-", "").substring(0, 16);
     }
@@ -409,7 +423,12 @@ public class PetDataApiClient {
     @JsonIgnoreProperties(ignoreUnknown = true)
     record PopularEntryPayload(String name,
             @JsonProperty("mention_count") Integer mentionCount,
-            double score) {
+            double score,
+            String address,
+            @JsonProperty("road_address") String roadAddress,
+            @JsonProperty("map_x") String mapX,
+            @JsonProperty("map_y") String mapY,
+            String telephone) {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
