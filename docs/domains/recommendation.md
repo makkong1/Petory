@@ -29,12 +29,9 @@ Petory 백엔드는 이제 모든 컨텍스트를 외부 추천 서버에 그대
 - **전용 JPA 엔티티 없음**: 추천 결과를 Petory MySQL에 영속하지 않음
 - **반려동물은 User 도메인 `Pet`에서 조회**: `findByUserIdAndNotDeleted` 첫 항목만 사용
 
-### 1.4 로드맵 — Location AI 추천과의 통합·폐기 예정
+### 1.4 Location AI 추천 통합 — 완료
 
-사용자 경험상 **“주변 서비스 추천”**은 Location 도메인의 `GET /api/location-services/recommend`(MySQL 검색 후 `LocationRecommendAgentService`/`Ollama`로 재순위·이유)과 **동일 목적 영역에서 겹친다.**
-
-- **현재**: 두 경로 모두 유지(회귀·프론트 의존성 방지).
-- **향후**: **Pet Data API(Python)가 `GET /api/recommend` 기준으로 기대 동작까지 안정 검증된 뒤**, Location **`/api/location-services/recommend`(및 해당 에이전트)·통합 지도 AI 모드**를 Pet Data 계약 한쪽으로 합치고 **코드/API 제거**할 예정이다. 시행 시점 확정 후 `docs/domains/location.md`·본 문서에 상태를 업데이트한다.
+`GET /api/location-services/recommend` 및 `LocationRecommendAgentService`는 코드베이스에서 **제거 완료**. 해당 컨트롤러·서비스 클래스 파일이 존재하지 않으며, “주변 서비스 추천” 목적은 `GET /api/recommend`(본 도메인)로 단일화되었다. `docs/domains/location.md` §4.4 참고.
 
 ---
 
@@ -51,7 +48,15 @@ Petory 백엔드는 이제 모든 컨텍스트를 외부 추천 서버에 그대
 | 응답 없음(현행 서비스는 거의 사용 안 함) | 서비스가 `null`이면 `503` (바디 없음)                                                |
 | 외부 API 실패                            | `PetDataApiClient`가 예외 throw → 애플리케이션 전역 예외 처리에 따름(일반적으로 5xx) |
 
-### 2.2 응답 DTO (`RecommendResponse`)
+### 2.2 추가 엔드포인트
+
+| 엔드포인트 | 메서드 | 인증 | 설명 |
+|---|---|---|---|
+| `/api/recommend/copy` | POST | 필수 | LLM 카피라이팅 생성 — `RecommendCopyRequest`(context, request_id, facilities, trends, pet) → `RecommendCopyResponse`. pet 정보는 백엔드가 자동 보강 |
+| `/api/recommend/events` | POST | 필수 | 사용자 행동 이벤트 기록 — `RecommendEventRequest`(request_id, events[]) → 202. userId는 해시(`userRef`)로 익명화 후 pet-data-api에 전송 |
+| `/api/recommend/trends/{category}/timeseries` | GET | 필수 | 트렌드 시계열 조회 — `days`(기본 14), `top_keywords`(기본 10) → `TrendTimeseriesResponse`(category, points[{date, keyword, score}]) |
+
+### 2.4 응답 DTO (`RecommendResponse`)
 
 ```java
 public record RecommendResponse(
@@ -149,7 +154,7 @@ Recommendation 도메인 **전용 테이블은 없습니다.**
 | 애플리케이션 서비스 | `RecommendService`                      |
 | nearby 후보 조회     | `LocationServiceService`                |
 | HTTP 클라이언트     | `PetDataApiClient`                      |
-| DTO                 | `RecommendRequest`, `RecommendResponse` |
+| DTO                 | `RecommendRequest`, `RecommendResponse`, `RecommendCopyRequest`, `RecommendCopyResponse`, `RecommendEventRequest`, `TrendTimeseriesResponse` |
 
 ## 8. 관련 아키텍처 문서
 
