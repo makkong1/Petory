@@ -70,8 +70,8 @@ public class FacilitySyncService {
     private boolean isValid(PetFacilityDto dto) {
         if (!StringUtils.hasText(dto.getName())) return false;
         if (!StringUtils.hasText(dto.getAddress())) return false;
-        if ("폐업".equals(dto.getStatus())) return false;
-        return true;
+        if (dto.getLat() == null || dto.getLng() == null) return false;
+        return !"폐업".equals(dto.getStatus());
     }
 
     private LocationService toEntity(PetFacilityDto dto) {
