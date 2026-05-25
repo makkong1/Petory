@@ -10,18 +10,18 @@ Petory 백엔드는 이제 모든 컨텍스트를 외부 추천 서버에 그대
   - Petory가 `LocationService` 구조화 저장소에서 **nearby 후보를 직접 조회**
   - `pet-data-api`에서는 **`popular` / `trends` 시그널만 조회**
   - 최종 조합과 정렬, 응답 DTO 조립은 **Petory 서비스 레이어**가 담당
-  - `boarding`, `hotel`은 2026-05-25 기준 전환 완료 — `GET /facilities` 구현 및 87개 시설 DB 적재 후 편입
+  - 시설 데이터는 Python batch CLI → JSON → `LocationImportService`를 통해 `locationservice` DB에 적재
 - **Track B (비-시설 카테고리: `supplies`, `snack`, `food`, `clothes`)**
   - 기존 `PetDataApiClient.recommend()` 경로를 유지
   - 구조화 시설 마스터가 없는 트렌드 중심 카테고리라서 Petory owner 전환 대상이 아님
 
 ### 1.2 Location 추천과의 구분
 
-| 구분        | Recommendation 도메인                                | Location (별도)                                                           |
-| ----------- | ---------------------------------------------------- | ------------------------------------------------------------------------- |
-| 경로        | `GET /api/recommend`                                 | `GET /api/location-services/recommend` 등                                 |
+| 구분        | Recommendation 도메인                                           | Location (별도)                                                           |
+| ----------- | --------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| 경로        | `GET /api/recommend`                                            | `GET /api/location-services/recommend` 등                                 |
 | 데이터 소스 | Petory `LocationService` + 외부 `pet-data-api` popularity/trend | `LocationService` + `LocationRecommendAgentService` 등 Petory DB/에이전트 |
-| 용도        | nearby 후보 + popularity/trend 조합 추천             | 주변 위치 서비스 목록 + AI 이유 enrich                                    |
+| 용도        | nearby 후보 + popularity/trend 조합 추천                        | 주변 위치 서비스 목록 + AI 이유 enrich                                    |
 
 ### 1.3 핵심 원칙
 
@@ -50,11 +50,11 @@ Petory 백엔드는 이제 모든 컨텍스트를 외부 추천 서버에 그대
 
 ### 2.2 추가 엔드포인트
 
-| 엔드포인트 | 메서드 | 인증 | 설명 |
-|---|---|---|---|
-| `/api/recommend/copy` | POST | 필수 | LLM 카피라이팅 생성 — `RecommendCopyRequest`(context, request_id, facilities, trends, pet) → `RecommendCopyResponse`. pet 정보는 백엔드가 자동 보강 |
-| `/api/recommend/events` | POST | 필수 | 사용자 행동 이벤트 기록 — `RecommendEventRequest`(request_id, events[]) → 202. userId는 해시(`userRef`)로 익명화 후 pet-data-api에 전송 |
-| `/api/recommend/trends/{category}/timeseries` | GET | 필수 | 트렌드 시계열 조회 — `days`(기본 14), `top_keywords`(기본 10) → `TrendTimeseriesResponse`(category, points[{date, keyword, score}]) |
+| 엔드포인트                                    | 메서드 | 인증 | 설명                                                                                                                                                |
+| --------------------------------------------- | ------ | ---- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/api/recommend/copy`                         | POST   | 필수 | LLM 카피라이팅 생성 — `RecommendCopyRequest`(context, request_id, facilities, trends, pet) → `RecommendCopyResponse`. pet 정보는 백엔드가 자동 보강 |
+| `/api/recommend/events`                       | POST   | 필수 | 사용자 행동 이벤트 기록 — `RecommendEventRequest`(request_id, events[]) → 202. userId는 해시(`userRef`)로 익명화 후 pet-data-api에 전송             |
+| `/api/recommend/trends/{category}/timeseries` | GET    | 필수 | 트렌드 시계열 조회 — `days`(기본 14), `top_keywords`(기본 10) → `TrendTimeseriesResponse`(category, points[{date, keyword, score}])                 |
 
 ### 2.4 응답 DTO (`RecommendResponse`)
 
@@ -148,12 +148,12 @@ Recommendation 도메인 **전용 테이블은 없습니다.**
 
 ## 7. 관련 코드
 
-| 역할                | 클래스                                  |
-| ------------------- | --------------------------------------- |
-| REST                | `RecommendController`                   |
-| 애플리케이션 서비스 | `RecommendService`                      |
-| nearby 후보 조회     | `LocationServiceService`                |
-| HTTP 클라이언트     | `PetDataApiClient`                      |
+| 역할                | 클래스                                                                                                                                       |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| REST                | `RecommendController`                                                                                                                        |
+| 애플리케이션 서비스 | `RecommendService`                                                                                                                           |
+| nearby 후보 조회    | `LocationServiceService`                                                                                                                     |
+| HTTP 클라이언트     | `PetDataApiClient`                                                                                                                           |
 | DTO                 | `RecommendRequest`, `RecommendResponse`, `RecommendCopyRequest`, `RecommendCopyResponse`, `RecommendEventRequest`, `TrendTimeseriesResponse` |
 
 ## 8. 관련 아키텍처 문서
