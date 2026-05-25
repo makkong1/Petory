@@ -94,10 +94,16 @@ public class FacilitySyncService {
     private String categoryLabel(String category, String type) {
         if (StringUtils.hasText(category)) {
             return switch (category) {
-                case "grooming" -> "동물미용";
-                case "hospital" -> "동물병원";
-                case "pharmacy" -> "동물약국";
-                default -> category;
+                case "grooming"  -> "미용";
+                case "hospital"  -> "동물병원";
+                case "pharmacy"  -> "동물약국";
+                case "cafe"      -> "카페";
+                case "restaurant"-> "식당";
+                case "pension"   -> "펜션";
+                case "boarding"  -> "위탁관리";
+                case "hotel"     -> "호텔";
+                case "supplies"  -> "반려동물용품";
+                default          -> category;
             };
         }
         return "HOSPITAL".equals(type) ? "동물병원" : "반려동물 시설";
