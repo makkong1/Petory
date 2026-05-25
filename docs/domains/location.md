@@ -561,6 +561,10 @@ public class LocationService {
     @Column(name = "rating")
     @Builder.Default
     private Double rating = 0.0; // 평균 평점
+
+    @Column(name = "review_count")
+    @Builder.Default
+    private Integer reviewCount = 0; // soft delete 제외 리뷰 수 캐시
     
     @Column(name = "last_updated")
     private LocalDate lastUpdated; // 최종작성일
@@ -1289,7 +1293,7 @@ public List<LocationServiceDTO> getPopularLocationServices(String category) {
 - **카테고리 계층 구조**: category1 → category2 → category3
 - **데이터 출처 관리**: `dataSource` 필드로 데이터 출처 구분
   - `"PUBLIC"`: 공공데이터 CSV 배치 임포트 경로
-  - `"PET_DATA_API"`: `FacilitySyncService`가 매일 01:00 `GET /facilities`를 호출해 pet-data-api Redis 캐시에서 적재 (grooming/hospital/pharmacy/cafe/restaurant/pension/boarding/hotel 9개 context)
+  - `"PET_DATA_API"`: `FacilitySyncService`가 매일 01:00 `GET /facilities`를 호출해 pet-data-api Redis 캐시에서 적재 (grooming/hospital/supplies/pharmacy/cafe/pension/restaurant/boarding/hotel — 9개 context)
 - **추가 필드**: `phone`, `website` 필드 존재
 
 ---
