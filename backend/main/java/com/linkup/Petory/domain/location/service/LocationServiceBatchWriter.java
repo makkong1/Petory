@@ -45,6 +45,8 @@ public class LocationServiceBatchWriter {
 
         try {
             locationServiceRepository.saveAll(batch);
+            entityManager.flush();
+            updateLocationPoints(batch);
             return batch.size();
         } catch (Exception e) {
             log.error("배치 저장 실패: {}개 중 일부 저장 실패 - {}", batch.size(), e.getMessage(), e);
@@ -60,6 +62,8 @@ public class LocationServiceBatchWriter {
                         entityManager.detach(entity);
                     }
                     locationServiceRepository.save(entity);
+                    entityManager.flush();
+                    updateLocationPoints(List.of(entity));
                     saved++;
                 } catch (Exception ex) {
                     log.warn("개별 저장 실패: {}", ex.getMessage());
@@ -74,5 +78,20 @@ public class LocationServiceBatchWriter {
 
             return saved;
         }
+    }
+
+    private void updateLocationPoints(List<LocationService> entities) {
+        List<Long> ids = entities.stream()
+                .filter(e -> e.getIdx() != null && e.getLatitude() != null && e.getLongitude() != null)
+                .map(LocationService::getIdx)
+                .toList();
+        if (ids.isEmpty()) return;
+
+        entityManager.createNativeQuery(
+                "UPDATE locationservice " +
+                "SET location = ST_GeomFromText(CONCAT('POINT(', longitude, ' ', latitude, ')'), 4326) " +
+                "WHERE idx IN :ids")
+                .setParameter("ids", ids)
+                .executeUpdate();
     }
 }
