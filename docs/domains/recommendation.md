@@ -6,13 +6,14 @@
 
 Petory 백엔드는 이제 모든 컨텍스트를 외부 추천 서버에 그대로 프록시하지 않습니다.
 
-- **Track A (`grooming`, `hospital`, `pharmacy`, `cafe`, `restaurant`, `pension`)**
+- **Track A (`grooming`, `hospital`, `pharmacy`, `cafe`, `restaurant`, `pension`, `boarding`, `hotel`)**
   - Petory가 `LocationService` 구조화 저장소에서 **nearby 후보를 직접 조회**
   - `pet-data-api`에서는 **`popular` / `trends` 시그널만 조회**
   - 최종 조합과 정렬, 응답 DTO 조립은 **Petory 서비스 레이어**가 담당
-- **Track B (`boarding`, `hotel`) + 비-시설 카테고리(`supplies`, `snack`, `food`, `clothes`)**
+  - `boarding`, `hotel`은 2026-05-25 기준 전환 완료 — `GET /facilities` 구현 및 87개 시설 DB 적재 후 편입
+- **Track B (비-시설 카테고리: `supplies`, `snack`, `food`, `clothes`)**
   - 기존 `PetDataApiClient.recommend()` 경로를 유지
-  - sparse context 또는 트렌드 중심 카테고리라서 아직 Petory owner 전환 대상이 아님
+  - 구조화 시설 마스터가 없는 트렌드 중심 카테고리라서 Petory owner 전환 대상이 아님
 
 ### 1.2 Location 추천과의 구분
 
