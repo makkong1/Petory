@@ -46,7 +46,8 @@ public class RecommendService {
     private static final int DEFAULT_TREND_LIMIT = 15;
 
     private static final Set<String> PETORY_OWNED_CONTEXTS = Set.of(
-            "grooming", "hospital", "pharmacy", "cafe", "restaurant", "pension");
+            "grooming", "hospital", "pharmacy", "cafe", "restaurant", "pension",
+            "boarding", "hotel");
 
     private static final Map<String, String> CONTEXT_TO_CATEGORY = createContextToCategory();
     private static final Map<String, String> CONTEXT_LABELS = createContextLabels();
