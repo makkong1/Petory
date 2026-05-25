@@ -385,10 +385,10 @@ public void deleteService(Long serviceIdx) {
 | `getPopularLocationServices()` | 인기 서비스 조회 | `findTop10ByCategoryOrderByRatingDesc(category)`, category1/2/3 매칭, `@Cacheable` 적용, Soft Delete 제외 (컨트롤러 엔드포인트 없음) |
 | `deleteService()` | 서비스 삭제 | Soft Delete 처리 (`isDeleted = true`, `deletedAt` 설정) |
 
-#### LocationRecommendAgentService
+#### LocationServiceScoreScheduler
 | 메서드 | 설명 | 주요 로직 |
 |--------|------|-----------|
-| `enrichWithRecommendations()` | AI 추천 적용 | 검색 결과 상위 30개를 LLM에 전달, 상위 10개 재순위화 + 1줄 추천 이유 추가, 실패 시 원본 반환, 타임아웃 설정 |
+| `recalculateAllScores()` | 전체 `score` 재계산 | 매일 자정(`0 0 0 * * *`), `score = 0.5 × rating × log10(reviewCount+1) + 0.2 × petFriendly` |
 
 #### NaverMapService
 | 메서드 | 설명 | 주요 로직 |
@@ -465,6 +465,7 @@ public void deleteService(Long serviceIdx) {
 | `description` | `String` | TEXT |
 | `rating` | `Double` | 기본 `0.0` |
 | `reviewCount` | `Integer` | `review_count` 컬럼, 기본 `0`. soft delete 제외 리뷰 수 캐시 — `updateReviewStats()` 원자적 갱신 |
+| `score` | `Double` | 기본 `0.0`. `LocationServiceScoreScheduler`가 매일 자정 재계산 — `sort=score` 정렬의 기준값 |
 | `lastUpdated` | `LocalDate` | 최종작성일 |
 | `dataSource` | `String` | 기본 `"PUBLIC"` (공공데이터), `"PET_DATA_API"` (FacilitySyncService 적재분) |
 | `isDeleted` | `Boolean` | Soft delete, 기본 `false` |
@@ -566,6 +567,10 @@ public class LocationService {
     @Column(name = "review_count")
     @Builder.Default
     private Integer reviewCount = 0; // soft delete 제외 리뷰 수 캐시
+
+    @Column(name = "score")
+    @Builder.Default
+    private Double score = 0.0; // LocationServiceScoreScheduler 재계산 — sort=score 기준
     
     @Column(name = "last_updated")
     private LocalDate lastUpdated; // 최종작성일
@@ -640,14 +645,17 @@ public class LocationServiceReview extends BaseTimeEntity {
 ```
 domain/location/
   ├── controller/
-  │   ├── LocationServiceController.java
+  │   ├── LocationServiceController.java         # GET /search, DELETE /{idx}
+  │   ├── LocationServiceAdminController.java     # POST /api/admin/location/sync
   │   ├── LocationServiceReviewController.java
   │   └── GeocodingController.java
   # 관리자: domain/admin/controller/AdminLocationController.java → /api/admin/location-services
   ├── service/
   │   ├── LocationServiceService.java
   │   ├── LocationServiceReviewService.java
-  │   ├── LocationRecommendAgentService.java   # AI 추천 (LLM 기반)
+  │   ├── LocationServiceScoreScheduler.java     # 매일 자정 score 재계산
+  │   ├── FacilitySyncService.java               # pet-data-api GET /facilities 동기화
+  │   ├── FacilitySyncScheduler.java             # 매일 01:00 FacilitySyncService 호출
   │   ├── PublicDataLocationService.java
   │   ├── LocationServiceBatchWriter.java
   │   ├── LocationServiceAdminService.java
@@ -685,7 +693,7 @@ erDiagram
 
 ### 4.4 API 설계
 
-> **로드맵 (폐기 예정 가능)**: `GET /api/location-services/recommend`는 사용자 관점에서 `GET /api/recommend`(Pet Data API 프록시)와 **목적이 겹친다**. Python 데이터 서버가 기대 형태로 **연결·검증된 뒤** 본 엔드포인트와 `LocationRecommendAgentService` 기반 플로우는 **통합 또는 제거**할 예정이다. 당분간 유지한다. [`recommendation.md`](./recommendation.md) §1.4.
+> **제거 완료**: `GET /api/location-services/recommend` 및 `LocationRecommendAgentService`는 코드베이스에서 완전히 제거됨. AI 추천은 `GET /api/recommend`(Recommendation 도메인)로 통합. [`recommendation.md`](./recommendation.md) §1.4.
 
 #### REST API
 **참고**: 리뷰 관련 API는 클래스 레벨에 `@PreAuthorize("isAuthenticated()")` 적용되어 인증 필요
@@ -693,7 +701,7 @@ erDiagram
 | 엔드포인트 | Method | 설명 |
 |-----------|--------|------|
 | `/api/location-services/search` | GET | 통합 검색 §1.1: **위치(lat+lng)** → **지역** → **키워드 단독 FULLTEXT** → 평점순. `radius` 생략·`≤0`이면 서비스에서 10000m. `size` 기본 100, `≤0`이면 전체. `sort` 값: `distance`(기본)·`rating`·`reviews`·`score`. 응답 `{"services","count"}`. **`/api/**` 인증 필요** |
-| `/api/location-services/recommend` | GET | AI 추천 — **`/api/**` 인증 필요**(컨트롤러 메서드에 `@PreAuthorize`는 없으나 `SecurityConfig`와 동일). 파라미터: `/search`와 동일(`latitude`, `longitude`, `radius`, `sido`, `sigungu`, `eupmyeondong`, `roadName`, `category`, `keyword`, `sort`). 후보 최대 30건 → LLM으로 최대 10건+이유(`LocationRecommendAgentService`, Spring AI `ChatModel`/Ollama). 실패 시 원본 상위 유지 |
+| ~~`/api/location-services/recommend`~~ | ~~GET~~ | **제거됨** — 컨트롤러·`LocationRecommendAgentService` 모두 코드베이스에 없음. AI 추천은 `GET /api/recommend`(Recommendation 도메인)로 통합. [`recommendation.md`](./recommendation.md) §1.4 참고 |
 | `/api/location-services/{serviceIdx}` | DELETE | 위치 서비스 삭제 (Soft Delete, `ADMIN`/`MASTER`, LocationServiceNotFoundException, LocationServiceAlreadyDeletedException) |
 | `/api/location-service-reviews` | POST | 리뷰 작성 (인증 필요, 클래스 레벨 `@PreAuthorize`, 응답: `{"review": {...}, "message": "..."}`) |
 | `/api/location-service-reviews/{reviewIdx}` | PUT | 리뷰 수정 (인증 필요, 클래스 레벨 `@PreAuthorize`, 응답: `{"review": {...}, "message": "..."}`) |
@@ -711,6 +719,11 @@ erDiagram
 | `/api/admin/location-services/load-data` | POST | 초기 데이터 로드 — `MASTER` 전용 |
 | `/api/admin/location-services/import-public-data` | POST | CSV 업로드 임포트 — `MASTER`, `multipart/form-data` |
 | `/api/admin/location-services/import-public-data-path` | POST | CSV 경로 임포트 — `MASTER` |
+
+#### 관리자 (`LocationServiceAdminController`, `/api/admin/location`)
+| 엔드포인트 | Method | 설명 |
+|-----------|--------|------|
+| `/api/admin/location/sync` | POST | pet-data-api `GET /facilities` 수동 동기화 — `FacilitySyncService.syncFromPetDataApi()`, `ADMIN`/`MASTER`. 응답: `{total, saved, duplicate, skipped}` |
 
 **보안 참고**: `SecurityConfig`에서 `/api/geocoding/**`는 `permitAll()`입니다. `/api/location-services/**`·`/api/location-service-reviews/**`는 기본적으로 `/api/**` 규칙에 따라 **인증 필요**(리뷰 컨트롤러는 `isAuthenticated()`).
 
@@ -1280,7 +1293,7 @@ public List<LocationServiceDTO> getPopularLocationServices(String category) {
 - **반경**: 기본 **5km** (`DEFAULT_RADIUS = 5`), UI에서 km 단위 → API에 `radius * 1000` m.
 - **초기 위치**: `navigator.geolocation`; 실패 시 기본 중심(서울 시청 근처 등 코드 상수).
 - **재조회**: `mapCenter`·`radius`·`locationKeyword`·`locationCategory` 변경 시 `fetchActiveMapItems` — **지도 idle**(`onMapIdle` → `setMapCenter`) 시에도 중심이 바뀌면 같은 효과로 재조회됨.
-- **AI 모드**: `locationServiceApi.recommendPlaces` (`/recommend`) 호출, 응답으로 마커 교체.
+- **AI 모드**: `locationServiceApi.recommendPlaces` → 백엔드 `GET /api/location-services/recommend`는 **제거됨**. 이 UI 경로는 현재 404가 예상되며, `GET /api/recommend`(Recommendation 도메인)로 교체 필요.
 - **`MapContainer.js`**: 네이버맵 `ncpKeyId`, 카카오식 `mapLevel`→줌 변환, **개별 핀**(클러스터 비활성 주석), 사용자 위치·호버 마커.
 
 **과거 전용 페이지·useReducer·지역 드롭다운·“이 지역 검색” 위주 서술**은 코드베이스와 어긋날 수 있음 — 상세는 `docs/refactoring/location/상태-관리-개선.md`, `프론트엔드-검색-로직-단순화.md` 등.
