@@ -20,7 +20,7 @@ public class FacilitySyncScheduler {
     @Scheduled(cron = "0 0 1 * * *")
     public void scheduledSync() {
         if (!StringUtils.hasText(importFilePath)) {
-            log.warn("[FacilitySyncScheduler] app.location.import.file-path 미설정 — sync 스킵");
+            log.info("[FacilitySyncScheduler] app.location.import.file-path 미설정 — sync 스킵");
             return;
         }
         log.info("[FacilitySyncScheduler] 파일 기반 import 시작: {}", importFilePath);

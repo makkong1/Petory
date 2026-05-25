@@ -21,13 +21,17 @@ public class LocationServiceAdminController {
     @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAnyRole('ADMIN', 'MASTER')")
     public ResponseEntity<Map<String, Object>> importFacilities(
-            @RequestPart("file") MultipartFile file) throws IOException {
-        LocationImportService.SyncResult result = locationImportService.importFromStream(file.getInputStream());
-        return ResponseEntity.ok(Map.of(
-                "total", result.getTotal(),
-                "saved", result.getSaved(),
-                "duplicate", result.getDuplicate(),
-                "skipped", result.getSkipped()
-        ));
+            @RequestPart("file") MultipartFile file) {
+        try {
+            LocationImportService.SyncResult result = locationImportService.importFromStream(file.getInputStream());
+            return ResponseEntity.ok(Map.of(
+                    "total", result.getTotal(),
+                    "saved", result.getSaved(),
+                    "duplicate", result.getDuplicate(),
+                    "skipped", result.getSkipped()
+            ));
+        } catch (IOException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "파일 읽기 실패: " + e.getMessage()));
+        }
     }
 }
