@@ -53,11 +53,24 @@ Petory 백엔드는 이제 모든 컨텍스트를 외부 추천 서버에 그대
 
 ### 2.2 응답 DTO (`RecommendResponse`)
 
-- `context`: 맥락 문자열(외부 API가 echo할 수 있음)
+```java
+public record RecommendResponse(
+    String context,
+    @JsonProperty("recommend_version") String recommendVersion,
+    @JsonProperty("request_id")        String requestId,
+    List<FacilityItem>                 facilities,
+    List<TrendItem>                    trends,
+    String                             recommendation,
+    @JsonProperty("generated_at")      String generatedAt)
+```
+
+- `context`: 요청한 context 문자열 그대로 echo
+- `recommend_version`: 응답 생성 경로 식별자 (`"petory-nearby-v1"` / `"popular-intelligence-v1"`)
+- `request_id`: 요청 추적용 UUID (Petory 내부 생성)
 - `facilities`: 시설 후보 — `name`, `distance_m`, `address`, `lat`, `lng`
 - `trends`: 트렌드 — `keyword`, `score`
-- `recommendation`: 자연어 한 덩어리 추천 문구
-- `generated_at`: 생성 시각(문자열)
+- `recommendation`: rule-based 또는 자연어 추천 문구
+- `generated_at`: 응답 생성 시각 (ISO 8601)
 
 ---
 
@@ -76,12 +89,25 @@ Petory 백엔드는 이제 모든 컨텍스트를 외부 추천 서버에 그대
    - 이름 normalize 기반으로 popularity 시그널 조인 후 Petory가 최종 정렬
 5. **Track B면**
    - `RecommendRequest` 빌드: `lat`, `lng`, `context`, **고정** `radius_km=10.0`, `top_n=5`, `pet`(또는 `null`)
-   - `PetDataApiClient.recommend(request)`로 레거시 호환 응답 조립
+   - `PetDataApiClient.recommend(request)` 호출
+     - **내부에서** `GET /popular/{context}` + `GET /trends/{category}` 를 각각 직접 호출
+     - `lat`/`lng`/`radius_km`은 실제 사용되지 않음 (`topN`, `context`만 사용)
+     - `RecommendResponse`를 rule-based 추천 문구와 함께 로컬 조립 (POST /recommend 없음)
 
-### 3.1 외부 요청 DTO (`RecommendRequest`)
+### 3.1 `RecommendRequest` DTO
 
-- JSON 직렬화 시 스네이크 케이스: `radius_km`, `top_n`, `pet` 내부 `age_months`
-- `pet`이 `null`이면 `@JsonInclude(NON_NULL)`로 생략 가능
+```java
+public record RecommendRequest(
+    double lat, double lng, String context,
+    @JsonProperty("radius_km") double radiusKm,
+    @JsonProperty("top_n")     int topN,
+    PetInfo pet)
+```
+
+- **Track A**: 이 DTO는 사용하지 않음 (Petory가 직접 popular/trends 호출)
+- **Track B**: `PetDataApiClient.recommend(request)` 인자로 전달되지만,  
+  내부에서 `context`와 `topN`만 사용. `lat`/`lng`/`radiusKm`은 무시됨.  
+  pet-data-api에 직접 직렬화 전송되지 않음.
 
 ---
 

@@ -465,7 +465,7 @@ public void deleteService(Long serviceIdx) {
 | `rating` | `Double` | 기본 `0.0` |
 | `reviewCount` | `Integer` | `review_count` 컬럼, 기본 `0`. soft delete 제외 리뷰 수 캐시 — `updateReviewStats()` 원자적 갱신 |
 | `lastUpdated` | `LocalDate` | 최종작성일 |
-| `dataSource` | `String` | 기본 `"PUBLIC"` |
+| `dataSource` | `String` | 기본 `"PUBLIC"` (공공데이터), `"PET_DATA_API"` (FacilitySyncService 적재분) |
 | `isDeleted` | `Boolean` | Soft delete, 기본 `false` |
 | `deletedAt` | `LocalDateTime` | 삭제 시각 |
 | `reviews` | `List<LocationServiceReview>` | `@OneToMany` |
@@ -1287,7 +1287,9 @@ public List<LocationServiceDTO> getPopularLocationServices(String category) {
   - `LocationServiceReview`: `isDeleted` (Boolean, 기본값 false), `deletedAt` (LocalDateTime)
 - **지역 계층 구조**: sido → sigungu → eupmyeondong → roadName
 - **카테고리 계층 구조**: category1 → category2 → category3
-- **데이터 출처 관리**: `dataSource` 필드로 데이터 출처 구분 (PUBLIC)
+- **데이터 출처 관리**: `dataSource` 필드로 데이터 출처 구분
+  - `"PUBLIC"`: 공공데이터 CSV 배치 임포트 경로
+  - `"PET_DATA_API"`: `FacilitySyncService`가 매일 01:00 `GET /facilities`를 호출해 pet-data-api Redis 캐시에서 적재 (grooming/hospital/pharmacy/cafe/restaurant/pension/boarding/hotel 9개 context)
 - **추가 필드**: `phone`, `website` 필드 존재
 
 ---
