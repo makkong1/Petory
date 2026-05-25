@@ -59,7 +59,7 @@ public class LocationImportService {
                     batch.clear();
                 }
             } catch (Exception e) {
-                log.warn("[LocationImportService] 변환 실패 name={} err={}", dto.getName(), e.getMessage());
+                log.warn("[LocationImportService] 변환 실패 name={}", dto.getName(), e);
                 skipped++;
             }
         }
