@@ -6,8 +6,10 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -39,6 +41,7 @@ import lombok.extern.slf4j.Slf4j;
 public class PetDataApiClient {
 
     private static final String PET_DATA_CORRELATION_HEADER = "X-Request-Id";
+    private static final Map<String, String> CONTEXT_LABELS = createContextLabels();
 
     private final RestClient recommendClient;
     private final RestClient facilityClient;
@@ -65,6 +68,7 @@ public class PetDataApiClient {
         return RestClient.builder()
                 .baseUrl(baseUrl)
                 .defaultHeader("X-API-Key", apiKey)
+                .defaultHeader("X-Caller-Service", "petory")
                 .requestFactory(factory)
                 .build();
     }
@@ -110,20 +114,17 @@ public class PetDataApiClient {
     @SuppressWarnings("UseSpecificCatch")
     public RecommendResponse recommend(RecommendRequest request) {
         String requestId = newRequestId();
-        String popularCtx = normalizePopularPathContext(request.context());
-        String trendCat = normalizeTrendCategory(request.context());
         try {
             int topN = request.topN() > 0 ? request.topN() : 5;
-            List<RecommendResponse.FacilityItem> facilities =
-                    fetchPopularAsFacilities(popularCtx, topN, requestId);
-            List<RecommendResponse.TrendItem> trends =
-                    fetchTrendsAsTrendItems(trendCat, 15, requestId);
+            List<RecommendResponse.FacilityItem> facilities = fetchPopular(request.context(), topN, requestId);
+            List<RecommendResponse.TrendItem> trends = fetchTrends(request.context(), 15, requestId);
 
             String recommendation = buildDefaultRecommendation(copyContextLabel(request.context()), facilities, trends);
 
             log.info(
                     "[PetDataApiClient/recommend→popular+trends] reqId={} popularCtx={} trendCat={} facilities={} trends={}",
-                    requestId, popularCtx, trendCat, facilities.size(), trends.size());
+                    requestId, normalizePopularPathContext(request.context()), normalizeTrendCategory(request.context()),
+                    facilities.size(), trends.size());
 
             return new RecommendResponse(
                     request.context(),
@@ -138,6 +139,14 @@ public class PetDataApiClient {
                     requestId, e.getClass().getSimpleName(), e.getMessage(), e);
             throw new RuntimeException("추천 API 호출 실패: " + e.getMessage(), e);
         }
+    }
+
+    public List<RecommendResponse.FacilityItem> fetchPopular(String context, int limit, String correlationId) {
+        return fetchPopularAsFacilities(normalizePopularPathContext(context), limit, correlationId);
+    }
+
+    public List<RecommendResponse.TrendItem> fetchTrends(String context, int limit, String correlationId) {
+        return fetchTrendsAsTrendItems(normalizeTrendCategory(context), limit, correlationId);
     }
 
     /** pet-data-api에 LLM 카피 엔드포인트 없음 — 규칙 기반 문구만 반환 */
@@ -200,14 +209,17 @@ public class PetDataApiClient {
             for (PopularEntryPayload p : parsed) {
                 if (p.name() == null || p.name().isBlank())
                     continue;
+                String addr = p.roadAddress() != null ? p.roadAddress() : p.address();
+                Double lat = parseCoord(p.mapY());
+                Double lng = parseCoord(p.mapX());
                 out.add(new RecommendResponse.FacilityItem(
                         null,
                         null,
                         p.name(),
                         0,
-                        null,
-                        null,
-                        null,
+                        addr,
+                        lat,
+                        lng,
                         p.mentionCount(),
                         p.score(),
                         "popular_blog",
@@ -300,9 +312,12 @@ public class PetDataApiClient {
     }
 
     private static String copyContextLabel(String context) {
-        if (context == null || context.isBlank())
+        if (context == null || context.isBlank()) {
             return "케어";
-        return normalizeTrendCategory(context);
+        }
+        return CONTEXT_LABELS.getOrDefault(
+                normalizeTrendCategory(context),
+                normalizeTrendCategory(context));
     }
 
     private static String buildDefaultRecommendation(String label, List<RecommendResponse.FacilityItem> facilities,
@@ -402,14 +417,46 @@ public class PetDataApiClient {
         return all;
     }
 
+    private static Double parseCoord(String raw) {
+        if (raw == null || raw.isBlank())
+            return null;
+        try {
+            return Long.parseLong(raw.trim()) / 10_000_000.0;
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
     private static String newRequestId() {
         return UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+    }
+
+    private static Map<String, String> createContextLabels() {
+        Map<String, String> labels = new LinkedHashMap<>();
+        labels.put("grooming", "미용");
+        labels.put("hospital", "동물병원");
+        labels.put("pharmacy", "동물약국");
+        labels.put("cafe", "카페");
+        labels.put("restaurant", "식당");
+        labels.put("pension", "펜션");
+        labels.put("boarding", "위탁관리");
+        labels.put("hotel", "호텔");
+        labels.put("supplies", "반려동물용품");
+        labels.put("snack", "간식");
+        labels.put("food", "사료");
+        labels.put("clothes", "의류");
+        return Map.copyOf(labels);
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     record PopularEntryPayload(String name,
             @JsonProperty("mention_count") Integer mentionCount,
-            double score) {
+            double score,
+            String address,
+            @JsonProperty("road_address") String roadAddress,
+            @JsonProperty("map_x") String mapX,
+            @JsonProperty("map_y") String mapY,
+            String telephone) {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)

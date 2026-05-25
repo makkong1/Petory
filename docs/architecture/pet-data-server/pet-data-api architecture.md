@@ -1,5 +1,11 @@
 # Pet Data API & Petory Recommendation — 통합 아키텍처
 
+> **주의 — 구버전 아키텍처 기준 문서**
+> 이 문서는 구버전 아키텍처(PostgreSQL·Ollama·LLM 기반) 기준으로 작성되었습니다.
+> 현재 pet-data-api의 실제 구조는 **Redis 기반 Popularity Intelligence API**이며, PostgreSQL·Ollama·Kakao 지오코더는 미사용입니다.
+> 현재 구조 기준 문서: [`pet-data-api/docs/분析/ARCHITECTURE.md`](../../data_server_통합/) 참고.
+> 현재 운영 중인 엔드포인트에 `GET /facilities` (cursor 기반 페이징, FacilitySyncService 연동용)가 추가되었습니다.
+
 ![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-4169E1?logo=postgresql&logoColor=white)
