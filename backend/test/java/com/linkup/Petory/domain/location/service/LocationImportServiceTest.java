@@ -83,6 +83,15 @@ class LocationImportServiceTest {
     }
 
     @Test
+    void importFromStream_skipsBlankAddress() throws IOException {
+        String json = "[{\"name\":\"멍멍미용\",\"address\":\"\",\"lat\":37.5,\"lng\":127.0}]";
+
+        LocationImportService.SyncResult result = service.importFromStream(toStream(json));
+
+        assertThat(result.getSkipped()).isEqualTo(1);
+    }
+
+    @Test
     void importFromStream_emptyArray_returnsZeros() throws IOException {
         String json = "[]";
 
