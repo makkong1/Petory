@@ -1,5 +1,6 @@
 -- location 컬럼을 NULL 허용으로 변경
--- FacilitySyncService가 lat/lng만 있는 상태로 INSERT한 뒤
--- LocationServiceBatchWriter가 native UPDATE로 POINT를 채우는 구조.
--- 기존 NOT NULL 제약이 INSERT를 막아 PET_DATA_API 동기화가 전혀 동작하지 않던 문제 해결.
-ALTER TABLE locationservice MODIFY COLUMN location POINT NULL;
+-- MySQL은 공간 인덱스가 있으면 SRID 변경으로 해석해 ALTER를 거부.
+-- 인덱스를 먼저 제거하고, SRID 4326을 명시한 채 NULL 허용으로 변경한 뒤 재생성.
+ALTER TABLE locationservice DROP INDEX idx_locationservice_location_spatial;
+ALTER TABLE locationservice MODIFY COLUMN location POINT NULL SRID 4326;
+ALTER TABLE locationservice ADD SPATIAL INDEX idx_locationservice_location_spatial (location);
