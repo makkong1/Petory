@@ -1,6 +1,5 @@
 package com.linkup.Petory.domain.location.controller;
 
-import com.linkup.Petory.domain.location.service.FacilitySyncService;
 import com.linkup.Petory.domain.location.service.LocationImportService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
@@ -17,20 +16,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class LocationServiceAdminController {
 
-    private final FacilitySyncService facilitySyncService;
     private final LocationImportService locationImportService;
-
-    @PostMapping("/sync")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MASTER')")
-    public ResponseEntity<Map<String, Object>> syncFacilities() {
-        FacilitySyncService.SyncResult result = facilitySyncService.syncFromPetDataApi();
-        return ResponseEntity.ok(Map.of(
-                "total", result.getTotal(),
-                "saved", result.getSaved(),
-                "duplicate", result.getDuplicate(),
-                "skipped", result.getSkipped()
-        ));
-    }
 
     @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAnyRole('ADMIN', 'MASTER')")
