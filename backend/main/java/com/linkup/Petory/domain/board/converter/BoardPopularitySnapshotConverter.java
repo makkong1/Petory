@@ -9,6 +9,8 @@ import com.linkup.Petory.domain.file.service.AttachmentFileService;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 import org.springframework.util.StringUtils;
@@ -23,8 +25,6 @@ public class BoardPopularitySnapshotConverter {
 
     public BoardPopularitySnapshotDTO toDTO(BoardPopularitySnapshot snapshot) {
         Board board = snapshot.getBoard();
-        String boardFilePath = resolvePrimaryFileUrl(board);
-
         return new BoardPopularitySnapshotDTO(
                 snapshot.getSnapshotId(),
                 board != null ? board.getIdx() : null,
@@ -38,7 +38,7 @@ public class BoardPopularitySnapshotConverter {
                 snapshot.getViewCount(),
                 board != null ? board.getTitle() : null,
                 board != null ? board.getCategory() : null,
-                boardFilePath,
+                null,
                 snapshot.getCreatedAt());
     }
 
@@ -57,27 +57,52 @@ public class BoardPopularitySnapshotConverter {
         return snapshot;
     }
 
+    // 단건 getAttachments 대신 배치 선조회 후 Map 전달 — N+1 방지
     public List<BoardPopularitySnapshotDTO> toDTOList(List<BoardPopularitySnapshot> snapshots) {
+        if (snapshots == null || snapshots.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> boardIds = snapshots.stream()
+                .map(BoardPopularitySnapshot::getBoard)
+                .filter(Objects::nonNull)
+                .map(Board::getIdx)
+                .collect(Collectors.toList());
+
+        Map<Long, List<FileDTO>> attachmentsMap =
+                attachmentFileService.getAttachmentsBatch(FileTargetType.BOARD, boardIds);
+
         return snapshots.stream()
-                .map(this::toDTO)
+                .map(s -> toDTO(s, attachmentsMap))
                 .collect(Collectors.toList());
     }
 
-    private String resolvePrimaryFileUrl(Board board) {
-        if (board == null) {
-            return null;
-        }
-        List<FileDTO> attachments = attachmentFileService.getAttachments(FileTargetType.BOARD, board.getIdx());
-        if (attachments == null || attachments.isEmpty()) {
-            return null;
-        }
+    private BoardPopularitySnapshotDTO toDTO(BoardPopularitySnapshot snapshot,
+                                              Map<Long, List<FileDTO>> attachmentsMap) {
+        Board board = snapshot.getBoard();
+        return new BoardPopularitySnapshotDTO(
+                snapshot.getSnapshotId(),
+                board != null ? board.getIdx() : null,
+                snapshot.getPeriodType(),
+                snapshot.getPeriodStartDate(),
+                snapshot.getPeriodEndDate(),
+                snapshot.getRanking(),
+                snapshot.getPopularityScore(),
+                snapshot.getLikeCount(),
+                snapshot.getCommentCount(),
+                snapshot.getViewCount(),
+                board != null ? board.getTitle() : null,
+                board != null ? board.getCategory() : null,
+                resolvePrimaryFileUrl(board, attachmentsMap),
+                snapshot.getCreatedAt());
+    }
+
+    private String resolvePrimaryFileUrl(Board board, Map<Long, List<FileDTO>> attachmentsMap) {
+        if (board == null) return null;
+        List<FileDTO> attachments = attachmentsMap.getOrDefault(board.getIdx(), List.of());
+        if (attachments.isEmpty()) return null;
         FileDTO primary = attachments.get(0);
-        if (primary == null) {
-            return null;
-        }
-        if (StringUtils.hasText(primary.getDownloadUrl())) {
-            return primary.getDownloadUrl();
-        }
+        if (StringUtils.hasText(primary.getDownloadUrl())) return primary.getDownloadUrl();
         return attachmentFileService.buildDownloadUrl(primary.getFilePath());
     }
 }
