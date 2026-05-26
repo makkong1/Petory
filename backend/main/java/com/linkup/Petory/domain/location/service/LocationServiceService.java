@@ -131,38 +131,33 @@ public class LocationServiceService {
 
         List<LocationService> services;
 
+        int dbLimit = (maxResults != null && maxResults > 0) ? maxResults : 50;
+
         // 지역 계층 우선순위에 따라 조회 (keyword·category는 쿼리 내부에서 필터)
         long queryStartTime = System.currentTimeMillis();
         if (StringUtils.hasText(roadName)) {
-            services = locationServiceRepository.findByRoadName(roadName, keyword, category);
+            services = locationServiceRepository.findByRoadName(roadName, keyword, category, dbLimit);
             log.debug("도로명 검색: roadName={}, keyword={}, category={}, 결과={}개",
                     roadName, keyword, category, services.size());
         } else if (StringUtils.hasText(eupmyeondong)) {
-            services = locationServiceRepository.findByEupmyeondong(eupmyeondong, keyword, category);
+            services = locationServiceRepository.findByEupmyeondong(eupmyeondong, keyword, category, dbLimit);
             log.debug("읍면동 검색: eupmyeondong={}, keyword={}, category={}, 결과={}개",
                     eupmyeondong, keyword, category, services.size());
         } else if (StringUtils.hasText(sigungu)) {
-            services = locationServiceRepository.findBySigungu(sigungu, keyword, category);
+            services = locationServiceRepository.findBySigungu(sigungu, keyword, category, dbLimit);
             log.debug("시군구 검색: sigungu={}, keyword={}, category={}, 결과={}개",
                     sigungu, keyword, category, services.size());
         } else if (StringUtils.hasText(sido)) {
-            services = locationServiceRepository.findBySido(sido, keyword, category);
+            services = locationServiceRepository.findBySido(sido, keyword, category, dbLimit);
             log.debug("시도 검색: sido={}, keyword={}, category={}, 결과={}개",
                     sido, keyword, category, services.size());
         } else {
-            services = locationServiceRepository.findByOrderByRatingDesc(keyword, category);
+            services = locationServiceRepository.findByOrderByRatingDesc(keyword, category, dbLimit);
             log.debug("전체 조회: keyword={}, category={}, 결과={}개",
                     keyword, category, services.size());
         }
         long queryTime = System.currentTimeMillis() - queryStartTime;
         log.info("[성능 측정] DB 쿼리 실행 시간: {}ms, 조회된 레코드 수: {}개", queryTime, services.size());
-
-        // 최대 결과 수 제한
-        if (maxResults != null && maxResults > 0) {
-            services = services.stream()
-                    .limit(maxResults)
-                    .collect(Collectors.toList());
-        }
 
         // DTO 변환
         long dtoConvertStartTime = System.currentTimeMillis();
@@ -250,17 +245,12 @@ public class LocationServiceService {
 
         long methodStartTime = System.currentTimeMillis();
 
+        int dbLimit = (maxResults != null && maxResults > 0) ? maxResults : 50;
+
         long queryStartTime = System.currentTimeMillis();
-        List<LocationService> services = locationServiceRepository.findByNameContaining(keyword, category);
+        List<LocationService> services = locationServiceRepository.findByNameContaining(keyword, category, dbLimit);
         long queryTime = System.currentTimeMillis() - queryStartTime;
         log.info("[성능 측정] 키워드 검색 DB 쿼리 실행 시간: {}ms, 조회된 레코드 수: {}개", queryTime, services.size());
-
-        // 최대 결과 수 제한
-        if (maxResults != null && maxResults > 0) {
-            services = services.stream()
-                    .limit(maxResults)
-                    .collect(Collectors.toList());
-        }
 
         // DTO 변환
         long dtoConvertStartTime = System.currentTimeMillis();
