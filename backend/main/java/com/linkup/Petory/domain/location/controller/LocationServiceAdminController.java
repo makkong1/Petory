@@ -27,7 +27,7 @@ public class LocationServiceAdminController {
             return ResponseEntity.ok(Map.of(
                     "total", result.getTotal(),
                     "saved", result.getSaved(),
-                    "duplicate", result.getDuplicate(),
+                    "updated", result.getUpdated(),
                     "skipped", result.getSkipped()
             ));
         } catch (IOException e) {

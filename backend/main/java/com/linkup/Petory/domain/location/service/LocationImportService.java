@@ -16,8 +16,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -44,30 +46,48 @@ public class LocationImportService {
     }
 
     private SyncResult processEntries(List<LocationImportDto> dtos) {
-        int total = dtos.size(), saved = 0, duplicate = 0, skipped = 0;
+        int total = dtos.size(), saved = 0, updated = 0, skipped = 0;
         List<LocationService> batch = new ArrayList<>();
 
         for (LocationImportDto dto : dtos) {
             try {
                 if (!isValid(dto)) { skipped++; continue; }
-                if (locationServiceRepository.existsByNameAndAddress(dto.getName(), dto.getAddress())) {
-                    duplicate++; continue;
-                }
-                batch.add(toEntity(dto));
-                if (batch.size() >= batchSize) {
-                    saved += batchWriter.saveBatch(batch);
-                    batch.clear();
+
+                Optional<LocationService> existing = locationServiceRepository
+                        .findByNameAndAddressAndDataSource(dto.getName(), dto.getAddress(), "BATCH_IMPORT");
+
+                if (existing.isPresent()) {
+                    LocationService entity = existing.get();
+                    entity.setPhone(dto.getPhone());
+                    entity.setLatitude(dto.getLat());
+                    entity.setLongitude(dto.getLng());
+                    entity.setSido(dto.getSido());
+                    entity.setSigungu(dto.getSigungu());
+                    entity.setCategory3(categoryLabel(dto.getCategory()));
+                    entity.setLastUpdated(LocalDate.now());
+                    if (Boolean.TRUE.equals(entity.getIsDeleted())) {
+                        entity.setIsDeleted(false);
+                        entity.setDeletedAt(null);
+                    }
+                    locationServiceRepository.save(entity);
+                    updated++;
+                } else {
+                    batch.add(toEntity(dto));
+                    if (batchSize > 0 && batch.size() >= batchSize) {
+                        saved += batchWriter.saveBatch(new ArrayList<>(batch));
+                        batch.clear();
+                    }
                 }
             } catch (Exception e) {
                 log.warn("[LocationImportService] 변환 실패 name={}", dto.getName(), e);
                 skipped++;
             }
         }
-        if (!batch.isEmpty()) saved += batchWriter.saveBatch(batch);
+        if (!batch.isEmpty()) saved += batchWriter.saveBatch(new ArrayList<>(batch));
 
-        log.info("[LocationImportService] 완료 total={} saved={} duplicate={} skipped={}",
-                total, saved, duplicate, skipped);
-        return new SyncResult(total, saved, duplicate, skipped);
+        log.info("[LocationImportService] 완료 total={} saved={} updated={} skipped={}",
+                total, saved, updated, skipped);
+        return new SyncResult(total, saved, updated, skipped);
     }
 
     private boolean isValid(LocationImportDto dto) {
@@ -91,6 +111,7 @@ public class LocationImportService {
                 .longitude(dto.getLng())
                 .petFriendly(true)
                 .dataSource("BATCH_IMPORT")
+                .lastUpdated(LocalDate.now())
                 .build();
     }
 
@@ -114,7 +135,7 @@ public class LocationImportService {
     public static class SyncResult {
         private final int total;
         private final int saved;
-        private final int duplicate;
+        private final int updated;
         private final int skipped;
     }
 }

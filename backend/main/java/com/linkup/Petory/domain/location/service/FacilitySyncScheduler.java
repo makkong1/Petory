@@ -26,8 +26,8 @@ public class FacilitySyncScheduler {
         log.info("[FacilitySyncScheduler] 파일 기반 import 시작: {}", importFilePath);
         try {
             LocationImportService.SyncResult result = locationImportService.importFromFile(importFilePath);
-            log.info("[FacilitySyncScheduler] 완료 total={} saved={} duplicate={} skipped={}",
-                    result.getTotal(), result.getSaved(), result.getDuplicate(), result.getSkipped());
+            log.info("[FacilitySyncScheduler] 완료 total={} saved={} updated={} skipped={}",
+                    result.getTotal(), result.getSaved(), result.getUpdated(), result.getSkipped());
         } catch (Exception e) {
             log.error("[FacilitySyncScheduler] 실패: {}", e.getMessage(), e);
         }
