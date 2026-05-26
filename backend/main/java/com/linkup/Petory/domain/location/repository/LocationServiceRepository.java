@@ -44,6 +44,12 @@ public interface LocationServiceRepository {
     boolean existsByNameAndAddress(String name, String address);
 
     /**
+     * name + address + dataSource로 조회 — isDeleted 무관 (soft-deleted row 포함)
+     */
+    Optional<LocationService> findByNameAndAddressAndDataSource(
+            String name, String address, String dataSource);
+
+    /**
      * 반경 검색 (ST_Distance_Sphere 사용, keyword·category 필터 포함)
      */
     List<LocationService> findByRadius(Double latitude, Double longitude, Double radiusInMeters,

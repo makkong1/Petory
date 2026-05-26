@@ -1,6 +1,7 @@
 package com.linkup.Petory.domain.location.repository;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -59,6 +60,14 @@ public interface SpringDataJpaLocationServiceRepository extends JpaRepository<Lo
                         "ls.name = :name AND ls.address = :address AND " +
                         "(ls.isDeleted IS NULL OR ls.isDeleted = false)")
         boolean existsByNameAndAddress(@Param("name") String name, @Param("address") String address);
+
+        @RepositoryMethod("장소 서비스: name+address+dataSource 조회 (isDeleted 무관)")
+        @Query("SELECT ls FROM LocationService ls WHERE " +
+                        "ls.name = :name AND ls.address = :address AND ls.dataSource = :dataSource")
+        Optional<LocationService> findByNameAndAddressAndDataSource(
+                        @Param("name") String name,
+                        @Param("address") String address,
+                        @Param("dataSource") String dataSource);
 
         // spatial index를 실제로 잘 타고 있음
         // ST_Within + ST_Distance_Sphere 조합이 망하지 않음
