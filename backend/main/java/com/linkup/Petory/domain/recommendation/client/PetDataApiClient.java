@@ -89,14 +89,10 @@ public class PetDataApiClient {
         if (context == null || context.isBlank()) {
             return "supplies";
         }
-        switch (context.toLowerCase(Locale.ROOT)) {
-            case "snack":
-            case "food":
-            case "clothes":
-                return "supplies";
-            default:
-                return context.toLowerCase(Locale.ROOT);
-        }
+        return switch (context.toLowerCase(Locale.ROOT)) {
+            case "snack", "food", "clothes" -> "supplies";
+            default -> context.toLowerCase(Locale.ROOT);
+        };
     }
 
     static String normalizeTrendCategory(String context) {
@@ -123,7 +119,8 @@ public class PetDataApiClient {
 
             log.info(
                     "[PetDataApiClient/recommend→popular+trends] reqId={} popularCtx={} trendCat={} facilities={} trends={}",
-                    requestId, normalizePopularPathContext(request.context()), normalizeTrendCategory(request.context()),
+                    requestId, normalizePopularPathContext(request.context()),
+                    normalizeTrendCategory(request.context()),
                     facilities.size(), trends.size());
 
             return new RecommendResponse(
@@ -175,8 +172,8 @@ public class PetDataApiClient {
             log.info("[PetDataApiClient/trends] 요청 스냅샷-only reqId={} category={} limit={}",
                     requestId, cat, topKeywords);
 
-            List<RecommendResponse.TrendItem> keywords =
-                    fetchTrendsAsTrendItems(cat, Math.max(topKeywords, 10), requestId);
+            List<RecommendResponse.TrendItem> keywords = fetchTrendsAsTrendItems(cat, Math.max(topKeywords, 10),
+                    requestId);
             List<TrendTimeseriesResponse.Point> points = expandSnapshotToSyntheticSeries(days, keywords);
 
             return new TrendTimeseriesResponse(cat, days, topKeywords, points);
@@ -192,12 +189,12 @@ public class PetDataApiClient {
             String popularContext, int limit, String correlationId) {
         try {
             RestClient.ResponseSpec rs = withOptionalCorrelation(
-                            recommendClient.get()
-                                    .uri(uriBuilder -> uriBuilder
-                                            .path("/popular/{ctx}")
-                                            .queryParam("limit", limit)
-                                            .build(popularContext)),
-                            correlationId)
+                    recommendClient.get()
+                            .uri(uriBuilder -> uriBuilder
+                                    .path("/popular/{ctx}")
+                                    .queryParam("limit", limit)
+                                    .build(popularContext)),
+                    correlationId)
                     .retrieve();
             String body = rs.body(String.class);
             if (body == null || body.isBlank()) {
@@ -253,12 +250,12 @@ public class PetDataApiClient {
             String category, int limit, String correlationId) {
         try {
             String body = withOptionalCorrelation(
-                            recommendClient.get()
-                                    .uri(uriBuilder -> uriBuilder
-                                            .path("/trends/{cat}")
-                                            .queryParam("limit", limit)
-                                            .build(category)),
-                            correlationId)
+                    recommendClient.get()
+                            .uri(uriBuilder -> uriBuilder
+                                    .path("/trends/{cat}")
+                                    .queryParam("limit", limit)
+                                    .build(category)),
+                    correlationId)
                     .retrieve()
                     .body(String.class);
             if (body == null || body.isBlank()) {
