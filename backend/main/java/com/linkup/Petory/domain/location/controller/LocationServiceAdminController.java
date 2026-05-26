@@ -1,13 +1,14 @@
 package com.linkup.Petory.domain.location.controller;
 
-import com.linkup.Petory.domain.location.service.FacilitySyncService;
+import com.linkup.Petory.domain.location.service.LocationImportService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.Map;
 
 @RestController
@@ -15,17 +16,22 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class LocationServiceAdminController {
 
-    private final FacilitySyncService facilitySyncService;
+    private final LocationImportService locationImportService;
 
-    @PostMapping("/sync")
+    @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAnyRole('ADMIN', 'MASTER')")
-    public ResponseEntity<Map<String, Object>> syncFacilities() {
-        FacilitySyncService.SyncResult result = facilitySyncService.syncFromPetDataApi();
-        return ResponseEntity.ok(Map.of(
-                "total", result.getTotal(),
-                "saved", result.getSaved(),
-                "duplicate", result.getDuplicate(),
-                "skipped", result.getSkipped()
-        ));
+    public ResponseEntity<Map<String, Object>> importFacilities(
+            @RequestPart("file") MultipartFile file) {
+        try {
+            LocationImportService.SyncResult result = locationImportService.importFromStream(file.getInputStream());
+            return ResponseEntity.ok(Map.of(
+                    "total", result.getTotal(),
+                    "saved", result.getSaved(),
+                    "updated", result.getUpdated(),
+                    "skipped", result.getSkipped()
+            ));
+        } catch (IOException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "파일 읽기 실패: " + e.getMessage()));
+        }
     }
 }
