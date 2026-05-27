@@ -36,7 +36,7 @@ public class ReactionService {
     private final CommentRepository commentRepository;
     private final UsersRepository usersRepository;
 
-    @CacheEvict(value = "boardDetail", key = "#boardId")
+    @CacheEvict(value = "boardDetail", key = "#p0")
     public ReactionSummaryDTO reactToBoard(Long boardId, Long userId, ReactionType reactionType) {
         Board board = boardRepository.findById(boardId)
                 .orElseThrow(() -> new BoardNotFoundException());
