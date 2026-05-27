@@ -172,8 +172,29 @@ public class FileStorageService {
     }
 
     private void verifyImageContent(MultipartFile file) {
+        String ct = file.getContentType();
+        if (ct != null && ct.equalsIgnoreCase("image/webp")) {
+            verifyWebpMagicBytes(file);
+            return;
+        }
         try (InputStream is = file.getInputStream()) {
             if (ImageIO.read(is) == null) {
+                throw FileUploadValidationException.invalidContentType();
+            }
+        } catch (FileUploadValidationException ex) {
+            throw ex;
+        } catch (IOException ex) {
+            throw FileUploadValidationException.invalidContentType();
+        }
+    }
+
+    // ImageIO does not support WebP natively — verify RIFF/WEBP header directly
+    private void verifyWebpMagicBytes(MultipartFile file) {
+        try (InputStream is = file.getInputStream()) {
+            byte[] header = new byte[12];
+            if (is.read(header) < 12
+                    || header[0] != 0x52 || header[1] != 0x49 || header[2] != 0x46 || header[3] != 0x46
+                    || header[8] != 0x57 || header[9] != 0x45 || header[10] != 0x42 || header[11] != 0x50) {
                 throw FileUploadValidationException.invalidContentType();
             }
         } catch (FileUploadValidationException ex) {

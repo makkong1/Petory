@@ -119,16 +119,17 @@ public class AdminLocationController {
 
         // 확장자 검증
         String originalFilename = file.getOriginalFilename();
-        if (originalFilename != null) {
-            String lower = originalFilename.toLowerCase();
-            boolean validExt = ALLOWED_CSV_EXTENSIONS.stream().anyMatch(lower::endsWith);
-            if (!validExt) {
-                log.warn("CSV 파일 확장자 불허: {}", originalFilename.replaceAll("[/\\\\]", "_"));
-                return ResponseEntity.badRequest()
-                        .body(BatchImportResult.builder()
-                                .error(1)
-                                .build());
-            }
+        if (originalFilename == null || originalFilename.isBlank()) {
+            return ResponseEntity.badRequest()
+                    .body(BatchImportResult.builder().error(1).build());
+        }
+        String lower = originalFilename.toLowerCase();
+        if (ALLOWED_CSV_EXTENSIONS.stream().noneMatch(lower::endsWith)) {
+            log.warn("CSV 파일 확장자 불허: {}", originalFilename.replaceAll("[/\\\\]", "_"));
+            return ResponseEntity.badRequest()
+                    .body(BatchImportResult.builder()
+                            .error(1)
+                            .build());
         }
 
         // Content-Type 검증 (null 허용)
@@ -144,8 +145,7 @@ public class AdminLocationController {
             }
         }
 
-        String safeFilename = originalFilename != null
-                ? originalFilename.replaceAll("[/\\\\]", "_") : "unknown";
+        String safeFilename = originalFilename.replaceAll("[/\\\\]", "_");
         log.info("공공데이터 CSV 파일 업로드 임포트 요청: {} ({} bytes)", safeFilename, file.getSize());
 
         try {
