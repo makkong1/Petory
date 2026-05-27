@@ -102,7 +102,7 @@ public class LocationServiceService {
     /**
      * 인기 위치 서비스 조회 (카테고리별 상위 10개)
      */
-    @Cacheable(value = "popularLocationServices", key = "#category")
+    @Cacheable(value = "popularLocationServices", key = "#p0")
     public List<LocationServiceDTO> getPopularLocationServices(String category) {
         return locationServiceRepository.findTop10ByCategoryOrderByRatingDesc(category)
                 .stream()

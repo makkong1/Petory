@@ -274,7 +274,7 @@ public class BoardService {
 
     // 게시글 수정
     @Caching(evict = {
-            @CacheEvict(value = "boardDetail", key = "#idx"),
+            @CacheEvict(value = "boardDetail", key = "#p0"),
             @CacheEvict(value = "boardList", allEntries = true) // 카테고리 변경 가능하므로 안전하게 전체 무효화
     })
     @Transactional
@@ -312,7 +312,7 @@ public class BoardService {
 
     // 게시글 삭제
     @Caching(evict = {
-            @CacheEvict(value = "boardDetail", key = "#idx"),
+            @CacheEvict(value = "boardDetail", key = "#p0"),
             @CacheEvict(value = "boardList", allEntries = true) // 해당 카테고리 캐시 무효화를 위해 전체 무효화
     })
     @Transactional
@@ -577,7 +577,7 @@ public class BoardService {
      * 게시글 상태 변경 (관리자용) - AdminBoardController에서 사용
      */
     @Caching(evict = {
-            @CacheEvict(value = "boardDetail", key = "#id"),
+            @CacheEvict(value = "boardDetail", key = "#p0"),
             @CacheEvict(value = "boardList", allEntries = true)
     })
     @Transactional
@@ -593,7 +593,7 @@ public class BoardService {
      * 게시글 복구 (관리자용) - AdminBoardController에서 사용
      */
     @Caching(evict = {
-            @CacheEvict(value = "boardDetail", key = "#id"),
+            @CacheEvict(value = "boardDetail", key = "#p0"),
             @CacheEvict(value = "boardList", allEntries = true)
     })
     @Transactional

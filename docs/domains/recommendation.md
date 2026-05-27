@@ -6,14 +6,15 @@
 
 Petory 백엔드는 이제 모든 컨텍스트를 외부 추천 서버에 그대로 프록시하지 않습니다.
 
-- **Track A (`grooming`, `hospital`, `pharmacy`, `cafe`, `restaurant`, `pension`, `boarding`, `hotel`)**
+- **Track A (`grooming`, `hospital`, `pharmacy`, `cafe`, `restaurant`, `pension`, `boarding`, `hotel`, `supplies`)**
   - Petory가 `LocationService` 구조화 저장소에서 **nearby 후보를 직접 조회**
   - `pet-data-api`에서는 **`popular` / `trends` 시그널만 조회**
   - 최종 조합과 정렬, 응답 DTO 조립은 **Petory 서비스 레이어**가 담당
   - 시설 데이터는 Python batch CLI → JSON → `LocationImportService`를 통해 `locationservice` DB에 적재
-- **Track B (비-시설 카테고리: `supplies`, `snack`, `food`, `clothes`)**
+- **Track B (비-시설 카테고리: `snack`, `food`, `clothes`)**
   - 기존 `PetDataApiClient.recommend()` 경로를 유지
   - 구조화 시설 마스터가 없는 트렌드 중심 카테고리라서 Petory owner 전환 대상이 아님
+  - `snack` / `food` / `clothes`는 `PetDataApiClient`에서 경로 alias `supplies`로 정규화되어 호출됨
 
 ### 1.2 Location 추천과의 구분
 
@@ -43,7 +44,7 @@ Petory 백엔드는 이제 모든 컨텍스트를 외부 추천 서버에 그대
 
 - **`GET`** `/api/recommend` — `lat`, `lng`, `context` 로 추천, 응답은 `RecommendResponse`.
 - **`POST`** `/api/recommend/copy` — 시설·트렌드 payload 로 LLM 카피 생성.
-- **`POST`** `/api/recommend/events` — 요청별 행동 이벤트 기록(`userId` 해시 후 pet-data-api 전달).
+- **`POST`** `/api/recommend/events` — 요청별 행동 이벤트 기록(`userId` SHA-256 해시 → `userRef`; 현재 전송 스킵).
 - **`GET`** `/api/recommend/trends/{category}/timeseries` — 트렌드 시계열.
 
 ### 2.2 `GET /api/recommend`
@@ -66,12 +67,14 @@ Petory 백엔드는 이제 모든 컨텍스트를 외부 추천 서버에 그대
 **`POST` `/api/recommend/events`**
 
 - 본문: `RecommendEventRequest`(request_id, events[]) → 응답 `202`
-- `userId` 는 해시(`userRef`) 후 pet-data-api 로 전달
+- `userId` 는 `SHA-256` 앞 12자 해시(`petory-xxxxxxxxxxxx`)로 변환해 `userRef` 필드에 주입
+- 현재 pet-data-api에 이벤트 수집 엔드포인트가 없어 **실제 전송은 스킵** (`sendEvents()`는 debug 로그만 출력). 추후 엔드포인트 구현 시 전송 로직 추가 예정
 
 **`GET` `/api/recommend/trends/{category}/timeseries`**
 
 - 쿼리: `days`(기본 14), `top_keywords`(기본 10)
 - 응답: `TrendTimeseriesResponse`(category, points: date, keyword, score)
+- pet-data-api는 현재 시점 스냅샷(1회 데이터)만 제공한다. `PetDataApiClient`는 이 스냅샷의 각 키워드를 `days`일치 포인트로 복제해 Recharts 차트 호환 시계열로 변환(`expandSnapshotToSyntheticSeries`)한다. 실제 일별 변화 데이터는 아님.
 
 ### 2.4 응답 DTO (`RecommendResponse`)
 
@@ -105,10 +108,18 @@ public record RecommendResponse(
    - `breed`: 품종
    - `age_months`: `birthDate`가 있을 때만 `ChronoUnit.MONTHS`로 계산, 없으면 `null`
 4. **Track A면**
-   - `LocationServiceService.searchLocationServicesByLocation(...)`로 반경 10km 후보 조회
-   - `PetDataApiClient.fetchPopular(context, ...)`
-   - `PetDataApiClient.fetchTrends(context, ...)`
-   - 이름 normalize 기반으로 popularity 시그널 조인 후 Petory가 최종 정렬
+   - `LocationServiceService.searchLocationServicesByLocation(...)`로 반경 10km 후보 최대 20개 조회
+   - `PetDataApiClient.fetchPopular(context, ...)` — popular 시그널 목록 조회
+   - `PetDataApiClient.fetchTrends(context, ...)` — 트렌드 키워드 최대 15개 조회
+   - **이름 정규화 + alias 조인**: 상호명에서 업종 suffix(예: `미용`, `애견미용실`, `동물병원`)를 제거한 별칭을 생성해 popular 시그널 인덱스와 매칭. 예) "피플앤독 미용" → "피플앤독" alias로 popular 시그널 찾음
+   - **가중 스코어링 후 상위 5개** 반환:
+     | 요소 | 가중치 |
+     |------|--------|
+     | 거리 (가까울수록 높음) | **55%** |
+     | 평점 (`rating / 5.0`) | 20% |
+     | 리뷰 수 (`log(n+1)` 정규화) | 15% |
+     | 인기도 (블로그 언급 점수·횟수) | 10% |
+   - 동점 시 거리순 → 이름 사전순으로 tie-break
 5. **Track B면**
    - `RecommendRequest` 빌드: `lat`, `lng`, `context`, **고정** `radius_km=10.0`, `top_n=5`, `pet`(또는 `null`)
    - `PetDataApiClient.recommend(request)` 호출
@@ -140,11 +151,20 @@ public record RecommendRequest(
 - **설정**
   - `app.pet-data-api.base-url` — Pet Data API 베이스 URL (필수)
   - `app.pet-data-api.api-key` — `X-API-Key` (빈 문자열 가능하나, 운영 시 필수)
+  - `app.pet-data-api.timeout-ms` — popular·trends 호출 타임아웃 (기본 3000ms)
+  - `app.pet-data-api.copy-timeout-ms` — 생성자 파라미터로 수신하나 **현재 미사용** (copy 호출이 로컬 규칙 기반으로 전환됨)
+- **RestClient 구성**
+  - `recommendClient` — popular·trends·copy 호출용, `timeout-ms` 적용
+  - `facilityClient` — 레거시 `/facilities` 페이지네이션용, **30초 하드코딩** (현 pet-data-api에 `/facilities` 없어 404 폴백)
 - **주 역할**
-  - `fetchPopular(context, limit, correlationId)` → `GET /popular/{context}`
+  - `fetchPopular(context, limit, correlationId)` → `GET /popular/{context}` (`snack`/`food`/`clothes` → `supplies` 경로 alias 자동 변환)
   - `fetchTrends(context, limit, correlationId)` → `GET /trends/{category}`
-  - `recommend(request)`는 Track B/레거시 호환용 조합 메서드로만 유지
-- **실패**: 예외는 래핑하여 `RuntimeException`으로 throw — 상위에서 `null`이 반환되는 경로는 현재 `RecommendService`에 없음
+  - `recommend(request)` — Track B/레거시 호환: pet-data-api에 `POST /recommend` 없으므로 `fetchPopular` + `fetchTrends`를 조합해 `RecommendResponse`를 **로컬에서 조립**
+  - `recommendCopy(request)` — LLM 카피 엔드포인트 없어 **규칙 기반 문구를 로컬 생성**
+  - `sendEvents(request)` — pet-data-api 이벤트 엔드포인트 미구현으로 **현재 스킵** (debug 로그만)
+- **실패 처리**
+  - `fetchPopular` / `fetchTrends`: 404(미지원 context) · 503(빈 캐시)는 빈 리스트 반환, 그 외는 `RuntimeException` throw
+  - `recommend()` / `getTrendTimeseries()`: 예외를 `RuntimeException`으로 래핑 — 상위 컨트롤러에서 `null` 반환 경로는 없음
 
 ---
 

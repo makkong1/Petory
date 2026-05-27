@@ -169,7 +169,7 @@ public class CommentService {
         return mapCommentsWithReactionCountsBatch(comments, reactionCountsMap, filesByCommentId);
     }
 
-    @CacheEvict(value = "boardDetail", key = "#boardId")
+    @CacheEvict(value = "boardDetail", key = "#p0")
     @Transactional
     public CommentDTO addComment(Long boardId, CommentDTO dto) {
         Board board = boardRepository.findById(boardId)
@@ -212,7 +212,7 @@ public class CommentService {
         return mapWithReactionCounts(saved);
     }
 
-    @CacheEvict(value = "boardDetail", key = "#boardId")
+    @CacheEvict(value = "boardDetail", key = "#p0")
     @Transactional
     public CommentDTO updateComment(Long boardId, Long commentId, CommentDTO dto) {
         Board board = boardRepository.findById(boardId)
@@ -251,7 +251,7 @@ public class CommentService {
         return mapWithReactionCounts(saved);
     }
 
-    @CacheEvict(value = "boardDetail", key = "#boardId")
+    @CacheEvict(value = "boardDetail", key = "#p0")
     @Transactional
     public void deleteComment(Long boardId, Long commentId) {
         Board board = boardRepository.findById(boardId)
@@ -350,7 +350,7 @@ public class CommentService {
      * 댓글 상태 변경 (관리자용)
      * - AdminBoardController에서 사용
      */
-    @CacheEvict(value = "boardDetail", key = "#boardId")
+    @CacheEvict(value = "boardDetail", key = "#p0")
     @Transactional
     public CommentDTO updateCommentStatus(Long boardId, Long commentId,
             com.linkup.Petory.domain.common.ContentStatus status) {
@@ -372,7 +372,7 @@ public class CommentService {
      * 댓글 복구 (관리자용)
      * - AdminBoardController에서 사용
      */
-    @CacheEvict(value = "boardDetail", key = "#boardId")
+    @CacheEvict(value = "boardDetail", key = "#p0")
     @Transactional
     public CommentDTO restoreComment(Long boardId, Long commentId) {
         Board board = boardRepository.findById(boardId)
