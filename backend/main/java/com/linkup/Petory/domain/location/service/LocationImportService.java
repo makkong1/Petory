@@ -2,6 +2,7 @@ package com.linkup.Petory.domain.location.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linkup.Petory.domain.location.converter.LocationImportConverter;
 import com.linkup.Petory.domain.location.dto.LocationImportDto;
 import com.linkup.Petory.domain.location.entity.LocationService;
 import com.linkup.Petory.domain.location.repository.LocationServiceRepository;
@@ -28,23 +29,27 @@ public class LocationImportService {
 
     private final LocationServiceRepository locationServiceRepository;
     private final LocationServiceBatchWriter batchWriter;
+    private final LocationImportConverter locationImportConverter;
     private final ObjectMapper objectMapper;
 
     @Value("${app.location.import.batch-size:500}")
     private int batchSize;
 
+    // InputStream으로 전달된 JSON을 파싱해 DB 적재 (CSV 업로드 경로에서 호출)
     public SyncResult importFromStream(InputStream in) throws IOException {
         List<LocationImportDto> dtos = objectMapper.readValue(
                 in, new TypeReference<List<LocationImportDto>>() {});
         return processEntries(dtos);
     }
 
+    // 설정된 파일 경로에서 읽어 importFromStream에 위임 (배치 스케줄러·관리자 수동 동기화에서 호출)
     public SyncResult importFromFile(String filePath) throws IOException {
         try (InputStream in = Files.newInputStream(Path.of(filePath))) {
             return importFromStream(in);
         }
     }
 
+    // DTO 목록을 순회하며 신규(배치 INSERT)·기존(UPDATE) 분기 처리 후 SyncResult 반환
     private SyncResult processEntries(List<LocationImportDto> dtos) {
         int total = dtos.size(), saved = 0, updated = 0, skipped = 0;
         List<LocationService> batch = new ArrayList<>();
@@ -63,7 +68,7 @@ public class LocationImportService {
                     entity.setLongitude(dto.getLng());
                     entity.setSido(dto.getSido());
                     entity.setSigungu(dto.getSigungu());
-                    entity.setCategory3(categoryLabel(dto.getCategory()));
+                    entity.setCategory3(locationImportConverter.categoryLabel(dto.getCategory()));
                     entity.setLastUpdated(LocalDate.now());
                     if (Boolean.TRUE.equals(entity.getIsDeleted())) {
                         entity.setIsDeleted(false);
@@ -72,7 +77,7 @@ public class LocationImportService {
                     locationServiceRepository.save(entity);
                     updated++;
                 } else {
-                    batch.add(toEntity(dto));
+                    batch.add(locationImportConverter.toEntity(dto));
                     if (batchSize > 0 && batch.size() >= batchSize) {
                         saved += batchWriter.saveBatch(new ArrayList<>(batch));
                         batch.clear();
@@ -90,45 +95,12 @@ public class LocationImportService {
         return new SyncResult(total, saved, updated, skipped);
     }
 
+    // 필수 필드(name·address·lat·lng) 존재 여부 및 폐업 상태 검증
     private boolean isValid(LocationImportDto dto) {
         if (!StringUtils.hasText(dto.getName())) return false;
         if (!StringUtils.hasText(dto.getAddress())) return false;
         if (dto.getLat() == null || dto.getLng() == null) return false;
         return !"폐업".equals(dto.getStatus());
-    }
-
-    private LocationService toEntity(LocationImportDto dto) {
-        return LocationService.builder()
-                .name(dto.getName())
-                .category1("반려동물 서비스")
-                .category2("반려동물")
-                .category3(categoryLabel(dto.getCategory()))
-                .sido(dto.getSido())
-                .sigungu(dto.getSigungu())
-                .address(dto.getAddress())
-                .phone(dto.getPhone())
-                .latitude(dto.getLat())
-                .longitude(dto.getLng())
-                .petFriendly(true)
-                .dataSource("BATCH_IMPORT")
-                .lastUpdated(LocalDate.now())
-                .build();
-    }
-
-    private String categoryLabel(String category) {
-        if (!StringUtils.hasText(category)) return "반려동물 시설";
-        return switch (category) {
-            case "grooming"    -> "미용";
-            case "hospital"    -> "동물병원";
-            case "pharmacy"    -> "동물약국";
-            case "cafe"        -> "카페";
-            case "restaurant"  -> "식당";
-            case "pension"     -> "펜션";
-            case "boarding"    -> "위탁관리";
-            case "hotel"       -> "호텔";
-            case "supplies"    -> "반려동물용품";
-            default            -> category;
-        };
     }
 
     @Data
