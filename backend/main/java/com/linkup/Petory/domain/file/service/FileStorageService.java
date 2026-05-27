@@ -1,7 +1,10 @@
 package com.linkup.Petory.domain.file.service;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.MalformedURLException;
+
+import javax.imageio.ImageIO;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -34,7 +37,8 @@ public class FileStorageService {
             "image/jpeg",
             "image/png",
             "image/gif",
-            "image/webp");
+            "image/webp",
+            "image/jfif");
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
             ".jpg",
             ".jpeg",
@@ -163,6 +167,19 @@ public class FileStorageService {
         }
         if (!StringUtils.hasText(extension) || !ALLOWED_EXTENSIONS.contains(extension.toLowerCase())) {
             throw FileUploadValidationException.invalidExtension();
+        }
+        verifyImageContent(file);
+    }
+
+    private void verifyImageContent(MultipartFile file) {
+        try (InputStream is = file.getInputStream()) {
+            if (ImageIO.read(is) == null) {
+                throw FileUploadValidationException.invalidContentType();
+            }
+        } catch (FileUploadValidationException ex) {
+            throw ex;
+        } catch (IOException ex) {
+            throw FileUploadValidationException.invalidContentType();
         }
     }
 }
