@@ -3,6 +3,7 @@ package com.linkup.Petory.domain.admin.controller;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -34,6 +35,12 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class AdminLocationController {
 
+    private static final long MAX_CSV_BYTES = 200 * 1024 * 1024L; // 200 MB (공공데이터 대용량 허용)
+    private static final Set<String> ALLOWED_CSV_EXTENSIONS = Set.of(".csv");
+    private static final Set<String> ALLOWED_CSV_CONTENT_TYPES = Set.of(
+            "text/csv", "application/csv", "text/plain", "application/octet-stream",
+            "application/vnd.ms-excel");
+
     private final LocationServiceAdminService locationServiceAdminService;
     private final LocationServiceService locationServiceService;
     private final PublicDataLocationService publicDataLocationService;
@@ -51,15 +58,15 @@ public class AdminLocationController {
             @RequestParam(value = "category", required = false) String category,
             @RequestParam(value = "size", required = false) Integer size,
             @RequestParam(value = "q", required = false) String q) {
-        
+
         // keyword(q)는 SQL WHERE에서 처리 — Java 후처리 불필요
         List<LocationServiceDTO> services = locationServiceService.searchLocationServicesByRegion(
                 sido, sigungu, eupmyeondong, roadName, q, category, size);
-        
+
         Map<String, Object> response = new HashMap<>();
         response.put("services", services);
         response.put("count", services.size());
-        
+
         return ResponseEntity.ok(response);
     }
 
@@ -82,7 +89,7 @@ public class AdminLocationController {
 
     /**
      * 공공데이터 CSV 파일을 업로드하여 임포트 (파일 업로드 방식)
-     * 
+     *
      * @param file 업로드된 CSV 파일
      * @return 배치 임포트 결과
      */
@@ -101,8 +108,45 @@ public class AdminLocationController {
                             .build());
         }
 
-        log.info("공공데이터 CSV 파일 업로드 임포트 요청: {} ({} bytes)",
-                file.getOriginalFilename(), file.getSize());
+        // 파일 크기 검증
+        if (file.getSize() > MAX_CSV_BYTES) {
+            log.warn("CSV 파일 크기 초과: {} bytes (최대 {} bytes)", file.getSize(), MAX_CSV_BYTES);
+            return ResponseEntity.badRequest()
+                    .body(BatchImportResult.builder()
+                            .error(1)
+                            .build());
+        }
+
+        // 확장자 검증
+        String originalFilename = file.getOriginalFilename();
+        if (originalFilename == null || originalFilename.isBlank()) {
+            return ResponseEntity.badRequest()
+                    .body(BatchImportResult.builder().error(1).build());
+        }
+        String lower = originalFilename.toLowerCase();
+        if (ALLOWED_CSV_EXTENSIONS.stream().noneMatch(lower::endsWith)) {
+            log.warn("CSV 파일 확장자 불허: {}", originalFilename.replaceAll("[/\\\\]", "_"));
+            return ResponseEntity.badRequest()
+                    .body(BatchImportResult.builder()
+                            .error(1)
+                            .build());
+        }
+
+        // Content-Type 검증 (null 허용)
+        String contentType = file.getContentType();
+        if (contentType != null) {
+            String baseType = contentType.split(";")[0].trim().toLowerCase();
+            if (!ALLOWED_CSV_CONTENT_TYPES.contains(baseType)) {
+                log.warn("CSV Content-Type 불허: {}", contentType);
+                return ResponseEntity.badRequest()
+                        .body(BatchImportResult.builder()
+                                .error(1)
+                                .build());
+            }
+        }
+
+        String safeFilename = originalFilename.replaceAll("[/\\\\]", "_");
+        log.info("공공데이터 CSV 파일 업로드 임포트 요청: {} ({} bytes)", safeFilename, file.getSize());
 
         try {
             BatchImportResult result = publicDataLocationService.importFromCsv(file);
@@ -118,7 +162,7 @@ public class AdminLocationController {
 
     /**
      * 공공데이터 CSV 파일 경로로 임포트 (기존 방식 - 하위 호환성)
-     * 
+     *
      * @param csvFilePath CSV 파일의 절대 경로 또는 상대 경로
      * @return 배치 임포트 결과
      */
