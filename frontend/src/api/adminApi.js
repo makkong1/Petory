@@ -36,5 +36,11 @@ export const adminApi = {
     const response = await api.post('/location/sync');
     return response.data;
   },
+
+  // JSON 파일 미리보기 (마지막 수정일 + 레코드 목록)
+  getJsonPreview: async () => {
+    const response = await api.get('/location/json-preview');
+    return response.data;
+  },
 };
 

@@ -76,6 +76,11 @@ public interface LocationServiceRepository {
     List<LocationService> findByRoadName(String roadName, String keyword, String category, int limit);
 
     /**
+     * dataSource별 조회 (최신 lastUpdated 순)
+     */
+    List<LocationService> findByDataSource(String dataSource, int limit);
+
+    /**
      * [FIX] 서비스 평점과 리뷰 수를 리뷰 집계 기준으로 원자적 갱신 (DB 단일 UPDATE)
      */
     void updateReviewStats(Long serviceIdx);

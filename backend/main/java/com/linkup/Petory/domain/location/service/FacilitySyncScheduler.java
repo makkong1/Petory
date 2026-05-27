@@ -1,11 +1,14 @@
 package com.linkup.Petory.domain.location.service;
 
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import java.io.IOException;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Component
@@ -28,7 +31,7 @@ public class FacilitySyncScheduler {
             LocationImportService.SyncResult result = locationImportService.importFromFile(importFilePath);
             log.info("[FacilitySyncScheduler] 완료 total={} saved={} updated={} skipped={}",
                     result.getTotal(), result.getSaved(), result.getUpdated(), result.getSkipped());
-        } catch (Exception e) {
+        } catch (IOException e) {
             log.error("[FacilitySyncScheduler] 실패: {}", e.getMessage(), e);
         }
     }

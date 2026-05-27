@@ -389,7 +389,7 @@ public class PetDataApiClient {
         }
     }
 
-    private static PetFacilityPageDto emptyFacilityPage(long ignoredCursorHint) {
+    private static PetFacilityPageDto emptyFacilityPage(@SuppressWarnings("unused") long ignoredCursorHint) {
         PetFacilityPageDto d = new PetFacilityPageDto();
         d.setItems(Collections.emptyList());
         d.setNextCursor(null);

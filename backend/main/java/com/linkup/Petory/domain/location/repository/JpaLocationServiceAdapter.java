@@ -91,6 +91,11 @@ public class JpaLocationServiceAdapter implements LocationServiceRepository {
     }
 
     @Override
+    public List<LocationService> findByDataSource(String dataSource, int limit) {
+        return jpaRepository.findByDataSource(dataSource, limit);
+    }
+
+    @Override
     public void updateReviewStats(Long serviceIdx) {
         jpaRepository.updateReviewStats(serviceIdx);
     }
