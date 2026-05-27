@@ -11,8 +11,7 @@ import CareCreateModal from "./CareCreateModal";
 import LocationLayer from "./layers/LocationLayer";
 import MeetupLayer from "./layers/MeetupLayer";
 import CareLayer from "./layers/CareLayer";
-import { fetchActiveMapItems, LAYER_CONFIG } from "../../api/unifiedMapApi";
-import { locationServiceApi } from "../../api/locationServiceApi";
+import { fetchActiveMapItems } from "../../api/unifiedMapApi";
 import RecommendCard from "../Recommendation/RecommendCard";
 import { recommendApi } from "../../api/recommendApi";
 
@@ -63,6 +62,28 @@ const isSameCenter = (a, b) => {
 
 const hasValidItemCoordinates = (item) =>
   Number.isFinite(item?.latitude) && Number.isFinite(item?.longitude);
+
+const buildAiFacilityRankMap = (aiFacilities, locationItems) => {
+  const locationIdxs = new Set(
+    locationItems
+      .map((item) => item?.idx)
+      .filter((idx) => Number.isFinite(idx))
+  );
+
+  const linked = new Map();
+  const detached = [];
+
+  aiFacilities.forEach((facility, index) => {
+    const rank = index + 1;
+    if (Number.isFinite(facility?.id) && locationIdxs.has(facility.id)) {
+      linked.set(facility.id, { facility, rank });
+      return;
+    }
+    detached.push({ facility, rank });
+  });
+
+  return { linked, detached };
+};
 
 const UnifiedPetMapPage = () => {
   const [activeLayer, setActiveLayer] = useState("location");
@@ -362,27 +383,76 @@ const UnifiedPetMapPage = () => {
     recommendApi.sendEvents({ requestId, events: [event] }).catch(() => {});
   }, []);
 
-  const aiDisplayItems = aiRecommendFacilities.map((f, i) => ({
-    id: `ai-${i}`,
-    type: "ai_recommend",
-    latitude: f.lat,
-    longitude: f.lng,
-    name: f.name,
-    title: f.name,
-    subtitle: f.address ?? "",
-    distanceM: f.distance_m,
-    isAiRecommend: true,
-    rawAiFacility: f,
-  }));
-  const displayItems = [...aiDisplayItems, ...items];
+  const {
+    linked: linkedAiFacilities,
+    detached: detachedAiFacilities,
+  } = buildAiFacilityRankMap(aiRecommendFacilities, items);
 
-  const handleLocationResultClick = useCallback((item) => {
+  const recommendedServiceIdxs = linkedAiFacilities.size > 0
+    ? new Map(
+        Array.from(linkedAiFacilities.entries()).map(([serviceIdx, value]) => [
+          serviceIdx,
+          value.rank,
+        ])
+      )
+    : null;
+
+  const recommendedLocationItems = [];
+  const regularLocationItems = [];
+
+  const annotatedLocationItems = items.map((item) => {
+    const linkedAi = linkedAiFacilities.get(item.idx);
+    if (!linkedAi) {
+      regularLocationItems.push(item);
+      return item;
+    }
+
+    const annotated = {
+      ...item,
+      isAiRecommend: true,
+      aiRank: linkedAi.rank,
+      rawAiFacility: linkedAi.facility,
+      distanceM:
+        linkedAi.facility.distance_m ??
+        (item.raw?.distance != null ? Math.round(item.raw.distance) : null),
+    };
+    recommendedLocationItems.push(annotated);
+    return annotated;
+  });
+
+  recommendedLocationItems.sort(
+    (left, right) => (left.aiRank ?? Number.MAX_SAFE_INTEGER) - (right.aiRank ?? Number.MAX_SAFE_INTEGER)
+  );
+
+  const detachedAiItems = detachedAiFacilities.map(({ facility, rank }) => ({
+    id: `ai-${rank}`,
+    idx: facility.id ?? null,
+    type: "ai_recommend",
+    latitude: facility.lat,
+    longitude: facility.lng,
+    name: facility.name,
+    title: facility.name,
+    subtitle: facility.address ?? "",
+    distanceM: facility.distance_m,
+    markerColor: "#FFD700",
+    isAiRecommend: true,
+    aiRank: rank,
+    rawAiFacility: facility,
+  }));
+
+  const displayItems = [...detachedAiItems, ...recommendedLocationItems, ...regularLocationItems];
+  const mapServices = [...annotatedLocationItems, ...detachedAiItems.filter(hasValidItemCoordinates)];
+
+  const handleLocationResultClick = useCallback((item, trackAiClick = false) => {
     setSelectedItem(item);
     setHoveredLocationItem(item);
     if (hasValidItemCoordinates(item)) {
       setMapViewportCenter({ lat: item.latitude, lng: item.longitude });
     }
-  }, []);
+    if (trackAiClick && item?.rawAiFacility) {
+      handleAiItemClick(item.rawAiFacility, aiRequestId);
+    }
+  }, [aiRequestId, handleAiItemClick]);
 
   const renderMobileBottomSheet = () => {
     if (activeLayer !== "location" && activeLayer !== "meetup" && activeLayer !== "care") {
@@ -436,8 +506,7 @@ const UnifiedPetMapPage = () => {
                 $selected={isSelected}
                 $isAiRecommend={isAi}
                 onClick={() => {
-                  handleLocationResultClick(item);
-                  if (isAi) handleAiItemClick(item.rawAiFacility, aiRequestId);
+                  handleLocationResultClick(item, isAi);
                 }}
                 onMouseEnter={() => setHoveredLocationItem(item)}
                 onMouseLeave={() =>
@@ -626,12 +695,7 @@ const UnifiedPetMapPage = () => {
                           $selected={isSelected}
                           $isAiRecommend={item.isAiRecommend}
                           onClick={() => {
-                            handleLocationResultClick(item);
-                            if (item.isAiRecommend)
-                              handleAiItemClick(
-                                item.rawAiFacility,
-                                aiRequestId
-                              );
+                            handleLocationResultClick(item, item.isAiRecommend);
                           }}
                           onMouseEnter={() => setHoveredLocationItem(item)}
                           onMouseLeave={() =>
@@ -747,28 +811,16 @@ const UnifiedPetMapPage = () => {
         <MapWrapper>
           {mapViewportCenter ? (
             <MapContainer
-              services={[
-                ...items,
-                ...aiRecommendFacilities
-                  .filter((f) => f.lat != null && f.lng != null)
-                  .map((f, i) => ({
-                    id: `ai-map-${i}`,
-                    type: "ai_recommend",
-                    latitude: f.lat,
-                    longitude: f.lng,
-                    name: f.name,
-                    title: f.name,
-                    subtitle: f.address,
-                    distanceM: f.distance_m,
-                    markerColor: "#FFD700",
-                  })),
-              ]}
-              onServiceClick={setSelectedItem}
+              services={mapServices}
+              onServiceClick={(item) =>
+                handleLocationResultClick(item, Boolean(item?.rawAiFacility))
+              }
               userLocation={userLocation}
               mapCenter={mapViewportCenter}
               mapLevel={mapLevel}
               selectedService={selectedItem}
               hoveredService={hoveredLocationItem}
+              recommendedServiceIdxs={recommendedServiceIdxs}
               onMapIdle={handleMapIdle}
             />
           ) : (
@@ -977,16 +1029,6 @@ const CountChip = styled.div`
   }
 `;
 
-const AiBadge = styled.span`
-  margin-right: 6px;
-  background: ${(props) => props.theme.colors.ai.bg};
-  color: ${(props) => props.theme.colors.ai.text};
-  font-weight: 700;
-  padding: 1px 6px;
-  border-radius: 8px;
-  font-size: 11px;
-`;
-
 const ErrorBanner = styled.div`
   position: absolute;
   top: 12px;
@@ -1170,17 +1212,6 @@ const ResultDistance = styled.span`
   background: ${(props) => props.theme.colors.domain.location + "1A"};
   padding: 4px 8px;
   border-radius: 999px;
-`;
-
-const ResultRankBadge = styled.span`
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 6px;
-  border-radius: 999px;
-  background: ${(props) => props.theme.colors.warningSoft};
-  color: ${(props) => props.theme.colors.warningDark};
-  font-size: 10px;
-  font-weight: 800;
 `;
 
 const AiItemBadge = styled.span`

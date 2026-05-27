@@ -1,48 +1,38 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import styled from 'styled-components';
 import { locationServiceApi } from '../../../api/locationServiceApi';
 import { adminApi } from '../../../api/adminApi';
 
 const LocationServiceManagementSection = () => {
-  const [sido, setSido] = useState('');
-  const [sigungu, setSigungu] = useState('');
-  const [category, setCategory] = useState('');
-  const [q, setQ] = useState('');
-  const [services, setServices] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
   const [importLoading, setImportLoading] = useState(false);
-  const [result, setResult] = useState(null);
+  const [importResult, setImportResult] = useState(null);
   const [importError, setImportError] = useState(null);
+
   const [syncLoading, setSyncLoading] = useState(false);
   const [syncResult, setSyncResult] = useState(null);
   const [syncError, setSyncError] = useState(null);
+
+  const [jsonPreview, setJsonPreview] = useState(null);
+  const [jsonLoading, setJsonLoading] = useState(false);
+
   const fileInputRef = useRef(null);
 
-  const fetchServices = useCallback(async () => {
+  const loadJsonPreview = async () => {
+    setJsonLoading(true);
     try {
-      setLoading(true);
-      setError(null);
-      const params = {};
-      if (sido) params.sido = sido;
-      if (sigungu) params.sigungu = sigungu;
-      if (category) params.category = category;
-      if (q) params.q = q;
-
-      const res = await locationServiceApi.listLocationServices(params);
-      setServices(res.data?.services || []);
+      const data = await adminApi.getJsonPreview();
+      setJsonPreview(data);
     } catch (e) {
-      console.error('장소 목록 조회 실패:', e);
-      setError(e.response?.data?.message || '목록을 불러오지 못했습니다.');
+      setJsonPreview(null);
     } finally {
-      setLoading(false);
+      setJsonLoading(false);
     }
-  }, [sido, sigungu, category, q]);
+  };
 
   useEffect(() => {
-    fetchServices();
-  }, [fetchServices]);
+    loadJsonPreview();
+  }, []);
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -53,34 +43,22 @@ const LocationServiceManagementSection = () => {
       }
       setSelectedFile(file);
       setImportError(null);
-      setResult(null);
+      setImportResult(null);
     }
   };
 
   const handleImport = async () => {
-    if (!selectedFile) {
-      alert('CSV 파일을 선택해주세요.');
-      return;
-    }
-
+    if (!selectedFile) { alert('CSV 파일을 선택해주세요.'); return; }
     setImportLoading(true);
     setImportError(null);
-    setResult(null);
-
+    setImportResult(null);
     try {
       const response = await locationServiceApi.importPublicData(selectedFile);
-      setResult(response.data);
-      alert(`임포트 완료!\n총 읽음: ${response.data.totalRead}\n저장: ${response.data.saved}\n중복: ${response.data.duplicate}\n스킵: ${response.data.skipped}\n에러: ${response.data.error}`);
-      // 파일 선택 초기화
+      setImportResult(response.data);
       setSelectedFile(null);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-      // 목록 새로고침
-      fetchServices();
+      if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (err) {
       setImportError(err?.response?.data?.message || err.message || '임포트 실패');
-      alert('임포트 실패: ' + (err?.response?.data?.message || err.message));
     } finally {
       setImportLoading(false);
     }
@@ -93,12 +71,17 @@ const LocationServiceManagementSection = () => {
     try {
       const data = await adminApi.syncFacilitiesFromPetDataApi();
       setSyncResult(data);
-      fetchServices();
+      loadJsonPreview();
     } catch (err) {
       setSyncError(err?.response?.data?.message || err.message || '동기화 실패');
     } finally {
       setSyncLoading(false);
     }
+  };
+
+  const formatDate = (iso) => {
+    if (!iso) return '-';
+    return iso.replace('T', ' ').substring(0, 16);
   };
 
   return (
@@ -108,36 +91,111 @@ const LocationServiceManagementSection = () => {
         <Subtitle>등록된 장소, 리뷰, 외부 API 캐시를 관리합니다.</Subtitle>
       </Header>
 
+      {/* ── pet-data-api 동기화 ── */}
       <Card>
         <CardTitle>pet-data-api 시설 동기화</CardTitle>
         <CardDescription>
-          pet-data-api에서 수집된 시설 데이터(동물미용·동물병원·동물약국)를 가져와 중복 제거 후 저장합니다.
+          pet-data-api에서 수집된 시설 데이터를 신규 저장하거나 기존 BATCH_IMPORT 데이터를 갱신합니다.
           매일 새벽 1시 자동 실행되며, 여기서 수동으로 즉시 실행할 수 있습니다.
         </CardDescription>
+
         <ButtonGroup>
           <SyncButton onClick={handleSync} disabled={syncLoading}>
             {syncLoading ? '동기화 중...' : '지금 동기화'}
           </SyncButton>
         </ButtonGroup>
+
         {syncError && <ErrorMessage>{syncError}</ErrorMessage>}
+
         {syncResult && (
-          <ResultBox>
-            <ResultTitle>동기화 결과</ResultTitle>
-            <ResultList>
-              <ResultItem>수신 시설 수: <strong>{syncResult.total}</strong></ResultItem>
-              <ResultItem>저장된 개수: <strong>{syncResult.saved}</strong></ResultItem>
-              <ResultItem>중복 스킵: <strong>{syncResult.duplicate}</strong></ResultItem>
-              <ResultItem>검증 실패 스킵: <strong>{syncResult.skipped}</strong></ResultItem>
-            </ResultList>
-          </ResultBox>
+          <>
+            <ResultBox>
+              <ResultTitle>동기화 결과</ResultTitle>
+              <ResultList>
+                <ResultItem>수신 시설 수: <strong>{syncResult.total}</strong></ResultItem>
+                <ResultItem>신규 저장: <strong>{syncResult.saved}</strong></ResultItem>
+                <ResultItem>업데이트된 개수: <strong>{syncResult.updated}</strong></ResultItem>
+                <ResultItem>검증 실패 스킵: <strong>{syncResult.skipped}</strong></ResultItem>
+              </ResultList>
+            </ResultBox>
+
+            {syncResult.records && syncResult.records.length > 0 && (
+              <SectionBlock>
+                <SectionLabel>DB에 저장된 BATCH_IMPORT 시설 ({syncResult.records.length}건)</SectionLabel>
+                <Table>
+                  <thead>
+                    <tr>
+                      <th>ID</th><th>시설명</th><th>카테고리</th><th>시도</th><th>시군구</th><th>주소</th><th>전화번호</th><th>최종갱신</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {syncResult.records.map((r) => (
+                      <tr key={r.idx}>
+                        <td>{r.idx}</td>
+                        <td className="ellipsis">{r.name || '-'}</td>
+                        <td>{r.category || '-'}</td>
+                        <td>{r.sido || '-'}</td>
+                        <td>{r.sigungu || '-'}</td>
+                        <td className="ellipsis">{r.address || '-'}</td>
+                        <td>{r.phone || '-'}</td>
+                        <td>{r.lastUpdated || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </Table>
+              </SectionBlock>
+            )}
+          </>
         )}
       </Card>
 
+      {/* ── JSON 파일 미리보기 ── */}
+      <Card>
+        <CardTitle>JSON 원본 파일 미리보기</CardTitle>
+        <CardDescription>
+          pet-data-api 배치가 생성한 원본 JSON 파일입니다. 동기화 전 데이터를 확인할 수 있습니다.
+        </CardDescription>
+
+        {jsonLoading && <Info>로딩 중...</Info>}
+
+        {!jsonLoading && jsonPreview && !jsonPreview.exists && (
+          <Info>파일 없음 — pet-data-api 배치를 먼저 실행해주세요. ({jsonPreview.reason})</Info>
+        )}
+
+        {!jsonLoading && jsonPreview && jsonPreview.exists && (
+          <>
+            <MetaRow>
+              <MetaBadge>마지막 생성: {formatDate(jsonPreview.lastModified)}</MetaBadge>
+              <MetaBadge>{jsonPreview.count}건</MetaBadge>
+            </MetaRow>
+            <Table>
+              <thead>
+                <tr>
+                  <th>시설명</th><th>카테고리</th><th>시도</th><th>시군구</th><th>주소</th><th>전화번호</th>
+                </tr>
+              </thead>
+              <tbody>
+                {jsonPreview.records.map((r, i) => (
+                  <tr key={i}>
+                    <td className="ellipsis">{r.name || '-'}</td>
+                    <td>{r.category || '-'}</td>
+                    <td>{r.sido || '-'}</td>
+                    <td>{r.sigungu || '-'}</td>
+                    <td className="ellipsis">{r.address || '-'}</td>
+                    <td>{r.phone || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          </>
+        )}
+      </Card>
+
+      {/* ── 공공데이터 CSV 임포트 ── */}
       <Card>
         <CardTitle>공공데이터 CSV 임포트</CardTitle>
         <CardDescription>
-          공공데이터 포털에서 제공하는 반려동물 관련 시설 정보 CSV 파일을 임포트합니다.
-          <br />
+          공공데이터 포털에서 제공하는 반려동물 관련 시설 정보 CSV 파일을 임포트합니다.<br />
           CSV 파일 형식: 시설명,카테고리1,카테고리2,카테고리3,시도명칭,시군구명칭,법정읍면동명칭,리명칭,번지,도로명이름,건물번호,위도,경도,우편번호,도로명주소,지번주소,전화번호,홈페이지,휴무일,운영시간,주차가능여부,입장가격정보,반려동물동반가능정보,반려동물전용정보,입장가능동물크기,반려동물제한사항,장소실내여부,장소실외여부,기본정보장소설명,애견동반추가요금,최종작성일
         </CardDescription>
 
@@ -167,90 +225,17 @@ const LocationServiceManagementSection = () => {
 
         {importError && <ErrorMessage>{importError}</ErrorMessage>}
 
-        {result && (
+        {importResult && (
           <ResultBox>
             <ResultTitle>임포트 결과</ResultTitle>
             <ResultList>
-              <ResultItem>총 읽은 라인: <strong>{result.totalRead}</strong></ResultItem>
-              <ResultItem>저장된 개수: <strong>{result.saved}</strong></ResultItem>
-              <ResultItem>중복 스킵: <strong>{result.duplicate}</strong></ResultItem>
-              <ResultItem>검증 실패 스킵: <strong>{result.skipped}</strong></ResultItem>
-              <ResultItem>에러 발생: <strong>{result.error}</strong></ResultItem>
+              <ResultItem>총 읽은 라인: <strong>{importResult.totalRead}</strong></ResultItem>
+              <ResultItem>저장된 개수: <strong>{importResult.saved}</strong></ResultItem>
+              <ResultItem>중복 스킵: <strong>{importResult.duplicate}</strong></ResultItem>
+              <ResultItem>검증 실패 스킵: <strong>{importResult.skipped}</strong></ResultItem>
+              <ResultItem>에러 발생: <strong>{importResult.error}</strong></ResultItem>
             </ResultList>
           </ResultBox>
-        )}
-      </Card>
-
-      <Filters>
-        <Group>
-          <Label>시도</Label>
-          <Input
-            placeholder="시도 (예: 서울특별시)"
-            value={sido}
-            onChange={e => setSido(e.target.value)}
-          />
-        </Group>
-        <Group>
-          <Label>시군구</Label>
-          <Input
-            placeholder="시군구 (예: 노원구)"
-            value={sigungu}
-            onChange={e => setSigungu(e.target.value)}
-          />
-        </Group>
-        <Group>
-          <Label>카테고리</Label>
-          <Input
-            placeholder="카테고리"
-            value={category}
-            onChange={e => setCategory(e.target.value)}
-          />
-        </Group>
-        <Group style={{ flex: 1 }}>
-          <Label>검색</Label>
-          <Input
-            placeholder="시설명/주소/카테고리"
-            value={q}
-            onChange={e => setQ(e.target.value)}
-          />
-        </Group>
-        <Group>
-          <Refresh onClick={fetchServices}>새로고침</Refresh>
-        </Group>
-      </Filters>
-
-      <Card>
-        {loading && services.length === 0 ? (
-          <Info>로딩 중...</Info>
-        ) : error ? (
-          <Info>{error}</Info>
-        ) : services.length === 0 ? (
-          <Info>데이터가 없습니다.</Info>
-        ) : (
-          <Table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>시설명</th>
-                <th>카테고리</th>
-                <th>주소</th>
-                <th>전화번호</th>
-                <th>평점</th>
-              </tr>
-            </thead>
-            <tbody>
-              {services.map((service) => (
-                <tr key={service.idx}>
-                  <td>{service.idx}</td>
-                  <td className="ellipsis">{service.name || '-'}</td>
-                  <td>{service.category3 || service.category2 || service.category1 || '-'}</td>
-                  <td className="ellipsis">{service.address || '-'}</td>
-                  <td>{service.phone || '-'}</td>
-                  <td>{service.rating || '-'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </Table>
         )}
       </Card>
     </Wrapper>
@@ -259,7 +244,11 @@ const LocationServiceManagementSection = () => {
 
 export default LocationServiceManagementSection;
 
-const Wrapper = styled.div``;
+const Wrapper = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${props => props.theme.spacing.lg};
+`;
 
 const Header = styled.div`
   margin-bottom: ${props => props.theme.spacing.lg};
@@ -275,54 +264,13 @@ const Subtitle = styled.p`
   color: ${props => props.theme.colors.textSecondary};
 `;
 
-const Filters = styled.div`
-  display: flex;
-  gap: ${props => props.theme.spacing.md};
-  align-items: center;
-  margin-bottom: ${props => props.theme.spacing.md};
-  flex-wrap: wrap;
-`;
-
-const Group = styled.div`
-  display: flex;
-  align-items: center;
-  gap: ${props => props.theme.spacing.xs};
-`;
-
-const Label = styled.span`
-  color: ${props => props.theme.colors.text};
-  font-size: ${props => props.theme.typography.caption.fontSize};
-`;
-
-const Input = styled.input`
-  width: 240px;
-  padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.sm};
-  border: 1px solid ${props => props.theme.colors.border};
-  border-radius: ${props => props.theme.borderRadius.sm};
-  background: ${props => props.theme.colors.surface};
-  color: ${props => props.theme.colors.text};
-`;
-
-const Refresh = styled.button`
-  padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.md};
-  border: 1px solid ${props => props.theme.colors.border};
-  background: ${props => props.theme.colors.background};
-  color: ${props => props.theme.colors.text};
-  border-radius: ${props => props.theme.borderRadius.sm};
-  cursor: pointer;
-  
-  &:hover {
-    background: ${props => props.theme.colors.surfaceHover};
-  }
-`;
-
 const Table = styled.table`
   width: 100%;
   border-collapse: collapse;
   font-size: ${props => props.theme.typography.caption.fontSize};
   th, td { padding: 8px 10px; border-bottom: 1px solid ${props => props.theme.colors.border}; }
   th { color: ${props => props.theme.colors.text}; text-align: left; white-space: nowrap; }
-  td.ellipsis { max-width: 420px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  td.ellipsis { max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 `;
 
 const Info = styled.div`
@@ -375,16 +323,8 @@ const FileInput = styled.input`
   border-radius: ${props => props.theme.borderRadius.sm};
   font-size: ${props => props.theme.typography.body1.fontSize};
   cursor: pointer;
-  
-  &:disabled {
-    background: ${props => props.theme.colors.surfaceSoft};
-    cursor: not-allowed;
-  }
-  
-  &:focus {
-    outline: none;
-    border-color: ${props => props.theme.colors.primary};
-  }
+  &:disabled { background: ${props => props.theme.colors.surfaceSoft}; cursor: not-allowed; }
+  &:focus { outline: none; border-color: ${props => props.theme.colors.primary}; }
 `;
 
 const FileInfo = styled.div`
@@ -393,11 +333,7 @@ const FileInfo = styled.div`
   border-radius: ${props => props.theme.borderRadius.sm};
   font-size: ${props => props.theme.typography.body2.fontSize};
   color: ${props => props.theme.colors.textSecondary};
-  
-  strong {
-    color: ${props => props.theme.colors.text};
-    font-weight: 600;
-  }
+  strong { color: ${props => props.theme.colors.text}; font-weight: 600; }
 `;
 
 const ButtonGroup = styled.div`
@@ -416,23 +352,13 @@ const ImportButton = styled.button`
   font-weight: 600;
   cursor: pointer;
   transition: background 0.2s;
-
-  &:hover:enabled {
-    background: ${props => props.theme.colors.primaryDark || '#176dd1'};
-  }
-
-  &:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
+  &:hover:enabled { background: ${props => props.theme.colors.primaryDark || '#176dd1'}; }
+  &:disabled { opacity: 0.6; cursor: not-allowed; }
 `;
 
 const SyncButton = styled(ImportButton)`
   background: #2e7d32;
-
-  &:hover:enabled {
-    background: #1b5e20;
-  }
+  &:hover:enabled { background: #1b5e20; }
 `;
 
 const ErrorMessage = styled.div`
@@ -466,11 +392,31 @@ const ResultList = styled.ul`
 const ResultItem = styled.li`
   padding: ${props => props.theme.spacing.xs} 0;
   color: ${props => props.theme.colors.textSecondary};
-  
-  strong {
-    color: ${props => props.theme.colors.text};
-    font-weight: 600;
-  }
+  strong { color: ${props => props.theme.colors.text}; font-weight: 600; }
 `;
 
+const SectionBlock = styled.div`
+  margin-top: ${props => props.theme.spacing.md};
+`;
 
+const SectionLabel = styled.div`
+  font-size: ${props => props.theme.typography.body2.fontSize};
+  font-weight: 600;
+  color: ${props => props.theme.colors.text};
+  margin-bottom: ${props => props.theme.spacing.sm};
+`;
+
+const MetaRow = styled.div`
+  display: flex;
+  gap: ${props => props.theme.spacing.sm};
+  margin-bottom: ${props => props.theme.spacing.md};
+`;
+
+const MetaBadge = styled.span`
+  padding: 4px 10px;
+  background: ${props => props.theme.colors.surfaceSoft};
+  border-radius: ${props => props.theme.borderRadius.sm};
+  font-size: ${props => props.theme.typography.caption.fontSize};
+  color: ${props => props.theme.colors.textSecondary};
+  font-weight: 600;
+`;

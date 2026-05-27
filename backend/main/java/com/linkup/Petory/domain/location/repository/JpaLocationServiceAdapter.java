@@ -39,8 +39,8 @@ public class JpaLocationServiceAdapter implements LocationServiceRepository {
     }
 
     @Override
-    public List<LocationService> findByOrderByRatingDesc(String keyword, String category) {
-        return jpaRepository.findByOrderByRatingDesc(keyword, category);
+    public List<LocationService> findByOrderByRatingDesc(String keyword, String category, int limit) {
+        return jpaRepository.findByOrderByRatingDesc(keyword, category, limit);
     }
 
     @Override
@@ -49,8 +49,8 @@ public class JpaLocationServiceAdapter implements LocationServiceRepository {
     }
 
     @Override
-    public List<LocationService> findByNameContaining(String keyword, String category) {
-        return jpaRepository.findByNameContaining(keyword, category);
+    public List<LocationService> findByNameContaining(String keyword, String category, int limit) {
+        return jpaRepository.findByNameContaining(keyword, category, limit);
     }
 
     @Override
@@ -71,23 +71,28 @@ public class JpaLocationServiceAdapter implements LocationServiceRepository {
     }
 
     @Override
-    public List<LocationService> findBySigungu(String sigungu, String keyword, String category) {
-        return jpaRepository.findBySigungu(sigungu, keyword, category);
+    public List<LocationService> findBySigungu(String sigungu, String keyword, String category, int limit) {
+        return jpaRepository.findBySigungu(sigungu, keyword, category, limit);
     }
 
     @Override
-    public List<LocationService> findBySido(String sido, String keyword, String category) {
-        return jpaRepository.findBySido(sido, keyword, category);
+    public List<LocationService> findBySido(String sido, String keyword, String category, int limit) {
+        return jpaRepository.findBySido(sido, keyword, category, limit);
     }
 
     @Override
-    public List<LocationService> findByEupmyeondong(String eupmyeondong, String keyword, String category) {
-        return jpaRepository.findByEupmyeondong(eupmyeondong, keyword, category);
+    public List<LocationService> findByEupmyeondong(String eupmyeondong, String keyword, String category, int limit) {
+        return jpaRepository.findByEupmyeondong(eupmyeondong, keyword, category, limit);
     }
 
     @Override
-    public List<LocationService> findByRoadName(String roadName, String keyword, String category) {
-        return jpaRepository.findByRoadName(roadName, keyword, category);
+    public List<LocationService> findByRoadName(String roadName, String keyword, String category, int limit) {
+        return jpaRepository.findByRoadName(roadName, keyword, category, limit);
+    }
+
+    @Override
+    public List<LocationService> findByDataSource(String dataSource, int limit) {
+        return jpaRepository.findByDataSource(dataSource, limit);
     }
 
     @Override

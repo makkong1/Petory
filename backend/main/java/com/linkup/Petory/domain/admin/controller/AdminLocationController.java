@@ -44,13 +44,13 @@ public class AdminLocationController {
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN','MASTER')")
     public ResponseEntity<Map<String, Object>> listLocationServices(
-            @RequestParam(required = false) String sido,
-            @RequestParam(required = false) String sigungu,
-            @RequestParam(required = false) String eupmyeondong,
-            @RequestParam(required = false) String roadName,
-            @RequestParam(required = false) String category,
-            @RequestParam(required = false) Integer size,
-            @RequestParam(required = false) String q) {
+            @RequestParam(value = "sido", required = false) String sido,
+            @RequestParam(value = "sigungu", required = false) String sigungu,
+            @RequestParam(value = "eupmyeondong", required = false) String eupmyeondong,
+            @RequestParam(value = "roadName", required = false) String roadName,
+            @RequestParam(value = "category", required = false) String category,
+            @RequestParam(value = "size", required = false) Integer size,
+            @RequestParam(value = "q", required = false) String q) {
         
         // keyword(q)는 SQL WHERE에서 처리 — Java 후처리 불필요
         List<LocationServiceDTO> services = locationServiceService.searchLocationServicesByRegion(
@@ -69,9 +69,9 @@ public class AdminLocationController {
     @PostMapping("/load-data")
     @PreAuthorize("hasRole('MASTER')")
     public ResponseEntity<LocationServiceLoadResponse> loadInitialData(
-            @RequestParam(defaultValue = "서울특별시") String region,
-            @RequestParam(defaultValue = "10") Integer maxResultsPerKeyword,
-            @RequestParam(required = false) String customKeywords) {
+            @RequestParam(value = "region", defaultValue = "서울특별시") String region,
+            @RequestParam(value = "maxResultsPerKeyword", defaultValue = "10") Integer maxResultsPerKeyword,
+            @RequestParam(value = "customKeywords", required = false) String customKeywords) {
 
         LocationServiceLoadResponse response = locationServiceAdminService.loadInitialData(
                 region,

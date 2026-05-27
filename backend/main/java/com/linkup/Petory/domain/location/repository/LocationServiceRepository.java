@@ -26,7 +26,7 @@ public interface LocationServiceRepository {
     /**
      * 평점순 서비스 조회 (keyword·category 필터 포함)
      */
-    List<LocationService> findByOrderByRatingDesc(String keyword, String category);
+    List<LocationService> findByOrderByRatingDesc(String keyword, String category, int limit);
 
     /**
      * 카테고리별 상위 10개 평점순 서비스 조회
@@ -36,7 +36,7 @@ public interface LocationServiceRepository {
     /**
      * FULLTEXT 키워드 검색 (위치 없을 때 fallback, category 필터 포함)
      */
-    List<LocationService> findByNameContaining(String keyword, String category);
+    List<LocationService> findByNameContaining(String keyword, String category, int limit);
 
     /**
      * 이름과 주소로 존재 여부 확인
@@ -58,22 +58,27 @@ public interface LocationServiceRepository {
     /**
      * 시군구별 조회 (keyword·category 필터 포함)
      */
-    List<LocationService> findBySigungu(String sigungu, String keyword, String category);
+    List<LocationService> findBySigungu(String sigungu, String keyword, String category, int limit);
 
     /**
      * 시도별 조회 (keyword·category 필터 포함)
      */
-    List<LocationService> findBySido(String sido, String keyword, String category);
+    List<LocationService> findBySido(String sido, String keyword, String category, int limit);
 
     /**
      * 읍면동별 조회 (keyword·category 필터 포함)
      */
-    List<LocationService> findByEupmyeondong(String eupmyeondong, String keyword, String category);
+    List<LocationService> findByEupmyeondong(String eupmyeondong, String keyword, String category, int limit);
 
     /**
      * 도로명별 조회 (keyword·category 필터 포함)
      */
-    List<LocationService> findByRoadName(String roadName, String keyword, String category);
+    List<LocationService> findByRoadName(String roadName, String keyword, String category, int limit);
+
+    /**
+     * dataSource별 조회 (최신 lastUpdated 순)
+     */
+    List<LocationService> findByDataSource(String dataSource, int limit);
 
     /**
      * [FIX] 서비스 평점과 리뷰 수를 리뷰 집계 기준으로 원자적 갱신 (DB 단일 UPDATE)

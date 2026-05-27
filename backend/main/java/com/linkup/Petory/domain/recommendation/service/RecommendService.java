@@ -47,7 +47,7 @@ public class RecommendService {
 
     private static final Set<String> PETORY_OWNED_CONTEXTS = Set.of(
             "grooming", "hospital", "pharmacy", "cafe", "restaurant", "pension",
-            "boarding", "hotel");
+            "boarding", "hotel", "supplies");
 
     private static final Map<String, String> CONTEXT_TO_CATEGORY = createContextToCategory();
     private static final Map<String, String> CONTEXT_LABELS = createContextLabels();

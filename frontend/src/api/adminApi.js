@@ -31,9 +31,15 @@ export const adminApi = {
     return response.data;
   },
 
-  // pet-data-api 시설 데이터 수동 동기화
+  // pet-data-api 시설 데이터 수동 동기화 (서버 설정 경로에서 읽기)
   syncFacilitiesFromPetDataApi: async () => {
     const response = await api.post('/location/sync');
+    return response.data;
+  },
+
+  // JSON 파일 미리보기 (마지막 수정일 + 레코드 목록)
+  getJsonPreview: async () => {
+    const response = await api.get('/location/json-preview');
     return response.data;
   },
 };

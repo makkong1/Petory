@@ -48,33 +48,40 @@ const HomePage = ({ setActiveTab }) => {
     meetup:    { items: [], loading: true, error: false },
     community: { items: [], loading: true, error: false },
   });
-  const [userCoords, setUserCoords] = useState(null);
+  const [geo, setGeo] = useState({ coords: null, ready: false });
 
   useEffect(() => {
-    if (!navigator.geolocation) return;
+    if (!navigator.geolocation) {
+      setGeo({ coords: null, ready: true });
+      return;
+    }
     navigator.geolocation.getCurrentPosition(
-      (pos) => setUserCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => setUserCoords(null),
+      (pos) => setGeo({ coords: { lat: pos.coords.latitude, lng: pos.coords.longitude }, ready: true }),
+      () => setGeo({ coords: null, ready: true }),
       { timeout: 5000, maximumAge: 60000 }
     );
   }, []);
 
   useEffect(() => {
+    if (!geo.ready) return;
+
     const toArr = (v) => (Array.isArray(v) ? v : []);
     const setSection = (key, items) =>
       setSections((prev) => ({ ...prev, [key]: { items: items.slice(0, 4), loading: false, error: false } }));
     const setError = (key) =>
       setSections((prev) => ({ ...prev, [key]: { items: [], loading: false, error: true } }));
 
+    const { coords } = geo;
+
     missingPetApi
-      .getHomeMissing(userCoords?.lat ?? null, userCoords?.lng ?? null, 6)
+      .getHomeMissing(coords?.lat ?? null, coords?.lng ?? null, 6)
       .then((res) => setSection('missing', toArr(res.data?.boards ?? res.data)))
       .catch(() => setError('missing'));
 
     const serviceParams = { sort: 'score', size: 6 };
-    if (userCoords) {
-      serviceParams.latitude = userCoords.lat;
-      serviceParams.longitude = userCoords.lng;
+    if (coords) {
+      serviceParams.latitude = coords.lat;
+      serviceParams.longitude = coords.lng;
       serviceParams.radius = 10000;
     }
     locationServiceApi
@@ -83,7 +90,7 @@ const HomePage = ({ setActiveTab }) => {
       .catch(() => setError('service'));
 
     meetupApi
-      .getHomeMeetups(userCoords?.lat ?? null, userCoords?.lng ?? null, 6)
+      .getHomeMeetups(coords?.lat ?? null, coords?.lng ?? null, 6)
       .then((res) => setSection('meetup', toArr(res.data?.meetups ?? res.data?.content ?? res.data)))
       .catch(() => setError('meetup'));
 
@@ -91,7 +98,7 @@ const HomePage = ({ setActiveTab }) => {
       .getPopularBoards('WEEKLY')
       .then((res) => setSection('community', toArr(res.data?.boards ?? res.data?.content ?? res.data)))
       .catch(() => setError('community'));
-  }, [userCoords]);
+  }, [geo]);
 
   return (
     <PageWrapper>

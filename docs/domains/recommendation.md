@@ -37,24 +37,41 @@ Petory 백엔드는 이제 모든 컨텍스트를 외부 추천 서버에 그대
 
 ## 2. API
 
-### 2.1 `GET /api/recommend`
+모든 경로는 `/api/recommend/**` 이며 **인증 필요**. (위 **1.3 핵심 원칙** 참고.)
 
-| 항목                                     | 내용                                                                                 |
-| ---------------------------------------- | ------------------------------------------------------------------------------------ |
-| 메서드                                   | `GET`                                                                                |
-| 쿼리                                     | `lat` (필수, `double`), `lng` (필수, `double`), `context` (필수, `String`)           |
-| 인증                                     | Spring Security — `Authentication`에서 `userId` = `auth.getName()`                   |
-| 성공                                     | `200` + `RecommendResponse` JSON                                                     |
-| 응답 없음(현행 서비스는 거의 사용 안 함) | 서비스가 `null`이면 `503` (바디 없음)                                                |
-| 외부 API 실패                            | `PetDataApiClient`가 예외 throw → 애플리케이션 전역 예외 처리에 따름(일반적으로 5xx) |
+### 2.1 엔드포인트 요약
 
-### 2.2 추가 엔드포인트
+- **`GET`** `/api/recommend` — `lat`, `lng`, `context` 로 추천, 응답은 `RecommendResponse`.
+- **`POST`** `/api/recommend/copy` — 시설·트렌드 payload 로 LLM 카피 생성.
+- **`POST`** `/api/recommend/events` — 요청별 행동 이벤트 기록(`userId` 해시 후 pet-data-api 전달).
+- **`GET`** `/api/recommend/trends/{category}/timeseries` — 트렌드 시계열.
 
-| 엔드포인트                                    | 메서드 | 인증 | 설명                                                                                                                                                |
-| --------------------------------------------- | ------ | ---- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/api/recommend/copy`                         | POST   | 필수 | LLM 카피라이팅 생성 — `RecommendCopyRequest`(context, request_id, facilities, trends, pet) → `RecommendCopyResponse`. pet 정보는 백엔드가 자동 보강 |
-| `/api/recommend/events`                       | POST   | 필수 | 사용자 행동 이벤트 기록 — `RecommendEventRequest`(request_id, events[]) → 202. userId는 해시(`userRef`)로 익명화 후 pet-data-api에 전송             |
-| `/api/recommend/trends/{category}/timeseries` | GET    | 필수 | 트렌드 시계열 조회 — `days`(기본 14), `top_keywords`(기본 10) → `TrendTimeseriesResponse`(category, points[{date, keyword, score}])                 |
+### 2.2 `GET /api/recommend`
+
+| 구분          | 내용                                                          |
+| ------------- | ------------------------------------------------------------- |
+| 쿼리          | `lat`, `lng`, `context` 필수 (`double`, `double`, `String`)   |
+| 인증          | `Authentication#getName()` → `userId`                         |
+| 성공          | `200` + `RecommendResponse`                                   |
+| 본문 없음     | 서비스가 `null`이면 `503`(바디 없음; 현 코드 경로에서는 드묾) |
+| 외부 I/O 실패 | `PetDataApiClient` 예외 → 전역 핸들러(대개 5xx)               |
+
+### 2.3 부가 엔드포인트
+
+**`POST` `/api/recommend/copy`**
+
+- 본문: `RecommendCopyRequest`(context, request_id, facilities, trends, pet) → `RecommendCopyResponse`
+- `pet` 는 백엔드에서 보강 가능
+
+**`POST` `/api/recommend/events`**
+
+- 본문: `RecommendEventRequest`(request_id, events[]) → 응답 `202`
+- `userId` 는 해시(`userRef`) 후 pet-data-api 로 전달
+
+**`GET` `/api/recommend/trends/{category}/timeseries`**
+
+- 쿼리: `days`(기본 14), `top_keywords`(기본 10)
+- 응답: `TrendTimeseriesResponse`(category, points: date, keyword, score)
 
 ### 2.4 응답 DTO (`RecommendResponse`)
 
@@ -141,20 +158,18 @@ Recommendation 도메인 **전용 테이블은 없습니다.**
 ## 6. 운영 시 체크리스트
 
 - `application.properties`에 `app.pet-data-api.base-url`, `app.pet-data-api.api-key` 설정
-- Pet Data API가 내려가면 `PetDataApiClient` 예외 → 사용자는 5xx/에러 응답을 볼 수 있으므로, 모니터링·재시도 정책은 API 쪽 또는 Resilience4j 도입 시 검토
+- Pet Data API가 내려가면 `PetDataApiClient` 예외 → 사용자는 5xx/에러 응답을 볼 수 있으므로, 모니터링·재시도 정책은 API 쪽 또는 Resilience4j 도입 시 검토 ㅋ
 - `context` 값은 **프론트·기획**과 Pet Data API가 합의한 자유 형식 문자열(예: 화면명, 시나리오 키)
 
----
+--
 
 ## 7. 관련 코드
 
-| 역할                | 클래스                                                                                                                                       |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| REST                | `RecommendController`                                                                                                                        |
-| 애플리케이션 서비스 | `RecommendService`                                                                                                                           |
-| nearby 후보 조회    | `LocationServiceService`                                                                                                                     |
-| HTTP 클라이언트     | `PetDataApiClient`                                                                                                                           |
-| DTO                 | `RecommendRequest`, `RecommendResponse`, `RecommendCopyRequest`, `RecommendCopyResponse`, `RecommendEventRequest`, `TrendTimeseriesResponse` |
+- **REST** — `RecommendController`
+- **애플리케이션 서비스** — `RecommendService`
+- **nearby 후보 조회** — `LocationServiceService`
+- **HTTP 클라이언트** — `PetDataApiClient`
+- **DTO** — `RecommendRequest`, `RecommendResponse`, `RecommendCopyRequest`, `RecommendCopyResponse`, `RecommendEventRequest`, `TrendTimeseriesResponse`
 
 ## 8. 관련 아키텍처 문서
 
