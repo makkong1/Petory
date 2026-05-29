@@ -9,10 +9,6 @@ const LocationServiceManagementSection = () => {
   const [importResult, setImportResult] = useState(null);
   const [importError, setImportError] = useState(null);
 
-  const [syncLoading, setSyncLoading] = useState(false);
-  const [syncResult, setSyncResult] = useState(null);
-  const [syncError, setSyncError] = useState(null);
-
   const [jsonPreview, setJsonPreview] = useState(null);
   const [jsonLoading, setJsonLoading] = useState(false);
 
@@ -98,21 +94,6 @@ const LocationServiceManagementSection = () => {
     }
   };
 
-  const handleSync = async () => {
-    setSyncLoading(true);
-    setSyncError(null);
-    setSyncResult(null);
-    try {
-      const data = await adminApi.syncFacilitiesFromPetDataApi();
-      setSyncResult(data);
-      loadJsonPreview();
-    } catch (err) {
-      setSyncError(err?.response?.data?.message || err.message || '동기화 실패');
-    } finally {
-      setSyncLoading(false);
-    }
-  };
-
   const formatDate = (iso) => {
     if (!iso) return '-';
     return iso.replace('T', ' ').substring(0, 16);
@@ -182,34 +163,6 @@ const LocationServiceManagementSection = () => {
         )}
       </Card>
 
-      {/* ── 설정 경로 즉시 동기화 (레거시) ── */}
-      <Card>
-        <CardTitle>설정 경로 즉시 동기화</CardTitle>
-        <CardDescription>
-          application.properties의 app.location.import.file-path 경로에서 바로 동기화합니다.
-          매일 새벽 1시 자동 실행과 동일한 경로를 씁니다.
-        </CardDescription>
-
-        <ButtonGroup>
-          <SyncButton onClick={handleSync} disabled={syncLoading}>
-            {syncLoading ? '동기화 중...' : '지금 동기화'}
-          </SyncButton>
-        </ButtonGroup>
-
-        {syncError && <ErrorMessage>{syncError}</ErrorMessage>}
-
-        {syncResult && (
-          <ResultBox>
-            <ResultTitle>동기화 결과</ResultTitle>
-            <ResultList>
-              <ResultItem>수신 시설 수: <strong>{syncResult.total}</strong></ResultItem>
-              <ResultItem>신규 저장: <strong>{syncResult.saved}</strong></ResultItem>
-              <ResultItem>업데이트된 개수: <strong>{syncResult.updated}</strong></ResultItem>
-              <ResultItem>검증 실패 스킵: <strong>{syncResult.skipped}</strong></ResultItem>
-            </ResultList>
-          </ResultBox>
-        )}
-      </Card>
 
       {/* ── JSON 파일 미리보기 ── */}
       <Card>
@@ -418,10 +371,6 @@ const ImportButton = styled.button`
   &:disabled { opacity: 0.6; cursor: not-allowed; }
 `;
 
-const SyncButton = styled(ImportButton)`
-  background: #2e7d32;
-  &:hover:enabled { background: #1b5e20; }
-`;
 
 const ErrorMessage = styled.div`
   color: #df3737;
@@ -457,9 +406,6 @@ const ResultItem = styled.li`
   strong { color: ${props => props.theme.colors.text}; font-weight: 600; }
 `;
 
-const SectionBlock = styled.div`
-  margin-top: ${props => props.theme.spacing.md};
-`;
 
 const CardTitleRow = styled.div`
   display: flex;
@@ -524,12 +470,6 @@ const SyncFail = styled.div`
   border-radius: 4px;
 `;
 
-const SectionLabel = styled.div`
-  font-size: ${props => props.theme.typography.body2.fontSize};
-  font-weight: 600;
-  color: ${props => props.theme.colors.text};
-  margin-bottom: ${props => props.theme.spacing.sm};
-`;
 
 const MetaRow = styled.div`
   display: flex;
