@@ -39,9 +39,9 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class LocationServiceAdminController {
 
-    private static final long   MAX_UPLOAD_BYTES    = 50 * 1024 * 1024L; // 50 MB
-    private static final int    MAGIC_PEEK_BYTES    = 16;
-    private static final Set<String> ALLOWED_EXTENSIONS    = Set.of(".json");
+    private static final long MAX_UPLOAD_BYTES = 50 * 1024 * 1024L; // 50 MB
+    private static final int MAGIC_PEEK_BYTES = 16;
+    private static final Set<String> ALLOWED_EXTENSIONS = Set.of(".json");
     private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
             "application/json", "text/json", "text/plain", "application/octet-stream");
 
@@ -56,7 +56,9 @@ public class LocationServiceAdminController {
     @PreAuthorize("hasAnyRole('ADMIN', 'MASTER')")
     public ResponseEntity<Map<String, Object>> syncFromConfiguredPath() {
         ResponseEntity<Map<String, Object>> pathError = validateSyncPath();
-        if (pathError != null) return pathError;
+        if (pathError != null) {
+            return pathError;
+        }
 
         try {
             LocationImportService.SyncResult result = locationImportService.importFromFile(importFilePath);
@@ -64,20 +66,20 @@ public class LocationServiceAdminController {
             List<LocationService> batchRecords = locationServiceRepository.findByDataSource("BATCH_IMPORT", 200);
             List<Map<String, Object>> records = batchRecords.stream().map(r -> {
                 Map<String, Object> m = new HashMap<>();
-                m.put("idx",         r.getIdx());
-                m.put("name",        r.getName());
-                m.put("category",    r.getCategory3() != null ? r.getCategory3() : "");
-                m.put("address",     r.getAddress()   != null ? r.getAddress()   : "");
-                m.put("sido",        r.getSido()      != null ? r.getSido()      : "");
-                m.put("sigungu",     r.getSigungu()   != null ? r.getSigungu()   : "");
-                m.put("phone",       r.getPhone()     != null ? r.getPhone()     : "");
+                m.put("idx", r.getIdx());
+                m.put("name", r.getName());
+                m.put("category", r.getCategory3() != null ? r.getCategory3() : "");
+                m.put("address", r.getAddress() != null ? r.getAddress() : "");
+                m.put("sido", r.getSido() != null ? r.getSido() : "");
+                m.put("sigungu", r.getSigungu() != null ? r.getSigungu() : "");
+                m.put("phone", r.getPhone() != null ? r.getPhone() : "");
                 m.put("lastUpdated", r.getLastUpdated() != null ? r.getLastUpdated().toString() : "");
                 return m;
             }).collect(Collectors.toList());
 
             Map<String, Object> response = new HashMap<>();
-            response.put("total",   result.getTotal());
-            response.put("saved",   result.getSaved());
+            response.put("total", result.getTotal());
+            response.put("saved", result.getSaved());
             response.put("updated", result.getUpdated());
             response.put("skipped", result.getSkipped());
             response.put("records", records);
@@ -108,14 +110,16 @@ public class LocationServiceAdminController {
 
         try {
             String content = Files.readString(path, StandardCharsets.UTF_8);
-            List<LocationImportDto> records = objectMapper.readValue(content, new TypeReference<>() {});
+            List<LocationImportDto> records = objectMapper.readValue(content, new TypeReference<>() {
+            });
             LocalDateTime lastModified = LocalDateTime.ofInstant(
                     Files.getLastModifiedTime(path).toInstant(), ZoneId.systemDefault());
             Map<String, Object> response = new HashMap<>();
-            response.put("exists",       true);
+            response.put("exists", true);
             response.put("lastModified", lastModified.toString());
-            response.put("count",        records.size());
-            response.put("records",      records);
+            response.put("count", records.size());
+            response.put("records", records);
+
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
@@ -128,13 +132,15 @@ public class LocationServiceAdminController {
             @RequestPart("file") MultipartFile file) {
 
         ResponseEntity<Map<String, Object>> fileError = validateUploadFile(file);
-        if (fileError != null) return fileError;
+        if (fileError != null) {
+            return fileError;
+        }
 
         try {
             LocationImportService.SyncResult result = locationImportService.importFromStream(file.getInputStream());
             return ResponseEntity.ok(Map.of(
-                    "total",   result.getTotal(),
-                    "saved",   result.getSaved(),
+                    "total", result.getTotal(),
+                    "saved", result.getSaved(),
                     "updated", result.getUpdated(),
                     "skipped", result.getSkipped()
             ));
@@ -144,7 +150,6 @@ public class LocationServiceAdminController {
     }
 
     // ── 업로드 파일 검증 ──────────────────────────────────────────────────
-
     // empty / max-size / 확장자 / Content-Type / magic bytes / filename sanitize 순서로 검증
     private ResponseEntity<Map<String, Object>> validateUploadFile(MultipartFile file) {
         if (file.isEmpty()) {
@@ -182,7 +187,9 @@ public class LocationServiceAdminController {
 
     // 파일명에서 경로 구분자·null 바이트·.. 제거 (path segment sanitize)
     private static String sanitizeFilename(String original) {
-        if (!StringUtils.hasText(original)) return "";
+        if (!StringUtils.hasText(original)) {
+            return "";
+        }
         return original
                 .replace('\0', '_')
                 .replaceAll("[/\\\\]", "_")
@@ -194,7 +201,9 @@ public class LocationServiceAdminController {
         try (InputStream is = file.getInputStream()) {
             byte[] peek = new byte[MAGIC_PEEK_BYTES];
             int read = is.read(peek);
-            if (read <= 0) return 0;
+            if (read <= 0) {
+                return 0;
+            }
             int start = 0;
             // UTF-8 BOM (EF BB BF) 건너뜀
             if (read >= 3
@@ -205,14 +214,15 @@ public class LocationServiceAdminController {
             }
             for (int i = start; i < read; i++) {
                 char c = (char) (peek[i] & 0xFF);
-                if (!Character.isWhitespace(c)) return c;
+                if (!Character.isWhitespace(c)) {
+                    return c;
+                }
             }
         }
         return 0;
     }
 
     // ── 서버 경로 검증 (sync / json-preview) ──────────────────────────────
-
     // path normalize + traversal 차단 + 존재 확인 + 정규 파일 여부 + MIME type probe
     private ResponseEntity<Map<String, Object>> validateSyncPath() {
         if (!StringUtils.hasText(importFilePath)) {
