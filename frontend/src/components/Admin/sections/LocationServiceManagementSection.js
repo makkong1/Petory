@@ -51,38 +51,59 @@ const LocationServiceManagementSection = () => {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
   }, []);
 
+  const startPolling = useCallback(() => {
+    if (pollRef.current) return; // 이미 polling 중
+    pollRef.current = setInterval(async () => {
+      try {
+        const status = await adminApi.getCollectStatus();
+        if (!status.running) {
+          stopPoll();
+          setCollectLoading(false);
+          if (status.status === 'done') {
+            setCollectMsg({ type: 'ok', text: '수집 완료 — 파일 목록을 갱신합니다.' });
+            loadImportFiles();
+          } else if (status.status !== 'idle') {
+            setCollectMsg({ type: 'error', text: `수집 실패: ${status.status}` });
+          }
+        }
+      } catch (e) {
+        stopPoll();
+        setCollectLoading(false);
+      }
+    }, 5000);
+  }, [stopPoll, loadImportFiles]);
+
   const handleCollect = async () => {
     setCollectLoading(true);
     setCollectMsg({ type: 'info', text: '수집 시작 중...' });
     try {
       await adminApi.startCollect();
-      setCollectMsg({ type: 'info', text: '수집 중... (완료 시 파일 목록이 자동 갱신됩니다)' });
-      // 5초마다 상태 폴링
-      pollRef.current = setInterval(async () => {
-        try {
-          const status = await adminApi.getCollectStatus();
-          if (!status.running) {
-            stopPoll();
-            setCollectLoading(false);
-            if (status.status === 'done') {
-              setCollectMsg({ type: 'ok', text: '수집 완료 — 파일 목록을 갱신합니다.' });
-              loadImportFiles();
-            } else {
-              setCollectMsg({ type: 'error', text: `수집 실패: ${status.status}` });
-            }
-          }
-        } catch (e) {
-          stopPoll();
-          setCollectLoading(false);
-          setCollectMsg({ type: 'error', text: '상태 확인 실패' });
-        }
-      }, 5000);
+      setCollectMsg({ type: 'info', text: '수집 중... 완료되면 파일 목록이 자동 갱신됩니다.' });
+      startPolling();
     } catch (err) {
-      setCollectLoading(false);
-      const msg = err?.response?.data?.message || err?.response?.data?.error || err.message;
-      setCollectMsg({ type: 'error', text: msg || '수집 시작 실패' });
+      const status = err?.response?.status;
+      if (status === 409) {
+        // 이미 서버에서 수집 중 → polling 붙이기
+        setCollectMsg({ type: 'info', text: '수집 중... (이미 진행 중인 수집이 있습니다)' });
+        startPolling();
+      } else {
+        setCollectLoading(false);
+        const msg = err?.response?.data?.message || err?.response?.data?.error || err.message;
+        setCollectMsg({ type: 'error', text: msg || '수집 시작 실패' });
+      }
     }
   };
+
+  // 마운트 시 이미 수집 중이면 자동으로 polling 시작
+  useEffect(() => {
+    adminApi.getCollectStatus().then(status => {
+      if (status.running) {
+        setCollectLoading(true);
+        setCollectMsg({ type: 'info', text: '수집 중... 완료되면 파일 목록이 자동 갱신됩니다.' });
+        startPolling();
+      }
+    }).catch(() => {});
+  }, [startPolling]);
 
   // 언마운트 시 폴링 정리
   useEffect(() => () => stopPoll(), [stopPoll]);
