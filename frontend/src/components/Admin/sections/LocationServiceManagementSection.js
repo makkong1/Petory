@@ -16,6 +16,11 @@ const LocationServiceManagementSection = () => {
   const [jsonPreview, setJsonPreview] = useState(null);
   const [jsonLoading, setJsonLoading] = useState(false);
 
+  const [importFiles, setImportFiles] = useState([]);
+  const [filesLoading, setFilesLoading] = useState(false);
+  const [fileSyncResults, setFileSyncResults] = useState({});
+  const [fileSyncLoading, setFileSyncLoading] = useState({});
+
   const fileInputRef = useRef(null);
 
   const loadJsonPreview = async () => {
@@ -30,8 +35,37 @@ const LocationServiceManagementSection = () => {
     }
   };
 
+  const loadImportFiles = async () => {
+    setFilesLoading(true);
+    try {
+      const data = await adminApi.getImportFiles();
+      setImportFiles(data || []);
+    } catch (e) {
+      setImportFiles([]);
+    } finally {
+      setFilesLoading(false);
+    }
+  };
+
+  const handleSyncFile = async (filename) => {
+    setFileSyncLoading(prev => ({ ...prev, [filename]: true }));
+    setFileSyncResults(prev => ({ ...prev, [filename]: null }));
+    try {
+      const data = await adminApi.syncFromFile(filename);
+      setFileSyncResults(prev => ({ ...prev, [filename]: { ok: true, ...data } }));
+    } catch (err) {
+      setFileSyncResults(prev => ({
+        ...prev,
+        [filename]: { ok: false, error: err?.response?.data?.error || '동기화 실패' },
+      }));
+    } finally {
+      setFileSyncLoading(prev => ({ ...prev, [filename]: false }));
+    }
+  };
+
   useEffect(() => {
     loadJsonPreview();
+    loadImportFiles();
   }, []);
 
   const handleFileChange = (e) => {
@@ -91,12 +125,69 @@ const LocationServiceManagementSection = () => {
         <Subtitle>등록된 장소, 리뷰, 외부 API 캐시를 관리합니다.</Subtitle>
       </Header>
 
-      {/* ── pet-data-api 동기화 ── */}
+      {/* ── 수집 파일 목록 ── */}
       <Card>
-        <CardTitle>pet-data-api 시설 동기화</CardTitle>
+        <CardTitleRow>
+          <CardTitle>수집 파일 목록</CardTitle>
+          <RefreshButton onClick={loadImportFiles} disabled={filesLoading}>
+            {filesLoading ? '로딩 중...' : '새로고침'}
+          </RefreshButton>
+        </CardTitleRow>
         <CardDescription>
-          pet-data-api에서 수집된 시설 데이터를 신규 저장하거나 기존 BATCH_IMPORT 데이터를 갱신합니다.
-          매일 새벽 1시 자동 실행되며, 여기서 수동으로 즉시 실행할 수 있습니다.
+          Python 배치가 생성한 JSON 파일 목록입니다. 파일별로 DB에 동기화할 수 있습니다.<br />
+          수집 명령: <Code>python cli.py popular --output ~/data/pet-locations-$(date +%Y-%m-%d).json</Code>
+        </CardDescription>
+
+        {filesLoading && <Info>파일 목록 로딩 중...</Info>}
+        {!filesLoading && importFiles.length === 0 && (
+          <Info>수집 파일이 없습니다. Python 배치를 먼저 실행해주세요.</Info>
+        )}
+        {!filesLoading && importFiles.length > 0 && (
+          <Table>
+            <thead>
+              <tr>
+                <th>파일명</th><th>크기</th><th>수정일</th><th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {importFiles.map((f) => {
+                const res = fileSyncResults[f.filename];
+                const loading = fileSyncLoading[f.filename];
+                return (
+                  <React.Fragment key={f.filename}>
+                    <tr>
+                      <td><FileName>{f.filename}</FileName></td>
+                      <td>{f.sizeKb} KB</td>
+                      <td>{formatDate(f.lastModified)}</td>
+                      <td>
+                        <FileSyncButton onClick={() => handleSyncFile(f.filename)} disabled={loading}>
+                          {loading ? '동기화 중...' : '동기화'}
+                        </FileSyncButton>
+                      </td>
+                    </tr>
+                    {res && (
+                      <tr>
+                        <td colSpan={4}>
+                          {res.ok
+                            ? <SyncOk>✓ 완료 — 총 {res.total}건 / 신규 {res.saved} / 업데이트 {res.updated} / 스킵 {res.skipped}</SyncOk>
+                            : <SyncFail>✗ {res.error}</SyncFail>}
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </tbody>
+          </Table>
+        )}
+      </Card>
+
+      {/* ── 설정 경로 즉시 동기화 (레거시) ── */}
+      <Card>
+        <CardTitle>설정 경로 즉시 동기화</CardTitle>
+        <CardDescription>
+          application.properties의 app.location.import.file-path 경로에서 바로 동기화합니다.
+          매일 새벽 1시 자동 실행과 동일한 경로를 씁니다.
         </CardDescription>
 
         <ButtonGroup>
@@ -108,44 +199,15 @@ const LocationServiceManagementSection = () => {
         {syncError && <ErrorMessage>{syncError}</ErrorMessage>}
 
         {syncResult && (
-          <>
-            <ResultBox>
-              <ResultTitle>동기화 결과</ResultTitle>
-              <ResultList>
-                <ResultItem>수신 시설 수: <strong>{syncResult.total}</strong></ResultItem>
-                <ResultItem>신규 저장: <strong>{syncResult.saved}</strong></ResultItem>
-                <ResultItem>업데이트된 개수: <strong>{syncResult.updated}</strong></ResultItem>
-                <ResultItem>검증 실패 스킵: <strong>{syncResult.skipped}</strong></ResultItem>
-              </ResultList>
-            </ResultBox>
-
-            {syncResult.records && syncResult.records.length > 0 && (
-              <SectionBlock>
-                <SectionLabel>DB에 저장된 BATCH_IMPORT 시설 ({syncResult.records.length}건)</SectionLabel>
-                <Table>
-                  <thead>
-                    <tr>
-                      <th>ID</th><th>시설명</th><th>카테고리</th><th>시도</th><th>시군구</th><th>주소</th><th>전화번호</th><th>최종갱신</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {syncResult.records.map((r) => (
-                      <tr key={r.idx}>
-                        <td>{r.idx}</td>
-                        <td className="ellipsis">{r.name || '-'}</td>
-                        <td>{r.category || '-'}</td>
-                        <td>{r.sido || '-'}</td>
-                        <td>{r.sigungu || '-'}</td>
-                        <td className="ellipsis">{r.address || '-'}</td>
-                        <td>{r.phone || '-'}</td>
-                        <td>{r.lastUpdated || '-'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </Table>
-              </SectionBlock>
-            )}
-          </>
+          <ResultBox>
+            <ResultTitle>동기화 결과</ResultTitle>
+            <ResultList>
+              <ResultItem>수신 시설 수: <strong>{syncResult.total}</strong></ResultItem>
+              <ResultItem>신규 저장: <strong>{syncResult.saved}</strong></ResultItem>
+              <ResultItem>업데이트된 개수: <strong>{syncResult.updated}</strong></ResultItem>
+              <ResultItem>검증 실패 스킵: <strong>{syncResult.skipped}</strong></ResultItem>
+            </ResultList>
+          </ResultBox>
         )}
       </Card>
 
@@ -397,6 +459,69 @@ const ResultItem = styled.li`
 
 const SectionBlock = styled.div`
   margin-top: ${props => props.theme.spacing.md};
+`;
+
+const CardTitleRow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: ${props => props.theme.spacing.sm};
+`;
+
+const RefreshButton = styled.button`
+  font-size: 12px;
+  padding: 4px 12px;
+  border: 1px solid ${props => props.theme.colors.border};
+  border-radius: ${props => props.theme.borderRadius.sm};
+  background: transparent;
+  color: ${props => props.theme.colors.textSecondary};
+  cursor: pointer;
+  &:hover:enabled { background: ${props => props.theme.colors.surfaceSoft}; }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+`;
+
+const Code = styled.code`
+  display: inline-block;
+  margin-top: 4px;
+  background: ${props => props.theme.colors.surfaceSoft};
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  color: ${props => props.theme.colors.text};
+`;
+
+const FileName = styled.span`
+  font-family: monospace;
+  font-size: 12px;
+`;
+
+const FileSyncButton = styled.button`
+  font-size: 12px;
+  padding: 3px 10px;
+  border: 1px solid #2e7d32;
+  border-radius: ${props => props.theme.borderRadius.sm};
+  background: transparent;
+  color: #2e7d32;
+  cursor: pointer;
+  white-space: nowrap;
+  &:hover:enabled { background: #2e7d3210; }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+`;
+
+const SyncOk = styled.div`
+  font-size: 12px;
+  color: #2e7d32;
+  padding: 4px 8px;
+  background: #e8f5e9;
+  border-radius: 4px;
+`;
+
+const SyncFail = styled.div`
+  font-size: 12px;
+  color: #c62828;
+  padding: 4px 8px;
+  background: #ffebee;
+  border-radius: 4px;
 `;
 
 const SectionLabel = styled.div`

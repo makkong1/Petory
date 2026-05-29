@@ -7,6 +7,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,6 +23,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
@@ -51,6 +54,9 @@ public class LocationServiceAdminController {
 
     @Value("${app.location.import.file-path:}")
     private String importFilePath;
+
+    @Value("${app.location.import.dir:}")
+    private String importDir;
 
     @PostMapping("/sync")
     @PreAuthorize("hasAnyRole('ADMIN', 'MASTER')")
@@ -83,6 +89,77 @@ public class LocationServiceAdminController {
             response.put("updated", result.getUpdated());
             response.put("skipped", result.getSkipped());
             response.put("records", records);
+            return ResponseEntity.ok(response);
+        } catch (IOException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "파일 읽기 실패: " + e.getMessage()));
+        }
+    }
+
+    /** 수집 디렉토리의 pet-locations-*.json 파일 목록 반환 */
+    @GetMapping("/import-files")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MASTER')")
+    @SuppressWarnings("UseSpecificCatch")
+    public ResponseEntity<List<Map<String, Object>>> listImportFiles() {
+        if (!StringUtils.hasText(importDir)) {
+            return ResponseEntity.ok(List.of());
+        }
+        Path dir;
+        try {
+            dir = Path.of(importDir).normalize().toAbsolutePath();
+        } catch (Exception e) {
+            return ResponseEntity.ok(List.of());
+        }
+        if (!Files.isDirectory(dir)) {
+            return ResponseEntity.ok(List.of());
+        }
+        List<Map<String, Object>> files = new ArrayList<>();
+        try (var stream = Files.list(dir)) {
+            stream.filter(p -> {
+                String name = p.getFileName().toString();
+                return name.startsWith("pet-locations") && name.endsWith(".json");
+            }).sorted(Comparator.reverseOrder()).forEach(p -> {
+                Map<String, Object> info = new HashMap<>();
+                info.put("filename", p.getFileName().toString());
+                try {
+                    info.put("sizeKb", Math.round(Files.size(p) / 1024.0));
+                    info.put("lastModified", LocalDateTime.ofInstant(
+                            Files.getLastModifiedTime(p).toInstant(), ZoneId.systemDefault()).toString());
+                } catch (IOException ignored) {}
+                files.add(info);
+            });
+        } catch (IOException e) {
+            return ResponseEntity.ok(List.of());
+        }
+        return ResponseEntity.ok(files);
+    }
+
+    /** 지정 파일명으로 동기화 (dir + filename 조합, traversal 차단) */
+    @PostMapping("/sync-file")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MASTER')")
+    public ResponseEntity<Map<String, Object>> syncFromFile(
+            @RequestParam("filename") String filename) {
+        if (!StringUtils.hasText(importDir)) {
+            return badRequest("app.location.import.dir 미설정");
+        }
+        // filename에 경로 구분자 포함 금지
+        if (filename.contains("/") || filename.contains("\\") || filename.contains("..")) {
+            return badRequest("유효하지 않은 파일명");
+        }
+        if (!filename.startsWith("pet-locations") || !filename.endsWith(".json")) {
+            return badRequest("허용되지 않는 파일명 형식");
+        }
+        Path filePath = Path.of(importDir).normalize().toAbsolutePath().resolve(filename);
+        if (!Files.isRegularFile(filePath)) {
+            return badRequest("파일 없음: " + filename);
+        }
+        try {
+            LocationImportService.SyncResult result = locationImportService.importFromFile(filePath.toString());
+            Map<String, Object> response = new HashMap<>();
+            response.put("filename", filename);
+            response.put("total", result.getTotal());
+            response.put("saved", result.getSaved());
+            response.put("updated", result.getUpdated());
+            response.put("skipped", result.getSkipped());
             return ResponseEntity.ok(response);
         } catch (IOException e) {
             return ResponseEntity.badRequest().body(Map.of("error", "파일 읽기 실패: " + e.getMessage()));

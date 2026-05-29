@@ -42,5 +42,17 @@ export const adminApi = {
     const response = await api.get('/location/json-preview');
     return response.data;
   },
+
+  // 수집 디렉토리의 파일 목록 조회
+  getImportFiles: async () => {
+    const response = await api.get('/location/import-files');
+    return response.data;
+  },
+
+  // 특정 파일명으로 동기화
+  syncFromFile: async (filename) => {
+    const response = await api.post(`/location/sync-file?filename=${encodeURIComponent(filename)}`);
+    return response.data;
+  },
 };
 
