@@ -59,10 +59,11 @@ public class LocationImportService {
                 if (!isValid(dto)) { skipped++; continue; }
 
                 Optional<LocationService> existing = locationServiceRepository
-                        .findByNameAndAddressAndDataSource(dto.getName(), dto.getAddress(), "BATCH_IMPORT");
+                        .findByAddressAndDataSource(dto.getAddress(), "BATCH_IMPORT");
 
                 if (existing.isPresent()) {
                     LocationService entity = existing.get();
+                    entity.setName(dto.getName()); // 이름 변경 시 최신값으로 갱신
                     entity.setPhone(dto.getPhone());
                     entity.setLatitude(dto.getLat());
                     entity.setLongitude(dto.getLng());
