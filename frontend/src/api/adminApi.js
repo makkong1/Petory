@@ -54,5 +54,17 @@ export const adminApi = {
     const response = await api.post(`/location/sync-file?filename=${encodeURIComponent(filename)}`);
     return response.data;
   },
+
+  // Python 수집 프로세스 시작
+  startCollect: async () => {
+    const response = await api.post('/location/collect');
+    return response.data;
+  },
+
+  // 수집 상태 조회
+  getCollectStatus: async () => {
+    const response = await api.get('/location/collect-status');
+    return response.data;
+  },
 };
 

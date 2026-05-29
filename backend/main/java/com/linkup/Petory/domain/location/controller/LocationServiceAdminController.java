@@ -5,6 +5,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -13,6 +14,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -57,6 +60,17 @@ public class LocationServiceAdminController {
 
     @Value("${app.location.import.dir:}")
     private String importDir;
+
+    @Value("${app.location.collect.python:}")
+    private String collectPython;
+
+    @Value("${app.location.collect.script:}")
+    private String collectScript;
+
+    // 수집 프로세스 상태 (인스턴스 단위 단순 관리)
+    private final AtomicBoolean collectRunning = new AtomicBoolean(false);
+    private final AtomicReference<String> collectStatus = new AtomicReference<>("idle");
+    private final AtomicReference<String> collectLastFile = new AtomicReference<>("");
 
     @PostMapping("/sync")
     @PreAuthorize("hasAnyRole('ADMIN', 'MASTER')")
@@ -164,6 +178,68 @@ public class LocationServiceAdminController {
         } catch (IOException e) {
             return ResponseEntity.badRequest().body(Map.of("error", "파일 읽기 실패: " + e.getMessage()));
         }
+    }
+
+    /** 데이터 수집 시작 (Python CLI 백그라운드 실행, 202 즉시 반환) */
+    @PostMapping("/collect")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MASTER')")
+    public ResponseEntity<Map<String, Object>> startCollect() {
+        if (!StringUtils.hasText(collectPython) || !StringUtils.hasText(collectScript)) {
+            return badRequest("app.location.collect.python / script 미설정");
+        }
+        if (!StringUtils.hasText(importDir)) {
+            return badRequest("app.location.import.dir 미설정");
+        }
+        if (collectRunning.get()) {
+            return ResponseEntity.status(409).body(Map.of(
+                    "status", "running",
+                    "message", "이미 수집 중입니다."
+            ));
+        }
+
+        String outputFile = Path.of(importDir)
+                .resolve("pet-locations-" + LocalDate.now() + ".json")
+                .toAbsolutePath().toString();
+
+        collectRunning.set(true);
+        collectStatus.set("running");
+        collectLastFile.set(outputFile);
+
+        Thread thread = new Thread(() -> {
+            try {
+                ProcessBuilder pb = new ProcessBuilder(
+                        collectPython, collectScript, "popular", "--output", outputFile
+                );
+                pb.redirectErrorStream(true);
+                pb.directory(Path.of(collectScript).getParent().toFile());
+                Process process = pb.start();
+                int exit = process.waitFor();
+                collectStatus.set(exit == 0 ? "done" : "error:" + exit);
+            } catch (Exception e) {
+                collectStatus.set("error:" + e.getMessage());
+            } finally {
+                collectRunning.set(false);
+            }
+        });
+        thread.setDaemon(true);
+        thread.setName("location-collect");
+        thread.start();
+
+        return ResponseEntity.accepted().body(Map.of(
+                "status", "running",
+                "outputFile", outputFile
+        ));
+    }
+
+    /** 수집 상태 조회 */
+    @GetMapping("/collect-status")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MASTER')")
+    public ResponseEntity<Map<String, Object>> collectStatus() {
+        return ResponseEntity.ok(Map.of(
+                "running", collectRunning.get(),
+                "status", collectStatus.get(),
+                "lastFile", collectLastFile.get()
+        ));
     }
 
     @GetMapping("/json-preview")

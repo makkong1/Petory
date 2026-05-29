@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import styled from 'styled-components';
 import { locationServiceApi } from '../../../api/locationServiceApi';
 import { adminApi } from '../../../api/adminApi';
@@ -16,6 +16,10 @@ const LocationServiceManagementSection = () => {
   const [filesLoading, setFilesLoading] = useState(false);
   const [fileSyncResults, setFileSyncResults] = useState({});
   const [fileSyncLoading, setFileSyncLoading] = useState({});
+
+  const [collectLoading, setCollectLoading] = useState(false);
+  const [collectMsg, setCollectMsg] = useState(null);
+  const pollRef = useRef(null);
 
   const fileInputRef = useRef(null);
 
@@ -42,6 +46,46 @@ const LocationServiceManagementSection = () => {
       setFilesLoading(false);
     }
   };
+
+  const stopPoll = useCallback(() => {
+    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+  }, []);
+
+  const handleCollect = async () => {
+    setCollectLoading(true);
+    setCollectMsg({ type: 'info', text: '수집 시작 중...' });
+    try {
+      await adminApi.startCollect();
+      setCollectMsg({ type: 'info', text: '수집 중... (완료 시 파일 목록이 자동 갱신됩니다)' });
+      // 5초마다 상태 폴링
+      pollRef.current = setInterval(async () => {
+        try {
+          const status = await adminApi.getCollectStatus();
+          if (!status.running) {
+            stopPoll();
+            setCollectLoading(false);
+            if (status.status === 'done') {
+              setCollectMsg({ type: 'ok', text: '수집 완료 — 파일 목록을 갱신합니다.' });
+              loadImportFiles();
+            } else {
+              setCollectMsg({ type: 'error', text: `수집 실패: ${status.status}` });
+            }
+          }
+        } catch (e) {
+          stopPoll();
+          setCollectLoading(false);
+          setCollectMsg({ type: 'error', text: '상태 확인 실패' });
+        }
+      }, 5000);
+    } catch (err) {
+      setCollectLoading(false);
+      const msg = err?.response?.data?.message || err?.response?.data?.error || err.message;
+      setCollectMsg({ type: 'error', text: msg || '수집 시작 실패' });
+    }
+  };
+
+  // 언마운트 시 폴링 정리
+  useEffect(() => () => stopPoll(), [stopPoll]);
 
   const handleSyncFile = async (filename) => {
     setFileSyncLoading(prev => ({ ...prev, [filename]: true }));
@@ -110,14 +154,22 @@ const LocationServiceManagementSection = () => {
       <Card>
         <CardTitleRow>
           <CardTitle>수집 파일 목록</CardTitle>
-          <RefreshButton onClick={loadImportFiles} disabled={filesLoading}>
-            {filesLoading ? '로딩 중...' : '새로고침'}
-          </RefreshButton>
+          <ButtonRow>
+            <CollectButton onClick={handleCollect} disabled={collectLoading}>
+              {collectLoading ? '수집 중...' : '▶ 수집 시작'}
+            </CollectButton>
+            <RefreshButton onClick={loadImportFiles} disabled={filesLoading}>
+              {filesLoading ? '로딩 중...' : '새로고침'}
+            </RefreshButton>
+          </ButtonRow>
         </CardTitleRow>
         <CardDescription>
-          Python 배치가 생성한 JSON 파일 목록입니다. 파일별로 DB에 동기화할 수 있습니다.<br />
-          수집 명령: <Code>python cli.py popular --output ~/data/pet-locations-$(date +%Y-%m-%d).json</Code>
+          Python 배치가 생성한 JSON 파일 목록입니다. 수집 시작 후 완료되면 자동으로 목록이 갱신됩니다.
         </CardDescription>
+
+        {collectMsg && (
+          <CollectStatus $type={collectMsg.type}>{collectMsg.text}</CollectStatus>
+        )}
 
         {filesLoading && <Info>파일 목록 로딩 중...</Info>}
         {!filesLoading && importFiles.length === 0 && (
@@ -406,6 +458,38 @@ const ResultItem = styled.li`
   strong { color: ${props => props.theme.colors.text}; font-weight: 600; }
 `;
 
+
+const ButtonRow = styled.div`
+  display: flex;
+  gap: ${props => props.theme.spacing.xs};
+  align-items: center;
+`;
+
+const CollectButton = styled.button`
+  font-size: 13px;
+  padding: 5px 14px;
+  border: none;
+  border-radius: ${props => props.theme.borderRadius.sm};
+  background: #1565c0;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  &:hover:enabled { background: #0d47a1; }
+  &:disabled { opacity: 0.6; cursor: not-allowed; }
+`;
+
+const CollectStatus = styled.div`
+  font-size: 13px;
+  padding: 8px 12px;
+  border-radius: ${props => props.theme.borderRadius.sm};
+  margin-bottom: ${props => props.theme.spacing.md};
+  background: ${props =>
+    props.$type === 'ok' ? '#e8f5e9' :
+    props.$type === 'error' ? '#ffebee' : '#e3f2fd'};
+  color: ${props =>
+    props.$type === 'ok' ? '#2e7d32' :
+    props.$type === 'error' ? '#c62828' : '#1565c0'};
+`;
 
 const CardTitleRow = styled.div`
   display: flex;
