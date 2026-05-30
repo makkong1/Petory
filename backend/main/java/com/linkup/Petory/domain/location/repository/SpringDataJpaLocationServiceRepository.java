@@ -220,4 +220,17 @@ public interface SpringDataJpaLocationServiceRepository extends JpaRepository<Lo
                         ") " +
                         "WHERE idx = :serviceIdx", nativeQuery = true)
         void updateReviewStats(@Param("serviceIdx") Long serviceIdx);
+
+        @Query(value = "SELECT * FROM locationservice " +
+                       "WHERE latitude BETWEEN :minLat AND :maxLat " +
+                       "AND longitude BETWEEN :minLng AND :maxLng " +
+                       "AND is_deleted = 0",
+               nativeQuery = true)
+        List<LocationService> findInBoundingBox(
+                @Param("minLat") double minLat, @Param("maxLat") double maxLat,
+                @Param("minLng") double minLng, @Param("maxLng") double maxLng);
+
+        @Query("SELECT ls FROM LocationService ls " +
+               "WHERE ls.name LIKE CONCAT(:prefix, '%') AND ls.isDeleted = false")
+        List<LocationService> findByNamePrefix(@Param("prefix") String prefix);
 }
