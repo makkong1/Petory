@@ -72,8 +72,6 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/**").permitAll()   // 모니터링 엔드포인트 (로컬 전용)
                         .requestMatchers("/admin-ui/**").permitAll()   // Spring Boot Admin UI (로컬 전용)
                         .requestMatchers("/ws/**", "/chat/**").permitAll() // WebSocket 엔드포인트 (인증은 인터셉터에서 처리)
-                        // 내부 서버 간 호출 (X-Ingest-Key 헤더로 인증 — 컨트롤러에서 검증)
-                        .requestMatchers(HttpMethod.POST, "/api/admin/place-candidates/batch-ingest").permitAll()
                         // MASTER 전용 API - 최상위 권한만 접근 가능
                         .requestMatchers("/api/master/**").hasRole("MASTER")
                         // 관리자 전용 API - ADMIN 또는 MASTER 권한 필요
