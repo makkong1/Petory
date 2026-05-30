@@ -56,14 +56,15 @@ public class PlaceCandidateJudgmentService {
             publicDataMatcher.findStrongMatch(rawName, rawAddress, lat, lng);
         if (strong.isPresent()) {
             doAutoApprove(candidate, 0.9, strong.get().getLocationServiceId(),
-                "strong_match:public_data", bd); return;
+                "strong_match:public_data", bd, "GATE2_STRONG_MATCH"); return;
         }
         // Path B: self-trust
+        int dup = 0;
         if (!riskFlag && nameChecker.isGoodQuality(rawName) && hasAddress && hasCoords) {
-            int dup = candidateRepo.countByRawNameAndRawAddress(rawName, rawAddress);
+            dup = candidateRepo.countByRawNameAndRawAddress(rawName, rawAddress);
             int src = candidateRepo.countDistinctSourcesByRawNameAndAddress(rawName, rawAddress);
             if (dup >= 3 || src >= 2) {
-                doAutoApprove(candidate, 0.9, null, "strong_match:self_trust", bd); return;
+                doAutoApprove(candidate, 0.9, null, "strong_match:self_trust", bd, "GATE2_STRONG_MATCH"); return;
             }
         }
 
@@ -92,8 +93,6 @@ public class PlaceCandidateJudgmentService {
         double medScore = medium.isPresent() ? 0.3 : 0.0;
         bd.put("public_medium_match", medScore); score += medScore;
 
-        int dup = candidateRepo.countByRawNameAndRawAddress(
-            rawName != null ? rawName : "", rawAddress != null ? rawAddress : "");
         double dupBoost = Math.min(Math.log(dup + 1) * 0.1, 0.2);
         bd.put("duplicate_boost", dupBoost); score += dupBoost;
 
@@ -108,7 +107,7 @@ public class PlaceCandidateJudgmentService {
 
         if (canAutoApprove) {
             Long lsId = medium.map(PublicDataMatcher.MatchResult::getLocationServiceId).orElse(null);
-            doAutoApprove(candidate, score, lsId, "threshold_passed", bd);
+            doAutoApprove(candidate, score, lsId, "threshold_passed", bd, "GATE4_THRESHOLD");
         } else if (score >= 0.3) {
             doNeedsReview(candidate, "score_below_auto_threshold", bd);
         } else {
@@ -117,8 +116,8 @@ public class PlaceCandidateJudgmentService {
     }
 
     private void doAutoApprove(PlaceCandidate c, double score, Long lsId,
-                                String reason, Map<String, Object> bd) {
-        bd.put("gate", score == 0.9 ? "GATE2_STRONG_MATCH" : "GATE4_THRESHOLD");
+                                String reason, Map<String, Object> bd, String gate) {
+        bd.put("gate", gate);
         bd.put("decision", "AUTO_APPROVED");
 
         Place place = placeRepo.save(Place.builder()
@@ -153,6 +152,7 @@ public class PlaceCandidateJudgmentService {
         c.setDecisionReason(reason);
         c.setRejectionReason(reason);
         c.setScoreBreakdown(toJson(bd));
+        c.setConfidenceScore(0.0);
         candidateRepo.save(c);
     }
 

@@ -131,4 +131,14 @@ class PlaceCandidateJudgmentServiceTest {
         sut.judge(c);
         assertThat(c.getDecisionStatus()).isEqualTo(CandidateDecisionStatus.REJECTED);
     }
+
+    @Test void gate2B_dupThreshold_isAutoApproved() {
+        stubPlaceSave(3L);
+        lenient().when(candidateRepo.countByRawNameAndRawAddress(any(), any())).thenReturn(3);
+        PlaceCandidate c = candidate("개떼놀이터", "경기도 남양주시 어딘가", 37.65, 127.19);
+        sut.judge(c);
+        assertThat(c.getDecisionStatus()).isEqualTo(CandidateDecisionStatus.AUTO_APPROVED);
+        assertThat(c.getConfidenceScore()).isEqualTo(0.9);
+        assertThat(c.getMatchedLocationserviceId()).isNull();
+    }
 }
