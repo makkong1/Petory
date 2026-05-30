@@ -4,10 +4,12 @@ import com.linkup.Petory.domain.petRecommendation.dto.PetIntentAnalyzeRequest;
 import com.linkup.Petory.domain.petRecommendation.dto.PetIntentAnalyzeResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
+import java.time.Duration;
 import java.util.Optional;
 
 @Slf4j
@@ -18,9 +20,14 @@ public class PetIntentClient {
     private final String baseUrl;
 
     public PetIntentClient(
-            @Value("${app.pet-intent.base-url:http://localhost:8000}") String baseUrl) {
+            RestTemplateBuilder restTemplateBuilder,
+            @Value("${app.pet-intent.base-url:http://localhost:8000}") String baseUrl,
+            @Value("${app.pet-intent.timeout-ms:3000}") long timeoutMs) {
         this.baseUrl = baseUrl;
-        this.restTemplate = new RestTemplate();
+        this.restTemplate = restTemplateBuilder
+                .connectTimeout(Duration.ofMillis(timeoutMs))
+                .readTimeout(Duration.ofMillis(timeoutMs))
+                .build();
     }
 
     public Optional<PetIntentAnalyzeResponse> analyze(String text, String petType) {

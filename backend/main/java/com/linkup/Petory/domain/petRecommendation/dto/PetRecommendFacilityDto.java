@@ -15,4 +15,6 @@ public class PetRecommendFacilityDto {
     private int reviewCount;
     private double finalScore;
     private List<String> matchReasons;
+    private List<String> locationTags;
+    private double popularityScore;
 }
