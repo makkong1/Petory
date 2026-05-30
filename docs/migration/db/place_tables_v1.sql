@@ -1,6 +1,11 @@
 -- docs/migration/db/place_tables_v1.sql
+-- Place Candidate Promotion System (1단계 MVP)
+-- 수집 → 후보(place_candidates) → 4-gate 판정 → 확정 장소(places) → 서비스 노출(ACTIVE)
+-- place_facts는 2단계 이후 자동 수집 예정 (1단계: 테이블 생성만)
 
 CREATE TABLE places (
+    -- 서비스 canonical 장소. AUTO_APPROVED/ADMIN_APPROVED 후보에서 승격된 확정 장소.
+    -- status=ACTIVE인 레코드만 서비스 API에 노출. PENDING=승격됐지만 미노출, INACTIVE=비활성.
     id                          BIGINT AUTO_INCREMENT PRIMARY KEY,
     name                        VARCHAR(150) NOT NULL,
     address                     VARCHAR(255),
@@ -19,9 +24,12 @@ CREATE TABLE places (
 
     INDEX idx_places_status_confidence (status, confidence DESC),
     INDEX idx_places_legacy_ls_id      (legacy_locationservice_id)
-);
+) COMMENT = '서비스 canonical 장소. place_candidates 승격 결과. status=ACTIVE만 서비스 노출.';
 
 CREATE TABLE place_candidates (
+    -- 수집 파이프라인(pet-data-api)에서 들어온 미확정 장소 후보.
+    -- 4-gate 판정 엔진이 PENDING → AUTO_APPROVED/NEEDS_REVIEW/REJECTED 로 분류.
+    -- 직접 서비스 API 노출 금지. 관리자 검수 후 places로 승격.
     id                          BIGINT AUTO_INCREMENT PRIMARY KEY,
     raw_name                    VARCHAR(255) NOT NULL,
     raw_address                 VARCHAR(255),
@@ -50,9 +58,12 @@ CREATE TABLE place_candidates (
         FOREIGN KEY (matched_place_id) REFERENCES places (id) ON DELETE SET NULL,
     CONSTRAINT fk_candidates_locationservice
         FOREIGN KEY (matched_locationservice_id) REFERENCES locationservice (idx) ON DELETE SET NULL
-);
+) COMMENT = '미확정 장소 후보. pet-data-api 수집 결과 적재. 4-gate 판정 후 places 승격 또는 탈락.';
 
 CREATE TABLE place_facts (
+    -- 장소별 개별 사실(영업시간·전화·반려동물 정책 등)을 fact_type+source+confidence 구조로 저장.
+    -- 동일 fact_type에 여러 source가 존재할 수 있으며, confidence 높은 값을 우선 사용.
+    -- 2단계 이후 공공데이터 strong match 시 자동 적재 예정.
     id              BIGINT AUTO_INCREMENT PRIMARY KEY,
     place_id        BIGINT NOT NULL,
     fact_type       VARCHAR(100),
@@ -66,4 +77,4 @@ CREATE TABLE place_facts (
 
     CONSTRAINT fk_facts_place
         FOREIGN KEY (place_id) REFERENCES places (id) ON DELETE CASCADE
-);
+) COMMENT = '장소별 사실 저장. fact_type(OPERATING_HOURS·PHONE 등)+source+confidence 구조. 2단계 이후 자동 수집.';
