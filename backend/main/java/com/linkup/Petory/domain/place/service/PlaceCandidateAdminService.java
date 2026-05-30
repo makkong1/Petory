@@ -6,6 +6,7 @@ import com.linkup.Petory.domain.place.dto.PlaceCandidateDto;
 import com.linkup.Petory.domain.place.entity.*;
 import com.linkup.Petory.domain.place.repository.*;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -17,6 +18,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PlaceCandidateAdminService {
@@ -35,6 +37,7 @@ public class PlaceCandidateAdminService {
 
         // idempotent: already has a linked place → return as-is
         if (c.getMatchedPlaceId() != null) {
+            log.info("[Admin] approve 멱등 반환 candidate={} place={}", id, c.getMatchedPlaceId());
             return PlaceCandidateDto.from(c);
         }
 
@@ -66,6 +69,7 @@ public class PlaceCandidateAdminService {
         c.setReviewedBy(adminUsername);
         c.setReviewedAt(LocalDateTime.now());
         candidateRepo.save(c);
+        log.info("[Admin] ADMIN_APPROVED candidate={} name={} → place={} by={}", id, c.getRawName(), place.getId(), adminUsername);
         return PlaceCandidateDto.from(c);
     }
 
@@ -85,6 +89,7 @@ public class PlaceCandidateAdminService {
         c.setReviewedBy(adminUsername);
         c.setReviewedAt(LocalDateTime.now());
         candidateRepo.save(c);
+        log.info("[Admin] REJECTED candidate={} name={} reason={} by={}", id, c.getRawName(), req.getRejectionReason(), adminUsername);
         return PlaceCandidateDto.from(c);
     }
 }

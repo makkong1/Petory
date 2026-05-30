@@ -144,6 +144,7 @@ public class PlaceCandidateJudgmentService {
         c.setDecisionReason(reason);
         c.setScoreBreakdown(toJson(bd));
         candidateRepo.save(c);
+        log.info("[Judgment] NEEDS_REVIEW id={} name={} score={} reason={}", c.getId(), c.getRawName(), c.getConfidenceScore(), reason);
     }
 
     private void doReject(PlaceCandidate c, String reason, Map<String, Object> bd) {
@@ -154,6 +155,7 @@ public class PlaceCandidateJudgmentService {
         c.setScoreBreakdown(toJson(bd));
         c.setConfidenceScore(0.0);
         candidateRepo.save(c);
+        log.info("[Judgment] REJECTED id={} name={} reason={}", c.getId(), c.getRawName(), reason);
     }
 
     private boolean detectAltBusiness(String rawName, String rawAddress) {

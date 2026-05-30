@@ -5,6 +5,7 @@ import com.linkup.Petory.domain.place.entity.Place;
 import com.linkup.Petory.domain.place.entity.PlaceStatus;
 import com.linkup.Petory.domain.place.repository.PlaceRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -14,6 +15,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PlaceAdminService {
@@ -38,6 +40,7 @@ public class PlaceAdminService {
         place.setActivatedBy(adminUsername);
         place.setActivatedAt(LocalDateTime.now());
         placeRepo.save(place);
+        log.info("[Admin] ACTIVATED place={} name={} by={}", id, place.getName(), adminUsername);
         return PlaceDto.from(place);
     }
 }

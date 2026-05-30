@@ -22,13 +22,16 @@ public class PlaceCandidateIngestService {
 
     @Transactional
     public int ingest(BatchIngestRequest request) {
+        log.info("[Ingest] 배치 수신 count={}", request.getCandidates().size());
         List<PlaceCandidate> toSave = new ArrayList<>();
+        int skipped = 0;
         for (BatchIngestRequest.CandidateItem item : request.getCandidates()) {
-            if (!StringUtils.hasText(item.getName())) continue;
+            if (!StringUtils.hasText(item.getName())) { skipped++; continue; }
             // same name+address already pending/needs_review → skip to prevent duplicate ingestion
             if (StringUtils.hasText(item.getAddress())
                 && candidateRepo.countByRawNameAndRawAddress(item.getName(), item.getAddress()) > 0) {
-                continue;
+                log.debug("[Ingest] 중복 스킵 name={}", item.getName());
+                skipped++; continue;
             }
             toSave.add(PlaceCandidate.builder()
                 .rawName(item.getName())
@@ -41,7 +44,7 @@ public class PlaceCandidateIngestService {
                 .build());
         }
         candidateRepo.saveAll(toSave);
-        log.info("[PlaceCandidateIngest] 적재 완료 requested={} saved={}", request.getCandidates().size(), toSave.size());
+        log.info("[Ingest] 적재 완료 requested={} saved={} skipped={}", request.getCandidates().size(), toSave.size(), skipped);
         return toSave.size();
     }
 }
