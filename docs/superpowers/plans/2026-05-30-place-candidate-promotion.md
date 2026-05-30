@@ -17,6 +17,7 @@
 ```
 backend/main/java/com/linkup/Petory/domain/place/
   entity/
+
     PlaceStatus.java
     CandidateDecisionStatus.java
     Place.java
@@ -86,6 +87,7 @@ docs/migration/db/place_tables_v1.sql
 ## Task 1: DB 마이그레이션 SQL
 
 **Files:**
+
 - Create: `docs/migration/db/place_tables_v1.sql`
 
 - [ ] **Step 1: SQL 파일 작성**
@@ -169,6 +171,7 @@ mysql -u root -p petory -e "SHOW TABLES LIKE 'place%';"
 ```
 
 Expected:
+
 ```
 place_candidates
 place_facts
@@ -187,6 +190,7 @@ git commit -m "feat(place): place_candidates/places/place_facts 테이블 생성
 ## Task 2: 열거형 + 엔티티
 
 **Files:**
+
 - Create: `backend/main/java/com/linkup/Petory/domain/place/entity/PlaceStatus.java`
 - Create: `backend/main/java/com/linkup/Petory/domain/place/entity/CandidateDecisionStatus.java`
 - Create: `backend/main/java/com/linkup/Petory/domain/place/entity/Place.java`
@@ -196,6 +200,7 @@ git commit -m "feat(place): place_candidates/places/place_facts 테이블 생성
 - [ ] **Step 1: 열거형 2개 작성**
 
 `PlaceStatus.java`:
+
 ```java
 package com.linkup.Petory.domain.place.entity;
 
@@ -205,6 +210,7 @@ public enum PlaceStatus {
 ```
 
 `CandidateDecisionStatus.java`:
+
 ```java
 package com.linkup.Petory.domain.place.entity;
 
@@ -407,6 +413,7 @@ git commit -m "feat(place): Place/PlaceCandidate/PlaceFact 엔티티 추가"
 ## Task 3: 리포지토리
 
 **Files:**
+
 - Create: `backend/main/java/com/linkup/Petory/domain/place/repository/PlaceRepository.java`
 - Create: `backend/main/java/com/linkup/Petory/domain/place/repository/PlaceCandidateRepository.java`
 - Create: `backend/main/java/com/linkup/Petory/domain/place/repository/PlaceFactRepository.java`
@@ -512,6 +519,7 @@ git commit -m "feat(place): 리포지토리 추가 및 locationservice bounding 
 ## Task 4: NameQualityChecker
 
 **Files:**
+
 - Create: `backend/main/java/com/linkup/Petory/domain/place/service/NameQualityChecker.java`
 - Create: `backend/test/java/com/linkup/Petory/domain/place/service/NameQualityCheckerTest.java`
 
@@ -645,6 +653,7 @@ git commit -m "feat(place): NameQualityChecker — hard/soft blacklist 판정"
 ## Task 5: GeoUtil + StringSimilarityUtil
 
 **Files:**
+
 - Create: `backend/main/java/com/linkup/Petory/domain/place/service/GeoUtil.java`
 - Create: `backend/main/java/com/linkup/Petory/domain/place/service/StringSimilarityUtil.java`
 - Create: `backend/test/java/com/linkup/Petory/domain/place/service/GeoUtilTest.java`
@@ -789,6 +798,7 @@ git commit -m "feat(place): GeoUtil(Haversine) + StringSimilarityUtil(Levenshtei
 ## Task 6: PublicDataMatcher
 
 **Files:**
+
 - Create: `backend/main/java/com/linkup/Petory/domain/place/service/PublicDataMatcher.java`
 
 - [ ] **Step 1: MatchResult inner class 포함 PublicDataMatcher 작성**
@@ -912,6 +922,7 @@ git commit -m "feat(place): PublicDataMatcher — strong/medium match 판정"
 ## Task 7: PlaceCandidateJudgmentService (4-gate 엔진)
 
 **Files:**
+
 - Create: `backend/main/java/com/linkup/Petory/domain/place/service/PlaceCandidateJudgmentService.java`
 - Create: `backend/test/java/com/linkup/Petory/domain/place/service/PlaceCandidateJudgmentServiceTest.java`
 
@@ -1261,6 +1272,7 @@ git commit -m "feat(place): PlaceCandidateJudgmentService — 4-gate 판정 엔�
 ## Task 8: PlaceJudgmentScheduler
 
 **Files:**
+
 - Create: `backend/main/java/com/linkup/Petory/domain/place/service/PlaceJudgmentScheduler.java`
 
 - [ ] **Step 1: 스케줄러 작성**
@@ -1333,6 +1345,7 @@ git commit -m "feat(place): PlaceJudgmentScheduler — 5분 주기 PENDING 후�
 ## Task 9: Admin API — 후보 검수 (DTOs + Service + Controller)
 
 **Files:**
+
 - Create: `backend/main/java/com/linkup/Petory/domain/place/dto/PlaceCandidateDto.java`
 - Create: `backend/main/java/com/linkup/Petory/domain/place/dto/CandidateApproveRequest.java`
 - Create: `backend/main/java/com/linkup/Petory/domain/place/dto/CandidateRejectRequest.java`
@@ -1343,6 +1356,7 @@ git commit -m "feat(place): PlaceJudgmentScheduler — 5분 주기 PENDING 후�
 - [ ] **Step 1: DTOs 작성**
 
 `PlaceCandidateDto.java`:
+
 ```java
 package com.linkup.Petory.domain.place.dto;
 
@@ -1377,6 +1391,7 @@ public class PlaceCandidateDto {
 ```
 
 `CandidateApproveRequest.java`:
+
 ```java
 package com.linkup.Petory.domain.place.dto;
 
@@ -1394,6 +1409,7 @@ public class CandidateApproveRequest {
 ```
 
 `CandidateRejectRequest.java`:
+
 ```java
 package com.linkup.Petory.domain.place.dto;
 
@@ -1578,6 +1594,7 @@ git commit -m "feat(place): Admin API — 후보 검수 (list/approve/reject)"
 ## Task 10: Admin API — Places 관리 (Service + Controller)
 
 **Files:**
+
 - Create: `backend/main/java/com/linkup/Petory/domain/place/dto/PlaceDto.java`
 - Create: `backend/main/java/com/linkup/Petory/domain/place/service/PlaceAdminService.java`
 - Create: `backend/main/java/com/linkup/Petory/domain/place/controller/PlaceAdminController.java`
@@ -1726,6 +1743,7 @@ git commit -m "feat(place): Admin API — PENDING places 조회 및 ACTIVE 전�
 ## Task 11: 배치 적재 엔드포인트 + locationservice write guard
 
 **Files:**
+
 - Create: `backend/main/java/com/linkup/Petory/domain/place/dto/BatchIngestRequest.java`
 - Create: `backend/main/java/com/linkup/Petory/domain/place/service/PlaceCandidateIngestService.java`
 - Create: `backend/main/java/com/linkup/Petory/domain/place/controller/PlaceCandidateIngestController.java`
@@ -1734,6 +1752,7 @@ git commit -m "feat(place): Admin API — PENDING places 조회 및 ACTIVE 전�
 - [ ] **Step 1: BatchIngestRequest + IngestService 작성**
 
 `BatchIngestRequest.java`:
+
 ```java
 package com.linkup.Petory.domain.place.dto;
 
@@ -1761,6 +1780,7 @@ public class BatchIngestRequest {
 ```
 
 `PlaceCandidateIngestService.java`:
+
 ```java
 package com.linkup.Petory.domain.place.service;
 
@@ -1846,12 +1866,14 @@ public class PlaceCandidateIngestController {
 `LocationImportService.java`의 `processEntries()` 내 `else` 브랜치(신규 INSERT 경로)에 가드 추가:
 
 기존:
+
 ```java
 } else {
     batch.add(locationImportConverter.toEntity(dto));
 ```
 
 변경 후:
+
 ```java
 } else {
     // [WRITE GUARD] 신규 후보는 place_candidates로만 적재.
@@ -1889,6 +1911,7 @@ git commit -m "feat(place): batch-ingest 엔드포인트 추가 + locationservic
 ## Task 12: pet-data-api Python 수정
 
 **Files:**
+
 - Create: `app/ingestion/petory_client.py` (in pet-data-api repo)
 - Modify: `app/platform/core/config.py`
 - Modify: `app/ingestion/exporter.py`
