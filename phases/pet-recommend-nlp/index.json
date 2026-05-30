@@ -1,0 +1,49 @@
+{
+  "task": "pet-recommend-nlp",
+  "description": "\ud55c\uad6d\uc5b4 \ubc18\ub824\uc0dd\ud65c \uc758\ub3c4 \ubd84\uc11d \uae30\ubc18 \uc8fc\ubcc0 \uc11c\ube44\uc2a4 \ucd94\ucc9c \uc2dc\uc2a4\ud15c \u2014 Python FastAPI NLP \uc11c\ubc84 + Spring \uc5f0\ub3d9 + \uc810\uc218 \uacc4\uc0b0 + fallback",
+  "steps": [
+    {
+      "step": 1,
+      "name": "Python \uc11c\ubc84 \ubf08\ub300: \ub514\ub809\ud1a0\ub9ac \uad6c\uc870 + requirements.txt + health check",
+      "status": "completed",
+      "started_at": "2026-05-30T22:29:16.114414",
+      "summary": "petory-nlp-server/ \uad6c\uc870 \uc0dd\uc131, requirements.txt, config.py, main.py \uc791\uc131, GET /health \u2192 200 \ud655\uc778"
+    },
+    {
+      "step": 2,
+      "name": "\uc2a4\ud0a4\ub9c8 + \uc758\ub3c4 \uc608\uc2dc \ub370\uc774\ud130: schemas/ + intent_examples.yml + intent_tags.yml",
+      "status": "completed",
+      "summary": "Pydantic \uc2a4\ud0a4\ub9c8(request/response), intent_examples.yml(9\ub3c4\uba54\uc778), intent_tags.yml \uc791\uc131 \uc644\ub8cc"
+    },
+    {
+      "step": 3,
+      "name": "NLP \ucf54\uc5b4: tokenizer + embedding_model + intent_classifier + tag_extractor",
+      "status": "completed",
+      "summary": "kiwipiepy \ud615\ud0dc\uc18c \ubd84\uc11d, ko-sroberta-multitask \uc784\ubca0\ub529, centroid \uae30\ubc18 \uc758\ub3c4 \ubd84\ub958, \ud0dc\uadf8 \ucd94\ucd9c \uad6c\ud604. 4/4 \ud14c\uc2a4\ud2b8 \ud1b5\uacfc. confidence_threshold=0.45\ub85c \uc870\uc815"
+    },
+    {
+      "step": 4,
+      "name": "\uaddc\uce59 + API \uc5d4\ub4dc\ud3ec\uc778\ud2b8: category_rules + urgency_rules + POST /api/pet-intent/analyze",
+      "status": "completed",
+      "summary": "category_rules(9\ub3c4\uba54\uc778 \ub9e4\ud551), urgency_rules, pet_intent_router \uad6c\ud604. curl \uc751\ub2f5 intentDomain=MEDICAL, recommendedCategories=[\ub3d9\ubb3c\ubcd1\uc6d0,\ub3d9\ubb3c\uc57d\uad6d], \uc758\ub8cc \uc548\uc804 \ubb38\uad6c \ud3ec\ud568 \ud655\uc778"
+    },
+    {
+      "step": 5,
+      "name": "Spring DTO + PetIntentClient + app.pet-intent \uc124\uc815",
+      "status": "completed",
+      "summary": "4\uac1c DTO + PetIntentClient(RestTemplate) \uc0dd\uc131, application-dev.properties\uc5d0 app.pet-intent \uc124\uc815 \ucd94\uac00, compileJava BUILD SUCCESSFUL"
+    },
+    {
+      "step": 6,
+      "name": "PetRecommendationService + Controller + LocationService \ubc18\uacbd \uac80\uc0c9 \uc5f0\ub3d9",
+      "status": "completed",
+      "summary": "PetRecommendationService(findByRadius \uc7ac\uc0ac\uc6a9), PetRecommendationController(GET /api/pet-recommend) \uc0dd\uc131, compileJava BUILD SUCCESSFUL"
+    },
+    {
+      "step": 7,
+      "name": "PetRecommendScoreCalculator + fallback \ucc98\ub9ac",
+      "status": "completed",
+      "summary": "PetRecommendScoreCalculator(distance/rating/review \uc810\uc218, Phase 3 \uae30\uc900 place/tag=0), fallbackRecommend(\ud0a4\uc6cc\ub4dc \uae30\ubc18 \uce74\ud14c\uace0\ub9ac \ucd94\ub860) \uad6c\ud604, compileJava BUILD SUCCESSFUL"
+    }
+  ]
+}

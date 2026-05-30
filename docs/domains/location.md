@@ -749,8 +749,6 @@ erDiagram
 
 ### 4.4 API 설계
 
-> **제거 완료**: `GET /api/location-services/recommend` 및 `LocationRecommendAgentService`는 코드베이스에서 완전히 제거됨. AI 추천은 `GET /api/recommend`(Recommendation 도메인)로 통합. [`recommendation.md`](./recommendation.md) §1.4.
-
 #### REST API
 
 **참고**: 리뷰 관련 API는 클래스 레벨에 `@PreAuthorize("isAuthenticated()")` 적용되어 인증 필요
@@ -758,7 +756,6 @@ erDiagram
 | 엔드포인트                                           | Method  | 설명                                                                                                                                                                                                                                                                       |
 | ---------------------------------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `/api/location-services/search`                      | GET     | 통합 검색 §1.1: **위치(lat+lng)** → **지역** → **키워드 단독 FULLTEXT** → 평점순. `radius` 생략·`≤0`이면 서비스에서 10000m. `size` 기본 100, `≤0`이면 전체. `sort` 값: `distance`(기본)·`rating`·`reviews`·`score`. 응답 `{"services","count"}`. **`/api/**` 인증 필요\*\* |
-| ~~`/api/location-services/recommend`~~               | ~~GET~~ | **제거됨** — 컨트롤러·`LocationRecommendAgentService` 모두 코드베이스에 없음. AI 추천은 `GET /api/recommend`(Recommendation 도메인)로 통합. [`recommendation.md`](./recommendation.md) §1.4 참고                                                                           |
 | `/api/location-services/{serviceIdx}`                | DELETE  | 위치 서비스 삭제 (Soft Delete, `ADMIN`/`MASTER`, LocationServiceNotFoundException, LocationServiceAlreadyDeletedException)                                                                                                                                                 |
 | `/api/location-service-reviews`                      | POST    | 리뷰 작성 (인증 필요, 클래스 레벨 `@PreAuthorize`, 응답: `{"review": {...}, "message": "..."}`)                                                                                                                                                                            |
 | `/api/location-service-reviews/{reviewIdx}`          | PUT     | 리뷰 수정 (인증 필요, 클래스 레벨 `@PreAuthorize`, 응답: `{"review": {...}, "message": "..."}`)                                                                                                                                                                            |
@@ -805,13 +802,6 @@ GET /api/location-services/search?latitude=37.5665&longitude=126.9780&radius=500
 ```http
 GET /api/location-services/search?latitude=37.5665&longitude=126.9780
 # 위치 분기 O, 기본 반경 10000m
-```
-
-**AI 추천 요청 예시** (JWT 등 **로그인 세션 필요** — `/search`와 동일하게 `/api/**` 인증 규칙):
-
-```http
-GET /api/location-services/recommend?latitude=37.5665&longitude=126.9780&radius=10000&category=동물병원
-# 검색 분기는 `/search`와 동일, 후보 최대 30건 후 LLM으로 최대 10건+추천 이유
 ```
 
 **지역 계층별 검색 응답 예시**:
@@ -1411,7 +1401,6 @@ public List<LocationServiceDTO> getPopularLocationServices(String category) {
 - **반경**: 기본 **5km** (`DEFAULT_RADIUS = 5`), UI에서 km 단위 → API에 `radius * 1000` m.
 - **초기 위치**: `navigator.geolocation`; 실패 시 기본 중심(서울 시청 근처 등 코드 상수).
 - **재조회**: `mapCenter`·`radius`·`locationKeyword`·`locationCategory` 변경 시 `fetchActiveMapItems` — **지도 idle**(`onMapIdle` → `setMapCenter`) 시에도 중심이 바뀌면 같은 효과로 재조회됨.
-- **AI 모드**: `locationServiceApi.recommendPlaces` → 백엔드 `GET /api/location-services/recommend`는 **제거됨**. 이 UI 경로는 현재 404가 예상되며, `GET /api/recommend`(Recommendation 도메인)로 교체 필요.
 - **`MapContainer.js`**: 네이버맵 `ncpKeyId`, 카카오식 `mapLevel`→줌 변환, **개별 핀**(클러스터 비활성 주석), 사용자 위치·호버 마커.
 
 **과거 전용 페이지·useReducer·지역 드롭다운·“이 지역 검색” 위주 서술**은 코드베이스와 어긋날 수 있음 — 상세는 `docs/refactoring/location/상태-관리-개선.md`, `프론트엔드-검색-로직-단순화.md` 등.

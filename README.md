@@ -78,16 +78,6 @@
 - **채팅 연동**: 모임 생성 시 그룹 채팅방 자동 생성 및 참여자 자동 추가
 - **이메일 인증**: 모임 생성/참여 시 이메일 인증 필수
 
-### 맞춤 추천 (Recommendation)
-- **외부 Pet Data API 연동**: `PetDataApiClient`(`RestClient`)가 설정된 베이스 URL에 `POST /recommend`로 요청을 보내고, `X-API-Key` 헤더로 인증
-- **API 엔드포인트**: `GET /api/recommend?lat={위도}&lng={경도}&context={맥락}` — 로그인 사용자만 호출 가능
-- **반려동물 컨텍스트**: `Pet` 중 삭제되지 않은 첫 프로필의 종·품종·출생일 기반 월령(`age_months`)을 요청 본문에 포함; 등록된 펫이 없으면 위치·맥락만 전달
-- **요청 기본값**: 반경 10km, 시설/후보 `top_n` 5
-- **응답**: 시설 목록(이름, 거리 m, 주소, 좌표), 트렌드 키워드·점수, 자연어 추천 문구, 생성 시각(`generated_at`)
-- **가용성**: 외부 API를 사용할 수 없을 때 `503 Service Unavailable`으로 응답 (서비스 레이어에서 `null` 반환 시)
-- **설정**: `app.pet-data-api.base-url`, `app.pet-data-api.api-key` (`application.properties`에 정의; 로컬/운영에서 Pet Data API URL·키를 맞출 것)
-- **로드맵(중복 추천)**: Location의 `GET /api/location-services/recommend`(DB+Spring AI 재순위)와 기능 목적이 겹친다. **Pet Data API 연결·품질 검증이 끝나면 후자를 폐기하고 단일 추천 경로로 통합**할 예정이며, 당분간은 둘 다 유지한다. 상세: [`docs/domains/recommendation.md`](./docs/domains/recommendation.md) §1.4.
-
 ### 커뮤니티 & 실종 제보
 - **블라인드 처리**: 신고 누적 시 자동으로 콘텐츠를 가리는 유해 콘텐츠 필터링 로직
 - **실종 골든타임**: 지도 기반의 직관적인 실종/목격 위치 공유
@@ -196,7 +186,6 @@ Petory/
 │       │   │   ├── chat/            # 채팅 시스템
 │       │   │   ├── location/        # 위치 기반 서비스
 │       │   │   ├── meetup/          # 모임 서비스
-│       │   │   ├── recommendation/  # 맞춤 추천 (외부 Pet Data API 프록시)
 │       │   │   ├── notification/    # 알림 시스템
 │       │   │   │   ├── controller/  # NotificationController, FcmTokenController
 │       │   │   │   ├── service/     # NotificationService, FcmService, NotificationSseService
@@ -374,7 +363,6 @@ npm run cap:sync:ios
 - [커뮤니티 & 실종 제보 아키텍처](./docs/architecture/커뮤니티%20&%20실종%20제보%20아키텍처.md) - 게시글/댓글 작성·수정·삭제, 실종 제보, 블라인드 처리, 반응(좋아요/싫어요) 등의 로직 흐름
 - [펫 케어 & 매칭 아키텍처](./docs/architecture/펫%20케어%20&%20매칭%20아키텍처.md) - 케어 요청 생성·수정·삭제, 채팅 기반 매칭, 리뷰 작성, 상태 변경 등의 로직 흐름
 - [Payment 도메인 (펫코인 결제)](./docs/domains/payment.md) - 에스크로 흐름, Care/Chat 연동, 동시성 제어(비관적 락), 트랜잭션·롤백 정책
-- [Recommendation 도메인 (맞춤 추천)](./docs/domains/recommendation.md) - Pet Data API(`POST /recommend`) 프록시, `GET /api/recommend`, 반려동물 프로필 매핑
 - [펫케어 코인 관련 흐름](./docs/architecture/펫케어%20코인%20관련%20흐름.md) - 펫코인 결제·에스크로 흐름 다이어그램 및 시나리오
 - [위치 기반 서비스 아키텍처](./docs/architecture/위치%20기반%20서비스%20아키텍처.md) - 지역 계층 검색, 지오코딩/역지오코딩, 길찾기, 리뷰 작성 및 평점 업데이트, 거리 계산 등의 로직 흐름
 - [산책 & 오프라인 모임 아키텍처](./docs/architecture/산책%20&%20오프라인%20모임%20아키텍처.md) - 모임 생성·참여·취소, 반경 기반 검색, 채팅방 자동 생성, 동시성 제어 등의 로직 흐름
