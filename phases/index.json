@@ -27,6 +27,10 @@
     {
       "dir": "facility-sync-petory",
       "status": "pending"
+    },
+    {
+      "dir": "pet-recommend-nlp",
+      "status": "pending"
     }
   ]
 }

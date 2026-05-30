@@ -29,7 +29,7 @@ public class LocationImportConverter {
                 .build();
     }
 
-    // pet-data-api context 문자열 → 한국어 카테고리 레이블 변환
+    // 외부 수집 context 문자열 → 한국어 카테고리 레이블 변환
     public String categoryLabel(String category) {
         if (!StringUtils.hasText(category)) return "반려동물 시설";
         return switch (category) {
