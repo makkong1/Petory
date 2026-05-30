@@ -12,6 +12,7 @@ import LocationLayer from "./layers/LocationLayer";
 import MeetupLayer from "./layers/MeetupLayer";
 import CareLayer from "./layers/CareLayer";
 import { fetchActiveMapItems } from "../../api/unifiedMapApi";
+import { petRecommendationApi } from "../../api/petRecommendationApi";
 
 const SORT_LABELS = {
   stable: "추천순",
@@ -88,6 +89,7 @@ const UnifiedPetMapPage = () => {
   const [locationSort, setLocationSort] = useState("stable");
   const [hasPendingAreaChange, setHasPendingAreaChange] = useState(false);
   const [searchMode, setSearchMode] = useState("initial");
+  const [petIntentSignals, setPetIntentSignals] = useState([]);
 
   // meetup 탭 전용
   const [showMeetupCreateModal, setShowMeetupCreateModal] = useState(false);
@@ -100,6 +102,7 @@ const UnifiedPetMapPage = () => {
 
   const cacheRef = useRef({});
   const fetchTimerRef = useRef(null);
+  const signalRefreshTimerRef = useRef(null);
 
   const commitLocationSearch = useCallback(
     (center, mode = "user-triggered") => {
@@ -110,6 +113,12 @@ const UnifiedPetMapPage = () => {
     },
     []
   );
+
+  const refreshPetIntentSignals = useCallback(() => {
+    petRecommendationApi.getSignals()
+      .then(signals => setPetIntentSignals(signals))
+      .catch(() => setPetIntentSignals([]));
+  }, []);
 
   // 위치 취득 (iOS WebView·시뮬에서 콜백이 안 오는 경우 방지: 시간 지나면 서울 중심으로 진행)
   useEffect(() => {
@@ -233,6 +242,28 @@ const UnifiedPetMapPage = () => {
     effectiveMapLevel,
     fetchItems,
   ]);
+
+  useEffect(() => {
+    if (activeLayer !== "location") return;
+    let cancelled = false;
+    petRecommendationApi.getSignals()
+      .then(signals => {
+        if (!cancelled) setPetIntentSignals(signals);
+      })
+      .catch(() => {
+        if (!cancelled) setPetIntentSignals([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeLayer, locationKeyword, locationCategory]);
+
+  useEffect(() => {
+    if (activeLayer !== "location" || !locationKeyword.trim()) return undefined;
+    window.clearTimeout(signalRefreshTimerRef.current);
+    signalRefreshTimerRef.current = window.setTimeout(refreshPetIntentSignals, 1500);
+    return () => window.clearTimeout(signalRefreshTimerRef.current);
+  }, [activeLayer, locationKeyword, refreshPetIntentSignals]);
 
   const handleTabChange = (layer) => {
     setActiveLayer(layer);
@@ -449,6 +480,7 @@ const UnifiedPetMapPage = () => {
         <LocationControls
           keyword={locationKeyword}
           category={locationCategory}
+          intentSignals={petIntentSignals}
           activeGroupId={locationCategoryGroupId}
           sort={locationSort}
           hasPendingAreaChange={hasPendingAreaChange}
@@ -460,6 +492,10 @@ const UnifiedPetMapPage = () => {
               mapViewportCenter,
               kw ? "keyword" : "user-triggered"
             );
+            if (kw) {
+              window.clearTimeout(signalRefreshTimerRef.current);
+              signalRefreshTimerRef.current = window.setTimeout(refreshPetIntentSignals, 1500);
+            }
           }}
           onCategoryPick={({ category: cat, groupId }) => {
             setLocationCategory(cat || "");
@@ -469,6 +505,13 @@ const UnifiedPetMapPage = () => {
               mapViewportCenter,
               cat ? "category" : "user-triggered"
             );
+          }}
+          onSignalPick={(cat) => {
+            setLocationKeyword("");
+            setLocationCategory(cat || "");
+            setLocationCategoryGroupId(null);
+            cacheRef.current = {};
+            commitLocationSearch(mapViewportCenter, "intent-signal");
           }}
           onSortChange={(sort) => {
             setLocationSort(sort);

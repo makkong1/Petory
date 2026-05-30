@@ -12,6 +12,7 @@ const RADIUS_OPTIONS = [1, 3, 5, 10];
 const LocationControls = ({
   keyword,
   category,
+  intentSignals = [],
   /** 마지막으로 선택한 중분류 브랜치 (소분류가 여러 중복일 때 필수) */
   activeGroupId = null,
   sort = 'stable',
@@ -23,6 +24,7 @@ const LocationControls = ({
   onSortChange,
   onSearchThisArea,
   onRadiusChange,
+  onSignalPick,
 }) => {
   const [inputValue, setInputValue] = useState(keyword || '');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -132,6 +134,25 @@ const LocationControls = ({
             ))}
           </LeafScrollRow>
         </>
+      )}
+
+      {intentSignals.length > 0 && (
+        <SignalRow>
+          {intentSignals.slice(0, 2).map((signal, index) => {
+            const categoryName = signal.targetCategory || signal.recommendedCategories?.[0];
+            if (!categoryName) return null;
+            return (
+              <SignalButton
+                key={`${signal.intent || 'intent'}-${categoryName}-${index}`}
+                type="button"
+                onClick={() => onSignalPick?.(categoryName)}
+              >
+                <SignalText>{signal.cardMessage || '최근 입력 기반 추천이 있어요.'}</SignalText>
+                <SignalAction>{signal.actionLabel || `근처 ${categoryName} 보기`}</SignalAction>
+              </SignalButton>
+            );
+          })}
+        </SignalRow>
       )}
 
       {isFilterOpen && onRadiusChange && (
@@ -274,6 +295,50 @@ const FilterBtn = styled.button`
     border-color: ${p => p.theme.colors.primary};
     color: ${p => p.theme.colors.primary};
   }
+`;
+
+const SignalRow = styled.div`
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 2px 0;
+`;
+
+const SignalButton = styled.button`
+  min-width: 0;
+  max-width: 100%;
+  border: 1px solid ${p => p.theme.colors.primary};
+  background: ${p => p.theme.colors.surface};
+  color: ${p => p.theme.colors.primary};
+  border-radius: 8px;
+  padding: 7px 9px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+`;
+
+const SignalText = styled.span`
+  display: block;
+  max-width: 220px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+`;
+
+const SignalAction = styled.span`
+  flex-shrink: 0;
+  color: ${p => p.theme.colors.textInverse};
+  background: ${p => p.theme.colors.primary};
+  border-radius: 999px;
+  padding: 3px 7px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
 `;
 
 const CategoryScrollRow = styled.div`
