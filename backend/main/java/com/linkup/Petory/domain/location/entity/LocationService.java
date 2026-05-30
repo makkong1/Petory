@@ -124,6 +124,18 @@ public class LocationService {
     @Column(name = "score")
     private Double score = 0.0;
 
+    @Column(name = "tags")
+    private String tags;
+
+    @Transient
+    public java.util.List<String> getTagList() {
+        if (tags == null || tags.isBlank()) return java.util.List.of();
+        try {
+            return new com.fasterxml.jackson.databind.ObjectMapper()
+                    .readValue(tags, new com.fasterxml.jackson.core.type.TypeReference<java.util.List<String>>() {});
+        } catch (Exception e) { return java.util.List.of(); }
+    }
+
     @Column(name = "last_updated")
     private LocalDate lastUpdated; // 최종작성일
 

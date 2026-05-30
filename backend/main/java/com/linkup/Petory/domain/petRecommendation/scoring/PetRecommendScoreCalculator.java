@@ -17,8 +17,8 @@ public class PetRecommendScoreCalculator {
     public PetRecommendFacilityDto calcScore(
             PetRecommendFacilityDto dto, int radiusM, List<String> intentTags) {
 
-        double placeScore    = 0.0;  // Phase 4 전까지 0
-        double tagScore      = 0.0;  // Phase 4 전까지 0
+        double placeScore    = dto.getPopularityScore();
+        double tagScore      = calcTagMatchScore(dto.getLocationTags(), intentTags);
         double distanceScore = calcDistanceScore(dto.getDistanceM(), radiusM);
         double ratingScore   = calcRatingScore(dto.getRating());
         double reviewScore   = calcReviewScore(dto.getReviewCount());
@@ -29,9 +29,9 @@ public class PetRecommendScoreCalculator {
                         + ratingScore   * W_RATING
                         + reviewScore   * W_REVIEW;
 
-        double finalScore = Math.round(rawScore * 1000.0) / 10.0;  // 0~100 스케일
+        double finalScore = Math.round(rawScore * 1000.0) / 10.0;
 
-        List<String> matchReasons = buildMatchReasons(dto, distanceScore, ratingScore);
+        List<String> matchReasons = buildMatchReasons(dto, distanceScore, ratingScore, intentTags);
 
         return PetRecommendFacilityDto.builder()
                 .id(dto.getId())
@@ -40,6 +40,8 @@ public class PetRecommendScoreCalculator {
                 .distanceM(dto.getDistanceM())
                 .rating(dto.getRating())
                 .reviewCount(dto.getReviewCount())
+                .popularityScore(placeScore)
+                .locationTags(dto.getLocationTags())
                 .finalScore(finalScore)
                 .matchReasons(matchReasons)
                 .build();
@@ -59,13 +61,28 @@ public class PetRecommendScoreCalculator {
         return Math.min(Math.log10(reviewCount + 1) / Math.log10(1001), 1.0);
     }
 
+    private double calcTagMatchScore(List<String> locationTags, List<String> intentTags) {
+        if (locationTags == null || locationTags.isEmpty()
+                || intentTags == null || intentTags.isEmpty()) return 0.0;
+        long matched = intentTags.stream().filter(locationTags::contains).count();
+        return (double) matched / intentTags.size();
+    }
+
     private List<String> buildMatchReasons(
-            PetRecommendFacilityDto dto, double distanceScore, double ratingScore) {
+            PetRecommendFacilityDto dto, double distanceScore, double ratingScore,
+            List<String> intentTags) {
         List<String> reasons = new ArrayList<>();
-        if (distanceScore >= 0.7)       reasons.add("nearby");
-        if (ratingScore   >= 0.8)       reasons.add("high_rating");
-        if (dto.getReviewCount() >= 50) reasons.add("many_reviews");
-        if (reasons.isEmpty())          reasons.add("in_radius");
+        if (distanceScore >= 0.7)           reasons.add("nearby");
+        if (ratingScore   >= 0.8)           reasons.add("high_rating");
+        if (dto.getReviewCount() >= 50)     reasons.add("many_reviews");
+        if (dto.getPopularityScore() >= 0.5) reasons.add("popular");
+        if (intentTags != null && dto.getLocationTags() != null) {
+            intentTags.stream()
+                    .filter(t -> dto.getLocationTags().contains(t))
+                    .map(t -> "tag_match:" + t)
+                    .forEach(reasons::add);
+        }
+        if (reasons.isEmpty()) reasons.add("in_radius");
         return reasons;
     }
 }
