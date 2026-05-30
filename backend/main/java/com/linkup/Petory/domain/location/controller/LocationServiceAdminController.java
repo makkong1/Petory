@@ -128,10 +128,8 @@ public class LocationServiceAdminController {
         }
         List<Map<String, Object>> files = new ArrayList<>();
         try (var stream = Files.list(dir)) {
-            stream.filter(p -> {
-                String name = p.getFileName().toString();
-                return name.startsWith("pet-locations") && name.endsWith(".json");
-            }).sorted(Comparator.reverseOrder()).forEach(p -> {
+            stream.filter(LocationServiceAdminController::isImportJsonFile)
+                    .sorted(Comparator.reverseOrder()).forEach(p -> {
                 Map<String, Object> info = new HashMap<>();
                 info.put("filename", p.getFileName().toString());
                 try {
@@ -210,7 +208,9 @@ public class LocationServiceAdminController {
                 ProcessBuilder pb = new ProcessBuilder(
                         collectPython, collectScript, "popular", "--output", outputFile
                 );
+                Path logFile = Path.of(importDir).normalize().toAbsolutePath().resolve("location-collect.log");
                 pb.redirectErrorStream(true);
+                pb.redirectOutput(ProcessBuilder.Redirect.appendTo(logFile.toFile()));
                 pb.directory(Path.of(collectScript).getParent().toFile());
                 Process process = pb.start();
                 int exit = process.waitFor();
@@ -245,14 +245,11 @@ public class LocationServiceAdminController {
     @GetMapping("/json-preview")
     @PreAuthorize("hasAnyRole('ADMIN', 'MASTER')")
     @SuppressWarnings("UseSpecificCatch")
-    public ResponseEntity<Map<String, Object>> jsonPreview() {
-        if (!StringUtils.hasText(importFilePath)) {
-            return ResponseEntity.ok(Map.of("exists", false, "reason", "파일 경로 미설정"));
-        }
-
+    public ResponseEntity<Map<String, Object>> jsonPreview(
+            @RequestParam(value = "filename", required = false) String filename) {
         Path path;
         try {
-            path = resolveAndValidatePath(importFilePath);
+            path = resolvePreviewPath(filename);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.ok(Map.of("exists", false, "reason", e.getMessage()));
         }
@@ -269,6 +266,7 @@ public class LocationServiceAdminController {
                     Files.getLastModifiedTime(path).toInstant(), ZoneId.systemDefault());
             Map<String, Object> response = new HashMap<>();
             response.put("exists", true);
+            response.put("filename", path.getFileName().toString());
             response.put("lastModified", lastModified.toString());
             response.put("count", records.size());
             response.put("records", records);
@@ -421,6 +419,68 @@ public class LocationServiceAdminController {
             // probeContentType 실패는 무시하고 통과
         }
         return normalized;
+    }
+
+    private Path resolvePreviewPath(String filename) {
+        if (StringUtils.hasText(filename)) {
+            return resolveImportFile(filename);
+        }
+        if (StringUtils.hasText(importFilePath)) {
+            return resolveAndValidatePath(importFilePath);
+        }
+        if (!StringUtils.hasText(importDir)) {
+            throw new IllegalArgumentException("파일 경로/디렉토리 미설정");
+        }
+
+        Path dir;
+        try {
+            dir = Path.of(importDir).normalize().toAbsolutePath();
+        } catch (Exception e) {
+            throw new IllegalArgumentException("유효하지 않은 디렉토리 경로");
+        }
+        if (!Files.isDirectory(dir)) {
+            throw new IllegalArgumentException("디렉토리 없음");
+        }
+
+        try (var stream = Files.list(dir)) {
+            return stream
+                    .filter(LocationServiceAdminController::isImportJsonFile)
+                    .max(Comparator.comparingLong(LocationServiceAdminController::lastModifiedMillis))
+                    .orElseThrow(() -> new IllegalArgumentException("JSON 파일 없음"));
+        } catch (IOException e) {
+            throw new IllegalArgumentException("디렉토리 읽기 실패: " + e.getMessage());
+        }
+    }
+
+    private static boolean isImportJsonFile(Path path) {
+        String name = path.getFileName().toString();
+        return Files.isRegularFile(path) && name.startsWith("pet-locations") && name.endsWith(".json");
+    }
+
+    private Path resolveImportFile(String filename) {
+        if (!StringUtils.hasText(importDir)) {
+            throw new IllegalArgumentException("app.location.import.dir 미설정");
+        }
+        if (filename.contains("/") || filename.contains("\\") || filename.contains("..")) {
+            throw new IllegalArgumentException("유효하지 않은 파일명");
+        }
+        if (!filename.startsWith("pet-locations") || !filename.endsWith(".json")) {
+            throw new IllegalArgumentException("허용되지 않는 파일명 형식");
+        }
+
+        Path filePath = Path.of(importDir).normalize().toAbsolutePath().resolve(filename);
+        if (!Files.isRegularFile(filePath)) {
+            throw new IllegalArgumentException("파일 없음: " + filename);
+        }
+        return filePath;
+    }
+
+    private static long lastModifiedMillis(Path path) {
+        try {
+            return Files.getLastModifiedTime(path).toMillis();
+        } catch (IOException e) {
+            return 0L;
+        }
     }
 
     private static ResponseEntity<Map<String, Object>> badRequest(String message) {

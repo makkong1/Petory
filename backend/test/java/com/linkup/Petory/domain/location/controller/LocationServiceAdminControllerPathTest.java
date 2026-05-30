@@ -1,8 +1,11 @@
 package com.linkup.Petory.domain.location.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkup.Petory.domain.location.repository.LocationServiceRepository;
-import com.linkup.Petory.domain.location.service.LocationImportService;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Map;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -14,24 +17,23 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.Map;
-
-import static org.assertj.core.api.Assertions.assertThat;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linkup.Petory.domain.location.repository.LocationServiceRepository;
+import com.linkup.Petory.domain.location.service.LocationImportService;
 
 /**
  * LocationServiceAdminController 경로 검증 버그 회귀 테스트
  *
- * 버그: resolveAndValidatePath가 Files.isRegularFile 체크를 먼저 실행하므로
- *       미존재 파일에 대해 "파일 없음"이 아닌 "경로가 파일이 아닙니다." 반환 (dead code)
+ * 버그: resolveAndValidatePath가 Files.isRegularFile 체크를 먼저 실행하므로 미존재 파일에 대해 "파일
+ * 없음"이 아닌 "경로가 파일이 아닙니다." 반환 (dead code)
  */
 @ExtendWith(MockitoExtension.class)
 class LocationServiceAdminControllerPathTest {
 
-    @Mock private LocationImportService locationImportService;
-    @Mock private LocationServiceRepository locationServiceRepository;
+    @Mock
+    private LocationImportService locationImportService;
+    @Mock
+    private LocationServiceRepository locationServiceRepository;
 
     @InjectMocks
     private LocationServiceAdminController controller;
@@ -55,8 +57,8 @@ class LocationServiceAdminControllerPathTest {
 
         // when
         @SuppressWarnings("unchecked")
-        ResponseEntity<Map<String, Object>> response =
-                (ResponseEntity<Map<String, Object>>) controller.jsonPreview();
+        ResponseEntity<Map<String, Object>> response
+                = (ResponseEntity<Map<String, Object>>) controller.jsonPreview("");
 
         // then: ★ 버그 — "파일 없음" 분기가 dead code여서 실제로는 이 메시지 반환
         assertThat(response.getBody()).isNotNull();
@@ -79,8 +81,8 @@ class LocationServiceAdminControllerPathTest {
 
         // when
         @SuppressWarnings("unchecked")
-        ResponseEntity<Map<String, Object>> response =
-                (ResponseEntity<Map<String, Object>>) controller.jsonPreview();
+        ResponseEntity<Map<String, Object>> response
+                = (ResponseEntity<Map<String, Object>>) controller.jsonPreview("");
 
         // then
         assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
@@ -90,15 +92,15 @@ class LocationServiceAdminControllerPathTest {
     }
 
     @Test
-    @DisplayName("파일 경로 미설정: exists=false, reason='파일 경로 미설정' 반환")
+    @DisplayName("파일 경로 미설정: exists=false, reason='파일 경로/디렉토리 미설정' 반환")
     void 경로미설정_exists_false() {
         ReflectionTestUtils.setField(controller, "importFilePath", "");
 
         @SuppressWarnings("unchecked")
-        ResponseEntity<Map<String, Object>> response =
-                (ResponseEntity<Map<String, Object>>) controller.jsonPreview();
+        ResponseEntity<Map<String, Object>> response
+                = (ResponseEntity<Map<String, Object>>) controller.jsonPreview("");
 
         assertThat(response.getBody().get("exists")).isEqualTo(false);
-        assertThat(response.getBody().get("reason")).isEqualTo("파일 경로 미설정");
+        assertThat(response.getBody().get("reason")).isEqualTo("파일 경로/디렉토리 미설정");
     }
 }

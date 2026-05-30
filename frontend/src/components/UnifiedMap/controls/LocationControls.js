@@ -5,8 +5,8 @@ import {
   resolveActiveGroup,
 } from '../../../constants/locationCategoryTree';
 
-const SORT_OPTIONS = ['distance', 'rating', 'reviews'];
-const SORT_LABELS = { distance: '거리순', rating: '평점순', reviews: '리뷰순' };
+const SORT_OPTIONS = ['stable', 'distance', 'rating', 'reviews'];
+const SORT_LABELS = { stable: '추천순', distance: '거리순', rating: '평점순', reviews: '리뷰순' };
 const RADIUS_OPTIONS = [1, 3, 5, 10];
 
 const LocationControls = ({
@@ -14,7 +14,7 @@ const LocationControls = ({
   category,
   /** 마지막으로 선택한 중분류 브랜치 (소분류가 여러 중복일 때 필수) */
   activeGroupId = null,
-  sort = 'distance',
+  sort = 'stable',
   hasPendingAreaChange = false,
   radius,
   onSearch,
@@ -61,7 +61,7 @@ const LocationControls = ({
           )}
         </SearchPill>
         <SortCycleBtn type="button" onClick={handleSortCycle} aria-label="정렬 변경">
-          {SORT_LABELS[sort]} ▾
+          {SORT_LABELS[sort] ?? SORT_LABELS.stable} ▾
         </SortCycleBtn>
         <FilterBtn
           type="button"

@@ -11,6 +11,7 @@ const LocationServiceManagementSection = () => {
 
   const [jsonPreview, setJsonPreview] = useState(null);
   const [jsonLoading, setJsonLoading] = useState(false);
+  const [previewFilename, setPreviewFilename] = useState(null);
 
   const [importFiles, setImportFiles] = useState([]);
   const [filesLoading, setFilesLoading] = useState(false);
@@ -23,19 +24,21 @@ const LocationServiceManagementSection = () => {
 
   const fileInputRef = useRef(null);
 
-  const loadJsonPreview = async () => {
+  const loadJsonPreview = useCallback(async (filename = null) => {
     setJsonLoading(true);
     try {
-      const data = await adminApi.getJsonPreview();
+      const data = await adminApi.getJsonPreview(filename);
       setJsonPreview(data);
+      setPreviewFilename(data?.exists ? data.filename : filename);
     } catch (e) {
       setJsonPreview(null);
+      setPreviewFilename(filename);
     } finally {
       setJsonLoading(false);
     }
-  };
+  }, []);
 
-  const loadImportFiles = async () => {
+  const loadImportFiles = useCallback(async () => {
     setFilesLoading(true);
     try {
       const data = await adminApi.getImportFiles();
@@ -45,7 +48,7 @@ const LocationServiceManagementSection = () => {
     } finally {
       setFilesLoading(false);
     }
-  };
+  }, []);
 
   const stopPoll = useCallback(() => {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
@@ -62,6 +65,7 @@ const LocationServiceManagementSection = () => {
           if (status.status === 'done') {
             setCollectMsg({ type: 'ok', text: '수집 완료 — 파일 목록을 갱신합니다.' });
             loadImportFiles();
+            loadJsonPreview();
           } else if (status.status !== 'idle') {
             setCollectMsg({ type: 'error', text: `수집 실패: ${status.status}` });
           }
@@ -71,7 +75,7 @@ const LocationServiceManagementSection = () => {
         setCollectLoading(false);
       }
     }, 5000);
-  }, [stopPoll, loadImportFiles]);
+  }, [stopPoll, loadImportFiles, loadJsonPreview]);
 
   const handleCollect = async () => {
     setCollectLoading(true);
@@ -124,10 +128,14 @@ const LocationServiceManagementSection = () => {
     }
   };
 
+  const handlePreviewFile = (filename) => {
+    loadJsonPreview(filename);
+  };
+
   useEffect(() => {
     loadJsonPreview();
     loadImportFiles();
-  }, []);
+  }, [loadJsonPreview, loadImportFiles]);
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -210,7 +218,15 @@ const LocationServiceManagementSection = () => {
                 return (
                   <React.Fragment key={f.filename}>
                     <tr>
-                      <td><FileName>{f.filename}</FileName></td>
+                      <td>
+                        <FileName
+                          type="button"
+                          $active={previewFilename === f.filename}
+                          onClick={() => handlePreviewFile(f.filename)}
+                        >
+                          {f.filename}
+                        </FileName>
+                      </td>
                       <td>{f.sizeKb} KB</td>
                       <td>{formatDate(f.lastModified)}</td>
                       <td>
@@ -253,6 +269,7 @@ const LocationServiceManagementSection = () => {
         {!jsonLoading && jsonPreview && jsonPreview.exists && (
           <>
             <MetaRow>
+              <MetaBadge>{jsonPreview.filename || previewFilename || '최신 파일'}</MetaBadge>
               <MetaBadge>마지막 생성: {formatDate(jsonPreview.lastModified)}</MetaBadge>
               <MetaBadge>{jsonPreview.count}건</MetaBadge>
             </MetaRow>
@@ -531,19 +548,19 @@ const RefreshButton = styled.button`
   &:disabled { opacity: 0.5; cursor: not-allowed; }
 `;
 
-const Code = styled.code`
-  display: inline-block;
-  margin-top: 4px;
-  background: ${props => props.theme.colors.surfaceSoft};
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 11px;
-  color: ${props => props.theme.colors.text};
-`;
-
-const FileName = styled.span`
+const FileName = styled.button`
   font-family: monospace;
   font-size: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: ${props => props.$active ? props.theme.colors.primary : props.theme.colors.text};
+  cursor: pointer;
+  text-align: left;
+  &:hover {
+    color: ${props => props.theme.colors.primary};
+    text-decoration: underline;
+  }
 `;
 
 const FileSyncButton = styled.button`

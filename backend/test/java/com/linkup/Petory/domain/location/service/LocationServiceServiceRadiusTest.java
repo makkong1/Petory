@@ -19,11 +19,9 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 /**
- * LocationServiceService 반경 검색 버그 회귀 테스트
+ * LocationServiceService 반경 검색 LIMIT 회귀 테스트.
  *
- * 버그: findByRadius 호출 시 SQL LIMIT 파라미터 없음 → DB 전체 조회 후 Java stream.limit()
- * 지역 검색(searchLocationServicesByRegion)은 dbLimit을 SQL에 전달하지만,
- * 반경 검색(searchLocationServicesByLocation)은 SQL에 LIMIT이 없음.
+ * 반경 검색도 지역 검색처럼 SQL LIMIT을 repository까지 전달해야 한다.
  */
 @ExtendWith(MockitoExtension.class)
 class LocationServiceServiceRadiusTest {
@@ -48,14 +46,14 @@ class LocationServiceServiceRadiusTest {
     }
 
     @Test
-    @DisplayName("반경검색 maxResults=null: findByRadius에 LIMIT 없이 호출 — DB가 전체 레코드 반환")
-    void 반경검색_maxResultsNull_DB전체조회() {
-        // given: DB에 200개 레코드 존재
-        List<LocationService> dbResults = IntStream.range(0, 200)
+    @DisplayName("반경검색 maxResults=null: 기본 LIMIT 100을 SQL에 전달한다")
+    void 반경검색_maxResultsNull_기본Limit100전달() {
+        // given: DB가 LIMIT 100으로 잘린 결과를 반환
+        List<LocationService> dbResults = IntStream.range(0, 100)
                 .mapToObj(this::dummyService)
                 .toList();
         when(locationServiceRepository.findByRadius(anyDouble(), anyDouble(), anyDouble(),
-                any(), any(), any()))
+                any(), any(), any(), eq(100)))
                 .thenReturn(dbResults);
         when(locationServiceConverter.toDTO(any())).thenReturn(new LocationServiceDTO());
 
@@ -63,39 +61,51 @@ class LocationServiceServiceRadiusTest {
         var result = service.searchLocationServicesByLocation(
                 37.5, 127.0, 3000, null, null, null, null);
 
-        // then: ★ 버그 — findByRadius는 SQL LIMIT 없이 200건 전부 반환
-        // (지역 검색이었다면 dbLimit=50으로 SQL에서 잘렸을 것)
-        // sort=null → normalizeSort → "distance" 기본값
         verify(locationServiceRepository).findByRadius(eq(37.5), eq(127.0), eq(3000.0),
-                isNull(), isNull(), eq("distance"));
+                isNull(), isNull(), eq("distance"), eq(100));
 
-        // Java stream.limit도 미적용 (maxResults=null이므로) → 200건 그대로 서비스까지 올라옴
-        assertThat(result).hasSize(200);
+        assertThat(result).hasSize(100);
     }
 
     @Test
-    @DisplayName("반경검색 maxResults=5: DB는 여전히 전체 조회, Java에서만 5개로 자름")
-    void 반경검색_maxResults5_DB는전체조회_Java에서자름() {
-        // given: DB에 100개 레코드
-        List<LocationService> dbResults = IntStream.range(0, 100)
+    @DisplayName("반경검색 maxResults=5: LIMIT 5를 SQL에 전달한다")
+    void 반경검색_maxResults5_SQLLimit5전달() {
+        // given: DB가 LIMIT 5로 잘린 결과를 반환
+        List<LocationService> dbResults = IntStream.range(0, 5)
                 .mapToObj(this::dummyService)
                 .toList();
         when(locationServiceRepository.findByRadius(anyDouble(), anyDouble(), anyDouble(),
-                any(), any(), any()))
-                .thenReturn(dbResults); // DB는 LIMIT 없이 100건 반환
+                any(), any(), any(), eq(5)))
+                .thenReturn(dbResults);
         when(locationServiceConverter.toDTO(any())).thenReturn(new LocationServiceDTO());
 
         // when: maxResults = 5
         var result = service.searchLocationServicesByLocation(
                 37.5, 127.0, 3000, null, null, null, 5);
 
-        // then: findByRadius는 LIMIT 파라미터 없이 호출됨 (SQL에서 안 잘림)
         verify(locationServiceRepository).findByRadius(
-                anyDouble(), anyDouble(), anyDouble(), any(), any(), any());
+                anyDouble(), anyDouble(), anyDouble(), any(), any(), any(), eq(5));
 
-        // Java stream.limit(5)로 잘려서 결과는 5개
         assertThat(result).hasSize(5);
-        // ★ 핵심: DB는 100건을 조회했지만 5개만 사용 → 95건 낭비
+    }
+
+    @Test
+    @DisplayName("반경검색 sort=stable: stable 정렬값을 repository에 전달한다")
+    void 반경검색_stableSort_전달() {
+        List<LocationService> dbResults = IntStream.range(0, 3)
+                .mapToObj(this::dummyService)
+                .toList();
+        when(locationServiceRepository.findByRadius(anyDouble(), anyDouble(), anyDouble(),
+                any(), any(), eq("stable"), eq(300)))
+                .thenReturn(dbResults);
+        when(locationServiceConverter.toDTO(any())).thenReturn(new LocationServiceDTO());
+
+        var result = service.searchLocationServicesByLocation(
+                37.5, 127.0, 3000, null, null, "stable", 300);
+
+        verify(locationServiceRepository).findByRadius(eq(37.5), eq(127.0), eq(3000.0),
+                isNull(), isNull(), eq("stable"), eq(300));
+        assertThat(result).hasSize(3);
     }
 
     @Test

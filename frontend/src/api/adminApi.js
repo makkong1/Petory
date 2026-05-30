@@ -38,8 +38,10 @@ export const adminApi = {
   },
 
   // JSON 파일 미리보기 (마지막 수정일 + 레코드 목록)
-  getJsonPreview: async () => {
-    const response = await api.get('/location/json-preview');
+  getJsonPreview: async (filename = null) => {
+    const response = await api.get('/location/json-preview', {
+      params: filename ? { filename } : undefined,
+    });
     return response.data;
   },
 
@@ -67,4 +69,3 @@ export const adminApi = {
     return response.data;
   },
 };
-

@@ -110,7 +110,7 @@ class CareRequestServiceTest {
 
         when(careRequestRepository.findByIdWithApplications(1L)).thenReturn(Optional.of(request));
         when(careRequestRepository.save(any(CareRequest.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(petCoinEscrowService.findByCareRequestForUpdate(any())).thenReturn(null);
+        when(petCoinEscrowService.findByCareRequest(any())).thenReturn(null);
         when(careRequestConverter.toDTO(any(CareRequest.class)))
                 .thenReturn(CareRequestDTO.builder().status("COMPLETED").build());
 
