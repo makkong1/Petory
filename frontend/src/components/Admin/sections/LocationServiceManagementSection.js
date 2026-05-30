@@ -257,13 +257,13 @@ const LocationServiceManagementSection = () => {
       <Card>
         <CardTitle>JSON 원본 파일 미리보기</CardTitle>
         <CardDescription>
-          pet-data-api 배치가 생성한 원본 JSON 파일입니다. 동기화 전 데이터를 확인할 수 있습니다.
+          위치 데이터 배치가 생성한 원본 JSON 파일입니다. 동기화 전 데이터를 확인할 수 있습니다.
         </CardDescription>
 
         {jsonLoading && <Info>로딩 중...</Info>}
 
         {!jsonLoading && jsonPreview && !jsonPreview.exists && (
-          <Info>파일 없음 — pet-data-api 배치를 먼저 실행해주세요. ({jsonPreview.reason})</Info>
+          <Info>파일 없음 — 위치 데이터 배치를 먼저 실행해주세요. ({jsonPreview.reason})</Info>
         )}
 
         {!jsonLoading && jsonPreview && jsonPreview.exists && (

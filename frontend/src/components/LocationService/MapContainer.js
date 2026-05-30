@@ -31,7 +31,7 @@ const NAVER_MAPS_KEY_ID = process.env.REACT_APP_NAVER_MAPS_KEY_ID || process.env
  * @param {Function} onRegionClick - 지역 클릭 핸들러
  */
 const MapContainer = React.forwardRef(
-  ({ services = [], onServiceClick, userLocation, mapCenter, mapLevel, onMapDragStart, onMapIdle, hoverMarker = null, currentMapView = 'nation', selectedSido = null, selectedSigungu = null, selectedEupmyeondong = null, onRegionClick = null, onMapClick = null, selectedService = null, hoveredService = null, recommendedServiceIdxs = null }, ref) => {
+  ({ services = [], onServiceClick, userLocation, mapCenter, mapLevel, onMapDragStart, onMapIdle, hoverMarker = null, currentMapView = 'nation', selectedSido = null, selectedSigungu = null, selectedEupmyeondong = null, onRegionClick = null, onMapClick = null, selectedService = null, hoveredService = null }, ref) => {
     const mapRef = useRef(null);
     const mapInstanceRef = useRef(null);
     const markersRef = useRef([]);
@@ -355,10 +355,9 @@ const MapContainer = React.forwardRef(
         if (validServices.length === 0) return;
 
         // 통합 핀 아이콘 생성 함수 (SVG)
-        // type: 'normal' | 'selected' | 'hovered' | 'missing' | 'top'
-        // rank: 'top' 타입일 때 순위 숫자 (1~10)
+        // type: 'normal' | 'selected' | 'hovered' | 'missing'
         // customColor: 서비스별 커스텀 마커 색상 (예: '#4A90D9')
-        const createPinIcon = (type, rank = null, customColor = null, name = null) => {
+        const createPinIcon = (type, customColor = null, name = null) => {
           let color = customColor || '#03C75A'; // 커스텀 색상 또는 기본 녹색
           let scale = 1;
           let zIndex = 100;
@@ -366,10 +365,6 @@ const MapContainer = React.forwardRef(
           if (type === 'missing') {
             color = '#FF6B6B'; // 실종: 빨강
             zIndex = 150;
-          } else if (type === 'top') {
-            color = '#F5A623'; // AI 추천: 금색
-            scale = 1.15;
-            zIndex = 500;
           }
 
           if (type === 'selected') {
@@ -385,10 +380,7 @@ const MapContainer = React.forwardRef(
           const width = 26 * scale;
           const height = 36 * scale;
 
-          // 내부 컨텐츠: 순위 숫자(top) 또는 흰 점
-          const innerContent = (type === 'top' && rank != null)
-            ? `<text x="12" y="16" text-anchor="middle" dominant-baseline="middle" font-size="10" font-weight="bold" fill="white">${rank}</text>`
-            : `<circle cx="12" cy="12" r="5" fill="white"/>`;
+          const innerContent = `<circle cx="12" cy="12" r="5" fill="white"/>`;
 
           // SVG Path: 날렵한 핀 모양
            const svgContent = `
@@ -410,9 +402,6 @@ const MapContainer = React.forwardRef(
           };
         };
 
-        // recommendedServiceIdxs: Map<idx, rank> (AI 추천 결과, rank는 1-based)
-        const recommendedMap = recommendedServiceIdxs instanceof Map ? recommendedServiceIdxs : null;
-
         // 모든 서비스에 대해 개별 마커 생성 (클러스터링 비활성화 - 사용자 요청)
         const individualMarkersList = validServices.map((service) => {
           const position = new window.naver.maps.LatLng(service.latitude, service.longitude);
@@ -430,16 +419,13 @@ const MapContainer = React.forwardRef(
              (hoveredService.key && service.key === hoveredService.key)
           );
 
-          const recommendedRank = recommendedMap?.get(service.idx) ?? null;
-
           let type = 'normal';
           if (service.type === 'missingPet') type = 'missing';
-          else if (recommendedRank != null) type = 'top';
           if (isSelected) type = 'selected';
-          else if (isHovered && type !== 'top') type = 'hovered';
+          else if (isHovered) type = 'hovered';
 
           // 개별 마커용 핀 아이콘 (service.markerColor로 커스텀 색상 지원)
-          const markerIcon = createPinIcon(type, recommendedRank, service.markerColor || null, service.name || null);
+          const markerIcon = createPinIcon(type, service.markerColor || null, service.name || null);
 
           const marker = new window.naver.maps.Marker({
             position,

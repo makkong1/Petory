@@ -19,7 +19,6 @@ Spring Boot 3.5.7 (Java 17) 백엔드 + React 19 프론트엔드 + Capacitor 모
 | Cache | Redis (알림 캐시, 게시글 캐시, 이메일 인증) |
 | Security | Spring Security + JWT + OAuth2 (Google, Naver) |
 | 실시간 | WebSocket (STOMP) — 채팅 / SSE — 알림 |
-| AI | Spring AI + Ollama (반려동물 추천) |
 | 푸시 알림 | Firebase Admin SDK 9.3.0 (FCM) |
 | 모니터링 | Spring Boot Admin 3.3.3 |
 
@@ -46,7 +45,6 @@ Spring Boot 3.5.7 (Java 17) 백엔드 + React 19 프론트엔드 + Capacitor 모
 - **1:1 채팅** — WebSocket(STOMP), 케어 매칭 시 자동 생성
 - **알림** — SSE 실시간(앱 열림) + FCM 푸시(앱 꺼짐)
 - **신고 및 제재** — 신고 처리, 경고/정지/밴 제재
-- **AI 추천** — Ollama 기반 반려동물 케어 추천
 - **통계** — 일/주/월별 배치 집계 (Daily Summary Pattern)
 - **관리자** — 도메인별 CRUD, 통계 대시보드, 감사 로그
 
@@ -89,7 +87,7 @@ Controller → Service → Repository → Entity
 
 ---
 
-## 도메인 목록 (15개)
+## 도메인 목록 (14개)
 
 | 도메인 | 설명 |
 |--------|------|
@@ -103,7 +101,6 @@ Controller → Service → Repository → Entity
 | `meetup` | 오프라인 모임 |
 | `report` | 신고 및 제재 |
 | `statistics` | 일/주/월 통계 배치 |
-| `recommendation` | AI 추천 (Ollama) |
 | `file` | 파일 업로드/다운로드 |
 | `activity` | 사용자 활동 로그 |
 | `admin` | 관리자 기능, 감사 로그 |
