@@ -77,6 +77,8 @@ CREATE TABLE places (
     lat                         DOUBLE,
     lng                         DOUBLE,
     category                    VARCHAR(100),
+    -- MVP에서 category = category3(소분류)에 해당.
+    -- category1/category2 계층 이전은 2단계 마이그레이션에서 결정.
     status                      ENUM('PENDING','ACTIVE','INACTIVE') DEFAULT 'PENDING',
     primary_source              VARCHAR(50),
     confidence                  FLOAT,
@@ -186,7 +188,7 @@ CREATE TABLE place_facts (
 
 ## 섹션 3: 자동 판정 로직 (4-gate)
 
-판정은 규칙 우선. `confidence_score`는 NEEDS_REVIEW 큐 정렬에만 사용.
+판정은 규칙 우선. `confidence_score`는 **Gate 4 threshold decision과 NEEDS_REVIEW 큐 정렬** 두 가지 목적으로 사용한다.
 
 ### Gate 1 — Hard Reject + Risk Flag
 
@@ -226,6 +228,20 @@ CREATE TABLE place_facts (
 > "서로 다른 source"란 collected_from이 다른 두 개의 candidate 레코드를 의미.
 > 같은 오탐이 동일 경로에서 중복 유입되는 케이스를 방지.
 
+**자동 판정 엔진 side effect (Gate 2 통과 시):**
+
+```text
+candidate.decision_status = AUTO_APPROVED
+candidate.confidence_score = 0.9
+candidate.decision_reason  = "strong_match:public_data" | "strong_match:self_trust"
+candidate.score_breakdown  = { gate: "GATE2_STRONG_MATCH", ... }
+candidate.matched_place_id = 생성된 places.id
+
+places.status     = PENDING
+places.confidence = 0.9
+places.primary_source = candidate.collected_from
+```
+
 ### Gate 3 — Scoring
 
 | 신호 | 조건 | 점수 |
@@ -258,6 +274,20 @@ score ≥ 0.3  → NEEDS_REVIEW
 score < 0.3  → REJECTED
 ```
 
+**자동 판정 엔진 side effect (Gate 4 AUTO_APPROVED 시):**
+
+```text
+candidate.decision_status = AUTO_APPROVED
+candidate.confidence_score = score
+candidate.decision_reason  = "threshold_passed"
+candidate.score_breakdown  = { gate: "GATE4_THRESHOLD", ... }
+candidate.matched_place_id = 생성된 places.id
+
+places.status     = PENDING
+places.confidence = score
+places.primary_source = candidate.collected_from
+```
+
 ---
 
 ## 섹션 4: Admin API
@@ -267,13 +297,17 @@ score < 0.3  → REJECTED
 ### 상태 전이 guard
 
 ```text
-approve 허용 상태: PENDING, NEEDS_REVIEW
-  → 그 외 (AUTO_APPROVED, ADMIN_APPROVED, REJECTED): 409 Conflict
+approve (idempotent 우선):
+  1. matched_place_id != null → 기존 place 반환 (상태 무관, 중복 생성 방지)
+  2. status not in (PENDING, NEEDS_REVIEW) → 409 Conflict
+  3. 정상 승인 처리
 
-reject 허용 상태: PENDING, NEEDS_REVIEW
+reject:
+  허용 상태: PENDING, NEEDS_REVIEW
   → 그 외: 409 Conflict
 
-activate 허용 상태: places.status = PENDING
+activate:
+  허용 상태: places.status = PENDING
   → ACTIVE, INACTIVE: 409 Conflict
 ```
 
