@@ -31,8 +31,8 @@ export const adminApi = {
     return response.data;
   },
 
-  // pet-data-api 시설 데이터 수동 동기화 (서버 설정 경로에서 읽기)
-  syncFacilitiesFromPetDataApi: async () => {
+  // 위치 JSON 파일 수동 동기화 (서버 설정 경로에서 읽기)
+  syncLocationImport: async () => {
     const response = await api.post('/location/sync');
     return response.data;
   },

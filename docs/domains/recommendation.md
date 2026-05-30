@@ -1,196 +1,374 @@
-# Recommendation 도메인 - 맞춤 추천 (Pet Data API)
+# Recommendation 도메인 - 포트폴리오 상세 설명
 
-## 1. 도메인 개요
+## 1. 개요
 
-### 1.1 역할
+Recommendation 도메인은 사용자의 최근 반려생활 입력을 분석해 주변서비스 탭에서 자연스럽게 추천 진입점을 제공하는 도메인입니다.
 
-Petory 백엔드는 이제 모든 컨텍스트를 외부 추천 서버에 그대로 프록시하지 않습니다.
+현재 구현은 "새로운 장소 조회 시스템"을 만드는 방식이 아니라, 기존 Location 도메인의 주변서비스 검색에 사용자 의도 기반 추천 카드를 연결하는 방식입니다. 사용자가 커뮤니티 글, 케어 요청, 주변서비스 검색어를 남기면 Spring이 비동기 이벤트로 Python NLP 서버를 호출하고, 분석 결과를 `user_pet_intent_signal`에 저장합니다. 주변서비스 탭은 이 signal을 조회해 추천 카드를 보여주고, 카드 클릭 시 기존 `/api/location-services/search`를 `category` 필터로 실행합니다.
 
-- **Track A (`grooming`, `hospital`, `pharmacy`, `cafe`, `restaurant`, `pension`, `boarding`, `hotel`, `supplies`)**
-  - Petory가 `LocationService` 구조화 저장소에서 **nearby 후보를 직접 조회**
-  - `pet-data-api`에서는 **`popular` / `trends` 시그널만 조회**
-  - 최종 조합과 정렬, 응답 DTO 조립은 **Petory 서비스 레이어**가 담당
-  - 시설 데이터는 Python batch CLI → JSON → `LocationImportService`를 통해 `locationservice` DB에 적재
-- **Track B (비-시설 카테고리: `snack`, `food`, `clothes`)**
-  - 기존 `PetDataApiClient.recommend()` 경로를 유지
-  - 구조화 시설 마스터가 없는 트렌드 중심 카테고리라서 Petory owner 전환 대상이 아님
-  - `snack` / `food` / `clothes`는 `PetDataApiClient`에서 경로 alias `supplies`로 정규화되어 호출됨
+**주요 기능**:
 
-### 1.2 Location 추천과의 구분
-
-| 구분        | Recommendation 도메인                                           | Location (별도)                                                           |
-| ----------- | --------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| 경로        | `GET /api/recommend`                                            | `GET /api/location-services/recommend` 등                                 |
-| 데이터 소스 | Petory `LocationService` + 외부 `pet-data-api` popularity/trend | `LocationService` + `LocationRecommendAgentService` 등 Petory DB/에이전트 |
-| 용도        | nearby 후보 + popularity/trend 조합 추천                        | 주변 위치 서비스 목록 + AI 이유 enrich                                    |
-
-### 1.3 핵심 원칙
-
-- **로그인 전용**: 비인증 요청은 `UnauthenticatedException`으로 처리
-- **전용 JPA 엔티티 없음**: 추천 결과를 Petory MySQL에 영속하지 않음
-- **반려동물은 User 도메인 `Pet`에서 조회**: `findByUserIdAndNotDeleted` 첫 항목만 사용
-
-### 1.4 Location AI 추천 통합 — 완료
-
-`GET /api/location-services/recommend` 및 `LocationRecommendAgentService`는 코드베이스에서 **제거 완료**. 해당 컨트롤러·서비스 클래스 파일이 존재하지 않으며, “주변 서비스 추천” 목적은 `GET /api/recommend`(본 도메인)로 단일화되었다. `docs/domains/location.md` §4.4 참고.
+- 커뮤니티 글, 케어 요청, 주변서비스 검색어 기반 의도 signal 수집
+- Python NLP 서버를 통한 반려생활 의도 분석
+- 원문 텍스트를 저장하지 않는 signal 저장 구조
+- 주변서비스 탭 추천 카드 표시
+- 추천 카드 클릭 시 Location 도메인의 카테고리 검색으로 연결
+- Python 서버 장애 시 원래 사용자 액션에 영향을 주지 않는 비동기 처리
 
 ---
 
-## 2. API
+## 2. 추천 서비스 동작 흐름
 
-모든 경로는 `/api/recommend/**` 이며 **인증 필요**. (위 **1.3 핵심 원칙** 참고.)
+### 2.1 전체 흐름
 
-### 2.1 엔드포인트 요약
-
-- **`GET`** `/api/recommend` — `lat`, `lng`, `context` 로 추천, 응답은 `RecommendResponse`.
-- **`POST`** `/api/recommend/copy` — 시설·트렌드 payload 로 LLM 카피 생성.
-- **`POST`** `/api/recommend/events` — 요청별 행동 이벤트 기록(`userId` SHA-256 해시 → `userRef`; 현재 전송 스킵).
-- **`GET`** `/api/recommend/trends/{category}/timeseries` — 트렌드 시계열.
-
-### 2.2 `GET /api/recommend`
-
-| 구분          | 내용                                                          |
-| ------------- | ------------------------------------------------------------- |
-| 쿼리          | `lat`, `lng`, `context` 필수 (`double`, `double`, `String`)   |
-| 인증          | `Authentication#getName()` → `userId`                         |
-| 성공          | `200` + `RecommendResponse`                                   |
-| 본문 없음     | 서비스가 `null`이면 `503`(바디 없음; 현 코드 경로에서는 드묾) |
-| 외부 I/O 실패 | `PetDataApiClient` 예외 → 전역 핸들러(대개 5xx)               |
-
-### 2.3 부가 엔드포인트
-
-**`POST` `/api/recommend/copy`**
-
-- 본문: `RecommendCopyRequest`(context, request_id, facilities, trends, pet) → `RecommendCopyResponse`
-- `pet` 는 백엔드에서 보강 가능
-
-**`POST` `/api/recommend/events`**
-
-- 본문: `RecommendEventRequest`(request_id, events[]) → 응답 `202`
-- `userId` 는 `SHA-256` 앞 12자 해시(`petory-xxxxxxxxxxxx`)로 변환해 `userRef` 필드에 주입
-- 현재 pet-data-api에 이벤트 수집 엔드포인트가 없어 **실제 전송은 스킵** (`sendEvents()`는 debug 로그만 출력). 추후 엔드포인트 구현 시 전송 로직 추가 예정
-
-**`GET` `/api/recommend/trends/{category}/timeseries`**
-
-- 쿼리: `days`(기본 14), `top_keywords`(기본 10)
-- 응답: `TrendTimeseriesResponse`(category, points: date, keyword, score)
-- pet-data-api는 현재 시점 스냅샷(1회 데이터)만 제공한다. `PetDataApiClient`는 이 스냅샷의 각 키워드를 `days`일치 포인트로 복제해 Recharts 차트 호환 시계열로 변환(`expandSnapshotToSyntheticSeries`)한다. 실제 일별 변화 데이터는 아님.
-
-### 2.4 응답 DTO (`RecommendResponse`)
-
-```java
-public record RecommendResponse(
-    String context,
-    @JsonProperty("recommend_version") String recommendVersion,
-    @JsonProperty("request_id")        String requestId,
-    List<FacilityItem>                 facilities,
-    List<TrendItem>                    trends,
-    String                             recommendation,
-    @JsonProperty("generated_at")      String generatedAt)
+```mermaid
+flowchart LR
+    A["커뮤니티 글 / 케어 요청 / 주변서비스 검색어"] --> B["Spring Event 발행"]
+    B --> C["@Async EventListener"]
+    C --> D["Python NLP 서버"]
+    D --> E["intentDomain / intent / category / tags"]
+    E --> F["user_pet_intent_signal 저장"]
+    F --> G["주변서비스 탭 /signals 조회"]
+    G --> H["추천 카드 표시"]
+    H --> I["카드 클릭"]
+    I --> J["/api/location-services/search category 필터"]
+    J --> K["지도와 목록에 장소 표시"]
 ```
 
-- `context`: 요청한 context 문자열 그대로 echo
-- `recommend_version`: 응답 생성 경로 식별자 (`"petory-nearby-v1"` / `"popular-intelligence-v1"`)
-- `request_id`: 요청 추적용 UUID (Petory 내부 생성)
-- `facilities`: 시설 후보 — `name`, `distance_m`, `address`, `lat`, `lng`
-- `trends`: 트렌드 — `keyword`, `score`
-- `recommendation`: rule-based 또는 자연어 추천 문구
-- `generated_at`: 응답 생성 시각 (ISO 8601)
+### 2.2 사용자 관점 시나리오
+
+1. 사용자가 주변서비스 검색창에 `강아지가 귀를 자꾸 긁어요`를 입력합니다.
+2. 기존 주변서비스 검색은 그대로 실행됩니다.
+3. 동시에 Spring이 `LocationSearchPerformedEvent`를 발행합니다.
+4. 비동기 listener가 Python NLP 서버에 텍스트 분석을 요청합니다.
+5. Python 서버가 `MEDICAL`, `동물병원` 같은 분석 결과를 반환합니다.
+6. confidence가 기준 이상이면 `user_pet_intent_signal`에 저장됩니다.
+7. 주변서비스 탭이 `/api/pet-recommend/signals`를 조회합니다.
+8. 화면에 `최근 건강 관련 고민이 있어 보여요. / 근처 동물병원 보기` 카드가 표시됩니다.
+9. 카드를 누르면 주변서비스 검색 카테고리가 `동물병원`으로 세팅되고, 기존 Location 검색 API가 실행됩니다.
 
 ---
 
-## 3. 서비스 흐름
+## 3. 입력 수집 지점
 
-1. `RecommendController`가 `userId`, `lat`, `lng`, `context`를 `RecommendService`에 전달
-2. `PetRepository.findByUserIdAndNotDeleted(userId)`로 반려동물 목록 조회
-3. **펫이 있으면** 첫 요소(`pets.get(0)`)로 `PetInfo` 구성
-   - `type`: `petType.name().toLowerCase()`
-   - `breed`: 품종
-   - `age_months`: `birthDate`가 있을 때만 `ChronoUnit.MONTHS`로 계산, 없으면 `null`
-4. **Track A면**
-   - `LocationServiceService.searchLocationServicesByLocation(...)`로 반경 10km 후보 최대 20개 조회
-   - `PetDataApiClient.fetchPopular(context, ...)` — popular 시그널 목록 조회
-   - `PetDataApiClient.fetchTrends(context, ...)` — 트렌드 키워드 최대 15개 조회
-   - **이름 정규화 + alias 조인**: 상호명에서 업종 suffix(예: `미용`, `애견미용실`, `동물병원`)를 제거한 별칭을 생성해 popular 시그널 인덱스와 매칭. 예) "피플앤독 미용" → "피플앤독" alias로 popular 시그널 찾음
-   - **가중 스코어링 후 상위 5개** 반환:
-     | 요소 | 가중치 |
-     |------|--------|
-     | 거리 (가까울수록 높음) | **55%** |
-     | 평점 (`rating / 5.0`) | 20% |
-     | 리뷰 수 (`log(n+1)` 정규화) | 15% |
-     | 인기도 (블로그 언급 점수·횟수) | 10% |
-   - 동점 시 거리순 → 이름 사전순으로 tie-break
-5. **Track B면**
-   - `RecommendRequest` 빌드: `lat`, `lng`, `context`, **고정** `radius_km=10.0`, `top_n=5`, `pet`(또는 `null`)
-   - `PetDataApiClient.recommend(request)` 호출
-     - **내부에서** `GET /popular/{context}` + `GET /trends/{category}` 를 각각 직접 호출
-     - `lat`/`lng`/`radius_km`은 실제 사용되지 않음 (`topN`, `context`만 사용)
-     - `RecommendResponse`를 rule-based 추천 문구와 함께 로컬 조립 (POST /recommend 없음)
+### 3.1 커뮤니티 게시글
 
-### 3.1 `RecommendRequest` DTO
+커뮤니티 게시글 작성 시 게시글 제목과 내용을 기반으로 `CommunityPostCreatedEvent`를 발행합니다.
 
-```java
-public record RecommendRequest(
-    double lat, double lng, String context,
-    @JsonProperty("radius_km") double radiusKm,
-    @JsonProperty("top_n")     int topN,
-    PetInfo pet)
+**의도**:
+
+- 사용자가 질문이나 고민을 글로 남겼을 때 추천 signal 후보로 활용
+- 예: `고양이가 밥을 잘 안 먹어요`, `강아지가 귀를 자꾸 긁어요`
+
+**처리 특징**:
+
+- 게시글 저장 응답을 막지 않도록 이벤트 기반으로 처리
+- Python 분석 실패 시 게시글 작성은 성공 상태로 유지
+
+### 3.2 케어 요청
+
+케어 요청 작성 시 요청 내용 기반으로 `CareRequestCreatedEvent`를 발행합니다.
+
+**의도**:
+
+- 돌봄, 미용, 위탁관리, 산책 등 실제 케어 요구에서 추천 signal 후보 추출
+- 예: `털이 많이 엉켰어요`, `며칠 맡길 곳이 필요해요`
+
+### 3.3 주변서비스 검색어
+
+주변서비스 검색창에 사용자가 키워드를 입력하면 `LocationSearchPerformedEvent`를 발행합니다.
+
+**구현 위치**: `LocationServiceService.publishSearchEvent`
+
+**의도**:
+
+- 가장 자연스럽게 추천이 체감되는 진입점
+- 검색어 자체가 반려생활 상황이면 이후 주변서비스 탭에서 추천 카드로 연결
+
+**주의**:
+
+- 로그인 사용자의 검색어만 signal 후보로 저장합니다.
+- 익명 사용자는 signal 저장 대상이 아닙니다.
+
+---
+
+## 4. Python NLP 서버
+
+### 4.1 Endpoint
+
+```http
+POST /api/pet-intent/analyze
 ```
 
-- **Track A**: 이 DTO는 사용하지 않음 (Petory가 직접 popular/trends 호출)
-- **Track B**: `PetDataApiClient.recommend(request)` 인자로 전달되지만,  
-  내부에서 `context`와 `topN`만 사용. `lat`/`lng`/`radiusKm`은 무시됨.  
-  pet-data-api에 직접 직렬화 전송되지 않음.
+### 4.2 요청 예시
+
+```json
+{
+  "text": "강아지가 귀를 자꾸 긁어요",
+  "petType": null
+}
+```
+
+### 4.3 응답 예시
+
+```json
+{
+  "intentDomain": "MEDICAL",
+  "intent": "HEALTH_SYMPTOM",
+  "recommendedCategories": ["동물병원"],
+  "confidence": 0.88,
+  "urgency": "NORMAL",
+  "intentTags": ["medical", "ear", "itching"]
+}
+```
+
+### 4.4 분석 방식
+
+Python 서버는 규칙 기반 키워드 매칭과 임베딩 기반 분류를 함께 사용합니다.
+
+- 명확한 키워드가 있으면 rule 우선 적용
+- rule로 판단하기 어려운 입력은 intent example과의 유사도 기반 분류
+- `sentence-transformers`가 설치되지 않은 환경에서도 테스트 가능한 fallback embedding 사용
+- `recommendedCategories`는 Location 도메인의 `category1`, `category2`, `category3` 값과 맞도록 반환
+
+### 4.5 대표 intentDomain
+
+| intentDomain | 추천 카테고리 예시 | 입력 예시 |
+| --- | --- | --- |
+| `MEDICAL` | `동물병원`, `동물약국` | 귀를 긁어요, 토해요, 밥을 안 먹어요 |
+| `GROOMING` | `미용` | 털이 엉켰어요, 목욕이 필요해요 |
+| `SUPPLIES` | `반려동물용품` | 사료가 필요해요, 모래를 사야 해요 |
+| `FOOD_SNACK` | `반려동물용품` | 간식 추천, 사료 구매 |
+| `CAFE_DINING` | `카페`, `식당` | 같이 갈 카페, 반려동물 동반 식당 |
+| `LODGING_TRAVEL` | `펜션`, `호텔`, `여행지` | 같이 여행, 숙소, 나들이 |
+| `CARE_SERVICE` | `위탁관리` | 맡길 곳, 돌봄, 펫시터 |
 
 ---
 
-## 4. 클라이언트 (`PetDataApiClient`)
+## 5. Signal 저장
 
-- **등록**: `@Component` — 애플리케이션 빈으로 등록
-- **내부**: 생성자에서 `RestClient.builder()...`로 `RestClient` 구성, `ObjectMapper`는 인스턴스 필드에 `new ObjectMapper()` (별도 `@Bean` 아님)
-- **설정**
-  - `app.pet-data-api.base-url` — Pet Data API 베이스 URL (필수)
-  - `app.pet-data-api.api-key` — `X-API-Key` (빈 문자열 가능하나, 운영 시 필수)
-  - `app.pet-data-api.timeout-ms` — popular·trends 호출 타임아웃 (기본 3000ms)
-  - `app.pet-data-api.copy-timeout-ms` — 생성자 파라미터로 수신하나 **현재 미사용** (copy 호출이 로컬 규칙 기반으로 전환됨)
-- **RestClient 구성**
-  - `recommendClient` — popular·trends·copy 호출용, `timeout-ms` 적용
-  - `facilityClient` — 레거시 `/facilities` 페이지네이션용, **30초 하드코딩** (현 pet-data-api에 `/facilities` 없어 404 폴백)
-- **주 역할**
-  - `fetchPopular(context, limit, correlationId)` → `GET /popular/{context}` (`snack`/`food`/`clothes` → `supplies` 경로 alias 자동 변환)
-  - `fetchTrends(context, limit, correlationId)` → `GET /trends/{category}`
-  - `recommend(request)` — Track B/레거시 호환: pet-data-api에 `POST /recommend` 없으므로 `fetchPopular` + `fetchTrends`를 조합해 `RecommendResponse`를 **로컬에서 조립**
-  - `recommendCopy(request)` — LLM 카피 엔드포인트 없어 **규칙 기반 문구를 로컬 생성**
-  - `sendEvents(request)` — pet-data-api 이벤트 엔드포인트 미구현으로 **현재 스킵** (debug 로그만)
-- **실패 처리**
-  - `fetchPopular` / `fetchTrends`: 404(미지원 context) · 503(빈 캐시)는 빈 리스트 반환, 그 외는 `RuntimeException` throw
-  - `recommend()` / `getTrendTimeseries()`: 예외를 `RuntimeException`으로 래핑 — 상위 컨트롤러에서 `null` 반환 경로는 없음
+### 5.1 저장 테이블
+
+```sql
+user_pet_intent_signal
+```
+
+### 5.2 저장 데이터
+
+| 컬럼 | 설명 |
+| --- | --- |
+| `user_idx` | signal 대상 사용자 |
+| `source_type` | `COMMUNITY`, `CARE`, `LOCATION_SEARCH` |
+| `source_id` | 원천 데이터 ID. 검색어 signal은 `null` |
+| `intent_domain` | Python 분석 domain |
+| `intent` | Python 분석 intent |
+| `recommended_categories` | 추천 Location 카테고리 JSON |
+| `confidence` | 분석 신뢰도 |
+| `intent_tags` | 분석 태그 JSON |
+| `created_at` | 생성 시각 |
+| `expires_at` | 만료 시각 |
+
+### 5.3 개인정보 처리 기준
+
+현재 구현은 원문 텍스트를 저장하지 않습니다. 저장되는 값은 분석 결과와 추천 카테고리, 태그입니다.
+
+**저장하는 것**:
+
+- intent domain
+- intent
+- 추천 카테고리
+- confidence
+- intent tags
+- source type
+- 만료 시각
+
+**저장하지 않는 것**:
+
+- 커뮤니티 글 원문
+- 케어 요청 원문
+- 주변서비스 검색어 원문
+
+### 5.4 저장 조건
+
+`UserPetIntentSignalService.saveIfConfident`에서 confidence가 `0.6` 이상인 분석 결과만 저장합니다.
+
+TTL은 7일입니다.
 
 ---
 
-## 5. 데이터베이스
+## 6. 추천 카드 API
 
-Recommendation 도메인 **전용 테이블은 없습니다.**  
-`Pet` 조회는 `com.linkup.Petory.domain.user.repository.PetRepository`를 사용합니다.
+### 6.1 Endpoint
+
+```http
+GET /api/pet-recommend/signals
+```
+
+### 6.2 응답 예시
+
+```json
+[
+  {
+    "intentDomain": "SUPPLIES",
+    "intent": "SUPPLIES_NEED",
+    "recommendedCategories": ["반려동물용품"],
+    "confidence": 0.88,
+    "intentTags": ["supplies", "food"],
+    "cardMessage": "반려동물 용품이 필요해 보여요.",
+    "actionLabel": "근처 반려동물용품 보기",
+    "targetTab": "location",
+    "targetCategory": "반려동물용품"
+  }
+]
+```
+
+### 6.3 응답 필드 의미
+
+| 필드 | 의미 |
+| --- | --- |
+| `cardMessage` | 사용자에게 보여줄 추천 이유 문장 |
+| `actionLabel` | 카드 안 CTA 문구 |
+| `targetTab` | 이동 대상 탭. 현재는 `location` |
+| `targetCategory` | Location 검색에 넘길 카테고리 |
+| `recommendedCategories` | NLP가 추천한 카테고리 목록 |
+| `intentTags` | 점수 계산이나 향후 태그 매칭에 사용할 태그 |
+
+`cardMessage`는 클릭 동작을 설명하는 문구가 아니라 순수 안내 문장입니다. 실제 액션은 `targetTab`, `targetCategory`, `actionLabel`로 표현합니다.
 
 ---
 
-## 6. 운영 시 체크리스트
+## 7. 프론트 동작
 
-- `application.properties`에 `app.pet-data-api.base-url`, `app.pet-data-api.api-key` 설정
-- Pet Data API가 내려가면 `PetDataApiClient` 예외 → 사용자는 5xx/에러 응답을 볼 수 있으므로, 모니터링·재시도 정책은 API 쪽 또는 Resilience4j 도입 시 검토 ㅋ
-- `context` 값은 **프론트·기획**과 Pet Data API가 합의한 자유 형식 문자열(예: 화면명, 시나리오 키)
+### 7.1 signal 조회
 
---
+주변서비스 탭이 활성화되면 프론트는 `/api/pet-recommend/signals`를 호출합니다.
 
-## 7. 관련 코드
+로그인 토큰이 없으면 호출하지 않고 빈 배열로 처리합니다.
 
-- **REST** — `RecommendController`
-- **애플리케이션 서비스** — `RecommendService`
-- **nearby 후보 조회** — `LocationServiceService`
-- **HTTP 클라이언트** — `PetDataApiClient`
-- **DTO** — `RecommendRequest`, `RecommendResponse`, `RecommendCopyRequest`, `RecommendCopyResponse`, `RecommendEventRequest`, `TrendTimeseriesResponse`
+### 7.2 카드 표시
 
-## 8. 관련 아키텍처 문서
+`LocationControls`는 signal이 있으면 중분류/소분류 영역 아래에 추천 카드를 표시합니다.
 
-- [Pet Data API & Petory Recommendation — 통합 아키텍처](../architecture/pet-data-api%20architecture.md) — pet-data-api 내부 구조, E2E 다이어그램, `context`·요청/응답 계약, 운영 시 장애 시나리오
+카드는 다음 두 부분으로 나뉩니다.
+
+- `cardMessage`: 추천 이유
+- `actionLabel`: 실제 클릭 CTA
+
+### 7.3 카드 클릭
+
+카드를 클릭하면 `targetCategory`를 `locationCategory`로 설정하고, 기존 주변서비스 검색을 다시 실행합니다.
+
+예를 들어 `targetCategory = "반려동물용품"`이면 기존 Location API가 아래 의미로 호출됩니다.
+
+```http
+GET /api/location-services/search?latitude={lat}&longitude={lng}&radius={radius}&category=반려동물용품
+```
+
+추천 서비스가 장소 목록을 직접 내려주지 않는 이유는 현재 지도 중심 좌표, 반경, 정렬 옵션이 프론트 상태에 있기 때문입니다. 추천 API는 "무엇을 보여줄지"를 알려주고, 실제 장소 조회는 Location 도메인이 담당합니다.
+
+---
+
+## 8. 장애 처리
+
+### 8.1 Python 서버 장애
+
+Python 서버 호출은 비동기 이벤트 listener에서 수행됩니다. Python 서버가 꺼져 있거나 응답이 늦어도 커뮤니티 글 작성, 케어 요청 작성, 주변서비스 검색 자체는 실패하지 않습니다.
+
+`PetIntentClient`는 timeout을 사용하며, 호출 실패 시 `Optional.empty()`를 반환합니다.
+
+### 8.2 signal 없음
+
+저장된 signal이 없거나 confidence가 낮으면 추천 카드는 표시되지 않습니다. 이 경우 주변서비스 탭의 기본 검색 기능은 그대로 동작합니다.
+
+### 8.3 비로그인 사용자
+
+비로그인 사용자는 signal 저장 및 추천 카드 조회 대상이 아닙니다. `/signals` 응답은 빈 배열로 처리됩니다.
+
+---
+
+## 9. 점수 기반 장소 추천과의 관계
+
+현재 주변서비스 탭 추천 카드는 "카테고리 진입점 추천"입니다. 즉, 사용자의 최근 입력을 보고 `동물병원`, `미용`, `반려동물용품` 같은 카테고리를 추천한 뒤 기존 Location 검색으로 연결합니다.
+
+별도로 `/api/pet-recommend`는 텍스트와 좌표를 받아 주변 장소를 점수화하는 API입니다.
+
+```http
+GET /api/pet-recommend?lat={lat}&lng={lng}&text={text}&radius={radius}
+```
+
+점수 계산은 `PetRecommendScoreCalculator`에서 처리하며, 현재는 거리, 평점, 리뷰 수, place score, tag match score를 조합합니다.
+
+단, `place_score`와 `tag_match_score`는 장소 태그와 score 데이터가 충분히 채워진 뒤 효과가 커집니다. 초기 단계에서는 거리, 평점, 리뷰 수 기반 검증이 중심입니다.
+
+---
+
+## 10. 구현 파일
+
+### 10.1 Backend
+
+- `backend/main/java/com/linkup/Petory/domain/petRecommendation/controller/PetRecommendationController.java`
+- `backend/main/java/com/linkup/Petory/domain/petRecommendation/client/PetIntentClient.java`
+- `backend/main/java/com/linkup/Petory/domain/petRecommendation/service/PetIntentSignalEventListener.java`
+- `backend/main/java/com/linkup/Petory/domain/petRecommendation/service/UserPetIntentSignalService.java`
+- `backend/main/java/com/linkup/Petory/domain/petRecommendation/service/PetRecommendationService.java`
+- `backend/main/java/com/linkup/Petory/domain/petRecommendation/scoring/PetRecommendScoreCalculator.java`
+- `backend/main/java/com/linkup/Petory/domain/petRecommendation/entity/UserPetIntentSignal.java`
+- `backend/main/java/com/linkup/Petory/domain/petRecommendation/repository/UserPetIntentSignalRepository.java`
+- `backend/main/java/com/linkup/Petory/domain/location/service/LocationServiceService.java`
+- `backend/main/resources/sql/migration/user-pet-intent-signal-table.sql`
+
+### 10.2 Frontend
+
+- `frontend/src/api/petRecommendationApi.js`
+- `frontend/src/components/UnifiedMap/UnifiedPetMapPage.js`
+- `frontend/src/components/UnifiedMap/controls/LocationControls.js`
+- `frontend/src/constants/locationCategoryTree.js`
+
+### 10.3 Python NLP Server
+
+- `petory-nlp-server/app/main.py`
+- `petory-nlp-server/app/api/pet_intent_router.py`
+- `petory-nlp-server/app/nlp/intent_classifier.py`
+- `petory-nlp-server/app/nlp/tag_extractor.py`
+- `petory-nlp-server/app/rules/category_rules.py`
+- `petory-nlp-server/app/rules/urgency_rules.py`
+- `petory-nlp-server/app/data/intent_examples.yml`
+- `petory-nlp-server/app/data/intent_tags.yml`
+
+---
+
+## 11. 로컬 실행 체크
+
+### 11.1 필요한 서버
+
+- Spring Boot: `localhost:8080`
+- React: `localhost:3000`
+- Python NLP: `localhost:8000`
+- MySQL
+- Redis
+
+### 11.2 Python 서버 실행
+
+```bash
+cd petory-nlp-server
+PYTHONPATH=. uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+### 11.3 DB migration
+
+추천 카드가 표시되려면 `user_pet_intent_signal` 테이블이 필요합니다.
+
+```sql
+-- backend/main/resources/sql/migration/user-pet-intent-signal-table.sql
+```
+
+### 11.4 동작 확인 절차
+
+1. Spring, React, Python 서버를 모두 실행합니다.
+2. 로그인합니다.
+3. 주변서비스 탭으로 이동합니다.
+4. 검색창에 `강아지가 귀를 자꾸 긁어요` 같은 문장을 입력합니다.
+5. 1-2초 뒤 추천 카드가 표시되는지 확인합니다.
+6. 추천 카드를 클릭합니다.
+7. 주변서비스 목록이 추천 카테고리 기준으로 필터링되는지 확인합니다.
+

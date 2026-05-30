@@ -10,11 +10,13 @@ import org.springframework.data.domain.Sort;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import com.linkup.Petory.global.security.RoleConstants;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.linkup.Petory.domain.petRecommendation.event.CareRequestCreatedEvent;
 import com.linkup.Petory.domain.care.converter.CareRequestConverter;
 import com.linkup.Petory.domain.care.dto.CareRequestDTO;
 import com.linkup.Petory.domain.care.dto.CareRequestPageResponseDTO;
@@ -51,6 +53,7 @@ public class CareRequestService {
     private final PetRepository petRepository;
     private final CareRequestConverter careRequestConverter;
     private final PetCoinEscrowService petCoinEscrowService;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * 현재 사용자가 관리자(ADMIN 또는 MASTER)인지 확인
@@ -212,6 +215,9 @@ public class CareRequestService {
         }
 
         CareRequest saved = careRequestRepository.save(builder.build());
+        eventPublisher.publishEvent(new CareRequestCreatedEvent(
+                this, user.getIdx(), saved.getIdx(),
+                saved.getTitle() + " " + saved.getDescription()));
         return careRequestConverter.toDTO(saved);
     }
 

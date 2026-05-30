@@ -12,24 +12,7 @@ import LocationLayer from "./layers/LocationLayer";
 import MeetupLayer from "./layers/MeetupLayer";
 import CareLayer from "./layers/CareLayer";
 import { fetchActiveMapItems } from "../../api/unifiedMapApi";
-import RecommendCard from "../Recommendation/RecommendCard";
-import { recommendApi } from "../../api/recommendApi";
-
-/** pet-data 추천 API context — 소분류( category3 에 주로 해당) 이름과 매핑. 신규 유형 추가 시 여기 및 locationCategoryTree.js 동기화 */
-const CATEGORY_TO_CONTEXT = {
-  미용: "grooming",
-  동물병원: "hospital",
-  동물약국: "pharmacy",
-  카페: "cafe",
-  펜션: "pension",
-  식당: "restaurant",
-  위탁관리: "boarding",
-  반려동물용품: "supplies",
-  호텔: "hotel",
-  간식: "snack",
-  사료: "food",
-  의류: "clothes",
-};
+import { petRecommendationApi } from "../../api/petRecommendationApi";
 
 const SORT_LABELS = {
   stable: "추천순",
@@ -83,28 +66,6 @@ const isSameCenter = (a, b, radiusKm) => {
 const hasValidItemCoordinates = (item) =>
   Number.isFinite(item?.latitude) && Number.isFinite(item?.longitude);
 
-const buildAiFacilityRankMap = (aiFacilities, locationItems) => {
-  const locationIdxs = new Set(
-    locationItems
-      .map((item) => item?.idx)
-      .filter((idx) => Number.isFinite(idx))
-  );
-
-  const linked = new Map();
-  const detached = [];
-
-  aiFacilities.forEach((facility, index) => {
-    const rank = index + 1;
-    if (Number.isFinite(facility?.id) && locationIdxs.has(facility.id)) {
-      linked.set(facility.id, { facility, rank });
-      return;
-    }
-    detached.push({ facility, rank });
-  });
-
-  return { linked, detached };
-};
-
 const UnifiedPetMapPage = () => {
   const [activeLayer, setActiveLayer] = useState("location");
   const [mapViewportCenter, setMapViewportCenter] = useState(null);
@@ -128,9 +89,7 @@ const UnifiedPetMapPage = () => {
   const [locationSort, setLocationSort] = useState("stable");
   const [hasPendingAreaChange, setHasPendingAreaChange] = useState(false);
   const [searchMode, setSearchMode] = useState("initial");
-  const [aiRecommendFacilities, setAiRecommendFacilities] = useState([]);
-  const [aiRequestId, setAiRequestId] = useState(null);
-  const [aiDismissed, setAiDismissed] = useState(false);
+  const [petIntentSignals, setPetIntentSignals] = useState([]);
 
   // meetup 탭 전용
   const [showMeetupCreateModal, setShowMeetupCreateModal] = useState(false);
@@ -143,6 +102,7 @@ const UnifiedPetMapPage = () => {
 
   const cacheRef = useRef({});
   const fetchTimerRef = useRef(null);
+  const signalRefreshTimerRef = useRef(null);
 
   const commitLocationSearch = useCallback(
     (center, mode = "user-triggered") => {
@@ -153,6 +113,12 @@ const UnifiedPetMapPage = () => {
     },
     []
   );
+
+  const refreshPetIntentSignals = useCallback(() => {
+    petRecommendationApi.getSignals()
+      .then(signals => setPetIntentSignals(signals))
+      .catch(() => setPetIntentSignals([]));
+  }, []);
 
   // 위치 취득 (iOS WebView·시뮬에서 콜백이 안 오는 경우 방지: 시간 지나면 서울 중심으로 진행)
   useEffect(() => {
@@ -277,13 +243,32 @@ const UnifiedPetMapPage = () => {
     fetchItems,
   ]);
 
+  useEffect(() => {
+    if (activeLayer !== "location") return;
+    let cancelled = false;
+    petRecommendationApi.getSignals()
+      .then(signals => {
+        if (!cancelled) setPetIntentSignals(signals);
+      })
+      .catch(() => {
+        if (!cancelled) setPetIntentSignals([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeLayer, locationKeyword, locationCategory]);
+
+  useEffect(() => {
+    if (activeLayer !== "location" || !locationKeyword.trim()) return undefined;
+    window.clearTimeout(signalRefreshTimerRef.current);
+    signalRefreshTimerRef.current = window.setTimeout(refreshPetIntentSignals, 1500);
+    return () => window.clearTimeout(signalRefreshTimerRef.current);
+  }, [activeLayer, locationKeyword, refreshPetIntentSignals]);
+
   const handleTabChange = (layer) => {
     setActiveLayer(layer);
-    setAiDismissed(false);
     setSelectedItem(null);
     setHoveredLocationItem(null);
-    setAiRecommendFacilities([]);
-    setAiRequestId(null);
     if (layer !== "location") {
       setLocationKeyword("");
       setLocationCategory("");
@@ -399,93 +384,16 @@ const UnifiedPetMapPage = () => {
     fetchItems("care", mapViewportCenter, radius, "", "", undefined, mapLevel);
   };
 
-  const handleAiRecommendLoad = useCallback(({ facilities, requestId }) => {
-    setAiRecommendFacilities(facilities);
-    setAiRequestId(requestId);
-  }, []);
+  const displayItems = items;
+  const mapServices = items;
 
-  const handleAiItemClick = useCallback((rawFacility, requestId) => {
-    if (!requestId) return;
-    const event = {
-      facility_id: rawFacility.id ?? null,
-      source_id: rawFacility.source_id ?? null,
-      event: "click",
-      occurred_at: new Date().toISOString(),
-    };
-    if (event.facility_id == null && event.source_id == null) return;
-    recommendApi.sendEvents({ requestId, events: [event] }).catch(() => {});
-  }, []);
-
-  const {
-    linked: linkedAiFacilities,
-    detached: detachedAiFacilities,
-  } = buildAiFacilityRankMap(aiRecommendFacilities, items);
-
-  const recommendedServiceIdxs = linkedAiFacilities.size > 0
-    ? new Map(
-        Array.from(linkedAiFacilities.entries()).map(([serviceIdx, value]) => [
-          serviceIdx,
-          value.rank,
-        ])
-      )
-    : null;
-
-  const recommendedLocationItems = [];
-  const regularLocationItems = [];
-
-  const annotatedLocationItems = items.map((item) => {
-    const linkedAi = linkedAiFacilities.get(item.idx);
-    if (!linkedAi) {
-      regularLocationItems.push(item);
-      return item;
-    }
-
-    const annotated = {
-      ...item,
-      isAiRecommend: true,
-      aiRank: linkedAi.rank,
-      rawAiFacility: linkedAi.facility,
-      distanceM:
-        linkedAi.facility.distance_m ??
-        (item.raw?.distance != null ? Math.round(item.raw.distance) : null),
-    };
-    recommendedLocationItems.push(annotated);
-    return annotated;
-  });
-
-  recommendedLocationItems.sort(
-    (left, right) => (left.aiRank ?? Number.MAX_SAFE_INTEGER) - (right.aiRank ?? Number.MAX_SAFE_INTEGER)
-  );
-
-  const detachedAiItems = detachedAiFacilities.map(({ facility, rank }) => ({
-    id: `ai-${rank}`,
-    idx: facility.id ?? null,
-    type: "ai_recommend",
-    latitude: facility.lat,
-    longitude: facility.lng,
-    name: facility.name,
-    title: facility.name,
-    subtitle: facility.address ?? "",
-    distanceM: facility.distance_m,
-    markerColor: "#FFD700",
-    isAiRecommend: true,
-    aiRank: rank,
-    rawAiFacility: facility,
-  }));
-
-  const displayItems = [...detachedAiItems, ...recommendedLocationItems, ...regularLocationItems];
-  const mapServices = [...annotatedLocationItems, ...detachedAiItems.filter(hasValidItemCoordinates)];
-
-  const handleLocationResultClick = useCallback((item, trackAiClick = false) => {
+  const handleLocationResultClick = useCallback((item) => {
     setSelectedItem(item);
     setHoveredLocationItem(item);
     if (hasValidItemCoordinates(item)) {
       setMapViewportCenter({ lat: item.latitude, lng: item.longitude });
     }
-    if (trackAiClick && item?.rawAiFacility) {
-      handleAiItemClick(item.rawAiFacility, aiRequestId);
-    }
-  }, [aiRequestId, handleAiItemClick]);
+  }, []);
 
   const renderMobileBottomSheet = () => {
     if (activeLayer !== "location" && activeLayer !== "meetup" && activeLayer !== "care") {
@@ -515,31 +423,16 @@ const UnifiedPetMapPage = () => {
           </div>
           <ResultSheetMeta>{sheetItems.length}개</ResultSheetMeta>
         </ResultSheetHeader>
-        {!aiDismissed &&
-          activeLayer === "location" &&
-          userLocation &&
-          CATEGORY_TO_CONTEXT[locationCategory] && (
-          <RecommendCard
-            lat={userLocation.lat}
-            lng={userLocation.lng}
-            context={CATEGORY_TO_CONTEXT[locationCategory]}
-            onFacilitiesLoaded={handleAiRecommendLoad}
-            variant="banner"
-            onDismiss={() => setAiDismissed(true)}
-          />
-        )}
         <ResultList>
           {sheetItems.map((item, index) => {
             const isSelected = selectedItem?.id === item.id;
-            const isAi = Boolean(item?.isAiRecommend);
             return (
               <ResultCard
                 key={item.id}
                 type="button"
                 $selected={isSelected}
-                $isAiRecommend={isAi}
                 onClick={() => {
-                  handleLocationResultClick(item, isAi);
+                  handleLocationResultClick(item);
                 }}
                 onMouseEnter={() => setHoveredLocationItem(item)}
                 onMouseLeave={() =>
@@ -550,7 +443,6 @@ const UnifiedPetMapPage = () => {
               >
                 <ResultCardTop>
                   <ResultCardTitle>
-                    {isAi && <AiItemBadge>AI</AiItemBadge>}
                     {item.title || item.name || `${activeLayer === "meetup" ? "모임" : activeLayer === "care" ? "케어" : "항목"} ${index + 1}`}
                   </ResultCardTitle>
                   {item.distanceM != null ? (
@@ -588,6 +480,7 @@ const UnifiedPetMapPage = () => {
         <LocationControls
           keyword={locationKeyword}
           category={locationCategory}
+          intentSignals={petIntentSignals}
           activeGroupId={locationCategoryGroupId}
           sort={locationSort}
           hasPendingAreaChange={hasPendingAreaChange}
@@ -599,23 +492,29 @@ const UnifiedPetMapPage = () => {
               mapViewportCenter,
               kw ? "keyword" : "user-triggered"
             );
+            if (kw) {
+              window.clearTimeout(signalRefreshTimerRef.current);
+              signalRefreshTimerRef.current = window.setTimeout(refreshPetIntentSignals, 1500);
+            }
           }}
           onCategoryPick={({ category: cat, groupId }) => {
             setLocationCategory(cat || "");
             setLocationCategoryGroupId(cat ? groupId ?? null : null);
-            setAiDismissed(false);
-            setAiRecommendFacilities([]);
-            setAiRequestId(null);
             cacheRef.current = {};
             commitLocationSearch(
               mapViewportCenter,
               cat ? "category" : "user-triggered"
             );
           }}
+          onSignalPick={(cat) => {
+            setLocationKeyword("");
+            setLocationCategory(cat || "");
+            setLocationCategoryGroupId(null);
+            cacheRef.current = {};
+            commitLocationSearch(mapViewportCenter, "intent-signal");
+          }}
           onSortChange={(sort) => {
             setLocationSort(sort);
-            setAiRecommendFacilities([]);
-            setAiRequestId(null);
             cacheRef.current = {};
             commitLocationSearch(mapViewportCenter, "user-triggered");
           }}
@@ -644,20 +543,6 @@ const UnifiedPetMapPage = () => {
     if (selectedItem.type === "meetup")
       return <MeetupLayer {...props} onRefresh={handleMeetupCreated} />;
     if (selectedItem.type === "care") return <CareLayer {...props} />;
-    if (selectedItem.type === "ai_recommend")
-      return (
-        <AiInfoPanel>
-          <AiInfoClose onClick={() => setSelectedItem(null)}>✕</AiInfoClose>
-          <AiInfoBadge>✨ AI 추천</AiInfoBadge>
-          <AiInfoName>{selectedItem.name}</AiInfoName>
-          {selectedItem.distanceM != null && (
-            <AiInfoMeta>{selectedItem.distanceM}m</AiInfoMeta>
-          )}
-          {selectedItem.subtitle && (
-            <AiInfoMeta>{selectedItem.subtitle}</AiInfoMeta>
-          )}
-        </AiInfoPanel>
-      );
     return null;
   };
 
@@ -685,16 +570,6 @@ const UnifiedPetMapPage = () => {
           {/* location 탭: 결과 목록 */}
           {activeLayer === "location" && (
             <LeftPanelResults>
-              {!aiDismissed && userLocation && CATEGORY_TO_CONTEXT[locationCategory] && (
-                <RecommendCard
-                  lat={userLocation.lat}
-                  lng={userLocation.lng}
-                  context={CATEGORY_TO_CONTEXT[locationCategory]}
-                  onFacilitiesLoaded={handleAiRecommendLoad}
-                  variant="banner"
-                  onDismiss={() => setAiDismissed(true)}
-                />
-              )}
               {loading && <PanelStatusMsg>검색 중...</PanelStatusMsg>}
               {!loading &&
                 !error &&
@@ -726,9 +601,8 @@ const UnifiedPetMapPage = () => {
                           key={item.id}
                           type="button"
                           $selected={isSelected}
-                          $isAiRecommend={item.isAiRecommend}
                           onClick={() => {
-                            handleLocationResultClick(item, item.isAiRecommend);
+                            handleLocationResultClick(item);
                           }}
                           onMouseEnter={() => setHoveredLocationItem(item)}
                           onMouseLeave={() =>
@@ -739,9 +613,6 @@ const UnifiedPetMapPage = () => {
                         >
                           <ResultCardTop>
                             <ResultCardTitle>
-                              {item.isAiRecommend && (
-                                <AiItemBadge>AI</AiItemBadge>
-                              )}
                               {item.title || item.name || `시설 ${index + 1}`}
                             </ResultCardTitle>
                             {item.distanceM != null ? (
@@ -808,7 +679,6 @@ const UnifiedPetMapPage = () => {
                           key={item.id}
                           type="button"
                           $selected={isSelected}
-                          $isAiRecommend={false}
                           onClick={() => handleLocationResultClick(item)}
                           onMouseEnter={() => setHoveredLocationItem(item)}
                           onMouseLeave={() =>
@@ -846,14 +716,13 @@ const UnifiedPetMapPage = () => {
             <MapContainer
               services={mapServices}
               onServiceClick={(item) =>
-                handleLocationResultClick(item, Boolean(item?.rawAiFacility))
+                handleLocationResultClick(item)
               }
               userLocation={userLocation}
               mapCenter={mapViewportCenter}
               mapLevel={mapLevel}
               selectedService={selectedItem}
               hoveredService={hoveredLocationItem}
-              recommendedServiceIdxs={recommendedServiceIdxs}
               onMapIdle={handleMapIdle}
             />
           ) : (
@@ -1192,15 +1061,12 @@ const ResultCard = styled.button`
       props.$selected
         ? props.theme.colors.domain.location
         : props.theme.colors.border};
-  ${(props) =>
-    props.$isAiRecommend &&
-    `border-left: 3px solid ${props.theme.colors.primary};`}
   background: ${(props) =>
     props.$selected
       ? props.theme.colors.domain.location + "1A"
       : props.theme.colors.background};
   border-radius: 18px;
-  padding: 14px 14px 13px ${(props) => (props.$isAiRecommend ? "11px" : "14px")};
+  padding: 14px 14px 13px;
   cursor: pointer;
   transition: border-color 0.15s ease, transform 0.15s ease,
     box-shadow 0.15s ease, background 0.15s ease;
@@ -1245,69 +1111,6 @@ const ResultDistance = styled.span`
   background: ${(props) => props.theme.colors.domain.location + "1A"};
   padding: 4px 8px;
   border-radius: 999px;
-`;
-
-const AiItemBadge = styled.span`
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: ${(props) => props.theme.colors.primaryLight || "#eef2ff"};
-  // color: ${(props) => props.theme.colors.textSecondary}
-  color: white;
-  font-size: 10px;
-  font-weight: 700;
-`;
-
-const AiInfoPanel = styled.div`
-  position: absolute;
-  bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: ${(props) => props.theme.colors.surface};
-  border: 1.5px solid ${(props) => props.theme.colors.ai.accent};
-  border-radius: 12px;
-  padding: 14px 18px;
-  min-width: 220px;
-  max-width: 320px;
-  z-index: 500;
-  box-shadow: ${(props) => props.theme.shadows.lg};
-`;
-
-const AiInfoClose = styled.button`
-  position: absolute;
-  top: 8px;
-  right: 10px;
-  background: none;
-  border: none;
-  font-size: 14px;
-  cursor: pointer;
-  color: ${(props) => props.theme.colors.textSecondary};
-  padding: 0;
-`;
-
-const AiInfoBadge = styled.span`
-  display: inline-block;
-  background: ${(props) => props.theme.colors.ai.bg};
-  color: ${(props) => props.theme.colors.ai.text};
-  font-size: 11px;
-  font-weight: 600;
-  padding: 2px 8px;
-  border-radius: 20px;
-  margin-bottom: 8px;
-`;
-
-const AiInfoName = styled.p`
-  font-size: 15px;
-  font-weight: 700;
-  color: ${(props) => props.theme.colors.text};
-  margin: 0 0 4px;
-`;
-
-const AiInfoMeta = styled.p`
-  font-size: 12px;
-  color: ${(props) => props.theme.colors.textSecondary};
-  margin: 2px 0 0;
 `;
 
 /* ── 데스크톱 2단 레이아웃 ── */

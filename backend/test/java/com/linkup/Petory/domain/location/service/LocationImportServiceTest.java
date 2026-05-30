@@ -25,7 +25,8 @@ import static org.mockito.Mockito.*;
 class LocationImportServiceTest {
 
     @Mock  LocationServiceRepository locationServiceRepository;
-    @Mock  LocationImportConverter locationImportConverter; // 누락돼 있던 mock — null이면 UPDATE/INSERT 경로 NPE
+    @Mock  LocationServiceBatchWriter batchWriter;
+    @Mock  LocationImportConverter locationImportConverter;
     @Spy   ObjectMapper objectMapper;
 
     @InjectMocks LocationImportService service;
@@ -34,19 +35,20 @@ class LocationImportServiceTest {
         return new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8));
     }
 
-    // ── 신규 INSERT 차단 (write guard) ──────────────────────────────────────
+    // ── 신규 INSERT ──────────────────────────────────────────────────────────
 
     @Test
-    void 신규시설_INSERT차단_skipped카운트증가() throws IOException {
+    void 신규시설_insert_saved카운트증가() throws IOException {
         String json = "[{\"name\":\"멍멍미용\",\"category\":\"grooming\",\"address\":\"서울 강남구\",\"lat\":37.5,\"lng\":127.0}]";
         when(locationServiceRepository.findByAddressAndDataSource("서울 강남구", "BATCH_IMPORT"))
                 .thenReturn(Optional.empty());
+        when(locationImportConverter.toEntity(any())).thenReturn(LocationService.builder().name("멍멍미용").build());
+        when(batchWriter.saveBatch(any())).thenReturn(1);
 
         LocationImportService.SyncResult result = service.importFromStream(toStream(json));
 
-        assertThat(result.getSaved()).isEqualTo(0);
+        assertThat(result.getSaved()).isEqualTo(1);
         assertThat(result.getUpdated()).isEqualTo(0);
-        assertThat(result.getSkipped()).isEqualTo(1);
     }
 
     // ── upsert (기존 BATCH_IMPORT row 갱신) ──────────────────────────────────

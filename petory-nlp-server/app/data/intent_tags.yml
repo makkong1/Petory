@@ -1,0 +1,81 @@
+tags:
+  MEDICAL:
+    - ear
+    - eye
+    - skin
+    - paw
+    - tooth
+    - vomit
+    - diarrhea
+    - itching
+    - scratch
+    - cough
+    - limp
+    - appetite_loss
+    - discharge
+    - swelling
+
+  GROOMING:
+    - fur
+    - bath
+    - nail
+    - trim
+    - shed
+    - tangle
+    - ear_cleaning
+    - brushing
+
+  SUPPLIES:
+    - leash
+    - collar
+    - toy
+    - bed
+    - cage
+    - clothes
+    - accessories
+    - carrier
+
+  FOOD_SNACK:
+    - kibble
+    - wet_food
+    - snack
+    - supplement
+    - natural_food
+    - treat
+
+  WALK_OUTING:
+    - walk
+    - park
+    - outdoor
+    - exercise
+    - outing
+    - nature
+
+  CAFE_DINING:
+    - cafe
+    - restaurant
+    - brunch
+    - dining
+    - pet_friendly
+
+  LODGING_TRAVEL:
+    - pension
+    - hotel
+    - travel
+    - overnight
+    - resort
+
+  DAYCARE_BOARDING:
+    - boarding
+    - daycare
+    - kindergarten
+    - sitter
+    - care
+
+  CULTURE_SPACE:
+    - museum
+    - gallery
+    - exhibition
+    - culture
+    - event
+    - performance
