@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Page;
@@ -20,6 +21,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.linkup.Petory.domain.petRecommendation.event.CommunityPostCreatedEvent;
 import com.linkup.Petory.domain.board.converter.BoardConverter;
 import com.linkup.Petory.domain.board.dto.BoardDTO;
 import com.linkup.Petory.domain.board.dto.BoardPageResponseDTO;
@@ -58,6 +60,7 @@ public class BoardService {
     private final BoardViewLogRepository boardViewLogRepository;
     private final AttachmentFileService attachmentFileService;
     private final BoardConverter boardConverter;
+    private final ApplicationEventPublisher eventPublisher;
 
     private boolean isAdmin() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -265,6 +268,9 @@ public class BoardService {
                 .build();
 
         Board saved = boardRepository.save(board);
+        eventPublisher.publishEvent(new CommunityPostCreatedEvent(
+                this, user.getIdx(), saved.getIdx(),
+                saved.getTitle() + " " + saved.getContent()));
         if (dto.getBoardFilePath() != null) {
             attachmentFileService.syncSingleAttachment(FileTargetType.BOARD, saved.getIdx(), dto.getBoardFilePath(),
                     null);

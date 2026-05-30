@@ -7,12 +7,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import com.linkup.Petory.domain.petRecommendation.event.LocationSearchPerformedEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import com.linkup.Petory.domain.location.converter.LocationServiceConverter;
 import com.linkup.Petory.domain.location.dto.LocationServiceDTO;
 import com.linkup.Petory.domain.location.entity.LocationService;
 import com.linkup.Petory.domain.location.exception.LocationServiceAlreadyDeletedException;
 import com.linkup.Petory.domain.location.exception.LocationServiceNotFoundException;
 import com.linkup.Petory.domain.location.repository.LocationServiceRepository;
+import com.linkup.Petory.domain.user.repository.UsersRepository;
 
 import java.util.Comparator;
 import java.util.List;
@@ -29,6 +32,8 @@ public class LocationServiceService {
 
     private final LocationServiceConverter locationServiceConverter;
     private final LocationServiceRepository locationServiceRepository;
+    private final ApplicationEventPublisher eventPublisher;
+    private final UsersRepository usersRepository;
 
     /**
      * 주변 서비스 통합 검색 — B 방향(위치 우선, 키워드는 필터).
@@ -53,6 +58,7 @@ public class LocationServiceService {
             String sort,
             Integer maxResults) {
 
+        publishSearchEvent(keyword);
         // 빈 문자열("")을 null로 정규화 — SQL의 :param IS NULL 조건이 올바르게 작동하도록
         keyword      = normalize(keyword);
         category     = normalize(category);
@@ -259,6 +265,19 @@ public class LocationServiceService {
                 totalTime, queryTime, dtoConvertTime);
 
         return result;
+    }
+
+    private void publishSearchEvent(String keyword) {
+        if (!org.springframework.util.StringUtils.hasText(keyword)) return;
+        try {
+            var auth = org.springframework.security.core.context.SecurityContextHolder
+                    .getContext().getAuthentication();
+            if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getName())) return;
+            usersRepository.findActiveByIdString(auth.getName())
+                    .map(user -> user.getIdx())
+                    .ifPresent(userIdx ->
+                            eventPublisher.publishEvent(new LocationSearchPerformedEvent(this, userIdx, keyword)));
+        } catch (Exception ignored) {}
     }
 
     /**
