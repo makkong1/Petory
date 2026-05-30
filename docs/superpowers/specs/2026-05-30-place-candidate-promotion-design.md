@@ -1,7 +1,7 @@
 # Place Candidate Promotion System — Design Spec
 
-**Date**: 2026-05-30  
-**Status**: Confirmed (Sections 1–4)  
+**Date**: 2026-05-30
+**Status**: Confirmed (Sections 1–4)
 **Scope**: 1단계 MVP
 
 ---
@@ -41,7 +41,7 @@ pet-data-api가 수집한 장소 후보(블로그·Naver Local 기반)가 품질
 
 ## 섹션 1: 데이터 흐름
 
-```
+```text
 [pet-data-api / 공공데이터 배치]
          │
          ▼
@@ -78,15 +78,19 @@ CREATE TABLE places (
     lng                         DOUBLE,
     category                    VARCHAR(100),
     status                      ENUM('PENDING','ACTIVE','INACTIVE') DEFAULT 'PENDING',
-    primary_source              VARCHAR(50),    -- 최초 등록 출처 (PUBLIC_DATA, PET_DATA_API…)
-    confidence                  FLOAT,          -- 0.0~1.0
-    legacy_locationservice_id   BIGINT NULL,    -- locationservice 레코드 추적용 (이전 시)
+    primary_source              VARCHAR(50),
+    confidence                  FLOAT,
+    legacy_locationservice_id   BIGINT NULL,
+
     activated_by                VARCHAR(100) NULL,
     activated_at                DATETIME NULL,
     created_at                  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at                  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at                  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    INDEX idx_places_status_confidence (status, confidence DESC),
+    INDEX idx_places_legacy_ls_id      (legacy_locationservice_id)
 );
--- 상세 출처 근거는 place_facts에서 source별로 관리 (places.source는 단일 ENUM 미사용)
+-- 상세 출처 근거는 place_facts에서 source별로 관리
 ```
 
 ### place_candidates
@@ -95,31 +99,45 @@ CREATE TABLE places (
 CREATE TABLE place_candidates (
     id                          BIGINT AUTO_INCREMENT PRIMARY KEY,
     raw_name                    VARCHAR(255),
-    raw_address                 VARCHAR(255),   -- 중복 판정 기준 (raw_name+raw_address)
+    raw_address                 VARCHAR(255),
     lat                         DOUBLE,
     lng                         DOUBLE,
-    collected_from              VARCHAR(100),   -- 'PET_DATA_API', 'BATCH_IMPORT' 등
-    evidence_text               TEXT,           -- 블로그 원문 스니펫
-    confidence_score            FLOAT,          -- NEEDS_REVIEW 큐 정렬용
+    collected_from              VARCHAR(100),
+    evidence_text               TEXT,
+    confidence_score            FLOAT,
     decision_status             ENUM(
                                     'PENDING',
                                     'AUTO_APPROVED',
-                                    'ADMIN_APPROVED',   -- 관리자 수동 승인 (AUTO와 구분)
+                                    'ADMIN_APPROVED',
                                     'NEEDS_REVIEW',
                                     'REJECTED'
                                 ) DEFAULT 'PENDING',
-    decision_reason             TEXT,           -- 판정 근거 서술 (디버깅·튜닝용)
-    score_breakdown             JSON,           -- 신호별 점수 상세 기록
-    matched_place_id            BIGINT NULL,    -- 승격된 places.id
-    matched_locationservice_id  BIGINT NULL,    -- 공공데이터 매칭 시 locationservice.id
+    decision_reason             TEXT,
+    score_breakdown             JSON,
+
+    matched_place_id            BIGINT NULL,
+    matched_locationservice_id  BIGINT NULL,
     rejection_reason            VARCHAR(255) NULL,
     collected_at                DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     reviewed_by                 VARCHAR(100) NULL,
-    reviewed_at                 DATETIME NULL
+    reviewed_at                 DATETIME NULL,
+
+    INDEX idx_candidates_status_score (decision_status, confidence_score DESC),
+    INDEX idx_candidates_dedup        (raw_name(100), raw_address(100)),
+    INDEX idx_candidates_collected    (collected_at),
+
+    -- FK: 운영 중 부모 삭제 방지. matched_* 는 nullable이라 SET NULL 허용.
+    CONSTRAINT fk_candidates_place
+        FOREIGN KEY (matched_place_id)
+        REFERENCES places (id) ON DELETE SET NULL,
+    CONSTRAINT fk_candidates_locationservice
+        FOREIGN KEY (matched_locationservice_id)
+        REFERENCES locationservice (idx) ON DELETE SET NULL
 );
 ```
 
 `score_breakdown` 예시:
+
 ```json
 {
   "name_quality": 0.1,
@@ -129,9 +147,10 @@ CREATE TABLE place_candidates (
   "alt_business_detected": -0.3,
   "public_medium_match": 0.3,
   "duplicate_boost": 0.1,
+  "risk_flag": true,
   "total": 0.7,
   "gate": "GATE4_THRESHOLD",
-  "decision": "AUTO_APPROVED"
+  "decision": "NEEDS_REVIEW"
 }
 ```
 
@@ -140,19 +159,25 @@ CREATE TABLE place_candidates (
 ```sql
 CREATE TABLE place_facts (
     id              BIGINT AUTO_INCREMENT PRIMARY KEY,
-    place_id        BIGINT NOT NULL,        -- places.id
-    fact_type       VARCHAR(100),           -- 'OPERATING_HOURS','PHONE','PET_SIZE_LIMIT'…
-    value_text      TEXT,                   -- 항상 저장 (사람이 읽을 수 있는 원문)
-    value_json      JSON NULL,              -- 구조화 필요 시 추가
-    source          VARCHAR(100),           -- 'PUBLIC_DATA','NAVER_BLOG','ADMIN'…
+    place_id        BIGINT NOT NULL,
+    fact_type       VARCHAR(100),
+    value_text      TEXT,
+    value_json      JSON NULL,
+    source          VARCHAR(100),
     confidence      FLOAT,
-    observed_at     DATE
+    observed_at     DATE,
+
+    INDEX idx_facts_place_type (place_id, fact_type),
+
+    CONSTRAINT fk_facts_place
+        FOREIGN KEY (place_id) REFERENCES places (id) ON DELETE CASCADE
 );
 -- 1단계: 테이블 생성만. 자동 수집 제외.
 -- 공공데이터 strong match 시 선택적 적재 여부는 2단계에서 결정.
 ```
 
 `value_json` 예시 (OPERATING_HOURS):
+
 ```json
 {"days": ["MON","TUE","WED","THU","FRI"], "open": "11:00", "close": "22:00"}
 ```
@@ -163,15 +188,11 @@ CREATE TABLE place_facts (
 
 판정은 규칙 우선. `confidence_score`는 NEEDS_REVIEW 큐 정렬에만 사용.
 
-### Gate 1 — Hard/Soft Reject
+### Gate 1 — Hard Reject + Risk Flag
 
-```
-[Hard blacklist] → 즉시 REJECTED (주소/좌표 무관)
+```text
+[Hard blacklist] → 즉시 REJECTED (주소/좌표 무관, 이후 gate 없음)
   식사, 기념일, 맛집, 주말, 데이트, 공원, 산책
-
-[Soft blacklist] → 주소 OR 좌표 없으면 REJECTED
-                   주소 OR 좌표 있으면 NEEDS_REVIEW로 진입
-  프렌치, 벚꽃, 감성, 라운지, 살롱
 
 [패턴 reject] → 즉시 REJECTED
   - raw_name 2글자 이하
@@ -179,11 +200,18 @@ CREATE TABLE place_facts (
   - 형용사·동사 단독 구성
   - 특수문자만
   - 주소 AND 좌표 모두 없음
+
+[Soft blacklist] → risk_flag = true 세팅 후 Gate 2 계속 진행
+  프렌치, 벚꽃, 감성, 라운지, 살롱
+  ※ terminal decision 아님. strong match(Gate 2)가 있으면 통과 가능.
+     strong match 실패 시 risk_flag → Gate 3/4에서 NEEDS_REVIEW로 처리.
 ```
 
 ### Gate 2 — Strong Match → AUTO_APPROVED, score=0.9
 
-```
+`risk_flag`가 있어도 통과 가능.
+
+```text
 [경로 A] 공공데이터 strong match:
   - 이름 유사도 ≥ 0.85
   - AND (주소 정규화 일치 OR 좌표 150m 이내)
@@ -195,13 +223,13 @@ CREATE TABLE place_facts (
   - AND 좌표 존재
 ```
 
-> 참고: "서로 다른 source"란 collected_from이 다른 두 개의 candidate 레코드를 의미.
+> "서로 다른 source"란 collected_from이 다른 두 개의 candidate 레코드를 의미.
 > 같은 오탐이 동일 경로에서 중복 유입되는 케이스를 방지.
 
 ### Gate 3 — Scoring
 
 | 신호 | 조건 | 점수 |
-|------|------|------|
+| --- | --- | --- |
 | 이름 품질 | 4글자+ 고유명사형 | +0.1 |
 | 주소 존재 | 도로명주소 있음 | +0.2 |
 | 좌표 존재 | lat/lng 있음 | +0.1 |
@@ -212,10 +240,22 @@ CREATE TABLE place_facts (
 
 ### Gate 4 — Threshold Decision
 
+**AUTO_APPROVED** (아래 조건 전부 충족):
+
+```text
+score ≥ 0.6
+AND name_quality > 0          (이름 품질 점수 양수)
+AND alt_business_detected = false  (주소 말미 별도 상호 없음)
+AND risk_flag = false          (soft blacklist 미해당)
+AND (public_medium_match가 있으면 이름 유사도 0.6 이상도 충족)
+→ places 생성 (status=PENDING)
 ```
-score ≥ 0.6   → AUTO_APPROVED → places 생성 (status=PENDING)
-score 0.3~0.6 → NEEDS_REVIEW  (confidence_score 높은 순 정렬)
-score < 0.3   → REJECTED
+
+조건 중 하나라도 미충족이면:
+
+```text
+score ≥ 0.3  → NEEDS_REVIEW
+score < 0.3  → REJECTED
 ```
 
 ---
@@ -224,9 +264,22 @@ score < 0.3   → REJECTED
 
 모든 엔드포인트: **ADMIN 권한 필수 + audit 컬럼 기록**
 
+### 상태 전이 guard
+
+```text
+approve 허용 상태: PENDING, NEEDS_REVIEW
+  → 그 외 (AUTO_APPROVED, ADMIN_APPROVED, REJECTED): 409 Conflict
+
+reject 허용 상태: PENDING, NEEDS_REVIEW
+  → 그 외: 409 Conflict
+
+activate 허용 상태: places.status = PENDING
+  → ACTIVE, INACTIVE: 409 Conflict
+```
+
 ### ① NEEDS_REVIEW 큐 조회
 
-```
+```text
 GET /admin/place-candidates?status=NEEDS_REVIEW&sort=confidence_score,desc
 
 Response:
@@ -248,16 +301,17 @@ Response:
 
 ### ② 후보 승인 (idempotent)
 
-```
+```text
 POST /admin/place-candidates/{id}/approve
+허용 상태: PENDING, NEEDS_REVIEW (그 외 409)
 
 Body:
 {
-  "override_name":     "...",   // optional
-  "override_address":  "...",   // optional
-  "override_category": "...",   // optional
-  "override_lat":      37.55,   // optional
-  "override_lng":      126.92   // optional
+  "override_name":     "...",
+  "override_address":  "...",
+  "override_category": "...",
+  "override_lat":      37.55,
+  "override_lng":      126.92
 }
 
 Logic:
@@ -273,8 +327,9 @@ Logic:
 
 ### ③ 후보 탈락
 
-```
+```text
 POST /admin/place-candidates/{id}/reject
+허용 상태: PENDING, NEEDS_REVIEW (그 외 409)
 
 Body: { "rejection_reason": "일반어로 판단" }
 
@@ -285,7 +340,7 @@ Body: { "rejection_reason": "일반어로 판단" }
 
 ### ④ PENDING places 조회
 
-```
+```text
 GET /admin/places?status=PENDING&sort=confidence,desc
 
 Response:
@@ -301,15 +356,15 @@ Response:
   "legacy_locationservice_id": null,
   "created_at": "2026-05-30T..."
 }
-// AUTO_APPROVED + ADMIN_APPROVED 후보에서 생성된 미노출 장소 전부 포함
 ```
 
 ### ⑤ PENDING → ACTIVE 전환
 
-```
+```text
 POST /admin/places/{id}/activate
+허용 상태: PENDING (그 외 409)
 
-→ places.status = ACTIVE          // 서비스 노출 시작
+→ places.status = ACTIVE
 → places.activated_by = currentAdmin
 → places.activated_at = now()
 ```
@@ -320,9 +375,9 @@ POST /admin/places/{id}/activate
 
 ### 포함
 
-- `place_candidates`, `places`, `place_facts` 테이블 생성 (DDL)
+- `place_candidates`, `places`, `place_facts` 테이블 생성 (DDL + index + FK)
 - 판정 엔진 4-gate (`@Scheduled` 또는 Spring Batch Job)
-- Admin API 5개 엔드포인트
+- Admin API 5개 엔드포인트 (상태 전이 guard 포함)
 - pet-data-api export → `place_candidates` 적재 (기존 적재 경로 변경)
 - `locationservice` 신규 장소 후보 적재 경로 write 차단 (service/repository 레벨)
 
@@ -339,9 +394,9 @@ POST /admin/places/{id}/activate
 ## 단계별 마이그레이션 계획
 
 | 단계 | 내용 |
-|------|------|
+| --- | --- |
 | 1단계 | locationservice 유지. places/place_candidates 추가. 신규 수집은 candidates만. |
-| 2단계 | locationservice 기존 레코드 → places 점진 이전. `places.primary_source=PUBLIC_DATA`, `legacy_locationservice_id` 연결. |
+| 2단계 | locationservice 기존 레코드 → places 점진 이전. `primary_source=PUBLIC_DATA`, `legacy_locationservice_id` 연결. |
 | 3단계 | 서비스 API 조회 기준을 places로 이동. place_facts로 공공데이터 상세 필드 분리. |
 | 4단계 | locationservice read-only/deprecated. 신규 write 전면 금지. |
 | 5단계 | 충분한 검증 후 locationservice archive 또는 제거. |
