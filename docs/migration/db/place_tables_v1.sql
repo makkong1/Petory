@@ -23,7 +23,7 @@ CREATE TABLE places (
 
 CREATE TABLE place_candidates (
     id                          BIGINT AUTO_INCREMENT PRIMARY KEY,
-    raw_name                    VARCHAR(255),
+    raw_name                    VARCHAR(255) NOT NULL,
     raw_address                 VARCHAR(255),
     lat                         DOUBLE,
     lng                         DOUBLE,
@@ -42,8 +42,9 @@ CREATE TABLE place_candidates (
     reviewed_at                 DATETIME NULL,
 
     INDEX idx_candidates_status_score (decision_status, confidence_score DESC),
-    INDEX idx_candidates_dedup        (raw_name(100), raw_address(100)),
+    INDEX idx_candidates_dedup        (raw_name, raw_address),
     INDEX idx_candidates_collected    (collected_at),
+    INDEX idx_candidates_matched_place (matched_place_id),
 
     CONSTRAINT fk_candidates_place
         FOREIGN KEY (matched_place_id) REFERENCES places (id) ON DELETE SET NULL,
