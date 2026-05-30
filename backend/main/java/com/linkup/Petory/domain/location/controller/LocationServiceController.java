@@ -40,8 +40,8 @@ public class LocationServiceController {
      * @param category     카테고리 (선택). DB의 category1·category2·category3 와 문자열 동일해야 매칭됨.
      *                     소분류 예: "동물약국","동물병원","카페","미술관" / 중분류 예: "반려의료","반려동반여행","반려동물식당카페","반려동물 서비스","반려문화시설"
      * @param keyword      키워드 (선택, 이름/설명/카테고리 검색, 예: "동물병원", "카페")
-     * @param sort         반경 검색 정렬 기준 (선택, distance|rating|reviews, 기본값: distance)
-     * @param size         최대 결과 수 (선택, 기본값: 100, 0 이하이면 전체)
+     * @param sort         반경 검색 정렬 기준 (선택, stable|distance|rating|reviews|score, 기본값: distance)
+     * @param size         최대 결과 수 (선택, 기본값: 100, 0 이하이면 서비스 기본 제한)
      * @return 검색 결과
      */
     @GetMapping("/search")
@@ -62,7 +62,7 @@ public class LocationServiceController {
             long startTime = System.currentTimeMillis();
 
             // 기본 결과 수 제한 (size 파라미터 없으면 100개로 제한)
-            // 단, size가 명시적으로 0이거나 음수면 전체 조회 (null 전달)
+            // 단, size가 명시적으로 0이거나 음수면 서비스 계층의 기본 제한을 사용한다.
             Integer effectiveSize = size;
             if (effectiveSize == null) {
                 effectiveSize = 100; // 기본값: 100개

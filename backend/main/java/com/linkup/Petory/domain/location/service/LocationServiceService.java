@@ -24,6 +24,7 @@ import java.util.stream.Collectors;
 public class LocationServiceService {
 
     private static final int DEFAULT_RADIUS_METERS = 10_000;
+    private static final int DEFAULT_RADIUS_LIMIT = 100;
     private static final String DEFAULT_RADIUS_SORT = "distance";
 
     private final LocationServiceConverter locationServiceConverter;
@@ -66,7 +67,7 @@ public class LocationServiceService {
                 || StringUtils.hasText(eupmyeondong) || StringUtils.hasText(roadName);
         boolean hasKeyword = StringUtils.hasText(keyword);
         boolean sortByScore = "score".equals(sort);
-        String dbSort = sortByScore ? "rating" : sort; // score는 DB 쿼리에서 rating으로 대체 후 post-sort
+        String dbSort = sort;
 
         List<LocationServiceDTO> results;
 
@@ -191,22 +192,16 @@ public class LocationServiceService {
         sort     = normalizeSort(sort);
 
         long methodStartTime = System.currentTimeMillis();
-        log.info("[위치 기반 검색] 시작 - lat={}, lng={}, radius={}m, keyword={}, category={}",
-                latitude, longitude, radiusInMeters, keyword, category);
+        int dbLimit = (maxResults != null && maxResults > 0) ? maxResults : DEFAULT_RADIUS_LIMIT;
+        log.info("[위치 기반 검색] 시작 - lat={}, lng={}, radius={}m, keyword={}, category={}, sort={}, limit={}",
+                latitude, longitude, radiusInMeters, keyword, category, sort, dbLimit);
 
         // 반경 검색 (keyword·category 포함)
         long queryStartTime = System.currentTimeMillis();
         List<LocationService> services = locationServiceRepository
-                .findByRadius(latitude, longitude, (double) radiusInMeters, keyword, category, sort);
+                .findByRadius(latitude, longitude, (double) radiusInMeters, keyword, category, sort, dbLimit);
         long queryTime = System.currentTimeMillis() - queryStartTime;
         log.info("[성능 측정] 위치 기반 DB 쿼리 실행 시간: {}ms, 조회된 레코드 수: {}개", queryTime, services.size());
-
-        // 최대 결과 수 제한
-        if (maxResults != null && maxResults > 0) {
-            services = services.stream()
-                    .limit(maxResults)
-                    .collect(Collectors.toList());
-        }
 
         // DTO 변환 및 거리 정보 설정
         long dtoConvertStartTime = System.currentTimeMillis();
@@ -279,7 +274,7 @@ public class LocationServiceService {
             return DEFAULT_RADIUS_SORT;
         }
         return switch (sort.trim().toLowerCase()) {
-            case "distance", "rating", "reviews", "score" -> sort.trim().toLowerCase();
+            case "stable", "distance", "rating", "reviews", "score" -> sort.trim().toLowerCase();
             default -> DEFAULT_RADIUS_SORT;
         };
     }

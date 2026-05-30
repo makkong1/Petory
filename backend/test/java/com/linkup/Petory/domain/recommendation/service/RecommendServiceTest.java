@@ -105,8 +105,9 @@ class RecommendServiceTest {
     @Test
     @DisplayName("Track B 컨텍스트는 기존 pet-data-api recommend 경로를 유지한다")
     void recommend_keepsLegacyProxyForNonPetoryOwnedContext() {
+        // "vet" is not in PETORY_OWNED_CONTEXTS — legacy proxy path
         RecommendResponse legacyResponse = new RecommendResponse(
-                "hotel",
+                "vet",
                 "popular-intelligence-v1",
                 "req-legacy",
                 List.of(),
@@ -117,7 +118,7 @@ class RecommendServiceTest {
         when(petRepository.findByUserIdAndNotDeleted("user-2")).thenReturn(List.of());
         when(petDataApiClient.recommend(any(RecommendRequest.class))).thenReturn(legacyResponse);
 
-        RecommendResponse response = recommendService.recommend("user-2", 37.4, 127.1, "hotel");
+        RecommendResponse response = recommendService.recommend("user-2", 37.4, 127.1, "vet");
 
         assertThat(response).isSameAs(legacyResponse);
         verify(locationServiceService, never()).searchLocationServicesByLocation(

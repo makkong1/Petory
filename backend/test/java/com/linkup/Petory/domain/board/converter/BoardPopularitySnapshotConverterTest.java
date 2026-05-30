@@ -234,4 +234,49 @@ class BoardPopularitySnapshotConverterTest {
         // then
         assertThat(results.get(0).boardFilePath()).isNull();
     }
+
+    // ── 단건 toDTO 버그 회귀 ──────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("단건 toDTO: boardFilePath 항상 null — attachmentFileService 미호출 (버그 확인)")
+    void toDTO_단건_boardFilePath_항상null() {
+        // given: 첨부파일이 있는 게시글 스냅샷
+        Board board = board(10L);
+        BoardPopularitySnapshot snap = snapshot(1L, board);
+
+        // when: 단건 오버로드 호출
+        var dto = converter.toDTO(snap);
+
+        // then: ★ 버그 — null 하드코딩, 이미지 URL 항상 null
+        assertThat(dto.boardFilePath()).isNull();
+
+        // toDTOList는 getAttachmentsBatch를 호출하지만 단건 toDTO는 호출하지 않음
+        verify(attachmentFileService, never())
+                .getAttachmentsBatch(any(), any());
+        verify(attachmentFileService, never())
+                .getAttachments(any(), any());
+    }
+
+    @Test
+    @DisplayName("단건 toDTO vs toDTOList: 동일 스냅샷에서 이미지 URL 불일치 (버그 확인)")
+    void toDTO_단건_vs_배치_이미지URL_불일치() {
+        // given: 첨부파일 있는 스냅샷
+        Board board = board(20L);
+        BoardPopularitySnapshot snap = snapshot(2L, board);
+        String expectedUrl = "https://cdn.example.com/image.jpg";
+
+        FileDTO file = FileDTO.builder()
+                .idx(1L).targetType(FileTargetType.BOARD).targetIdx(20L)
+                .filePath(expectedUrl).downloadUrl(expectedUrl).fileType("image/jpeg").build();
+        when(attachmentFileService.getAttachmentsBatch(eq(FileTargetType.BOARD), anyList()))
+                .thenReturn(Map.of(20L, List.of(file)));
+
+        // when
+        var singleDto = converter.toDTO(snap);                    // 단건
+        var listDto = converter.toDTOList(List.of(snap)).get(0);  // 배치
+
+        // then: 같은 데이터인데 호출 경로에 따라 이미지 유무가 달라짐
+        assertThat(singleDto.boardFilePath()).isNull();        // 단건: 항상 null
+        assertThat(listDto.boardFilePath()).isNotNull();       // 배치: 정상 조회
+    }
 }

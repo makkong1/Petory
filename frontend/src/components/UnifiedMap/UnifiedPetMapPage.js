@@ -32,6 +32,7 @@ const CATEGORY_TO_CONTEXT = {
 };
 
 const SORT_LABELS = {
+  stable: "추천순",
   distance: "거리순",
   rating: "평점순",
   reviews: "리뷰순",
@@ -39,7 +40,8 @@ const SORT_LABELS = {
 
 const DEFAULT_CENTER = { lat: 37.5665, lng: 126.978 };
 const DEFAULT_RADIUS = 5;
-const COORD_EPSILON = 0.0001;
+const EARTH_RADIUS_METERS = 6371000;
+const MIN_SEARCH_AREA_THRESHOLD_METERS = 300;
 
 const calculateMapLevelFromRadius = (radiusKm) => {
   if (radiusKm <= 1) return 5;
@@ -52,12 +54,30 @@ const calculateMapLevelFromRadius = (radiusKm) => {
 const hasValidCenter = (center) =>
   Number.isFinite(center?.lat) && Number.isFinite(center?.lng);
 
-const isSameCenter = (a, b) => {
+const haversineDistanceMeters = (a, b) => {
+  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+  const dLng = ((b.lng - a.lng) * Math.PI) / 180;
+  const lat1 = (a.lat * Math.PI) / 180;
+  const lat2 = (b.lat * Math.PI) / 180;
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+
+  return EARTH_RADIUS_METERS * 2 * Math.asin(Math.sqrt(h));
+};
+
+const isSameCenter = (a, b, radiusKm) => {
   if (!hasValidCenter(a) || !hasValidCenter(b)) return false;
-  return (
-    Math.abs(a.lat - b.lat) < COORD_EPSILON &&
-    Math.abs(a.lng - b.lng) < COORD_EPSILON
+  const radiusMeters =
+    typeof radiusKm === "number" && Number.isFinite(radiusKm)
+      ? radiusKm * 1000
+      : DEFAULT_RADIUS * 1000;
+  const threshold = Math.max(
+    MIN_SEARCH_AREA_THRESHOLD_METERS,
+    radiusMeters * 0.1
   );
+
+  return haversineDistanceMeters(a, b) < threshold;
 };
 
 const hasValidItemCoordinates = (item) =>
@@ -105,7 +125,7 @@ const UnifiedPetMapPage = () => {
   const [locationCategory, setLocationCategory] = useState("");
   /** 소분류(카페·미술관 등)가 여러 중분류에 있을 때 선택한 중분류 id */
   const [locationCategoryGroupId, setLocationCategoryGroupId] = useState(null);
-  const [locationSort, setLocationSort] = useState("distance");
+  const [locationSort, setLocationSort] = useState("stable");
   const [hasPendingAreaChange, setHasPendingAreaChange] = useState(false);
   const [searchMode, setSearchMode] = useState("initial");
   const [aiRecommendFacilities, setAiRecommendFacilities] = useState([]);
@@ -185,9 +205,19 @@ const UnifiedPetMapPage = () => {
       if (!hasValidCenter(center)) return;
       clearTimeout(fetchTimerRef.current);
       fetchTimerRef.current = setTimeout(async () => {
-        const cacheKey = `${type}-${center.lat.toFixed(4)}-${center.lng.toFixed(
-          4
-        )}-${r}-${keyword}-${category}-${sort}-${level}`;
+        const cacheKeyParts = [
+          type,
+          center.lat.toFixed(4),
+          center.lng.toFixed(4),
+          r,
+          keyword,
+          category,
+          sort,
+        ];
+        if (type !== "location") {
+          cacheKeyParts.push(level);
+        }
+        const cacheKey = cacheKeyParts.join("-");
         if (cacheRef.current[cacheKey]) {
           setItems(cacheRef.current[cacheKey]);
           return;
@@ -222,6 +252,7 @@ const UnifiedPetMapPage = () => {
 
   const effectiveFetchCenter =
     activeLayer === "location" ? searchCenter : mapViewportCenter;
+  const effectiveMapLevel = activeLayer === "location" ? null : mapLevel;
 
   useEffect(() => {
     if (effectiveFetchCenter) {
@@ -232,7 +263,7 @@ const UnifiedPetMapPage = () => {
         locationKeyword,
         locationCategory,
         locationSort,
-        mapLevel
+        effectiveMapLevel
       );
     }
   }, [
@@ -242,7 +273,7 @@ const UnifiedPetMapPage = () => {
     locationKeyword,
     locationCategory,
     locationSort,
-    mapLevel,
+    effectiveMapLevel,
     fetchItems,
   ]);
 
@@ -257,7 +288,7 @@ const UnifiedPetMapPage = () => {
       setLocationKeyword("");
       setLocationCategory("");
       setLocationCategoryGroupId(null);
-      setLocationSort("distance");
+      setLocationSort("stable");
     }
     if (
       layer === "location" &&
@@ -271,7 +302,9 @@ const UnifiedPetMapPage = () => {
       hasValidCenter(mapViewportCenter) &&
       hasValidCenter(searchCenter)
     ) {
-      setHasPendingAreaChange(!isSameCenter(mapViewportCenter, searchCenter));
+      setHasPendingAreaChange(
+        !isSameCenter(mapViewportCenter, searchCenter, radius)
+      );
     }
     if (layer !== "location") {
       setHasPendingAreaChange(false);
@@ -340,10 +373,10 @@ const UnifiedPetMapPage = () => {
         isManualOperation &&
         hasValidCenter(searchCenter)
       ) {
-        setHasPendingAreaChange(!isSameCenter(nextCenter, searchCenter));
+        setHasPendingAreaChange(!isSameCenter(nextCenter, searchCenter, radius));
       }
     },
-    [activeLayer, searchCenter]
+    [activeLayer, radius, searchCenter]
   );
 
   // 모임 생성 성공 시 목록 갱신

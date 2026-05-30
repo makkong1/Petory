@@ -15,7 +15,7 @@ const wrap = (props) =>
         hasPendingAreaChange={false}
         radius={5}
         onSearch={jest.fn()}
-        onCategoryChange={jest.fn()}
+        onCategoryPick={jest.fn()}
         onSortChange={jest.fn()}
         onSearchThisArea={jest.fn()}
         onRadiusChange={jest.fn()}
@@ -27,15 +27,25 @@ const wrap = (props) =>
 test('카테고리 칩 전체가 가로 스크롤 행에 렌더된다', () => {
   wrap({});
   expect(screen.getByText('전체')).toBeInTheDocument();
-  expect(screen.getByText('동물병원')).toBeInTheDocument();
-  expect(screen.getByText('미용')).toBeInTheDocument();
+  expect(screen.getByText('반려의료')).toBeInTheDocument();
+  expect(screen.getByText('용품·서비스')).toBeInTheDocument();
 });
 
-test('카테고리 칩 클릭 시 onCategoryChange가 해당 value로 호출된다', () => {
-  const onCategoryChange = jest.fn();
-  wrap({ onCategoryChange });
-  fireEvent.click(screen.getByText('동물병원'));
-  expect(onCategoryChange).toHaveBeenCalledWith('동물병원');
+test('카테고리 칩 클릭 시 onCategoryPick이 해당 category와 groupId로 호출된다', () => {
+  const onCategoryPick = jest.fn();
+  wrap({ onCategoryPick });
+  fireEvent.click(screen.getByText('반려의료'));
+  expect(onCategoryPick).toHaveBeenCalledWith({
+    category: '반려의료',
+    groupId: 'medical',
+  });
+});
+
+test('정렬 버튼 클릭 시 추천순→거리순 순환한다', () => {
+  const onSortChange = jest.fn();
+  wrap({ sort: 'stable', onSortChange });
+  fireEvent.click(screen.getByLabelText('정렬 변경'));
+  expect(onSortChange).toHaveBeenCalledWith('distance');
 });
 
 test('정렬 버튼 클릭 시 거리순→평점순 순환한다', () => {
@@ -45,11 +55,11 @@ test('정렬 버튼 클릭 시 거리순→평점순 순환한다', () => {
   expect(onSortChange).toHaveBeenCalledWith('rating');
 });
 
-test('정렬 버튼 클릭 시 리뷰순→거리순 순환한다', () => {
+test('정렬 버튼 클릭 시 리뷰순→추천순 순환한다', () => {
   const onSortChange = jest.fn();
   wrap({ sort: 'reviews', onSortChange });
   fireEvent.click(screen.getByLabelText('정렬 변경'));
-  expect(onSortChange).toHaveBeenCalledWith('distance');
+  expect(onSortChange).toHaveBeenCalledWith('stable');
 });
 
 test('필터 버튼 클릭 시 반경 패널이 표시된다', () => {

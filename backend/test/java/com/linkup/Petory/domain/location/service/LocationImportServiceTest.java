@@ -1,11 +1,11 @@
 package com.linkup.Petory.domain.location.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linkup.Petory.domain.location.converter.LocationImportConverter;
 import com.linkup.Petory.domain.location.entity.LocationService;
 import com.linkup.Petory.domain.location.repository.LocationServiceRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
@@ -15,7 +15,6 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
-import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -26,7 +25,7 @@ import static org.mockito.Mockito.*;
 class LocationImportServiceTest {
 
     @Mock  LocationServiceRepository locationServiceRepository;
-    @Mock  LocationServiceBatchWriter batchWriter;
+    @Mock  LocationImportConverter locationImportConverter; // 누락돼 있던 mock — null이면 UPDATE/INSERT 경로 NPE
     @Spy   ObjectMapper objectMapper;
 
     @InjectMocks LocationImportService service;
@@ -35,34 +34,19 @@ class LocationImportServiceTest {
         return new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8));
     }
 
-    // ── 신규 insert ──────────────────────────────────────────────────────────
+    // ── 신규 INSERT 차단 (write guard) ──────────────────────────────────────
 
     @Test
-    void 신규시설_insert_saved카운트증가() throws IOException {
+    void 신규시설_INSERT차단_skipped카운트증가() throws IOException {
         String json = "[{\"name\":\"멍멍미용\",\"category\":\"grooming\",\"address\":\"서울 강남구\",\"lat\":37.5,\"lng\":127.0}]";
-        when(locationServiceRepository.findByNameAndAddressAndDataSource("멍멍미용", "서울 강남구", "BATCH_IMPORT"))
+        when(locationServiceRepository.findByAddressAndDataSource("서울 강남구", "BATCH_IMPORT"))
                 .thenReturn(Optional.empty());
-        when(batchWriter.saveBatch(any(List.class))).thenReturn(1);
 
         LocationImportService.SyncResult result = service.importFromStream(toStream(json));
 
-        assertThat(result.getSaved()).isEqualTo(1);
+        assertThat(result.getSaved()).isEqualTo(0);
         assertThat(result.getUpdated()).isEqualTo(0);
-        assertThat(result.getSkipped()).isEqualTo(0);
-    }
-
-    @Test
-    void 신규시설_insert시_lastUpdated가today() throws IOException {
-        String json = "[{\"name\":\"멍멍미용\",\"category\":\"grooming\",\"address\":\"서울 강남구\",\"lat\":37.5,\"lng\":127.0}]";
-        when(locationServiceRepository.findByNameAndAddressAndDataSource(any(), any(), any()))
-                .thenReturn(Optional.empty());
-        ArgumentCaptor<List<LocationService>> captor = ArgumentCaptor.forClass(List.class);
-        when(batchWriter.saveBatch(captor.capture())).thenReturn(1);
-
-        service.importFromStream(toStream(json));
-
-        LocationService saved = captor.getValue().get(0);
-        assertThat(saved.getLastUpdated()).isEqualTo(LocalDate.now());
+        assertThat(result.getSkipped()).isEqualTo(1);
     }
 
     // ── upsert (기존 BATCH_IMPORT row 갱신) ──────────────────────────────────
@@ -73,7 +57,7 @@ class LocationImportServiceTest {
         LocationService existing = LocationService.builder()
                 .name("멍멍미용").address("서울 강남구").dataSource("BATCH_IMPORT")
                 .latitude(37.0).longitude(126.0).isDeleted(false).build();
-        when(locationServiceRepository.findByNameAndAddressAndDataSource("멍멍미용", "서울 강남구", "BATCH_IMPORT"))
+        when(locationServiceRepository.findByAddressAndDataSource("서울 강남구", "BATCH_IMPORT"))
                 .thenReturn(Optional.of(existing));
         when(locationServiceRepository.save(existing)).thenReturn(existing);
 
@@ -91,9 +75,10 @@ class LocationImportServiceTest {
                 .name("멍멍미용").address("서울 강남구").dataSource("BATCH_IMPORT")
                 .latitude(37.0).longitude(127.0).phone("010-0000-0000")
                 .category3("미용").sido("경기").sigungu("성남시").isDeleted(false).build();
-        when(locationServiceRepository.findByNameAndAddressAndDataSource("멍멍미용", "서울 강남구", "BATCH_IMPORT"))
+        when(locationServiceRepository.findByAddressAndDataSource("서울 강남구", "BATCH_IMPORT"))
                 .thenReturn(Optional.of(existing));
         when(locationServiceRepository.save(existing)).thenReturn(existing);
+        when(locationImportConverter.categoryLabel("hospital")).thenReturn("동물병원");
 
         service.importFromStream(toStream(json));
 
@@ -113,7 +98,7 @@ class LocationImportServiceTest {
                 .name("멍멍미용").address("서울 강남구").dataSource("BATCH_IMPORT")
                 .latitude(37.0).longitude(127.0)
                 .rating(4.8).reviewCount(42).score(0.95).isDeleted(false).build();
-        when(locationServiceRepository.findByNameAndAddressAndDataSource("멍멍미용", "서울 강남구", "BATCH_IMPORT"))
+        when(locationServiceRepository.findByAddressAndDataSource("서울 강남구", "BATCH_IMPORT"))
                 .thenReturn(Optional.of(existing));
         when(locationServiceRepository.save(existing)).thenReturn(existing);
 
@@ -132,7 +117,7 @@ class LocationImportServiceTest {
         LocationService softDeleted = LocationService.builder()
                 .name("멍멍미용").address("서울 강남구").dataSource("BATCH_IMPORT")
                 .latitude(37.0).longitude(127.0).isDeleted(true).build();
-        when(locationServiceRepository.findByNameAndAddressAndDataSource("멍멍미용", "서울 강남구", "BATCH_IMPORT"))
+        when(locationServiceRepository.findByAddressAndDataSource("서울 강남구", "BATCH_IMPORT"))
                 .thenReturn(Optional.of(softDeleted));
         when(locationServiceRepository.save(softDeleted)).thenReturn(softDeleted);
 
@@ -143,19 +128,19 @@ class LocationImportServiceTest {
         assertThat(softDeleted.getDeletedAt()).isNull();
     }
 
-    // ── PUBLIC row 격리 ──────────────────────────────────────────────────────
+    // ── PUBLIC row 격리 — BATCH_IMPORT row 없으면 INSERT 차단 ────────────────
 
     @Test
-    void PUBLIC_row_동일name_address_BATCH_IMPORT없으면_신규insert() throws IOException {
+    void PUBLIC_row_동일name_address_BATCH_IMPORT없으면_INSERT차단_skipped() throws IOException {
         String json = "[{\"name\":\"멍멍미용\",\"category\":\"grooming\",\"address\":\"서울 강남구\",\"lat\":37.5,\"lng\":127.0}]";
-        when(locationServiceRepository.findByNameAndAddressAndDataSource("멍멍미용", "서울 강남구", "BATCH_IMPORT"))
+        when(locationServiceRepository.findByAddressAndDataSource("서울 강남구", "BATCH_IMPORT"))
                 .thenReturn(Optional.empty());
-        when(batchWriter.saveBatch(any(List.class))).thenReturn(1);
 
         LocationImportService.SyncResult result = service.importFromStream(toStream(json));
 
-        assertThat(result.getSaved()).isEqualTo(1);
+        assertThat(result.getSaved()).isEqualTo(0);
         assertThat(result.getUpdated()).isEqualTo(0);
+        assertThat(result.getSkipped()).isEqualTo(1);
     }
 
     // ── isValid 실패 ─────────────────────────────────────────────────────────
@@ -190,5 +175,55 @@ class LocationImportServiceTest {
         assertThat(result.getTotal()).isEqualTo(0);
         assertThat(result.getSaved()).isEqualTo(0);
         assertThat(result.getUpdated()).isEqualTo(0);
+    }
+
+    // ── N+1 SELECT 버그 회귀 ──────────────────────────────────────────────────
+
+    @Test
+    @org.junit.jupiter.api.DisplayName("레코드 N개 import 시 findByAddressAndDataSource가 N회 개별 호출됨 (N+1 패턴 확인)")
+    void 레코드N개_import시_SELECT_N회_개별호출() throws IOException {
+        String json = """
+                [
+                  {"name":"A미용","address":"서울 강남구","lat":37.5,"lng":127.0,"category":"grooming"},
+                  {"name":"B병원","address":"서울 서초구","lat":37.4,"lng":126.9,"category":"hospital"},
+                  {"name":"C카페","address":"서울 마포구","lat":37.6,"lng":126.8,"category":"cafe"}
+                ]
+                """;
+        when(locationServiceRepository.findByAddressAndDataSource(any(), eq("BATCH_IMPORT")))
+                .thenReturn(Optional.empty());
+
+        service.importFromStream(toStream(json));
+
+        // ★ N+1: 레코드 3개에 대해 SELECT가 3회 개별 실행 (신규는 INSERT 차단)
+        verify(locationServiceRepository, times(3))
+                .findByAddressAndDataSource(any(), eq("BATCH_IMPORT"));
+    }
+
+    @Test
+    @org.junit.jupiter.api.DisplayName("UPDATE 경로: save()가 레코드별로 개별 호출됨 (배치 처리 미적용 확인)")
+    void UPDATE경로_save_레코드별_개별호출() throws IOException {
+        String json = """
+                [
+                  {"name":"A미용","address":"서울 강남구","lat":37.5,"lng":127.0,"category":"grooming"},
+                  {"name":"B병원","address":"서울 서초구","lat":37.4,"lng":126.9,"category":"hospital"}
+                ]
+                """;
+        LocationService existingA = LocationService.builder()
+                .name("구이름A").address("서울 강남구").dataSource("BATCH_IMPORT").isDeleted(false).build();
+        LocationService existingB = LocationService.builder()
+                .name("구이름B").address("서울 서초구").dataSource("BATCH_IMPORT").isDeleted(false).build();
+
+        when(locationServiceRepository.findByAddressAndDataSource("서울 강남구", "BATCH_IMPORT"))
+                .thenReturn(Optional.of(existingA));
+        when(locationServiceRepository.findByAddressAndDataSource("서울 서초구", "BATCH_IMPORT"))
+                .thenReturn(Optional.of(existingB));
+        when(locationServiceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.importFromStream(toStream(json));
+
+        // ★ UPDATE 시 이름도 최신값으로 갱신되는지 확인
+        assertThat(existingA.getName()).isEqualTo("A미용");
+        assertThat(existingB.getName()).isEqualTo("B병원");
+        verify(locationServiceRepository, times(2)).save(any(LocationService.class));
     }
 }

@@ -61,9 +61,10 @@ const toMapItem = (type, raw) => {
   };
 };
 
-// 줌 레벨(카카오맵 1~14) → 반환 개수 매핑
+// location은 결과 안정성을 위해 고정 제한을 사용하고, meetup/care만 줌 레벨 제한을 적용한다.
+const LOCATION_RESULT_LIMIT = 300;
+
 const ZOOM_LIMIT_TABLE = {
-  location: { 4: 30, 5: 50, 6: 100, 7: 150, 8: 250, 9: 400, default: 500 },
   meetup:   { 4: 30, 5: 50, 6: 100, 7: 200, 8: 350, 9: 500, default: 800 },
   care:     { 4: 20, 5: 30, 6: 50,  7: 80,  8: 150, 9: 250, default: 400 },
 };
@@ -76,7 +77,7 @@ const getLimitForLevel = (type, level) => {
 
 /**
  * 활성 탭 1개의 데이터만 조회해 공통 mapItem 배열로 반환
- * @param {number} mapLevel - 카카오맵 기준 줌 레벨 (1=최대확대, 14=전국). 기본값 7
+ * @param {number} mapLevel - meetup/care용 카카오맵 기준 줌 레벨 (1=최대확대, 14=전국). 기본값 7
  */
 export const fetchActiveMapItems = async ({ type, lat, lng, radius, keyword, category, sort, mapLevel = 7 }) => {
   if (type === 'location') {
@@ -88,7 +89,7 @@ export const fetchActiveMapItems = async ({ type, lat, lng, radius, keyword, cat
       ...(keyword && { keyword }),
       ...(category && { category }),
       ...(sort && { sort }),
-      size: getLimitForLevel('location', mapLevel),
+      size: LOCATION_RESULT_LIMIT,
     });
     const services = res?.data?.services ?? [];
     return services.map(r => toMapItem('location', r));

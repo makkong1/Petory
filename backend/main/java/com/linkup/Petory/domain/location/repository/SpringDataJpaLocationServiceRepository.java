@@ -73,6 +73,12 @@ public interface SpringDataJpaLocationServiceRepository extends JpaRepository<Lo
                         @Param("address") String address,
                         @Param("dataSource") String dataSource);
 
+        @RepositoryMethod("장소 서비스: address+dataSource 조회 — 이름 변동 upsert 중복 감지용")
+        @Query("SELECT ls FROM LocationService ls WHERE ls.address = :address AND ls.dataSource = :dataSource")
+        Optional<LocationService> findByAddressAndDataSource(
+                        @Param("address") String address,
+                        @Param("dataSource") String dataSource);
+
         // spatial index를 실제로 잘 타고 있음
         // ST_Within + ST_Distance_Sphere 조합이 망하지 않음
         // LIKE '%??%'가 인덱스를 못 타더라도, 이미 반경 후보가 줄어든 뒤라 피해가 제한적임
@@ -100,17 +106,22 @@ public interface SpringDataJpaLocationServiceRepository extends JpaRepository<Lo
                         "     OR ls.category2 = :category " +
                         "     OR ls.category1 = :category) " +
                         "ORDER BY " +
+                        "CASE WHEN :sort = 'score' THEN ls.score END DESC, " +
+                        "CASE WHEN :sort = 'stable' THEN ls.rating END DESC, " +
+                        "CASE WHEN :sort = 'stable' THEN ls.review_count END DESC, " +
                         "CASE WHEN :sort = 'reviews' THEN ls.review_count END DESC, " +
                         "CASE WHEN :sort = 'rating' THEN ls.rating END DESC, " +
-                        "ST_Distance_Sphere(ls.location, ST_GeomFromText(" +
-                        "CONCAT('POINT(', :latitude, ' ', :longitude, ')'), 4326)) ASC, " +
-                        "ls.rating DESC, ls.idx ASC", nativeQuery = true)
+                        "CASE WHEN :sort NOT IN ('stable', 'score') THEN ST_Distance_Sphere(ls.location, ST_GeomFromText(" +
+                        "CONCAT('POINT(', :latitude, ' ', :longitude, ')'), 4326)) END ASC, " +
+                        "ls.rating DESC, ls.idx ASC " +
+                        "LIMIT :limit", nativeQuery = true)
         List<LocationService> findByRadius(@Param("latitude") Double latitude,
                         @Param("longitude") Double longitude,
                         @Param("radiusInMeters") Double radiusInMeters,
                         @Param("keyword") String keyword,
                         @Param("category") String category,
-                        @Param("sort") String sort);
+                        @Param("sort") String sort,
+                        @Param("limit") int limit);
 
         @RepositoryMethod("장소 서비스: 시군구별 조회 (keyword·category 필터)")
         @Query(value = "SELECT * FROM locationservice USE INDEX (idx_locationservice_sigungu_deleted_rating) " +
@@ -209,4 +220,17 @@ public interface SpringDataJpaLocationServiceRepository extends JpaRepository<Lo
                         ") " +
                         "WHERE idx = :serviceIdx", nativeQuery = true)
         void updateReviewStats(@Param("serviceIdx") Long serviceIdx);
+
+        @Query(value = "SELECT * FROM locationservice " +
+                       "WHERE latitude BETWEEN :minLat AND :maxLat " +
+                       "AND longitude BETWEEN :minLng AND :maxLng " +
+                       "AND is_deleted = 0",
+               nativeQuery = true)
+        List<LocationService> findInBoundingBox(
+                @Param("minLat") double minLat, @Param("maxLat") double maxLat,
+                @Param("minLng") double minLng, @Param("maxLng") double maxLng);
+
+        @Query("SELECT ls FROM LocationService ls " +
+               "WHERE ls.name LIKE CONCAT(:prefix, '%') AND ls.isDeleted = false")
+        List<LocationService> findByNamePrefix(@Param("prefix") String prefix);
 }

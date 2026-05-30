@@ -9,7 +9,6 @@ import com.linkup.Petory.domain.location.repository.LocationServiceRepository;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -18,7 +17,6 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -28,12 +26,8 @@ import java.util.Optional;
 public class LocationImportService {
 
     private final LocationServiceRepository locationServiceRepository;
-    private final LocationServiceBatchWriter batchWriter;
     private final LocationImportConverter locationImportConverter;
     private final ObjectMapper objectMapper;
-
-    @Value("${app.location.import.batch-size:500}")
-    private int batchSize;
 
     // InputStream으로 전달된 JSON을 파싱해 DB 적재 (CSV 업로드 경로에서 호출)
     public SyncResult importFromStream(InputStream in) throws IOException {
@@ -49,20 +43,20 @@ public class LocationImportService {
         }
     }
 
-    // DTO 목록을 순회하며 신규(배치 INSERT)·기존(UPDATE) 분기 처리 후 SyncResult 반환
+    // DTO 목록을 순회하며 기존(UPDATE) 처리. 신규는 place_candidates로만 적재.
     private SyncResult processEntries(List<LocationImportDto> dtos) {
         int total = dtos.size(), saved = 0, updated = 0, skipped = 0;
-        List<LocationService> batch = new ArrayList<>();
 
         for (LocationImportDto dto : dtos) {
             try {
                 if (!isValid(dto)) { skipped++; continue; }
 
                 Optional<LocationService> existing = locationServiceRepository
-                        .findByNameAndAddressAndDataSource(dto.getName(), dto.getAddress(), "BATCH_IMPORT");
+                        .findByAddressAndDataSource(dto.getAddress(), "BATCH_IMPORT");
 
                 if (existing.isPresent()) {
                     LocationService entity = existing.get();
+                    entity.setName(dto.getName()); // 이름 변경 시 최신값으로 갱신
                     entity.setPhone(dto.getPhone());
                     entity.setLatitude(dto.getLat());
                     entity.setLongitude(dto.getLng());
@@ -77,18 +71,17 @@ public class LocationImportService {
                     locationServiceRepository.save(entity);
                     updated++;
                 } else {
-                    batch.add(locationImportConverter.toEntity(dto));
-                    if (batchSize > 0 && batch.size() >= batchSize) {
-                        saved += batchWriter.saveBatch(new ArrayList<>(batch));
-                        batch.clear();
-                    }
+                    // [WRITE GUARD] 신규 장소 후보는 place_candidates로만 적재.
+                    // pet-data-api는 POST /api/admin/place-candidates/batch-ingest 사용.
+                    log.warn("[LocationImportService] 신규 장소 INSERT 차단 name={} address={} — place_candidates 사용",
+                        dto.getName(), dto.getAddress());
+                    skipped++;
                 }
             } catch (Exception e) {
                 log.warn("[LocationImportService] 변환 실패 name={}", dto.getName(), e);
                 skipped++;
             }
         }
-        if (!batch.isEmpty()) saved += batchWriter.saveBatch(new ArrayList<>(batch));
 
         log.info("[LocationImportService] 완료 total={} saved={} updated={} skipped={}",
                 total, saved, updated, skipped);
