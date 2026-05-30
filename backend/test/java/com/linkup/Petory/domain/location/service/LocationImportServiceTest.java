@@ -6,7 +6,6 @@ import com.linkup.Petory.domain.location.entity.LocationService;
 import com.linkup.Petory.domain.location.repository.LocationServiceRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
@@ -16,7 +15,6 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
-import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -27,7 +25,6 @@ import static org.mockito.Mockito.*;
 class LocationImportServiceTest {
 
     @Mock  LocationServiceRepository locationServiceRepository;
-    @Mock  LocationServiceBatchWriter batchWriter;
     @Mock  LocationImportConverter locationImportConverter; // 누락돼 있던 mock — null이면 UPDATE/INSERT 경로 NPE
     @Spy   ObjectMapper objectMapper;
 
@@ -37,36 +34,19 @@ class LocationImportServiceTest {
         return new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8));
     }
 
-    // ── 신규 insert ──────────────────────────────────────────────────────────
+    // ── 신규 INSERT 차단 (write guard) ──────────────────────────────────────
 
     @Test
-    void 신규시설_insert_saved카운트증가() throws IOException {
+    void 신규시설_INSERT차단_skipped카운트증가() throws IOException {
         String json = "[{\"name\":\"멍멍미용\",\"category\":\"grooming\",\"address\":\"서울 강남구\",\"lat\":37.5,\"lng\":127.0}]";
         when(locationServiceRepository.findByAddressAndDataSource("서울 강남구", "BATCH_IMPORT"))
                 .thenReturn(Optional.empty());
-        when(batchWriter.saveBatch(any(List.class))).thenReturn(1);
 
         LocationImportService.SyncResult result = service.importFromStream(toStream(json));
 
-        assertThat(result.getSaved()).isEqualTo(1);
+        assertThat(result.getSaved()).isEqualTo(0);
         assertThat(result.getUpdated()).isEqualTo(0);
-        assertThat(result.getSkipped()).isEqualTo(0);
-    }
-
-    @Test
-    void 신규시설_insert시_lastUpdated가today() throws IOException {
-        String json = "[{\"name\":\"멍멍미용\",\"category\":\"grooming\",\"address\":\"서울 강남구\",\"lat\":37.5,\"lng\":127.0}]";
-        LocationService entity = LocationService.builder().lastUpdated(LocalDate.now()).build();
-        when(locationServiceRepository.findByAddressAndDataSource(any(), any()))
-                .thenReturn(Optional.empty());
-        when(locationImportConverter.toEntity(any())).thenReturn(entity);
-        ArgumentCaptor<List<LocationService>> captor = ArgumentCaptor.forClass(List.class);
-        when(batchWriter.saveBatch(captor.capture())).thenReturn(1);
-
-        service.importFromStream(toStream(json));
-
-        LocationService saved = captor.getValue().get(0);
-        assertThat(saved.getLastUpdated()).isEqualTo(LocalDate.now());
+        assertThat(result.getSkipped()).isEqualTo(1);
     }
 
     // ── upsert (기존 BATCH_IMPORT row 갱신) ──────────────────────────────────
@@ -148,19 +128,19 @@ class LocationImportServiceTest {
         assertThat(softDeleted.getDeletedAt()).isNull();
     }
 
-    // ── PUBLIC row 격리 ──────────────────────────────────────────────────────
+    // ── PUBLIC row 격리 — BATCH_IMPORT row 없으면 INSERT 차단 ────────────────
 
     @Test
-    void PUBLIC_row_동일name_address_BATCH_IMPORT없으면_신규insert() throws IOException {
+    void PUBLIC_row_동일name_address_BATCH_IMPORT없으면_INSERT차단_skipped() throws IOException {
         String json = "[{\"name\":\"멍멍미용\",\"category\":\"grooming\",\"address\":\"서울 강남구\",\"lat\":37.5,\"lng\":127.0}]";
         when(locationServiceRepository.findByAddressAndDataSource("서울 강남구", "BATCH_IMPORT"))
                 .thenReturn(Optional.empty());
-        when(batchWriter.saveBatch(any(List.class))).thenReturn(1);
 
         LocationImportService.SyncResult result = service.importFromStream(toStream(json));
 
-        assertThat(result.getSaved()).isEqualTo(1);
+        assertThat(result.getSaved()).isEqualTo(0);
         assertThat(result.getUpdated()).isEqualTo(0);
+        assertThat(result.getSkipped()).isEqualTo(1);
     }
 
     // ── isValid 실패 ─────────────────────────────────────────────────────────
@@ -211,12 +191,10 @@ class LocationImportServiceTest {
                 """;
         when(locationServiceRepository.findByAddressAndDataSource(any(), eq("BATCH_IMPORT")))
                 .thenReturn(Optional.empty());
-        when(locationImportConverter.toEntity(any())).thenReturn(LocationService.builder().build());
-        when(batchWriter.saveBatch(any(List.class))).thenReturn(3);
 
         service.importFromStream(toStream(json));
 
-        // ★ N+1: 레코드 3개에 대해 SELECT가 3회 개별 실행
+        // ★ N+1: 레코드 3개에 대해 SELECT가 3회 개별 실행 (신규는 INSERT 차단)
         verify(locationServiceRepository, times(3))
                 .findByAddressAndDataSource(any(), eq("BATCH_IMPORT"));
     }
