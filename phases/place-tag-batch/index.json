@@ -1,0 +1,24 @@
+{
+  "task": "place-tag-batch",
+  "description": "locationservice \uce74\ud14c\uace0\ub9ac \uae30\ubc18 \uc758\ub3c4 \ud0dc\uadf8 \ubc30\uce58 \uc0dd\uc131 \u2014 Python \ubc30\uce58 \uc2a4\ud06c\ub9bd\ud2b8 + DB \ubc18\uc601 + tag_match_score \ud65c\uc131\ud654",
+  "steps": [
+    {
+      "step": 1,
+      "name": "Python \ubc30\uce58 \uc2a4\ud06c\ub9bd\ud2b8 \u2014 category \u2192 tags \ub9e4\ud551 + JSON \ucd9c\ub825",
+      "status": "completed",
+      "summary": "500\uac74 \ucc98\ub9ac, place_tags_sample.json \uc0dd\uc131. \uc0c1\uc704 \ud0dc\uadf8: health/medical(407), pharmacy(229), veterinary(178)"
+    },
+    {
+      "step": 2,
+      "name": "DB \ub9c8\uc774\uadf8\ub808\uc774\uc158 \u2014 locationservice\uc5d0 tags \uceec\ub7fc \ucd94\uac00 + SQL import",
+      "status": "completed",
+      "summary": "ALTER TABLE tags JSON \uceec\ub7fc \ucd94\uac00, 500\uac74 UPDATE \uc801\uc6a9. idx=33310 \ub4f1 tags \uceec\ub7fc \ud655\uc778"
+    },
+    {
+      "step": 3,
+      "name": "Spring tag_match_score \ud65c\uc131\ud654 \u2014 \uc5d4\ud2f0\ud2f0 tags \ud544\ub4dc + ScoreCalculator \uc5c5\ub370\uc774\ud2b8",
+      "status": "completed",
+      "summary": "LocationService.tagsJson+getTagList(), PetRecommendFacilityDto.locationTags, calcTagMatchScore, buildMatchReasons tag_match \ucd94\uac00. compileJava BUILD SUCCESSFUL"
+    }
+  ]
+}

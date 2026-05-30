@@ -30,6 +30,10 @@
     },
     {
       "dir": "pet-recommend-nlp",
+      "status": "completed"
+    },
+    {
+      "dir": "place-tag-batch",
       "status": "pending"
     }
   ]
