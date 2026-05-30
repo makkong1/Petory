@@ -15,6 +15,10 @@ public class PlaceCandidateDto {
     private CandidateDecisionStatus decisionStatus;
     private Long matchedPlaceId, matchedLocationserviceId;
     private String collectedAt;
+    private String reviewedBy;
+    private String reviewedAt;
+    private String rejectionReason;
+    private String scoreBreakdown;
 
     public static PlaceCandidateDto from(PlaceCandidate c) {
         return PlaceCandidateDto.builder()
@@ -25,6 +29,10 @@ public class PlaceCandidateDto {
             .matchedPlaceId(c.getMatchedPlaceId())
             .matchedLocationserviceId(c.getMatchedLocationserviceId())
             .collectedAt(c.getCollectedAt() != null ? c.getCollectedAt().toString() : null)
+            .reviewedBy(c.getReviewedBy())
+            .reviewedAt(c.getReviewedAt() != null ? c.getReviewedAt().toString() : null)
+            .rejectionReason(c.getRejectionReason())
+            .scoreBreakdown(c.getScoreBreakdown())
             .build();
     }
 }
