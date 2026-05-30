@@ -55,12 +55,18 @@ public class PlaceCandidate {
     private String rejectionReason;
 
     @Column(name = "collected_at", nullable = false)
-    @Builder.Default
-    private LocalDateTime collectedAt = LocalDateTime.now();
+    private LocalDateTime collectedAt;
 
     @Column(name = "reviewed_by", length = 100)
     private String reviewedBy;
 
     @Column(name = "reviewed_at")
     private LocalDateTime reviewedAt;
+
+    @PrePersist
+    protected void onPersist() {
+        if (this.collectedAt == null) {
+            this.collectedAt = LocalDateTime.now();
+        }
+    }
 }
