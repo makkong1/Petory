@@ -8,6 +8,7 @@ import com.linkup.Petory.domain.petRecommendation.entity.UserPetIntentSignal;
 import com.linkup.Petory.domain.petRecommendation.repository.UserPetIntentSignalRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
@@ -18,8 +19,11 @@ import java.util.List;
 @RequiredArgsConstructor
 public class UserPetIntentSignalService {
 
+    // Python confidence_threshold(0.45)보다 높게 설정하여 2-pass 품질 필터 구성.
+    // Python 1차 필터: 0.45 미만 → UNKNOWN 반환, Spring 2차 필터: 0.60 미만 → 저장 거부.
     private static final double CONFIDENCE_THRESHOLD = 0.6;
     private static final int    SIGNAL_TTL_DAYS      = 7;
+    private static final int    ACTIVE_SIGNAL_LIMIT  = 10;
 
     private final UserPetIntentSignalRepository signalRepository;
     private final ObjectMapper objectMapper;
@@ -30,6 +34,12 @@ public class UserPetIntentSignalService {
         if (analysis == null || analysis.getConfidence() < CONFIDENCE_THRESHOLD) {
             log.debug("[Signal] confidence 미달 또는 분석 없음 — 저장 안 함. confidence={}",
                     analysis != null ? analysis.getConfidence() : "null");
+            return;
+        }
+        // R3: 같은 도메인 유효 signal이 이미 있으면 중복 저장 방지
+        if (signalRepository.existsByUserIdxAndIntentDomainAndExpiresAtAfter(
+                userIdx, analysis.getIntentDomain(), LocalDateTime.now())) {
+            log.debug("[Signal] 같은 도메인 유효 signal 존재 — 저장 스킵. domain={}", analysis.getIntentDomain());
             return;
         }
         try {
@@ -56,9 +66,10 @@ public class UserPetIntentSignalService {
     }
 
     @Transactional(readOnly = true)
-    public List<UserPetIntentSignalResponse> getActiveSignals(Long userIdx) {
+    public List<UserPetIntentSignalResponse> getActiveSignals(long userIdx) {
         List<UserPetIntentSignal> signals =
-                signalRepository.findActiveByUser(userIdx, LocalDateTime.now());
+                signalRepository.findActiveByUser(userIdx, LocalDateTime.now(),
+                        PageRequest.of(0, ACTIVE_SIGNAL_LIMIT));
         return signals.stream()
                 .map(this::toResponse)
                 .toList();

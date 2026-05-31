@@ -38,6 +38,7 @@ def _load():
 def classify(text: str) -> Tuple[str, str, float]:
     """
     Returns: (intent, intentDomain, confidence)
+    petType은 MVP에서 사용하지 않는다. 이후 petType별 규칙/모델 분기 시 파라미터 추가 예정.
     """
     rule_result = _classify_by_rule(text)
     if rule_result is not None:
