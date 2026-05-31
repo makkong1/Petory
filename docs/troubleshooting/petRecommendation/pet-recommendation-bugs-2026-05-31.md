@@ -6,11 +6,11 @@
 
 | ID | 위치 | 증상 | 심각도 | 상태 |
 |----|------|------|--------|------|
-| T1 | `PetIntentSignalEventListener` | 트랜잭션 롤백 시 dangling signal 발생 가능 | 🔴 High | 🔵 미수정 |
-| T2 | `PetRecommendationController` | 데이터 변경 API에 인가 어노테이션 없음 | 🔴 High | 🔵 미수정 |
-| T3 | `PetRecommendationController` | `text` 파라미터 길이 무제한 | 🟡 Medium | 🔵 미수정 |
-| T4 | `pet_intent_router.py` | NLP 분석 중 예외 발생 시 구조화된 에러 응답 없음 | 🟡 Medium | 🔵 미수정 |
-| T5 | `PetRecommendationController` | `interactionType` 임의 문자열 그대로 저장 | 🟡 Medium | 🔵 미수정 |
+| T1 | `PetIntentSignalEventListener` | 트랜잭션 롤백 시 dangling signal 발생 가능 | 🔴 High | ✅ 수정 완료 (2026-05-31) |
+| T2 | `PetRecommendationController` | 데이터 변경 API에 인가 어노테이션 없음 | 🔴 High | ✅ 수정 완료 (refactor R1에서 처리) |
+| T3 | `PetRecommendationController` | `text` 파라미터 길이 무제한 | 🟡 Medium | ✅ 수정 완료 (2026-05-31) |
+| T4 | `pet_intent_router.py` | NLP 분석 중 예외 발생 시 구조화된 에러 응답 없음 | 🟡 Medium | ✅ 수정 완료 (2026-05-31) |
+| T5 | `PetRecommendationController` | `interactionType` 임의 문자열 그대로 저장 | 🟡 Medium | ✅ 수정 완료 (2026-05-31) |
 
 ---
 
