@@ -35,6 +35,10 @@
     {
       "dir": "place-tag-batch",
       "status": "pending"
+    },
+    {
+      "dir": "nlp-traffic-policy",
+      "status": "pending"
     }
   ]
 }

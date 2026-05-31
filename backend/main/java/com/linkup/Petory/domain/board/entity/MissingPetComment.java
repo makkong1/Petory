@@ -3,6 +3,7 @@ package com.linkup.Petory.domain.board.entity;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+import com.linkup.Petory.domain.common.BaseTimeEntity;
 import com.linkup.Petory.domain.user.entity.Users;
 
 import jakarta.persistence.Column;
@@ -13,7 +14,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -28,7 +28,7 @@ import lombok.Setter;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class MissingPetComment {
+public class MissingPetComment extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -53,9 +53,6 @@ public class MissingPetComment {
     @Column(precision = 15, scale = 12)
     private BigDecimal longitude; // 목격 위치 경도
 
-    @Column(name = "created_at")
-    private LocalDateTime createdAt;
-
     @Column(name = "is_deleted")
     @Builder.Default
     private Boolean isDeleted = false;
@@ -63,8 +60,4 @@ public class MissingPetComment {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
-    @PrePersist
-    protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
-    }
 }

@@ -1,16 +1,16 @@
 package com.linkup.Petory.domain.statistics.entity;
 
+import com.linkup.Petory.domain.common.BaseTimeEntity;
 import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "monthly_statistics",
        uniqueConstraints = @UniqueConstraint(columnNames = {"year", "month"}))
 @Getter @Setter
 @NoArgsConstructor @AllArgsConstructor @Builder
-public class MonthlyStatistics {
+public class MonthlyStatistics extends BaseTimeEntity {
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -45,9 +45,4 @@ public class MonthlyStatistics {
     @Builder.Default @Column(name = "new_reports") private Long newReports = 0L;
     @Builder.Default @Column(name = "resolved_reports") private Long resolvedReports = 0L;
 
-    @Column(name = "created_at", updatable = false) private LocalDateTime createdAt;
-    @Column(name = "updated_at") private LocalDateTime updatedAt;
-
-    @PrePersist protected void onCreate() { createdAt = updatedAt = LocalDateTime.now(); }
-    @PreUpdate protected void onUpdate() { updatedAt = LocalDateTime.now(); }
 }

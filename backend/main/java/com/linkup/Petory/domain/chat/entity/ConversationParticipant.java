@@ -1,5 +1,6 @@
 package com.linkup.Petory.domain.chat.entity;
 
+import com.linkup.Petory.domain.common.BaseTimeEntity;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
@@ -13,7 +14,7 @@ import com.linkup.Petory.domain.user.entity.Users;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class ConversationParticipant {
+public class ConversationParticipant extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -68,17 +69,9 @@ public class ConversationParticipant {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
-    @Column(name = "created_at")
-    private LocalDateTime createdAt;
-
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
-
     @PrePersist
     protected void onCreate() {
         this.joinedAt = LocalDateTime.now();
-        this.createdAt = LocalDateTime.now();
-        this.updatedAt = LocalDateTime.now();
         if (this.role == null) {
             this.role = ParticipantRole.MEMBER;
         }
@@ -91,11 +84,6 @@ public class ConversationParticipant {
         if (this.isDeleted == null) {
             this.isDeleted = false;
         }
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        this.updatedAt = LocalDateTime.now();
     }
 
     // 읽지 않은 메시지 수 증가

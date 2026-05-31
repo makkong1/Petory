@@ -1,5 +1,6 @@
 package com.linkup.Petory.domain.petRecommendation.entity;
 
+import com.linkup.Petory.domain.common.BaseTimeEntity;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
@@ -10,7 +11,7 @@ import java.time.LocalDateTime;
         @Index(name = "idx_signal_source",      columnList = "source_type, source_id")
 })
 @Getter @Builder @NoArgsConstructor @AllArgsConstructor
-public class UserPetIntentSignal {
+public class UserPetIntentSignal extends BaseTimeEntity {
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -38,9 +39,6 @@ public class UserPetIntentSignal {
 
     @Column(name = "intent_tags", columnDefinition = "JSON")
     private String intentTags;
-
-    @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt;
 
     @Column(name = "expires_at", nullable = false)
     private LocalDateTime expiresAt;

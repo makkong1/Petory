@@ -39,7 +39,6 @@ public class NotificationConverter {
                 .relatedId(dto.getRelatedId())
                 .relatedType(dto.getRelatedType())
                 .isRead(dto.getIsRead() != null ? dto.getIsRead() : false)
-                .createdAt(dto.getCreatedAt())
                 .build();
     }
 }

@@ -54,7 +54,6 @@ public class UserPetIntentSignalService {
                     .recommendedCategories(categoriesJson)
                     .confidence(analysis.getConfidence())
                     .intentTags(tagsJson)
-                    .createdAt(LocalDateTime.now())
                     .expiresAt(LocalDateTime.now().plusDays(SIGNAL_TTL_DAYS))
                     .build();
             signalRepository.save(signal);

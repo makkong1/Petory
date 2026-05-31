@@ -1,388 +1,264 @@
-# 🐾 Petory (페토리)
-> **데이터 기반의 반려동물 케어 & 커뮤니티 통합 플랫폼**
+# Petory (펫토리)
 
-![Project Status](https://img.shields.io/badge/Status-Active-success) ![Java](https://img.shields.io/badge/Java-17-orange) ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.7-green) ![React](https://img.shields.io/badge/React-19-blue) ![Capacitor](https://img.shields.io/badge/Capacitor-8-blueviolet)
+> **반려동물 통합 플랫폼**
 
----
-
-## 📖 프로젝트 소개
-**Petory**는 반려동물 보호자를 위한 **통합 플랫폼**입니다.
-단순한 정보 공유를 넘어, **위치 기반 서비스 매칭**, **실시간 케어 요청**, 그리고 **데이터 기반의 관리자 대시보드**를 통해 체계적인 반려동물 생태계를 구축하는 것을 목표로 합니다.
+![Status](https://img.shields.io/badge/Status-Active-success) ![Java](https://img.shields.io/badge/Java-17-orange) ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.7-green) ![React](https://img.shields.io/badge/React-19-blue) ![Python](https://img.shields.io/badge/Python-FastAPI-3776AB) ![Capacitor](https://img.shields.io/badge/Capacitor-8-blueviolet)
 
 ---
 
-## 🛠 Tech Stack
+## 프로젝트 소개
 
-### Backend
-- **Core**: Java 17, Spring Boot 3.5.7
-- **Database**: MySQL 8.0 (JPA/Hibernate)
-- **Cache**: Redis
-  - 알림 버퍼링: 최신 알림 50개를 24시간 TTL로 캐싱하여 실시간 조회 성능 향상
-  - 게시글 캐싱: Spring Cache를 통한 게시글 상세 조회 캐싱 (`@Cacheable`)
-  - 이메일 인증: 회원가입 전 이메일 인증 상태 임시 저장 (24시간 TTL)
-- **Security**: Spring Security, JWT (Access Token + Refresh Token)
-- **Build**: Gradle
-- **Scheduling**: Spring Scheduler (@Scheduled)
-- **Async**: Spring Async (@Async)
-- **푸시 알림**: Firebase Admin SDK 9.3.0 (FCM)
+**Petory**는 반려동물 보호자를 위한 웹·모바일 통합 플랫폼입니다. 도메인별 역할은 [포트폴리오](https://makkong1.github.io/makkong1-github.io/portfolio/petory)와 동일하게 정리했습니다.
 
-### Frontend
-- **Framework**: React 19
-- **Styling**: Styled-components
-- **HTTP Client**: Axios
-- **Visualization**: Recharts (Admin Dashboard)
+| 도메인             | 설명                                                                                |
+| ------------------ | ----------------------------------------------------------------------------------- |
+| **User**           | 사용자 인증/인가, 프로필 관리, 반려동물 등록, 제재 시스템                           |
+| **Board**          | 커뮤니티 게시판, 댓글, 좋아요/싫어요, 인기글 스냅샷                                 |
+| **Care**           | 펫케어 요청/지원, 채팅 기반 매칭, 거래 확정, 리뷰 시스템                            |
+| **Missing Pet**    | 실종 동물 신고 및 관리, 위치 기반 검색, 목격 정보 댓글                              |
+| **Location**       | 공공데이터 기반 위치 서비스, 통합 검색, 네이버맵·리뷰                               |
+| **Recommendation** | 커뮤니티·케어·검색어 intent 분석 → 주변서비스 탭 추천 카드 → Location 카테고리 검색 |
+| **Meetup**         | 오프라인 모임 생성/참여, 위치 기반 검색, 상태 관리                                  |
+| **Chat**           | 실시간 채팅, WebSocket(STOMP), 펫케어 거래 확정                                     |
 
-### Mobile
-- **Framework**: Capacitor 8 (Android / iOS WebView 래핑)
-- **토큰 저장**: `@capacitor/preferences` (앱) + localStorage (웹) 하이브리드
-- **푸시 알림**: `@capacitor/push-notifications` + Firebase FCM
-- **빌드**: 동일한 React 코드베이스 → 웹 / Android APK / iOS IPA 동시 지원
+공통으로 **Payment**(펫코인 에스크로), **Notification**(SSE·FCM), **Report**(신고·제재), **Statistics·Admin**(Daily Summary·감사 로그)이 각 도메인과 연동됩니다.
+
+본 프로젝트는 기능 구현 이후, 도메인별로 발생 가능성이 높은 성능·동시성 문제를 가정하고 테스트 코드로 의도적으로 재현한 뒤 **측정 → 개선 → 재검증**을 반복하는 방식으로 진행되었습니다.
 
 ---
 
-## 🌟 핵심 기능 (Key Features)
+## Tech Stack
 
-### 위치 기반 서비스 (LBS)
-- **반경 검색**: MySQL `ST_Distance_Sphere` 함수를 활용한 반경 기반 위치 검색 (미터 단위)
-- **지역 계층 검색**: 시도 > 시군구 > 읍면동 > 도로명 우선순위로 지역별 서비스 검색
-- **거리 계산**: Haversine 공식을 통한 두 좌표 간 거리 계산 (미터 단위)
-- **네이버맵 API 연동**: 
-  - **프론트엔드**: 
-    - 지도 표시 및 마커 표시 - `MapContainer` 컴포넌트 (API 키는 Referer 제한으로 보호)
-    - 시군구 선택 시 자동 확대 (5km 반경, 레벨 7)
-  - **백엔드**: 
-    - 주소-좌표 변환(Geocoding) - `NaverMapService` (`GeocodingController` `/api/geocoding/address`) - API 키 보호, 구독 필요 시 fallback
-    - 좌표-주소 변환(역지오코딩) - `NaverMapService` (`GeocodingController` `/api/geocoding/coordinates`)
-    - 길찾기(Directions API) - `NaverMapService` (`GeocodingController` `/api/geocoding/directions`)
-- **공공데이터 연동**: CSV 배치 업로드를 통한 대량 위치 데이터 수집
-- **캐싱**: 인기 위치 서비스 조회 결과 캐싱 (카테고리별 상위 10개)
+| 영역         | 기술                                                             |
+| ------------ | ---------------------------------------------------------------- |
+| **Backend**  | Java 17, Spring Boot 3.5.7, Spring Security, JPA, Gradle         |
+| **Frontend** | React 19, Styled-components, Axios, Recharts                     |
+| **Mobile**   | Capacitor 8 (Android / iOS), FCM                                 |
+| **NLP**      | Python, FastAPI, `petory-nlp-server` (한국어 반려생활 의도 분석) |
+| **Data**     | MySQL 8.0, Redis                                                 |
+| **Realtime** | WebSocket(STOMP), SSE, Firebase Admin SDK (FCM)                  |
 
-### 펫 케어 & 매칭 (Pet Care)
-- **생애주기 관리**: 요청 -> 지원 -> 매칭 -> 케어 수행 -> 리뷰로 이어지는 전체 프로세스 구현
-- **신뢰 시스템**: 상호 리뷰 및 평점 시스템을 통한 펫시터 검증
-- **상태 관리**: OPEN, IN_PROGRESS, COMPLETED, CANCELLED 상태 전이 로직
-- **채팅 연동**: 케어 요청 생성 시 1:1 채팅방 자동 생성 및 매칭 기반 소통
+### Redis 용도
 
-### 펫코인 결제 (Payment)
-- **에스크로 시스템**: 거래 확정 시 코인 임시 보관 → 거래 완료 시 제공자 지급 / 취소 시 요청자 환불
-- **연동 흐름**: 채팅 거래 확정(ConversationService) → 코인 차감·에스크로 생성 / 상태 변경(CareRequestService) → 완료 시 지급·취소 시 환불 / 스케줄러 자동 완료 시에도 동일 로직
-- **동시성 제어**: 비관적 락(`findByIdForUpdate`, `findByCareRequestForUpdate`)으로 잔액 차감·에스크로 상태 변경·중복 지급/환불 방지
-- **트랜잭션 일관성**: 에스크로 생성·지급·환불 실패 시 상태 변경 롤백, 모든 거래 내역 `pet_coin_transaction` 기록
-- **확장성**: 현재 시뮬레이션 충전, 실제 운영 시 충전 단계만 PG 연동으로 교체 가능  
-
-### 산책 & 오프라인 모임 (Meetup)
-- **모임 생성 및 참여**: 산책 모임 생성, 참여/취소 기능
-- **위치 기반 검색**: Haversine 공식을 활용한 반경 기반 모임 검색 (미터 단위)
-- **인원 관리**: 최대 인원 제한 및 동시성 제어로 정확한 인원 수 관리
-- **상태 관리**: RECRUITING → CLOSED → COMPLETED 상태 전이 로직
-- **채팅 연동**: 모임 생성 시 그룹 채팅방 자동 생성 및 참여자 자동 추가
-- **이메일 인증**: 모임 생성/참여 시 이메일 인증 필수
-
-### 커뮤니티 & 실종 제보
-- **블라인드 처리**: 신고 누적 시 자동으로 콘텐츠를 가리는 유해 콘텐츠 필터링 로직
-- **실종 골든타임**: 지도 기반의 직관적인 실종/목격 위치 공유
-- **Magazine + Smart Grid 레이아웃**: 공지사항, 이미지 게시글, 텍스트 게시글을 크기별로 구분하여 표시
-- **인기 게시글 추적**: 조회수, 반응 수 기반 인기 게시글 스냅샷 생성
-
-### 관리자 대시보드 & 통계 시스템 (Admin Dashboard)
-- **효율적인 데이터 집계**: 실시간 쿼리 부하를 줄이기 위해 `DailyStatistics` 테이블을 설계하여 일별 핵심 지표(가입자, 게시글 등)를 요약 저장
-- **시각화**: Recharts를 활용하여 일별 성장 추이(Line Chart) 및 서비스 활성화 지표(Bar Chart) 시각화
-- **통합 관리**: 신고(Report), 유저, 콘텐츠, 케어 서비스를 한곳에서 제어하는 중앙 집중형 관리자 페이지
-- **감사·설정 영속화**: 관리자 쓰기 행위는 `admin_audit_log`에 기록하고, 마스터 시스템 설정은 `system_config`에 키-값으로 저장
-
-### 알림 시스템 (Notification System)
-- **이중 저장소 전략**:
-    - **Redis**: 최신 알림 50개를 24시간 TTL로 캐싱하여 실시간 조회 속도 극대화
-    - **MySQL**: 모든 알림을 영구 저장하여 이력 관리 및 안정성 보장
-    - **병합 전략**: Redis와 DB 데이터를 병합하여 중복 제거 후 최신순 정렬
-- **다양한 알림 유형**: 댓글, 케어 요청, 실종 제보 등 도메인별 이벤트 트리거 구현
-- **실시간 알림**: SSE(Server-Sent Events)를 통한 실시간 알림 푸시 (앱 열려있을 때)
-- **푸시 알림**: FCM(Firebase Cloud Messaging)을 통한 푸시 알림 (앱 꺼져있을 때)
-  - 백엔드: Firebase Admin SDK → `FcmService.sendToUser()`
-  - 프론트/앱: `@capacitor/push-notifications`로 FCM 토큰 등록 → `POST /api/fcm/token`
-  - DB: `fcm_token` 테이블에 디바이스별 토큰 저장 (ANDROID / IOS)
-
-### 신고 및 제재 시스템 (Report & Sanction System)
-- **다양한 신고 타입**: 게시글, 댓글, 실종 제보, 유저 신고 지원
-- **자동 제재 시스템**: 
-    - 경고 3회 누적 시 자동 이용제한 3일 적용
-    - 관리자 수동 제재 (경고, 이용제한, 영구 차단)
-- **제재 이력 관리**: 모든 제재 이력을 `UserSanction` 테이블에 기록
-- **자동 해제**: 스케줄러를 통한 만료된 이용제한 자동 해제
-- **동시성 제어**: DB 레벨 원자적 증가 쿼리로 여러 관리자가 동시에 경고 부여 시에도 경고 횟수 정확성 보장
-
-### 채팅 시스템 (Chat System)
-- **실시간 통신**: WebSocket (STOMP) 기반 실시간 메시지 전송
-- **다양한 채팅 유형**: 1:1 채팅, 그룹 채팅 지원
-- **자동 채팅방 생성**: 펫 케어 요청/모임 생성 시 채팅방 자동 생성 및 참여자 자동 추가
-- **읽음 상태 관리**: 메시지 읽음/안 읽음 상태 추적
-- **역할 관리**: 채팅방 내 역할 기반 권한 관리 (케어 요청자/지원자, 모임 호스트/참여자)
+- 알림 최신 50건 캐시 (TTL 24h)
+- 게시글 상세 `@Cacheable`
+- 회원가입 전 이메일 인증 임시 저장 (TTL 24h)
+- Location 검색 NLP **중복 호출 방지** (user + keyword TTL)
 
 ---
 
-## 🏗️ System Architecture & Strategy
+## 핵심 기능
 
-### 📊 통계 데이터 처리 전략
-> **Problem**: 데이터가 누적될수록 `COUNT(*)` 기반의 실시간 통계 쿼리는 DB 성능에 영향을 줄 수 있습니다.
->
-> **Solution**: **[Daily Summary Pattern]**
-> 매일 자정 배치 작업을 통해 전날의 데이터를 집계하여 `DailyStatistics` 테이블에 요약 저장합니다. 이를 통해 데이터 양이 늘어나도 대시보드 조회 성능을 일정하게 유지합니다.
+### Recommendation — 의도 기반 추천 카드
 
-### 🔔 알림 시스템 아키텍처
-> **Strategy**: 알림은 생성 직후 조회가 빈번하고, 일정 시간이 지나면 조회 빈도가 낮아지는 특성이 있습니다.
-> 따라서 Redis를 캐시로 사용하여 최신 알림 조회 성능을 높이고, DB 부하를 분산시키는 구조를 채택했습니다.
+별도 장소 목록 API 없이, **볼 카테고리만 제안**하고 클릭 시 Location 검색으로 이어집니다.
 
-### 🔐 인증 및 보안 아키텍처
-- **JWT 기반 인증**: Access Token (15분) + Refresh Token (1일) 이중 토큰 전략
-- **소셜 로그인**: OAuth2 기반 Google, Naver 로그인 지원
-  - 일반 로그인과 동일한 JWT 토큰 발급 방식
-  - 기존 계정과 소셜 계정 자동 연결 (이메일 기반)
-  - 소셜 로그인 사용자는 자동으로 이메일 인증 완료 처리
-- **Spring Security**: Method-level Security (`@PreAuthorize`)를 통한 세밀한 권한 제어
-- **Role 기반 접근 제어**: USER, SERVICE_PROVIDER, ADMIN, MASTER 역할 구분
-- **제재된 유저 로그인 차단**: 로그인 시 유저 상태(ACTIVE, SUSPENDED, BANNED) 확인
+```
+커뮤니티 글 / 케어 요청 / 주변서비스 검색어
+  → Spring Event (@Async, petIntentExecutor)
+  → petory-nlp-server POST /api/pet-intent/analyze
+  → user_pet_intent_signal 저장 (원문 미저장, TTL 7일)
+  → GET /api/pet-recommend/signals → 추천 카드
+  → 클릭 시 /api/location-services/search?category=...
+```
 
-### ✉️ 이메일 인증 시스템 아키텍처
-> **핵심 원칙**: 이메일 인증은 **하나의 통합 시스템**으로 구현하며, 용도(purpose)만 분리합니다.
->
-> **구현 전략**:
-> 1. **단일 인증 토큰 생성**: 이메일 인증 링크에 포함된 토큰은 하나의 표준 형식
-> 2. **용도(Purpose) 분리**: 토큰에 `purpose` 파라미터 포함 (PASSWORD_RESET, PET_CARE, MEETUP 등)
-> 3. **서비스 레벨 권한 체크**: 각 서비스(펫케어, 모임 등)에서 `emailVerified` 필드 확인
-> 4. **통합 인증 처리**: 인증 링크 클릭 시 `emailVerified = true`로 업데이트 (용도 무관)
-> 5. **회원가입 전 인증 지원**: Redis를 활용하여 회원가입 전 이메일 인증 상태 임시 저장 (24시간 TTL)
->
-> **권한 정책**:
-> - **1단계 (로그인만)**: 모든 조회, 게시글/댓글 작성 (유입용, 참여 유도용)
-> - **2단계 (이메일 인증 필수)**: 게시글/댓글 수정/삭제, 실종 제보, 리뷰 작성, 모임/펫케어 서비스, 비밀번호 변경 (책임 있는 행동)
->
-> **특징**:
-> - 소셜 로그인 사용자는 자동으로 이메일 인증 완료 (Google: `email_verified`, Naver: 기본 `true`)
-> - 일반 회원가입 사용자는 이메일 인증 링크 클릭 필요
-> - 회원가입 전 이메일 인증 가능 (Redis에 임시 저장 후 회원가입 시 적용)
+- Python **rule + embedding** hybrid 분류, confidence 2단계 필터 (Python 0.45 / Spring 0.60)
+- Board·Care는 `@TransactionalEventListener(AFTER_COMMIT)` — 본 트랜잭션과 분리
+- NLP·Redis·실행 풀 장애 시 **게시·케어·검색은 정상** (부가 기능 우선 축소)
 
+→ 상세: [`docs/domains/recommendation.md`](./docs/domains/recommendation.md)
 
-### 📁 파일 관리 시스템
-- **통합 파일 관리**: `AttachmentFile` 엔티티를 통한 모든 도메인의 파일 통합 관리
-- **타입별 분리**: BOARD, COMMENT, MISSING_PET 등 타입별 파일 분리 저장
-- **동기화 메커니즘**: 게시글/댓글 생성/수정 시 파일 자동 동기화
+### Location — 주변 서비스
+
+- **통합 검색** `GET /api/location-services/search`: 위치 반경 → 지역 계층 → FULLTEXT → 전체 평점순
+- `ST_Distance_Sphere` 반경 검색, 카테고리·키워드 SQL `WHERE` 일원화
+- 네이버맵 Geocoding / 역지오코딩 / 길찾기 (백엔드 프록시)
+- 공공 CSV 배치 임포트, 리뷰·평점
+- UX: **「이 지역 검색」** — 지도 이동만으로는 API 재호출하지 않음
+
+→ 상세: [`docs/domains/location.md`](./docs/domains/location.md)
+
+### Care · Payment · Meetup · Chat
+
+- **Care**: OPEN → IN_PROGRESS → COMPLETED 상태, 케어 요청 시 1:1 채팅방 자동 생성
+- **Payment**: 펫코인 에스크로, 비관적 락, Care/Chat 거래 확정 연동
+- **Meetup**: 반경 검색, 인원 원자적 증가, 그룹 채팅
+- **Chat**: STOMP 실시간, 읽음 상태, 역할 기반 참여
+
+### Board · Missing Pet · Report
+
+- Magazine + Smart Grid, 인기 게시글 스냅샷, FULLTEXT 검색
+- 실종 제보·목격 댓글, 지도 기반 UX
+- 신고 누적 블라인드, 경고 3회 자동 이용제한, `UserSanction` 이력
+
+### Notification · Admin · Statistics
+
+- Redis + MySQL 이중 저장, SSE 실시간 + FCM 푸시
+- `DailyStatistics` 자정 배치 (Daily Summary Pattern)
+- `admin_audit_log`, `system_config`, Recharts 대시보드
 
 ---
 
-## 📂 Project Structure
+## 아키텍처 요약
+
+| 주제         | 방식                                                               |
+| ------------ | ------------------------------------------------------------------ |
+| **인증**     | JWT Access(기본 15분) + Refresh(1일, DB), OAuth2(Google/Naver)     |
+| **권한**     | `@PreAuthorize`, USER → SERVICE_PROVIDER → ADMIN → MASTER          |
+| **트랜잭션** | Service 레이어 `@Transactional`, 읽기 전용 기본                    |
+| **동시성**   | 펫코인·에스크로 비관적 락, 경고·모임 인원 DB 원자적 증가, ShedLock |
+| **NLP 부하** | `petIntentExecutor` 전용 풀, Location 검색 2단 필터, fail-closed   |
+| **캐시**     | Redis 알림·게시글·이메일 인증, Spring Cache                        |
+
+---
+
+## 프로젝트 구조
 
 ```
 Petory/
-├── android/                          # Capacitor Android 프로젝트 (cap sync로 생성)
-├── ios/                              # Capacitor iOS 프로젝트 (cap sync로 생성)
-├── capacitor.config.json             # Capacitor 설정 (appId, webDir 등)
-├── backend/
-│   └── main/
-│       ├── java/com/linkup/Petory/
-│       │   ├── domain/              # 도메인별 패키지
-│       │   │   ├── activity/        # 활동 통계
-│       │   │   ├── board/           # 커뮤니티 게시판
-│       │   │   ├── care/            # 펫 케어 서비스
-│       │   │   ├── chat/            # 채팅 시스템
-│       │   │   ├── location/        # 위치 기반 서비스
-│       │   │   ├── meetup/          # 모임 서비스
-│       │   │   ├── notification/    # 알림 시스템
-│       │   │   │   ├── controller/  # NotificationController, FcmTokenController
-│       │   │   │   ├── service/     # NotificationService, FcmService, NotificationSseService
-│       │   │   │   └── entity/      # Notification, FcmToken
-│       │   │   ├── report/          # 신고 관리
-│       │   │   ├── payment/         # 펫코인 결제
-│       │   │   ├── statistics/      # 통계/대시보드
-│       │   │   ├── user/            # 유저 관리
-│       │   │   └── file/            # 파일 관리
-│       │   ├── filter/              # JwtAuthenticationFilter
-│       │   ├── global/              # 전역 설정
-│       │   │   ├── config/          # FirebaseConfig, SecurityConfig 등
-│       │   │   ├── exception/       # GlobalExceptionHandler
-│       │   │   └── common/          # 공통 응답 DTO
-│       │   └── util/                # JwtUtil 등 유틸리티
-│       └── resources/
-│           ├── application.properties
-│           ├── firebase-service-account.json  # gitignore — 로컬에만 보관
-│           └── sql/migration/               # SQL 마이그레이션 스크립트
-└── frontend/
-    └── src/
-        ├── components/               # React 컴포넌트
-        ├── api/                      # Axios API 모듈
-        │   ├── apiClient.js          # Axios 인스턴스, API_ROOT
-        │   ├── tokenStorage.js       # 하이브리드 토큰 저장 (웹/앱)
-        │   └── pushNotifications.js  # FCM 토큰 등록
-        ├── contexts/                 # React Context (Auth, Theme)
-        └── styles/                   # 테마 설정
+├── backend/main/java/com/linkup/Petory/
+│   ├── domain/
+│   │   ├── activity/          # 활동 통계
+│   │   ├── admin/             # 관리자·감사·시스템 설정
+│   │   ├── board/             # 커뮤니티·실종 제보
+│   │   ├── care/              # 펫 케어
+│   │   ├── chat/              # 채팅
+│   │   ├── location/          # 주변 서비스
+│   │   ├── meetup/            # 모임
+│   │   ├── notification/      # 알림·FCM
+│   │   ├── payment/           # 펫코인
+│   │   ├── petRecommendation/ # 의도 signal·추천 API
+│   │   ├── report/            # 신고·제재
+│   │   ├── statistics/        # 일별·월별 통계
+│   │   ├── user/              # 인증·유저·OAuth
+│   │   └── file/              # 첨부 파일
+│   ├── filter/                # JwtAuthenticationFilter
+│   ├── global/                # SecurityConfig, 예외, 공통 DTO
+│   └── util/
+├── backend/main/resources/
+│   └── sql/migration/         # DDL·마이그레이션
+├── frontend/src/              # React SPA (+ Capacitor webDir)
+├── petory-nlp-server/         # FastAPI NLP (port 8000)
+│   └── app/                   # intent_classifier, rules, data/
+├── android/ · ios/            # Capacitor 네이티브 프로젝트
+└── docs/                      # 도메인·아키텍처·리팩토링 문서
 ```
 
 ---
 
-## 🗄️ 데이터베이스 설계 핵심
+## 빠른 시작
 
-### 주요 메인 도메인 엔티티
-- **Users**: 유저 정보, 역할(ROLE), 제재 상태(ACTIVE/SUSPENDED/BANNED)
-- **UserSanction**: 유저 제재 이력 (경고, 이용제한, 영구 차단)
-- **Pet**: 유저의 반려동물
-- **Board**: 커뮤니티 게시글 (카테고리, 상태, 조회수, 반응 수)
-- **Comment**: 댓글 (게시글/실종제보 댓글 통합 관리)
-- **MissingPet**: 실종 제보
-- **CareRequest**: 펫 케어 요청 (상태, 위치, 기간)
-- **LocationService**: 위치 기반 서비스 (POINT 타입으로 좌표 저장)
-- **Meetup**: 모임(산책/오프라인 등) 정보 및 참가자
-- **Chat/Conversation**: 채팅 대화방 및 메시지
-- **PetCoinTransaction / PetCoinEscrow**: 펫코인 거래 내역, 에스크로 (거래 확정 시 HOLD → 완료 시 RELEASED / 취소 시 REFUNDED)
-- **Notification**: 알림 (타입별 분류, 읽음 상태)
-- **FcmToken**: FCM 디바이스 토큰 (ANDROID/IOS, UNIQUE, 유저별 다중 디바이스)
-- **Report**: 신고 (타입별 분류, 처리 상태)
-- **DailyStatistics**: 일별 통계 요약 (배치 작업으로 집계)
-- **AdminAuditLog** (`admin_audit_log`): 관리자 감사 로그 (행위 코드, 대상 타입·idx, 시각순 조회용 인덱스)
-- **SystemConfig** (`system_config`): 시스템 설정 키-값 (`config_key` UNIQUE, `BaseTimeEntity`로 생성·수정 시각)
+### 필수 서비스
 
-### 인덱스 전략
-- **공간 인덱스**: `LocationService`의 `location` 필드에 SPATIAL INDEX 적용
-- **복합 인덱스**: `(target_type, target_idx, reporter_idx)` 등 자주 조회되는 조합에 인덱스 적용
-- **타임스탬프 인덱스**: 생성일 기준 정렬이 빈번한 테이블에 인덱스 적용
+| 서비스       | 기본                          | 비고                |
+| ------------ | ----------------------------- | ------------------- |
+| MySQL 8.0+   | `localhost:3306`, DB `petory` |                     |
+| Redis        | `localhost:6379`              |                     |
+| Python 3.10+ | NLP 서버용                    | `petory-nlp-server` |
 
----
+### 설정
 
-## 🔒 보안 구현
+`backend/main/resources/application.properties`는 gitignore입니다. 로컬에서 직접 생성:
 
-### JWT 인증
-- **Access Token**: 15분 유효기간, 모든 API 요청에 포함
-- **Refresh Token**: 1일 유효기간, DB에 저장하여 관리
-- **토큰 갱신**: Refresh Token으로 Access Token 자동 갱신
+- `spring.datasource.*` — DB 연결
+- `jwt.secret` (필수), `jwt.access-token-expiration-ms` (선택)
+- OAuth2 클라이언트 등록 (더미값이라도 필수)
+- Redis: `spring.redis.host` / `spring.redis.port`
+- NLP: `app.pet-intent.base-url=http://localhost:8000` (선택)
+- `spring.profiles.active=dev` — 이메일 인증 스킵
 
-### 권한 제어
-- **@PreAuthorize**: 메서드 레벨 권한 제어
-  - `hasAnyRole('ADMIN','MASTER')`: 관리자 전용
-  - `isAuthenticated()`: 로그인 사용자 전용
-- **Role 계층**: USER < SERVICE_PROVIDER < ADMIN < MASTER
+### 실행
 
-### 제재 시스템
-- **로그인 차단**: 제재된 유저(BANNED, SUSPENDED)는 로그인 불가
-- **자동 해제**: 스케줄러를 통한 만료된 이용제한 자동 해제
-
----
-
-## ⚡ 성능 최적화 전략
-
-### 캐싱 전략
-- **알림 버퍼링**: Redis에 최신 알림 50개를 24시간 TTL로 저장하여 실시간 조회 성능 향상
-- **게시글 캐싱**: `@Cacheable`을 통한 게시글 상세 조회 캐싱 (Redis 기반)
-- **이메일 인증**: 회원가입 전 이메일 인증 상태를 Redis에 임시 저장 (24시간 TTL)
-- **캐시 키 전략**: `notification:{userId}`, `boardDetail:{boardId}`, `email_verification:pre_registration:{email}` 등 도메인별 키 분리
-
-### 배치 작업
-- **일별 통계 집계**: 매일 자정 `DailyStatistics` 테이블 업데이트
-- **인기 게시글 스냅샷**: 주기적으로 인기 게시글 스냅샷 생성
-- **만료 제재 해제**: 매일 자정 만료된 이용제한 자동 해제
-
-### 쿼리 최적화
-- **공간 인덱스**: 위치 기반 검색 성능 향상
-- **페이징 처리**: 대량 데이터 조회 시 페이징 적용
-- **지연 로딩**: `@ManyToOne(fetch = FetchType.LAZY)` 적용
-- **N+1 문제 해결**: IN 절을 활용한 배치 조회 (500개 단위)
-  - 효과: 1000개 게시글 기준 2001개 쿼리 → 3개 쿼리로 감소 (99.8% 개선)
-
----
-
-## 🔄 트랜잭션 관리 & 동시성 제어
-
-### 트랜잭션 전략
-- **@Transactional**: Service 레이어에서 트랜잭션 경계 명확히 설정
-- **읽기 전용 최적화**: `@Transactional(readOnly = true)` 기본값으로 설정 후 쓰기 작업만 명시
-- **격리 수준**: 기본값(REPEATABLE_READ) 사용, 필요 시 명시적 설정
-- **롤백 정책**: RuntimeException 발생 시 자동 롤백
-
-### 동시성 제어 전략
-- **DB 레벨 제약**: Unique Constraint로 중복 방지 (반응, 신고, 소셜 로그인 등)
-- **원자적 증가**: `@Modifying @Query`로 동시성 문제 해결 (경고 횟수 등)
-- **조회수 중복 방지**: `BoardViewLog`를 통한 사용자별 1회 조회 제한
-- **스케줄러 중복 실행 방지**: ShedLock을 통한 분산 환경 대응
-
-### 주요 해결 사례
-- **게시글 삭제 시 댓글 일괄 삭제**: 트랜잭션으로 원자성 보장
-- **댓글 추가 시 게시글 카운트 동기화**: 트랜잭션 내에서 원자적 처리
-- **제재 시스템 경고 횟수**: DB 레벨 원자적 증가 쿼리로 Lost Update 방지
-- **모임 참여 인원 관리**: DB 레벨 원자적 증가 쿼리로 최대 인원 초과 방지
-- **소셜 로그인 중복 계정**: DB UNIQUE 제약조건 + 트랜잭션으로 Race Condition 방지
-- **펫코인 결제**: 비관적 락으로 잔액 차감·에스크로 상태 변경·에스크로 조회 시 Race Condition 방지, 지급/환불 실패 시 상태 변경 롤백
-
----
-
-## 🚀 개발 환경 설정
-
-### 필수 요구사항
-- Java 17+
-- MySQL 8.0+
-- Redis 6.0+
-- Gradle 7.0+
-
-### 모바일 빌드
 ```bash
-# 프론트엔드 빌드 후 앱에 동기화
-cd frontend && npm run build
-npx --prefix frontend cap sync android
-npx --prefix frontend cap sync ios
+# 1. NLP 서버 (추천 카드·signal 사용 시)
+cd petory-nlp-server
+python -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+PYTHONPATH=. uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 
-# 또는 루트 스크립트로
-npm run cap:sync:android
-npm run cap:sync:ios
+# 2. Backend (루트, port 8080)
+./gradlew bootRun --args='--spring.profiles.active=dev'
+
+# 3. Frontend (port 3000 → proxy 8080)
+cd frontend && npm install && npm start
 ```
 
-- Android: `npm run cap:open:android` → Android Studio에서 빌드/실행
-- iOS: `npm run cap:open:ios` → Xcode에서 빌드/실행
-- FCM 사용 시: `backend/main/resources/firebase-service-account.json` 필요 (Firebase Console에서 발급)
+### 빌드·테스트
+
+```bash
+./gradlew compileJava
+./gradlew test                    # MySQL + Redis 필요
+cd frontend && npm run build && npm test
+```
+
+### DB migration (추천 기능)
+
+```bash
+# user_pet_intent_signal 등
+mysql petory < backend/main/resources/sql/migration/user-pet-intent-signal-table.sql
+```
+
+### 모바일 (Capacitor)
+
+```bash
+cd frontend && npm run build
+npm run cap:sync:android   # 또는 cap:sync:ios (루트 package.json)
+npm run cap:open:android
+```
+
+FCM 사용 시 `backend/main/resources/firebase-service-account.json` 필요 — [`docs/deployment/09-mobile-capacitor.md`](./docs/deployment/09-mobile-capacitor.md)
 
 ---
 
-## 📚 상세 문서
+## 주요 엔티티
 
-### 도메인별 백엔드 성능 최적화 리팩토링
-- [Board](./docs/refactoring/board/board-backend-performance-optimization.md) - N+1, 메모리 페이징, Admin 필터링
-- [User](./docs/refactoring/user/user-backend-performance-optimization.md) - Auth 중복 조회, Admin 삭제, SocialUsers N+1
-- [Payment](./docs/refactoring/payment/payment-backend-performance-optimization.md) - 펫코인 Race Condition, DB 페이징, N+1
-- [Meetup](./docs/refactoring/meetup/meetup-backend-performance-optimization.md) - 인근 모임 인메모리 필터링, 참여자 N+1
-
-### 백엔드 아키텍처
-- [전체 아키텍처 문서](./docs/architecture/전체%20아키텍처.md) - 시스템 전체 구조, 도메인 아키텍처, 공통 인프라
-- [트랜잭션 관리 & 동시성 제어 사례](./docs/concurrency/transaction-concurrency-cases.md) - 실제 코드 기반 사례
-
-### 도메인별 알고리즘 (핵심 비즈니스 로직)
-- [알고리즘 개요](./docs/algorithm/00-algorithm-overview.md) - 계산·검색·상태 전이·규칙 기반 로직 정리
-- [위치](./docs/algorithm/location/위치-알고리즘.md) - Haversine, 지역 계층 검색, ST_Distance_Sphere
-- [케어](./docs/algorithm/care/케어-알고리즘.md), [펫코인](./docs/algorithm/payment/펫코인-알고리즘.md) - 에스크로, 상태 전이
-- [모임](./docs/algorithm/meetup/모임-알고리즘.md) - 반경 검색, 인원 원자적 증가
-- [커뮤니티](./docs/algorithm/board/커뮤니티-알고리즘.md) - 인기 게시글 점수
-- [제재](./docs/algorithm/user/제재-알고리즘.md), [통계](./docs/algorithm/statistics/통계-알고리즘.md), [알림](./docs/algorithm/notification/알림-알고리즘.md)
-
-### 도메인별 아키텍처 문서
-각 도메인별 상세 아키텍처, **비즈니스 로직 흐름**, API 엔드포인트를 포함합니다.
-
-- [커뮤니티 & 실종 제보 아키텍처](./docs/architecture/커뮤니티%20&%20실종%20제보%20아키텍처.md) - 게시글/댓글 작성·수정·삭제, 실종 제보, 블라인드 처리, 반응(좋아요/싫어요) 등의 로직 흐름
-- [펫 케어 & 매칭 아키텍처](./docs/architecture/펫%20케어%20&%20매칭%20아키텍처.md) - 케어 요청 생성·수정·삭제, 채팅 기반 매칭, 리뷰 작성, 상태 변경 등의 로직 흐름
-- [Payment 도메인 (펫코인 결제)](./docs/domains/payment.md) - 에스크로 흐름, Care/Chat 연동, 동시성 제어(비관적 락), 트랜잭션·롤백 정책
-- [펫케어 코인 관련 흐름](./docs/architecture/펫케어%20코인%20관련%20흐름.md) - 펫코인 결제·에스크로 흐름 다이어그램 및 시나리오
-- [위치 기반 서비스 아키텍처](./docs/architecture/위치%20기반%20서비스%20아키텍처.md) - 지역 계층 검색, 지오코딩/역지오코딩, 길찾기, 리뷰 작성 및 평점 업데이트, 거리 계산 등의 로직 흐름
-- [산책 & 오프라인 모임 아키텍처](./docs/architecture/산책%20&%20오프라인%20모임%20아키텍처.md) - 모임 생성·참여·취소, 반경 기반 검색, 채팅방 자동 생성, 동시성 제어 등의 로직 흐름
-- [채팅 시스템 아키텍처](./docs/architecture/채팅%20시스템%20설계.md) - 채팅방 생성·나가기·삭제, 메시지 전송·조회·읽음 처리, 펫케어 거래 확정, 재참여 처리 등의 로직 흐름
-- [알림 시스템 아키텍처](./docs/architecture/알림%20시스템%20아키텍처.md) - 알림 생성·조회·병합(Redis+MySQL), SSE 실시간 알림, 읽음 처리 등의 로직 흐름
-- [관리자 대시보드 & 통계 시스템 아키텍처](./docs/architecture/관리자%20대시보드%20&%20통계%20시스템%20아키텍처.md) - 일별 통계 집계(스케줄러), 실시간 통계 계산, 과거 데이터 초기화(Backfill) 등의 로직 흐름
-- [신고 및 제재 시스템 아키텍처](./docs/architecture/신고%20및%20제재%20시스템%20아키텍처.md) - 신고 생성·처리, 경고 추가 및 자동 이용제한, 만료된 이용제한 자동 해제, 동시성 제어 등의 로직 흐름
-- [이메일 인증 시스템 아키텍처](./docs/architecture/이메일%20인증%20시스템%20아키텍처.md)
-
-### 공통 인프라 문서
-- [Redis 캐싱 전략](./docs/architecture/Redis_캐싱_전략.md)
-- [위치서비스 공공데이터 CSV 배치 임포트](./docs/architecture/위치서비스_공공데이터_CSV_배치_임포트_구현.md)
-- [모바일 앱 & FCM 가이드](./docs/deployment/09-mobile-capacitor.md) - Capacitor 구조, FCM 설정, 빌드/배포, 보안
+| 엔티티                                  | 설명                             |
+| --------------------------------------- | -------------------------------- |
+| `Users`, `Pet`, `UserSanction`          | 유저·반려동물·제재               |
+| `Board`, `Comment`, `MissingPet`        | 커뮤니티·실종                    |
+| `CareRequest`, `CareApplication`        | 펫 케어                          |
+| `LocationService`                       | 주변 시설 (POINT, SPATIAL INDEX) |
+| `UserPetIntentSignal`                   | 추천 intent signal (원문 미저장) |
+| `Meetup`, `Conversation`, `ChatMessage` | 모임·채팅                        |
+| `PetCoinTransaction`, `PetCoinEscrow`   | 펫코인                           |
+| `Notification`, `FcmToken`              | 알림·푸시                        |
+| `DailyStatistics`, `AdminAuditLog`      | 통계·감사                        |
 
 ---
 
-## 📝 라이선스
-이 프로젝트는 개인 포트폴리오 프로젝트입니다.
+## 문서
+
+### 도메인
+
+[`docs/domains/`](./docs/domains/) — board, care, location, **recommendation**, payment, chat, meetup, user, notification, report, statistics, admin 등
+
+### Recommendation (2026-05)
+
+- [도메인 개요](./docs/domains/recommendation.md)
+- [리팩토링 백로그](./docs/refactoring/petRecommendation/pet-recommendation-refactoring-2026-05-31.md)
+- [버그·보안](./docs/troubleshooting/petRecommendation/pet-recommendation-bugs-2026-05-31.md)
+- [NLP 호출·부하 정책](./docs/refactoring/petRecommendation/pet-recommendation-nlp-traffic-policy-2026-05-31.md)
+
+### 아키텍처·알고리즘
+
+- [전체 아키텍처](./docs/architecture/전체%20아키텍처.md)
+- [위치 기반 서비스](./docs/architecture/위치%20기반%20서비스%20아키텍처.md)
+- [트랜잭션·동시성 사례](./docs/concurrency/transaction-concurrency-cases.md)
+- [알고리즘 개요](./docs/algorithm/00-algorithm-overview.md)
+
+### 성능 리팩토링
+
+- [Board](./docs/refactoring/board/board-backend-performance-optimization.md)
+- [User](./docs/refactoring/user/user-backend-performance-optimization.md)
+- [Payment](./docs/refactoring/payment/payment-backend-performance-optimization.md)
+- [Meetup](./docs/refactoring/meetup/meetup-backend-performance-optimization.md)
+
+### 에이전트·개발 규격
+
+- [`CLAUDE.md`](./CLAUDE.md) · [`AGENTS.md`](./AGENTS.md) · [`docs/AGENT_TOOLING.md`](./docs/AGENT_TOOLING.md)
 
 ---
 
-## 👨‍💻 개발자
-백엔드 개발자 포트폴리오 프로젝트
+## 라이선스
+
+개인 포트폴리오 프로젝트입니다.
