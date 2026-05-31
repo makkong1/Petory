@@ -1,0 +1,18 @@
+{
+  "task": "nlp-traffic-policy",
+  "description": "NLP 호출 정책 개선 — petIntentExecutor bounded 스레드 풀 + LocationSearch 호출 조건 필터(자연어 판단 + Redis TTL dedup)",
+  "steps": [
+    {
+      "step": 1,
+      "name": "petIntentExecutor — bounded ThreadPoolTaskExecutor 분리",
+      "status": "completed",
+      "summary": "PetIntentAsyncConfig(core=2,max=6,queue=500,DiscardWithWarnPolicy) 생성, @Async(\"petIntentExecutor\") 적용"
+    },
+    {
+      "step": 2,
+      "name": "LocationSearch NLP 호출 조건 필터 — 자연어 판단 + Redis TTL dedup",
+      "status": "completed",
+      "summary": "isNaturalLanguage(length>=7+공백), normalize, Redis setIfAbsent TTL 10분, fail-closed 정책 적용. 테스트 32/32 통과"
+    }
+  ]
+}
