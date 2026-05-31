@@ -1,4 +1,5 @@
-from fastapi import APIRouter
+import logging
+from fastapi import APIRouter, HTTPException
 from app.schemas.request import PetIntentAnalyzeRequest
 from app.schemas.response import PetIntentAnalyzeResponse, IntentDomain, Urgency
 from app.nlp.intent_classifier import classify
@@ -8,16 +9,22 @@ from app.rules.category_rules import get_categories, get_suggested_categories
 from app.rules.urgency_rules import judge_urgency
 from app.config import settings
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/pet-intent", tags=["pet-intent"])
 
 MEDICAL_SAFETY_MSG = "정확한 진단은 수의사 상담이 필요합니다. 증상이 심하거나 지속된다면 가까운 동물병원에 문의하세요."
 
 @router.post("/analyze", response_model=PetIntentAnalyzeResponse)
 def analyze(req: PetIntentAnalyzeRequest):
-    intent, domain, confidence = classify(req.text)
-    keywords = extract_keywords(req.text)
-    intent_tags = extract_tags(req.text, domain)
-    urgency = judge_urgency(req.text, domain)
+    try:
+        intent, domain, confidence = classify(req.text)
+        keywords = extract_keywords(req.text)
+        intent_tags = extract_tags(req.text, domain)
+        urgency = judge_urgency(req.text, domain)
+    except Exception as e:
+        logger.error("NLP 분석 실패 text_len=%d error=%s", len(req.text or ""), str(e), exc_info=True)
+        raise HTTPException(status_code=500, detail="의도 분석 중 오류가 발생했습니다.")
 
     if confidence < settings.confidence_threshold:
         return PetIntentAnalyzeResponse(
