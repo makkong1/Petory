@@ -1,5 +1,6 @@
 package com.linkup.Petory.domain.user.entity;
 
+import com.linkup.Petory.domain.common.BaseTimeEntity;
 import java.time.LocalDateTime;
 
 import jakarta.persistence.*;
@@ -12,7 +13,7 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class UserSanction {
+public class UserSanction extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -45,12 +46,8 @@ public class UserSanction {
     @Column(name = "report_idx")
     private Long reportIdx; // 관련 신고 ID (nullable)
 
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
-
     @PrePersist
     protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
         if (this.startsAt == null) {
             this.startsAt = LocalDateTime.now();
         }

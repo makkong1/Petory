@@ -34,7 +34,6 @@ public class FileConverter {
                 .targetIdx(dto.getTargetIdx())
                 .filePath(dto.getFilePath())
                 .fileType(dto.getFileType())
-                .createdAt(dto.getCreatedAt())
                 .build();
     }
 

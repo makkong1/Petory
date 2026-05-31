@@ -27,7 +27,6 @@ public class PlaceInteractionService {
                 .userIdx(userIdx)
                 .locationIdx(locationIdx)
                 .interactionType(interactionType)
-                .createdAt(LocalDateTime.now())
                 .build());
     }
 

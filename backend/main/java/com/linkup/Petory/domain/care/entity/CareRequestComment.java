@@ -1,5 +1,6 @@
 package com.linkup.Petory.domain.care.entity;
 
+import com.linkup.Petory.domain.common.BaseTimeEntity;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
@@ -19,7 +20,7 @@ import com.linkup.Petory.domain.user.entity.Users;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class CareRequestComment {
+public class CareRequestComment extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -39,8 +40,6 @@ public class CareRequestComment {
     @Lob
     private String content;
 
-    private LocalDateTime createdAt;
-
     @Column(name = "is_deleted")
     @Builder.Default
     private Boolean isDeleted = false;
@@ -48,8 +47,4 @@ public class CareRequestComment {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
-    @PrePersist
-    protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
-    }
 }

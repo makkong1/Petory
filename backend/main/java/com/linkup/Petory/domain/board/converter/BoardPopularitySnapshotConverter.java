@@ -53,7 +53,6 @@ public class BoardPopularitySnapshotConverter {
         snapshot.setLikeCount(dto.likeCount());
         snapshot.setCommentCount(dto.commentCount());
         snapshot.setViewCount(dto.viewCount());
-        snapshot.setCreatedAt(dto.createdAt());
         return snapshot;
     }
 
