@@ -24,7 +24,6 @@ public class LocationService {
     private String name;
 
     // 카테고리 필드 제거됨 - category3, category2, category1 사용
-
     // 카테고리 계층 구조
     @Column(name = "category1", length = 100)
     private String category1; // 카테고리1 (대분류)
@@ -58,12 +57,16 @@ public class LocationService {
     /**
      * 위도·경도 — 애플리케이션·DTO·적재(PublicData 등)의 기준 필드.
      * <p>
-     * 반경 검색용 네이티브 쿼리({@link com.linkup.Petory.domain.location.repository.SpringDataJpaLocationServiceRepository#findByRadius})
-     * 는 DB 컬럼 {@code location} (POINT SRID 4326)에 대해 {@code ST_Within}, {@code ST_Distance_Sphere}를 사용합니다.
-     * 엔티티에는 POINT를 매핑하지 않으며(Hibernate Spatial 미도입), 스키마·백필·공간 인덱스는
-     * {@code docs/migration/db/index/location/locationservice_spatial_index.sql} 를 따릅니다.
+     * 반경 검색용 네이티브
+     * 쿼리({@link com.linkup.Petory.domain.location.repository.SpringDataJpaLocationServiceRepository#findByRadius})
+     * 는 DB 컬럼 {@code location} (POINT SRID 4326)에 대해 {@code ST_Within},
+     * {@code ST_Distance_Sphere}를 사용합니다. 엔티티에는 POINT를 매핑하지 않으며(Hibernate
+     * Spatial 미도입), 스키마·백필·공간 인덱스는
+     * {@code docs/migration/db/index/location/locationservice_spatial_index.sql}
+     * 를 따릅니다.
      * <p>
-     * 과거 주석의 {@code coordinates} 명칭은 본 테이블 설계와 일치하지 않습니다. 실제 공간 컬럼명은 {@code location} 입니다.
+     * 과거 주석의 {@code coordinates} 명칭은 본 테이블 설계와 일치하지 않습니다. 실제 공간 컬럼명은
+     * {@code location} 입니다.
      */
     private Double latitude;
     private Double longitude;
@@ -128,12 +131,18 @@ public class LocationService {
     private String tags;
 
     @Transient
+    @SuppressWarnings("UseSpecificCatch")
     public java.util.List<String> getTagList() {
-        if (tags == null || tags.isBlank()) return java.util.List.of();
+        if (tags == null || tags.isBlank()) {
+            return java.util.List.of();
+        }
         try {
             return new com.fasterxml.jackson.databind.ObjectMapper()
-                    .readValue(tags, new com.fasterxml.jackson.core.type.TypeReference<java.util.List<String>>() {});
-        } catch (Exception e) { return java.util.List.of(); }
+                    .readValue(tags, new com.fasterxml.jackson.core.type.TypeReference<java.util.List<String>>() {
+                    });
+        } catch (Exception e) {
+            return java.util.List.of();
+        }
     }
 
     @Column(name = "last_updated")
@@ -157,10 +166,8 @@ public class LocationService {
     // 필요시 DB에 컬럼 추가 후 활성화
     // @Column(name = "created_at", nullable = false, updatable = false)
     // private LocalDateTime createdAt;
-
     // @Column(name = "updated_at", nullable = false)
     // private LocalDateTime updatedAt;
-
     @OneToMany(mappedBy = "service", cascade = CascadeType.ALL)
     private List<LocationServiceReview> reviews;
 
@@ -171,7 +178,6 @@ public class LocationService {
     // this.createdAt = now;
     // this.updatedAt = now;
     // }
-
     // @PreUpdate
     // protected void onUpdate() {
     // this.updatedAt = LocalDateTime.now();
