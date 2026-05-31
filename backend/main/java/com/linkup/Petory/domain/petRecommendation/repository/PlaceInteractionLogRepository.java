@@ -10,13 +10,14 @@ import java.util.List;
 public interface PlaceInteractionLogRepository extends JpaRepository<PlaceInteractionLog, Long> {
 
     @Query("""
-        SELECT p.locationIdx, COUNT(p) AS cnt
+        SELECT new com.linkup.Petory.domain.petRecommendation.repository.LocationInteractionCount(
+            p.locationIdx, COUNT(p))
         FROM PlaceInteractionLog p
         WHERE p.locationIdx IN :locationIds
           AND p.createdAt >= :since
         GROUP BY p.locationIdx
         """)
-    List<Object[]> countByLocationIdsSince(
+    List<LocationInteractionCount> countByLocationIdsSince(
             @Param("locationIds") List<Long> locationIds,
             @Param("since") LocalDateTime since);
 }

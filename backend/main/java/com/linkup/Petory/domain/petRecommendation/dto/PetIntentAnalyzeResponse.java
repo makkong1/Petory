@@ -1,10 +1,12 @@
 package com.linkup.Petory.domain.petRecommendation.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import lombok.Data;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 import java.util.List;
 
-@Data
+@Getter
+@NoArgsConstructor
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class PetIntentAnalyzeResponse {
     private String intentDomain;

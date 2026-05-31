@@ -1,6 +1,7 @@
 package com.linkup.Petory.domain.petRecommendation.service;
 
 import com.linkup.Petory.domain.petRecommendation.entity.PlaceInteractionLog;
+import com.linkup.Petory.domain.petRecommendation.repository.LocationInteractionCount;
 import com.linkup.Petory.domain.petRecommendation.repository.PlaceInteractionLogRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,7 +22,7 @@ public class PlaceInteractionService {
     private final PlaceInteractionLogRepository logRepository;
 
     @Transactional
-    public void record(Long userIdx, Long locationIdx, String interactionType) {
+    public void record(long userIdx, Long locationIdx, String interactionType) {
         logRepository.save(PlaceInteractionLog.builder()
                 .userIdx(userIdx)
                 .locationIdx(locationIdx)
@@ -34,10 +35,10 @@ public class PlaceInteractionService {
     public Map<Long, Double> getPopularityScores(List<Long> locationIds) {
         if (locationIds == null || locationIds.isEmpty()) return Map.of();
         LocalDateTime since = LocalDateTime.now().minusDays(POPULARITY_WINDOW_DAYS);
-        List<Object[]> rows = logRepository.countByLocationIdsSince(locationIds, since);
+        List<LocationInteractionCount> rows = logRepository.countByLocationIdsSince(locationIds, since);
         return rows.stream().collect(Collectors.toMap(
-                r -> (Long) r[0],
-                r -> Math.min(Math.log10(((Number) r[1]).doubleValue() + 1) / Math.log10(1001), 1.0)
+                LocationInteractionCount::locationIdx,
+                r -> Math.min(Math.log10(r.count() + 1.0) / Math.log10(1001), 1.0)
         ));
     }
 }
