@@ -1,7 +1,6 @@
 package com.linkup.Petory.domain.location.repository;
 
 import java.util.List;
-import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -64,20 +63,6 @@ public interface SpringDataJpaLocationServiceRepository extends JpaRepository<Lo
                         "ls.name = :name AND ls.address = :address AND " +
                         "(ls.isDeleted IS NULL OR ls.isDeleted = false)")
         boolean existsByNameAndAddress(@Param("name") String name, @Param("address") String address);
-
-        @RepositoryMethod("장소 서비스: name+address+dataSource 조회 (isDeleted 무관)")
-        @Query("SELECT ls FROM LocationService ls WHERE " +
-                        "ls.name = :name AND ls.address = :address AND ls.dataSource = :dataSource")
-        Optional<LocationService> findByNameAndAddressAndDataSource(
-                        @Param("name") String name,
-                        @Param("address") String address,
-                        @Param("dataSource") String dataSource);
-
-        @RepositoryMethod("장소 서비스: address+dataSource 조회 — 이름 변동 upsert 중복 감지용")
-        @Query("SELECT ls FROM LocationService ls WHERE ls.address = :address AND ls.dataSource = :dataSource")
-        Optional<LocationService> findByAddressAndDataSource(
-                        @Param("address") String address,
-                        @Param("dataSource") String dataSource);
 
         // spatial index를 실제로 잘 타고 있음
         // ST_Within + ST_Distance_Sphere 조합이 망하지 않음
@@ -189,13 +174,6 @@ public interface SpringDataJpaLocationServiceRepository extends JpaRepository<Lo
                         @Param("roadName") String roadName,
                         @Param("keyword") String keyword,
                         @Param("category") String category,
-                        @Param("limit") int limit);
-
-        @RepositoryMethod("장소 서비스: dataSource별 조회 (최신순)")
-        @Query(value = "SELECT * FROM locationservice WHERE data_source = :dataSource " +
-                        "ORDER BY last_updated DESC LIMIT :limit", nativeQuery = true)
-        List<LocationService> findByDataSource(
-                        @Param("dataSource") String dataSource,
                         @Param("limit") int limit);
 
         // [FIX] 리뷰 평균을 DB에서 직접 계산해 rating 컬럼을 한 번의 UPDATE로 갱신.

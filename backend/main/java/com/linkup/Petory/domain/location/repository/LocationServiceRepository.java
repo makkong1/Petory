@@ -44,17 +44,6 @@ public interface LocationServiceRepository {
     boolean existsByNameAndAddress(String name, String address);
 
     /**
-     * name + address + dataSource로 조회 — isDeleted 무관 (soft-deleted row 포함)
-     */
-    Optional<LocationService> findByNameAndAddressAndDataSource(
-            String name, String address, String dataSource);
-
-    /**
-     * address + dataSource로 조회 — 이름 변동에 무관한 upsert 중복 감지용
-     */
-    Optional<LocationService> findByAddressAndDataSource(String address, String dataSource);
-
-    /**
      * 반경 검색 (ST_Distance_Sphere 사용, keyword·category 필터 포함)
      */
     List<LocationService> findByRadius(Double latitude, Double longitude, Double radiusInMeters,
@@ -79,11 +68,6 @@ public interface LocationServiceRepository {
      * 도로명별 조회 (keyword·category 필터 포함)
      */
     List<LocationService> findByRoadName(String roadName, String keyword, String category, int limit);
-
-    /**
-     * dataSource별 조회 (최신 lastUpdated 순)
-     */
-    List<LocationService> findByDataSource(String dataSource, int limit);
 
     /**
      * [FIX] 서비스 평점과 리뷰 수를 리뷰 집계 기준으로 원자적 갱신 (DB 단일 UPDATE)
