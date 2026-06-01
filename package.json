@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "nlp": "cd petory-nlp-server && ./run.sh",
     "cap:sync:android": "cd frontend && npx cap sync android",
     "cap:sync:ios": "cd frontend && npx cap sync ios",
     "cap:open:android": "cd frontend && npx cap open android",

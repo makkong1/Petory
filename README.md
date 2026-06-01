@@ -171,10 +171,8 @@ Petory/
 
 ```bash
 # 1. NLP 서버 (추천 카드·signal 사용 시)
-cd petory-nlp-server
-python -m venv venv && source venv/bin/activate
-pip install -r requirements.txt
-PYTHONPATH=. uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+cd petory-nlp-server && ./run.sh
+# 또는 프로젝트 루트에서: npm run nlp
 
 # 2. Backend (루트, port 8080)
 ./gradlew bootRun --args='--spring.profiles.active=dev'

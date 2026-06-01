@@ -1,26 +1,29 @@
 package com.linkup.Petory.domain.petRecommendation.service;
 
+import java.time.LocalDateTime;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import org.mockito.Spy;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Pageable;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkup.Petory.domain.petRecommendation.dto.PetIntentAnalyzeResponse;
 import com.linkup.Petory.domain.petRecommendation.dto.UserPetIntentSignalResponse;
 import com.linkup.Petory.domain.petRecommendation.entity.UserPetIntentSignal;
 import com.linkup.Petory.domain.petRecommendation.repository.UserPetIntentSignalRepository;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.Spy;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Pageable;
-
-import java.time.LocalDateTime;
-import java.util.List;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class UserPetIntentSignalServiceTest {
@@ -35,7 +38,6 @@ class UserPetIntentSignalServiceTest {
     private ObjectMapper objectMapper;
 
     // ===== saveIfConfident =====
-
     @Test
     @DisplayName("confidence < 0.6 이면 signal 저장하지 않는다")
     void saveIfConfident_belowThreshold_doesNotSave() {
@@ -105,7 +107,6 @@ class UserPetIntentSignalServiceTest {
     }
 
     // ===== getActiveSignals =====
-
     @Test
     @DisplayName("getActiveSignals 는 PageRequest.of(0, 10) 으로 호출된다 (R2)")
     void getActiveSignals_passesPageableLimitOf10() {
@@ -137,13 +138,12 @@ class UserPetIntentSignalServiceTest {
     }
 
     // ===== helpers =====
-
     private PetIntentAnalyzeResponse analysisOf(String domain, double confidence) {
         try {
             var mapper = new ObjectMapper();
             String json = String.format(
-                    "{\"intentDomain\":\"%s\",\"intent\":\"%s_NEED\",\"confidence\":%f," +
-                    "\"recommendedCategories\":[],\"keywords\":[],\"intentTags\":[],\"urgency\":\"NORMAL\",\"message\":\"test\"}",
+                    "{\"intentDomain\":\"%s\",\"intent\":\"%s_NEED\",\"confidence\":%f,"
+                    + "\"recommendedCategories\":[],\"keywords\":[],\"intentTags\":[],\"urgency\":\"NORMAL\",\"message\":\"test\"}",
                     domain, domain, confidence);
             return mapper.readValue(json, PetIntentAnalyzeResponse.class);
         } catch (Exception e) {
@@ -161,7 +161,6 @@ class UserPetIntentSignalServiceTest {
                 .recommendedCategories("[]")
                 .confidence(confidence)
                 .intentTags("[]")
-                .createdAt(LocalDateTime.now())
                 .expiresAt(LocalDateTime.now().plusDays(7))
                 .build();
     }
