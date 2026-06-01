@@ -5,6 +5,15 @@
 ## 실행
 
 ```bash
+# petory-nlp-server 디렉터리에서 (최초 1회 venv·pip 자동)
+./run.sh
+```
+
+프로젝트 루트에서: `npm run nlp`
+
+수동 설정이 필요할 때만:
+
+```bash
 python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
