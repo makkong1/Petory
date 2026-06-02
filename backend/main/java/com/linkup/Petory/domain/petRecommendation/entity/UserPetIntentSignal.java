@@ -5,6 +5,11 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
 
+/**
+ * 사용자 반려생활 의도 signal 저장 엔티티.
+ *
+ * <p>원문 텍스트 대신 intent/도메인/추천 카테고리/신뢰도/만료시각 등 요약 신호만 보관한다.
+ */
 @Entity
 @Table(name = "user_pet_intent_signal", indexes = {
         @Index(name = "idx_user_signal_active", columnList = "user_idx, expires_at, created_at"),
@@ -20,7 +25,7 @@ public class UserPetIntentSignal extends BaseTimeEntity {
     private Long userIdx;
 
     @Column(name = "source_type", nullable = false, length = 30)
-    private String sourceType;   // COMMUNITY | CARE | LOCATION_SEARCH
+    private String sourceType;   // COMMUNITY | CARE | LOCATION_SEARCH (signal 발생 출처)
 
     @Column(name = "source_id")
     private Long sourceId;

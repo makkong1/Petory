@@ -5,6 +5,11 @@ import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * 추천 후보 시설의 최종 점수를 계산하는 가중치 기반 계산기.
+ *
+ * <p>인기도/태그일치/거리/평점/리뷰수를 0~1로 정규화해 가중합 후 0~100 스케일 점수로 반환한다.
+ */
 @Component
 public class PetRecommendScoreCalculator {
 

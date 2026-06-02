@@ -13,6 +13,11 @@ import java.util.*;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+/**
+ * 반려생활 추천 오케스트레이션 서비스.
+ *
+ * <p>NLP 분석 -> 주변 시설 조회 -> 인기도/태그/거리 기반 점수 계산 -> 상위 결과 반환 순서로 동작한다.
+ */
 public class PetRecommendationService {
 
     private final PetIntentClient             petIntentClient;
@@ -20,6 +25,7 @@ public class PetRecommendationService {
     private final PetRecommendScoreCalculator scoreCalculator;
     private final PlaceInteractionService     interactionService;
 
+    /** 추천 본 흐름. NLP 실패 시 {@link #fallbackRecommend(String, double, double, int)} 으로 전환한다. */
     public PetRecommendResponse recommend(
             String text, double lat, double lng, int radius, String petType) {
 
@@ -64,6 +70,7 @@ public class PetRecommendationService {
                 .build();
     }
 
+    /** NLP 서버 장애 시 키워드 기반 카테고리 추정으로 최소 기능을 보장한다. */
     PetRecommendResponse fallbackRecommend(String text, double lat, double lng, int radius) {
         log.warn("[PetRecommendationService] Python 서버 장애 — fallback 실행. text={}", text);
         String fallbackCategory = inferCategoryFromKeyword(text);
@@ -82,6 +89,7 @@ public class PetRecommendationService {
                 .build();
     }
 
+    /** LocationService 엔티티를 추천 응답 DTO로 변환한다. */
     PetRecommendFacilityDto toDto(LocationService loc, double userLat, double userLng,
                                    List<String> intentTags, Map<Long, Double> popularityMap) {
         double distM = calcDistanceM(userLat, userLng,
@@ -115,6 +123,7 @@ public class PetRecommendationService {
         return null;
     }
 
+    /** Haversine 공식을 이용해 사용자-시설 직선 거리를 미터 단위로 계산한다. */
     private double calcDistanceM(double lat1, double lng1, double lat2, double lng2) {
         final double R = 6371000;
         double dLat = Math.toRadians(lat2 - lat1);

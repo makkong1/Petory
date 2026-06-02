@@ -19,6 +19,11 @@ import java.util.Optional;
 
 @Slf4j
 @Component
+/**
+ * 도메인 이벤트를 받아 비동기로 NLP 분석 signal 저장을 트리거한다.
+ *
+ * <p>커뮤니티/케어는 커밋 이후 처리하고, 위치 검색은 자연어+dedup 필터를 통과한 경우만 처리한다.
+ */
 public class PetIntentSignalEventListener {
 
     private final PetIntentClient            petIntentClient;
