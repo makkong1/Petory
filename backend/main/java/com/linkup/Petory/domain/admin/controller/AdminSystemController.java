@@ -13,6 +13,7 @@ import java.util.Map;
 @RequestMapping("/api/master/system")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('MASTER')")
+/** 시스템 설정(SystemConfig) 조회·변경 API. [MASTER] */
 public class AdminSystemController {
 
     private final AdminSystemFacade systemFacade;

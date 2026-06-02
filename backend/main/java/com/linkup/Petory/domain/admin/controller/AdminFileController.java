@@ -17,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 @RequestMapping("/api/admin/files")
 @RequiredArgsConstructor
 @PreAuthorize("hasAnyRole('ADMIN','MASTER')")
+/** 관리자용 첨부파일 목록 조회·삭제 API. [ADMIN, MASTER] */
 public class AdminFileController {
 
     private final AdminFileFacade adminFileFacade;
@@ -24,10 +25,10 @@ public class AdminFileController {
 
     @GetMapping
     public ResponseEntity<Page<FileDTO>> listFiles(
-            @RequestParam(required = false) String targetType,
-            @RequestParam(required = false) String q,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(name = "targetType", required = false) String targetType,
+            @RequestParam(name = "q", required = false) String q,
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "20") int size) {
         return ResponseEntity.ok(adminFileFacade.getFiles(targetType, q, page, size));
     }
 

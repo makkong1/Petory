@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/admin/users")
 @RequiredArgsConstructor
 @PreAuthorize("hasAnyRole('ADMIN', 'MASTER')")
+/** 관리자용 일반 사용자 목록 조회·상태 변경·삭제·복구 API. [ADMIN, MASTER] */
 public class AdminUserController {
 
     private final AdminUserFacade adminUserFacade;
@@ -20,11 +21,11 @@ public class AdminUserController {
 
     @GetMapping("/paging")
     public ResponseEntity<UserPageResponseDTO> getUsers(
-            @RequestParam(required = false) String role,
-            @RequestParam(required = false) String status,
-            @RequestParam(required = false) String q,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(name = "role", required = false) String role,
+            @RequestParam(name = "status", required = false) String status,
+            @RequestParam(name = "q", required = false) String q,
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "20") int size) {
         return ResponseEntity.ok(adminUserFacade.getUsers(role, status, q, page, size));
     }
 

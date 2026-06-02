@@ -16,6 +16,7 @@ import java.util.List;
 @RequestMapping("/api/admin/meetups")
 @RequiredArgsConstructor
 @PreAuthorize("hasAnyRole('ADMIN','MASTER')")
+/** 관리자용 모임 목록 조회·삭제·참여자 조회 API. [ADMIN, MASTER] */
 public class AdminMeetupController {
 
     private final AdminCareAndMeetupFacade facade;
@@ -23,10 +24,10 @@ public class AdminMeetupController {
 
     @GetMapping
     public ResponseEntity<Page<MeetupDTO>> listMeetups(
-            @RequestParam(required = false) String status,
-            @RequestParam(required = false) String q,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(name = "status", required = false) String status,
+            @RequestParam(name = "q", required = false) String q,
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "20") int size) {
         return ResponseEntity.ok(facade.getMeetups(status, q, page, size));
     }
 

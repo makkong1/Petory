@@ -12,6 +12,7 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+/** key-value 형태의 시스템 설정 엔티티. MASTER 권한으로 런타임에 값을 변경할 수 있다. */
 public class SystemConfig extends BaseTimeEntity {
 
     @Id

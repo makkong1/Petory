@@ -15,6 +15,7 @@ import java.util.Map;
 @RequestMapping("/api/master/admin-users")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('MASTER')")
+/** 관리자 계정 목록 조회·생성·권한 변경·삭제·비밀번호 변경 API. [MASTER] */
 public class AdminUserManagementController {
 
     private final AdminUserFacade adminUserFacade;

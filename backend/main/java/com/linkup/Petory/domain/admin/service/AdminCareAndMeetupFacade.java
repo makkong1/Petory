@@ -20,6 +20,7 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
+/** 관리자용 케어 요청·모임 조회·상태 변경·삭제를 처리하는 퍼사드. */
 public class AdminCareAndMeetupFacade {
 
     private final CareRequestRepository careRequestRepository;
