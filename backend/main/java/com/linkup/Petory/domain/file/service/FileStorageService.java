@@ -1,10 +1,21 @@
 package com.linkup.Petory.domain.file.service;
 
+import com.linkup.Petory.domain.file.exception.FileNotFoundException;
+import com.linkup.Petory.domain.file.exception.FileStorageException;
+import com.linkup.Petory.domain.file.exception.FileUploadValidationException;
+import com.linkup.Petory.domain.file.exception.FileValidationException;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
+import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
+
+import javax.imageio.ImageIO;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
-
-import javax.imageio.ImageIO;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -13,39 +24,17 @@ import java.time.LocalDate;
 import java.util.Set;
 import java.util.UUID;
 
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.Resource;
-import org.springframework.core.io.UrlResource;
-import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
-import org.springframework.web.multipart.MultipartFile;
-
-import com.linkup.Petory.domain.file.exception.FileNotFoundException;
-import com.linkup.Petory.domain.file.exception.FileStorageException;
-import com.linkup.Petory.domain.file.exception.FileUploadValidationException;
-import com.linkup.Petory.domain.file.exception.FileValidationException;
-
-import lombok.extern.slf4j.Slf4j;
-
 @Slf4j
 @Service
 public class FileStorageService {
 
     private final Path uploadLocation;
+
     private static final long MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
     private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
-            "image/jpeg",
-            "image/png",
-            "image/gif",
-            "image/webp",
-            "image/jfif");
+            "image/jpeg", "image/png", "image/gif", "image/webp", "image/jfif");
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
-            ".jpg",
-            ".jpeg",
-            ".png",
-            ".gif",
-            ".webp",
-            ".jfif");
+            ".jpg", ".jpeg", ".png", ".gif", ".webp", ".jfif");
 
     public FileStorageService(@Value("${file.upload-dir:uploads}") String uploadDir) {
         this.uploadLocation = Paths.get(uploadDir).toAbsolutePath().normalize();
@@ -56,16 +45,17 @@ public class FileStorageService {
         }
     }
 
+    // -------------------------------------------------------------------------
+    // public API
+    // -------------------------------------------------------------------------
+
     /** 이미지 파일을 검증하고 pathSegments 하위 디렉터리에 저장한 뒤 상대경로를 반환한다. */
     public String storeImage(MultipartFile file, String... pathSegments) {
         if (file == null || file.isEmpty()) {
             throw FileValidationException.emptyFile();
         }
-
         String rawFilename = file.getOriginalFilename();
-        String originalFilename = rawFilename != null
-                ? StringUtils.cleanPath(rawFilename)
-                : "image";
+        String originalFilename = rawFilename != null ? StringUtils.cleanPath(rawFilename) : "image";
         String extension = extractExtension(originalFilename);
         validateFile(file, extension);
 
@@ -76,13 +66,10 @@ public class FileStorageService {
             log.error("업로드 경로 디렉터리 생성에 실패했습니다.", ex);
             throw FileStorageException.prepareFailed(ex);
         }
-        String filename = generateFileName(extension);
-        Path targetLocation = targetDirectory.resolve(filename);
-
+        Path targetLocation = targetDirectory.resolve(generateFileName(extension));
         try {
             Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
-            Path relativePath = uploadLocation.relativize(targetLocation);
-            return normalizeRelativePath(relativePath);
+            return normalizeRelativePath(uploadLocation.relativize(targetLocation));
         } catch (IOException ex) {
             log.error("파일 저장에 실패했습니다. filename={}", originalFilename, ex);
             throw FileStorageException.saveFailed(ex);
@@ -116,12 +103,9 @@ public class FileStorageService {
         return filePath;
     }
 
-    /** 날짜 접두사 + UUID로 고유 파일명을 생성한다. 예: 20260602_abc123.jpg */
-    private String generateFileName(String extension) {
-        String datePrefix = LocalDate.now().toString().replace("-", "");
-        String randomPart = UUID.randomUUID().toString().replace("-", "");
-        return datePrefix + "_" + randomPart + extension.toLowerCase();
-    }
+    // -------------------------------------------------------------------------
+    // private: 저장 헬퍼
+    // -------------------------------------------------------------------------
 
     /** pathSegments를 sanitize하여 업로드 루트 아래 대상 디렉터리를 생성하고 반환한다. */
     private Path resolveTargetDirectory(String... pathSegments) throws IOException {
@@ -149,18 +133,25 @@ public class FileStorageService {
         return sanitized;
     }
 
+    /** 날짜 접두사 + UUID로 고유 파일명을 생성한다. 예: 20260602_abc123.jpg */
+    private String generateFileName(String extension) {
+        String datePrefix = LocalDate.now().toString().replace("-", "");
+        String randomPart = UUID.randomUUID().toString().replace("-", "");
+        return datePrefix + "_" + randomPart + extension.toLowerCase();
+    }
+
     private String extractExtension(String filename) {
         int dotIndex = filename.lastIndexOf('.');
-        if (dotIndex > -1) {
-            return filename.substring(dotIndex);
-        }
-        return "";
+        return dotIndex > -1 ? filename.substring(dotIndex) : "";
     }
 
     private String normalizeRelativePath(Path relativePath) {
-        String path = relativePath.toString();
-        return path.replace("\\", "/");
+        return relativePath.toString().replace("\\", "/");
     }
+
+    // -------------------------------------------------------------------------
+    // private: 검증 헬퍼
+    // -------------------------------------------------------------------------
 
     /** 파일 크기·MIME 타입·확장자·실제 이미지 내용을 순서대로 검증한다. */
     private void validateFile(MultipartFile file, String extension) {

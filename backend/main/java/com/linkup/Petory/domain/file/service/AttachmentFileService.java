@@ -31,6 +31,10 @@ public class AttachmentFileService {
     private final FileConverter fileConverter;
     private final FileStorageService fileStorageService;
 
+    // -------------------------------------------------------------------------
+    // 조회
+    // -------------------------------------------------------------------------
+
     /** 단일 타겟의 첨부파일 목록을 다운로드 URL 포함하여 조회한다. */
     public List<FileDTO> getAttachments(FileTargetType targetType, Long targetIdx) {
         if (targetType == null || targetIdx == null) {
@@ -55,6 +59,25 @@ public class AttachmentFileService {
                         )
                 ));
     }
+
+    /** 첨부파일 목록에서 첫 번째 파일의 다운로드 URL을 반환한다. 목록이 비어 있으면 null. */
+    public String extractPrimaryFileUrl(List<? extends FileDTO> attachments) {
+        if (attachments == null || attachments.isEmpty()) {
+            return null;
+        }
+        FileDTO primary = attachments.get(0);
+        if (primary == null) {
+            return null;
+        }
+        if (StringUtils.hasText(primary.getDownloadUrl())) {
+            return primary.getDownloadUrl();
+        }
+        return buildDownloadUrl(primary.getFilePath());
+    }
+
+    // -------------------------------------------------------------------------
+    // 쓰기
+    // -------------------------------------------------------------------------
 
     /** 기존 첨부파일을 모두 삭제하고 새 파일 1개로 교체한다. filePath가 없으면 삭제만 한다. */
     @Transactional
@@ -84,6 +107,21 @@ public class AttachmentFileService {
         fileRepository.deleteByTargetTypeAndTargetIdx(targetType, targetIdx);
     }
 
+    // -------------------------------------------------------------------------
+    // URL / 경로 유틸
+    // -------------------------------------------------------------------------
+
+    /** 상대경로를 /api/uploads/file?path=... 형태의 다운로드 URL로 변환한다. */
+    public String buildDownloadUrl(String relativePath) {
+        if (!StringUtils.hasText(relativePath)) {
+            return null;
+        }
+        return ServletUriComponentsBuilder.fromCurrentContextPath()
+                .path("/api/uploads/file")
+                .queryParam("path", relativePath)
+                .toUriString();
+    }
+
     /** URL·절대경로·상대경로 등 다양한 형태의 입력을 uploads/ 기준 상대경로로 정규화한다. */
     public String normalizeFilePath(String rawPath) {
         if (!StringUtils.hasText(rawPath)) {
@@ -94,6 +132,36 @@ public class AttachmentFileService {
             return null;
         }
         return decoded.replace("\\", "/");
+    }
+
+    // -------------------------------------------------------------------------
+    // private
+    // -------------------------------------------------------------------------
+
+    private FileDTO withDownloadUrl(FileDTO dto) {
+        if (dto == null) {
+            return null;
+        }
+        dto.setDownloadUrl(buildDownloadUrl(dto.getFilePath()));
+        return dto;
+    }
+
+    /** providedType이 없으면 실제 파일을 읽어 MIME 타입을 감지한다. 감지 실패 시 null 반환. */
+    private String resolveMimeType(String relativePath, String providedType) {
+        if (StringUtils.hasText(providedType)) {
+            return providedType.toLowerCase();
+        }
+        try {
+            Path storagePath = fileStorageService.resolveStoragePath(relativePath);
+            if (Files.exists(storagePath)) {
+                String detected = Files.probeContentType(storagePath);
+                if (StringUtils.hasText(detected)) {
+                    return detected.toLowerCase();
+                }
+            }
+        } catch (IOException | IllegalArgumentException ignored) {
+        }
+        return null;
     }
 
     /** ?path= 쿼리 파라미터 → /uploads/ 경로 → 절대경로 순으로 상대경로를 추출한다. */
@@ -137,57 +205,5 @@ public class AttachmentFileService {
         } catch (IllegalArgumentException ex) {
             return value;
         }
-    }
-
-    /** providedType이 없으면 실제 파일을 읽어 MIME 타입을 감지한다. 감지 실패 시 null 반환. */
-    private String resolveMimeType(String relativePath, String providedType) {
-        if (StringUtils.hasText(providedType)) {
-            return providedType.toLowerCase();
-        }
-        try {
-            Path storagePath = fileStorageService.resolveStoragePath(relativePath);
-            if (Files.exists(storagePath)) {
-                String detected = Files.probeContentType(storagePath);
-                if (StringUtils.hasText(detected)) {
-                    return detected.toLowerCase();
-                }
-            }
-        } catch (IOException | IllegalArgumentException ignored) {
-        }
-        return null;
-    }
-
-    private FileDTO withDownloadUrl(FileDTO dto) {
-        if (dto == null) {
-            return null;
-        }
-        dto.setDownloadUrl(buildDownloadUrl(dto.getFilePath()));
-        return dto;
-    }
-
-    /** 상대경로를 /api/uploads/file?path=... 형태의 다운로드 URL로 변환한다. */
-    public String buildDownloadUrl(String relativePath) {
-        if (!StringUtils.hasText(relativePath)) {
-            return null;
-        }
-        return ServletUriComponentsBuilder.fromCurrentContextPath()
-                .path("/api/uploads/file")
-                .queryParam("path", relativePath)
-                .toUriString();
-    }
-
-    /** 첨부파일 목록에서 첫 번째 파일의 다운로드 URL을 반환한다. 목록이 비어 있으면 null. */
-    public String extractPrimaryFileUrl(List<? extends FileDTO> attachments) {
-        if (attachments == null || attachments.isEmpty()) {
-            return null;
-        }
-        FileDTO primary = attachments.get(0);
-        if (primary == null) {
-            return null;
-        }
-        if (StringUtils.hasText(primary.getDownloadUrl())) {
-            return primary.getDownloadUrl();
-        }
-        return buildDownloadUrl(primary.getFilePath());
     }
 }
