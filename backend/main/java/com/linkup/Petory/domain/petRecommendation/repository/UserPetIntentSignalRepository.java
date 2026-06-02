@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/** 사용자 펫 의도 신호 JPA 리포지토리. 사용자별 최신 신호 조회를 제공한다. */
 public interface UserPetIntentSignalRepository extends JpaRepository<UserPetIntentSignal, Long> {
 
     // R2: Pageable로 최대 10건 제한 — 호출 시 PageRequest.of(0, 10)

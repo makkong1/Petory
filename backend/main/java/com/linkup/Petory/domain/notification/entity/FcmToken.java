@@ -23,6 +23,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+/** FCM 디바이스 토큰 엔티티. 사용자별 기기 토큰을 저장하며 토큰은 전체 유니크하다. */
 @Entity
 @Table(name = "fcm_token",
         uniqueConstraints = @UniqueConstraint(columnNames = "token"))

@@ -7,6 +7,7 @@ import java.time.LocalDateTime;
 
 import com.linkup.Petory.domain.user.entity.Users;
 
+/** 대화방 참여자 엔티티. 참여자의 역할·읽음 상태·거래 확인 여부를 관리한다. */
 @Entity
 @Table(name = "conversationparticipant")
 @Getter

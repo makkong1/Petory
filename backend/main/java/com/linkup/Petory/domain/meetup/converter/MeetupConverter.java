@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
+/** Meetup 엔티티 → MeetupDTO 변환기. */
 @Component
 @RequiredArgsConstructor
 public class MeetupConverter {

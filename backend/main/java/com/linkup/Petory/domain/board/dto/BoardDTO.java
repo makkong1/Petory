@@ -12,6 +12,7 @@ import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 
+/** 게시글 응답/요청 DTO. 작성자 정보·댓글·첨부파일·리액션 통계를 포함한다. */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

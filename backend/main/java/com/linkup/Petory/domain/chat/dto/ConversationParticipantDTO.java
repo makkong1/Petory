@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 
+/** 대화방 참여자 응답 DTO. 역할·읽음 상태·거래 확인 여부 및 탈퇴 사용자 표시 플래그를 포함한다. */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

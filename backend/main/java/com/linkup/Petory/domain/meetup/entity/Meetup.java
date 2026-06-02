@@ -28,6 +28,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+/** 모임 엔티티. 생성 시 그룹 채팅방이 자동 생성되며, 인원 제한·상태(RECRUITING/CLOSED/COMPLETED)를 관리한다. */
 @Entity
 @Getter
 @Setter

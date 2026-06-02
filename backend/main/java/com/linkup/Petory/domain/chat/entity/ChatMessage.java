@@ -5,6 +5,7 @@ import lombok.*;
 import com.linkup.Petory.domain.common.BaseTimeEntity;
 import com.linkup.Petory.domain.user.entity.Users;
 
+/** 채팅 메시지 엔티티. 어느 대화방의 누가 보낸 메시지인지, 답장·삭제 여부를 관리한다. */
 @Entity
 @Table(name = "chatmessage")
 @Getter

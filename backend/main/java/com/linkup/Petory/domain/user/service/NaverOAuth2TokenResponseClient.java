@@ -19,6 +19,7 @@ import org.springframework.web.client.RestTemplate;
 
 import lombok.extern.slf4j.Slf4j;
 
+/** 네이버 전용 OAuth2 액세스 토큰 응답 클라이언트. 네이버의 비표준 응답 형식을 직접 파싱해 OAuth2AccessTokenResponse로 변환한다. */
 @Slf4j
 @Component
 public class NaverOAuth2TokenResponseClient

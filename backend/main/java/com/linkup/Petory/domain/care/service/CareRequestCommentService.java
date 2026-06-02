@@ -28,6 +28,7 @@ import com.linkup.Petory.domain.notification.service.NotificationService;
 
 import lombok.RequiredArgsConstructor;
 
+/** 펫케어 요청 댓글 조회·작성·삭제를 담당하는 서비스. */
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)

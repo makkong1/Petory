@@ -16,6 +16,7 @@ import com.linkup.Petory.domain.user.entity.Pet;
 
 import lombok.RequiredArgsConstructor;
 
+/** CareRequest 엔티티 → CareRequestDTO 변환기. */
 @Component
 @RequiredArgsConstructor
 public class CareRequestConverter {

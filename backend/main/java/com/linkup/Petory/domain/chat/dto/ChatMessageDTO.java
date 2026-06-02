@@ -5,16 +5,18 @@ import java.util.List;
 
 import com.linkup.Petory.domain.file.dto.FileDTO;
 
-import lombok.Data;
-import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
+/** 채팅 메시지 응답 DTO. 발신자 정보·읽음 상태·파일 첨부·답장 메시지를 포함한다. */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class ChatMessageDTO {
+
     private Long idx;
     private Long conversationIdx;
     private Long senderIdx;

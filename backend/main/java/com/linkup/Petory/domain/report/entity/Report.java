@@ -24,6 +24,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+/** 신고 엔티티. 사용자 1명이 동일 대상을 중복 신고할 수 없으며(unique), 처리 상태·조치 유형을 관리한다. */
 @Entity
 @Table(name = "report", uniqueConstraints = @UniqueConstraint(columnNames = { "target_type", "target_idx", "reporter_idx" }))
 @Getter

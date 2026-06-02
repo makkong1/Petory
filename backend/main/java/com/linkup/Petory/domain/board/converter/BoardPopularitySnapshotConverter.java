@@ -17,6 +17,7 @@ import org.springframework.util.StringUtils;
 
 import lombok.RequiredArgsConstructor;
 
+/** BoardPopularitySnapshot 엔티티 → DTO 변환기. 목록 변환 시 첨부파일을 배치 선조회해 N+1을 방지한다. */
 @Component
 @RequiredArgsConstructor
 public class BoardPopularitySnapshotConverter {

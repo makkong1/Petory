@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 
+/** 대화방 응답 DTO. 참여자 목록·읽지 않은 메시지 수·마지막 메시지 미리보기를 포함한다. */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

@@ -8,6 +8,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 
 @Data
+/** 펫케어 지원 응답/요청 DTO. 지원자 정보와 지원 상태(PENDING/ACCEPTED/REJECTED)를 포함한다. */
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder

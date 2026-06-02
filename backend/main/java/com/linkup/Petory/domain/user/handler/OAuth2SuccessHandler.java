@@ -21,6 +21,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+/** OAuth2 인증 성공 핸들러. JWT를 발급해 프론트엔드 콜백 URL로 리다이렉트하며, 닉네임 미설정 시 설정 페이지로 안내한다. */
 @Slf4j
 @Component
 @RequiredArgsConstructor

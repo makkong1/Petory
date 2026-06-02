@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 
+/** 사용자 응답/요청 DTO. 응답 시 password는 포함하지 않으며, 제재·펫코인·이메일 인증 상태를 포함한다. */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

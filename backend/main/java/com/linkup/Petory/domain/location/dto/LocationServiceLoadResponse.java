@@ -5,6 +5,7 @@ import java.util.List;
 import lombok.Builder;
 import lombok.Data;
 
+/** 위치 서비스 데이터 로드 결과 응답 DTO. 메시지·처리 지역·건수를 포함한다. */
 @Data
 @Builder
 public class LocationServiceLoadResponse {

@@ -6,6 +6,7 @@ import lombok.*;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/** 채팅 대화방 엔티티. 1:1·그룹·케어요청 등 유형과 관련 도메인(relatedType/relatedIdx)을 저장한다. */
 @Entity
 @Table(name = "conversation")
 @Getter

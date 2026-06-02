@@ -19,6 +19,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+/** 모임 참여자 엔티티. (meetup, user) 복합 키로 유니크하며 참여 시각·취소 여부를 관리한다. */
 @Entity
 @Table(name = "meetupparticipants")
 @IdClass(MeetupParticipantsId.class)

@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/** AttachmentFile 엔티티 → FileDTO 변환기. */
 @Component
 public class FileConverter {
 

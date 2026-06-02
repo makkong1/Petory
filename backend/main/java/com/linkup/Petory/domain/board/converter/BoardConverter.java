@@ -10,6 +10,7 @@ import com.linkup.Petory.domain.board.entity.Board;
 
 import lombok.RequiredArgsConstructor;
 
+/** Board 엔티티 → BoardDTO 변환기. Lazy Loading N+1 방지를 위해 commentCount 필드만 사용한다. */
 @Component
 @RequiredArgsConstructor
 public class BoardConverter {

@@ -10,6 +10,7 @@ import lombok.Setter;
 
 import java.time.LocalDateTime;
 
+/** 게시글 조회 로그. 사용자 1명이 게시글 1개를 한 번만 조회 카운트로 집계하도록 unique 제약이 있다. */
 @Entity
 @Table(name = "board_view_log", uniqueConstraints = {
         @UniqueConstraint(name = "uk_board_view_log_board_user", columnNames = { "board_id", "user_id" })

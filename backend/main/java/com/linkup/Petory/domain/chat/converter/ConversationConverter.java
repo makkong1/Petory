@@ -9,6 +9,7 @@ import com.linkup.Petory.domain.chat.dto.ConversationDTO;
 import com.linkup.Petory.domain.chat.entity.Conversation;
 
 
+/** Conversation 엔티티 → ConversationDTO 변환기. 참여자·마지막 메시지는 서비스 레이어에서 별도 주입한다. */
 @Component
 public class ConversationConverter {
 

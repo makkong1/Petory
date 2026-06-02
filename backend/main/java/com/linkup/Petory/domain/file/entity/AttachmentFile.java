@@ -11,6 +11,7 @@ import lombok.Setter;
 @Entity
 @Table(name = "file")
 @Getter
+/** 첨부파일 엔티티. 도메인 유형(targetType)과 대상 ID(targetIdx)로 어떤 도메인 레코드에 속하는지 식별한다. */
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor

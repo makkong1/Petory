@@ -9,6 +9,7 @@ import com.linkup.Petory.domain.chat.dto.ChatMessageDTO;
 import com.linkup.Petory.domain.chat.entity.ChatMessage;
 
 
+/** ChatMessage 엔티티 → ChatMessageDTO 변환기. 순환 참조 방지를 위해 답장·파일 정보는 서비스 레이어에서 별도 주입한다. */
 @Component
 public class ChatMessageConverter {
 

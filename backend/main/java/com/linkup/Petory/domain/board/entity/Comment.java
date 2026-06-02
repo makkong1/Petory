@@ -7,6 +7,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
 
+/** 게시글 댓글 엔티티. soft delete(isDeleted + deletedAt) 방식으로 삭제를 처리한다. */
 @Entity
 @Table(name = "comment")
 @Getter
@@ -14,7 +15,6 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-
 public class Comment extends BaseTimeEntity {
 
 	@Id

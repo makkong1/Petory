@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.Map;
 
+/** 네이버 OAuth2 사용자 정보 로더. response 중첩 객체를 펼쳐 표준 OAuth2User로 반환한다. */
 @Slf4j
 @Service
 @RequiredArgsConstructor

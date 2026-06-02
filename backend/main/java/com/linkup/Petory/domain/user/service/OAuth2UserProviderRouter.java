@@ -8,6 +8,7 @@ import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 
+/** OAuth2 제공자별 UserService 라우터. provider 이름에 따라 Google/Naver UserService를 선택해 위임한다. */
 @Slf4j
 @Service
 @RequiredArgsConstructor

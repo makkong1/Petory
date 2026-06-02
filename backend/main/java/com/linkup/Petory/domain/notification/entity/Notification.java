@@ -19,6 +19,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+/** 알림 엔티티. 알림 유형·제목·관련 도메인 ID·읽음 여부를 관리하며 SSE와 Redis·DB 이중 저장으로 제공된다. */
 @Entity
 @Table(name = "notifications")
 @Getter
