@@ -56,6 +56,7 @@ public class FileStorageService {
         }
     }
 
+    /** 이미지 파일을 검증하고 pathSegments 하위 디렉터리에 저장한 뒤 상대경로를 반환한다. */
     public String storeImage(MultipartFile file, String... pathSegments) {
         if (file == null || file.isEmpty()) {
             throw FileValidationException.emptyFile();
@@ -88,6 +89,7 @@ public class FileStorageService {
         }
     }
 
+    /** 상대경로로 저장된 파일을 스프링 Resource로 로드한다. 파일이 없으면 FileNotFoundException. */
     public Resource loadAsResource(String relativePath) {
         try {
             Path filePath = resolveStoragePath(relativePath);
@@ -102,6 +104,7 @@ public class FileStorageService {
         throw FileNotFoundException.forPath(relativePath);
     }
 
+    /** 상대경로를 절대 저장경로로 변환한다. 경로 순회 공격(../) 시 FileValidationException. */
     public Path resolveStoragePath(String relativePath) {
         if (!StringUtils.hasText(relativePath)) {
             throw FileValidationException.emptyPath();
@@ -113,12 +116,14 @@ public class FileStorageService {
         return filePath;
     }
 
+    /** 날짜 접두사 + UUID로 고유 파일명을 생성한다. 예: 20260602_abc123.jpg */
     private String generateFileName(String extension) {
         String datePrefix = LocalDate.now().toString().replace("-", "");
         String randomPart = UUID.randomUUID().toString().replace("-", "");
         return datePrefix + "_" + randomPart + extension.toLowerCase();
     }
 
+    /** pathSegments를 sanitize하여 업로드 루트 아래 대상 디렉터리를 생성하고 반환한다. */
     private Path resolveTargetDirectory(String... pathSegments) throws IOException {
         Path directory = uploadLocation;
         if (pathSegments != null) {
@@ -157,6 +162,7 @@ public class FileStorageService {
         return path.replace("\\", "/");
     }
 
+    /** 파일 크기·MIME 타입·확장자·실제 이미지 내용을 순서대로 검증한다. */
     private void validateFile(MultipartFile file, String extension) {
         if (file.getSize() > MAX_FILE_SIZE_BYTES) {
             throw FileUploadValidationException.sizeExceeded();
@@ -181,8 +187,6 @@ public class FileStorageService {
             if (ImageIO.read(is) == null) {
                 throw FileUploadValidationException.invalidContentType();
             }
-        } catch (FileUploadValidationException ex) {
-            throw ex;
         } catch (IOException ex) {
             throw FileUploadValidationException.invalidContentType();
         }
@@ -197,8 +201,6 @@ public class FileStorageService {
                     || header[8] != 0x57 || header[9] != 0x45 || header[10] != 0x42 || header[11] != 0x50) {
                 throw FileUploadValidationException.invalidContentType();
             }
-        } catch (FileUploadValidationException ex) {
-            throw ex;
         } catch (IOException ex) {
             throw FileUploadValidationException.invalidContentType();
         }
