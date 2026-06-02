@@ -36,6 +36,10 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+/**
+ * 통계 집계 스케줄러. 매일 18:00에 전날 일별 통계를 집계하고, 일요일·월말에 주간·월간 롤업을 실행한다.
+ * 누락된 날짜는 자동으로 감지해 backfill한다.
+ */
 public class StatisticsScheduler {
 
     private final DailyStatisticsRepository dailyStatisticsRepository;
@@ -48,6 +52,7 @@ public class StatisticsScheduler {
     private final MeetupParticipantsRepository meetupParticipantsRepository;
     private final ReportRepository reportRepository;
 
+    /** 매일 18:00 실행. 전날 통계 집계 → 일요일이면 주간 롤업 → 월말이면 월간 롤업 → 1년 초과 데이터 삭제. */
     @Scheduled(cron = "0 0 18 * * ?")
     @Transactional
     public void aggregateDailyStatistics() {
@@ -67,6 +72,7 @@ public class StatisticsScheduler {
         }
     }
 
+    /** 특정 날짜의 일별 통계를 집계해 저장한다. 이미 존재하면 건너뛴다. */
     @Transactional
     public void aggregateStatisticsForDate(LocalDate date) {
         if (dailyStatisticsRepository.findByStatDate(date).isPresent()) {
@@ -104,6 +110,7 @@ public class StatisticsScheduler {
         log.info("일일 통계 집계 완료: {}", date);
     }
 
+    /** 해당 주(일요일 기준)의 일별 통계를 합산해 주간 통계를 생성한다. */
     @Transactional
     public void rollupWeekly(LocalDate sunday) {
         LocalDate monday = sunday.minusDays(6);
@@ -149,6 +156,7 @@ public class StatisticsScheduler {
         log.info("주간 통계 롤업 완료: {}년 {}주차", year, weekNumber);
     }
 
+    /** 특정 연월의 일별 통계를 합산해 월간 통계를 생성한다. */
     @Transactional
     public void rollupMonthly(int year, int month) {
         if (monthlyStatisticsRepository.findByYearAndMonth(year, month).isPresent()) {
@@ -192,6 +200,7 @@ public class StatisticsScheduler {
         log.info("월간 통계 롤업 완료: {}년 {}월", year, month);
     }
 
+    /** 날짜 범위 내 누락된 일별 통계를 순서대로 소급 집계한다. */
     @Transactional
     public void backfill(LocalDate startDate, LocalDate endDate) {
         startDate.datesUntil(endDate.plusDays(1)).forEach(date -> {

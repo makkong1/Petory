@@ -7,6 +7,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Getter @Builder
+/** 일별 통계 API 응답 DTO. 사용자·케어·결제·커뮤니티·운영 섹션으로 그룹화된다. */
 public class DailyStatisticsResponse {
 
     private LocalDate statDate;

@@ -10,6 +10,7 @@ import java.math.BigDecimal;
        uniqueConstraints = @UniqueConstraint(columnNames = {"year", "month"}))
 @Getter @Setter
 @NoArgsConstructor @AllArgsConstructor @Builder
+/** 월 단위로 집계한 플랫폼 통계. (year, month) 조합으로 유니크하다. */
 public class MonthlyStatistics extends BaseTimeEntity {
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)

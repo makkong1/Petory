@@ -7,6 +7,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Getter @Builder
+/** 주간 통계 API 응답 DTO. DailyStatisticsResponse 의 중첩 Stats 클래스를 재사용한다. */
 public class WeeklyStatisticsResponse {
 
     private Integer year;

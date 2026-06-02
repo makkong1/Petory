@@ -5,6 +5,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
+/** 일별 통계 저장소 인터페이스. JPA 구현체는 JpaDailyStatisticsAdapter. */
 public interface DailyStatisticsRepository {
     DailyStatistics save(DailyStatistics dailyStatistics);
     Optional<DailyStatistics> findById(Long id);

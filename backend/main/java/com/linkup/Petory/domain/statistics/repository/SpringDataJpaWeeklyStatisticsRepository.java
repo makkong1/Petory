@@ -7,6 +7,7 @@ import org.springframework.data.repository.query.Param;
 import java.util.List;
 import java.util.Optional;
 
+/** WeeklyStatistics Spring Data JPA 전용 인터페이스. */
 public interface SpringDataJpaWeeklyStatisticsRepository extends JpaRepository<WeeklyStatistics, Long> {
     Optional<WeeklyStatistics> findByYearAndWeekNumber(int year, int weekNumber);
     List<WeeklyStatistics> findByYearOrderByWeekNumberAsc(int year);

@@ -11,6 +11,7 @@ import java.time.LocalDate;
        uniqueConstraints = @UniqueConstraint(columnNames = {"year", "week_number"}))
 @Getter @Setter
 @NoArgsConstructor @AllArgsConstructor @Builder
+/** 주 단위로 집계한 플랫폼 통계. ISO 주차(year + weekNumber) 기준으로 유니크하다. */
 public class WeeklyStatistics extends BaseTimeEntity {
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
