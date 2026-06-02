@@ -17,7 +17,9 @@ import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -29,59 +31,51 @@ public class AttachmentFileService {
     private final FileConverter fileConverter;
     private final FileStorageService fileStorageService;
 
+    /** 단일 타겟의 첨부파일 목록을 다운로드 URL 포함하여 조회한다. */
     public List<FileDTO> getAttachments(FileTargetType targetType, Long targetIdx) {
         if (targetType == null || targetIdx == null) {
             return List.of();
         }
-        List<AttachmentFile> files = fileRepository.findByTargetTypeAndTargetIdx(targetType, targetIdx);
-        return fileConverter.toDTOList(files).stream()
-                .map(this::withDownloadUrl)
-                .collect(Collectors.toList());
+        return fileRepository.findByTargetTypeAndTargetIdx(targetType, targetIdx).stream()
+                .map(file -> withDownloadUrl(fileConverter.toDTO(file)))
+                .toList();
     }
 
-    /**
-     * 여러 타겟의 첨부파일을 한 번에 조회 (배치 조회)
-     * 반환값: Map<TargetIdx, List<FileDTO>>
-     */
-    public java.util.Map<Long, List<FileDTO>> getAttachmentsBatch(FileTargetType targetType, List<Long> targetIndices) {
+    /** 여러 타겟의 첨부파일을 한 번에 조회한다. 반환값은 Map&lt;targetIdx, List&lt;FileDTO&gt;&gt;. */
+    public Map<Long, List<FileDTO>> getAttachmentsBatch(FileTargetType targetType, List<Long> targetIndices) {
         if (targetType == null || targetIndices == null || targetIndices.isEmpty()) {
-            return java.util.Collections.emptyMap();
+            return Collections.emptyMap();
         }
-        
-        List<AttachmentFile> files = fileRepository.findByTargetTypeAndTargetIdxIn(targetType, targetIndices);
-        
-        // AttachmentFile을 targetIdx별로 그룹화한 후 FileDTO로 변환
-        return files.stream()
+        return fileRepository.findByTargetTypeAndTargetIdxIn(targetType, targetIndices).stream()
                 .collect(Collectors.groupingBy(
-                    AttachmentFile::getTargetIdx,
-                    Collectors.mapping(
-                        file -> withDownloadUrl(fileConverter.toDTO(file)),
-                        Collectors.toList()
-                    )
+                        AttachmentFile::getTargetIdx,
+                        Collectors.mapping(
+                                file -> withDownloadUrl(fileConverter.toDTO(file)),
+                                Collectors.toList()
+                        )
                 ));
     }
 
+    /** 기존 첨부파일을 모두 삭제하고 새 파일 1개로 교체한다. filePath가 없으면 삭제만 한다. */
     @Transactional
     public void syncSingleAttachment(FileTargetType targetType, Long targetIdx, String filePath, String fileType) {
         if (targetType == null || targetIdx == null) {
             return;
         }
-
         fileRepository.deleteByTargetTypeAndTargetIdx(targetType, targetIdx);
-
         String normalizedPath = normalizeFilePath(filePath);
         if (StringUtils.hasText(normalizedPath)) {
-            String resolvedFileType = resolveMimeType(normalizedPath, fileType);
             AttachmentFile attachment = AttachmentFile.builder()
                     .targetType(targetType)
                     .targetIdx(targetIdx)
                     .filePath(normalizedPath)
-                    .fileType(resolvedFileType)
+                    .fileType(resolveMimeType(normalizedPath, fileType))
                     .build();
             fileRepository.save(attachment);
         }
     }
 
+    /** 타겟에 속한 첨부파일 레코드를 전부 삭제한다. */
     @Transactional
     public void deleteAll(FileTargetType targetType, Long targetIdx) {
         if (targetType == null || targetIdx == null) {
@@ -90,19 +84,19 @@ public class AttachmentFileService {
         fileRepository.deleteByTargetTypeAndTargetIdx(targetType, targetIdx);
     }
 
+    /** URL·절대경로·상대경로 등 다양한 형태의 입력을 uploads/ 기준 상대경로로 정규화한다. */
     public String normalizeFilePath(String rawPath) {
         if (!StringUtils.hasText(rawPath)) {
             return null;
         }
-
-        String trimmed = rawPath.trim();
-        String decoded = decodeIfNecessary(extractRelativePath(trimmed));
+        String decoded = decodeIfNecessary(extractRelativePath(rawPath.trim()));
         if (!StringUtils.hasText(decoded)) {
             return null;
         }
         return decoded.replace("\\", "/");
     }
 
+    /** ?path= 쿼리 파라미터 → /uploads/ 경로 → 절대경로 순으로 상대경로를 추출한다. */
     private String extractRelativePath(String value) {
         try {
             URI uri = URI.create(value);
@@ -110,29 +104,26 @@ public class AttachmentFileService {
             if (StringUtils.hasText(query)) {
                 for (String param : query.split("&")) {
                     int idx = param.indexOf('=');
-                    if (idx > -1) {
-                        String key = param.substring(0, idx);
-                        if ("path".equals(key)) {
-                            return param.substring(idx + 1);
-                        }
+                    if (idx > -1 && "path".equals(param.substring(0, idx))) {
+                        return param.substring(idx + 1);
                     }
                 }
             }
-
             String uriPath = uri.getPath();
             if (StringUtils.hasText(uriPath)) {
-                String marker = "/uploads/";
-                int markerIndex = uriPath.indexOf(marker);
+                int markerIndex = uriPath.indexOf("/uploads/");
                 if (markerIndex >= 0) {
-                    return uriPath.substring(markerIndex + marker.length());
+                    return uriPath.substring(markerIndex + "/uploads/".length());
                 }
                 if (uriPath.startsWith("/")) {
                     return uriPath.substring(1);
                 }
+                if (uriPath.startsWith("uploads/")) {
+                    return uriPath.substring("uploads/".length());
+                }
                 return uriPath;
             }
         } catch (IllegalArgumentException ignored) {
-            // treat as plain string
         }
         return value;
     }
@@ -148,6 +139,7 @@ public class AttachmentFileService {
         }
     }
 
+    /** providedType이 없으면 실제 파일을 읽어 MIME 타입을 감지한다. 감지 실패 시 null 반환. */
     private String resolveMimeType(String relativePath, String providedType) {
         if (StringUtils.hasText(providedType)) {
             return providedType.toLowerCase();
@@ -173,6 +165,7 @@ public class AttachmentFileService {
         return dto;
     }
 
+    /** 상대경로를 /api/uploads/file?path=... 형태의 다운로드 URL로 변환한다. */
     public String buildDownloadUrl(String relativePath) {
         if (!StringUtils.hasText(relativePath)) {
             return null;
@@ -183,12 +176,7 @@ public class AttachmentFileService {
                 .toUriString();
     }
 
-    /**
-     * 첨부파일 목록에서 첫 번째 파일의 다운로드 URL 추출
-     * [리팩토링] BoardService, CommentService, MissingPetBoardService, MissingPetCommentService 중복 제거 → 공통화
-     * @param attachments 첨부파일 목록 (null/empty 허용)
-     * @return downloadUrl이 있으면 반환, 없으면 filePath로 buildDownloadUrl 생성
-     */
+    /** 첨부파일 목록에서 첫 번째 파일의 다운로드 URL을 반환한다. 목록이 비어 있으면 null. */
     public String extractPrimaryFileUrl(List<? extends FileDTO> attachments) {
         if (attachments == null || attachments.isEmpty()) {
             return null;
