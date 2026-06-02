@@ -19,6 +19,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 
 @Slf4j
+/** JWT 인증 필터. 요청마다 Authorization 헤더의 토큰을 검증하고 SecurityContext에 인증 정보를 설정한다. */
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
