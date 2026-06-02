@@ -7,6 +7,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+/** 사용자 활동 내역 응답 DTO. 활동 유형(CARE_REQUEST·BOARD·COMMENT 등)·제목·생성 시각을 포함한다. */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

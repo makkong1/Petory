@@ -14,6 +14,7 @@ import com.google.firebase.FirebaseOptions;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 
+/** Firebase 초기화 설정. 서비스 계정 키를 사용해 FirebaseApp을 등록하며, FCM 푸시 알림에 사용된다. */
 @Slf4j
 @Configuration
 public class FirebaseConfig {

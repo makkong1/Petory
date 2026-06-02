@@ -14,6 +14,7 @@ import com.linkup.Petory.global.security.AuthenticatedUserIdResolver;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
+/** FCM 디바이스 토큰 등록·삭제 API. 푸시 알림 전송을 위해 사용자 기기 토큰을 관리한다. */
 @RestController
 @RequestMapping("/api/fcm")
 @RequiredArgsConstructor

@@ -5,6 +5,7 @@ import com.linkup.Petory.domain.notification.entity.Notification;
 
 import org.springframework.stereotype.Component;
 
+/** Notification 엔티티 ↔ NotificationDTO 변환기. */
 @Component
 public class NotificationConverter {
 

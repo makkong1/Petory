@@ -18,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
+/** 관리자용 첨부파일 목록 조회·삭제를 처리하는 퍼사드. */
 public class AdminFileFacade {
 
     private final AttachmentFileRepository fileRepository;

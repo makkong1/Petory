@@ -9,6 +9,7 @@ import com.linkup.Petory.domain.user.entity.Users;
 @Table(name = "locationservicereview", uniqueConstraints = {
         @UniqueConstraint(columnNames = { "service_idx", "user_idx" })
 })
+/** 위치 기반 서비스 리뷰 엔티티. 서비스에 대한 별점과 내용을 저장한다. */
 @Getter
 @Setter
 @NoArgsConstructor

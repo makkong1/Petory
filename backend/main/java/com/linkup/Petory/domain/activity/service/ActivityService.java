@@ -28,6 +28,7 @@ import com.linkup.Petory.domain.user.repository.UsersRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+/** 사용자의 케어 요청·게시글·댓글 등 여러 도메인 활동 내역을 통합 조회하는 서비스. */
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)

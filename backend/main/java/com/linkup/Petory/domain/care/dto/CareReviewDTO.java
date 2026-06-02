@@ -12,6 +12,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 
 @Data
+/** 펫케어 리뷰 응답/요청 DTO. 별점(1-5)·내용·리뷰어 정보를 포함한다. */
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder

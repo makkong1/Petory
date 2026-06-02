@@ -7,6 +7,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+/** 사용자 활동 내역 페이징 응답 DTO. */
 @Data
 @Builder
 @NoArgsConstructor

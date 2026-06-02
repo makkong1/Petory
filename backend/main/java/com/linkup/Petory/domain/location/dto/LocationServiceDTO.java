@@ -4,6 +4,7 @@ import lombok.*;
 
 import java.util.List;
 
+/** 위치 기반 서비스(동물병원·펫숍 등) 응답 DTO. 위치·카테고리·평점·리뷰 수를 포함한다. */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

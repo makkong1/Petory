@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 
+/** 모임 생성 시 그룹 채팅방을 자동으로 생성하는 서비스. */
 @Slf4j
 @Service
 @RequiredArgsConstructor

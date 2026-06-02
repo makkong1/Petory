@@ -19,6 +19,7 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
+/** 관리자용 신고 조회·처리를 담당하는 퍼사드. */
 public class AdminReportFacade {
 
     private final ReportService reportService;

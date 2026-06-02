@@ -19,6 +19,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+/** 댓글 리액션(좋아요/싫어요) 엔티티. 사용자 1명이 댓글 1개에 1개의 리액션만 가질 수 있다. */
 @Entity
 @Table(name = "comment_reaction", uniqueConstraints = {
         @UniqueConstraint(columnNames = { "comment_idx", "user_idx" })

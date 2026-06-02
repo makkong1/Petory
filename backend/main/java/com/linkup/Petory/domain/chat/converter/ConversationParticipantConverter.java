@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 import com.linkup.Petory.domain.chat.dto.ConversationParticipantDTO;
 import com.linkup.Petory.domain.chat.entity.ConversationParticipant;
 
+/** ConversationParticipant 엔티티 → ConversationParticipantDTO 변환기. */
 @Component
 public class ConversationParticipantConverter {
 

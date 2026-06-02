@@ -20,6 +20,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/** 위치 기반 서비스(동물병원·펫숍 등) 리뷰 작성·조회·삭제 API. */
 @Slf4j
 @RestController
 @RequestMapping("/api/location-service-reviews")

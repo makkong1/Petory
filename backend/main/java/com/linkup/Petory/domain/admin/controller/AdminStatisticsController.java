@@ -17,6 +17,7 @@ import java.util.List;
 @RequestMapping("/api/admin/statistics")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('MASTER')")
+/** 관리자용 일별·주간·월간 통계 조회 및 backfill API. [MASTER] */
 public class AdminStatisticsController {
 
     private final StatisticsService statisticsService;
@@ -32,13 +33,13 @@ public class AdminStatisticsController {
 
     @GetMapping("/weekly")
     public ResponseEntity<List<WeeklyStatisticsResponse>> getWeeklyStatistics(
-            @RequestParam(defaultValue = "#{T(java.time.LocalDate).now().getYear()}") int year) {
+            @RequestParam(name = "year", defaultValue = "#{T(java.time.LocalDate).now().getYear()}") int year) {
         return ResponseEntity.ok(statisticsService.getWeeklyStatistics(year));
     }
 
     @GetMapping("/monthly")
     public ResponseEntity<List<MonthlyStatisticsResponse>> getMonthlyStatistics(
-            @RequestParam(defaultValue = "#{T(java.time.LocalDate).now().getYear()}") int year) {
+            @RequestParam(name = "year", defaultValue = "#{T(java.time.LocalDate).now().getYear()}") int year) {
         return ResponseEntity.ok(statisticsService.getMonthlyStatistics(year));
     }
 

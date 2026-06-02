@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 @EntityListeners(AuditingEntityListener.class)
+/** 관리자 행위 감사 로그. 어떤 관리자가 어떤 대상에 어떤 작업을 했는지 기록한다. */
 public class AdminAuditLog {
 
     @Id

@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/** 모임 생성·조회·참가·취소·좋아요 API. */
 @RestController
 @RequestMapping("/api/meetups")
 @RequiredArgsConstructor

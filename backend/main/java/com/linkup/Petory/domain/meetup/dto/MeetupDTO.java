@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Data
+/** 모임 응답/요청 DTO. 모임 정보·참여자 목록·좋아요 수·현재 사용자 참여 여부를 포함한다. */
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder

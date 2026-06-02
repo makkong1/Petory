@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/admin/care-requests")
 @RequiredArgsConstructor
 @PreAuthorize("hasAnyRole('ADMIN','MASTER')")
+/** 관리자용 케어 요청 목록 조회·상태 변경·삭제·복구 API. [ADMIN, MASTER] */
 public class AdminCareRequestController {
 
     private final AdminCareAndMeetupFacade facade;
@@ -20,11 +21,11 @@ public class AdminCareRequestController {
 
     @GetMapping
     public ResponseEntity<Page<CareRequestDTO>> listCareRequests(
-            @RequestParam(required = false) String status,
-            @RequestParam(required = false) Boolean deleted,
-            @RequestParam(required = false) String q,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(name = "status", required = false) String status,
+            @RequestParam(name = "deleted", required = false) Boolean deleted,
+            @RequestParam(name = "q", required = false) String q,
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "20") int size) {
         return ResponseEntity.ok(facade.getCareRequests(status, deleted, q, page, size));
     }
 

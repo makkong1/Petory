@@ -11,6 +11,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+/** 실종 반려동물 댓글 응답 DTO. 목격 위치(주소·위경도)와 첨부파일을 포함한다. */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

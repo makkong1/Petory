@@ -5,6 +5,7 @@ import lombok.*;
 
 import com.linkup.Petory.domain.common.BaseTimeEntity;
 
+/** 소셜 로그인 연동 정보 엔티티. Provider(KAKAO/GOOGLE/NAVER)별 ID와 원본 프로필 데이터를 저장한다. */
 @Entity
 @Table(name = "socialuser")
 @Getter

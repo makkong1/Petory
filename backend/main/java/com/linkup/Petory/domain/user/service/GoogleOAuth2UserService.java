@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.Map;
 
+/** Google OAuth2 사용자 정보 로더. 표준 attributes를 그대로 반환하고 전역 컬렉터에 원본 데이터를 저장한다. */
 @Slf4j
 @Service
 @RequiredArgsConstructor

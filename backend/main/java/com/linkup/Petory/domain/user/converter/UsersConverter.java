@@ -11,6 +11,7 @@ import com.linkup.Petory.domain.user.entity.Users;
 
 import lombok.RequiredArgsConstructor;
 
+/** Users 엔티티 ↔ UsersDTO 변환기. 응답 시 password는 제외하고, 소셜 계정 목록을 함께 변환한다. */
 @Component
 @RequiredArgsConstructor
 public class UsersConverter {

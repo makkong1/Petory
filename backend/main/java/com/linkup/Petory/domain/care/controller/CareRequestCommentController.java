@@ -13,6 +13,7 @@ import com.linkup.Petory.domain.care.service.CareRequestCommentService;
 
 import lombok.RequiredArgsConstructor;
 
+/** 펫케어 요청 댓글 조회·작성·삭제 API. */
 @RestController
 @RequestMapping("/api/care-requests/{careRequestId}/comments")
 @RequiredArgsConstructor

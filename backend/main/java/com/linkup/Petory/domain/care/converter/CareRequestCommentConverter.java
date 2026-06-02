@@ -5,6 +5,7 @@ import org.springframework.stereotype.Component;
 import com.linkup.Petory.domain.care.dto.CareRequestCommentDTO;
 import com.linkup.Petory.domain.care.entity.CareRequestComment;
 
+/** CareRequestComment 엔티티 → CareRequestCommentDTO 변환기. */
 @Component
 public class CareRequestCommentConverter {
 

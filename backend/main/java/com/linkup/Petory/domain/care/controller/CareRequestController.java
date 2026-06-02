@@ -16,6 +16,7 @@ import com.linkup.Petory.global.security.AuthenticatedUserIdResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+/** 펫케어 요청 생성·조회·지원·진행·완료 API. */
 @Slf4j
 @RestController
 @RequestMapping("/api/care-requests")

@@ -13,6 +13,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 
 @Data
+/** 펫케어 요청 댓글 응답/요청 DTO. */
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder

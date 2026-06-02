@@ -8,6 +8,7 @@ import lombok.*;
 
 import java.time.LocalDateTime;
 
+/** 위치 서비스 리뷰 응답/요청 DTO. 별점·내용·리뷰어 정보를 포함한다. */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

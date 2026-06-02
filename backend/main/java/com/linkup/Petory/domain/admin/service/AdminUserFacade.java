@@ -25,6 +25,7 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
+/** 관리자용 일반 사용자·관리자 계정 조회·상태 변경·생성·삭제를 처리하는 퍼사드. */
 public class AdminUserFacade {
 
     private final UsersRepository usersRepository;

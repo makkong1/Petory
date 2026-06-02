@@ -10,6 +10,7 @@ import lombok.Setter;
 
 import java.time.LocalDate;
 
+/** 게시글 인기 스냅샷. 주간·월간 기간별 좋아요·댓글·조회 수와 랭킹을 기록한다. */
 @Entity
 @Table(name = "board_popularity_snapshot")
 @Getter

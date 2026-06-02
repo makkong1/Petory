@@ -12,6 +12,7 @@ import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 
+/** 댓글 응답/요청 DTO. 작성자·좋아요/싫어요 수·첨부파일을 포함한다. */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

@@ -1,5 +1,6 @@
 package com.linkup.Petory.global.security;
 
+/** @PreAuthorize 등에서 사용하는 역할 상수. ROLE_ 접두사 포함 버전과 미포함 버전을 제공한다. */
 public final class RoleConstants {
 
     private RoleConstants() {}

@@ -19,6 +19,11 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/pet-recommend")
 @RequiredArgsConstructor
+/**
+ * 반려생활 추천 API 진입점.
+ *
+ * <p>추천 조회, 사용자 signal 조회, 장소 상호작용 기록 엔드포인트를 제공한다.
+ */
 public class PetRecommendationController {
 
     private final PetRecommendationService   petRecommendationService;
@@ -26,6 +31,7 @@ public class PetRecommendationController {
     private final PlaceInteractionService    interactionService;
     private final AuthenticatedUserIdResolver userIdResolver;
 
+    /** 자연어 텍스트와 사용자 위치를 받아 추천 시설 목록을 반환한다. */
     @GetMapping
     public ResponseEntity<PetRecommendResponse> recommend(
             @RequestParam("lat") double lat,
@@ -37,12 +43,14 @@ public class PetRecommendationController {
                 petRecommendationService.recommend(text, lat, lng, radius, petType));
     }
 
+    /** 로그인 사용자의 최근 유효 의도 signal 카드 데이터를 조회한다. */
     @GetMapping("/signals")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<UserPetIntentSignalResponse>> getSignals() {
         return ResponseEntity.ok(signalService.getActiveSignals(userIdResolver.requireCurrentUserIdx()));
     }
 
+    /** 추천 결과에서 발생한 사용자 행동(조회/길찾기/관심)을 로그로 적재한다. */
     @PostMapping("/interact")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Void> interact(

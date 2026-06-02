@@ -14,6 +14,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 
+/** OAuth2 인증 실패 핸들러. 에러 메시지를 쿼리 파라미터로 담아 프론트엔드 콜백 URL로 리다이렉트한다. */
 @Slf4j
 @Component
 public class OAuth2FailureHandler extends SimpleUrlAuthenticationFailureHandler {

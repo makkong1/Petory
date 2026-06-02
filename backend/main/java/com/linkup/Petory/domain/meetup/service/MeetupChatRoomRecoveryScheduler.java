@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 
+/** 채팅방 없이 생성된 모임에 채팅방을 복구하는 스케줄러. 5분 주기로 실행된다. */
 @Slf4j
 @Component
 @RequiredArgsConstructor

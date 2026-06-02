@@ -7,6 +7,7 @@ import com.linkup.Petory.domain.care.entity.CareApplication;
 
 import lombok.RequiredArgsConstructor;
 
+/** CareApplication 엔티티 → CareApplicationDTO 변환기. */
 @Component
 @RequiredArgsConstructor
 public class CareApplicationConverter {

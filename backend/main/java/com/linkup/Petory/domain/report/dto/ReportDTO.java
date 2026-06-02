@@ -9,6 +9,7 @@ import com.linkup.Petory.domain.report.entity.ReportTargetType;
 import lombok.Builder;
 import lombok.Value;
 
+/** 신고 응답 DTO. 신고 대상 유형·ID·신고 사유·처리 상태를 포함한다. */
 @Value
 @Builder
 public class ReportDTO {

@@ -5,6 +5,7 @@ import org.springframework.stereotype.Component;
 import com.linkup.Petory.domain.report.dto.ReportDTO;
 import com.linkup.Petory.domain.report.entity.Report;
 
+/** Report 엔티티 → ReportDTO / ReportDetailDTO 변환기. */
 @Component
 public class ReportConverter {
 

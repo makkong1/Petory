@@ -1,5 +1,6 @@
 package com.linkup.Petory.domain.chat.entity;
 
+/** 대화방 유형. DIRECT·GROUP·CARE_REQUEST·MISSING_PET·MEETUP·ADMIN_SUPPORT. */
 public enum ConversationType {
     DIRECT,           // 1:1 일반 채팅
     GROUP,            // 그룹 채팅

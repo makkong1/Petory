@@ -30,6 +30,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+/** 실종 반려동물 게시글 엔티티. 반려동물 특징·실종 위치·현황(MISSING/FOUND/RESOLVED)을 관리한다. */
 @Entity
 @Table(name = "MissingPetBoard")
 @Getter

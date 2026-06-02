@@ -21,6 +21,7 @@ import lombok.RequiredArgsConstructor;
 @RequestMapping("/api/admin/boards")
 @RequiredArgsConstructor
 @PreAuthorize("hasAnyRole('ADMIN','MASTER')")
+/** 관리자용 게시글·댓글 조회·블라인드·삭제·복구 API. [ADMIN, MASTER] */
 public class AdminBoardController {
 
     private final BoardService boardService;

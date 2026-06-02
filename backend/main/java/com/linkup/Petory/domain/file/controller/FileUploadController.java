@@ -27,6 +27,7 @@ import com.linkup.Petory.domain.file.service.FileStorageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+/** 파일 업로드·삭제 API. 도메인별 첨부파일(게시글·댓글·케어 등)을 S3에 저장하고 관리한다. */
 @Slf4j
 @RestController
 @RequestMapping("/api/uploads")

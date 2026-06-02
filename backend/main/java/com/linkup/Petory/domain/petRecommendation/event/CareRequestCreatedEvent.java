@@ -3,6 +3,7 @@ package com.linkup.Petory.domain.petRecommendation.event;
 import lombok.Getter;
 import org.springframework.context.ApplicationEvent;
 
+/** 케어 요청 작성 직후 NLP signal 분석을 요청하기 위한 이벤트. */
 @Getter
 public class CareRequestCreatedEvent extends ApplicationEvent {
     private final Long userIdx;

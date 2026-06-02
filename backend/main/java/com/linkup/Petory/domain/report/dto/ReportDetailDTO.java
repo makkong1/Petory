@@ -3,6 +3,7 @@ package com.linkup.Petory.domain.report.dto;
 import lombok.Builder;
 import lombok.Value;
 
+/** 신고 상세 응답 DTO. 신고 정보에 신고 대상 미리보기(TargetPreview)를 포함한다. */
 @Value
 @Builder
 public class ReportDetailDTO {
