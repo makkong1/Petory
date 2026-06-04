@@ -55,4 +55,9 @@ public class JpaBoardReactionAdapter implements BoardReactionRepository {
     public List<Object[]> countByBoardsAndReactionType(List<Long> boardIds, ReactionType reactionType) {
         return jpaRepository.countByBoardsAndReactionType(boardIds, reactionType);
     }
+
+    @Override
+    public int insertIgnore(Long boardId, Long userId, String reactionType) {
+        return jpaRepository.insertIgnore(boardId, userId, reactionType);
+    }
 }

@@ -14,4 +14,12 @@ public class LocationSearchPerformedEvent extends ApplicationEvent {
         this.userIdx  = userIdx;
         this.keyword  = keyword;
     }
+
+    public Long getUserIdx() {
+        return userIdx;
+    }
+
+    public String getKeyword() {
+        return keyword;
+    }
 }

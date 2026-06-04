@@ -16,3 +16,10 @@ ALTER TABLE board_popularity_snapshot
         ON UPDATE CURRENT_TIMESTAMP
         AFTER created_at;
 UPDATE board_popularity_snapshot SET updated_at = created_at;
+
+-- user_pet_intent_signal — signal INSERT 시 updated_at
+ALTER TABLE user_pet_intent_signal
+    ADD COLUMN updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        ON UPDATE CURRENT_TIMESTAMP
+        AFTER created_at;
+UPDATE user_pet_intent_signal SET updated_at = created_at;

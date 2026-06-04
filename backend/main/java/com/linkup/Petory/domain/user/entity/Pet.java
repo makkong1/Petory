@@ -82,6 +82,16 @@ public class Pet extends BaseTimeEntity {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
+    public void softDelete() {
+        this.isDeleted = true;
+        this.deletedAt = LocalDateTime.now();
+    }
+
+    public void restore() {
+        this.isDeleted = false;
+        this.deletedAt = null;
+    }
+
     // [3단계 최적화] PetVaccination N+1 문제 해결: @BatchSize 사용
     // Hibernate의 중첩 컬렉션 FETCH JOIN 제한으로 인해 @BatchSize로 대체
     @OneToMany(mappedBy = "pet", cascade = CascadeType.ALL, fetch = FetchType.LAZY)

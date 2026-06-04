@@ -43,6 +43,8 @@ public class LocationServiceReview extends BaseTimeEntity {
     @Column(name = "deleted_at")
     private java.time.LocalDateTime deletedAt;
 
-    // createdAt, updatedAt은 BaseTimeEntity에서 상속받음
-    // @PrePersist, @PreUpdate는 BaseTimeEntity의 @EntityListeners가 자동 처리
+    public void softDelete() {
+        this.isDeleted = true;
+        this.deletedAt = java.time.LocalDateTime.now();
+    }
 }

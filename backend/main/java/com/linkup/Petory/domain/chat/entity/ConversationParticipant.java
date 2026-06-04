@@ -87,6 +87,11 @@ public class ConversationParticipant extends BaseTimeEntity {
         }
     }
 
+    public void softDelete() {
+        this.isDeleted = true;
+        this.deletedAt = LocalDateTime.now();
+    }
+
     // 읽지 않은 메시지 수 증가
     public void incrementUnreadCount() {
         if (this.unreadCount == null) {

@@ -17,6 +17,8 @@ public interface BoardReactionRepository {
 
     void delete(BoardReaction reaction);
 
+    int insertIgnore(Long boardId, Long userId, String reactionType);
+
     long countByBoardAndReactionType(Board board, ReactionType reactionType);
 
     Optional<BoardReaction> findByBoardAndUser(Board board, Users user);

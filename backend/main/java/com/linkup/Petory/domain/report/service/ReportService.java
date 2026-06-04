@@ -1,6 +1,5 @@
 package com.linkup.Petory.domain.report.service;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -178,11 +177,7 @@ public class ReportService {
         Users admin = usersRepository.findById(adminUserId)
                 .orElseThrow(UserNotFoundException::new);
 
-        report.setStatus(req.getStatus());
-        report.setHandledBy(admin);
-        report.setHandledAt(LocalDateTime.now());
-        report.setAdminNote(req.getAdminNote());
-        report.setActionTaken(req.getActionTaken() != null ? req.getActionTaken() : ReportActionType.NONE);
+        report.handle(admin, req.getStatus(), req.getActionTaken(), req.getAdminNote());
 
         // 제재 조치가 있으면 자동 적용
         if (req.getActionTaken() != null

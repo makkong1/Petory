@@ -141,4 +141,29 @@ public class JpaBoardAdapter implements BoardRepository {
     public List<Board> findAllForAdmin() {
         return jpaRepository.findAllForAdmin();
     }
+
+    @Override
+    public void incrementViewCount(Long idx) {
+        jpaRepository.incrementViewCount(idx);
+    }
+
+    @Override
+    public void adjustLikeCount(Long idx, int delta) {
+        jpaRepository.adjustLikeCount(idx, delta);
+    }
+
+    @Override
+    public void adjustDislikeCount(Long idx, int delta) {
+        jpaRepository.adjustDislikeCount(idx, delta);
+    }
+
+    @Override
+    public void adjustCommentCount(Long idx, int delta) {
+        jpaRepository.adjustCommentCount(idx, delta);
+    }
+
+    @Override
+    public void updateLastReactionAt(Long idx, java.time.LocalDateTime at) {
+        jpaRepository.updateLastReactionAt(idx, at);
+    }
 }

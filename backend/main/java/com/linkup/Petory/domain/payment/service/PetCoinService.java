@@ -51,10 +51,8 @@ public class PetCoinService {
                 .orElseThrow(() -> new UserNotFoundException());
 
         Integer balanceBefore = currentUser.getPetCoinBalance();
-        Integer balanceAfter = balanceBefore + amount;
-
-        // 잔액 업데이트
-        currentUser.setPetCoinBalance(balanceAfter);
+        currentUser.creditCoins(amount);
+        Integer balanceAfter = currentUser.getPetCoinBalance();
         usersRepository.save(currentUser);
 
         // 거래 내역 기록
@@ -99,16 +97,11 @@ public class PetCoinService {
 
         Integer balanceBefore = currentUser.getPetCoinBalance();
 
-        // [FIX] IllegalStateException → InsufficientBalanceException (HTTP 400, errorCode=INSUFFICIENT_BALANCE)
-        // 클라이언트·모니터링 시스템이 잔액 부족을 일반 서버 오류와 구분 가능
         if (balanceBefore < amount) {
             throw InsufficientBalanceException.of(balanceBefore, amount);
         }
-
-        Integer balanceAfter = balanceBefore - amount;
-
-        // 잔액 업데이트
-        currentUser.setPetCoinBalance(balanceAfter);
+        currentUser.debitCoins(amount);
+        Integer balanceAfter = currentUser.getPetCoinBalance();
         usersRepository.save(currentUser);
 
         // 거래 내역 기록
@@ -154,10 +147,8 @@ public class PetCoinService {
                 .orElseThrow(() -> new UserNotFoundException());
 
         Integer balanceBefore = currentUser.getPetCoinBalance();
-        Integer balanceAfter = balanceBefore + amount;
-
-        // 잔액 업데이트
-        currentUser.setPetCoinBalance(balanceAfter);
+        currentUser.creditCoins(amount);
+        Integer balanceAfter = currentUser.getPetCoinBalance();
         usersRepository.save(currentUser);
 
         // 거래 내역 기록
@@ -203,10 +194,8 @@ public class PetCoinService {
                 .orElseThrow(() -> new UserNotFoundException());
 
         Integer balanceBefore = currentUser.getPetCoinBalance();
-        Integer balanceAfter = balanceBefore + amount;
-
-        // 잔액 업데이트
-        currentUser.setPetCoinBalance(balanceAfter);
+        currentUser.creditCoins(amount);
+        Integer balanceAfter = currentUser.getPetCoinBalance();
         usersRepository.save(currentUser);
 
         // 거래 내역 기록

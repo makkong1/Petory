@@ -126,8 +126,7 @@ public class CareRequestCommentService {
                         throw CareForbiddenException.commentOwnerOnly();
                 }
 
-                comment.setIsDeleted(true);
-                comment.setDeletedAt(java.time.LocalDateTime.now());
+                comment.softDelete();
                 commentRepository.save(comment);
         }
 }

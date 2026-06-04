@@ -4,8 +4,10 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.board.entity.Comment;
@@ -30,5 +32,10 @@ public interface SpringDataJpaCommentReactionRepository extends JpaRepository<Co
            "WHERE cr.comment.idx IN :commentIds " +
            "GROUP BY cr.comment.idx, cr.reactionType")
     List<Object[]> countByCommentsGroupByReactionType(@Param("commentIds") List<Long> commentIds);
+
+    @Modifying
+    @Transactional
+    @Query(value = "INSERT IGNORE INTO comment_reaction (comment_idx, user_idx, reaction_type) VALUES (:commentId, :userId, :reactionType)", nativeQuery = true)
+    int insertIgnore(@Param("commentId") Long commentId, @Param("userId") Long userId, @Param("reactionType") String reactionType);
 }
 

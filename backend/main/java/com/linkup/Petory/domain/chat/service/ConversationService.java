@@ -255,8 +255,7 @@ public class ConversationService {
 
                 participant.setStatus(ParticipantStatus.LEFT);
                 participant.setLeftAt(LocalDateTime.now());
-                participant.setIsDeleted(true);
-                participant.setDeletedAt(LocalDateTime.now());
+                participant.softDelete();
                 participantRepository.save(participant);
 
                 // 참여자가 없으면 채팅방 비활성화
@@ -266,7 +265,7 @@ public class ConversationService {
                 if (activeParticipants.isEmpty()) {
                         Conversation conversation = conversationRepository.findById(conversationIdx)
                                         .orElseThrow();
-                        conversation.setStatus(ConversationStatus.CLOSED);
+                        conversation.close();
                         conversationRepository.save(conversation);
                 }
         }
@@ -283,8 +282,7 @@ public class ConversationService {
                 participantRepository.findByConversationIdxAndUserIdx(conversationIdx, userId)
                                 .orElseThrow(ChatForbiddenException::notParticipant);
 
-                conversation.setIsDeleted(true);
-                conversation.setDeletedAt(LocalDateTime.now());
+                conversation.softDelete();
                 conversationRepository.save(conversation);
         }
 
@@ -575,12 +573,11 @@ public class ConversationService {
                                                                         .saveAndFlush(newApplication);
                                                 } else {
                                                         // 이미 있으면 승인 상태로 변경
-                                                        existingApplication.setStatus(CareApplicationStatus.ACCEPTED);
+                                                        existingApplication.accept();
                                                         finalApplication = existingApplication;
                                                 }
 
-                                                // CareRequest 상태를 IN_PROGRESS로 변경
-                                                careRequest.setStatus(CareRequestStatus.IN_PROGRESS);
+                                                careRequest.transitionTo(CareRequestStatus.IN_PROGRESS);
                                                 careRequestRepository.save(careRequest);
 
                                                 // 펫코인 차감 및 에스크로 생성

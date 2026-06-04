@@ -83,9 +83,18 @@ public class UserPetIntentSignalService {
             return;
         }
 
+        final String categoriesJson;
+        final String tagsJson;
         try {
-            String categoriesJson = objectMapper.writeValueAsString(analysis.getRecommendedCategories());
-            String tagsJson = objectMapper.writeValueAsString(analysis.getIntentTags());
+            categoriesJson = objectMapper.writeValueAsString(analysis.getRecommendedCategories());
+            tagsJson = objectMapper.writeValueAsString(analysis.getIntentTags());
+        } catch (Exception e) {
+            log.warn("[Signal] 저장 스킵 — JSON 직렬화 실패. userIdx={} domain={}",
+                    userIdx, analysis.getIntentDomain(), e);
+            return;
+        }
+
+        try {
             UserPetIntentSignal signal = UserPetIntentSignal.builder()
                     .userIdx(userIdx)
                     .sourceType(sourceType)
@@ -102,8 +111,7 @@ public class UserPetIntentSignalService {
                     userIdx, sourceType, sourceId, analysis.getIntentDomain(),
                     analysis.getConfidence(), SIGNAL_TTL_DAYS);
         } catch (Exception e) {
-            // categories/tags JSON 직렬화 실패 시 row 미생성 (분석 결과만 버림)
-            log.warn("[Signal] 저장 실패 — JSON 직렬화 오류. userIdx={} domain={}",
+            log.warn("[Signal] 저장 실패 — DB 오류(스키마·연결 등). userIdx={} domain={}",
                     userIdx, analysis.getIntentDomain(), e);
         }
     }

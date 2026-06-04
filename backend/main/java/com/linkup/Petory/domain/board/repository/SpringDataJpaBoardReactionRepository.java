@@ -4,8 +4,10 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.board.entity.Board;
@@ -37,5 +39,10 @@ public interface SpringDataJpaBoardReactionRepository extends JpaRepository<Boar
            "WHERE br.board.idx IN :boardIds AND br.reactionType = :reactionType " +
            "GROUP BY br.board.idx")
     List<Object[]> countByBoardsAndReactionType(@Param("boardIds") List<Long> boardIds, @Param("reactionType") ReactionType reactionType);
+
+    @Modifying
+    @Transactional
+    @Query(value = "INSERT IGNORE INTO board_reaction (board_idx, user_idx, reaction_type) VALUES (:boardId, :userId, :reactionType)", nativeQuery = true)
+    int insertIgnore(@Param("boardId") Long boardId, @Param("userId") Long userId, @Param("reactionType") String reactionType);
 }
 

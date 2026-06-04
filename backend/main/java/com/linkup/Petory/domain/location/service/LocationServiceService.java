@@ -332,8 +332,7 @@ public class LocationServiceService {
             throw new LocationServiceAlreadyDeletedException();
         }
 
-        service.setIsDeleted(true);
-        service.setDeletedAt(java.time.LocalDateTime.now());
+        service.softDelete();
         locationServiceRepository.save(service);
 
         log.info("위치 서비스가 삭제되었습니다. serviceIdx: {}", serviceIdx);

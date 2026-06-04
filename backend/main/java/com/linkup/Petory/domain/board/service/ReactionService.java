@@ -49,40 +49,39 @@ public class ReactionService {
         boolean toggledOff = false;
 
         if (existing.isPresent() && existing.get().getReactionType() == reactionType) {
-            // 같은 반응을 다시 클릭하면 삭제 (토글)
             previousReactionType = existing.get().getReactionType();
             currentReactionType = null;
             toggledOff = true;
             boardReactionRepository.delete(existing.get());
-            // 삭제 시에는 lastReactionAt을 업데이트하지 않음 (마지막 반응 시간 유지)
         } else if (existing.isPresent()) {
-            // 반응 타입 변경 (예: 좋아요 -> 싫어요)
             previousReactionType = existing.get().getReactionType();
-            BoardReaction reaction = existing.get();
-            reaction.setReactionType(reactionType);
-            boardReactionRepository.save(reaction);
-            board.setLastReactionAt(LocalDateTime.now());
+            existing.get().setReactionType(reactionType);
+            boardReactionRepository.save(existing.get());
+            boardRepository.updateLastReactionAt(boardId, LocalDateTime.now());
         } else {
-            // 새로운 반응 추가
-            BoardReaction reaction = BoardReaction.builder()
-                    .board(board)
-                    .user(user)
-                    .reactionType(reactionType)
-                    .build();
-            boardReactionRepository.save(reaction);
-            board.setLastReactionAt(LocalDateTime.now());
+            int inserted = boardReactionRepository.insertIgnore(boardId, userId, reactionType.name());
+            if (inserted == 0) {
+                return getBoardSummary(boardId, userId);
+            }
+            boardRepository.updateLastReactionAt(boardId, LocalDateTime.now());
         }
 
-        // likeCount, dislikeCount 실시간 업데이트
-        updateBoardReactionCounts(board, previousReactionType, currentReactionType);
-        boardRepository.save(board);
+        // 원자적 카운트 조정
+        int likeDelta = 0;
+        int dislikeDelta = 0;
+        if (previousReactionType == ReactionType.LIKE) likeDelta--;
+        else if (previousReactionType == ReactionType.DISLIKE) dislikeDelta--;
+        if (currentReactionType == ReactionType.LIKE) likeDelta++;
+        else if (currentReactionType == ReactionType.DISLIKE) dislikeDelta++;
 
-        // 반응 변경 후 summary는 엔티티 값 사용 (DB 재조회 불필요)
+        if (likeDelta != 0) boardRepository.adjustLikeCount(boardId, likeDelta);
+        if (dislikeDelta != 0) boardRepository.adjustDislikeCount(boardId, dislikeDelta);
+
+        // 반환값: 메모리 내 기존 값 + delta (DB 재조회 불필요)
+        int newLikeCount = Math.max(0, (board.getLikeCount() != null ? board.getLikeCount() : 0) + likeDelta);
+        int newDislikeCount = Math.max(0, (board.getDislikeCount() != null ? board.getDislikeCount() : 0) + dislikeDelta);
         ReactionType userReaction = toggledOff ? null : reactionType;
-        return buildBoardSummaryFromCounts(
-                board.getLikeCount() != null ? board.getLikeCount() : 0,
-                board.getDislikeCount() != null ? board.getDislikeCount() : 0,
-                userReaction);
+        return buildBoardSummaryFromCounts(newLikeCount, newDislikeCount, userReaction);
     }
 
     @Transactional(readOnly = true)
@@ -102,23 +101,22 @@ public class ReactionService {
                 .orElseThrow(() -> new UserNotFoundException());
 
         Optional<CommentReaction> existing = commentReactionRepository.findByCommentAndUser(comment, user);
-        if (existing.isPresent() && existing.get().getReactionType() == reactionType) {
+        // 뮤테이션 전에 이전 타입을 저장 — 이후 setReactionType이 같은 객체를 변경하기 때문
+        ReactionType previousType = existing.map(CommentReaction::getReactionType).orElse(null);
+
+        if (existing.isPresent() && previousType == reactionType) {
             commentReactionRepository.delete(existing.get());
         } else if (existing.isPresent()) {
-            CommentReaction reaction = existing.get();
-            reaction.setReactionType(reactionType);
-            commentReactionRepository.save(reaction);
+            existing.get().setReactionType(reactionType);
+            commentReactionRepository.save(existing.get());
         } else {
-            CommentReaction reaction = CommentReaction.builder()
-                    .comment(comment)
-                    .user(user)
-                    .reactionType(reactionType)
-                    .build();
-            commentReactionRepository.save(reaction);
+            int inserted = commentReactionRepository.insertIgnore(commentId, userId, reactionType.name());
+            if (inserted == 0) {
+                return getCommentSummary(commentId, userId);
+            }
         }
 
-        // userReaction은 반응 변경 결과로 알 수 있음 (findByCommentAndUser 재조회 불필요)
-        boolean toggledOff = (existing.isPresent() && existing.get().getReactionType() == reactionType);
+        boolean toggledOff = (previousType == reactionType);
         ReactionType userReaction = toggledOff ? null : reactionType;
         return buildCommentSummaryWithUserReaction(comment, userReaction);
     }
@@ -179,34 +177,4 @@ public class ReactionService {
                 userReaction);
     }
 
-    /**
-     * 게시글의 likeCount, dislikeCount를 실시간으로 업데이트
-     * [리팩토링] Board 엔티티 dislikeCount 추가, buildBoardSummary count 쿼리 제거
-     *
-     * @param board                게시글 엔티티
-     * @param previousReactionType 이전 반응 타입 (null이면 새로 추가)
-     * @param currentReactionType  현재 반응 타입 (null이면 삭제/토글)
-     */
-    private void updateBoardReactionCounts(Board board, ReactionType previousReactionType,
-            ReactionType currentReactionType) {
-        Integer likeCount = board.getLikeCount() != null ? board.getLikeCount() : 0;
-        Integer dislikeCount = board.getDislikeCount() != null ? board.getDislikeCount() : 0;
-
-        // 이전 반응 제거
-        if (previousReactionType == ReactionType.LIKE) {
-            likeCount = Math.max(0, likeCount - 1);
-        } else if (previousReactionType == ReactionType.DISLIKE) {
-            dislikeCount = Math.max(0, dislikeCount - 1);
-        }
-
-        // 현재 반응 추가
-        if (currentReactionType == ReactionType.LIKE) {
-            likeCount = likeCount + 1;
-        } else if (currentReactionType == ReactionType.DISLIKE) {
-            dislikeCount = dislikeCount + 1;
-        }
-
-        board.setLikeCount(likeCount);
-        board.setDislikeCount(dislikeCount);
-    }
 }

@@ -208,8 +208,7 @@ public class MeetupService {
             throw MeetupForbiddenException.notOrganizer();
         }
 
-        meetup.setIsDeleted(true);
-        meetup.setDeletedAt(LocalDateTime.now());
+        meetup.softDelete();
         meetupRepository.save(meetup);
 
         log.info("모임 소프트 삭제 완료: meetupIdx={}", meetupIdx);
@@ -220,8 +219,7 @@ public class MeetupService {
     public void deleteMeetupForAdmin(Long meetupIdx) {
         Meetup meetup = meetupRepository.findById(meetupIdx)
                 .orElseThrow(MeetupNotFoundException::new);
-        meetup.setIsDeleted(true);
-        meetup.setDeletedAt(LocalDateTime.now());
+        meetup.softDelete();
         meetupRepository.save(meetup);
         log.info("관리자 소프트 삭제: meetupIdx={}", meetupIdx);
     }

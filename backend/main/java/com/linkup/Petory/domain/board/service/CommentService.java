@@ -186,9 +186,7 @@ public class CommentService {
 
         Comment saved = commentRepository.save(comment);
 
-        // commentCount 실시간 업데이트
-        incrementBoardCommentCount(board);
-        boardRepository.save(board);
+        boardRepository.adjustCommentCount(board.getIdx(), 1);
 
         if (dto.getCommentFilePath() != null) {
             attachmentFileService.syncSingleAttachment(FileTargetType.COMMENT, saved.getIdx(), dto.getCommentFilePath(),
@@ -275,14 +273,10 @@ public class CommentService {
         }
 
         // Soft delete instead of physical delete
-        comment.setStatus(ContentStatus.DELETED);
-        comment.setIsDeleted(true);
-        comment.setDeletedAt(LocalDateTime.now());
+        comment.softDelete();
         commentRepository.save(comment);
 
-        // commentCount 실시간 업데이트 (삭제된 댓글은 카운트에서 제외)
-        decrementBoardCommentCount(board);
-        boardRepository.save(board);
+        boardRepository.adjustCommentCount(board.getIdx(), -1);
         // keep attachments and reactions for audit/possible restore
     }
 
@@ -382,33 +376,12 @@ public class CommentService {
         if (!comment.getBoard().getIdx().equals(board.getIdx())) {
             throw new CommentNotBelongToBoardException();
         }
-        comment.setIsDeleted(false);
-        comment.setDeletedAt(null);
-        if (comment.getStatus() == com.linkup.Petory.domain.common.ContentStatus.DELETED) {
-            comment.setStatus(com.linkup.Petory.domain.common.ContentStatus.ACTIVE);
-        }
+        comment.restore();
         Comment saved = commentRepository.save(comment);
 
-        // commentCount 실시간 업데이트 (복구된 댓글은 카운트에 포함)
-        incrementBoardCommentCount(board);
-        boardRepository.save(board);
+        boardRepository.adjustCommentCount(board.getIdx(), 1);
 
         return mapWithReactionCounts(saved);
     }
 
-    /**
-     * 게시글의 commentCount를 증가시킴
-     */
-    private void incrementBoardCommentCount(Board board) {
-        Integer currentCount = board.getCommentCount() != null ? board.getCommentCount() : 0;
-        board.setCommentCount(currentCount + 1);
-    }
-
-    /**
-     * 게시글의 commentCount를 감소시킴
-     */
-    private void decrementBoardCommentCount(Board board) {
-        Integer currentCount = board.getCommentCount() != null ? board.getCommentCount() : 0;
-        board.setCommentCount(Math.max(0, currentCount - 1));
-    }
 }

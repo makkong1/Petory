@@ -286,8 +286,7 @@ public class CareRequestService {
             throw CareForbiddenException.ownRequestOnly();
         }
 
-        request.setIsDeleted(true);
-        request.setDeletedAt(java.time.LocalDateTime.now());
+        request.softDelete();
         careRequestRepository.save(request);
     }
 
@@ -330,12 +329,7 @@ public class CareRequestService {
         CareRequestStatus oldStatus = request.getStatus();
         CareRequestStatus newStatus = CareRequestStatus.valueOf(status);
 
-        // [FIX] COMPLETED 전환 시 완료 시각 기록 — 통계에서 '당일 완료 건수' 집계에 사용
-        if (oldStatus != CareRequestStatus.COMPLETED && newStatus == CareRequestStatus.COMPLETED) {
-            request.setCompletedAt(java.time.LocalDateTime.now());
-        }
-
-        request.setStatus(newStatus);
+        request.transitionTo(newStatus);
         CareRequest updated = careRequestRepository.save(request);
 
         // 상태가 COMPLETED로 변경될 때 에스크로에서 제공자에게 코인 지급
@@ -386,8 +380,7 @@ public class CareRequestService {
     public CareRequestDTO restoreForAdmin(Long id) {
         CareRequest request = careRequestRepository.findById(id)
                 .orElseThrow(CareRequestNotFoundException::new);
-        request.setIsDeleted(false);
-        request.setDeletedAt(null);
+        request.restore();
         return careRequestConverter.toDTO(careRequestRepository.save(request));
     }
 }

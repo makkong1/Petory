@@ -344,9 +344,7 @@ public class MissingPetBoardService {
                     EmailVerificationPurpose.MISSING_PET);
         }
 
-        // 게시글 소프트 삭제
-        board.setIsDeleted(true);
-        board.setDeletedAt(java.time.LocalDateTime.now());
+        board.softDelete();
 
         // 관련 댓글 모두 소프트 삭제
         missingPetCommentService.deleteAllCommentsByBoard(board);
@@ -364,8 +362,7 @@ public class MissingPetBoardService {
         MissingPetBoard board = missingPetBoardRepository.findById(id)
                 .orElseThrow(() -> new MissingPetBoardNotFoundException());
 
-        board.setIsDeleted(false);
-        board.setDeletedAt(null);
+        board.restore();
 
         return mapBoardWithAttachments(missingPetBoardRepository.save(board));
     }

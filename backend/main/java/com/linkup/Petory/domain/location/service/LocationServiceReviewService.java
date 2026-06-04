@@ -131,9 +131,7 @@ public class LocationServiceReviewService {
                     com.linkup.Petory.domain.user.entity.EmailVerificationPurpose.LOCATION_REVIEW);
         }
 
-        // Soft Delete 처리
-        review.setIsDeleted(true);
-        review.setDeletedAt(java.time.LocalDateTime.now());
+        review.softDelete();
         reviewRepository.save(review);
 
         // 서비스 평점 업데이트

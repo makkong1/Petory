@@ -1,5 +1,6 @@
 package com.linkup.Petory.domain.board.repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -86,5 +87,10 @@ public class JpaCommentAdapter implements CommentRepository {
     @Override
     public Page<Comment> findByBoardIdAndIsDeletedFalseOrderByCreatedAtAsc(Long boardId, Pageable pageable) {
         return jpaRepository.findByBoardIdAndIsDeletedFalseOrderByCreatedAtAsc(boardId, pageable);
+    }
+
+    @Override
+    public void softDeleteByBoardIdx(Long boardIdx, LocalDateTime now) {
+        jpaRepository.softDeleteByBoardIdx(boardIdx, now);
     }
 }

@@ -72,6 +72,14 @@ public class Report extends BaseTimeEntity {
     @Column(name = "admin_note", columnDefinition = "TEXT")
     private String adminNote;
 
+    public void handle(Users admin, ReportStatus status, ReportActionType actionTaken, String adminNote) {
+        this.status = status;
+        this.handledBy = admin;
+        this.handledAt = LocalDateTime.now();
+        this.adminNote = adminNote;
+        this.actionTaken = actionTaken != null ? actionTaken : ReportActionType.NONE;
+    }
+
     @PrePersist
     protected void onCreate() {
         if (this.status == null) {
