@@ -504,39 +504,40 @@ public class BoardService {
     public BoardPageResponseDTO getAdminBoardsWithPagingOptimized(
             String status, Boolean deleted, String category, String q, int page, int size) {
 
-        // Specification으로 동적 쿼리 구성
+        // null에서 시작해 파라미터가 있을 때만 조건을 .and()로 붙인다.
+        // 파라미터가 전혀 없으면 spec이 null인 채로 findAll에 전달되고,
+        // Spring Data JPA는 null spec을 "조건 없음(전체 조회)"으로 처리한다.
         Specification<Board> spec = null;
 
-        // 삭제 여부 필터
+        // 삭제 여부 필터 — deleted=true면 삭제된 것만, false면 활성 게시글만
         if (deleted != null) {
             Specification<Board> deletedSpec = (root, query, cb) -> cb.equal(root.get("isDeleted"), deleted);
             spec = spec == null ? deletedSpec : spec.and(deletedSpec);
         }
 
-        // 카테고리 필터
+        // 카테고리 필터 — "ALL"이면 조건 미적용
         if (category != null && !category.equals("ALL")) {
             Specification<Board> categorySpec = (root, query, cb) -> cb.equal(root.get("category"), category);
             spec = spec == null ? categorySpec : spec.and(categorySpec);
         }
 
-        // 상태 필터
+        // 상태 필터 — 잘못된 status 문자열은 예외 없이 무시하고 전체 조회
         if (status != null && !status.equals("ALL")) {
             try {
                 ContentStatus contentStatus = ContentStatus.valueOf(status.toUpperCase());
                 Specification<Board> statusSpec = (root, query, cb) -> cb.equal(root.get("status"), contentStatus);
                 spec = spec == null ? statusSpec : spec.and(statusSpec);
             } catch (IllegalArgumentException e) {
-                // 잘못된 status 값은 무시
                 log.warn("Invalid status value: {}", status);
             }
         }
 
-        // 검색어 필터 (제목, 내용, 작성자명) - join으로 user 조인
+        // 검색어 필터 — 제목·내용·작성자명 OR 검색, LIKE 양쪽 와일드카드
+        // user는 LEFT JOIN으로 조인해 작성자명 검색 지원 (userJoin은 이 spec 안에서만 사용)
         if (q != null && !q.isBlank()) {
             String keyword = "%" + q.toLowerCase() + "%";
             Specification<Board> searchSpec = (root, query, cb) -> {
-                Join<Board, Users> userJoin = root.join("user",
-                        JoinType.LEFT);
+                Join<Board, Users> userJoin = root.join("user", JoinType.LEFT);
                 return cb.or(
                         cb.like(cb.lower(root.get("title")), keyword),
                         cb.like(cb.lower(root.get("content")), keyword),
@@ -545,21 +546,22 @@ public class BoardService {
             spec = spec == null ? searchSpec : spec.and(searchSpec);
         }
 
-        // [리팩토링] user fetch - boardConverter.toDTO() N+1 방지
+        // Board → DTO 변환 시 board.getUser() 접근으로 발생하는 N+1 방지용 FETCH JOIN.
+        // JPA 페이징은 내부적으로 데이터 쿼리(SELECT)와 전체 개수 쿼리(COUNT) 두 번을 날리는데,
+        // COUNT 쿼리에 fetch를 포함하면 Hibernate가 예외를 던진다.
+        // getResultType()이 Long이면 COUNT 쿼리이므로 fetch를 건너뛴다.
         Specification<Board> userFetchSpec = (root, query, cb) -> {
             if (Long.class != query.getResultType()) {
                 root.fetch("user", JoinType.LEFT);
             }
-            return cb.conjunction();
+            return cb.conjunction(); // 이 spec 자체는 WHERE 조건에 아무것도 추가하지 않음
         };
         spec = spec == null ? userFetchSpec : spec.and(userFetchSpec);
 
-        // 최신순 정렬 추가
         Pageable pageable = PageRequest.of(page, size,
-                Sort.by(org.springframework.data.domain.Sort.Direction.DESC,
-                        "createdAt"));
+                Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "createdAt"));
 
-        // DB 레벨에서 필터링 및 페이징 처리
+        // 위에서 조립한 spec을 DB에 위임 — 메모리 필터링 없이 DB 레벨에서 필터·페이징 처리
         Page<Board> boardPage = boardRepository.findAll(spec, pageable);
 
         if (boardPage.isEmpty()) {
@@ -573,7 +575,7 @@ public class BoardService {
                     false);
         }
 
-        // 배치 조회로 N+1 문제 해결
+        // 리액션 카운트(likeCount, dislikeCount) N+1 방지 — 게시글 ID 목록으로 IN 배치 조회 후 Map으로 합산
         List<BoardDTO> boardDTOs = mapBoardsWithReactionsBatch(boardPage.getContent());
 
         return new BoardPageResponseDTO(
