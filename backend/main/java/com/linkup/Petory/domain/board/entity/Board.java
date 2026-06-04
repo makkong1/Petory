@@ -81,6 +81,10 @@ public class Board extends BaseTimeEntity {
         this.deletedAt = null;
     }
 
+    public void changeStatus(ContentStatus newStatus) {
+        this.status = newStatus;
+    }
+
     @PrePersist
     protected void onCreate() {
         if (this.status == null) {
