@@ -532,8 +532,11 @@ public class BoardService {
             }
         }
 
-        // 검색어 필터 — 제목·내용은 FULLTEXT MATCH...AGAINST, 작성자명은 접두사 LIKE
-        // - title·content: idx_board_title_content FULLTEXT 인덱스 사용 → 풀스캔 없음
+        // 검색어 필터 — 제목·내용은 FULLTEXT ngram MATCH...AGAINST, 작성자명은 접두사 LIKE
+        // - title·content: idx_board_title_content ngram FULLTEXT 인덱스 사용 (자연어 모드)
+        //   ngram 파서(ngram_token_size=2)가 텍스트를 2글자 단위로 분리해 저장하므로
+        //   "강아지"→["강아","아지"], "산책"→["산책"] 형태로 짧은 한글도 인덱싱된다.
+        //   자연어 모드에서 ngram은 ft_min_word_len 제한을 받지 않아 정상 동작한다.
         // - username: users.username unique 인덱스로 접두사 LIKE 'q%' 사용
         //   (앞 와일드카드 없애야 인덱스 range scan 가능)
         if (q != null && !q.isBlank()) {
