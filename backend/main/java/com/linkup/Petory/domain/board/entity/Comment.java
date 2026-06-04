@@ -46,6 +46,18 @@ public class Comment extends BaseTimeEntity {
 	@Column(name = "deleted_at")
 	private LocalDateTime deletedAt;
 
+	public void softDelete() {
+		this.status = ContentStatus.DELETED;
+		this.isDeleted = true;
+		this.deletedAt = LocalDateTime.now();
+	}
+
+	public void restore() {
+		this.status = ContentStatus.ACTIVE;
+		this.isDeleted = false;
+		this.deletedAt = null;
+	}
+
 	@PrePersist
 	protected void onCreate() {
 		if (this.status == null) {

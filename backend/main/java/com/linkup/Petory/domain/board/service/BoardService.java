@@ -26,7 +26,6 @@ import com.linkup.Petory.domain.board.converter.BoardConverter;
 import com.linkup.Petory.domain.board.dto.BoardDTO;
 import com.linkup.Petory.domain.board.dto.BoardPageResponseDTO;
 import com.linkup.Petory.domain.board.entity.Board;
-import com.linkup.Petory.domain.board.entity.BoardViewLog;
 import com.linkup.Petory.domain.board.entity.ReactionType;
 import com.linkup.Petory.domain.board.exception.BoardForbiddenException;
 import com.linkup.Petory.domain.board.exception.BoardNotFoundException;
@@ -34,6 +33,7 @@ import com.linkup.Petory.global.security.RoleConstants;
 import com.linkup.Petory.domain.board.repository.BoardReactionRepository;
 import com.linkup.Petory.domain.board.repository.BoardRepository;
 import com.linkup.Petory.domain.board.repository.BoardViewLogRepository;
+import com.linkup.Petory.domain.board.repository.CommentRepository;
 import com.linkup.Petory.domain.common.ContentStatus;
 import com.linkup.Petory.domain.file.dto.FileDTO;
 import com.linkup.Petory.domain.file.entity.FileTargetType;
@@ -61,6 +61,7 @@ public class BoardService {
     private final AttachmentFileService attachmentFileService;
     private final BoardConverter boardConverter;
     private final ApplicationEventPublisher eventPublisher;
+    private final CommentRepository commentRepository;
 
     private boolean isAdmin() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -98,96 +99,6 @@ public class BoardService {
         return mapBoardsWithReactionsBatch(boards);
     }
 
-    /**
-     * 관리자용 게시글 조회 (페이징 + 필터링 지원) - 작성자 상태 체크 없이 조회 (삭제된 사용자 콘텐츠도 포함) -
-     * AdminBoardController에서 사용
-     */
-    public BoardPageResponseDTO getAdminBoardsWithPaging(
-            String status, Boolean deleted, String category, String q, int page, int size) {
-        // 기본 쿼리: 전체 게시글 조회 (삭제 포함 여부에 따라)
-        // 관리자 페이지에서는 전체 게시글을 조회해야 하므로 List로 조회
-        List<Board> allBoards;
-
-        if (Boolean.TRUE.equals(deleted)) {
-            // 삭제된 게시글 포함 (관리자용 - 작성자 상태 체크 없음)
-            allBoards = boardRepository.findAllForAdmin();
-        } else {
-            // 삭제되지 않은 게시글만 (관리자용 - 작성자 상태 체크 없음)
-            allBoards = boardRepository.findAllByIsDeletedFalseForAdmin();
-        }
-
-        // 메모리에서 필터링
-        List<Board> filteredBoards = allBoards.stream()
-                .filter(board -> {
-                    // 카테고리 필터
-                    if (category != null && !category.equals("ALL")
-                            && !category.equalsIgnoreCase(board.getCategory())) {
-                        return false;
-                    }
-                    // 상태 필터
-                    if (status != null && !status.equals("ALL")) {
-                        if (!status.equalsIgnoreCase(board.getStatus().name())) {
-                            return false;
-                        }
-                    }
-                    // 삭제 여부 필터
-                    if (deleted != null) {
-                        if (Boolean.TRUE.equals(deleted) != board.getIsDeleted()) {
-                            return false;
-                        }
-                    }
-                    // 검색어 필터
-                    if (q != null && !q.isBlank()) {
-                        String keyword = q.toLowerCase();
-                        boolean matches = (board.getTitle() != null && board.getTitle().toLowerCase().contains(keyword))
-                                || (board.getContent() != null && board.getContent().toLowerCase().contains(keyword))
-                                || (board.getUser() != null && board.getUser().getUsername() != null
-                                        && board.getUser().getUsername().toLowerCase().contains(keyword));
-                        if (!matches) {
-                            return false;
-                        }
-                    }
-                    return true;
-                })
-                .collect(Collectors.toList());
-
-        // 필터링된 결과로 페이징 재구성
-        int start = page * size;
-        int end = Math.min(start + size, filteredBoards.size());
-        List<Board> pagedBoards = start < filteredBoards.size()
-                ? filteredBoards.subList(start, end)
-                : new ArrayList<>();
-
-        // 전체 개수 계산 (필터링된 전체)
-        long totalCount = filteredBoards.size();
-        int totalPages = (int) Math.ceil((double) totalCount / size);
-
-        // hasNext 계산: 현재 페이지가 마지막 페이지보다 작으면 true
-        boolean hasNextPage = page < totalPages - 1;
-
-        if (pagedBoards.isEmpty()) {
-            return new BoardPageResponseDTO(
-                    new ArrayList<>(),
-                    totalCount,
-                    totalPages,
-                    page,
-                    size,
-                    hasNextPage,
-                    page > 0);
-        }
-
-        // 배치 조회로 N+1 문제 해결
-        List<BoardDTO> boardDTOs = mapBoardsWithReactionsBatch(pagedBoards);
-
-        return new BoardPageResponseDTO(
-                boardDTOs,
-                totalCount,
-                totalPages,
-                page,
-                size,
-                hasNextPage,
-                page > 0);
-    }
 
     // 전체 게시글 조회 (페이징 지원)
     public BoardPageResponseDTO getAllBoardsWithPaging(String category, int page, int size) {
@@ -245,11 +156,16 @@ public class BoardService {
         Board board = boardRepository.findByIdWithUser(idx)
                 .orElseThrow(() -> new BoardNotFoundException());
 
-        if (shouldIncrementView(board, viewerId)) {
-            incrementViewCount(board);
+        boolean incremented = shouldIncrementView(board, viewerId);
+        if (incremented) {
+            boardRepository.incrementViewCount(board.getIdx());
         }
 
-        return mapBoardWithDetails(board);
+        BoardDTO dto = mapBoardWithDetails(board);
+        if (incremented) {
+            dto.setViews((board.getViewCount() != null ? board.getViewCount() : 0) + 1);
+        }
+        return dto;
     }
 
     // 게시글 생성
@@ -337,20 +253,9 @@ public class BoardService {
                     com.linkup.Petory.domain.user.entity.EmailVerificationPurpose.BOARD_EDIT);
         }
 
-        // Soft delete: mark as DELETED and keep related data for audit/hard-delete
-        // later
-        board.setStatus(ContentStatus.DELETED);
-        board.setIsDeleted(true);
-        board.setDeletedAt(LocalDateTime.now());
-        // Optionally mark child comments as deleted as well
-        if (board.getComments() != null) {
-            board.getComments().forEach(c -> {
-                c.setStatus(ContentStatus.DELETED);
-                c.setIsDeleted(true);
-                c.setDeletedAt(LocalDateTime.now());
-            });
-        }
+        board.softDelete();
         boardRepository.saveAndFlush(board);
+        commentRepository.softDeleteByBoardIdx(board.getIdx(), LocalDateTime.now());
     }
 
     // 내 게시글 조회
@@ -547,36 +452,11 @@ public class BoardService {
         return countsMap;
     }
 
-    private void incrementViewCount(Board board) {
-        Integer current = board.getViewCount();
-        board.setViewCount((current == null ? 0 : current) + 1);
-        boardRepository.save(board);
-    }
-
     private boolean shouldIncrementView(Board board, Long viewerId) {
-        if (viewerId == null) {
-            return true;
-        }
-
+        if (viewerId == null) return true;
         Users viewer = usersRepository.findById(viewerId).orElse(null);
-        if (viewer == null) {
-            log.error("❌ [BoardService.shouldIncrementView] User not found with viewerId: {}", viewerId);
-        }
-        if (viewer == null) {
-            return true;
-        }
-
-        boolean alreadyViewed = boardViewLogRepository.existsByBoardAndUser(board, viewer);
-        if (alreadyViewed) {
-            return false;
-        }
-
-        BoardViewLog log = BoardViewLog.builder()
-                .board(board)
-                .user(viewer)
-                .build();
-        boardViewLogRepository.save(log);
-        return true;
+        if (viewer == null) return true;
+        return boardViewLogRepository.insertIgnore(board.getIdx(), viewer.getIdx()) > 0;
     }
 
     /**
@@ -605,11 +485,7 @@ public class BoardService {
     @Transactional
     public BoardDTO restoreBoard(long id) {
         Board board = boardRepository.findByIdWithUser(id).orElseThrow(() -> new BoardNotFoundException());
-        board.setIsDeleted(false);
-        board.setDeletedAt(null);
-        if (board.getStatus() == com.linkup.Petory.domain.common.ContentStatus.DELETED) {
-            board.setStatus(com.linkup.Petory.domain.common.ContentStatus.ACTIVE);
-        }
+        board.restore();
         Board saved = boardRepository.save(board);
         return mapBoardWithDetails(saved);
     }

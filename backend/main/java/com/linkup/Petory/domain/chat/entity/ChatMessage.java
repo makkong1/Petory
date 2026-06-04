@@ -47,6 +47,11 @@ public class ChatMessage extends BaseTimeEntity {
     @Column(name = "deleted_at")
     private java.time.LocalDateTime deletedAt;
 
+    public void softDelete() {
+        this.isDeleted = true;
+        this.deletedAt = java.time.LocalDateTime.now();
+    }
+
     @PrePersist
     protected void onCreate() {
         // BaseTimeEntity가 createdAt, updatedAt을 자동 관리하므로 여기서는 기본값만 설정

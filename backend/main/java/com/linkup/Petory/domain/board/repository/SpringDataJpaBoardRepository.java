@@ -8,8 +8,10 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.linkup.Petory.domain.board.entity.Board;
 import com.linkup.Petory.domain.user.entity.Users;
@@ -87,4 +89,29 @@ public interface SpringDataJpaBoardRepository extends JpaRepository<Board, Long>
     @RepositoryMethod("게시글: idx로 조회 (작성자 포함)")
     @Query("SELECT b FROM Board b JOIN FETCH b.user u WHERE b.idx = :idx")
     Optional<Board> findByIdWithUser(@Param("idx") Long idx);
+
+    @Transactional
+    @Modifying
+    @Query("UPDATE Board b SET b.viewCount = COALESCE(b.viewCount, 0) + 1 WHERE b.idx = :idx")
+    void incrementViewCount(@Param("idx") Long idx);
+
+    @Transactional
+    @Modifying
+    @Query("UPDATE Board b SET b.likeCount = GREATEST(0, COALESCE(b.likeCount, 0) + :delta) WHERE b.idx = :idx")
+    void adjustLikeCount(@Param("idx") Long idx, @Param("delta") int delta);
+
+    @Transactional
+    @Modifying
+    @Query("UPDATE Board b SET b.dislikeCount = GREATEST(0, COALESCE(b.dislikeCount, 0) + :delta) WHERE b.idx = :idx")
+    void adjustDislikeCount(@Param("idx") Long idx, @Param("delta") int delta);
+
+    @Transactional
+    @Modifying
+    @Query("UPDATE Board b SET b.commentCount = GREATEST(0, COALESCE(b.commentCount, 0) + :delta) WHERE b.idx = :idx")
+    void adjustCommentCount(@Param("idx") Long idx, @Param("delta") int delta);
+
+    @Transactional
+    @Modifying
+    @Query("UPDATE Board b SET b.lastReactionAt = :at WHERE b.idx = :idx")
+    void updateLastReactionAt(@Param("idx") Long idx, @Param("at") java.time.LocalDateTime at);
 }

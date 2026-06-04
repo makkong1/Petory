@@ -49,4 +49,9 @@ public class JpaCommentReactionAdapter implements CommentReactionRepository {
     public List<Object[]> countByCommentsGroupByReactionType(List<Long> commentIds) {
         return jpaRepository.countByCommentsGroupByReactionType(commentIds);
     }
+
+    @Override
+    public int insertIgnore(Long commentId, Long userId, String reactionType) {
+        return jpaRepository.insertIgnore(commentId, userId, reactionType);
+    }
 }

@@ -86,7 +86,6 @@ public class PetService {
         // DTO → Entity 변환
         Pet pet = petConverter.toEntity(dto);
         pet.setUser(user);
-        pet.setIsDeleted(false);
 
         Pet saved = petRepository.save(pet);
         
@@ -201,8 +200,7 @@ public class PetService {
 
         assertPetOwnedBy(pet, ownerUserId);
 
-        pet.setIsDeleted(true);
-        pet.setDeletedAt(java.time.LocalDateTime.now());
+        pet.softDelete();
         petRepository.save(pet);
         
         // 펫 이미지 파일 삭제 (소프트 삭제이므로 파일은 유지하되 필요시 삭제 가능)
@@ -218,8 +216,7 @@ public class PetService {
 
         assertPetOwnedBy(pet, ownerUserId);
 
-        pet.setIsDeleted(false);
-        pet.setDeletedAt(null);
+        pet.restore();
         Pet restored = petRepository.save(pet);
         return petConverter.toDTO(restored);
     }

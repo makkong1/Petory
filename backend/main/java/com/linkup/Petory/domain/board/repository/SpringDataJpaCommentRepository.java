@@ -1,12 +1,15 @@
 package com.linkup.Petory.domain.board.repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.linkup.Petory.domain.board.entity.Board;
 import com.linkup.Petory.domain.board.entity.Comment;
@@ -46,5 +49,11 @@ public interface SpringDataJpaCommentRepository extends JpaRepository<Comment, L
     @Query(value = "SELECT c FROM Comment c JOIN FETCH c.user u WHERE c.board.idx = :boardId AND c.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY c.createdAt ASC",
            countQuery = "SELECT COUNT(c) FROM Comment c JOIN c.user u WHERE c.board.idx = :boardId AND c.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE'")
     Page<Comment> findByBoardIdAndIsDeletedFalseOrderByCreatedAtAsc(@Param("boardId") Long boardId, Pageable pageable);
+
+    @Transactional
+    @Modifying
+    @Query("UPDATE Comment c SET c.isDeleted = true, c.deletedAt = :now, c.status = 'DELETED' " +
+           "WHERE c.board.idx = :boardIdx AND c.isDeleted = false")
+    void softDeleteByBoardIdx(@Param("boardIdx") Long boardIdx, @Param("now") LocalDateTime now);
 }
 

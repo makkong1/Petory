@@ -173,13 +173,8 @@ public class LocationService {
 
     // @PrePersist, @PreUpdate는 created_at, updated_at가 있을 때만 사용
     // @PrePersist
-    // protected void onCreate() {
-    // LocalDateTime now = LocalDateTime.now();
-    // this.createdAt = now;
-    // this.updatedAt = now;
-    // }
-    // @PreUpdate
-    // protected void onUpdate() {
-    // this.updatedAt = LocalDateTime.now();
-    // }
+    public void softDelete() {
+        this.isDeleted = true;
+        this.deletedAt = LocalDateTime.now();
+    }
 }

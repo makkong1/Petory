@@ -133,8 +133,7 @@ public class AdminUserFacade {
         if (user.getRole() != Role.ADMIN) {
             throw new IllegalArgumentException("ADMIN 계정만 이 엔드포인트로 삭제할 수 있습니다.");
         }
-        user.setIsDeleted(true);
-        user.setDeletedAt(java.time.LocalDateTime.now());
+        user.softDelete();
         user.setRefreshToken(null);
         user.setRefreshExpiration(null);
         usersRepository.save(user);

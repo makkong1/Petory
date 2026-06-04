@@ -85,6 +85,23 @@ public class CareRequest extends BaseTimeEntity {
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
 
+    public void transitionTo(CareRequestStatus newStatus) {
+        if (newStatus == CareRequestStatus.COMPLETED && this.status != CareRequestStatus.COMPLETED) {
+            this.completedAt = LocalDateTime.now();
+        }
+        this.status = newStatus;
+    }
+
+    public void softDelete() {
+        this.isDeleted = true;
+        this.deletedAt = LocalDateTime.now();
+    }
+
+    public void restore() {
+        this.isDeleted = false;
+        this.deletedAt = null;
+    }
+
     /** 펫케어 지원 목록 (서비스 제공자들의 지원) */
     @OneToMany(mappedBy = "careRequest", cascade = CascadeType.ALL)
     @BatchSize(size = 50)  // 페이징 목록 조회 시 CareApplication N+1 방지

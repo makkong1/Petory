@@ -17,6 +17,8 @@ public interface CommentReactionRepository {
 
     void delete(CommentReaction reaction);
 
+    int insertIgnore(Long commentId, Long userId, String reactionType);
+
     long countByCommentAndReactionType(Comment comment, ReactionType reactionType);
 
     Optional<CommentReaction> findByCommentAndUser(Comment comment, Users user);

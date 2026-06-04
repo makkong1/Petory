@@ -8,7 +8,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.linkup.Petory.domain.report.entity.ReportActionType;
 import com.linkup.Petory.domain.user.entity.UserSanction;
-import com.linkup.Petory.domain.user.entity.UserStatus;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.exception.UserNotFoundException;
 import com.linkup.Petory.domain.user.repository.UserSanctionRepository;
@@ -102,9 +101,7 @@ public class UserSanctionService {
 
         sanctionRepository.save(suspension);
 
-        // 유저 상태 업데이트
-        user.setStatus(UserStatus.SUSPENDED);
-        user.setSuspendedUntil(endsAt);
+        user.suspend(endsAt);
         usersRepository.save(user);
 
         return suspension;
@@ -134,9 +131,7 @@ public class UserSanctionService {
 
         sanctionRepository.save(ban);
 
-        // 유저 상태 업데이트
-        user.setStatus(UserStatus.BANNED);
-        user.setSuspendedUntil(null);
+        user.ban();
         usersRepository.save(user);
 
         return ban;
@@ -150,8 +145,7 @@ public class UserSanctionService {
         Users user = usersRepository.findById(userId)
                 .orElseThrow(UserNotFoundException::new);
 
-        user.setStatus(UserStatus.ACTIVE);
-        user.setSuspendedUntil(null);
+        user.activate();
         usersRepository.save(user);
     }
 
@@ -181,9 +175,7 @@ public class UserSanctionService {
                             && s.getEndsAt() != null && s.getEndsAt().isAfter(LocalDateTime.now()));
 
             if (!hasActiveSuspension) {
-                // 활성 이용제한이 없으면 해제
-                user.setStatus(UserStatus.ACTIVE);
-                user.setSuspendedUntil(null);
+                user.activate();
                 usersRepository.save(user);
                 log.info("유저 {} 이용제한 자동 해제", user.getIdx());
             }
@@ -207,7 +199,7 @@ public class UserSanctionService {
             Long reportId) {
         switch (actionType) {
             case WARN_USER -> addWarning(userId, reason, adminId, reportId);
-            case SUSPEND_USER -> addBan(userId, reason, adminId, reportId); // 정지는 영구 차단으로 처리
+            case SUSPEND_USER -> addSuspension(userId, reason, adminId, reportId, AUTO_SUSPENSION_DAYS);
             default -> {
                 // NONE, DELETE_CONTENT, OTHER는 제재 없음
             }

@@ -106,6 +106,41 @@ public class Users extends BaseTimeEntity {
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Pet> pets; // 등록한 애완동물 목록
 
+    public void softDelete() {
+        this.isDeleted = true;
+        this.deletedAt = LocalDateTime.now();
+    }
+
+    public void restore() {
+        this.isDeleted = false;
+        this.deletedAt = null;
+    }
+
+    public void suspend(LocalDateTime until) {
+        this.status = UserStatus.SUSPENDED;
+        this.suspendedUntil = until;
+    }
+
+    public void ban() {
+        this.status = UserStatus.BANNED;
+        this.suspendedUntil = null;
+    }
+
+    public void activate() {
+        this.status = UserStatus.ACTIVE;
+        this.suspendedUntil = null;
+    }
+
+    public void creditCoins(int amount) {
+        this.petCoinBalance += amount;
+    }
+
+    public void debitCoins(int amount) {
+        if (this.petCoinBalance < amount)
+            throw new IllegalStateException("잔액 부족: balance=" + petCoinBalance + ", requested=" + amount);
+        this.petCoinBalance -= amount;
+    }
+
     /**
      * 현재 제재 상태인지 확인
      */

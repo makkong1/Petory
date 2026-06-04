@@ -58,6 +58,15 @@ public class Conversation extends BaseTimeEntity {
     @OneToMany(mappedBy = "conversation", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<ChatMessage> messages;
 
+    public void close() {
+        this.status = ConversationStatus.CLOSED;
+    }
+
+    public void softDelete() {
+        this.isDeleted = true;
+        this.deletedAt = LocalDateTime.now();
+    }
+
     @PrePersist
     protected void onCreate() {
         if (this.status == null) {

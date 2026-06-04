@@ -227,9 +227,7 @@ public class MissingPetCommentService {
                         throw new CommentNotBelongToBoardException();
                 }
                 assertCommentOwner(comment.getUser());
-                // soft delete comment
-                comment.setIsDeleted(true);
-                comment.setDeletedAt(java.time.LocalDateTime.now());
+                comment.softDelete();
                 commentRepository.save(comment);
         }
 

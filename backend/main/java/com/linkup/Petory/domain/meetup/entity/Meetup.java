@@ -84,9 +84,13 @@ public class Meetup extends BaseTimeEntity {
     @BatchSize(size = 50) // 목록 조회 시 participants N+1 방지
     private List<MeetupParticipants> participants;
 
+    public void softDelete() {
+        this.isDeleted = true;
+        this.deletedAt = LocalDateTime.now();
+    }
+
     @PrePersist
     protected void onCreate() {
-        // BaseTimeEntity가 createdAt, updatedAt을 자동 관리하므로 여기서는 기본값만 설정
         if (this.isDeleted == null) {
             this.isDeleted = false;
         }

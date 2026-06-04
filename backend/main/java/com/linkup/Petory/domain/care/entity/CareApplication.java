@@ -49,4 +49,11 @@ public class CareApplication extends BaseTimeEntity {
     @Lob
     private String message;
 
+    public void accept() {
+        this.status = CareApplicationStatus.ACCEPTED;
+    }
+
+    public void reject() {
+        this.status = CareApplicationStatus.REJECTED;
+    }
 }

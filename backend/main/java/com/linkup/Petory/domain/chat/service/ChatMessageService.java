@@ -205,8 +205,7 @@ public class ChatMessageService {
             throw ChatForbiddenException.ownMessageOnly();
         }
 
-        message.setIsDeleted(true);
-        message.setDeletedAt(LocalDateTime.now());
+        message.softDelete();
         chatMessageRepository.save(message);
     }
 

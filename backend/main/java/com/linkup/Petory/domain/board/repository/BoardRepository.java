@@ -78,4 +78,14 @@ public interface BoardRepository {
 
         // 관리자용: 전체 조회 (삭제 포함)
         List<Board> findAllForAdmin();
+
+        void incrementViewCount(Long idx);
+
+        void adjustLikeCount(Long idx, int delta);
+
+        void adjustDislikeCount(Long idx, int delta);
+
+        void adjustCommentCount(Long idx, int delta);
+
+        void updateLastReactionAt(Long idx, java.time.LocalDateTime at);
 }

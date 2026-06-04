@@ -238,8 +238,7 @@ public class UsersService {
     public void deleteUser(long idx) {
         Users user = usersRepository.findById(idx)
                 .orElseThrow(UserNotFoundException::new);
-        user.setIsDeleted(true);
-        user.setDeletedAt(java.time.LocalDateTime.now());
+        user.softDelete();
         user.setRefreshToken(null);
         user.setRefreshExpiration(null);
         usersRepository.save(user);
@@ -252,8 +251,7 @@ public class UsersService {
     public UsersDTO restoreUser(long idx) {
         Users user = usersRepository.findById(idx)
                 .orElseThrow(UserNotFoundException::new);
-        user.setIsDeleted(false);
-        user.setDeletedAt(null);
+        user.restore();
         Users restored = usersRepository.save(user);
         return usersConverter.toDTO(restored);
     }

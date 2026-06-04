@@ -3,6 +3,7 @@ package com.linkup.Petory.domain.payment.entity;
 import com.linkup.Petory.domain.care.entity.CareApplication;
 import com.linkup.Petory.domain.care.entity.CareRequest;
 import com.linkup.Petory.domain.common.BaseTimeEntity;
+import com.linkup.Petory.domain.payment.exception.PaymentConflictException;
 import com.linkup.Petory.domain.user.entity.Users;
 import jakarta.persistence.*;
 import lombok.*;
@@ -56,4 +57,18 @@ public class PetCoinEscrow extends BaseTimeEntity {
 
     @Column(name = "refunded_at")
     private LocalDateTime refundedAt; // 환불 시간
+
+    public void release() {
+        if (this.status != EscrowStatus.HOLD)
+            throw new IllegalStateException("HOLD 상태만 지급 가능");
+        this.status = EscrowStatus.RELEASED;
+        this.releasedAt = LocalDateTime.now();
+    }
+
+    public void refund() {
+        if (this.status != EscrowStatus.HOLD)
+            throw PaymentConflictException.holdStatusRequiredForRefund();
+        this.status = EscrowStatus.REFUNDED;
+        this.refundedAt = LocalDateTime.now();
+    }
 }

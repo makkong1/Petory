@@ -36,4 +36,9 @@ public class JpaBoardViewLogAdapter implements BoardViewLogRepository {
     public List<Object[]> countByBoards(List<Long> boardIds) {
         return jpaRepository.countByBoards(boardIds);
     }
+
+    @Override
+    public int insertIgnore(Long boardId, Long userId) {
+        return jpaRepository.insertIgnore(boardId, userId);
+    }
 }

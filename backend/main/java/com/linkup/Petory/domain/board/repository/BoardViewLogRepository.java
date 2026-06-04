@@ -15,6 +15,8 @@ public interface BoardViewLogRepository {
 
     boolean existsByBoardAndUser(Board board, Users user);
 
+    int insertIgnore(Long boardId, Long userId);
+
     /**
      * 여러 게시글의 조회수 카운트를 한 번에 조회 (배치 조회)
      * 반환값: List<Object[]> [boardId, count]
