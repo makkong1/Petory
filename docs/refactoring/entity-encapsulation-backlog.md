@@ -585,8 +585,8 @@ ReactionType userReaction = toggledOff ? null : reactionType;
 | 3 | 🔴 Critical | `getBoard()` 조회수 stale 응답 (메모리 viewCount + 1 반영) | `BoardService.java` | ✅ |
 | 4 | 🔴 Critical | `reactToComment()` 반응 변경 시 `userReaction: null` 버그 | `ReactionService.java` | ✅ |
 | 5 | 🟡 Warning | 에스크로 release/refund — 상태 검증 먼저, 코인 이동 나중으로 순서 변경 | `PetCoinEscrowService.java` | ✅ |
-| 6 | 🟢 Info | `updateBoardStatus` 직접 `setStatus` → entity 메서드로 통일 | `BoardService.java:491` | 미완 |
-| 7 | 🟢 Info | `reactToBoard` 반응 변경 분기 직접 `setReactionType` | `ReactionService.java:60` | 미완 |
+| 6 | 🟢 Info | `updateBoardStatus` 직접 `setStatus` → entity 메서드로 통일 | `BoardService.java` | ✅ |
+| 7 | 🟢 Info | `reactToBoard`·`reactToComment` 반응 변경 분기 직접 `setReactionType` | `ReactionService.java` | ✅ |
 
 ---
 
@@ -612,5 +612,4 @@ ReactionType userReaction = toggledOff ? null : reactionType;
 
 ### 잔여 (Info — 다음 기회)
 
-- `BoardService.updateBoardStatus` — `board.setStatus(status)` 직접 호출 → `Board.changeStatus()` 메서드 추가 필요
-- `ReactionService.reactToBoard` 반응 변경 분기 — `existing.get().setReactionType()` → `BoardReaction.changeReactionType()` 메서드 추가 필요
+없음. 전체 수정 완료.
