@@ -55,7 +55,7 @@ public class ReactionService {
             boardReactionRepository.delete(existing.get());
         } else if (existing.isPresent()) {
             previousReactionType = existing.get().getReactionType();
-            existing.get().setReactionType(reactionType);
+            existing.get().changeReactionType(reactionType);
             boardReactionRepository.save(existing.get());
             boardRepository.updateLastReactionAt(boardId, LocalDateTime.now());
         } else {
@@ -107,7 +107,7 @@ public class ReactionService {
         if (existing.isPresent() && previousType == reactionType) {
             commentReactionRepository.delete(existing.get());
         } else if (existing.isPresent()) {
-            existing.get().setReactionType(reactionType);
+            existing.get().changeReactionType(reactionType);
             commentReactionRepository.save(existing.get());
         } else {
             int inserted = commentReactionRepository.insertIgnore(commentId, userId, reactionType.name());
