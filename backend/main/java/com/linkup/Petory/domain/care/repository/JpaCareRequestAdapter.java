@@ -170,7 +170,10 @@ public class JpaCareRequestAdapter implements CareRequestRepository {
 
     @Override
     public Page<CareRequest> findAllForAdmin(String status, Boolean deleted, String keyword, Pageable pageable) {
-        return jpaRepository.findAllForAdmin(status, deleted, keyword, pageable);
+        if (keyword != null && !keyword.isBlank()) {
+            return jpaRepository.findAllForAdminWithKeyword(status, deleted, keyword, pageable);
+        }
+        return jpaRepository.findAllForAdmin(status, deleted, pageable);
     }
 
     @Override

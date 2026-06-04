@@ -129,13 +129,30 @@ public interface SpringDataJpaCareRequestRepository extends JpaRepository<CareRe
             nativeQuery = true)
     Page<CareRequest> searchWithPaging(@Param("keyword") String keyword, Pageable pageable);
 
-    @RepositoryMethod("펫케어 요청: 관리자 필터 페이징 조회")
+    @RepositoryMethod("펫케어 요청: 관리자 필터 페이징 조회 (keyword 없을 때)")
     @Query("SELECT r FROM CareRequest r WHERE " +
            "(:status IS NULL OR CAST(r.status AS string) = :status) AND " +
-           "(:deleted IS NULL OR r.isDeleted = :deleted) AND " +
-           "(:keyword IS NULL OR r.title LIKE %:keyword% OR r.description LIKE %:keyword%) " +
+           "(:deleted IS NULL OR r.isDeleted = :deleted) " +
            "ORDER BY r.createdAt DESC")
     Page<CareRequest> findAllForAdmin(
+            @Param("status") String status,
+            @Param("deleted") Boolean deleted,
+            Pageable pageable);
+
+    @RepositoryMethod("펫케어 요청: 관리자 키워드 페이징 조회 (FULLTEXT title/description)")
+    @Query(value =
+           "SELECT * FROM carerequest r " +
+           "WHERE (:status IS NULL OR r.status = :status) " +
+           "AND (:deleted IS NULL OR r.is_deleted = :deleted) " +
+           "AND MATCH(r.title, r.description) AGAINST(:keyword IN NATURAL LANGUAGE MODE) " +
+           "ORDER BY r.created_at DESC",
+           countQuery =
+           "SELECT COUNT(*) FROM carerequest r " +
+           "WHERE (:status IS NULL OR r.status = :status) " +
+           "AND (:deleted IS NULL OR r.is_deleted = :deleted) " +
+           "AND MATCH(r.title, r.description) AGAINST(:keyword IN NATURAL LANGUAGE MODE)",
+           nativeQuery = true)
+    Page<CareRequest> findAllForAdminWithKeyword(
             @Param("status") String status,
             @Param("deleted") Boolean deleted,
             @Param("keyword") String keyword,
