@@ -16,4 +16,16 @@ public class CommunityPostCreatedEvent extends ApplicationEvent {
         this.postId  = postId;
         this.text    = text;
     }
+
+    public Long getUserIdx() {
+        return userIdx;
+    }
+
+    public Long getPostId() {
+        return postId;
+    }
+
+    public String getText() {
+        return text;
+    }
 }

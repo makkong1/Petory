@@ -1,24 +1,40 @@
 package com.linkup.Petory.domain.petRecommendation.entity;
 
-import com.linkup.Petory.domain.common.BaseTimeEntity;
-import jakarta.persistence.*;
-import lombok.*;
 import java.time.LocalDateTime;
+
+import com.linkup.Petory.domain.common.BaseTimeEntity;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 /**
  * 사용자 반려생활 의도 signal 저장 엔티티.
  *
- * <p>원문 텍스트 대신 intent/도메인/추천 카테고리/신뢰도/만료시각 등 요약 신호만 보관한다.
+ * <p>
+ * 원문 텍스트 대신 intent/도메인/추천 카테고리/신뢰도/만료시각 등 요약 신호만 보관한다.
  */
 @Entity
 @Table(name = "user_pet_intent_signal", indexes = {
-        @Index(name = "idx_user_signal_active", columnList = "user_idx, expires_at, created_at"),
-        @Index(name = "idx_signal_source",      columnList = "source_type, source_id")
+    @Index(name = "idx_user_signal_active", columnList = "user_idx, expires_at, created_at"),
+    @Index(name = "idx_signal_source", columnList = "source_type, source_id")
 })
-@Getter @Builder @NoArgsConstructor @AllArgsConstructor
+@Getter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class UserPetIntentSignal extends BaseTimeEntity {
 
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @Column(name = "user_idx", nullable = false)

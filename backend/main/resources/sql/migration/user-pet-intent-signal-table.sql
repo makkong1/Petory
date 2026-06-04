@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS user_pet_intent_signal (
     confidence              DOUBLE       NOT NULL,
     intent_tags             JSON         NULL,
     created_at              DATETIME     NOT NULL,
+    updated_at              DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     expires_at              DATETIME     NOT NULL,
     PRIMARY KEY (id),
     INDEX idx_user_signal_active (user_idx, expires_at, created_at),
