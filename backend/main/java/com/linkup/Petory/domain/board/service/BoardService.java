@@ -532,16 +532,21 @@ public class BoardService {
             }
         }
 
-        // 검색어 필터 — 제목·내용·작성자명 OR 검색, LIKE 양쪽 와일드카드
-        // user는 LEFT JOIN으로 조인해 작성자명 검색 지원 (userJoin은 이 spec 안에서만 사용)
+        // 검색어 필터 — 제목·내용은 FULLTEXT MATCH...AGAINST, 작성자명은 접두사 LIKE
+        // - title·content: idx_board_title_content FULLTEXT 인덱스 사용 → 풀스캔 없음
+        // - username: users.username unique 인덱스로 접두사 LIKE 'q%' 사용
+        //   (앞 와일드카드 없애야 인덱스 range scan 가능)
         if (q != null && !q.isBlank()) {
-            String keyword = "%" + q.toLowerCase() + "%";
+            final String trimmed = q.trim();
             Specification<Board> searchSpec = (root, query, cb) -> {
                 Join<Board, Users> userJoin = root.join("user", JoinType.LEFT);
                 return cb.or(
-                        cb.like(cb.lower(root.get("title")), keyword),
-                        cb.like(cb.lower(root.get("content")), keyword),
-                        cb.like(cb.lower(userJoin.get("username")), keyword));
+                        cb.gt(
+                                cb.function("MATCH", Double.class,
+                                        root.get("title"), root.get("content"),
+                                        cb.literal(trimmed)),
+                                0.0),
+                        cb.like(cb.lower(userJoin.get("username")), trimmed.toLowerCase() + "%"));
             };
             spec = spec == null ? searchSpec : spec.and(searchSpec);
         }
