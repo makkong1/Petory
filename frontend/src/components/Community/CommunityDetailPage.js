@@ -8,6 +8,7 @@ import { usePermission } from '../../hooks/usePermission';
 import { useAuth } from '../../contexts/AuthContext';
 import PageNavigation from '../Common/PageNavigation';
 import UserProfileModal from '../User/UserProfileModal';
+import CommunityPostModal from './CommunityPostModal';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
@@ -20,6 +21,7 @@ const CommunityDetailPage = ({
   onBoardViewUpdate,
   currentUser,
   onBoardDeleted,
+  onBoardUpdated,
 }) => {
   const { requireLogin } = usePermission();
   const { user, redirectToLogin } = useAuth();
@@ -40,6 +42,8 @@ const CommunityDetailPage = ({
   const [uploadError, setUploadError] = useState('');
   const [selectedUserId, setSelectedUserId] = useState(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
 
   // 댓글 페이징 상태
   const [commentPage, setCommentPage] = useState(0);
@@ -428,6 +432,32 @@ const CommunityDetailPage = ({
     }
   }, [boardId, currentUser, board, onBoardDeleted, onClose]);
 
+  const handleEditSubmit = async (form) => {
+    if (!boardId) return;
+    try {
+      setIsSubmittingEdit(true);
+      await boardApi.updateBoard(boardId, {
+        title: form.title,
+        content: form.content,
+        category: form.category,
+        boardFilePath: form.boardFilePath || null,
+      });
+      setIsEditOpen(false);
+      await fetchBoard();
+      onBoardUpdated?.(boardId, {
+        title: form.title,
+        content: form.content,
+        category: form.category,
+        boardFilePath: form.boardFilePath || null,
+      });
+    } catch (err) {
+      const message = err.response?.data?.error || err.message || '게시글 수정에 실패했습니다.';
+      alert(message);
+    } finally {
+      setIsSubmittingEdit(false);
+    }
+  };
+
   const handleDeleteComment = useCallback(
     async (commentId) => {
       if (!boardId || !currentUser) {
@@ -491,6 +521,11 @@ const CommunityDetailPage = ({
                 >
                   👎 {board?.dislikes ?? 0}
                 </HeaderActionButton>
+                {currentUser && board?.userId === currentUser.idx && (
+                  <HeaderActionButton type="button" onClick={() => setIsEditOpen(true)}>
+                    ✏️ 수정
+                  </HeaderActionButton>
+                )}
                 {currentUser && board?.userId === currentUser.idx && (
                   <HeaderActionButton type="button" onClick={handleDeleteBoard}>
                     🗑 삭제
@@ -692,6 +727,16 @@ const CommunityDetailPage = ({
           setIsProfileModalOpen(false);
           setSelectedUserId(null);
         }}
+      />
+
+      <CommunityPostModal
+        isOpen={isEditOpen}
+        onClose={() => setIsEditOpen(false)}
+        onSubmit={handleEditSubmit}
+        loading={isSubmittingEdit}
+        currentUser={currentUser}
+        initialData={board}
+        mode="edit"
       />
     </>
   );

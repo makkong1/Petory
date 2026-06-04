@@ -11,17 +11,32 @@ const defaultForm = {
   boardFilePath: '',
 };
 
-const CommunityPostModal = ({ isOpen, onClose, onSubmit, loading, currentUser }) => {
+const CommunityPostModal = ({ isOpen, onClose, onSubmit, loading, currentUser, initialData, mode = 'create' }) => {
   const [form, setForm] = useState(defaultForm);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
 
   useEffect(() => {
-    if (!isOpen) {
+    if (isOpen) {
+      setForm(
+        initialData
+          ? {
+              title: initialData.title || '',
+              content: initialData.content || '',
+              category: initialData.category || '일상',
+              boardFilePath: initialData.boardFilePath || '',
+            }
+          : defaultForm
+      );
+      setUploadError('');
+      setIsUploading(false);
+    } else {
       setForm(defaultForm);
       setUploadError('');
       setIsUploading(false);
     }
+    // initialData는 isOpen 변경 시점의 값을 사용하므로 의도적으로 제외
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
   if (!isOpen) {
@@ -98,7 +113,7 @@ const CommunityPostModal = ({ isOpen, onClose, onSubmit, loading, currentUser })
     <Overlay onClick={handleOverlayClick}>
       <Modal onClick={(event) => event.stopPropagation()}>
         <ModalHeader>
-          <ModalTitle>커뮤니티 글 작성</ModalTitle>
+          <ModalTitle>{mode === 'edit' ? '게시글 수정' : '커뮤니티 글 작성'}</ModalTitle>
           <CloseButton type="button" onClick={onClose}>
             ✕
           </CloseButton>
@@ -175,7 +190,7 @@ const CommunityPostModal = ({ isOpen, onClose, onSubmit, loading, currentUser })
                 취소
               </SecondaryButton>
               <PrimaryButton type="submit" disabled={loading || isUploading}>
-                {loading ? '등록 중...' : '등록'}
+                {mode === 'edit' ? (loading ? '저장 중...' : '수정 저장') : (loading ? '등록 중...' : '등록')}
               </PrimaryButton>
             </ButtonRow>
           </Form>

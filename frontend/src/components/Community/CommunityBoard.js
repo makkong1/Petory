@@ -37,6 +37,9 @@ const CommunityBoard = () => {
   const [activeCategory, setActiveCategory] = useState('ALL');
   const [isPostModalOpen, setIsPostModalOpen] = useState(false);
   const [isSubmittingPost, setIsSubmittingPost] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingPost, setEditingPost] = useState(null);
+  const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
   const [selectedBoard, setSelectedBoard] = useState(null);
   const [selectedBoardId, setSelectedBoardId] = useState(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -392,6 +395,61 @@ const CommunityBoard = () => {
     setSelectedBoardId(null);
     setSelectedBoard(null);
   };
+
+  const handleEditClick = useCallback((post, event) => {
+    event?.stopPropagation?.();
+    setEditingPost(post);
+    setIsEditModalOpen(true);
+  }, []);
+
+  const handleEditSubmit = async (form) => {
+    if (!editingPost) return;
+    try {
+      setIsSubmittingEdit(true);
+      await boardApi.updateBoard(editingPost.idx, {
+        title: form.title,
+        content: form.content,
+        category: form.category,
+        boardFilePath: form.boardFilePath || null,
+      });
+      setIsEditModalOpen(false);
+      const updatedFields = {
+        title: form.title,
+        content: form.content,
+        category: form.category,
+        boardFilePath: form.boardFilePath || editingPost.boardFilePath,
+      };
+      setPostsData((prev) => {
+        const post = prev.map[editingPost.idx];
+        if (post) {
+          return {
+            ...prev,
+            map: { ...prev.map, [editingPost.idx]: { ...post, ...updatedFields } },
+          };
+        }
+        return prev;
+      });
+      setEditingPost(null);
+    } catch (err) {
+      const message = err.response?.data?.error || err.message;
+      alert(`게시글 수정에 실패했습니다: ${message}`);
+    } finally {
+      setIsSubmittingEdit(false);
+    }
+  };
+
+  const handleBoardUpdated = useCallback((boardId, updatedData) => {
+    setPostsData((prev) => {
+      const post = prev.map[boardId];
+      if (post) {
+        return {
+          ...prev,
+          map: { ...prev.map, [boardId]: { ...post, ...updatedData } },
+        };
+      }
+      return prev;
+    });
+  }, []);
 
   const handlePopularCardClick = (snapshot) => {
     if (!snapshot?.boardId) return;
@@ -854,6 +912,14 @@ const CommunityBoard = () => {
                       </PostStats>
                       <PostActionsRight>
                         {user && user.idx === post.userId && (
+                          <EditButton
+                            type="button"
+                            onClick={(event) => handleEditClick(post, event)}
+                          >
+                            수정
+                          </EditButton>
+                        )}
+                        {user && user.idx === post.userId && (
                           <DeleteButton
                             type="button"
                             onClick={(event) => handleDeletePost(post.idx, event)}
@@ -933,6 +999,14 @@ const CommunityBoard = () => {
                       </PostStats>
                       <PostActionsRight>
                         {user && user.idx === post.userId && (
+                          <EditButton
+                            type="button"
+                            onClick={(event) => handleEditClick(post, event)}
+                          >
+                            수정
+                          </EditButton>
+                        )}
+                        {user && user.idx === post.userId && (
                           <DeleteButton
                             type="button"
                             onClick={(event) => handleDeletePost(post.idx, event)}
@@ -1006,6 +1080,14 @@ const CommunityBoard = () => {
                       </PostStats>
                       <PostActionsRight>
                         {user && user.idx === post.userId && (
+                          <EditButton
+                            type="button"
+                            onClick={(event) => handleEditClick(post, event)}
+                          >
+                            수정
+                          </EditButton>
+                        )}
+                        {user && user.idx === post.userId && (
                           <DeleteButton
                             type="button"
                             onClick={(event) => handleDeletePost(post.idx, event)}
@@ -1060,6 +1142,17 @@ const CommunityBoard = () => {
         onBoardViewUpdate={handleBoardViewUpdate}
         currentUser={user}
         onBoardDeleted={handleBoardDeleted}
+        onBoardUpdated={handleBoardUpdated}
+      />
+
+      <CommunityPostModal
+        isOpen={isEditModalOpen}
+        onClose={() => { setIsEditModalOpen(false); setEditingPost(null); }}
+        onSubmit={handleEditSubmit}
+        loading={isSubmittingEdit}
+        currentUser={user}
+        initialData={editingPost}
+        mode="edit"
       />
     </Container>
   );
@@ -1487,6 +1580,22 @@ const ReportButton = styled.button`
     color: ${props => props.theme.colors.error};
     background: ${props => props.theme.colors.errorSoft};
     transform: scale(1.1);
+  }
+`;
+
+const EditButton = styled.button`
+  background: none;
+  border: 1px solid ${props => props.theme.colors.primary};
+  color: ${props => props.theme.colors.primary};
+  cursor: pointer;
+  padding: ${props => props.theme.spacing.sm};
+  border-radius: ${props => props.theme.borderRadius.md};
+  font-size: ${props => props.theme.typography.body2.fontSize};
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: ${props => props.theme.colors.surfaceHover};
+    transform: translateY(-1px);
   }
 `;
 
