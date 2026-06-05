@@ -7,9 +7,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Caching;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -21,7 +21,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.linkup.Petory.domain.petRecommendation.event.CommunityPostCreatedEvent;
 import com.linkup.Petory.domain.board.converter.BoardConverter;
 import com.linkup.Petory.domain.board.dto.BoardDTO;
 import com.linkup.Petory.domain.board.dto.BoardPageResponseDTO;
@@ -29,7 +28,6 @@ import com.linkup.Petory.domain.board.entity.Board;
 import com.linkup.Petory.domain.board.entity.ReactionType;
 import com.linkup.Petory.domain.board.exception.BoardForbiddenException;
 import com.linkup.Petory.domain.board.exception.BoardNotFoundException;
-import com.linkup.Petory.global.security.RoleConstants;
 import com.linkup.Petory.domain.board.repository.BoardReactionRepository;
 import com.linkup.Petory.domain.board.repository.BoardRepository;
 import com.linkup.Petory.domain.board.repository.BoardViewLogRepository;
@@ -38,10 +36,12 @@ import com.linkup.Petory.domain.common.ContentStatus;
 import com.linkup.Petory.domain.file.dto.FileDTO;
 import com.linkup.Petory.domain.file.entity.FileTargetType;
 import com.linkup.Petory.domain.file.service.AttachmentFileService;
+import com.linkup.Petory.domain.petRecommendation.event.CommunityPostCreatedEvent;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException;
 import com.linkup.Petory.domain.user.exception.UserNotFoundException;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
+import com.linkup.Petory.global.security.RoleConstants;
 
 import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
@@ -65,7 +65,9 @@ public class BoardService {
 
     private boolean isAdmin() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || auth.getAuthorities() == null) return false;
+        if (auth == null || auth.getAuthorities() == null) {
+            return false;
+        }
         return auth.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
                 .anyMatch(a -> a.equals(RoleConstants.ROLE_ADMIN) || a.equals(RoleConstants.ROLE_MASTER));
@@ -98,7 +100,6 @@ public class BoardService {
         // 배치 조회로 N+1 문제 해결
         return mapBoardsWithReactionsBatch(boards);
     }
-
 
     // 전체 게시글 조회 (페이징 지원)
     public BoardPageResponseDTO getAllBoardsWithPaging(String category, int page, int size) {
@@ -196,8 +197,8 @@ public class BoardService {
 
     // 게시글 수정
     @Caching(evict = {
-            @CacheEvict(value = "boardDetail", key = "#p0"),
-            @CacheEvict(value = "boardList", allEntries = true) // 카테고리 변경 가능하므로 안전하게 전체 무효화
+        @CacheEvict(value = "boardDetail", key = "#p0"),
+        @CacheEvict(value = "boardList", allEntries = true) // 카테고리 변경 가능하므로 안전하게 전체 무효화
     })
     @Transactional
     public BoardDTO updateBoard(long idx, BoardDTO dto) {
@@ -234,8 +235,8 @@ public class BoardService {
 
     // 게시글 삭제
     @Caching(evict = {
-            @CacheEvict(value = "boardDetail", key = "#p0"),
-            @CacheEvict(value = "boardList", allEntries = true) // 해당 카테고리 캐시 무효화를 위해 전체 무효화
+        @CacheEvict(value = "boardDetail", key = "#p0"),
+        @CacheEvict(value = "boardList", allEntries = true) // 해당 카테고리 캐시 무효화를 위해 전체 무효화
     })
     @Transactional
     public void deleteBoard(long idx) {
@@ -346,7 +347,7 @@ public class BoardService {
      * 배치 조회 결과(Object[])를 Map으로 변환
      *
      * @param results Repository에서 반환된 Object[] 리스트 [boardId, reactionType,
-     *                count]
+     * count]
      * @return Map<BoardId, Map<ReactionType, Count>>
      */
     private Map<Long, Map<ReactionType, Long>> parseBatchReactionCountResults(List<Object[]> results) {
@@ -365,7 +366,7 @@ public class BoardService {
     /**
      * BoardDTO에 반응 카운트 적용
      *
-     * @param dto    대상 BoardDTO
+     * @param dto 대상 BoardDTO
      * @param counts Map<ReactionType, Count>
      */
     private void applyReactionCounts(BoardDTO dto, Map<ReactionType, Long> counts) {
@@ -376,8 +377,8 @@ public class BoardService {
     /**
      * BoardDTO에 첨부파일 정보 적용 (배치 조회용)
      *
-     * @param dto            대상 BoardDTO
-     * @param boardId        게시글 ID
+     * @param dto 대상 BoardDTO
+     * @param boardId 게시글 ID
      * @param attachmentsMap Map<BoardId, List<FileDTO>>
      */
     private void applyAttachmentInfo(BoardDTO dto, Long boardId, Map<Long, List<FileDTO>> attachmentsMap) {
@@ -453,9 +454,13 @@ public class BoardService {
     }
 
     private boolean shouldIncrementView(Board board, Long viewerId) {
-        if (viewerId == null) return true;
+        if (viewerId == null) {
+            return true;
+        }
         Users viewer = usersRepository.findById(viewerId).orElse(null);
-        if (viewer == null) return true;
+        if (viewer == null) {
+            return true;
+        }
         return boardViewLogRepository.insertIgnore(board.getIdx(), viewer.getIdx()) > 0;
     }
 
@@ -463,14 +468,13 @@ public class BoardService {
      * 게시글 상태 변경 (관리자용) - AdminBoardController에서 사용
      */
     @Caching(evict = {
-            @CacheEvict(value = "boardDetail", key = "#p0"),
-            @CacheEvict(value = "boardList", allEntries = true)
+        @CacheEvict(value = "boardDetail", key = "#p0"),
+        @CacheEvict(value = "boardList", allEntries = true)
     })
     @Transactional
-    public BoardDTO updateBoardStatus(long id, com.linkup.Petory.domain.common.ContentStatus status) {
+    public BoardDTO updateBoardStatus(long id, ContentStatus status) {
         Board board = boardRepository.findByIdWithUser(id).orElseThrow(() -> new BoardNotFoundException());
-        // do not change isDeleted here
-        board.setStatus(status);
+        board.changeStatus(status);
         Board saved = boardRepository.save(board);
         return mapBoardWithDetails(saved);
     }
@@ -479,8 +483,8 @@ public class BoardService {
      * 게시글 복구 (관리자용) - AdminBoardController에서 사용
      */
     @Caching(evict = {
-            @CacheEvict(value = "boardDetail", key = "#p0"),
-            @CacheEvict(value = "boardList", allEntries = true)
+        @CacheEvict(value = "boardDetail", key = "#p0"),
+        @CacheEvict(value = "boardList", allEntries = true)
     })
     @Transactional
     public BoardDTO restoreBoard(long id) {
@@ -494,68 +498,78 @@ public class BoardService {
      * 관리자용 게시글 조회 (페이징 + 필터링 지원) - DB 레벨 필터링 버전 [리팩토링] getAdminBoardsWithPaging
      * 메모리 필터링 → Specification + DB 페이징
      *
-     * 개선사항: - 메모리 필터링 → DB 레벨 필터링 (Specification 패턴 사용) - 불필요한 데이터 조회 제거
-     * - 인덱스 활용 가능 - 성능 대폭 개선
+     * 개선사항: - 메모리 필터링 → DB 레벨 필터링 (Specification 패턴 사용) - 불필요한 데이터 조회 제거 - 인덱스
+     * 활용 가능 - 성능 대폭 개선
      */
     public BoardPageResponseDTO getAdminBoardsWithPagingOptimized(
             String status, Boolean deleted, String category, String q, int page, int size) {
 
-        // Specification으로 동적 쿼리 구성
+        // null에서 시작해 파라미터가 있을 때만 조건을 .and()로 붙인다.
+        // 파라미터가 전혀 없으면 spec이 null인 채로 findAll에 전달되고,
+        // Spring Data JPA는 null spec을 "조건 없음(전체 조회)"으로 처리한다.
         Specification<Board> spec = null;
 
-        // 삭제 여부 필터
+        // 삭제 여부 필터 — deleted=true면 삭제된 것만, false면 활성 게시글만
         if (deleted != null) {
             Specification<Board> deletedSpec = (root, query, cb) -> cb.equal(root.get("isDeleted"), deleted);
             spec = spec == null ? deletedSpec : spec.and(deletedSpec);
         }
 
-        // 카테고리 필터
+        // 카테고리 필터 — "ALL"이면 조건 미적용
         if (category != null && !category.equals("ALL")) {
             Specification<Board> categorySpec = (root, query, cb) -> cb.equal(root.get("category"), category);
             spec = spec == null ? categorySpec : spec.and(categorySpec);
         }
 
-        // 상태 필터
+        // 상태 필터 — 잘못된 status 문자열은 예외 없이 무시하고 전체 조회
         if (status != null && !status.equals("ALL")) {
             try {
                 ContentStatus contentStatus = ContentStatus.valueOf(status.toUpperCase());
                 Specification<Board> statusSpec = (root, query, cb) -> cb.equal(root.get("status"), contentStatus);
                 spec = spec == null ? statusSpec : spec.and(statusSpec);
             } catch (IllegalArgumentException e) {
-                // 잘못된 status 값은 무시
                 log.warn("Invalid status value: {}", status);
             }
         }
 
-        // 검색어 필터 (제목, 내용, 작성자명) - join으로 user 조인
+        // 검색어 필터 — 제목·내용은 FULLTEXT ngram MATCH...AGAINST, 작성자명은 접두사 LIKE
+        // - title·content: idx_board_title_content ngram FULLTEXT 인덱스 사용 (자연어 모드)
+        //   ngram 파서(ngram_token_size=2)가 텍스트를 2글자 단위로 분리해 저장하므로
+        //   "강아지"→["강아","아지"], "산책"→["산책"] 형태로 짧은 한글도 인덱싱된다.
+        //   자연어 모드에서 ngram은 ft_min_word_len 제한을 받지 않아 정상 동작한다.
+        // - username: users.username unique 인덱스로 접두사 LIKE 'q%' 사용
+        //   (앞 와일드카드 없애야 인덱스 range scan 가능)
         if (q != null && !q.isBlank()) {
-            String keyword = "%" + q.toLowerCase() + "%";
+            final String trimmed = q.trim();
             Specification<Board> searchSpec = (root, query, cb) -> {
-                Join<Board, Users> userJoin = root.join("user",
-                        JoinType.LEFT);
+                Join<Board, Users> userJoin = root.join("user", JoinType.LEFT);
                 return cb.or(
-                        cb.like(cb.lower(root.get("title")), keyword),
-                        cb.like(cb.lower(root.get("content")), keyword),
-                        cb.like(cb.lower(userJoin.get("username")), keyword));
+                        cb.gt(
+                                cb.function("MATCH", Double.class,
+                                        root.get("title"), root.get("content"),
+                                        cb.literal(trimmed)),
+                                0.0),
+                        cb.like(cb.lower(userJoin.get("username")), trimmed.toLowerCase() + "%"));
             };
             spec = spec == null ? searchSpec : spec.and(searchSpec);
         }
 
-        // [리팩토링] user fetch - boardConverter.toDTO() N+1 방지
+        // Board → DTO 변환 시 board.getUser() 접근으로 발생하는 N+1 방지용 FETCH JOIN.
+        // JPA 페이징은 내부적으로 데이터 쿼리(SELECT)와 전체 개수 쿼리(COUNT) 두 번을 날리는데,
+        // COUNT 쿼리에 fetch를 포함하면 Hibernate가 예외를 던진다.
+        // getResultType()이 Long이면 COUNT 쿼리이므로 fetch를 건너뛴다.
         Specification<Board> userFetchSpec = (root, query, cb) -> {
             if (Long.class != query.getResultType()) {
                 root.fetch("user", JoinType.LEFT);
             }
-            return cb.conjunction();
+            return cb.conjunction(); // 이 spec 자체는 WHERE 조건에 아무것도 추가하지 않음
         };
         spec = spec == null ? userFetchSpec : spec.and(userFetchSpec);
 
-        // 최신순 정렬 추가
         Pageable pageable = PageRequest.of(page, size,
-                Sort.by(org.springframework.data.domain.Sort.Direction.DESC,
-                        "createdAt"));
+                Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "createdAt"));
 
-        // DB 레벨에서 필터링 및 페이징 처리
+        // 위에서 조립한 spec을 DB에 위임 — 메모리 필터링 없이 DB 레벨에서 필터·페이징 처리
         Page<Board> boardPage = boardRepository.findAll(spec, pageable);
 
         if (boardPage.isEmpty()) {
@@ -569,7 +583,7 @@ public class BoardService {
                     false);
         }
 
-        // 배치 조회로 N+1 문제 해결
+        // 리액션 카운트(likeCount, dislikeCount) N+1 방지 — 게시글 ID 목록으로 IN 배치 조회 후 Map으로 합산
         List<BoardDTO> boardDTOs = mapBoardsWithReactionsBatch(boardPage.getContent());
 
         return new BoardPageResponseDTO(

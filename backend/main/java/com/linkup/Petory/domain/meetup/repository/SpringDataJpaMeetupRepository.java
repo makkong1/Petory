@@ -40,12 +40,19 @@ public interface SpringDataJpaMeetupRepository extends JpaRepository<Meetup, Lon
                     @Param("minLng") Double minLng,
                     @Param("maxLng") Double maxLng);
 
-    @RepositoryMethod("모임: 키워드 검색")
-    @Query("SELECT m FROM Meetup m JOIN FETCH m.organizer WHERE " +
-                    "(m.title LIKE %:keyword% OR m.description LIKE %:keyword%) AND " +
-                    "(m.isDeleted = false OR m.isDeleted IS NULL) " +
-                    "ORDER BY m.date ASC")
-    List<Meetup> findByKeyword(@Param("keyword") String keyword);
+    @RepositoryMethod("모임: 키워드 FULLTEXT 검색 — idx 목록 반환 (N+1 방지용 1단계)")
+    @Query(value = "SELECT m.idx FROM meetup m " +
+                    "WHERE (m.is_deleted = false OR m.is_deleted IS NULL) " +
+                    "AND MATCH(m.title, m.description) AGAINST(:keyword IN NATURAL LANGUAGE MODE) " +
+                    "ORDER BY m.date ASC", nativeQuery = true)
+    List<Long> findIdxByFulltextKeyword(@Param("keyword") String keyword);
+
+    @RepositoryMethod("모임: 키워드 검색 (FULLTEXT 2단계)")
+    default List<Meetup> findByKeyword(String keyword) {
+        List<Long> ids = findIdxByFulltextKeyword(keyword);
+        if (ids.isEmpty()) return java.util.List.of();
+        return findByIdxInWithOrganizer(ids);
+    }
 
     /**
      * 참여 가능 목록. GROUP BY/HAVING 제거 → currentParticipants 직접 비교로 메모리 페이징 위험 해소.
@@ -129,13 +136,31 @@ public interface SpringDataJpaMeetupRepository extends JpaRepository<Meetup, Lon
     Page<Meetup> findAllNotDeleted(Pageable pageable);
 
     @EntityGraph(attributePaths = {"organizer"})
-    @RepositoryMethod("모임: 관리자 필터 페이징 조회")
+    @RepositoryMethod("모임: 관리자 필터 페이징 조회 (keyword 없을 때)")
     @Query("SELECT m FROM Meetup m WHERE " +
             "(m.isDeleted = false OR m.isDeleted IS NULL) AND " +
-            "(:status IS NULL OR CAST(m.status AS string) = :status) AND " +
-            "(:keyword IS NULL OR m.title LIKE %:keyword% OR m.description LIKE %:keyword% OR m.location LIKE %:keyword%) " +
+            "(:status IS NULL OR CAST(m.status AS string) = :status) " +
             "ORDER BY m.createdAt DESC")
     Page<Meetup> findAllForAdmin(
+            @Param("status") String status,
+            Pageable pageable);
+
+    @RepositoryMethod("모임: 관리자 키워드 페이징 조회 (FULLTEXT title/description + LIKE location)")
+    @Query(value =
+            "SELECT * FROM meetup m " +
+            "WHERE (m.is_deleted = false OR m.is_deleted IS NULL) " +
+            "AND (:status IS NULL OR m.status = :status) " +
+            "AND (MATCH(m.title, m.description) AGAINST(:keyword IN NATURAL LANGUAGE MODE) " +
+            "     OR m.location LIKE CONCAT('%', :keyword, '%')) " +
+            "ORDER BY m.created_at DESC",
+            countQuery =
+            "SELECT COUNT(*) FROM meetup m " +
+            "WHERE (m.is_deleted = false OR m.is_deleted IS NULL) " +
+            "AND (:status IS NULL OR m.status = :status) " +
+            "AND (MATCH(m.title, m.description) AGAINST(:keyword IN NATURAL LANGUAGE MODE) " +
+            "     OR m.location LIKE CONCAT('%', :keyword, '%'))",
+            nativeQuery = true)
+    Page<Meetup> findAllForAdminWithKeyword(
             @Param("status") String status,
             @Param("keyword") String keyword,
             Pageable pageable);

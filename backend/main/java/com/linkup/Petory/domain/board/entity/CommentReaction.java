@@ -47,4 +47,7 @@ public class CommentReaction extends BaseTimeEntity {
     @Column(name = "reaction_type", nullable = false)
     private ReactionType reactionType;
 
+    public void changeReactionType(ReactionType newType) {
+        this.reactionType = newType;
+    }
 }

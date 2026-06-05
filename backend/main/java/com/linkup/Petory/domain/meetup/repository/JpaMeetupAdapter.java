@@ -103,7 +103,10 @@ public class JpaMeetupAdapter implements MeetupRepository {
 
     @Override
     public Page<Meetup> findAllForAdmin(String status, String keyword, Pageable pageable) {
-        return jpaRepository.findAllForAdmin(status, keyword, pageable);
+        if (keyword != null && !keyword.isBlank()) {
+            return jpaRepository.findAllForAdminWithKeyword(status, keyword, pageable);
+        }
+        return jpaRepository.findAllForAdmin(status, pageable);
     }
 
     @Override
