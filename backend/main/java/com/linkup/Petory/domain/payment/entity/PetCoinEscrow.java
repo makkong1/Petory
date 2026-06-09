@@ -1,19 +1,34 @@
 package com.linkup.Petory.domain.payment.entity;
 
+import java.time.LocalDateTime;
+
 import com.linkup.Petory.domain.care.entity.CareApplication;
 import com.linkup.Petory.domain.care.entity.CareRequest;
 import com.linkup.Petory.domain.common.BaseTimeEntity;
 import com.linkup.Petory.domain.payment.exception.PaymentConflictException;
 import com.linkup.Petory.domain.user.entity.Users;
-import jakarta.persistence.*;
-import lombok.*;
 
-import java.time.LocalDateTime;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 /**
- * 펫코인 에스크로 엔티티
- * 역할: 거래 확정 시 요청자의 코인을 임시 보관하는 엔티티입니다.
- * 서비스 완료 시 제공자에게 지급되거나, 취소 시 요청자에게 환불됩니다.
+ * 펫코인 에스크로 엔티티 역할: 거래 확정 시 요청자의 코인을 임시 보관하는 엔티티입니다. 서비스 완료 시 제공자에게 지급되거나, 취소 시
+ * 요청자에게 환불됩니다.
  */
 @Entity
 @Table(name = "pet_coin_escrow")
@@ -59,15 +74,17 @@ public class PetCoinEscrow extends BaseTimeEntity {
     private LocalDateTime refundedAt; // 환불 시간
 
     public void release() {
-        if (this.status != EscrowStatus.HOLD)
+        if (this.status != EscrowStatus.HOLD) {
             throw new IllegalStateException("HOLD 상태만 지급 가능");
+        }
         this.status = EscrowStatus.RELEASED;
         this.releasedAt = LocalDateTime.now();
     }
 
     public void refund() {
-        if (this.status != EscrowStatus.HOLD)
+        if (this.status != EscrowStatus.HOLD) {
             throw PaymentConflictException.holdStatusRequiredForRefund();
+        }
         this.status = EscrowStatus.REFUNDED;
         this.refundedAt = LocalDateTime.now();
     }

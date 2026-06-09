@@ -1,7 +1,5 @@
 package com.linkup.Petory.domain.payment.controller;
 
-import jakarta.validation.Valid;
-
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
@@ -25,12 +23,11 @@ import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.exception.UserNotFoundException;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 /**
- * 관리자용 펫코인 관리 컨트롤러
- * - ADMIN과 MASTER만 접근 가능
- * - 사용자에게 코인을 직접 지급할 수 있는 기능 제공
+ * 관리자용 펫코인 관리 컨트롤러 - ADMIN과 MASTER만 접근 가능 - 사용자에게 코인을 직접 지급할 수 있는 기능 제공
  *
  * [리팩토링] SpringDataJpaPetCoinTransactionRepository →
  * PetCoinTransactionRepository (도메인 인터페이스) 사용
@@ -41,59 +38,59 @@ import lombok.RequiredArgsConstructor;
 @PreAuthorize("hasAnyRole('ADMIN', 'MASTER')")
 public class AdminPaymentController {
 
-        private final PetCoinService petCoinService;
-        private final UsersRepository usersRepository;
-        private final PetCoinTransactionRepository transactionRepository;
-        private final com.linkup.Petory.domain.payment.converter.PetCoinTransactionConverter transactionConverter;
+    private final PetCoinService petCoinService;
+    private final UsersRepository usersRepository;
+    private final PetCoinTransactionRepository transactionRepository;
+    private final com.linkup.Petory.domain.payment.converter.PetCoinTransactionConverter transactionConverter;
 
-        /**
-         * 관리자가 사용자에게 코인 지급
-         */
-        @PostMapping("/charge")
-        public ResponseEntity<PetCoinTransactionDTO> chargeCoins(
-                        @Valid @RequestBody PetCoinChargeRequest request) {
-                if (request.userId() == null) {
-                        throw PaymentValidationException.userIdRequired();
-                }
-
-                Users user = usersRepository.findById(request.userId())
-                                .orElseThrow(() -> new UserNotFoundException());
-
-                PetCoinTransaction transaction = petCoinService.chargeCoins(
-                                user,
-                                request.amount(),
-                                request.description() != null ? request.description() : "관리자 지급");
-
-                return ResponseEntity.ok(transactionConverter.toDTO(transaction));
+    /**
+     * 관리자가 사용자에게 코인 지급
+     */
+    @PostMapping("/charge")
+    public ResponseEntity<PetCoinTransactionDTO> chargeCoins(
+            @Valid @RequestBody PetCoinChargeRequest request) {
+        if (request.userId() == null) {
+            throw PaymentValidationException.userIdRequired();
         }
 
-        /**
-         * 사용자 코인 잔액 조회 (관리자용)
-         */
-        @GetMapping("/balance/{userId}")
-        public ResponseEntity<PetCoinBalanceResponse> getUserBalance(@PathVariable("userId") Long userId) {
-                Users user = usersRepository.findById(userId)
-                                .orElseThrow(() -> new UserNotFoundException());
+        Users user = usersRepository.findById(request.userId())
+                .orElseThrow(() -> new UserNotFoundException());
 
-                Integer balance = petCoinService.getBalance(user);
+        PetCoinTransaction transaction = petCoinService.chargeCoins(
+                user,
+                request.amount(),
+                request.description() != null ? request.description() : "관리자 지급");
 
-                return ResponseEntity.ok(new PetCoinBalanceResponse(userId, balance));
-        }
+        return ResponseEntity.ok(transactionConverter.toDTO(transaction));
+    }
 
-        /**
-         * 사용자 거래 내역 조회 (관리자용, 페이징)
-         */
-        @GetMapping("/transactions/{userId}")
-        public ResponseEntity<Page<PetCoinTransactionDTO>> getUserTransactions(
-                        @PathVariable("userId") Long userId,
-                        @PageableDefault(size = 20) Pageable pageable) {
-                Users user = usersRepository.findById(userId)
-                                .orElseThrow(() -> new UserNotFoundException());
+    /**
+     * 사용자 코인 잔액 조회 (관리자용)
+     */
+    @GetMapping("/balance/{userId}")
+    public ResponseEntity<PetCoinBalanceResponse> getUserBalance(@PathVariable("userId") Long userId) {
+        Users user = usersRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException());
 
-                Page<PetCoinTransaction> transactions = transactionRepository
-                                .findByUserOrderByCreatedAtDesc(user, pageable);
+        Integer balance = petCoinService.getBalance(user);
 
-                Page<PetCoinTransactionDTO> dtoPage = transactions.map(transactionConverter::toDTO);
-                return ResponseEntity.ok(dtoPage);
-        }
+        return ResponseEntity.ok(new PetCoinBalanceResponse(userId, balance));
+    }
+
+    /**
+     * 사용자 거래 내역 조회 (관리자용, 페이징)
+     */
+    @GetMapping("/transactions/{userId}")
+    public ResponseEntity<Page<PetCoinTransactionDTO>> getUserTransactions(
+            @PathVariable("userId") Long userId,
+            @PageableDefault(size = 20) Pageable pageable) {
+        Users user = usersRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException());
+
+        Page<PetCoinTransaction> transactions = transactionRepository
+                .findByUserOrderByCreatedAtDesc(user, pageable);
+
+        Page<PetCoinTransactionDTO> dtoPage = transactions.map(transactionConverter::toDTO);
+        return ResponseEntity.ok(dtoPage);
+    }
 }

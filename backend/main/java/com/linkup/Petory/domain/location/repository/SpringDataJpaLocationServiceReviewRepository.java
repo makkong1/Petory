@@ -16,17 +16,17 @@ import com.linkup.Petory.global.annotation.RepositoryMethod;
 public interface SpringDataJpaLocationServiceReviewRepository extends JpaRepository<LocationServiceReview, Long> {
 
     @RepositoryMethod("장소 리뷰: 서비스별 목록 조회")
-    @Query("SELECT r FROM LocationServiceReview r JOIN FETCH r.user WHERE " +
-            "r.service.idx = :serviceIdx AND " +
-            "(r.isDeleted IS NULL OR r.isDeleted = false) " +
-            "ORDER BY r.createdAt DESC")
+    @Query("SELECT r FROM LocationServiceReview r JOIN FETCH r.user WHERE "
+            + "r.service.idx = :serviceIdx AND "
+            + "(r.isDeleted IS NULL OR r.isDeleted = false) "
+            + "ORDER BY r.createdAt DESC")
     List<LocationServiceReview> findByServiceIdxOrderByCreatedAtDesc(@Param("serviceIdx") Long serviceIdx);
 
     @RepositoryMethod("장소 리뷰: 사용자별 목록 조회")
-    @Query("SELECT r FROM LocationServiceReview r JOIN FETCH r.service JOIN FETCH r.user WHERE " +
-            "r.user.idx = :userIdx AND " +
-            "(r.isDeleted IS NULL OR r.isDeleted = false) " +
-            "ORDER BY r.createdAt DESC")
+    @Query("SELECT r FROM LocationServiceReview r JOIN FETCH r.service JOIN FETCH r.user WHERE "
+            + "r.user.idx = :userIdx AND "
+            + "(r.isDeleted IS NULL OR r.isDeleted = false) "
+            + "ORDER BY r.createdAt DESC")
     List<LocationServiceReview> findByUserIdxOrderByCreatedAtDesc(@Param("userIdx") Long userIdx);
 
     @RepositoryMethod("장소 리뷰: 단건 조회 (user, service 포함)")
@@ -34,15 +34,15 @@ public interface SpringDataJpaLocationServiceReviewRepository extends JpaReposit
     Optional<LocationServiceReview> findByIdWithUserAndService(@Param("idx") Long idx);
 
     @RepositoryMethod("장소 리뷰: 서비스별 평균 평점")
-    @Query("SELECT AVG(r.rating) FROM LocationServiceReview r WHERE " +
-            "r.service.idx = :serviceIdx AND " +
-            "(r.isDeleted IS NULL OR r.isDeleted = false)")
+    @Query("SELECT AVG(r.rating) FROM LocationServiceReview r WHERE "
+            + "r.service.idx = :serviceIdx AND "
+            + "(r.isDeleted IS NULL OR r.isDeleted = false)")
     Optional<Double> findAverageRatingByServiceIdx(@Param("serviceIdx") Long serviceIdx);
 
     @RepositoryMethod("장소 리뷰: 서비스+사용자 리뷰 작성 여부")
-    @Query("SELECT COUNT(r) > 0 FROM LocationServiceReview r WHERE " +
-            "r.service.idx = :serviceIdx AND " +
-            "r.user.idx = :userIdx AND " +
-            "(r.isDeleted IS NULL OR r.isDeleted = false)")
+    @Query("SELECT COUNT(r) > 0 FROM LocationServiceReview r WHERE "
+            + "r.service.idx = :serviceIdx AND "
+            + "r.user.idx = :userIdx AND "
+            + "(r.isDeleted IS NULL OR r.isDeleted = false)")
     boolean existsByServiceIdxAndUserIdx(@Param("serviceIdx") Long serviceIdx, @Param("userIdx") Long userIdx);
 }

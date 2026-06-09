@@ -1,26 +1,34 @@
 package com.linkup.Petory.domain.location.controller;
 
-import com.linkup.Petory.domain.location.dto.LocationServiceReviewDTO;
-import com.linkup.Petory.domain.location.service.LocationServiceReviewService;
-
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import jakarta.validation.Valid;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
+import com.linkup.Petory.domain.location.dto.LocationServiceReviewDTO;
+import com.linkup.Petory.domain.location.service.LocationServiceReviewService;
 import com.linkup.Petory.domain.user.exception.UnauthenticatedException;
 import com.linkup.Petory.global.exception.ApiException;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
-/** 위치 기반 서비스(동물병원·펫숍 등) 리뷰 작성·조회·삭제 API. */
+/**
+ * 위치 기반 서비스(동물병원·펫숍 등) 리뷰 작성·조회·삭제 API.
+ */
 @Slf4j
 @RestController
 @RequestMapping("/api/location-service-reviews")

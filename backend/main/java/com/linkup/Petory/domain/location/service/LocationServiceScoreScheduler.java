@@ -1,14 +1,16 @@
 package com.linkup.Petory.domain.location.service;
 
-import com.linkup.Petory.domain.location.entity.LocationService;
-import com.linkup.Petory.domain.location.repository.SpringDataJpaLocationServiceRepository;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import java.util.List;
+
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
+import com.linkup.Petory.domain.location.entity.LocationService;
+import com.linkup.Petory.domain.location.repository.SpringDataJpaLocationServiceRepository;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Component
@@ -18,8 +20,8 @@ public class LocationServiceScoreScheduler {
     private final SpringDataJpaLocationServiceRepository locationServiceRepository;
 
     /**
-     * 매일 자정 전체 score 재계산.
-     * score = 0.5 × rating × log10(reviewCount+1) + 0.2 × petFriendly
+     * 매일 자정 전체 score 재계산. score = 0.5 × rating × log10(reviewCount+1) + 0.2 ×
+     * petFriendly
      */
     @Scheduled(cron = "0 0 0 * * *")
     @Transactional

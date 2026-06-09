@@ -5,8 +5,7 @@ import org.springframework.http.HttpStatus;
 import com.linkup.Petory.global.exception.ApiException;
 
 /**
- * 거래 내역을 찾을 수 없을 때 발생하는 예외.
- * HTTP 404 Not Found
+ * 거래 내역을 찾을 수 없을 때 발생하는 예외. HTTP 404 Not Found
  */
 public class PetCoinTransactionNotFoundException extends ApiException {
 

@@ -1,12 +1,11 @@
 package com.linkup.Petory.domain.meetup.event;
 
-import lombok.Getter;
 import org.springframework.context.ApplicationEvent;
 
+import lombok.Getter;
+
 /**
- * 모임 생성 완료 이벤트
- * 모임 생성이 성공적으로 완료된 후 발행되는 이벤트
- * 채팅방 생성 등 후처리 작업을 위해 사용
+ * 모임 생성 완료 이벤트 모임 생성이 성공적으로 완료된 후 발행되는 이벤트 채팅방 생성 등 후처리 작업을 위해 사용
  */
 @Getter
 public class MeetupCreatedEvent extends ApplicationEvent {

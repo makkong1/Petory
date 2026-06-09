@@ -1,10 +1,15 @@
 package com.linkup.Petory.domain.location.dto;
 
-import lombok.*;
-
 import java.util.List;
 
-/** 위치 기반 서비스(동물병원·펫숍 등) 응답 DTO. 위치·카테고리·평점·리뷰 수를 포함한다. */
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+/**
+ * 위치 기반 서비스(동물병원·펫숍 등) 응답 DTO. 위치·카테고리·평점·리뷰 수를 포함한다.
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -27,43 +32,43 @@ public class LocationServiceDTO {
     private String description;
     private Boolean petFriendly;
     private String petPolicy; // petRestrictions 매핑
-    
+
     // 카테고리 계층 구조
     private String category1;
     private String category2;
     private String category3;
-    
+
     // 주소 구성 요소
     private String sido;
     private String sigungu;
     private String eupmyeondong;
     private String roadName;
     private String zipCode;
-    
+
     // 운영 정보
     private String closedDay;
     private String operatingHours; // 운영시간 문자열 (예: "월~금 09:00~18:00")
     private Boolean parkingAvailable;
     private String priceInfo;
-    
+
     // 반려동물 정보
     private Boolean isPetOnly;
     private String petSize;
     private String petRestrictions;
     private String petExtraFee;
-    
+
     // 장소 정보
     private Boolean indoor;
     private Boolean outdoor;
-    
+
     // 메타데이터
     private java.time.LocalDate lastUpdated;
     private String dataSource;
-    
+
     // Soft Delete 필드
     private Boolean isDeleted;
     private java.time.LocalDateTime deletedAt;
-    
+
     // 하위 호환성을 위한 필드 (deprecated)
     @Deprecated
     private java.time.LocalTime openingTime; // operatingHours로 통합됨
@@ -71,11 +76,11 @@ public class LocationServiceDTO {
     private java.time.LocalTime closingTime; // operatingHours로 통합됨
     @Deprecated
     private String imageUrl; // 제거됨
-    
+
     // 리뷰 정보
     private Integer reviewCount; // 리뷰 개수
     private List<LocationServiceReviewDTO> reviews;
-    
+
     // 거리 정보 (내 위치 기반 검색 시 사용)
     private Double distance; // 미터 단위
 

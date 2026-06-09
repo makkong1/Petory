@@ -1,10 +1,9 @@
 package com.linkup.Petory.domain.location.controller;
 
-import com.linkup.Petory.domain.location.dto.LocationServiceDTO;
-import com.linkup.Petory.domain.location.service.LocationServiceService;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -14,9 +13,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import com.linkup.Petory.domain.location.dto.LocationServiceDTO;
+import com.linkup.Petory.domain.location.service.LocationServiceService;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @RestController
@@ -27,21 +28,22 @@ public class LocationServiceController {
     private final LocationServiceService locationServiceService;
 
     /**
-     * DB에서 위치 서비스 검색
-     * 위치 기반 검색 또는 지역 계층별 검색 수행
-     * 
-     * @param latitude     위도 (선택, 위치 기반 검색 시 필수)
-     * @param longitude    경도 (선택, 위치 기반 검색 시 필수)
-     * @param radius       반경 (미터 단위, 선택, 기본값: 10000m = 10km)
-     * @param sido         시도 (선택, 예: "서울특별시", "경기도")
-     * @param sigungu      시군구 (선택, 예: "노원구", "고양시 덕양구")
+     * DB에서 위치 서비스 검색 위치 기반 검색 또는 지역 계층별 검색 수행
+     *
+     * @param latitude 위도 (선택, 위치 기반 검색 시 필수)
+     * @param longitude 경도 (선택, 위치 기반 검색 시 필수)
+     * @param radius 반경 (미터 단위, 선택, 기본값: 10000m = 10km)
+     * @param sido 시도 (선택, 예: "서울특별시", "경기도")
+     * @param sigungu 시군구 (선택, 예: "노원구", "고양시 덕양구")
      * @param eupmyeondong 읍면동 (선택, 예: "상계동", "동산동")
-     * @param roadName     도로명 (선택, 예: "상계로", "동세로")
-     * @param category     카테고리 (선택). DB의 category1·category2·category3 와 문자열 동일해야 매칭됨.
-     *                     소분류 예: "동물약국","동물병원","카페","미술관" / 중분류 예: "반려의료","반려동반여행","반려동물식당카페","반려동물 서비스","반려문화시설"
-     * @param keyword      키워드 (선택, 이름/설명/카테고리 검색, 예: "동물병원", "카페")
-     * @param sort         반경 검색 정렬 기준 (선택, stable|distance|rating|reviews|score, 기본값: distance)
-     * @param size         최대 결과 수 (선택, 기본값: 100, 0 이하이면 서비스 기본 제한)
+     * @param roadName 도로명 (선택, 예: "상계로", "동세로")
+     * @param category 카테고리 (선택). DB의 category1·category2·category3 와 문자열 동일해야
+     * 매칭됨. 소분류 예: "동물약국","동물병원","카페","미술관" / 중분류 예:
+     * "반려의료","반려동반여행","반려동물식당카페","반려동물 서비스","반려문화시설"
+     * @param keyword 키워드 (선택, 이름/설명/카테고리 검색, 예: "동물병원", "카페")
+     * @param sort 반경 검색 정렬 기준 (선택, stable|distance|rating|reviews|score, 기본값:
+     * distance)
+     * @param size 최대 결과 수 (선택, 기본값: 100, 0 이하이면 서비스 기본 제한)
      * @return 검색 결과
      */
     @GetMapping("/search")
@@ -114,7 +116,7 @@ public class LocationServiceController {
 
     /**
      * 위치 서비스 삭제 (Soft Delete)
-     * 
+     *
      * @param serviceIdx 서비스 ID
      * @return 삭제 결과
      */

@@ -1,15 +1,16 @@
 package com.linkup.Petory.domain.location.util;
 
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.util.StringUtils;
-
 import java.time.LocalTime;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.springframework.util.StringUtils;
+
+import lombok.extern.slf4j.Slf4j;
+
 /**
- * 운영시간 문자열을 파싱하여 LocalTime으로 변환하는 유틸리티
- * 예: "월~금 09:00~18:00" -> openingTime: 09:00, closingTime: 18:00
+ * 운영시간 문자열을 파싱하여 LocalTime으로 변환하는 유틸리티 예: "월~금 09:00~18:00" -> openingTime:
+ * 09:00, closingTime: 18:00
  */
 @Slf4j
 public class OperatingHoursParser {
@@ -17,15 +18,16 @@ public class OperatingHoursParser {
     private static final Pattern TIME_RANGE_PATTERN = Pattern.compile(
             "(\\d{1,2}):(\\d{2})\\s*~\\s*(\\d{1,2}):(\\d{2})"
     );
-    
+
     private static final Pattern SINGLE_TIME_PATTERN = Pattern.compile(
             "(\\d{1,2}):(\\d{2})"
     );
 
     /**
      * 운영시간 문자열에서 시작시간과 종료시간을 추출
-     * 
-     * @param operatingHours 운영시간 문자열 (예: "월~금 09:00~18:00", "09:00~18:00", "09:00")
+     *
+     * @param operatingHours 운영시간 문자열 (예: "월~금 09:00~18:00", "09:00~18:00",
+     * "09:00")
      * @return OperatingHoursResult (openingTime, closingTime)
      */
     public static OperatingHoursResult parse(String operatingHours) {
@@ -48,7 +50,7 @@ public class OperatingHoursParser {
                 LocalTime closingTime = LocalTime.of(endHour, endMinute);
 
                 return OperatingHoursResult.of(openingTime, closingTime);
-            } catch (Exception e) {
+            } catch (NumberFormatException e) {
                 log.warn("운영시간 파싱 실패: {}", operatingHours, e);
             }
         }
@@ -61,7 +63,7 @@ public class OperatingHoursParser {
                 int minute = Integer.parseInt(singleMatcher.group(2));
                 LocalTime time = LocalTime.of(hour, minute);
                 return OperatingHoursResult.of(time, null);
-            } catch (Exception e) {
+            } catch (NumberFormatException e) {
                 log.warn("운영시간 파싱 실패: {}", operatingHours, e);
             }
         }
@@ -70,6 +72,7 @@ public class OperatingHoursParser {
     }
 
     public static class OperatingHoursResult {
+
         private final LocalTime openingTime;
         private final LocalTime closingTime;
 
@@ -95,4 +98,3 @@ public class OperatingHoursParser {
         }
     }
 }
-

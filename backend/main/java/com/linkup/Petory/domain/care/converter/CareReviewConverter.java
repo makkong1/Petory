@@ -5,7 +5,9 @@ import org.springframework.stereotype.Component;
 import com.linkup.Petory.domain.care.dto.CareReviewDTO;
 import com.linkup.Petory.domain.care.entity.CareReview;
 
-/** CareReview 엔티티 → CareReviewDTO 변환기. */
+/**
+ * CareReview 엔티티 → CareReviewDTO 변환기.
+ */
 @Component
 public class CareReviewConverter {
 

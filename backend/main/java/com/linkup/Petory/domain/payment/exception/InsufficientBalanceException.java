@@ -5,8 +5,7 @@ import org.springframework.http.HttpStatus;
 import com.linkup.Petory.global.exception.ApiException;
 
 /**
- * 펫코인 잔액 부족 시 발생하는 예외.
- * HTTP 400 Bad Request
+ * 펫코인 잔액 부족 시 발생하는 예외. HTTP 400 Bad Request
  */
 public class InsufficientBalanceException extends ApiException {
 

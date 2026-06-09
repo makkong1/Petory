@@ -1,23 +1,39 @@
 package com.linkup.Petory.domain.care.entity;
 
-import org.hibernate.annotations.BatchSize;
-
-import jakarta.persistence.*;
-import lombok.*;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import org.hibernate.annotations.BatchSize;
+
+import com.linkup.Petory.domain.common.BaseTimeEntity;
 import com.linkup.Petory.domain.user.entity.Pet;
 import com.linkup.Petory.domain.user.entity.Users;
 
-import com.linkup.Petory.domain.common.BaseTimeEntity;
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.Lob;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 /**
- * 펫케어 요청 엔티티
- * 역할: 펫케어 요청을 나타내는 핵심 엔티티입니다. 반려동물 돌봄이 필요한 사용자가 서비스 제공자를 모집하기 위해 생성하는 게시물입니다.
- * 요청자는 제목, 설명, 날짜, 관련 펫 정보를 포함하여 요청을 생성하며, 상태는 OPEN → IN_PROGRESS → COMPLETED로
- * 전이됩니다.
- * 하나의 요청에는 여러 지원(CareApplication)과 댓글(CareRequestComment)이 연결될 수 있습니다.
+ * 펫케어 요청 엔티티 역할: 펫케어 요청을 나타내는 핵심 엔티티입니다. 반려동물 돌봄이 필요한 사용자가 서비스 제공자를 모집하기 위해
+ * 생성하는 게시물입니다. 요청자는 제목, 설명, 날짜, 관련 펫 정보를 포함하여 요청을 생성하며, 상태는 OPEN → IN_PROGRESS
+ * → COMPLETED로 전이됩니다. 하나의 요청에는 여러 지원(CareApplication)과 댓글(CareRequestComment)이
+ * 연결될 수 있습니다.
  */
 @Entity
 @Table(name = "carerequest")
@@ -47,13 +63,17 @@ public class CareRequest extends BaseTimeEntity {
 
     private LocalDateTime date;
 
-    /** 일정이 위 date에 고정되는지, 채팅 후 조율인지 */
+    /**
+     * 일정이 위 date에 고정되는지, 채팅 후 조율인지
+     */
     @Enumerated(EnumType.STRING)
     @Column(name = "schedule_mode", nullable = false, length = 32)
     @Builder.Default
     private CareScheduleMode scheduleMode = CareScheduleMode.FIXED;
 
-    /** 예상 돌봄 소요 시간(분). 선택. */
+    /**
+     * 예상 돌봄 소요 시간(분). 선택.
+     */
     @Column(name = "estimated_duration_minutes")
     private Integer estimatedDurationMinutes;
 
@@ -102,12 +122,16 @@ public class CareRequest extends BaseTimeEntity {
         this.deletedAt = null;
     }
 
-    /** 펫케어 지원 목록 (서비스 제공자들의 지원) */
+    /**
+     * 펫케어 지원 목록 (서비스 제공자들의 지원)
+     */
     @OneToMany(mappedBy = "careRequest", cascade = CascadeType.ALL)
     @BatchSize(size = 50)  // 페이징 목록 조회 시 CareApplication N+1 방지
     private List<CareApplication> applications;
 
-    /** 펫케어 요청 댓글 목록 */
+    /**
+     * 펫케어 요청 댓글 목록
+     */
     @OneToMany(mappedBy = "careRequest", cascade = CascadeType.ALL)
     private List<CareRequestComment> comments;
 

@@ -3,23 +3,26 @@ package com.linkup.Petory.domain.care.dto;
 import java.time.LocalDateTime;
 import java.util.List;
 
-import jakarta.validation.constraints.NotBlank;
-
 import com.linkup.Petory.domain.file.dto.FileDTO;
 
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Data
-/** 펫케어 요청 댓글 응답/요청 DTO. */
+/**
+ * 펫케어 요청 댓글 응답/요청 DTO.
+ */
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class CareRequestCommentDTO {
+
     private Long idx;
-    @NotBlank private String content;
+    @NotBlank
+    private String content;
     private LocalDateTime createdAt;
     private String status; // ACTIVE / BLINDED / DELETED
     private Boolean deleted;

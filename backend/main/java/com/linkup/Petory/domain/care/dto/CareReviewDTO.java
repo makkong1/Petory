@@ -5,26 +5,32 @@ import java.time.LocalDateTime;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
-
-import lombok.Data;
-import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Data
-/** 펫케어 리뷰 응답/요청 DTO. 별점(1-5)·내용·리뷰어 정보를 포함한다. */
+/**
+ * 펫케어 리뷰 응답/요청 DTO. 별점(1-5)·내용·리뷰어 정보를 포함한다.
+ */
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class CareReviewDTO {
+
     private Long idx;
-    @NotNull @Min(1) @Max(5) private Integer rating;
+    @NotNull
+    @Min(1)
+    @Max(5)
+    private Integer rating;
     private String comment;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
     // 케어 지원 정보
-    @NotNull private Long careApplicationId;
+    @NotNull
+    private Long careApplicationId;
 
     // 리뷰 작성자 정보
     private Long reviewerId;

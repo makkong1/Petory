@@ -64,18 +64,21 @@ public class FcmService {
     }
 
     /**
-     * 사용자의 모든 기기에 FCM 푸시 알림 발송.
-     * Firebase가 초기화되지 않은 경우(설정 누락) 조용히 건너뜀.
+     * 사용자의 모든 기기에 FCM 푸시 알림 발송. Firebase가 초기화되지 않은 경우(설정 누락) 조용히 건너뜀.
      */
     public void sendToUser(Long userId, String title, String body) {
         if (FirebaseApp.getApps().isEmpty()) {
             return;
         }
         Users user = usersRepository.findById(userId).orElse(null);
-        if (user == null) return;
+        if (user == null) {
+            return;
+        }
 
         List<FcmToken> tokens = fcmTokenRepository.findByUser(user);
-        if (tokens.isEmpty()) return;
+        if (tokens.isEmpty()) {
+            return;
+        }
 
         Notification notification = Notification.builder()
                 .setTitle(title)

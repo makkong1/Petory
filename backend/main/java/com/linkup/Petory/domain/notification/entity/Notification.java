@@ -2,11 +2,12 @@ package com.linkup.Petory.domain.notification.entity;
 
 import com.linkup.Petory.domain.common.BaseTimeEntity;
 import com.linkup.Petory.domain.user.entity.Users;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -19,7 +20,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/** 알림 엔티티. 알림 유형·제목·관련 도메인 ID·읽음 여부를 관리하며 SSE와 Redis·DB 이중 저장으로 제공된다. */
+/**
+ * 알림 엔티티. 알림 유형·제목·관련 도메인 ID·읽음 여부를 관리하며 SSE와 Redis·DB 이중 저장으로 제공된다.
+ */
 @Entity
 @Table(name = "notifications")
 @Getter

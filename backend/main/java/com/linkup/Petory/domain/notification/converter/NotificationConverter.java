@@ -1,11 +1,13 @@
 package com.linkup.Petory.domain.notification.converter;
 
+import org.springframework.stereotype.Component;
+
 import com.linkup.Petory.domain.notification.dto.NotificationDTO;
 import com.linkup.Petory.domain.notification.entity.Notification;
 
-import org.springframework.stereotype.Component;
-
-/** Notification 엔티티 ↔ NotificationDTO 변환기. */
+/**
+ * Notification 엔티티 ↔ NotificationDTO 변환기.
+ */
 @Component
 public class NotificationConverter {
 
@@ -43,4 +45,3 @@ public class NotificationConverter {
                 .build();
     }
 }
-

@@ -13,4 +13,5 @@ public record CareRequestPageResponseDTO(
         int pageSize,
         boolean hasNext,
         boolean hasPrevious) {
+
 }

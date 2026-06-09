@@ -5,8 +5,7 @@ import org.springframework.http.HttpStatus;
 import com.linkup.Petory.global.exception.ApiException;
 
 /**
- * 펫케어 요청을 찾을 수 없을 때 발생하는 예외.
- * HTTP 404 Not Found
+ * 펫케어 요청을 찾을 수 없을 때 발생하는 예외. HTTP 404 Not Found
  */
 public class CareRequestNotFoundException extends ApiException {
 

@@ -1,20 +1,23 @@
 package com.linkup.Petory.domain.meetup.converter;
 
-import com.linkup.Petory.domain.meetup.dto.MeetupParticipantsDTO;
-import com.linkup.Petory.domain.meetup.entity.MeetupParticipants;
-
-import org.springframework.stereotype.Component;
-
 import java.util.List;
 import java.util.stream.Collectors;
 
-/** MeetupParticipants 엔티티 → MeetupParticipantsDTO 변환기. */
+import org.springframework.stereotype.Component;
+
+import com.linkup.Petory.domain.meetup.dto.MeetupParticipantsDTO;
+import com.linkup.Petory.domain.meetup.entity.MeetupParticipants;
+
+/**
+ * MeetupParticipants 엔티티 → MeetupParticipantsDTO 변환기.
+ */
 @Component
 public class MeetupParticipantsConverter {
 
     public MeetupParticipantsDTO toDTO(MeetupParticipants participants) {
-        if (participants == null)
+        if (participants == null) {
             return null;
+        }
 
         return new MeetupParticipantsDTO(
                 participants.getMeetup().getIdx(),
@@ -33,8 +36,9 @@ public class MeetupParticipantsConverter {
     }
 
     public MeetupParticipants toEntity(MeetupParticipantsDTO dto) {
-        if (dto == null)
+        if (dto == null) {
             return null;
+        }
 
         return MeetupParticipants.builder()
                 .joinedAt(dto.joinedAt())

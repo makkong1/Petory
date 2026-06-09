@@ -14,7 +14,9 @@ import org.springframework.web.filter.HiddenHttpMethodFilter;
 
 import de.codecentric.boot.admin.server.config.EnableAdminServer;
 
-/** 펫토리 애플리케이션 진입점. 스케줄링·비동기·캐시·감사·메서드 보안을 활성화한다. */
+/**
+ * 펫토리 애플리케이션 진입점. 스케줄링·비동기·캐시·감사·메서드 보안을 활성화한다.
+ */
 @SpringBootApplication
 @ConfigurationProperties(prefix = "app")
 // @ServletComponentScan // 이 어노테이션을 추가하여 Servlet 리스너와 필터 자동 등록

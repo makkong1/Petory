@@ -5,8 +5,7 @@ import org.springframework.http.HttpStatus;
 import com.linkup.Petory.global.exception.ApiException;
 
 /**
- * 결제 도메인 충돌(중복, 상태 불일치) 시 발생하는 예외.
- * HTTP 409 Conflict
+ * 결제 도메인 충돌(중복, 상태 불일치) 시 발생하는 예외. HTTP 409 Conflict
  */
 public class PaymentConflictException extends ApiException {
 

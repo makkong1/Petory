@@ -16,7 +16,9 @@ import com.linkup.Petory.domain.user.entity.Pet;
 
 import lombok.RequiredArgsConstructor;
 
-/** CareRequest 엔티티 → CareRequestDTO 변환기. */
+/**
+ * CareRequest 엔티티 → CareRequestDTO 변환기.
+ */
 @Component
 @RequiredArgsConstructor
 public class CareRequestConverter {
@@ -79,14 +81,14 @@ public class CareRequestConverter {
         if (requests == null || requests.isEmpty()) {
             return List.of();
         }
-        
+
         // 모든 Pet 수집
         List<Pet> pets = requests.stream()
                 .map(CareRequest::getPet)
                 .filter(Objects::nonNull)
                 .distinct()
                 .collect(Collectors.toList());
-        
+
         // Pet 배치 변환 (File N+1 방지)
         Map<Long, PetDTO> petDTOMap = Map.of();
         if (!pets.isEmpty()) {
@@ -94,7 +96,7 @@ public class CareRequestConverter {
             petDTOMap = petDTOs.stream()
                     .collect(Collectors.toMap(PetDTO::getIdx, dto -> dto, (existing, replacement) -> existing));
         }
-        
+
         // 각 CareRequest를 변환하면서 미리 변환된 Pet DTO 사용
         final Map<Long, PetDTO> finalPetDTOMap = petDTOMap;
         return requests.stream()

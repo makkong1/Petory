@@ -54,10 +54,14 @@ import lombok.extern.slf4j.Slf4j;
 @Transactional(readOnly = true)
 public class MeetupService {
 
-    /** 근처 모임 네이티브 조회 상한 (과다 로드 방지) */
+    /**
+     * 근처 모임 네이티브 조회 상한 (과다 로드 방지)
+     */
     public static final int DEFAULT_NEARBY_MAX_RESULTS = 500;
 
-    /** 위치·키워드·주최자별 목록 조회 상한 (OOM 방지, 풀 페이징 전환 전 임시 상한) */
+    /**
+     * 위치·키워드·주최자별 목록 조회 상한 (OOM 방지, 풀 페이징 전환 전 임시 상한)
+     */
     public static final int MAX_LIST_SIZE = 500;
 
     private final MeetupRepository meetupRepository;
@@ -225,7 +229,9 @@ public class MeetupService {
     }
 
     // 모든 모임 조회 (소프트 삭제 제외)
-    /** @deprecated 컨트롤러는 {@link #getAllMeetups(Pageable)}를 사용하세요. */
+    /**
+     * @deprecated 컨트롤러는 {@link #getAllMeetups(Pageable)}를 사용하세요.
+     */
     @Deprecated(forRemoval = true)
     @Timed("getAllMeetups")
     public List<MeetupDTO> getAllMeetups() {
@@ -253,8 +259,8 @@ public class MeetupService {
     }
 
     /**
-     * 반경 기반 모임 조회 (마커 표시용)
-     * 네이티브로 ID·정렬·LIMIT 조회 후, 주최자는 IN + JOIN FETCH로 한 번에 로딩 (organizer N+1 방지).
+     * 반경 기반 모임 조회 (마커 표시용) 네이티브로 ID·정렬·LIMIT 조회 후, 주최자는 IN + JOIN FETCH로 한 번에
+     * 로딩 (organizer N+1 방지).
      */
     @Timed("getNearbyMeetups")
     public List<MeetupDTO> getNearbyMeetups(Double lat, Double lng, Double radiusKm, int maxResults) {
@@ -415,9 +421,8 @@ public class MeetupService {
     }
 
     /**
-     * 사용자의 모임 히스토리 조회.
-     * participants → meetup → organizer를 fetch join한 단일 목록 조회를 사용해 카드 변환 중 N+1을
-     * 막는다.
+     * 사용자의 모임 히스토리 조회. participants → meetup → organizer를 fetch join한 단일 목록 조회를
+     * 사용해 카드 변환 중 N+1을 막는다.
      */
     public List<MeetupHistoryDTO> getMeetupHistory(Long userIdx) {
         List<MeetupParticipants> histories = meetupParticipantsRepository.findByUserIdxOrderByJoinedAtDesc(userIdx);
@@ -427,8 +432,8 @@ public class MeetupService {
     }
 
     /**
-     * 로그인 사용자의 모임 히스토리 좋아요 상태 변경.
-     * 이미 참가/주최자로 기록된 모임에만 표시할 수 있으므로 별도 동시성 제어 없이 단건 행만 갱신한다.
+     * 로그인 사용자의 모임 히스토리 좋아요 상태 변경. 이미 참가/주최자로 기록된 모임에만 표시할 수 있으므로 별도 동시성 제어 없이
+     * 단건 행만 갱신한다.
      */
     @Transactional
     public MeetupHistoryDTO updateMyMeetupLike(Long meetupIdx, String userId, boolean liked) {
@@ -486,8 +491,8 @@ public class MeetupService {
     }
 
     /**
-     * @deprecated 컨트롤러는 {@link #getAvailableMeetups(Pageable)}를 사용하세요.
-     *             이 메서드는 Pageable.unpaged()로 전량 조회합니다.
+     * @deprecated 컨트롤러는 {@link #getAvailableMeetups(Pageable)}를 사용하세요. 이 메서드는
+     * Pageable.unpaged()로 전량 조회합니다.
      */
     @Deprecated
     @Timed("getAvailableMeetups")
@@ -511,8 +516,8 @@ public class MeetupService {
     }
 
     /**
-     * 홈 화면 모임 추천.
-     * score = 0.4 * distScore + 0.4 * urgencyScore + 0.2 * capacityScore
+     * 홈 화면 모임 추천. score = 0.4 * distScore + 0.4 * urgencyScore + 0.2 *
+     * capacityScore
      */
     public List<MeetupDTO> getHomeMeetups(Double lat, Double lng, int size) {
         Pageable fallbackPage = org.springframework.data.domain.PageRequest.of(
@@ -540,7 +545,7 @@ public class MeetupService {
 
                     double daysUntil = m.getDate() != null
                             ? (m.getDate().atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli() - nowMs)
-                                    / 86_400_000.0
+                            / 86_400_000.0
                             : 30;
                     double urgencyScore = Math.max(0, 1.0 - daysUntil / 30.0);
 
@@ -567,7 +572,7 @@ public class MeetupService {
         double dLng = Math.toRadians(lng2 - lng1);
         double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
                 + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
-                        * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+                * Math.sin(dLng / 2) * Math.sin(dLng / 2);
         return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
 

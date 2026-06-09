@@ -18,6 +18,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class PetCoinTransactionDTO {
+
     private Long idx;
     private Long userId;
     private TransactionType transactionType;
