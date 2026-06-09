@@ -1,14 +1,18 @@
 package com.linkup.Petory.domain.location.dto;
 
+import java.time.LocalDateTime;
+
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-import lombok.*;
-
-import java.time.LocalDateTime;
-
-/** 위치 서비스 리뷰 응답/요청 DTO. 별점·내용·리뷰어 정보를 포함한다. */
+/**
+ * 위치 서비스 리뷰 응답/요청 DTO. 별점·내용·리뷰어 정보를 포함한다.
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -20,7 +24,10 @@ public class LocationServiceReviewDTO {
     private String serviceName;
     private Long userIdx;
     private String username;
-    @NotNull @Min(1) @Max(5) private Integer rating;
+    @NotNull
+    @Min(1)
+    @Max(5)
+    private Integer rating;
     private String comment;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

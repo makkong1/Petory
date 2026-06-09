@@ -158,8 +158,8 @@ public class LocationServiceReviewService {
     }
 
     /**
-     * 특정 사용자가 작성한 리뷰 목록 + 평균 평점 + 개수를 한 번의 조회로 가져온다.
-     * 프로필 화면에서 작성 리뷰 요약을 만들 때 getReviewsByUser + 별도 집계를 나누지 않기 위한 메서드다.
+     * 특정 사용자가 작성한 리뷰 목록 + 평균 평점 + 개수를 한 번의 조회로 가져온다. 프로필 화면에서 작성 리뷰 요약을 만들 때
+     * getReviewsByUser + 별도 집계를 나누지 않기 위한 메서드다.
      */
     @Transactional(readOnly = true)
     public LocationServiceReviewSummaryDTO getReviewsWithAverage(Long userIdx) {

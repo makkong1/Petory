@@ -1,15 +1,19 @@
 package com.linkup.Petory.domain.location.controller;
 
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
-import com.linkup.Petory.domain.location.service.NaverMapService;
-
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.linkup.Petory.domain.location.service.NaverMapService;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * 주소를 위도/경도로 변환하는 컨트롤러
@@ -23,8 +27,8 @@ public class GeocodingController {
     private final NaverMapService naverMapService;
 
     /**
-     * 주소를 위도/경도로 변환 (네이버맵 Geocoding API)
-     * GET /api/geocoding/address?address=서울시 강남구
+     * 주소를 위도/경도로 변환 (네이버맵 Geocoding API) GET /api/geocoding/address?address=서울시
+     * 강남구
      */
     @GetMapping("/address")
     public ResponseEntity<Map<String, Object>> addressToCoordinates(
@@ -73,8 +77,7 @@ public class GeocodingController {
     }
 
     /**
-     * 주소 키워드 검색 (최대 5개 결과 반환)
-     * GET /api/geocoding/search?query=서울시 강남구
+     * 주소 키워드 검색 (최대 5개 결과 반환) GET /api/geocoding/search?query=서울시 강남구
      */
     @GetMapping("/search")
     public ResponseEntity<Map<String, Object>> searchAddresses(
@@ -95,8 +98,7 @@ public class GeocodingController {
     }
 
     /**
-     * 네이버맵 길찾기 (Directions API)
-     * GET
+     * 네이버맵 길찾기 (Directions API) GET
      * /api/geocoding/directions?start=127.1058342,37.359708&goal=129.075986,35.179470&option=traoptimal
      */
     @GetMapping("/directions")
@@ -142,8 +144,8 @@ public class GeocodingController {
     }
 
     /**
-     * 위도/경도를 주소로 변환 (역지오코딩)
-     * GET /api/geocoding/coordinates?lat=37.5665&lng=126.9780
+     * 위도/경도를 주소로 변환 (역지오코딩) GET
+     * /api/geocoding/coordinates?lat=37.5665&lng=126.9780
      */
     @GetMapping("/coordinates")
     public ResponseEntity<Map<String, Object>> coordinatesToAddress(

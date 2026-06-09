@@ -54,12 +54,12 @@ public class NotificationService {
 
     /**
      * 알림 생성 및 발송
-     * 
-     * @param userId      알림을 받을 사용자 ID
-     * @param type        알림 타입
-     * @param title       알림 제목
-     * @param content     알림 내용
-     * @param relatedId   관련 게시글/댓글 ID
+     *
+     * @param userId 알림을 받을 사용자 ID
+     * @param type 알림 타입
+     * @param title 알림 제목
+     * @param content 알림 내용
+     * @param relatedId 관련 게시글/댓글 ID
      * @param relatedType 관련 타입
      */
     @Transactional
@@ -134,8 +134,7 @@ public class NotificationService {
     }
 
     /**
-     * 읽지 않은 알림 개수 조회
-     * SSE 연결 등 장시간 연결에서 호출될 수 있으므로 트랜잭션 없이 실행
+     * 읽지 않은 알림 개수 조회 SSE 연결 등 장시간 연결에서 호출될 수 있으므로 트랜잭션 없이 실행
      */
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public Long getUnreadCount(Long userId) {
@@ -261,12 +260,15 @@ public class NotificationService {
 
         // 최신순 정렬
         merged.sort((a, b) -> {
-            if (a.getCreatedAt() == null && b.getCreatedAt() == null)
+            if (a.getCreatedAt() == null && b.getCreatedAt() == null) {
                 return 0;
-            if (a.getCreatedAt() == null)
+            }
+            if (a.getCreatedAt() == null) {
                 return 1;
-            if (b.getCreatedAt() == null)
+            }
+            if (b.getCreatedAt() == null) {
                 return -1;
+            }
             return b.getCreatedAt().compareTo(a.getCreatedAt());
         });
 

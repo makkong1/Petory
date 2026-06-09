@@ -15,6 +15,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Builder
 public class LocationServiceReviewSummaryDTO {
+
     private List<LocationServiceReviewDTO> reviews;
     private Double averageRating;
     private Integer reviewCount;

@@ -1,16 +1,5 @@
 package com.linkup.Petory.domain.location.service;
 
-import com.linkup.Petory.domain.location.dto.PublicDataLocationDTO;
-import com.linkup.Petory.domain.location.entity.LocationService;
-import com.linkup.Petory.domain.location.repository.LocationServiceRepository;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
-
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -26,7 +15,18 @@ import java.util.List;
 import java.util.Set;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
+
+import com.linkup.Petory.domain.location.dto.PublicDataLocationDTO;
+import com.linkup.Petory.domain.location.entity.LocationService;
+import com.linkup.Petory.domain.location.repository.LocationServiceRepository;
+
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * 공공데이터 CSV 파일을 읽어서 LocationService 엔티티로 변환하여 배치 저장하는 서비스
@@ -47,9 +47,8 @@ public class PublicDataLocationService {
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     /**
-     * 업로드된 CSV 파일을 받아서 데이터를 파싱하고 배치로 저장
-     * 각 배치는 별도 트랜잭션으로 처리되므로 메인 메서드는 트랜잭션 불필요
-     * 
+     * 업로드된 CSV 파일을 받아서 데이터를 파싱하고 배치로 저장 각 배치는 별도 트랜잭션으로 처리되므로 메인 메서드는 트랜잭션 불필요
+     *
      * @param file 업로드된 CSV 파일
      * @return 저장 결과 통계
      */
@@ -174,9 +173,8 @@ public class PublicDataLocationService {
     }
 
     /**
-     * CSV 파일 경로를 받아서 데이터를 파싱하고 배치로 저장
-     * 각 배치는 별도 트랜잭션으로 처리되므로 메인 메서드는 트랜잭션 불필요
-     * 
+     * CSV 파일 경로를 받아서 데이터를 파싱하고 배치로 저장 각 배치는 별도 트랜잭션으로 처리되므로 메인 메서드는 트랜잭션 불필요
+     *
      * @param csvFilePath CSV 파일 경로
      * @return 저장 결과 통계
      */
@@ -299,8 +297,7 @@ public class PublicDataLocationService {
     }
 
     /**
-     * CSV 한 라인을 파싱하여 DTO로 변환
-     * CSV 형식:
+     * CSV 한 라인을 파싱하여 DTO로 변환 CSV 형식:
      * 시설명,카테고리1,카테고리2,카테고리3,시도명칭,시군구명칭,법정읍면동명칭,리명칭,번지,도로명이름,건물번호,위도,경도,우편번호,도로명주소,지번주소,전화번호,홈페이지,휴무일,운영시간,주차가능여부,입장가격정보,반려동물동반가능정보,반려동물전용정보,입장가능동물크기,반려동물제한사항,장소실내여부,장소실외여부,기본정보장소설명,애견동반추가요금,최종작성일
      */
     private PublicDataLocationDTO parseCsvLine(String line) {
@@ -395,10 +392,7 @@ public class PublicDataLocationService {
         if (!StringUtils.hasText(dto.getFacilityName())) {
             return false;
         }
-        if (!StringUtils.hasText(dto.getRoadAddress()) && !StringUtils.hasText(dto.getJibunAddress())) {
-            return false;
-        }
-        return true;
+        return !(!StringUtils.hasText(dto.getRoadAddress()) && !StringUtils.hasText(dto.getJibunAddress()));
     }
 
     /**
@@ -425,9 +419,8 @@ public class PublicDataLocationService {
     }
 
     /**
-     * DTO를 엔티티로 변환
-     * 구조: 1) 모든 값 검증 및 파싱 먼저 수행, 2) 마지막에 엔티티 생성
-     * 이렇게 하면 파싱 실패 시 영속성 컨텍스트에 엔티티가 들어가지 않음
+     * DTO를 엔티티로 변환 구조: 1) 모든 값 검증 및 파싱 먼저 수행, 2) 마지막에 엔티티 생성 이렇게 하면 파싱 실패 시 영속성
+     * 컨텍스트에 엔티티가 들어가지 않음
      */
     private LocationService convertToEntity(PublicDataLocationDTO dto) {
         // ============================================
@@ -500,7 +493,7 @@ public class PublicDataLocationService {
             return null;
         }
         try {
-            return Double.parseDouble(value.trim());
+            return Double.valueOf(value.trim());
         } catch (NumberFormatException e) {
             return null;
         }
@@ -562,6 +555,7 @@ public class PublicDataLocationService {
     @lombok.Data
     @lombok.Builder
     public static class BatchImportResult {
+
         private int totalRead;
         private int saved;
         private int duplicate;

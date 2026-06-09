@@ -13,7 +13,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Builder
 public class PublicDataLocationDTO {
-    
+
     private String facilityName; // 시설명
     private String category1; // 카테고리1
     private String category2; // 카테고리2
@@ -46,4 +46,3 @@ public class PublicDataLocationDTO {
     private String petAdditionalFee; // 애견 동반 추가 요금
     private String lastUpdatedDate; // 최종작성일
 }
-

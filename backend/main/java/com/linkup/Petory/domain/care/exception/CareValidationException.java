@@ -5,8 +5,7 @@ import org.springframework.http.HttpStatus;
 import com.linkup.Petory.global.exception.ApiException;
 
 /**
- * 펫케어 도메인 입력 검증 실패 시 발생하는 예외.
- * HTTP 400 Bad Request
+ * 펫케어 도메인 입력 검증 실패 시 발생하는 예외. HTTP 400 Bad Request
  */
 public class CareValidationException extends ApiException {
 

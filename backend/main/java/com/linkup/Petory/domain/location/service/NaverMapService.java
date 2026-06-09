@@ -38,12 +38,12 @@ public class NaverMapService {
 
     /**
      * 네이버맵 Directions API 호출
-     * 
+     *
      * @param startLng 출발지 경도
      * @param startLat 출발지 위도
-     * @param endLng   도착지 경도
-     * @param endLat   도착지 위도
-     * @param option   경로 옵션 (traoptimal=최적, trafast=최단, tracomfort=편한길)
+     * @param endLng 도착지 경도
+     * @param endLat 도착지 위도
+     * @param option 경로 옵션 (traoptimal=최적, trafast=최단, tracomfort=편한길)
      * @return 길찾기 결과
      */
     @SuppressWarnings("UseSpecificCatch")
@@ -134,11 +134,11 @@ public class NaverMapService {
 
     /**
      * 네이버맵 지오코딩 (주소를 좌표로 변환)
-     * 
+     *
      * @param address 변환할 주소
      * @return 위도, 경도 정보가 담긴 배열 [latitude, longitude], 변환 실패 시 null
      */
-    @SuppressWarnings({ "null", "SizeReplaceableByIsEmpty", "UseSpecificCatch" })
+    @SuppressWarnings({"null", "SizeReplaceableByIsEmpty", "UseSpecificCatch"})
     public Double[] addressToCoordinates(String address) {
         log.info("📍 [NaverMapService] addressToCoordinates 호출됨 - 주소: {}", address);
 
@@ -158,7 +158,7 @@ public class NaverMapService {
                         apiKeyId != null ? apiKeyId : "null",
                         apiKey != null
                                 ? (apiKey.length() > 0 ? apiKey.substring(0, Math.min(5, apiKey.length())) + "***"
-                                        : "비어있음")
+                                : "비어있음")
                                 : "null");
                 return null;
             }
@@ -205,7 +205,7 @@ public class NaverMapService {
                                 @SuppressWarnings("UnnecessaryTemporaryOnConversionFromString")
                                 Double longitude = Double.parseDouble(longitudeStr);
                                 log.info("네이버맵 지오코딩 성공 - 좌표: ({}, {})", latitude, longitude);
-                                return new Double[] { latitude, longitude };
+                                return new Double[]{latitude, longitude};
                             } catch (NumberFormatException e) {
                                 log.warn("좌표 파싱 실패: latitude={}, longitude={}", latitudeStr, longitudeStr);
                                 return null;
@@ -221,8 +221,8 @@ public class NaverMapService {
                                 address,
                                 responseBody != null ? responseBody.get("status") : "N/A",
                                 responseBody != null && responseBody.containsKey("meta")
-                                        ? ((Map<?, ?>) responseBody.get("meta")).get("totalCount")
-                                        : "N/A");
+                                ? ((Map<?, ?>) responseBody.get("meta")).get("totalCount")
+                                : "N/A");
                         return null;
                     }
                 } else {
@@ -258,7 +258,7 @@ public class NaverMapService {
      * @param query 검색어 (주소 또는 장소명 일부)
      * @return 주소 결과 목록, 각 항목에 address/roadAddress/latitude/longitude 포함
      */
-    @SuppressWarnings({ "null", "UnnecessaryTemporaryOnConversionFromString", "UseSpecificCatch" })
+    @SuppressWarnings({"null", "UnnecessaryTemporaryOnConversionFromString", "UseSpecificCatch"})
     public List<Map<String, Object>> searchAddresses(String query) {
         if (query == null || query.trim().isEmpty()) {
             return List.of();
@@ -332,12 +332,12 @@ public class NaverMapService {
 
     /**
      * 네이버맵 역지오코딩 (좌표를 주소로 변환)
-     * 
+     *
      * @param lat 위도
      * @param lng 경도
      * @return 주소 정보
      */
-    @SuppressWarnings({ "SizeReplaceableByIsEmpty", "UseSpecificCatch" })
+    @SuppressWarnings({"SizeReplaceableByIsEmpty", "UseSpecificCatch"})
     public Map<String, Object> coordinatesToAddress(double lat, double lng) {
         try {
             // API 키가 없으면 에러 반환
@@ -385,9 +385,9 @@ public class NaverMapService {
                                 .filter(item -> "roadaddr".equals(item.get("name")))
                                 .findFirst()
                                 .orElseGet(() -> results.stream()
-                                        .filter(item -> "addr".equals(item.get("name")))
-                                        .findFirst()
-                                        .orElse(results.get(0)));
+                                .filter(item -> "addr".equals(item.get("name")))
+                                .findFirst()
+                                .orElse(results.get(0)));
                         @SuppressWarnings("unchecked")
                         Map<String, Object> region = (Map<String, Object>) firstResult.get("region");
 

@@ -1,25 +1,26 @@
 package com.linkup.Petory.domain.location.service;
 
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import java.util.Comparator;
+import java.util.List;
+import java.util.stream.Collectors;
+
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import com.linkup.Petory.domain.petRecommendation.event.LocationSearchPerformedEvent;
-import org.springframework.context.ApplicationEventPublisher;
 import com.linkup.Petory.domain.location.converter.LocationServiceConverter;
 import com.linkup.Petory.domain.location.dto.LocationServiceDTO;
 import com.linkup.Petory.domain.location.entity.LocationService;
 import com.linkup.Petory.domain.location.exception.LocationServiceAlreadyDeletedException;
 import com.linkup.Petory.domain.location.exception.LocationServiceNotFoundException;
 import com.linkup.Petory.domain.location.repository.LocationServiceRepository;
+import com.linkup.Petory.domain.petRecommendation.event.LocationSearchPerformedEvent;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 
-import java.util.Comparator;
-import java.util.List;
-import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
@@ -39,10 +40,11 @@ public class LocationServiceService {
      * 주변 서비스 통합 검색 — B 방향(위치 우선, 키워드는 필터).
      *
      * <ol>
-     *   <li>위치(lat·lng·radius) 있음 → 반경 검색 (keyword·category는 SQL WHERE 필터)</li>
-     *   <li>지역(sido/sigungu/eupmyeondong/roadName) 있음 → 지역 검색 (keyword·category는 SQL WHERE 필터)</li>
-     *   <li>keyword만 있음 → FULLTEXT 전국 검색 (위치 없을 때 fallback)</li>
-     *   <li>아무것도 없음 → 전체 평점순</li>
+     * <li>위치(lat·lng·radius) 있음 → 반경 검색 (keyword·category는 SQL WHERE 필터)</li>
+     * <li>지역(sido/sigungu/eupmyeondong/roadName) 있음 → 지역 검색 (keyword·category는
+     * SQL WHERE 필터)</li>
+     * <li>keyword만 있음 → FULLTEXT 전국 검색 (위치 없을 때 fallback)</li>
+     * <li>아무것도 없음 → 전체 평점순</li>
      * </ol>
      */
     public List<LocationServiceDTO> searchLocationServices(
@@ -60,13 +62,13 @@ public class LocationServiceService {
 
         publishSearchEvent(keyword);
         // 빈 문자열("")을 null로 정규화 — SQL의 :param IS NULL 조건이 올바르게 작동하도록
-        keyword      = normalize(keyword);
-        category     = normalize(category);
-        sido         = normalize(sido);
-        sigungu      = normalize(sigungu);
+        keyword = normalize(keyword);
+        category = normalize(category);
+        sido = normalize(sido);
+        sigungu = normalize(sigungu);
         eupmyeondong = normalize(eupmyeondong);
-        roadName     = normalize(roadName);
-        sort         = normalizeSort(sort);
+        roadName = normalize(roadName);
+        sort = normalizeSort(sort);
 
         boolean hasLocation = latitude != null && longitude != null;
         boolean hasRegion = StringUtils.hasText(sido) || StringUtils.hasText(sigungu)
@@ -118,8 +120,7 @@ public class LocationServiceService {
     }
 
     /**
-     * 지역 계층별 서비스 조회
-     * 우선순위: roadName > eupmyeondong > sigungu > sido > 전체
+     * 지역 계층별 서비스 조회 우선순위: roadName > eupmyeondong > sigungu > sido > 전체
      * keyword·category 필터는 SQL WHERE에서 처리
      */
     public List<LocationServiceDTO> searchLocationServicesByRegion(
@@ -131,7 +132,7 @@ public class LocationServiceService {
             String category,
             Integer maxResults) {
 
-        keyword  = normalize(keyword);
+        keyword = normalize(keyword);
         category = normalize(category);
 
         long methodStartTime = System.currentTimeMillis();
@@ -181,8 +182,7 @@ public class LocationServiceService {
     }
 
     /**
-     * 위치 기반 서비스 조회 (반경 검색)
-     * keyword·category 필터는 SQL WHERE에서 처리
+     * 위치 기반 서비스 조회 (반경 검색) keyword·category 필터는 SQL WHERE에서 처리
      */
     public List<LocationServiceDTO> searchLocationServicesByLocation(
             Double latitude,
@@ -193,9 +193,9 @@ public class LocationServiceService {
             String sort,
             Integer maxResults) {
 
-        keyword  = normalize(keyword);
+        keyword = normalize(keyword);
         category = normalize(category);
-        sort     = normalizeSort(sort);
+        sort = normalizeSort(sort);
 
         long methodStartTime = System.currentTimeMillis();
         int dbLimit = (maxResults != null && maxResults > 0) ? maxResults : DEFAULT_RADIUS_LIMIT;
@@ -233,15 +233,14 @@ public class LocationServiceService {
     }
 
     /**
-     * FULLTEXT 키워드 검색 — 위치 정보가 없을 때만 사용 (fallback)
-     * category 필터는 SQL WHERE에서 처리
+     * FULLTEXT 키워드 검색 — 위치 정보가 없을 때만 사용 (fallback) category 필터는 SQL WHERE에서 처리
      */
     public List<LocationServiceDTO> searchLocationServicesByKeyword(
             String keyword,
             String category,
             Integer maxResults) {
 
-        keyword  = normalize(keyword);
+        keyword = normalize(keyword);
         category = normalize(category);
 
         long methodStartTime = System.currentTimeMillis();
@@ -268,21 +267,26 @@ public class LocationServiceService {
     }
 
     private void publishSearchEvent(String keyword) {
-        if (!org.springframework.util.StringUtils.hasText(keyword)) return;
+        if (!org.springframework.util.StringUtils.hasText(keyword)) {
+            return;
+        }
         try {
             var auth = org.springframework.security.core.context.SecurityContextHolder
                     .getContext().getAuthentication();
-            if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getName())) return;
+            if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getName())) {
+                return;
+            }
             usersRepository.findActiveByIdString(auth.getName())
                     .map(user -> user.getIdx())
-                    .ifPresent(userIdx ->
-                            eventPublisher.publishEvent(new LocationSearchPerformedEvent(this, userIdx, keyword)));
-        } catch (Exception ignored) {}
+                    .ifPresent(userIdx
+                            -> eventPublisher.publishEvent(new LocationSearchPerformedEvent(this, userIdx, keyword)));
+        } catch (Exception ignored) {
+        }
     }
 
     /**
-     * 빈 문자열("")을 null로 정규화하고 앞뒤 공백을 제거한다.
-     * SQL의 {@code :param IS NULL} 조건이 올바르게 작동하려면 빈 문자열이 아닌 null이 전달되어야 한다.
+     * 빈 문자열("")을 null로 정규화하고 앞뒤 공백을 제거한다. SQL의 {@code :param IS NULL} 조건이 올바르게
+     * 작동하려면 빈 문자열이 아닌 null이 전달되어야 한다.
      */
     private static String normalize(String value) {
         return StringUtils.hasText(value) ? value.trim() : null;
@@ -293,8 +297,10 @@ public class LocationServiceService {
             return DEFAULT_RADIUS_SORT;
         }
         return switch (sort.trim().toLowerCase()) {
-            case "stable", "distance", "rating", "reviews", "score" -> sort.trim().toLowerCase();
-            default -> DEFAULT_RADIUS_SORT;
+            case "stable", "distance", "rating", "reviews", "score" ->
+                sort.trim().toLowerCase();
+            default ->
+                DEFAULT_RADIUS_SORT;
         };
     }
 
@@ -311,9 +317,9 @@ public class LocationServiceService {
         double dLat = Math.toRadians(lat2 - lat1);
         double dLng = Math.toRadians(lng2 - lng1);
 
-        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
-                        Math.sin(dLng / 2) * Math.sin(dLng / 2);
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                * Math.sin(dLng / 2) * Math.sin(dLng / 2);
 
         double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 

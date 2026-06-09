@@ -10,7 +10,7 @@ import com.linkup.Petory.domain.user.entity.Users;
 
 /**
  * PetCoinTransaction 도메인 Repository 인터페이스입니다.
- * 
+ *
  * 이 인터페이스는 도메인 레벨의 순수 인터페이스로, JPA나 다른 기술에 의존하지 않습니다.
  */
 public interface PetCoinTransactionRepository {

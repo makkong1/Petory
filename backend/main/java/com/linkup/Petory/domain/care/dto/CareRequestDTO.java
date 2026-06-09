@@ -3,36 +3,47 @@ package com.linkup.Petory.domain.care.dto;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import com.linkup.Petory.domain.care.entity.CareScheduleMode;
+import com.linkup.Petory.domain.user.dto.PetDTO;
+
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-
-import com.linkup.Petory.domain.care.entity.CareScheduleMode;
-import com.linkup.Petory.domain.user.dto.PetDTO;
-
-import lombok.Data;
-import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class CareRequestDTO {
-    private Long idx;
-    @NotBlank private String title;
-    @NotBlank private String description;
-    @NotNull private LocalDateTime date;
 
-    /** null 이면 서버에서 {@link CareScheduleMode#FIXED} 로 처리 */
+    private Long idx;
+    @NotBlank
+    private String title;
+    @NotBlank
+    private String description;
+    @NotNull
+    private LocalDateTime date;
+
+    /**
+     * null 이면 서버에서 {@link CareScheduleMode#FIXED} 로 처리
+     */
     private CareScheduleMode scheduleMode;
 
-    /** 예상 이용 시간(분). 선택 — 15~1440분 */
-    @Min(15) @Max(1440) private Integer estimatedDurationMinutes;
+    /**
+     * 예상 이용 시간(분). 선택 — 15~1440분
+     */
+    @Min(15)
+    @Max(1440)
+    private Integer estimatedDurationMinutes;
 
-    @NotNull @Min(1) private Integer offeredCoins;
+    @NotNull
+    @Min(1)
+    private Integer offeredCoins;
     private String status; // OPEN, IN_PROGRESS, COMPLETED, CANCELLED
     private LocalDateTime createdAt;
     private Boolean deleted;

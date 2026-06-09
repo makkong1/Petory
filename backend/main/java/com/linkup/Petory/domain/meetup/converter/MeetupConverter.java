@@ -1,19 +1,23 @@
 package com.linkup.Petory.domain.meetup.converter;
 
+import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
+
+import org.springframework.stereotype.Component;
+
 import com.linkup.Petory.domain.meetup.dto.MeetupDTO;
 import com.linkup.Petory.domain.meetup.dto.MeetupParticipantsDTO;
 import com.linkup.Petory.domain.meetup.entity.Meetup;
 import com.linkup.Petory.domain.meetup.entity.MeetupParticipants;
 import com.linkup.Petory.domain.meetup.entity.MeetupStatus;
 import com.linkup.Petory.domain.user.entity.Users;
+
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Component;
 
-import java.util.List;
-import java.util.Objects;
-import java.util.stream.Collectors;
-
-/** Meetup 엔티티 → MeetupDTO 변환기. */
+/**
+ * Meetup 엔티티 → MeetupDTO 변환기.
+ */
 @Component
 @RequiredArgsConstructor
 public class MeetupConverter {

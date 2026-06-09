@@ -1,15 +1,31 @@
 package com.linkup.Petory.domain.location.entity;
 
-import jakarta.persistence.*;
-import lombok.*;
 import com.linkup.Petory.domain.common.BaseTimeEntity;
 import com.linkup.Petory.domain.user.entity.Users;
 
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.Lob;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
 @Entity
 @Table(name = "locationservicereview", uniqueConstraints = {
-        @UniqueConstraint(columnNames = { "service_idx", "user_idx" })
+    @UniqueConstraint(columnNames = {"service_idx", "user_idx"})
 })
-/** 위치 기반 서비스 리뷰 엔티티. 서비스에 대한 별점과 내용을 저장한다. */
+/**
+ * 위치 기반 서비스 리뷰 엔티티. 서비스에 대한 별점과 내용을 저장한다.
+ */
 @Getter
 @Setter
 @NoArgsConstructor

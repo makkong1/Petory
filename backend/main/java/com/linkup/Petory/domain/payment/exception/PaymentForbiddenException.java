@@ -5,8 +5,7 @@ import org.springframework.http.HttpStatus;
 import com.linkup.Petory.global.exception.ApiException;
 
 /**
- * 결제 도메인 권한 부족 시 발생하는 예외.
- * HTTP 403 Forbidden
+ * 결제 도메인 권한 부족 시 발생하는 예외. HTTP 403 Forbidden
  */
 public class PaymentForbiddenException extends ApiException {
 

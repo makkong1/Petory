@@ -28,7 +28,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/** 모임 엔티티. 생성 시 그룹 채팅방이 자동 생성되며, 인원 제한·상태(RECRUITING/CLOSED/COMPLETED)를 관리한다. */
+/**
+ * 모임 엔티티. 생성 시 그룹 채팅방이 자동 생성되며, 인원 제한·상태(RECRUITING/CLOSED/COMPLETED)를 관리한다.
+ */
 @Entity
 @Getter
 @Setter
@@ -72,7 +74,6 @@ public class Meetup extends BaseTimeEntity {
     private MeetupStatus status = MeetupStatus.RECRUITING; // 모임 상태
 
     // createdAt, updatedAt은 BaseTimeEntity에서 상속받음
-
     @Column(name = "is_deleted")
     @Builder.Default
     private Boolean isDeleted = false;

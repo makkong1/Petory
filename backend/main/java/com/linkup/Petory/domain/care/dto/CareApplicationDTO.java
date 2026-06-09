@@ -2,17 +2,20 @@ package com.linkup.Petory.domain.care.dto;
 
 import java.time.LocalDateTime;
 
-import lombok.Data;
-import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Data
-/** 펫케어 지원 응답/요청 DTO. 지원자 정보와 지원 상태(PENDING/ACCEPTED/REJECTED)를 포함한다. */
+/**
+ * 펫케어 지원 응답/요청 DTO. 지원자 정보와 지원 상태(PENDING/ACCEPTED/REJECTED)를 포함한다.
+ */
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class CareApplicationDTO {
+
     private Long idx;
     private Long careRequestId;
     private String message;
