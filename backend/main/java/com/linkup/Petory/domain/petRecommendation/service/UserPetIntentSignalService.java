@@ -2,6 +2,7 @@ package com.linkup.Petory.domain.petRecommendation.service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -52,15 +53,14 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class UserPetIntentSignalService {
 
-    /**
-     * Python {@code confidence_threshold}(0.45)보다 높게 — 2-pass 품질 필터의 Spring 측
-     * 하한
-     */
-    private static final double CONFIDENCE_THRESHOLD = 0.6;
-    /**
-     * signal 유효 기간(일). 만료 후 조회·중복 체크 대상에서 제외
-     */
-    private static final int SIGNAL_TTL_DAYS = 7;
+    private static final Map<String, Double> DOMAIN_THRESHOLDS = Map.of(
+        "MEDICAL",          0.65,  // urgency=HIGH 시 thresholdFor()에서 0.55로 완화
+        "FOOD_SNACK",       0.45,  // Python 1차 필터와 동일 — 오탐 비용 낮음
+        "SUPPLIES",         0.45,
+        "WALK_OUTING",      0.45,
+        "CAFE_DINING",      0.45
+    );
+    private static final double DEFAULT_THRESHOLD = 0.60;
     /**
      * 활성 signal 조회 상한 (R2). {@link PageRequest#of(int, int)} 와 함께 사용
      */
@@ -86,10 +86,14 @@ public class UserPetIntentSignalService {
     @Transactional
     public void saveIfConfident(Long userIdx, String sourceType, Long sourceId,
             PetIntentAnalyzeResponse analysis) {
-        if (analysis == null || analysis.getConfidence() < CONFIDENCE_THRESHOLD) {
-            log.debug("[Signal] 저장 스킵 — confidence 미달 또는 분석 없음. userIdx={} sourceType={} confidence={}",
-                    userIdx, sourceType,
-                    analysis != null ? analysis.getConfidence() : "null");
+        if (analysis == null
+                || analysis.getConfidence() < thresholdFor(analysis.getIntentDomain(), analysis.getUrgency())) {
+            log.debug("[Signal] 저장 스킵 — confidence 미달 또는 분석 없음. userIdx={} domain={} urgency={} confidence={} threshold={}",
+                    userIdx,
+                    analysis != null ? analysis.getIntentDomain() : "null",
+                    analysis != null ? analysis.getUrgency() : "null",
+                    analysis != null ? analysis.getConfidence() : "null",
+                    analysis != null ? thresholdFor(analysis.getIntentDomain(), analysis.getUrgency()) : "null");
             return;
         }
 
@@ -121,13 +125,15 @@ public class UserPetIntentSignalService {
                     .intent(analysis.getIntent())
                     .recommendedCategories(categoriesJson)
                     .confidence(analysis.getConfidence())
+                    .urgency(analysis.getUrgency())
                     .intentTags(tagsJson)
-                    .expiresAt(LocalDateTime.now().plusDays(SIGNAL_TTL_DAYS))
+                    .expiresAt(LocalDateTime.now().plusDays(ttlDaysFor(analysis.getIntentDomain(), analysis.getUrgency())))
                     .build();
             signalRepository.save(signal);
-            log.info("[Signal] 저장 완료 userIdx={} sourceType={} sourceId={} domain={} confidence={} expiresInDays={}",
+            log.info("[Signal] 저장 완료 userIdx={} sourceType={} sourceId={} domain={} urgency={} confidence={} ttlDays={}",
                     userIdx, sourceType, sourceId, analysis.getIntentDomain(),
-                    analysis.getConfidence(), SIGNAL_TTL_DAYS);
+                    analysis.getUrgency(), analysis.getConfidence(),
+                    ttlDaysFor(analysis.getIntentDomain(), analysis.getUrgency()));
         } catch (Exception e) {
             log.warn("[Signal] 저장 실패 — DB 오류(스키마·연결 등). userIdx={} domain={}",
                     userIdx, analysis.getIntentDomain(), e);
@@ -159,13 +165,14 @@ public class UserPetIntentSignalService {
     private UserPetIntentSignalResponse toResponse(UserPetIntentSignal s) {
         List<String> categories = parseJson(s.getRecommendedCategories());
         List<String> tags = parseJson(s.getIntentTags());
-        String cardMessage = buildCardMessage(s.getIntentDomain(), categories);
+        String cardMessage = buildCardMessage(s.getIntentDomain(), s.getUrgency(), categories);
         String targetCategory = categories.isEmpty() ? null : categories.get(0);
         return UserPetIntentSignalResponse.builder()
                 .intentDomain(s.getIntentDomain())
                 .intent(s.getIntent())
                 .recommendedCategories(categories)
                 .confidence(s.getConfidence())
+                .urgency(s.getUrgency())
                 .intentTags(tags)
                 .cardMessage(cardMessage)
                 .actionLabel(targetCategory != null ? "근처 " + targetCategory + " 보기" : "주변 서비스 보기")
@@ -191,31 +198,45 @@ public class UserPetIntentSignalService {
         }
     }
 
+    private int ttlDaysFor(String domain, String urgency) {
+        if ("MEDICAL".equals(domain)) {
+            return "HIGH".equals(urgency) ? 1 : 3;
+        }
+        if ("LODGING_TRAVEL".equals(domain)) {
+            return 14;
+        }
+        return 7;
+    }
+
+    private double thresholdFor(String domain, String urgency) {
+        // MEDICAL+HIGH: 위급 signal 누락 비용 > 오탐 비용 → threshold 완화
+        if ("MEDICAL".equals(domain) && "HIGH".equals(urgency)) {
+            return 0.55;
+        }
+        return DOMAIN_THRESHOLDS.getOrDefault(domain, DEFAULT_THRESHOLD);
+    }
+
     /**
-     * intentDomain별 홈/추천 영역 카드 본문 (categories는 현재 미사용, 확장 여지)
+     * intentDomain + urgency 기반 카드 본문.
+     * MEDICAL+HIGH는 위급 문구, 나머지는 기존 도메인별 문구.
+     * Phase 1에서 constraints 파라미터 추가 예정.
      */
-    private String buildCardMessage(String domain, @SuppressWarnings("unused") List<String> categories) {
+    private String buildCardMessage(String domain, String urgency,
+            @SuppressWarnings("unused") List<String> categories) {
+        boolean isHigh = "HIGH".equals(urgency);
         return switch (domain != null ? domain : "") {
-            case "MEDICAL" ->
-                "최근 건강 관련 고민이 있어 보여요.";
-            case "GROOMING" ->
-                "반려동물 미용이 필요해 보여요.";
-            case "CAFE_DINING" ->
-                "반려동물과 나들이 어떠세요?";
-            case "LODGING_TRAVEL" ->
-                "여행 계획 중이신가요?";
-            case "SUPPLIES" ->
-                "반려동물 용품이 필요해 보여요.";
-            case "FOOD_SNACK" ->
-                "반려동물 먹거리가 필요해 보여요.";
-            case "WALK_OUTING" ->
-                "반려동물과 산책하기 좋은 곳을 찾아드릴게요.";
-            case "DAYCARE_BOARDING" ->
-                "반려동물 돌봄 서비스가 필요해 보여요.";
-            case "CULTURE_SPACE" ->
-                "반려동물과 함께하는 문화 공간을 찾아보세요.";
-            default ->
-                "최근 입력을 바탕으로 추천합니다.";
+            case "MEDICAL"         -> isHigh
+                    ? "위급할 수 있어요. 가까운 동물병원에 바로 문의하세요."
+                    : "최근 건강 관련 고민이 있어 보여요.";
+            case "GROOMING"        -> "반려동물 미용이 필요해 보여요.";
+            case "CAFE_DINING"     -> "반려동물과 나들이 어떠세요?";
+            case "LODGING_TRAVEL"  -> "여행 계획 중이신가요?";
+            case "SUPPLIES"        -> "반려동물 용품이 필요해 보여요.";
+            case "FOOD_SNACK"      -> "반려동물 먹거리가 필요해 보여요.";
+            case "WALK_OUTING"     -> "반려동물과 산책하기 좋은 곳을 찾아드릴게요.";
+            case "DAYCARE_BOARDING"-> "반려동물 돌봄 서비스가 필요해 보여요.";
+            case "CULTURE_SPACE"   -> "반려동물과 함께하는 문화 공간을 찾아보세요.";
+            default                -> "최근 입력을 바탕으로 추천합니다.";
         };
     }
 }

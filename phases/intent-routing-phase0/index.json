@@ -1,0 +1,36 @@
+{
+  "task": "intent-routing-phase0",
+  "description": "PetRecommendation 의도 라우팅 확장 Phase 0 — petType 전달 / urgency 저장 / domain×urgency threshold / domain×urgency TTL / signal 클릭 로그 테이블",
+  "steps": [
+    {
+      "step": 1,
+      "name": "CareRequest petType 전달 (Phase 0.1)",
+      "status": "completed",
+      "summary": "CareRequestCreatedEvent에 petType 추가, CareRequestService/EventListener 연결. compileJava SUCCESS"
+    },
+    {
+      "step": 2,
+      "name": "urgency 컬럼 저장 + buildCardMessage 확장 (Phase 0.2)",
+      "status": "completed",
+      "summary": "urgency 컬럼(SQL migration + 엔티티 + 응답 DTO), buildCardMessage(domain, urgency, categories) 확장, MEDICAL+HIGH 위급 문구 추가. compileJava SUCCESS"
+    },
+    {
+      "step": 3,
+      "name": "domain×urgency confidence threshold Map (Phase 0.3)",
+      "status": "completed",
+      "summary": "DOMAIN_THRESHOLDS Map + thresholdFor(domain, urgency) 구현. MEDICAL+HIGH→0.55, MEDICAL→0.65, FOOD_SNACK/WALK/CAFE→0.45. compileJava SUCCESS"
+    },
+    {
+      "step": 4,
+      "name": "domain×urgency TTL (Phase 0.4)",
+      "status": "completed",
+      "summary": "ttlDaysFor(domain, urgency) 구현. MEDICAL+HIGH→1일, MEDICAL→3일, LODGING_TRAVEL→14일, default→7일. compileJava SUCCESS"
+    },
+    {
+      "step": 5,
+      "name": "signal_interaction_log 테이블 설계 (Phase 0.5)",
+      "status": "completed",
+      "summary": "signal-interaction-log-table.sql + SignalInteractionLog 엔티티(CLICKED/DISMISSED/CONVERTED) + Repository 생성. compileJava SUCCESS"
+    }
+  ]
+}
