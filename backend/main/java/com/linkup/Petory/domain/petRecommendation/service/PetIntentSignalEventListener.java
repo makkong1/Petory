@@ -47,13 +47,13 @@ public class PetIntentSignalEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Async("petIntentExecutor")
     public void handle(CommunityPostCreatedEvent event) {
-        analyze(event.getUserIdx(), "COMMUNITY", event.getPostId(), event.getText());
+        analyze(event.getUserIdx(), "COMMUNITY", event.getPostId(), event.getText(), null);
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Async("petIntentExecutor")
     public void handle(CareRequestCreatedEvent event) {
-        analyze(event.getUserIdx(), "CARE", event.getCareRequestId(), event.getText());
+        analyze(event.getUserIdx(), "CARE", event.getCareRequestId(), event.getText(), event.getPetType());
     }
 
     // LocationSearch: 자연어 판단 + Redis TTL dedup 적용
@@ -90,12 +90,13 @@ public class PetIntentSignalEventListener {
             return;
         }
 
-        analyze(event.getUserIdx(), "LOCATION_SEARCH", null, keyword);
+        analyze(event.getUserIdx(), "LOCATION_SEARCH", null, keyword, null);
     }
 
-    private void analyze(Long userIdx, String sourceType, Long sourceId, String text) {
+    private void analyze(Long userIdx, String sourceType, Long sourceId,
+                         String text, String petType) {
         try {
-            Optional<PetIntentAnalyzeResponse> result = petIntentClient.analyze(text, null);
+            Optional<PetIntentAnalyzeResponse> result = petIntentClient.analyze(text, petType);
             result.ifPresent(analysis ->
                     signalService.saveIfConfident(userIdx, sourceType, sourceId, analysis));
         } catch (Exception e) {

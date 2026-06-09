@@ -39,6 +39,10 @@
     {
       "dir": "nlp-traffic-policy",
       "status": "pending"
+    },
+    {
+      "dir": "intent-routing-phase0",
+      "status": "pending"
     }
   ]
 }

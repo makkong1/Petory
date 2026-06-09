@@ -58,6 +58,9 @@ public class UserPetIntentSignal extends BaseTimeEntity {
     @Column(name = "confidence", nullable = false)
     private Double confidence;
 
+    @Column(name = "urgency", length = 10)
+    private String urgency;  // "HIGH" | "NORMAL" | "LOW" | null (레거시 행 호환)
+
     @Column(name = "intent_tags", columnDefinition = "JSON")
     private String intentTags;
 

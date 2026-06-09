@@ -14,6 +14,7 @@ public class UserPetIntentSignalResponse {
     private String intent;
     private List<String> recommendedCategories;
     private Double confidence;
+    private String urgency;
     private List<String> intentTags;
     private String cardMessage;
     private String actionLabel;

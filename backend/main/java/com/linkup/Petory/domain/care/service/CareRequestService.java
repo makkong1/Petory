@@ -215,9 +215,10 @@ public class CareRequestService {
         }
 
         CareRequest saved = careRequestRepository.save(builder.build());
+        String petType = saved.getPet() != null ? saved.getPet().getPetType().name() : null;
         eventPublisher.publishEvent(new CareRequestCreatedEvent(
                 this, user.getIdx(), saved.getIdx(),
-                saved.getTitle() + " " + saved.getDescription()));
+                saved.getTitle() + " " + saved.getDescription(), petType));
         return careRequestConverter.toDTO(saved);
     }
 

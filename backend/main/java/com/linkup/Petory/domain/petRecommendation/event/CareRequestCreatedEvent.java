@@ -13,12 +13,15 @@ public class CareRequestCreatedEvent extends ApplicationEvent {
     private final Long userIdx;
     private final Long careRequestId;
     private final String text;
+    private final String petType;  // "DOG" | "CAT" | "BIRD" | "RABBIT" | "HAMSTER" | "ETC" | null
 
-    public CareRequestCreatedEvent(Object source, Long userIdx, Long careRequestId, String text) {
+    public CareRequestCreatedEvent(Object source, Long userIdx, Long careRequestId,
+                                   String text, String petType) {
         super(source);
         this.userIdx = userIdx;
         this.careRequestId = careRequestId;
         this.text = text;
+        this.petType = petType;
     }
 
     public Long getUserIdx() {
@@ -31,5 +34,9 @@ public class CareRequestCreatedEvent extends ApplicationEvent {
 
     public String getText() {
         return text;
+    }
+
+    public String getPetType() {
+        return petType;
     }
 }
