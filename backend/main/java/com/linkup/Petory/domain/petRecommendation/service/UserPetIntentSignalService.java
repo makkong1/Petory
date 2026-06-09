@@ -206,6 +206,14 @@ public class UserPetIntentSignalService {
                 "여행 계획 중이신가요?";
             case "SUPPLIES" ->
                 "반려동물 용품이 필요해 보여요.";
+            case "FOOD_SNACK" ->
+                "반려동물 먹거리가 필요해 보여요.";
+            case "WALK_OUTING" ->
+                "반려동물과 산책하기 좋은 곳을 찾아드릴게요.";
+            case "DAYCARE_BOARDING" ->
+                "반려동물 돌봄 서비스가 필요해 보여요.";
+            case "CULTURE_SPACE" ->
+                "반려동물과 함께하는 문화 공간을 찾아보세요.";
             default ->
                 "최근 입력을 바탕으로 추천합니다.";
         };
