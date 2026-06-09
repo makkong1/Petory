@@ -218,6 +218,7 @@ user_pet_intent_signal
 | `intent`                 | Python 분석 intent                     |
 | `recommended_categories` | 추천 Location 카테고리 JSON            |
 | `confidence`             | 분석 신뢰도                            |
+| `urgency`                | NLP urgency_rules 결과 (`HIGH`\|`NORMAL`\|`LOW`\|null) |
 | `intent_tags`            | 분석 태그 JSON                         |
 | `created_at`             | 생성 시각                              |
 | `expires_at`             | 만료 시각                              |
@@ -232,6 +233,7 @@ user_pet_intent_signal
 - intent
 - 추천 카테고리
 - confidence
+- urgency (HIGH/NORMAL/LOW)
 - intent tags
 - source type
 - 만료 시각
@@ -246,16 +248,32 @@ user_pet_intent_signal
 
 `UserPetIntentSignalService.saveIfConfident`에서 다음 조건을 모두 만족해야 저장됩니다.
 
-1. confidence ≥ 0.6 (Python의 1차 필터 0.45보다 높은 Spring 2차 필터)
+1. `thresholdFor(domain, urgency)` 이상의 confidence (domain×urgency별 Spring 2차 필터)
 2. 같은 `(userIdx, intentDomain)` 조합의 유효 signal이 없을 것 (도메인별 중복 방지)
 
-TTL은 7일입니다.
+**domain×urgency confidence threshold**:
+
+| domain | urgency | threshold | 이유 |
+|--------|---------|-----------|------|
+| `MEDICAL` | `HIGH` | 0.55 | 위급 signal 누락 비용 > 오탐 비용 → threshold 완화 |
+| `MEDICAL` | NORMAL/LOW/null | 0.65 | MEDICAL 오탐 비용이 높아 기본값보다 엄격 |
+| `FOOD_SNACK`, `SUPPLIES`, `WALK_OUTING`, `CAFE_DINING` | any | 0.45 | Python 1차 필터와 동일 — 오탐 비용 낮음 |
+| 그 외 | any | 0.60 | 기본값 |
+
+**domain×urgency TTL**:
+
+| 조건 | TTL | 이유 |
+|------|-----|------|
+| `MEDICAL` + `HIGH` | 1일 | 위급 signal이 stale하게 남으면 안 됨 |
+| `MEDICAL` (NORMAL/LOW/null) | 3일 | 증상 signal stale 방지 |
+| `LODGING_TRAVEL` | 14일 | 여행 계획은 비교적 장기 |
+| 그 외 | 7일 | 기본값 |
 
 **confidence 이중 필터 설계**:
 
 - Python 1차: 0.45 미만 → UNKNOWN 반환
-- Spring 2차: 0.60 미만 → 저장 거부
-- 0.45~0.59 구간은 Python이 결과를 반환하지만 Spring이 저장을 거부합니다.
+- Spring 2차: `thresholdFor(domain, urgency)` 미만 → 저장 거부
+- 낮은 confidence 구간은 Python이 결과를 반환하더라도 Spring이 저장을 거부합니다.
 
 **confidence 수치 해석 주의**:
 
@@ -286,6 +304,7 @@ GET /api/pet-recommend/signals
     "intent": "SUPPLIES_NEED",
     "recommendedCategories": ["반려동물용품"],
     "confidence": 0.88,
+    "urgency": "NORMAL",
     "intentTags": ["supplies", "food"],
     "cardMessage": "반려동물 용품이 필요해 보여요.",
     "actionLabel": "근처 반려동물용품 보기",
@@ -297,14 +316,15 @@ GET /api/pet-recommend/signals
 
 ### 6.3 응답 필드 의미
 
-| 필드                    | 의미                                       |
-| ----------------------- | ------------------------------------------ |
-| `cardMessage`           | 사용자에게 보여줄 추천 이유 문장           |
-| `actionLabel`           | 카드 안 CTA 문구                           |
-| `targetTab`             | 이동 대상 탭. 현재는 `location`            |
-| `targetCategory`        | Location 검색에 넘길 카테고리              |
-| `recommendedCategories` | NLP가 추천한 카테고리 목록                 |
-| `intentTags`            | 점수 계산이나 향후 태그 매칭에 사용할 태그 |
+| 필드                    | 의미                                                       |
+| ----------------------- | ---------------------------------------------------------- |
+| `cardMessage`           | 사용자에게 보여줄 추천 이유 문장 (urgency HIGH 시 위급 문구) |
+| `actionLabel`           | 카드 안 CTA 문구                                           |
+| `targetTab`             | 이동 대상 탭. 현재는 `location`                            |
+| `targetCategory`        | Location 검색에 넘길 카테고리                              |
+| `recommendedCategories` | NLP가 추천한 카테고리 목록                                 |
+| `urgency`               | NLP 긴급도 (`HIGH`\|`NORMAL`\|`LOW`\|null)                 |
+| `intentTags`            | 점수 계산이나 향후 태그 매칭에 사용할 태그                 |
 
 `cardMessage`는 클릭 동작을 설명하는 문구가 아니라 순수 안내 문장입니다. 실제 액션은 `targetTab`, `targetCategory`, `actionLabel`로 표현합니다.
 
@@ -506,10 +526,14 @@ reviewScore = min(log10(reviewCount + 1) / log10(1001), 1.0)
 - `backend/main/java/com/linkup/Petory/domain/petRecommendation/service/PetRecommendationService.java`
 - `backend/main/java/com/linkup/Petory/domain/petRecommendation/scoring/PetRecommendScoreCalculator.java`
 - `backend/main/java/com/linkup/Petory/domain/petRecommendation/entity/UserPetIntentSignal.java`
+- `backend/main/java/com/linkup/Petory/domain/petRecommendation/entity/SignalInteractionLog.java` ← 추천 카드 상호작용 로그 (CLICKED/DISMISSED/CONVERTED)
 - `backend/main/java/com/linkup/Petory/domain/petRecommendation/repository/UserPetIntentSignalRepository.java`
+- `backend/main/java/com/linkup/Petory/domain/petRecommendation/repository/SignalInteractionLogRepository.java`
 - `backend/main/java/com/linkup/Petory/domain/petRecommendation/repository/LocationInteractionCount.java` ← 타입 안전 프로젝션
 - `backend/main/java/com/linkup/Petory/domain/location/service/LocationServiceService.java`
 - `backend/main/resources/sql/migration/user-pet-intent-signal-table.sql`
+- `backend/main/resources/sql/migration/user-pet-intent-signal-add-urgency-column.sql` ← urgency 컬럼 추가
+- `backend/main/resources/sql/migration/signal-interaction-log-table.sql` ← signal 클릭 로그 테이블
 
 ### 10.2 Frontend
 
