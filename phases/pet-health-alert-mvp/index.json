@@ -1,0 +1,32 @@
+{
+  "task": "pet-health-alert-mvp",
+  "description": "MEDICAL+HIGH urgency signal 저장 성공 시 PET_HEALTH_ALERT SSE 알림 발송 (MVP)",
+  "branch": "feat-pet-health-alert-mvp",
+  "base_branch": "dev",
+  "steps": [
+    {
+      "step": 1,
+      "name": "NotificationType.PET_HEALTH_ALERT 추가",
+      "status": "completed",
+      "summary": "NotificationType enum에 PET_HEALTH_ALERT 추가, compileJava BUILD SUCCESSFUL"
+    },
+    {
+      "step": 2,
+      "name": "SignalSavedEvent 생성 + saveIfConfident() publish",
+      "status": "completed",
+      "summary": "SignalSavedEvent record 생성, UserPetIntentSignalService에 ApplicationEventPublisher 주입 + 저장 후 publish, compileJava BUILD SUCCESSFUL"
+    },
+    {
+      "step": 3,
+      "name": "PetHealthAlertNotificationHandler 생성 (after-commit 알림)",
+      "status": "completed",
+      "summary": "PetHealthAlertNotificationHandler(@TransactionalEventListener AFTER_COMMIT + @Async petIntentExecutor) 생성, MEDICAL+HIGH 조건 시 createNotification() 호출, compileJava BUILD SUCCESSFUL"
+    },
+    {
+      "step": 4,
+      "name": "Navigation.js + UnifiedPetMapPage.js CustomEvent 연동",
+      "status": "completed",
+      "summary": "Navigation.js handleNotificationClick에 PET_HEALTH_ALERT 케이스 추가(type 기준), UnifiedPetMapPage.js navigateToHealthAlert 리스너 추가(동물병원/medical 자동 선택), npm build 성공"
+    }
+  ]
+}

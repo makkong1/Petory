@@ -265,6 +265,17 @@ const UnifiedPetMapPage = () => {
     return () => window.clearTimeout(signalRefreshTimerRef.current);
   }, [activeLayer, locationKeyword, refreshPetIntentSignals]);
 
+  useEffect(() => {
+    const handler = (e) => {
+      const { category, groupId } = e.detail || {};
+      setActiveLayer('location');
+      setLocationCategory(category || '동물병원');
+      setLocationCategoryGroupId(groupId || 'medical');
+    };
+    window.addEventListener('navigateToHealthAlert', handler);
+    return () => window.removeEventListener('navigateToHealthAlert', handler);
+  }, []);
+
   const handleTabChange = (layer) => {
     setActiveLayer(layer);
     setSelectedItem(null);
