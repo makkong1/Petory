@@ -80,6 +80,15 @@ public class PetIntentClient {
      * @param petType 반려동물 종류 힌트 (예: DOG). 없으면 null — Python 측에서 선택적 사용
      * @return 분석 성공 시 응답 DTO, 실패·빈 본문 시 {@link Optional#empty()}
      */
+    /** Python PetType enum(DOG|CAT|OTHER) 기준으로 Java petType을 정규화한다. */
+    private static String normalizePetType(String petType) {
+        if (petType == null) return null;
+        return switch (petType) {
+            case "DOG", "CAT" -> petType;
+            default -> "OTHER";
+        };
+    }
+
     public Optional<PetIntentAnalyzeResponse> analyze(String text, String petType) {
         int textLen = text != null ? text.length() : 0;
         // 본문 전체는 로그에 남기지 않음 (개인정보·과도한 로그 방지)
@@ -88,7 +97,7 @@ public class PetIntentClient {
         try {
             PetIntentAnalyzeRequest req = PetIntentAnalyzeRequest.builder()
                     .text(text)
-                    .petType(petType)
+                    .petType(normalizePetType(petType))
                     .build();
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
