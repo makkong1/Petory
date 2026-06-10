@@ -233,6 +233,13 @@ const Navigation = ({ activeTab, setActiveTab, user, onNavigateToBoard }) => {
       }, 100);
     } else if (notification.relatedType === 'CARE_REQUEST' && notification.relatedId) {
       setActiveTab('unified-map');
+    } else if (notification.type === 'PET_HEALTH_ALERT') {
+      setActiveTab('unified-map');
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('navigateToHealthAlert', {
+          detail: { category: '동물병원', groupId: 'medical' }
+        }));
+      }, 100);
     }
   };
 

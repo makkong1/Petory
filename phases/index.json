@@ -43,6 +43,10 @@
     {
       "dir": "intent-routing-phase0",
       "status": "pending"
+    },
+    {
+      "dir": "pet-health-alert-mvp",
+      "status": "pending"
     }
   ]
 }

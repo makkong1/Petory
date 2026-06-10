@@ -14,7 +14,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkup.Petory.domain.petRecommendation.dto.PetIntentAnalyzeResponse;
 import com.linkup.Petory.domain.petRecommendation.dto.UserPetIntentSignalResponse;
 import com.linkup.Petory.domain.petRecommendation.entity.UserPetIntentSignal;
+import com.linkup.Petory.domain.petRecommendation.event.SignalSavedEvent;
 import com.linkup.Petory.domain.petRecommendation.repository.UserPetIntentSignalRepository;
+import org.springframework.context.ApplicationEventPublisher;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -68,6 +70,7 @@ public class UserPetIntentSignalService {
 
     private final UserPetIntentSignalRepository signalRepository;
     private final ObjectMapper objectMapper;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * NLP 분석 결과가 충분히 확실할 때만 DB에 signal을 insert 한다.
@@ -129,11 +132,17 @@ public class UserPetIntentSignalService {
                     .intentTags(tagsJson)
                     .expiresAt(LocalDateTime.now().plusDays(ttlDaysFor(analysis.getIntentDomain(), analysis.getUrgency())))
                     .build();
-            signalRepository.save(signal);
+            UserPetIntentSignal saved = signalRepository.save(signal);
             log.info("[Signal] 저장 완료 userIdx={} sourceType={} sourceId={} domain={} urgency={} confidence={} ttlDays={}",
                     userIdx, sourceType, sourceId, analysis.getIntentDomain(),
                     analysis.getUrgency(), analysis.getConfidence(),
                     ttlDaysFor(analysis.getIntentDomain(), analysis.getUrgency()));
+            eventPublisher.publishEvent(new SignalSavedEvent(
+                    userIdx,
+                    saved.getId(),
+                    analysis.getIntentDomain(),
+                    analysis.getUrgency()
+            ));
         } catch (Exception e) {
             log.warn("[Signal] 저장 실패 — DB 오류(스키마·연결 등). userIdx={} domain={}",
                     userIdx, analysis.getIntentDomain(), e);
