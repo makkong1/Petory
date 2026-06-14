@@ -58,15 +58,9 @@ public interface LocationServiceRepository {
      */
     List<LocationService> findBySido(String sido, String keyword, String category, int limit);
 
-    /**
-     * 읍면동별 조회 (keyword·category 필터 포함)
-     */
-    List<LocationService> findByEupmyeondong(String eupmyeondong, String keyword, String category, int limit);
-
-    /**
-     * 도로명별 조회 (keyword·category 필터 포함)
-     */
-    List<LocationService> findByRoadName(String roadName, String keyword, String category, int limit);
+    // 읍면동·도로명 검색 — 프론트 미사용으로 비활성화
+    // List<LocationService> findByEupmyeondong(String eupmyeondong, String keyword, String category, int limit);
+    // List<LocationService> findByRoadName(String roadName, String keyword, String category, int limit);
 
     /**
      * [FIX] 서비스 평점과 리뷰 수를 리뷰 집계 기준으로 원자적 갱신 (DB 단일 UPDATE)

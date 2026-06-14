@@ -15,7 +15,9 @@ import com.linkup.Petory.domain.activity.service.ActivityService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-/** 사용자 활동 내역(케어 요청·게시글·댓글 등) 조회 API. */
+/**
+ * 사용자 활동 내역(케어 요청·게시글·댓글 등) 조회 API.
+ */
 @RestController
 @RequestMapping("/api/activities")
 @RequiredArgsConstructor
