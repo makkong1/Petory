@@ -35,8 +35,6 @@ public class LocationServiceController {
      * @param radius 반경 (미터 단위, 선택, 기본값: 10000m = 10km)
      * @param sido 시도 (선택, 예: "서울특별시", "경기도")
      * @param sigungu 시군구 (선택, 예: "노원구", "고양시 덕양구")
-     * @param eupmyeondong 읍면동 (선택, 예: "상계동", "동산동")
-     * @param roadName 도로명 (선택, 예: "상계로", "동세로")
      * @param category 카테고리 (선택). DB의 category1·category2·category3 와 문자열 동일해야
      * 매칭됨. 소분류 예: "동물약국","동물병원","카페","미술관" / 중분류 예:
      * "반려의료","반려동반여행","반려동물식당카페","반려동물 서비스","반려문화시설"
@@ -53,8 +51,6 @@ public class LocationServiceController {
             @RequestParam(value = "radius", required = false) Integer radius,
             @RequestParam(value = "sido", required = false) String sido,
             @RequestParam(value = "sigungu", required = false) String sigungu,
-            @RequestParam(value = "eupmyeondong", required = false) String eupmyeondong,
-            @RequestParam(value = "roadName", required = false) String roadName,
             @RequestParam(value = "category", required = false) String category,
             @RequestParam(value = "keyword", required = false) String keyword,
             @RequestParam(value = "sort", required = false) String sort,
@@ -73,8 +69,8 @@ public class LocationServiceController {
             }
 
             log.info(
-                    "🚀 [성능 측정] 위치 서비스 검색 시작 - latitude={}, longitude={}, radius={}, sido={}, sigungu={}, eupmyeondong={}, category={}, keyword={}, sort={}, size={} (effectiveSize={})",
-                    latitude, longitude, radius, sido, sigungu, eupmyeondong, category, keyword, sort, size, effectiveSize);
+                    "🚀 [성능 측정] 위치 서비스 검색 시작 - latitude={}, longitude={}, radius={}, sido={}, sigungu={}, category={}, keyword={}, sort={}, size={} (effectiveSize={})",
+                    latitude, longitude, radius, sido, sigungu, category, keyword, sort, size, effectiveSize);
 
             List<LocationServiceDTO> services = locationServiceService.searchLocationServices(
                     keyword,
@@ -83,8 +79,6 @@ public class LocationServiceController {
                     radius,
                     sido,
                     sigungu,
-                    eupmyeondong,
-                    roadName,
                     category,
                     sort,
                     effectiveSize);

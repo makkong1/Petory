@@ -41,7 +41,7 @@ public class LocationServiceService {
      *
      * <ol>
      * <li>위치(lat·lng·radius) 있음 → 반경 검색 (keyword·category는 SQL WHERE 필터)</li>
-     * <li>지역(sido/sigungu/eupmyeondong/roadName) 있음 → 지역 검색 (keyword·category는
+     * <li>지역(sido/sigungu) 있음 → 지역 검색 (keyword·category는
      * SQL WHERE 필터)</li>
      * <li>keyword만 있음 → FULLTEXT 전국 검색 (위치 없을 때 fallback)</li>
      * <li>아무것도 없음 → 전체 평점순</li>
@@ -54,8 +54,6 @@ public class LocationServiceService {
             Integer radius,
             String sido,
             String sigungu,
-            String eupmyeondong,
-            String roadName,
             String category,
             String sort,
             Integer maxResults) {
@@ -66,13 +64,10 @@ public class LocationServiceService {
         category = normalize(category);
         sido = normalize(sido);
         sigungu = normalize(sigungu);
-        eupmyeondong = normalize(eupmyeondong);
-        roadName = normalize(roadName);
         sort = normalizeSort(sort);
 
         boolean hasLocation = latitude != null && longitude != null;
-        boolean hasRegion = StringUtils.hasText(sido) || StringUtils.hasText(sigungu)
-                || StringUtils.hasText(eupmyeondong) || StringUtils.hasText(roadName);
+        boolean hasRegion = StringUtils.hasText(sido) || StringUtils.hasText(sigungu);
         boolean hasKeyword = StringUtils.hasText(keyword);
         boolean sortByScore = "score".equals(sort);
         String dbSort = sort;
@@ -86,15 +81,13 @@ public class LocationServiceService {
                     keyword, category, dbSort, maxResults);
         } else if (hasRegion) {
             // 2순위: 지역 계층
-            results = searchLocationServicesByRegion(sido, sigungu, eupmyeondong, roadName,
-                    keyword, category, maxResults);
+            results = searchLocationServicesByRegion(sido, sigungu, keyword, category, maxResults);
         } else if (hasKeyword) {
             // 3순위: 위치 없을 때 키워드 단독 FULLTEXT (fallback)
             results = searchLocationServicesByKeyword(keyword, category, maxResults);
         } else {
             // 4순위: 전체 평점순
-            results = searchLocationServicesByRegion(null, null, null, null,
-                    null, category, maxResults);
+            results = searchLocationServicesByRegion(null, null, null, category, maxResults);
         }
 
         // score 정렬 post-processing
@@ -120,14 +113,12 @@ public class LocationServiceService {
     }
 
     /**
-     * 지역 계층별 서비스 조회 우선순위: roadName > eupmyeondong > sigungu > sido > 전체
+     * 지역 계층별 서비스 조회 우선순위: sigungu > sido > 전체
      * keyword·category 필터는 SQL WHERE에서 처리
      */
     public List<LocationServiceDTO> searchLocationServicesByRegion(
             String sido,
             String sigungu,
-            String eupmyeondong,
-            String roadName,
             String keyword,
             String category,
             Integer maxResults) {
@@ -143,15 +134,7 @@ public class LocationServiceService {
 
         // 지역 계층 우선순위에 따라 조회 (keyword·category는 쿼리 내부에서 필터)
         long queryStartTime = System.currentTimeMillis();
-        if (StringUtils.hasText(roadName)) {
-            services = locationServiceRepository.findByRoadName(roadName, keyword, category, dbLimit);
-            log.debug("도로명 검색: roadName={}, keyword={}, category={}, 결과={}개",
-                    roadName, keyword, category, services.size());
-        } else if (StringUtils.hasText(eupmyeondong)) {
-            services = locationServiceRepository.findByEupmyeondong(eupmyeondong, keyword, category, dbLimit);
-            log.debug("읍면동 검색: eupmyeondong={}, keyword={}, category={}, 결과={}개",
-                    eupmyeondong, keyword, category, services.size());
-        } else if (StringUtils.hasText(sigungu)) {
+        if (StringUtils.hasText(sigungu)) {
             services = locationServiceRepository.findBySigungu(sigungu, keyword, category, dbLimit);
             log.debug("시군구 검색: sigungu={}, keyword={}, category={}, 결과={}개",
                     sigungu, keyword, category, services.size());
