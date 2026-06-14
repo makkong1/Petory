@@ -1,6 +1,5 @@
 package com.linkup.Petory.domain.location.service;
 
-import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -27,7 +26,6 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class LocationServiceService {
 
-    private static final int DEFAULT_RADIUS_METERS = 10_000;
     private static final int DEFAULT_RADIUS_LIMIT = 100;
     private static final String DEFAULT_RADIUS_SORT = "distance";
 
@@ -36,84 +34,11 @@ public class LocationServiceService {
     private final ApplicationEventPublisher eventPublisher;
     private final UsersRepository usersRepository;
 
-    /**
-     * 통합 검색 진입점 — 우선순위: 위치(반경) → 지역(sido/sigungu) → 키워드 FULLTEXT → 평점순
-     */
-    public List<LocationServiceDTO> searchLocationServices(
-            String keyword, Double latitude, Double longitude, Integer radius,
-            String sido, String sigungu, String category, String sort, Integer maxResults) {
+    // -----------------------------------------------------------------------
+    // 검색 메서드 (컨트롤러가 파라미터 조합을 보고 하나를 직접 호출)
+    // -----------------------------------------------------------------------
 
-        publishSearchEvent(keyword);
-        keyword  = normalize(keyword);
-        category = normalize(category);
-        sido     = normalize(sido);
-        sigungu  = normalize(sigungu);
-        sort     = normalizeSort(sort);
-
-        boolean hasLocation = latitude != null && longitude != null;
-        boolean hasRegion   = StringUtils.hasText(sido) || StringUtils.hasText(sigungu);
-        boolean hasKeyword  = StringUtils.hasText(keyword);
-        boolean sortByScore = "score".equals(sort);
-
-        List<LocationServiceDTO> results;
-        if (hasLocation) {
-            int radiusM = (radius != null && radius > 0) ? radius : DEFAULT_RADIUS_METERS;
-            results = searchLocationServicesByLocation(latitude, longitude, radiusM, keyword, category, sort, maxResults);
-        } else if (hasRegion) {
-            results = searchLocationServicesByRegion(sido, sigungu, keyword, category, maxResults);
-        } else if (hasKeyword) {
-            results = searchLocationServicesByKeyword(keyword, category, maxResults);
-        } else {
-            results = searchLocationServicesByRegion(null, null, null, category, maxResults);
-        }
-
-        // score 정렬은 DB ORDER BY 미지원 — Java 후처리
-        if (sortByScore) {
-            results = new java.util.ArrayList<>(results);
-            results.sort(Comparator.comparingDouble(
-                    (LocationServiceDTO dto) -> dto.getScore() != null ? dto.getScore() : 0.0
-            ).reversed());
-        }
-        return results;
-    }
-
-    @Cacheable(value = "popularLocationServices", key = "#p0")
-    public List<LocationServiceDTO> getPopularLocationServices(String category) {
-        return locationServiceRepository.findTop10ByCategoryOrderByRatingDesc(category)
-                .stream()
-                .map(locationServiceConverter::toDTO)
-                .collect(Collectors.toList());
-    }
-
-    /** 지역 계층별 검색: sigungu > sido > 전체 평점순 */
-    public List<LocationServiceDTO> searchLocationServicesByRegion(
-            String sido, String sigungu, String keyword, String category, Integer maxResults) {
-
-        keyword  = normalize(keyword);
-        category = normalize(category);
-
-        int limit = (maxResults != null && maxResults > 0) ? maxResults : 50;
-        long t0 = System.currentTimeMillis();
-
-        List<LocationService> services;
-        if (StringUtils.hasText(sigungu)) {
-            services = locationServiceRepository.findBySigungu(sigungu, keyword, category, limit);
-        } else if (StringUtils.hasText(sido)) {
-            services = locationServiceRepository.findBySido(sido, keyword, category, limit);
-        } else {
-            services = locationServiceRepository.findByOrderByRatingDesc(keyword, category, limit);
-        }
-
-        List<LocationServiceDTO> result = services.stream()
-                .map(locationServiceConverter::toDTO)
-                .collect(Collectors.toList());
-
-        log.info("[지역검색] sido={} sigungu={} keyword={} → {}건 ({}ms)",
-                sido, sigungu, keyword, result.size(), System.currentTimeMillis() - t0);
-        return result;
-    }
-
-    /** 위치 기반 반경 검색 */
+    /** ① 반경 검색 — 지도 초기 로드 / "이 지역 검색" */
     public List<LocationServiceDTO> searchLocationServicesByLocation(
             Double latitude, Double longitude, Integer radiusInMeters,
             String keyword, String category, String sort, Integer maxResults) {
@@ -121,6 +46,7 @@ public class LocationServiceService {
         keyword  = normalize(keyword);
         category = normalize(category);
         sort     = normalizeSort(sort);
+        publishSearchEvent(keyword);
 
         int limit = (maxResults != null && maxResults > 0) ? maxResults : DEFAULT_RADIUS_LIMIT;
         long t0 = System.currentTimeMillis();
@@ -144,12 +70,42 @@ public class LocationServiceService {
         return result;
     }
 
-    /** FULLTEXT 키워드 검색 — 위치·지역 모두 없을 때 fallback */
+    /** ② 지역 검색 — 강남구·서울특별시 등 지역명, 또는 기본 평점순(sido/sigungu null) */
+    public List<LocationServiceDTO> searchLocationServicesByRegion(
+            String sido, String sigungu, String keyword, String category, Integer maxResults) {
+
+        keyword  = normalize(keyword);
+        category = normalize(category);
+        publishSearchEvent(keyword);
+
+        int limit = (maxResults != null && maxResults > 0) ? maxResults : 50;
+        long t0 = System.currentTimeMillis();
+
+        List<LocationService> services;
+        if (StringUtils.hasText(sigungu)) {
+            services = locationServiceRepository.findBySigungu(sigungu, keyword, category, limit);
+        } else if (StringUtils.hasText(sido)) {
+            services = locationServiceRepository.findBySido(sido, keyword, category, limit);
+        } else {
+            services = locationServiceRepository.findByOrderByRatingDesc(keyword, category, limit);
+        }
+
+        List<LocationServiceDTO> result = services.stream()
+                .map(locationServiceConverter::toDTO)
+                .collect(Collectors.toList());
+
+        log.info("[지역검색] sido={} sigungu={} keyword={} → {}건 ({}ms)",
+                sido, sigungu, keyword, result.size(), System.currentTimeMillis() - t0);
+        return result;
+    }
+
+    /** ③ FULLTEXT 키워드 검색 — 위치·지역 없을 때 시설명 전국 검색 */
     public List<LocationServiceDTO> searchLocationServicesByKeyword(
             String keyword, String category, Integer maxResults) {
 
         keyword  = normalize(keyword);
         category = normalize(category);
+        publishSearchEvent(keyword);
 
         int limit = (maxResults != null && maxResults > 0) ? maxResults : 50;
         long t0 = System.currentTimeMillis();
@@ -164,6 +120,18 @@ public class LocationServiceService {
         log.info("[키워드검색] keyword={} category={} → {}건 ({}ms)",
                 keyword, category, result.size(), System.currentTimeMillis() - t0);
         return result;
+    }
+
+    // -----------------------------------------------------------------------
+    // 기타
+    // -----------------------------------------------------------------------
+
+    @Cacheable(value = "popularLocationServices", key = "#p0")
+    public List<LocationServiceDTO> getPopularLocationServices(String category) {
+        return locationServiceRepository.findTop10ByCategoryOrderByRatingDesc(category)
+                .stream()
+                .map(locationServiceConverter::toDTO)
+                .collect(Collectors.toList());
     }
 
     @Transactional
@@ -188,6 +156,10 @@ public class LocationServiceService {
                 * Math.sin(dLng / 2) * Math.sin(dLng / 2);
         return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
+
+    // -----------------------------------------------------------------------
+    // 내부 유틸
+    // -----------------------------------------------------------------------
 
     private void publishSearchEvent(String keyword) {
         if (!StringUtils.hasText(keyword)) return;
