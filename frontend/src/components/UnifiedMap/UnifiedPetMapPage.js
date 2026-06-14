@@ -13,6 +13,7 @@ import MeetupLayer from "./layers/MeetupLayer";
 import CareLayer from "./layers/CareLayer";
 import { fetchActiveMapItems } from "../../api/unifiedMapApi";
 import { petRecommendationApi } from "../../api/petRecommendationApi";
+import { geocodingApi } from "../../api/geocodingApi";
 
 const SORT_LABELS = {
   stable: "추천순",
@@ -496,17 +497,34 @@ const UnifiedPetMapPage = () => {
           sort={locationSort}
           hasPendingAreaChange={hasPendingAreaChange}
           radius={showRadius ? radius : undefined}
-          onSearch={(kw) => {
+          onSearch={async (kw) => {
+            if (!kw) {
+              setLocationKeyword("");
+              cacheRef.current = {};
+              commitLocationSearch(mapViewportCenter, "user-triggered");
+              return;
+            }
+            // geocoding 먼저 시도 — 주소·지역명(강남구, 묵동 등)이면 좌표로 변환해 지도 이동
+            try {
+              const geoResult = await geocodingApi.searchPlaces(kw);
+              const first = geoResult?.results?.[0];
+              if (first?.latitude && first?.longitude) {
+                const loc = { lat: first.latitude, lng: first.longitude };
+                setMapViewportCenter(loc);
+                setLocationKeyword("");
+                cacheRef.current = {};
+                commitLocationSearch(loc, "geocoding");
+                return;
+              }
+            } catch (_) {
+              // geocoding 실패 시 keyword 검색으로 fallback
+            }
+            // fallback: 시설명 keyword 검색
             setLocationKeyword(kw);
             cacheRef.current = {};
-            commitLocationSearch(
-              mapViewportCenter,
-              kw ? "keyword" : "user-triggered"
-            );
-            if (kw) {
-              window.clearTimeout(signalRefreshTimerRef.current);
-              signalRefreshTimerRef.current = window.setTimeout(refreshPetIntentSignals, 1500);
-            }
+            commitLocationSearch(mapViewportCenter, "keyword");
+            window.clearTimeout(signalRefreshTimerRef.current);
+            signalRefreshTimerRef.current = window.setTimeout(refreshPetIntentSignals, 1500);
           }}
           onCategoryPick={({ category: cat, groupId }) => {
             setLocationCategory(cat || "");
