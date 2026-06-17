@@ -281,7 +281,14 @@ public class MeetupService {
         List<MeetupDTO> result = ids.stream()
                 .map(byId::get)
                 .filter(Objects::nonNull)
-                .map(converter::toDTO)
+                .map(meetup -> {
+                    MeetupDTO dto = converter.toDTO(meetup);
+                    if (meetup.getLatitude() != null && meetup.getLongitude() != null) {
+                        dto.setDistance(calculateDistanceMeters(
+                                lat, lng, meetup.getLatitude(), meetup.getLongitude()));
+                    }
+                    return dto;
+                })
                 .collect(Collectors.toList());
         log.info("최종 결과 모임 수: {}", result.size());
 
@@ -292,6 +299,17 @@ public class MeetupService {
         }
 
         return result;
+    }
+
+    private double calculateDistanceMeters(Double lat1, Double lng1, Double lat2, Double lng2) {
+        final int earthRadiusMeters = 6371000;
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLng = Math.toRadians(lng2 - lng1);
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return earthRadiusMeters * c;
     }
 
     // 특정 모임의 참가자 목록 조회 (존재·삭제 여부 먼저 확인)
@@ -474,13 +492,6 @@ public class MeetupService {
                 .participationRole(isOrganizer ? "ORGANIZER" : "PARTICIPANT")
                 .liked(Boolean.TRUE.equals(participant.getLiked()))
                 .build();
-    }
-
-    // 지역별 모임 조회
-    @Timed("getMeetupsByLocation")
-    public List<MeetupDTO> getMeetupsByLocation(Double minLat, Double maxLat, Double minLng, Double maxLng) {
-        List<Meetup> meetups = meetupRepository.findByLocationRange(minLat, maxLat, minLng, maxLng);
-        return converter.toDTOList(meetups.size() > MAX_LIST_SIZE ? meetups.subList(0, MAX_LIST_SIZE) : meetups);
     }
 
     // 키워드로 모임 검색

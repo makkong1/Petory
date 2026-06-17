@@ -1,5 +1,6 @@
 package com.linkup.Petory.domain.board.repository;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -103,6 +104,24 @@ public class JpaMissingPetBoardAdapter implements MissingPetBoardRepository {
     @Override
     public Page<MissingPetBoard> findByStatusOrderByCreatedAtDesc(MissingPetStatus status, Pageable pageable) {
         return jpaRepository.findByStatusOrderByCreatedAtDesc(status, pageable);
+    }
+
+    @Override
+    public Page<MissingPetBoard> findHomeCandidatesByStatusOrderByLostDateDesc(
+            MissingPetStatus status, Pageable pageable) {
+        return jpaRepository.findHomeCandidatesByStatusOrderByLostDateDesc(status, pageable);
+    }
+
+    @Override
+    public Page<MissingPetBoard> findHomeCandidatesInBoundingBox(
+            MissingPetStatus status,
+            BigDecimal minLat,
+            BigDecimal maxLat,
+            BigDecimal minLng,
+            BigDecimal maxLng,
+            Pageable pageable) {
+        return jpaRepository.findHomeCandidatesInBoundingBox(
+                status, minLat, maxLat, minLng, maxLng, pageable);
     }
 
     // [리팩토링] Admin 페이징 - Specification 기반 DB 레벨 필터링

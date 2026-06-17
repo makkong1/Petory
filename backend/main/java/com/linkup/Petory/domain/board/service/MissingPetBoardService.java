@@ -1,6 +1,8 @@
 package com.linkup.Petory.domain.board.service;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -47,6 +49,9 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class MissingPetBoardService {
+
+    private static final double HOME_MISSING_RADIUS_KM = 20.0;
+    private static final int HOME_MISSING_CANDIDATE_LIMIT = 200;
 
     private final MissingPetBoardRepository missingPetBoardRepository;
     private final MissingPetCommentService missingPetCommentService;
@@ -467,30 +472,37 @@ public class MissingPetBoardService {
      * score = 0.6 * recencyScore + 0.4 * distScore
      * recencyScore = max(0, 1 - daysSinceLost / 14)
      * distScore    = max(0, 1 - distKm / 20)
-     * 좌표 없으면 lostDate DESC LIMIT size
+     * 좌표 있으면 20km 반경 후보 우선, 부족하면 lostDate DESC로 보충
      */
     public List<MissingPetBoardDTO> getHomeMissing(Double lat, Double lng, int size) {
-        Pageable page = PageRequest.of(0, size, org.springframework.data.domain.Sort.by(
-                Direction.DESC, "lostDate"));
+        int limit = Math.max(size, 1);
+        Pageable page = PageRequest.of(0, limit);
 
         if (lat == null || lng == null) {
             return missingPetBoardRepository
-                    .findByStatusOrderByCreatedAtDesc(MissingPetStatus.MISSING, page)
+                    .findHomeCandidatesByStatusOrderByLostDateDesc(MissingPetStatus.MISSING, page)
                     .getContent()
                     .stream()
                     .map(missingPetConverter::toBoardDTOWithoutComments)
                     .collect(Collectors.toList());
         }
 
-        Pageable bigPage = PageRequest.of(0, 50, org.springframework.data.domain.Sort.by(
-                Direction.DESC, "lostDate"));
+        Pageable candidatePage = PageRequest.of(0, Math.max(HOME_MISSING_CANDIDATE_LIMIT, limit));
+        double[] bounds = boundingBox(lat, lng, HOME_MISSING_RADIUS_KM);
         List<MissingPetBoard> candidates = missingPetBoardRepository
-                .findByStatusOrderByCreatedAtDesc(MissingPetStatus.MISSING, bigPage)
+                .findHomeCandidatesInBoundingBox(
+                        MissingPetStatus.MISSING,
+                        BigDecimal.valueOf(bounds[0]),
+                        BigDecimal.valueOf(bounds[1]),
+                        BigDecimal.valueOf(bounds[2]),
+                        BigDecimal.valueOf(bounds[3]),
+                        candidatePage)
                 .getContent();
 
         java.time.LocalDate today = java.time.LocalDate.now();
+        LinkedHashMap<Long, MissingPetBoardDTO> resultById = new LinkedHashMap<>();
 
-        return candidates.stream()
+        candidates.stream()
                 .map(board -> {
                     long daysSinceLost = board.getLostDate() != null
                             ? java.time.temporal.ChronoUnit.DAYS.between(board.getLostDate(), today)
@@ -498,20 +510,53 @@ public class MissingPetBoardService {
                     double recencyScore = Math.max(0, 1.0 - daysSinceLost / 14.0);
 
                     double distScore = 0.0;
+                    double distKm = Double.MAX_VALUE;
                     if (board.getLatitude() != null && board.getLongitude() != null) {
-                        double distKm = haversineKm(lat, lng,
+                        distKm = haversineKm(lat, lng,
                                 board.getLatitude().doubleValue(),
                                 board.getLongitude().doubleValue());
-                        distScore = Math.max(0, 1.0 - distKm / 20.0);
+                        distScore = Math.max(0, 1.0 - distKm / HOME_MISSING_RADIUS_KM);
                     }
 
                     double score = 0.6 * recencyScore + 0.4 * distScore;
-                    return new java.util.AbstractMap.SimpleEntry<>(board, score);
+                    return new ScoredMissingPet(board, distKm, score);
                 })
-                .sorted(java.util.Map.Entry.<MissingPetBoard, Double>comparingByValue().reversed())
-                .limit(size)
-                .map(e -> missingPetConverter.toBoardDTOWithoutComments(e.getKey()))
-                .collect(Collectors.toList());
+                .filter(scored -> scored.distanceKm() <= HOME_MISSING_RADIUS_KM)
+                .sorted(java.util.Comparator.comparingDouble(ScoredMissingPet::score).reversed())
+                .limit(limit)
+                .forEach(scored -> {
+                    MissingPetBoardDTO dto = missingPetConverter.toBoardDTOWithoutComments(scored.board());
+                    dto.setDistance(scored.distanceKm() * 1000);
+                    resultById.put(dto.getIdx(), dto);
+                });
+
+        if (resultById.size() < limit) {
+            missingPetBoardRepository
+                    .findHomeCandidatesByStatusOrderByLostDateDesc(MissingPetStatus.MISSING, candidatePage)
+                    .getContent()
+                    .stream()
+                    .filter(board -> !resultById.containsKey(board.getIdx()))
+                    .limit(limit - resultById.size())
+                    .map(missingPetConverter::toBoardDTOWithoutComments)
+                    .forEach(dto -> resultById.put(dto.getIdx(), dto));
+        }
+
+        return new ArrayList<>(resultById.values());
+    }
+
+    private double[] boundingBox(double lat, double lng, double radiusKm) {
+        double latDelta = radiusKm / 111.0;
+        double cosLat = Math.cos(Math.toRadians(lat));
+        double lngDelta = Math.abs(cosLat) < 0.000001 ? 180.0 : radiusKm / (111.0 * cosLat);
+        return new double[] {
+                lat - latDelta,
+                lat + latDelta,
+                lng - lngDelta,
+                lng + lngDelta
+        };
+    }
+
+    private record ScoredMissingPet(MissingPetBoard board, double distanceKm, double score) {
     }
 
     private double haversineKm(double lat1, double lng1, double lat2, double lng2) {
