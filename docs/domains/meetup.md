@@ -319,7 +319,7 @@ public void handleMeetupCreated(MeetupCreatedEvent event) {
 
 **핵심 로직**:
 
-- **Haversine 공식**: 지구 반지름 6371km 사용
+- **공간 거리 계산**: `geo_point` 공간 컬럼과 `ST_Distance_Sphere` 사용
 - **필터링**: 미래 날짜만, COMPLETED 상태 제외, 소프트 삭제 제외
 - **쿼리**: `findNearbyMeetupIds`로 ID·정렬·LIMIT → `findByIdxInWithOrganizer`로 엔티티 로드 (주최자 N+1 방지)
 - **정렬**: 거리순 정렬, 같으면 날짜순 정렬
@@ -716,7 +716,7 @@ CREATE INDEX idx_meetup_date ON meetup(date);
 CREATE INDEX idx_meetup_date_status ON meetup(date, status);
 
 -- 위치 기반 검색
-CREATE INDEX idx_meetup_location ON meetup(latitude, longitude);
+ALTER TABLE meetup ADD SPATIAL INDEX idx_meetup_geo_point_spatial (geo_point);
 
 -- 상태별 모임 조회
 CREATE INDEX idx_meetup_status ON meetup(status);
@@ -740,7 +740,7 @@ CREATE INDEX user_idx ON meetupparticipants(user_idx);
 - 자주 조회되는 컬럼 조합 (status, date)
 - WHERE 절에서 자주 사용되는 조건
 - JOIN에 사용되는 외래키 (organizer_idx)
-- 위치 기반 검색을 위한 인덱스 (latitude, longitude)
+- 위치 기반 검색을 위한 POINT 공간 인덱스 (`geo_point`)
 - 복합 키로 중복 참여 방지
 
 ### 7.2 애플리케이션 레벨 최적화
@@ -751,11 +751,11 @@ CREATE INDEX user_idx ON meetupparticipants(user_idx);
 
 **최적화 사항**:
 
-- **DB 레벨 필터링**: Bounding Box 방식으로 인덱스 활용 (`idx_meetup_location`)
-- **거리 계산**: Haversine 공식으로 정확한 거리 계산 (DB 쿼리에서 수행)
+- **DB 레벨 필터링**: POINT 공간 컬럼의 Bounding Box 방식으로 인덱스 활용 (`idx_meetup_geo_point_spatial`)
+- **거리 계산**: `ST_Distance_Sphere`로 정확한 거리 계산 (DB 쿼리에서 수행)
 - **정렬**: 거리순 정렬, 같으면 날짜순 정렬
 - **필터링**: 좌표 있는 모임만, 미래 날짜만, COMPLETED 상태 제외
-- **성능 개선**: 전체 시간 43.8% 감소, DB 쿼리 40.7% 감소, 메모리 85.8% 감소
+- **성능 개선**: DB에서 공간 인덱스로 후보를 줄인 뒤 필요한 ID만 조회
 
 #### 코드 중복 제거
 
@@ -823,10 +823,10 @@ CREATE INDEX user_idx ON meetupparticipants(user_idx);
 
 ### 8.4 위치 기반 검색
 
-- **반경 기반 검색**: Haversine 공식으로 거리 계산, 거리순 정렬
+- **반경 기반 검색**: `ST_Distance_Sphere`로 거리 계산, 거리순 정렬
   - `radius` 파라미터 기본값 5.0km
-  - DB 레벨 필터링 (Bounding Box 방식으로 인덱스 활용)
-  - 성능 개선: 전체 시간 43.8% 감소, DB 쿼리 40.7% 감소, 메모리 85.8% 감소
+  - DB 레벨 필터링 (POINT 공간 컬럼의 Bounding Box 방식으로 공간 인덱스 활용)
+  - 기존 B-tree Bounding Box 최적화에서 공간 인덱스 기반 검색으로 전환
 - **지역별 검색**: 위도/경도 범위로 모임 검색
 - **키워드 검색**: 제목/설명에 키워드 포함 모임 검색
 
