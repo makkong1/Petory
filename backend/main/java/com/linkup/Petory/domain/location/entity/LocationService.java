@@ -171,10 +171,15 @@ public class LocationService {
     @OneToMany(mappedBy = "service", cascade = CascadeType.ALL)
     private List<LocationServiceReview> reviews;
 
-    // @PrePersist, @PreUpdate는 created_at, updated_at가 있을 때만 사용
-    // @PrePersist
     public void softDelete() {
         this.isDeleted = true;
         this.deletedAt = LocalDateTime.now();
+    }
+
+    @PrePersist
+    protected void onCreate() {
+        if (this.isDeleted == null) {
+            this.isDeleted = false;
+        }
     }
 }

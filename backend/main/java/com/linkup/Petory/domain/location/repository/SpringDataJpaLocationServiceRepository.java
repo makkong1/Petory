@@ -61,7 +61,7 @@ public interface SpringDataJpaLocationServiceRepository extends JpaRepository<Lo
     @RepositoryMethod("장소 서비스: 이름+주소 존재 여부")
     @Query("SELECT COUNT(ls) > 0 FROM LocationService ls WHERE "
             + "ls.name = :name AND ls.address = :address AND "
-            + "(ls.isDeleted IS NULL OR ls.isDeleted = false)")
+            + "ls.isDeleted = false")
     boolean existsByNameAndAddress(@Param("name") String name, @Param("address") String address);
 
     // spatial index를 실제로 잘 타고 있음
@@ -158,14 +158,14 @@ public interface SpringDataJpaLocationServiceRepository extends JpaRepository<Lo
             + "SELECT avg_rating FROM ("
             + "SELECT COALESCE(AVG(r.rating), 0.0) AS avg_rating "
             + "FROM locationservicereview r "
-            + "WHERE r.service_idx = :serviceIdx AND (r.is_deleted IS NULL OR r.is_deleted = 0)"
+            + "WHERE r.service_idx = :serviceIdx AND r.is_deleted = 0"
             + ") avg_stats"
             + "), "
             + "review_count = ("
             + "SELECT review_count FROM ("
             + "SELECT COUNT(*) AS review_count "
             + "FROM locationservicereview r "
-            + "WHERE r.service_idx = :serviceIdx AND (r.is_deleted IS NULL OR r.is_deleted = 0)"
+            + "WHERE r.service_idx = :serviceIdx AND r.is_deleted = 0"
             + ") review_stats"
             + ") "
             + "WHERE idx = :serviceIdx", nativeQuery = true)
