@@ -1,450 +1,322 @@
-# File 도메인 - 포트폴리오 상세 설명
+# File 도메인
 
-## 1. 개요
-
-File 도메인은 파일 업로드/다운로드 관리 도메인으로, 다양한 도메인에서 사용하는 파일을 통합 관리합니다. 폴리모픽 관계(`FileTargetType` + `targetIdx`)로 게시글·댓글·펫케어 댓글·실종 제보·반려동물 등에 첨부합니다.
-
-**주요 기능**:
-- 파일 업로드/다운로드/삭제
-- 폴리모픽 관계로 다양한 대상 타입 지원 (BOARD, COMMENT, CARE_COMMENT, MISSING_PET, MISSING_PET_COMMENT, PET)
-- 파일 동기화 (기존 파일 삭제 후 새 파일 추가)
-- 배치 파일 조회 (N+1 문제 해결)
-- 파일 검증 및 보안 (크기 제한, 확장자 검증, 경로 정규화)
-- 고유 파일명 생성 (날짜 + UUID)
+> 기준: 현재 `domain/file`, `domain/admin` 파일 관리 API, 프론트 `uploadApi/fileAdminApi` 코드.  
+> 역할: 이미지 업로드, 로컬 저장소 조회, 도메인별 첨부파일 메타데이터 연결을 담당한다.
 
 ---
 
-## 2. 기능 설명
+## 1. 도메인 책임
 
-### 2.1 파일 업로드 및 관리
+File 도메인은 실제 이미지 파일 저장과, 저장된 파일을 Petory의 여러 도메인 레코드에 연결하는 공통 도메인이다.
 
-**파일 업로드 프로세스**:
-1. 클라이언트에서 이미지 파일 업로드 (`POST /api/uploads/images`) — **`SecurityConfig`에서 `GET /api/uploads/**`만 `permitAll`이므로 업로드(POST)는 로그인(JWT) 필요**, 다운로드(GET)는 공개
-2. 파일 검증 (크기, 확장자, MIME 타입)
-3. 디렉터리 구조 생성 (카테고리/소유자 타입/소유자 ID/엔티티 ID)
-4. 고유 파일명 생성 (`yyyyMMdd` + `_` + UUID + 확장자, `FileStorageService.generateFileName`)
-5. 파일 저장 후 **`uploadLocation` 기준 상대 경로** 반환(프로젝트 기본값이면 보통 `uploads` 디렉터리 **내부** 경로만, 예: `board/user/123/456/20240101_….jpg` — 선행 `uploads/` 없을 수 있음)
-6. 다운로드 URL 생성 (`/api/uploads/file?path=…`)
+현재 구현은 S3가 아니라 **로컬 파일 시스템 저장**이다.
 
-**파일 다운로드 프로세스**:
-1. 클라이언트에서 상대 경로로 파일 요청 (`GET /api/uploads/file?path={상대경로}`)
-2. 경로 정규화 및 보안 검증
-3. 파일 리소스 반환
+- 업로드 루트: `file.upload-dir`
+- 기본값: `uploads`
+- 공개 조회: `GET /api/uploads/file?path=...`
+- 업로드: `POST /api/uploads/images`
+- 첨부 메타데이터 테이블: `file`
 
-### 2.2 파일 동기화
+파일 도메인은 두 레이어로 나뉜다.
 
-**동기화 프로세스**:
-- 기존 파일 삭제 후 새 파일 추가
-- 파일 경로 정규화 (URL 디코딩, 상대 경로 추출)
-- MIME 타입 자동 감지
-- `AttachmentFile` 엔티티 생성 및 저장
+1. `FileStorageService`
+   - Multipart 이미지 검증
+   - 업로드 디렉터리 생성
+   - 고유 파일명 생성
+   - 로컬 파일 저장
+   - 저장 파일 Resource 로드
 
-### 2.3 배치 파일 조회
-
-**배치 조회 프로세스**:
-- 여러 대상의 파일을 한 번에 조회 (`findByTargetTypeAndTargetIdxIn`)
-- `targetIdx`별로 그룹화하여 `Map<Long, List<FileDTO>>` 반환
-- 각 파일에 다운로드 URL 자동 추가
-- N+1 문제 해결
+2. `AttachmentFileService`
+   - 저장된 파일 경로를 특정 도메인 레코드에 연결
+   - `FileTargetType + targetIdx` 폴리모픽 참조
+   - 단일 첨부파일 교체
+   - 대상별/배치 첨부파일 조회
+   - 다운로드 URL 생성
 
 ---
 
-## 3. 서비스 로직 설명
+## 2. 주요 코드 위치
 
-### 3.1 핵심 비즈니스 로직
-
-#### 로직 1: 파일 동기화
-**구현 위치**: `AttachmentFileService.syncSingleAttachment()` 
-
-```java
-@Transactional
-public void syncSingleAttachment(FileTargetType targetType, Long targetIdx, String filePath, String fileType) {
-    if (targetType == null || targetIdx == null) {
-        return;
-    }
-
-    // 1. 기존 파일 삭제
-    fileRepository.deleteByTargetTypeAndTargetIdx(targetType, targetIdx);
-
-    // 2. 파일 경로 정규화 (URL 디코딩, 상대 경로 추출)
-    String normalizedPath = normalizeFilePath(filePath);
-    if (StringUtils.hasText(normalizedPath)) {
-        // 3. MIME 타입 해결 (제공된 타입 또는 파일 시스템에서 자동 감지)
-        String resolvedFileType = resolveMimeType(normalizedPath, fileType);
-        
-        // 4. 새 파일 추가
-        AttachmentFile attachment = AttachmentFile.builder()
-                .targetType(targetType)
-                .targetIdx(targetIdx)
-                .filePath(normalizedPath)
-                .fileType(resolvedFileType)
-                .build();
-        fileRepository.save(attachment);
-    }
-}
-```
-
-**핵심 로직**:
-- **기존 파일 삭제**: `deleteByTargetTypeAndTargetIdx()`로 기존 파일 삭제
-- **파일 경로 정규화**: `normalizeFilePath()`로 경로 정규화 (URL 디코딩, 상대 경로 추출)
-- **MIME 타입 해결**: `resolveMimeType()`로 파일 타입 자동 감지
-- **새 파일 추가**: 정규화된 경로와 파일 타입으로 `AttachmentFile` 생성
-
-#### 로직 2: 배치 파일 조회 (N+1 문제 해결)
-**구현 위치**: `AttachmentFileService.getAttachmentsBatch()`
-
-```java
-public Map<Long, List<FileDTO>> getAttachmentsBatch(FileTargetType targetType, List<Long> targetIndices) {
-    if (targetType == null || targetIndices == null || targetIndices.isEmpty()) {
-        return Collections.emptyMap();
-    }
-    
-    // 1. 배치 조회: 여러 대상의 파일을 한 번에 조회
-    List<AttachmentFile> files = fileRepository.findByTargetTypeAndTargetIdxIn(targetType, targetIndices);
-    
-    // 2. targetIdx별로 그룹화한 후 FileDTO로 변환
-    return files.stream()
-            .collect(Collectors.groupingBy(
-                AttachmentFile::getTargetIdx,
-                Collectors.mapping(
-                    file -> withDownloadUrl(fileConverter.toDTO(file)),
-                    Collectors.toList()
-                )
-            ));
-}
-```
-
-**핵심 로직**:
-- **배치 조회**: `findByTargetTypeAndTargetIdxIn()`로 여러 대상의 파일을 한 번에 조회
-- **그룹화**: `targetIdx`별로 그룹화하여 `Map<Long, List<FileDTO>>` 반환
-- **다운로드 URL 생성**: `withDownloadUrl()`로 각 파일에 다운로드 URL 추가
-- **효과**: N+1 문제 해결, 여러 게시글의 파일을 한 번의 쿼리로 조회
-
-#### 로직 3: 파일 저장 및 검증
-**구현 위치**: `FileStorageService.storeImage()` 
-
-**핵심 로직**:
-- **파일 검증**: 빈 파일 시 `FileValidationException.emptyFile()`, 용량/타입/확장자 검증 시 `FileUploadValidationException` 발생
-- **경로 생성**: 카테고리, 소유자 타입, 소유자 ID, 엔티티 ID를 기반으로 디렉터리 구조 생성 (실패 시 `FileStorageException.prepareFailed()`)
-- **파일명 생성**: 날짜 접두사 + UUID로 고유 파일명 생성 (예: `20240101_abc123def456.jpg`)
-- **보안**: 경로 정규화 및 상대 경로 검증으로 디렉터리 탐색 공격 방지
-- **저장 실패**: IO 오류 시 `FileStorageException.saveFailed()` 발생
-
-**파일 검증 로직** (`validateFile()`):
-```java
-private void validateFile(MultipartFile file, String extension) {
-    // 1. 파일 크기 검증 (최대 5MB)
-    if (file.getSize() > MAX_FILE_SIZE_BYTES) {
-        throw FileUploadValidationException.sizeExceeded();
-    }
-    
-    // 2. MIME 타입 검증
-    String contentType = file.getContentType();
-    if (contentType == null || !ALLOWED_CONTENT_TYPES.contains(contentType.toLowerCase())) {
-        throw FileUploadValidationException.invalidContentType();
-    }
-    
-    // 3. 확장자 검증
-    if (!StringUtils.hasText(extension) || !ALLOWED_EXTENSIONS.contains(extension.toLowerCase())) {
-        throw FileUploadValidationException.invalidExtension();
-    }
-}
-```
-
-#### 로직 4: 파일 경로 정규화
-**구현 위치**: `AttachmentFileService.normalizeFilePath()`
-
-**핵심 로직**:
-- **상대 경로 추출**: URI에서 `/uploads/` 마커 이후 경로 추출 또는 쿼리 파라미터에서 `path` 추출
-- **URL 디코딩**: 인코딩된 경로 디코딩
-- **경로 정규화**: 백슬래시를 슬래시로 변환 (`\` → `/`)
+| 영역 | 파일 |
+|---|---|
+| 업로드/조회 API | `domain/file/controller/FileUploadController.java` |
+| 로컬 저장소 서비스 | `domain/file/service/FileStorageService.java` |
+| 첨부 메타데이터 서비스 | `domain/file/service/AttachmentFileService.java` |
+| 첨부 엔티티 | `domain/file/entity/AttachmentFile.java` |
+| 대상 타입 enum | `domain/file/entity/FileTargetType.java` |
+| Repository adapter | `domain/file/repository/JpaAttachmentFileAdapter.java` |
+| Spring Data JPA | `domain/file/repository/SpringDataJpaAttachmentFileRepository.java` |
+| 관리자 파일 API | `domain/admin/controller/AdminFileController.java` |
+| 관리자 파일 facade | `domain/admin/service/AdminFileFacade.java` |
+| 프론트 업로드 API | `frontend/src/api/uploadApi.js` |
+| 프론트 관리자 API | `frontend/src/api/fileAdminApi.js` |
 
 ---
 
-## 4. 아키텍처 설명
+## 3. API
 
-### 4.1 엔티티 구조
+### 3.1 이미지 업로드
 
-#### AttachmentFile (첨부 파일)
-```java
-@Entity
-@Table(name = "file")
-public class AttachmentFile {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long idx;
-    
-    @Enumerated(EnumType.STRING)
-    @Column(name = "target_type", nullable = false, length = 32)
-    private FileTargetType targetType;      // 위 enum (6종)
-    
-    @Column(name = "target_idx", nullable = false)
-    private Long targetIdx;                 // 대상 ID
-    
-    @Column(name = "file_path", nullable = false, length = 255)
-    private String filePath;                // 파일 경로 (상대 경로)
-    
-    @Column(name = "file_type", length = 50)
-    private String fileType;                // 파일 타입 (MIME 타입)
-    
-    @Column(name = "created_at")
-    private LocalDateTime createdAt;       // @PrePersist로 자동 설정
-    
-    @PrePersist
-    protected void onCreate() {
-        if (this.createdAt == null) {
-            this.createdAt = LocalDateTime.now();
-        }
-    }
-}
-```
-
-**특징**:
-- `BaseTimeEntity`를 상속하지 않음 (`@PrePersist`로 직접 `createdAt` 관리)
-- 폴리모픽 관계로 다양한 대상 타입 지원
-
-#### FileTargetType (파일 대상 타입)
-```java
-public enum FileTargetType {
-    BOARD,
-    COMMENT,
-    CARE_COMMENT,
-    MISSING_PET,
-    MISSING_PET_COMMENT,
-    PET
-}
-```
-
-### 4.2 도메인 구조
-```
-domain/file/
-  ├── controller/
-  │   └── FileUploadController.java
-  ├── service/
-  │   ├── AttachmentFileService.java
-  │   └── FileStorageService.java
-  ├── entity/
-  │   ├── AttachmentFile.java
-  │   └── FileTargetType.java
-  ├── repository/
-  │   ├── AttachmentFileRepository.java
-  │   ├── JpaAttachmentFileAdapter.java
-  │   └── SpringDataJpaAttachmentFileRepository.java
-  ├── exception/
-  │   ├── FileValidationException.java
-  │   ├── FileUploadValidationException.java
-  │   ├── FileNotFoundException.java
-  │   └── FileStorageException.java
-  ├── dto/
-  │   └── FileDTO.java
-  └── converter/
-      └── FileConverter.java
-```
-
-**참고**: `AdminFileController`는 `domain/admin/controller/`에 위치하며, ADMIN/MASTER 권한으로 파일 관리 API를 제공합니다.
-
-### 4.3 엔티티 관계도 (ERD)
-```mermaid
-erDiagram
-    AttachmentFile -.->|폴리모픽| Board
-    AttachmentFile -.->|폴리모픽| Comment
-    AttachmentFile -.->|폴리모픽| CareRequestComment
-    AttachmentFile -.->|폴리모픽| MissingPetBoard
-    AttachmentFile -.->|폴리모픽| MissingPetComment
-    AttachmentFile -.->|폴리모픽| Pet
-```
-
-### 4.4 서비스 메서드 구조
-
-#### AttachmentFileService
-| 메서드 | 설명 | 주요 로직 |
-|--------|------|-----------|
-| `getAttachments()` | 단일 대상의 파일 목록 조회 | `findByTargetTypeAndTargetIdx()`로 조회, 다운로드 URL 추가 |
-| `getAttachmentsBatch()` | 여러 대상의 파일 목록 배치 조회 | `findByTargetTypeAndTargetIdxIn()`로 배치 조회, targetIdx별 그룹화, N+1 문제 해결 |
-| `syncSingleAttachment()` | 파일 동기화 (기존 파일 삭제 후 새 파일 추가) | 기존 파일 삭제, 경로 정규화, MIME 타입 해결, 새 파일 추가 |
-| `deleteAll()` | 대상의 모든 파일 삭제 | `deleteByTargetTypeAndTargetIdx()`로 삭제 |
-| `normalizeFilePath()` | 파일 경로 정규화 | 상대 경로 추출, URL 디코딩, 경로 정규화 |
-| `buildDownloadUrl()` | 다운로드 URL 생성 | `/api/uploads/file?path={상대경로}` 형식으로 생성 |
-| `extractPrimaryFileUrl()` | 목록 중 첫 첨부의 URL | `downloadUrl` 없으면 `filePath`로 `buildDownloadUrl` |
-
-#### FileStorageService
-| 메서드 | 설명 | 주요 로직 | 예외 |
-|--------|------|-----------|------|
-| `storeImage()` | 이미지 파일 저장 | 파일 검증, 디렉터리 생성, 고유 파일명 생성, 파일 저장 | `FileValidationException`, `FileUploadValidationException`, `FileStorageException` |
-| `loadAsResource()` | 파일 리소스 로드 | 경로 검증, 파일 리소스 반환 | `FileNotFoundException` |
-| `resolveStoragePath()` | 저장 경로 해석 | 상대 경로를 절대 경로로 변환, 보안 검증 | `FileValidationException` |
-
-### 4.5 예외 처리
-
-| 예외 | HTTP 상태 | 발생 시점 |
-|------|----------|----------|
-| `FileValidationException` | 400 Bad Request | 빈 파일 업로드(`emptyFile`), 빈 경로(`emptyPath`), 경로 탈취 시도(`invalidPath`) |
-| `FileUploadValidationException` | 400 Bad Request | 용량 초과(`sizeExceeded`), 허용되지 않은 MIME 타입(`invalidContentType`), 허용되지 않은 확장자(`invalidExtension`) |
-| `FileNotFoundException` | 404 Not Found | `loadAsResource()`에서 파일 미존재 또는 읽기 불가 |
-| `FileStorageException` | 500 Internal Server Error | 업로드 디렉터리 초기화 실패(`initFailed`), 디렉터리 준비 실패(`prepareFailed`), 파일 저장 실패(`saveFailed`) |
-
-### 4.6 API 설계
-
-#### REST API (FileUploadController)
-클래스 단 `@PreAuthorize` 없음. **`GET /api/uploads/**`**는 `SecurityConfig`에서 공개, **`POST /api/uploads/images`**는 `/api/**` 인증 규칙에 걸려 **인증 필요**.
-
-| 엔드포인트 | Method | 설명 | 예외 |
-|-----------|--------|------|------|
-| `/api/uploads/images` | POST | `multipart` `file` + 선택 `category`, `ownerType`, `ownerId`, `entityId`(문자열, 경로 세그먼트로 사용) | `FileValidationException`, `FileUploadValidationException`, `FileStorageException` |
-| `/api/uploads/file` | GET | `path` 쿼리(상대 경로). 스트리밍 응답, `Content-Disposition: inline` | 파일 없음: `FileNotFoundException`(404). 잘못된 경로: `FileValidationException`(400). 컨트롤러에 `IllegalArgumentException` catch가 있으나 일반 실패는 위 예외로 전파되는 편 |
-
-#### REST API (AdminFileController, `@PreAuthorize("hasAnyRole('ADMIN','MASTER')")`)
-| 엔드포인트 | Method | 설명 | 비고 |
-|-----------|--------|------|------|
-| `/api/admin/files` | GET | 목록 (`targetType`으로 필터, `q`로 경로/MIME 부분 검색, `page`/`size` 기본 0/20). `AdminFileFacade.getFiles()` 경유 | - |
-| `/api/admin/files/target` | GET | 타겟별 첨부 (`targetType`+`targetIdx` 필수, `AttachmentFileService.getAttachments`) | 잘못된 enum → **400** |
-| `/api/admin/files/{id}` | DELETE | DB 행 삭제 (Hard Delete). `auditService.log()` 호출 | **204** |
-| `/api/admin/files/target` | DELETE | 대상 파일 전체 삭제 (`deleteAll`). `auditService.log()` 호출 | **204**. 잘못된 enum → **400** |
-
-**파일 업로드 요청 예시**:
 ```http
 POST /api/uploads/images
 Content-Type: multipart/form-data
-
-file: [이미지 파일]
-category: board
-ownerType: user
-ownerId: 123
-entityId: 456
+Authorization: Bearer <JWT>
 ```
 
-**파일 업로드 응답 예시** (`path`는 저장 루트(`file.upload-dir`, 기본 `uploads`) 대비 **상대 경로**):
+파라미터:
+
+| 이름 | 필수 | 설명 |
+|---|---:|---|
+| `file` | O | 업로드할 이미지 |
+| `category` | X | 저장 하위 디렉터리. 예: `community`, `missing-pets`, `pets`, `chat` |
+| `ownerType` | X | 예: `user`, `guest` |
+| `ownerId` | X | 사용자 ID 등 |
+| `entityId` | X | 연결 대상 엔티티 ID |
+
+응답 예시:
+
 ```json
 {
-  "path": "board/user/123/456/20240101_abc123def45678901234567890123456.jpg",
-  "filename": "20240101_abc123def45678901234567890123456.jpg",
-  "url": "http://localhost:8080/api/uploads/file?path=board/user/123/456/20240101_abc123def45678901234567890123456.jpg",
+  "path": "community/user/1/20260619_abc123.jpg",
+  "filename": "20260619_abc123.jpg",
+  "url": "http://localhost:8080/api/uploads/file?path=community/user/1/20260619_abc123.jpg",
   "contentType": "image/jpeg",
-  "size": 123456
+  "size": 12345
 }
 ```
 
-**파일 다운로드 요청 예시**:
+`SecurityConfig` 기준으로 `GET /api/uploads/**`만 공개이고, 업로드 `POST`는 인증이 필요하다.
+
+### 3.2 파일 조회
+
 ```http
-GET /api/uploads/file?path=board/user/123/456/20240101_abc123def45678901234567890123456.jpg
+GET /api/uploads/file?path={relativePath}
 ```
 
-**파일 다운로드 응답**: 이미지 바이너리 (Content-Type: image/jpeg)
+흐름:
+
+1. `path`를 업로드 루트 기준 상대경로로 해석
+2. `FileStorageService.resolveStoragePath()`에서 경로 정규화
+3. 정규화된 경로가 `uploadLocation` 밖이면 거부
+4. 파일이 존재하고 읽을 수 있으면 inline Resource 반환
+5. content type은 `Files.probeContentType()`으로 감지
+
+### 3.3 관리자 파일 API
+
+```http
+GET    /api/admin/files?targetType=&q=&page=&size=
+GET    /api/admin/files/target?targetType=&targetIdx=
+DELETE /api/admin/files/{id}
+DELETE /api/admin/files/target?targetType=&targetIdx=
+```
+
+권한:
+
+- `ADMIN`
+- `MASTER`
+
+삭제 시 `AdminAuditService`에 감사 로그를 남긴다.
+
+주의: 프론트 `fileAdminApi.getStatistics()`는 `GET /api/admin/files/statistics`를 호출하지만, 현재 백엔드 `AdminFileController`에는 해당 엔드포인트가 없다.
 
 ---
 
-## 5. 트랜잭션 처리
+## 4. 데이터 모델
 
-### 5.1 트랜잭션 전략
-- **`AttachmentFileService`**: 클래스 기본 `@Transactional(readOnly = true)` — `syncSingleAttachment`, `deleteAll`만 쓰기 트랜잭션
-- **파일 동기화/삭제**: DB 일관성은 트랜잭션으로 묶음
-- **`FileStorageService`**: `@Transactional` 없음 — 디스크 저장·검증은 DB 트랜잭션 밖
+### 4.1 AttachmentFile
 
-### 5.2 동시성 제어
-- **파일 동기화**: 트랜잭션으로 기존 파일 삭제와 새 파일 추가를 원자적으로 처리하여 동시성 문제 방지
-- **파일명 충돌 방지**: 날짜 접두사 + UUID 조합으로 고유 파일명 생성
+테이블명은 `file`이다.
 
----
+| 필드 | 설명 |
+|---|---|
+| `idx` | 파일 메타데이터 PK |
+| `targetType` | 첨부 대상 도메인 타입 |
+| `targetIdx` | 첨부 대상 레코드 ID |
+| `filePath` | 업로드 루트 기준 상대경로 |
+| `fileType` | MIME 타입 |
+| `createdAt`, `updatedAt` | `BaseTimeEntity`에서 관리 |
 
-## 6. 트러블슈팅
+현재 `AttachmentFile`은 `BaseTimeEntity`를 상속한다. 그래서 `file` 테이블에는 `updated_at` 컬럼이 필요하며, 이를 보정하는 migration이 있다.
 
----
+### 4.2 FileTargetType
 
-## 7. 성능 최적화
-
-### 7.1 DB 최적화
-
-#### 인덱스 전략
-
-**file 테이블**:
-```sql
--- Primary Key
--- PRIMARY KEY (idx)
-```
-
-**참고**: 파일 테이블은 주로 `target_type`과 `target_idx`로 조회하므로, 애플리케이션 레벨에서 배치 조회를 통해 N+1 문제를 해결합니다. 필요시 다음 인덱스 추가를 고려할 수 있습니다:
-
-```sql
--- 대상별 파일 조회 (필요시 추가)
-CREATE INDEX idx_file_target ON file(target_type, target_idx);
-```
-
-**선정 이유**:
-- PRIMARY KEY만 기본으로 존재
-- 배치 조회로 N+1 문제 해결
-- 필요시 복합 인덱스 추가로 조회 성능 향상 가능
-
-### 7.2 애플리케이션 레벨 최적화
-
-#### 배치 파일 조회
-**구현 위치**: `AttachmentFileRepository.findByTargetTypeAndTargetIdxIn()`
-
-**효과**: N+1 문제 해결, 여러 대상의 파일을 한 번에 조회하여 성능 향상
-
-**사용 예시**:
 ```java
-// N+1 문제 발생 코드 (비효율적)
-List<Board> boards = boardRepository.findAll();
-for (Board board : boards) {
-    List<FileDTO> files = attachmentFileService.getAttachments(FileTargetType.BOARD, board.getIdx());
-    // 각 board마다 쿼리 실행
-}
-
-// 배치 조회 사용 (효율적)
-List<Board> boards = boardRepository.findAll();
-List<Long> boardIndices = boards.stream().map(Board::getIdx).collect(Collectors.toList());
-Map<Long, List<FileDTO>> filesMap = attachmentFileService.getAttachmentsBatch(FileTargetType.BOARD, boardIndices);
-// 한 번의 쿼리로 모든 파일 조회
+BOARD
+COMMENT
+CARE_COMMENT
+MISSING_PET
+MISSING_PET_COMMENT
+PET
 ```
 
-#### 파일 검증 및 보안
-**구현 위치**: `FileStorageService.validateFile()`
-
-**최적화 사항**:
-- 파일 크기 제한: 최대 5MB
-- 허용 확장자: `.jpg`, `.jpeg`, `.png`, `.gif`, `.webp`, `.jfif`
-- MIME 타입 검증: `image/jpeg`, `image/png`, `image/gif`, `image/webp`
-- 경로 정규화: 디렉터리 탐색 공격 방지 (`../` 제거)
-
-**보안 검증 로직** (`resolveStoragePath()`):
-```java
-public Path resolveStoragePath(String relativePath) {
-    if (!StringUtils.hasText(relativePath)) {
-        throw FileValidationException.emptyPath();
-    }
-    Path filePath = uploadLocation.resolve(relativePath).normalize();
-    // 상대 경로가 업로드 디렉터리를 벗어나지 않도록 검증
-    if (!filePath.startsWith(uploadLocation)) {
-        throw FileValidationException.invalidPath(relativePath);
-    }
-    return filePath;
-}
-```
+현재 enum에는 `CARE_REQUEST`, `USER`, `CHAT` 타입이 없다.
 
 ---
 
-## 8. 핵심 포인트 요약
+## 5. 업로드 저장 규칙
 
-### 8.1 폴리모픽 관계
-- **다양한 대상 타입 지원**: `FileTargetType` 6종(§4.1)
-- **유연한 파일 관리**: 하나의 엔티티로 다양한 도메인의 파일을 통합 관리
+### 5.1 저장 경로
 
-### 8.2 파일 동기화
-- **기존 파일 삭제 후 새 파일 추가**: `syncSingleAttachment()`로 파일 동기화
-- **경로 정규화**: URL 디코딩, 상대 경로 추출로 일관된 경로 관리
-- **MIME 타입 자동 감지**: 제공된 타입 또는 파일 시스템에서 자동 감지
+`FileUploadController`는 `category`, `ownerType`, `ownerId`, `entityId`를 순서대로 path segment로 넘긴다.
 
-### 8.3 성능 최적화
-- **배치 조회**: `getAttachmentsBatch()`로 N+1 문제 완화
-- **인덱스**: 엔티티에 `@Index` 없음 — §7.1 참고(운영 DB에서 복합 인덱스 검토 가능)
-- **고유 파일명**: 날짜 접두사 + UUID로 충돌 방지
+예:
 
-### 8.4 보안
-- **파일 검증**: 크기 제한(5MB), 확장자 및 MIME 타입 검증
-- **경로 정규화**: 디렉터리 탐색 공격 방지 (`../` 제거)
-- **상대 경로 검증**: 업로드 디렉터리를 벗어나지 않도록 검증
+```text
+category=missing-pets
+ownerType=user
+ownerId=3
+entityId=10
+```
 
-### 8.5 엔티티 설계 특징
-- **BaseTimeEntity 미사용**: `@PrePersist`로 직접 `createdAt` 관리
-- **폴리모픽 관계**: `targetType`과 `targetIdx`로 다양한 대상 타입 지원
-- **상대 경로 저장**: 파일 경로를 상대 경로로 저장하여 이식성 향상
+저장 상대경로:
+
+```text
+missing-pets/user/3/10/20260619_<uuid>.jpg
+```
+
+`FileStorageService`는 각 segment를 `[a-zA-Z0-9._-]` 외 문자는 `_`로 치환하고, `..`도 `_`로 바꾼다.
+
+### 5.2 파일명
+
+```text
+yyyyMMdd_<uuid-without-hyphen>.<extension>
+```
+
+예:
+
+```text
+20260619_7c47eaf620604a0d8d22c456b5e2a1fb.jpg
+```
+
+### 5.3 검증
+
+| 항목 | 현재 기준 |
+|---|---|
+| 크기 | 최대 5MB |
+| MIME type | `image/jpeg`, `image/png`, `image/gif`, `image/webp`, `image/jfif` |
+| 확장자 | `.jpg`, `.jpeg`, `.png`, `.gif`, `.webp`, `.jfif` |
+| 실제 이미지 | WebP 외에는 `ImageIO.read()` 성공 필요 |
+| WebP | `RIFF/WEBP` magic bytes 확인 |
+
+---
+
+## 6. 첨부파일 연결 흐름
+
+### 6.1 단일 첨부 교체
+
+`AttachmentFileService.syncSingleAttachment(targetType, targetIdx, filePath, fileType)`는 기존 첨부 레코드를 모두 삭제하고 새 파일 1개를 저장한다.
+
+흐름:
+
+1. `targetType`, `targetIdx`가 없으면 return
+2. 기존 `file` row 삭제
+3. `filePath` 정규화
+4. `fileType`이 없으면 실제 파일에서 MIME type 추정
+5. 새 `AttachmentFile` 저장
+
+이 메서드는 **단일 파일만 지원**한다. 다중 첨부 구조가 필요한 경우 별도 메서드가 필요하다.
+
+### 6.2 경로 정규화
+
+`normalizeFilePath()`는 다양한 입력을 업로드 루트 기준 상대경로로 바꾼다.
+
+지원 형태:
+
+- `/api/uploads/file?path=...`
+- URL query `path=...`
+- `/uploads/...`
+- `uploads/...`
+- 일반 상대경로
+
+정규화 후 백슬래시는 `/`로 바꾼다.
+
+과거에는 `uploads/` 접두사가 DB에 저장되어 `uploads/uploads/...`로 해석되는 문제가 있었고, 이를 보정하는 migration이 있다.
+
+### 6.3 배치 조회
+
+목록 API에서 N+1을 줄이기 위해 `getAttachmentsBatch(targetType, targetIndices)`를 사용한다.
+
+흐름:
+
+1. `findByTargetTypeAndTargetIdxIn()`
+2. `targetIdx`별 grouping
+3. 각 `FileDTO`에 `/api/uploads/file?path=...` 다운로드 URL 추가
+
+Board, MissingPet, Comment, Pet 변환 흐름에서 사용된다.
+
+---
+
+## 7. 도메인 연동
+
+| 도메인 | 연결 방식 |
+|---|---|
+| Board | 게시글 이미지 `FileTargetType.BOARD` |
+| Board Comment | 댓글 이미지 `FileTargetType.COMMENT` |
+| MissingPet | 실종 제보 대표 이미지 `FileTargetType.MISSING_PET` |
+| MissingPet Comment | 실종 제보 댓글 이미지 `FileTargetType.MISSING_PET_COMMENT` |
+| Care Comment | 케어 요청 댓글 첫 번째 첨부 `FileTargetType.CARE_COMMENT` |
+| Pet | 반려동물 프로필 이미지 `FileTargetType.PET` |
+| Chat | `uploadApi.uploadImage(category='chat')`로 파일은 저장하지만 `AttachmentFile` 레코드는 만들지 않고 이미지 URL을 메시지 content로 전송 |
+
+---
+
+## 8. 관리자 파일 관리
+
+관리자 목록 조회:
+
+- `targetType` 필터
+- `q` keyword 필터: `filePath` 또는 `fileType` LIKE 검색
+- `createdAt DESC` 정렬
+- Page 응답
+
+관리자 삭제:
+
+- `DELETE /api/admin/files/{id}`는 `file` row 1개 삭제
+- `DELETE /api/admin/files/target`은 특정 대상의 파일 row 전체 삭제
+- 둘 다 감사 로그를 남긴다.
+
+주의: 관리자 삭제는 현재 DB 메타데이터 삭제다. 로컬 디스크의 물리 파일 삭제는 수행하지 않는다.
+
+---
+
+## 9. 장애와 예외
+
+| 상황 | 예외 |
+|---|---|
+| 빈 파일 | `FileValidationException.emptyFile()` |
+| 빈 경로 | `FileValidationException.emptyPath()` |
+| 업로드 루트 밖 경로 | `FileValidationException.invalidPath()` |
+| 크기 초과 | `FileUploadValidationException.sizeExceeded()` |
+| MIME type 불일치 | `FileUploadValidationException.invalidContentType()` |
+| 확장자 불일치 | `FileUploadValidationException.invalidExtension()` |
+| 디렉터리 초기화/생성 실패 | `FileStorageException` |
+| 저장 실패 | `FileStorageException.saveFailed()` |
+| 파일 없음 | `FileNotFoundException.forPath()` |
+
+현재 `FileUploadController.serveFile()`은 `IllegalArgumentException`만 잡아 404를 반환한다. `FileNotFoundException`은 `ApiException` 계층으로 전파된다.
+
+---
+
+## 10. 현재 한계와 주의사항
+
+- 저장소는 S3가 아니라 로컬 파일 시스템이다.
+- 업로드는 이미지 전용이다. 일반 파일 업로드 API는 없다.
+- `syncSingleAttachment()`는 단일 파일 교체만 지원한다.
+- 첨부 메타데이터 삭제 시 물리 파일은 삭제하지 않는다.
+- 업로드 직후 생성된 파일은 도메인 저장이 실패해도 물리 파일로 남을 수 있다.
+- `AttachmentFile`은 폴리모픽 참조라 DB 외래키로 대상 존재를 강제하지 않는다.
+- `FileTargetType` enum과 관리자 UI 옵션이 일부 맞지 않는다. UI에는 `CARE_REQUEST`, `USER`가 있지만 enum에는 없다.
+- 프론트 `fileAdminApi.getStatistics()`는 백엔드 엔드포인트가 없다.
+- Chat 이미지는 업로드 파일을 메시지 URL로만 사용하며 `file` 테이블과 연결되지 않는다.
+
+---
+
+## 11. DomainV2 페이지에 넣을 포인트
+
+- 파일 저장과 도메인 첨부 메타데이터를 `FileStorageService`와 `AttachmentFileService`로 분리했다.
+- 경로는 업로드 루트 기준 상대경로만 DB에 저장해 환경 의존성을 낮췄다.
+- `FileTargetType + targetIdx` 폴리모픽 구조로 여러 도메인에서 공통 첨부파일 테이블을 사용한다.
+- 목록 조회는 `findByTargetTypeAndTargetIdxIn()` 배치 조회로 N+1을 줄인다.
+- 이미지 검증은 MIME/확장자뿐 아니라 실제 이미지 내용까지 확인한다.
+- `uploads/` 접두사 이중 경로 문제를 migration과 normalize 로직으로 보정했다.
+- 현재 한계는 물리 파일 lifecycle과 DB 메타데이터 lifecycle이 완전히 묶여 있지 않다는 점이다.
