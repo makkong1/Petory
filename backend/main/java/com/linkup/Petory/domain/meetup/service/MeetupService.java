@@ -320,7 +320,7 @@ public class MeetupService {
                 meetupParticipantsRepository.findByMeetupIdxOrderByJoinedAtAsc(meetupIdx));
     }
 
-    // 모임 참가 (원자적 UPDATE 쿼리 방식 - 권장)
+    // 모임 참가 (비관적 락 + 조건부 UPDATE + PK 제약으로 동시성 방어)
     @Transactional
     public MeetupParticipantsDTO joinMeetup(Long meetupIdx, String userId) {
         // 비관적 락으로 조회 — 동시 참가 요청 직렬화 (TOCTOU 방지)
@@ -347,6 +347,8 @@ public class MeetupService {
             throw MeetupConflictException.alreadyJoined();
         }
 
+        boolean participantsIncremented = false;
+
         // 주최자가 아닌 경우에만 인원 증가 (원자적 UPDATE 쿼리)
         if (!meetup.getOrganizer().getIdx().equals(userIdx)) {
             // 원자적 UPDATE 쿼리로 조건부 증가 (RECRUITING 상태 + 인원 미달 조건 동시 체크)
@@ -362,6 +364,7 @@ public class MeetupService {
                         meetupIdx, userId, meetup.getCurrentParticipants(), meetup.getMaxParticipants());
                 throw MeetupConflictException.fullCapacity();
             }
+            participantsIncremented = true;
             // [리팩토링] findById 2회 호출 제거 → entityManager.refresh()로 영속성 컨텍스트 동기화
             entityManager.refresh(meetup);
         }
@@ -377,7 +380,9 @@ public class MeetupService {
         try {
             savedParticipant = meetupParticipantsRepository.save(participant);
         } catch (DataIntegrityViolationException e) {
-            meetupRepository.decrementParticipantsIfPositive(meetupIdx);
+            if (participantsIncremented) {
+                meetupRepository.decrementParticipantsIfPositive(meetupIdx);
+            }
             log.warn("중복 참가 시도 감지 (PK 충돌): meetupIdx={}, userIdx={}", meetupIdx, userIdx);
             throw MeetupConflictException.alreadyJoined();
         }
