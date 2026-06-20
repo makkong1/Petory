@@ -13,8 +13,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort.Direction;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+
+import com.linkup.Petory.global.security.CustomUserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -61,15 +62,16 @@ public class MissingPetBoardService {
 
     private boolean isAdmin() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || auth.getAuthorities() == null) return false;
-        return auth.getAuthorities().stream()
-                .map(GrantedAuthority::getAuthority)
-                .anyMatch(a -> a.equals(RoleConstants.ROLE_ADMIN) || a.equals(RoleConstants.ROLE_MASTER));
+        if (!(auth != null && auth.getPrincipal() instanceof CustomUserDetails ud)) return false;
+        return ud.isAdmin();
     }
 
     private void assertOwner(Users boardOwner) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!isAdmin() && (auth == null || !auth.getName().equals(boardOwner.getId()))) {
+        if (!(auth != null && auth.getPrincipal() instanceof CustomUserDetails ud)) {
+            throw MissingPetForbiddenException.boardOwnerOnly();
+        }
+        if (!ud.isAdmin() && !ud.getLoginId().equals(boardOwner.getId())) {
             throw MissingPetForbiddenException.boardOwnerOnly();
         }
     }
@@ -197,10 +199,9 @@ public class MissingPetBoardService {
      * - 게시글 이미지 업로드 지원
      */
     @Transactional
-    public MissingPetBoardDTO createBoard(MissingPetBoardDTO dto) {
-        String loginId = SecurityContextHolder.getContext().getAuthentication().getName();
-        Users user = usersRepository.findActiveByIdString(loginId)
-                .orElseThrow(() -> new UserNotFoundException());
+    public MissingPetBoardDTO createBoard(MissingPetBoardDTO dto, String currentUserLoginId) {
+        Users user = usersRepository.findActiveByIdString(currentUserLoginId)
+                .orElseThrow(UserNotFoundException::new);
 
         // 이메일 인증 확인
         if (user.getEmailVerified() == null || !user.getEmailVerified()) {

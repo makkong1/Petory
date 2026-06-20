@@ -16,8 +16,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+
+import com.linkup.Petory.global.security.CustomUserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -65,17 +66,16 @@ public class BoardService {
 
     private boolean isAdmin() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || auth.getAuthorities() == null) {
-            return false;
-        }
-        return auth.getAuthorities().stream()
-                .map(GrantedAuthority::getAuthority)
-                .anyMatch(a -> a.equals(RoleConstants.ROLE_ADMIN) || a.equals(RoleConstants.ROLE_MASTER));
+        if (!(auth != null && auth.getPrincipal() instanceof CustomUserDetails ud)) return false;
+        return ud.isAdmin();
     }
 
     private void assertBoardOwner(Users boardOwner) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!isAdmin() && (auth == null || !auth.getName().equals(boardOwner.getId()))) {
+        if (!(auth != null && auth.getPrincipal() instanceof CustomUserDetails ud)) {
+            throw BoardForbiddenException.boardOwnerOnly();
+        }
+        if (!ud.isAdmin() && !ud.getLoginId().equals(boardOwner.getId())) {
             throw BoardForbiddenException.boardOwnerOnly();
         }
     }
@@ -172,10 +172,9 @@ public class BoardService {
     // 게시글 생성
     @CacheEvict(value = "boardList", allEntries = true) // 전체 리스트 캐시 무효화 (전체/카테고리 모두)
     @Transactional
-    public BoardDTO createBoard(BoardDTO dto) {
-        String loginId = SecurityContextHolder.getContext().getAuthentication().getName();
-        Users user = usersRepository.findActiveByIdString(loginId)
-                .orElseThrow(() -> new UserNotFoundException());
+    public BoardDTO createBoard(BoardDTO dto, String currentUserLoginId) {
+        Users user = usersRepository.findActiveByIdString(currentUserLoginId)
+                .orElseThrow(UserNotFoundException::new);
 
         Board board = Board.builder()
                 .title(dto.getTitle())

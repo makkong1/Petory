@@ -25,6 +25,13 @@ public class AuthenticatedUserIdResolver {
         if (authentication == null || authentication.getPrincipal() == null) {
             throw new UnauthenticatedException("인증되지 않은 사용자입니다.");
         }
+
+        // CustomUserDetails가 있으면 DB 조회 없이 바로 반환
+        if (authentication.getPrincipal() instanceof CustomUserDetails userDetails) {
+            return userDetails.getIdx();
+        }
+
+        // fallback: 이전 방식 호환
         String loginId = authentication.getName();
         Users user = usersRepository.findActiveByIdString(loginId)
                 .orElseThrow(() -> new UnauthenticatedException("유효하지 않은 인증 사용자입니다."));

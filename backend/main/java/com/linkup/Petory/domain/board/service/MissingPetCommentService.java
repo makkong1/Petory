@@ -10,8 +10,9 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+
+import com.linkup.Petory.global.security.CustomUserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -53,15 +54,16 @@ public class MissingPetCommentService {
 
         private boolean isAdmin() {
                 Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-                if (auth == null || auth.getAuthorities() == null) return false;
-                return auth.getAuthorities().stream()
-                                .map(GrantedAuthority::getAuthority)
-                                .anyMatch(a -> a.equals(RoleConstants.ROLE_ADMIN) || a.equals(RoleConstants.ROLE_MASTER));
+                if (!(auth != null && auth.getPrincipal() instanceof CustomUserDetails ud)) return false;
+                return ud.isAdmin();
         }
 
         private void assertCommentOwner(Users commentOwner) {
                 Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-                if (!isAdmin() && (auth == null || !auth.getName().equals(commentOwner.getId()))) {
+                if (!(auth != null && auth.getPrincipal() instanceof CustomUserDetails ud)) {
+                        throw MissingPetForbiddenException.commentOwnerOnly();
+                }
+                if (!ud.isAdmin() && !ud.getLoginId().equals(commentOwner.getId())) {
                         throw MissingPetForbiddenException.commentOwnerOnly();
                 }
         }
@@ -173,12 +175,11 @@ public class MissingPetCommentService {
          * - 게시글 작성자에게 알림 발송 (비동기 처리)
          */
         @Transactional
-        public MissingPetCommentDTO addComment(Long boardId, MissingPetCommentDTO dto) {
+        public MissingPetCommentDTO addComment(Long boardId, MissingPetCommentDTO dto, String currentUserLoginId) {
                 MissingPetBoard board = boardRepository.findById(boardId)
-                                .orElseThrow(() -> new MissingPetBoardNotFoundException());
-                String loginId = SecurityContextHolder.getContext().getAuthentication().getName();
-                Users user = usersRepository.findActiveByIdString(loginId)
-                                .orElseThrow(() -> new UserNotFoundException());
+                                .orElseThrow(MissingPetBoardNotFoundException::new);
+                Users user = usersRepository.findActiveByIdString(currentUserLoginId)
+                                .orElseThrow(UserNotFoundException::new);
 
                 MissingPetComment comment = MissingPetComment.builder()
                                 .board(board)

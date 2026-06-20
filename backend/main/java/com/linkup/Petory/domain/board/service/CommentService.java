@@ -12,8 +12,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+
+import com.linkup.Petory.global.security.CustomUserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -59,15 +60,16 @@ public class CommentService {
 
     private boolean isAdmin() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || auth.getAuthorities() == null) return false;
-        return auth.getAuthorities().stream()
-                .map(GrantedAuthority::getAuthority)
-                .anyMatch(a -> a.equals(RoleConstants.ROLE_ADMIN) || a.equals(RoleConstants.ROLE_MASTER));
+        if (!(auth != null && auth.getPrincipal() instanceof CustomUserDetails ud)) return false;
+        return ud.isAdmin();
     }
 
     private void assertCommentOwner(Users commentOwner) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!isAdmin() && (auth == null || !auth.getName().equals(commentOwner.getId()))) {
+        if (!(auth != null && auth.getPrincipal() instanceof CustomUserDetails ud)) {
+            throw BoardForbiddenException.commentOwnerOnly();
+        }
+        if (!ud.isAdmin() && !ud.getLoginId().equals(commentOwner.getId())) {
             throw BoardForbiddenException.commentOwnerOnly();
         }
     }
@@ -171,12 +173,11 @@ public class CommentService {
 
     @CacheEvict(value = "boardDetail", key = "#p0")
     @Transactional
-    public CommentDTO addComment(Long boardId, CommentDTO dto) {
+    public CommentDTO addComment(Long boardId, CommentDTO dto, String currentUserLoginId) {
         Board board = boardRepository.findById(boardId)
-                .orElseThrow(() -> new BoardNotFoundException());
-        String loginId = SecurityContextHolder.getContext().getAuthentication().getName();
-        Users user = usersRepository.findActiveByIdString(loginId)
-                .orElseThrow(() -> new UserNotFoundException());
+                .orElseThrow(BoardNotFoundException::new);
+        Users user = usersRepository.findActiveByIdString(currentUserLoginId)
+                .orElseThrow(UserNotFoundException::new);
 
         Comment comment = Comment.builder()
                 .board(board)
