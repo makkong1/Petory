@@ -34,15 +34,6 @@ public interface MeetupRepository {
     List<Meetup> findByOrganizerIdxOrderByCreatedAtDesc(Long organizerIdx);
 
     /**
-     * 지역별 모임 조회 (위도/경도 범위, 소프트 삭제 제외)
-     */
-    List<Meetup> findByLocationRange(
-            Double minLat,
-            Double maxLat,
-            Double minLng,
-            Double maxLng);
-
-    /**
      * 카테고리별 모임 조회 (제목이나 설명에 키워드 포함, 소프트 삭제 제외)
      */
     List<Meetup> findByKeyword(String keyword);

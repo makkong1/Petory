@@ -46,23 +46,21 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 token = request.getParameter("token");
             }
 
-            if (token != null && jwtUtil.validateToken(token)) {
+            if (token != null && jwtUtil.validateToken(token) && !jwtUtil.isTokenExpired(token)) {
                 String id = jwtUtil.getIdFromToken(token);
 
                 if (id != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                     UserDetails userDetails = userDetailsService.loadUserByUsername(id);
 
-                    if (jwtUtil.validateToken(token) && !jwtUtil.isTokenExpired(token)) {
-                        UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                                userDetails,
-                                null,
-                                userDetails.getAuthorities());
+                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                            userDetails,
+                            null,
+                            userDetails.getAuthorities());
 
-                        authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                        SecurityContextHolder.getContext().setAuthentication(authToken);
+                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    SecurityContextHolder.getContext().setAuthentication(authToken);
 
-                        log.debug("JWT 인증 성공: {}", id);
-                    }
+                    log.debug("JWT 인증 성공: {}", id);
                 }
             }
         } catch (Exception e) {

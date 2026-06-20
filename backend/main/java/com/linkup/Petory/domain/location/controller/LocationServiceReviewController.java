@@ -6,8 +6,7 @@ import java.util.Map;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -19,8 +18,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.linkup.Petory.domain.location.dto.LocationServiceReviewDTO;
 import com.linkup.Petory.domain.location.service.LocationServiceReviewService;
-import com.linkup.Petory.domain.user.exception.UnauthenticatedException;
 import com.linkup.Petory.global.exception.ApiException;
+import com.linkup.Petory.global.security.CustomUserDetails;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -38,19 +37,12 @@ public class LocationServiceReviewController {
 
     private final LocationServiceReviewService reviewService;
 
-    private String getCurrentUserLoginId() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || authentication.getPrincipal() == null) {
-            throw new UnauthenticatedException();
-        }
-        return authentication.getName();
-    }
-
-    // 리뷰 생성
     @PostMapping
-    public ResponseEntity<Map<String, Object>> createReview(@Valid @RequestBody LocationServiceReviewDTO reviewDTO) {
+    public ResponseEntity<Map<String, Object>> createReview(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @Valid @RequestBody LocationServiceReviewDTO reviewDTO) {
         try {
-            LocationServiceReviewDTO createdReview = reviewService.createReview(reviewDTO, getCurrentUserLoginId());
+            LocationServiceReviewDTO createdReview = reviewService.createReview(reviewDTO, userDetails.getLoginId());
 
             Map<String, Object> response = new HashMap<>();
             response.put("review", createdReview);
@@ -67,13 +59,14 @@ public class LocationServiceReviewController {
         }
     }
 
-    // 리뷰 수정
     @PutMapping("/{reviewIdx}")
-    public ResponseEntity<Map<String, Object>> updateReview(@PathVariable("reviewIdx") Long reviewIdx,
+    public ResponseEntity<Map<String, Object>> updateReview(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable("reviewIdx") Long reviewIdx,
             @Valid @RequestBody LocationServiceReviewDTO reviewDTO) {
         try {
             LocationServiceReviewDTO updatedReview = reviewService.updateReview(reviewIdx, reviewDTO,
-                    getCurrentUserLoginId());
+                    userDetails.getLoginId());
 
             Map<String, Object> response = new HashMap<>();
             response.put("review", updatedReview);
@@ -90,11 +83,12 @@ public class LocationServiceReviewController {
         }
     }
 
-    // 리뷰 삭제
     @DeleteMapping("/{reviewIdx}")
-    public ResponseEntity<Map<String, Object>> deleteReview(@PathVariable("reviewIdx") Long reviewIdx) {
+    public ResponseEntity<Map<String, Object>> deleteReview(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable("reviewIdx") Long reviewIdx) {
         try {
-            reviewService.deleteReview(reviewIdx, getCurrentUserLoginId());
+            reviewService.deleteReview(reviewIdx, userDetails.getLoginId());
 
             Map<String, Object> response = new HashMap<>();
             response.put("message", "리뷰가 성공적으로 삭제되었습니다.");
@@ -110,7 +104,6 @@ public class LocationServiceReviewController {
         }
     }
 
-    // 특정 서비스의 리뷰 목록 조회
     @GetMapping("/service/{serviceIdx}")
     public ResponseEntity<Map<String, Object>> getReviewsByService(@PathVariable("serviceIdx") Long serviceIdx) {
         try {
@@ -129,7 +122,6 @@ public class LocationServiceReviewController {
         }
     }
 
-    // 특정 사용자의 리뷰 목록 조회
     @GetMapping("/user/{userIdx}")
     public ResponseEntity<Map<String, Object>> getReviewsByUser(@PathVariable("userIdx") Long userIdx) {
         try {

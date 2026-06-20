@@ -131,22 +131,6 @@ public class MeetupController {
         return ResponseEntity.ok(response);
     }
 
-    // 지역별 모임 조회
-    @GetMapping("/location")
-    public ResponseEntity<Map<String, Object>> getMeetupsByLocation(
-            @RequestParam(value = "minLat") Double minLat,
-            @RequestParam(value = "maxLat") Double maxLat,
-            @RequestParam(value = "minLng") Double minLng,
-            @RequestParam(value = "maxLng") Double maxLng) {
-        List<MeetupDTO> meetups = meetupService.getMeetupsByLocation(minLat, maxLat, minLng, maxLng);
-
-        Map<String, Object> response = new HashMap<>();
-        response.put("meetups", meetups);
-        response.put("count", meetups.size());
-
-        return ResponseEntity.ok(response);
-    }
-
     // 키워드로 모임 검색
     @GetMapping("/search")
     public ResponseEntity<Map<String, Object>> searchMeetupsByKeyword(@RequestParam(value = "keyword") String keyword) {

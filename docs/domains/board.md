@@ -1,999 +1,399 @@
-# Board 도메인 - 포트폴리오 상세 설명
-
-## 1. 기능 설명
-
-### 1.1 도메인 개요
-- **역할**: 커뮤니티 게시판 시스템의 핵심 도메인으로, 게시글 작성/조회, 댓글, 좋아요/싫어요 반응, 인기글 관리 등을 담당합니다.
-- **주요 기능**: 
-  - 게시글 CRUD (생성, 조회, 수정, 삭제)
-  - 카테고리별 게시글 필터링
-  - 댓글 시스템
-  - 좋아요/싫어요 반응 시스템
-  - 조회수 관리 (중복 방지)
-  - 인기글 스냅샷 (주간/월간)
-  - 게시글 검색 (제목·내용 통합, 작성자 닉네임)
-
-### 1.2 기능 시연
-> **스크린샷/영상 링크**: [기능 작동 영상 또는 스크린샷 추가]
-> 
-> 각 주요 기능별로 작동 모습을 보여주는 시각적 자료를 포함합니다.
-
-#### 주요 기능 1: 게시글 작성 및 조회
-- **설명**: 사용자가 게시글을 작성하고, 카테고리별로 필터링하여 조회할 수 있습니다.
-- **사용자 시나리오**: 
-  1. 사용자가 게시글 작성 (제목, 내용, 카테고리 선택)
-  2. 이미지 첨부 가능
-  3. 카테고리별 필터링 (자유, 정보, 질문, 자랑 등)
-  4. 페이징 지원 (기본 20개씩)
-- **스크린샷/영상**: 
-
-#### 주요 기능 2: 댓글 및 반응 시스템
-- **설명**: 게시글에 댓글을 작성하고, 좋아요/싫어요를 누를 수 있습니다.
-- **사용자 시나리오**:
-  1. 게시글 상세 조회 시 댓글 목록 표시
-  2. 댓글 작성 시 게시글 작성자에게 알림 발송
-  3. 좋아요/싫어요 클릭 시 실시간 카운트 업데이트
-  4. 같은 반응 재클릭 시 취소 (토글)
-- **스크린샷/영상**: 
-
-#### 주요 기능 3: 인기글 시스템
-- **설명**: 주간/월간 인기글을 미리 계산하여 스냅샷으로 저장하고 빠르게 조회합니다.
-- **사용자 시나리오**:
-  1. 매일 18:30에 주간 인기글 스냅샷 자동 생성
-  2. 매주 월요일 18:30에 월간 인기글 스냅샷 자동 생성
-  3. 인기도 점수 = (좋아요 × 3) + (댓글 × 2) + 조회수
-  4. "자랑" 카테고리 게시글만 대상으로 상위 30개 게시글 스냅샷 저장
-  5. 스냅샷 조회 시 다단계 전략 사용 (정확한 날짜 매칭 → 겹치는 기간 → 최근 스냅샷 → 생성)
-- **스크린샷/영상**: 
-
-#### 주요 기능 4: 게시글 검색
-- **설명**: 제목·내용 통합 검색 또는 작성자 닉네임으로 검색할 수 있습니다. `searchType`으로 검색 방식을 선택합니다.
-- **사용자 시나리오**:
-  1. 검색어 입력
-  2. 검색 타입 선택 (`TITLE_CONTENT`: 제목+내용, `NICKNAME`: 작성자 닉네임)
-  3. 페이징 지원 (기본 20개씩)
-  4. 검색 결과는 최신순으로 정렬
-- **검색 타입**:
-  - `TITLE_CONTENT`: 제목과 내용 통합 검색 (FULLTEXT 인덱스, 기본값)
-  - `NICKNAME`: 작성자 닉네임으로 검색 (JOIN 쿼리 최적화)
-- **스크린샷/영상**: 
-
----
-
-## 2. 서비스 로직 설명
-
-### 2.1 핵심 비즈니스 로직
-
-#### 로직 1: 게시글 목록 조회 (N+1 문제 해결)
-```java
-// BoardService.java
-private List<BoardDTO> mapBoardsWithReactionsBatch(List<Board> boards) {
-    // 1. 게시글 ID 목록 추출
-    List<Long> boardIds = boards.stream()
-        .map(Board::getIdx)
-        .collect(Collectors.toList());
-    
-    // 2. 좋아요/싫어요 카운트 배치 조회 (500개 단위)
-    Map<Long, Map<ReactionType, Long>> reactionCountsMap = 
-        getReactionCountsBatch(boardIds);
-    
-    // 3. 첨부파일 배치 조회
-    Map<Long, List<FileDTO>> attachmentsMap = 
-        attachmentFileService.getAttachmentsBatch(FileTargetType.BOARD, boardIds);
-    
-    // 4. DTO 변환 및 반응 정보 매핑
-    return boards.stream()
-        .map(board -> {
-            BoardDTO dto = boardConverter.toDTO(board);
-            Map<ReactionType, Long> counts = reactionCountsMap.getOrDefault(
-                board.getIdx(), new HashMap<>());
-            dto.setLikes(Math.toIntExact(counts.getOrDefault(ReactionType.LIKE, 0L)));
-            dto.setDislikes(Math.toIntExact(counts.getOrDefault(ReactionType.DISLIKE, 0L)));
-            dto.setAttachments(attachmentsMap.getOrDefault(board.getIdx(), new ArrayList<>()));
-            return dto;
-        })
-        .collect(Collectors.toList());
-}
-
-// 배치 조회 구현 (500개 단위로 분할)
-private Map<Long, Map<ReactionType, Long>> getReactionCountsBatch(List<Long> boardIds) {
-    final int BATCH_SIZE = 500;
-    Map<Long, Map<ReactionType, Long>> countsMap = new HashMap<>();
-    
-    // boardIds를 배치 단위로 나누어 처리
-    for (int i = 0; i < boardIds.size(); i += BATCH_SIZE) {
-        int end = Math.min(i + BATCH_SIZE, boardIds.size());
-        List<Long> batch = boardIds.subList(i, end);
-        
-        // 배치 단위로 쿼리 실행
-        List<Object[]> results = boardReactionRepository.countByBoardsGroupByReactionType(batch);
-        
-        // 결과를 Map으로 변환
-        for (Object[] result : results) {
-            Long boardId = ((Number) result[0]).longValue();
-            ReactionType reactionType = (ReactionType) result[1];
-            Long count = ((Number) result[2]).longValue();
-            
-            countsMap.computeIfAbsent(boardId, k -> new HashMap<>())
-                .put(reactionType, count);
-        }
-    }
-    
-    return countsMap;
-}
-```
-
-**설명**:
-- **문제**: 게시글 목록 조회 시 각 게시글의 좋아요/싫어요 수를 개별 쿼리로 조회하면 N+1 문제 발생
-- **해결**: 배치 조회로 한 번에 모든 게시글의 반응 수를 조회
-- **배치 처리**: IN 절 크기 제한을 고려하여 500개 단위로 분할하여 처리
-- **구현 위치**: `BoardService.getReactionCountsBatch()` 메서드
-
-#### 로직 2: 조회수 중복 방지
-```java
-// BoardService.java
-private boolean shouldIncrementView(Board board, Long viewerId) {
-    if (viewerId == null) {
-        return true; // 비로그인 사용자는 항상 조회수 증가
-    }
-    
-    Users viewer = usersRepository.findById(viewerId).orElse(null);
-    if (viewer == null) {
-        return true;
-    }
-    
-    // BoardViewLog 테이블에 기록이 있는지 확인
-    boolean alreadyViewed = boardViewLogRepository.existsByBoardAndUser(board, viewer);
-    if (alreadyViewed) {
-        return false; // 이미 조회한 경우 조회수 증가 안 함
-    }
-    
-    // 기록 추가
-    BoardViewLog log = BoardViewLog.builder()
-        .board(board)
-        .user(viewer)
-        .build();
-    boardViewLogRepository.save(log);
-    return true;
-}
-```
-
-**설명**:
-- **문제**: 같은 사용자가 새로고침할 때마다 조회수 증가
-- **해결**: BoardViewLog 테이블에 사용자별 조회 기록 저장하여 중복 방지
-- **효과**: 정확한 조회 수 추적, 중복 조회 방지
-
-#### 로직 3: 반응 토글 시스템
-```java
-// ReactionService.java
-public ReactionSummaryDTO reactToBoard(Long boardId, Long userId, ReactionType reactionType) {
-    Board board = boardRepository.findById(boardId).orElseThrow();
-    Users user = usersRepository.findById(userId).orElseThrow();
-    
-    Optional<BoardReaction> existing = boardReactionRepository.findByBoardAndUser(board, user);
-    ReactionType previousReactionType = null;
-    
-    if (existing.isPresent() && existing.get().getReactionType() == reactionType) {
-        // 같은 반응을 다시 클릭하면 삭제 (토글)
-        previousReactionType = existing.get().getReactionType();
-        boardReactionRepository.delete(existing.get());
-        // 삭제 시에는 lastReactionAt을 업데이트하지 않음 (마지막 반응 시간 유지)
-    } else if (existing.isPresent()) {
-        // 반응 타입 변경 (예: 좋아요 → 싫어요)
-        previousReactionType = existing.get().getReactionType();
-        existing.get().setReactionType(reactionType);
-        boardReactionRepository.save(existing.get());
-        // 반응이 변경되었으므로 lastReactionAt 업데이트
-        board.setLastReactionAt(LocalDateTime.now());
-    } else {
-        // 새로운 반응 추가
-        BoardReaction reaction = BoardReaction.builder()
-            .board(board)
-            .user(user)
-            .reactionType(reactionType)
-            .build();
-        boardReactionRepository.save(reaction);
-        // 반응이 추가되었으므로 lastReactionAt 업데이트
-        board.setLastReactionAt(LocalDateTime.now());
-    }
-    
-    // likeCount, dislikeCount 실시간 업데이트
-    updateBoardReactionCounts(board, previousReactionType, reactionType);
-    boardRepository.save(board);
-    
-    return buildBoardSummaryFromCounts(board.getLikeCount(), board.getDislikeCount(), userReaction);
-}
-```
-
-**설명**:
-- **처리 흐름**: 
-  1. 기존 반응 확인
-  2. 같은 반응이면 삭제 (토글) - lastReactionAt 업데이트 안 함
-  3. 다른 반응이면 타입 변경 - lastReactionAt 업데이트
-  4. 없으면 새로 추가 - lastReactionAt 업데이트
-- **주요 판단 기준**: Unique 제약조건 (board_idx, user_idx)으로 중복 방지
-- **실시간 업데이트**: likeCount, dislikeCount 필드를 실시간으로 업데이트하여 조회 성능 향상
-- **lastReactionAt 관리**: 반응 추가/변경 시에만 업데이트, 삭제 시에는 유지
-
-#### 로직 4: 댓글 작성 시 알림 발송
-```java
-// CommentService.java
-@Transactional
-public CommentDTO addComment(Long boardId, CommentDTO dto) {
-    Board board = boardRepository.findById(boardId).orElseThrow();
-    Users user = usersRepository.findById(dto.getUserId()).orElseThrow();
-    
-    Comment comment = Comment.builder()
-        .board(board)
-        .user(user)
-        .content(dto.getContent())
-        .build();
-    
-    Comment saved = commentRepository.save(comment);
-    
-    // commentCount 실시간 업데이트
-    incrementBoardCommentCount(board);
-    boardRepository.save(board);
-    
-    // 댓글 파일 첨부 처리
-    if (dto.getCommentFilePath() != null) {
-        attachmentFileService.syncSingleAttachment(
-            FileTargetType.COMMENT, saved.getIdx(), dto.getCommentFilePath(), null);
-    }
-    
-    // 알림 발송: 댓글 작성자가 게시글 작성자가 아닌 경우에만
-    Long boardOwnerId = board.getUser().getIdx();
-    if (!boardOwnerId.equals(user.getIdx())) {
-        notificationService.createNotification(
-            boardOwnerId,
-            NotificationType.BOARD_COMMENT,
-            "내 게시글에 새로운 댓글이 달렸습니다",
-            String.format("%s님이 댓글을 남겼습니다: %s", 
-                user.getUsername(),
-                dto.getContent().length() > 50 ? dto.getContent().substring(0, 50) + "..." 
-                    : dto.getContent()),
-            board.getIdx(),
-            "BOARD");
-    }
-    
-    return mapWithReactionCounts(saved);
-}
-```
-
-**설명**:
-- **처리 흐름**: 댓글 저장 → commentCount 증가 → 파일 첨부 처리 → 알림 발송 (조건부)
-- **주요 판단 기준**: 댓글 작성자와 게시글 작성자가 다른 경우에만 알림 발송
-- **특징**: 댓글에도 이미지 첨부 가능
-
-#### 로직 5: 게시글/댓글 수정/삭제 시 이메일 인증 체크
-```java
-// BoardService.java (요약 — 실제는 findByIdWithUser, BoardNotFoundException 등 사용)
-@Transactional
-public BoardDTO updateBoard(long idx, BoardDTO dto) {
-    Board board = boardRepository.findByIdWithUser(idx).orElseThrow(() -> new BoardNotFoundException());
-    
-    // 이메일 인증 확인
-    Users user = board.getUser();
-    if (user.getEmailVerified() == null || !user.getEmailVerified()) {
-        throw new EmailVerificationRequiredException(
-                "게시글 수정을 위해 이메일 인증이 필요합니다.",
-                EmailVerificationPurpose.BOARD_EDIT);
-    }
-    
-    // 게시글 수정 로직...
-}
-
-@Transactional
-public void deleteBoard(long idx) {
-    Board board = boardRepository.findByIdWithUser(idx).orElseThrow(() -> new BoardNotFoundException());
-    
-    // 이메일 인증 확인
-    Users user = board.getUser();
-    if (user.getEmailVerified() == null || !user.getEmailVerified()) {
-        throw new EmailVerificationRequiredException(
-                "게시글 삭제를 위해 이메일 인증이 필요합니다.",
-                EmailVerificationPurpose.BOARD_EDIT);
-    }
-    
-    // 게시글 소프트 삭제
-    board.setStatus(ContentStatus.DELETED);
-    board.setIsDeleted(true);
-    board.setDeletedAt(LocalDateTime.now());
-    
-    // 연관된 댓글도 소프트 삭제
-    if (board.getComments() != null) {
-        board.getComments().forEach(c -> {
-            c.setStatus(ContentStatus.DELETED);
-            c.setIsDeleted(true);
-            c.setDeletedAt(LocalDateTime.now());
-        });
-    }
-    boardRepository.saveAndFlush(board);
-}
-```
-
-**설명**:
-- **처리 흐름**: 이메일 인증 확인 → 수정/삭제 처리
-- **주요 판단 기준**: `emailVerified` 필드 확인, 예외에 `EmailVerificationPurpose.BOARD_EDIT` 전달(클라이언트가 재인증 플로우 구분에 활용)
-- **특징**: 
-  - 게시글 삭제 시 연관된 댓글도 소프트 삭제
-  - 이메일 인증이 필요한 이유: 책임 있는 행동 (수정/삭제)을 위해
-
-#### 로직 6: 댓글 수정/삭제/복구
-```java
-// CommentService.java
-@Transactional
-public CommentDTO updateComment(Long boardId, Long commentId, CommentDTO dto) {
-    Comment comment = commentRepository.findById(commentId).orElseThrow();
-    
-    // 이메일 인증 확인
-    Users user = comment.getUser();
-    if (user.getEmailVerified() == null || !user.getEmailVerified()) {
-        throw new EmailVerificationRequiredException(
-                "댓글 수정을 위해 이메일 인증이 필요합니다.",
-                EmailVerificationPurpose.COMMENT_EDIT);
-    }
-    
-    // 댓글 내용 업데이트
-    if (dto.getContent() != null) {
-        comment.setContent(dto.getContent());
-    }
-    
-    // 첨부파일 업데이트
-    if (dto.getCommentFilePath() != null) {
-        attachmentFileService.syncSingleAttachment(
-            FileTargetType.COMMENT, comment.getIdx(), dto.getCommentFilePath(), null);
-    }
-    
-    return mapWithReactionCounts(commentRepository.save(comment));
-}
-
-@Transactional
-public void deleteComment(Long boardId, Long commentId) {
-    Comment comment = commentRepository.findById(commentId).orElseThrow();
-    
-    // 이메일 인증 확인
-    Users user = comment.getUser();
-    if (user.getEmailVerified() == null || !user.getEmailVerified()) {
-        throw new EmailVerificationRequiredException(
-                "댓글 삭제를 위해 이메일 인증이 필요합니다.",
-                EmailVerificationPurpose.COMMENT_EDIT);
-    }
-    
-    // 소프트 삭제
-    comment.setStatus(ContentStatus.DELETED);
-    comment.setIsDeleted(true);
-    comment.setDeletedAt(LocalDateTime.now());
-    commentRepository.save(comment);
-    
-    // commentCount 실시간 업데이트 (삭제된 댓글은 카운트에서 제외)
-    decrementBoardCommentCount(board);
-    boardRepository.save(board);
-}
-
-@Transactional
-public CommentDTO restoreComment(Long boardId, Long commentId) {
-    Comment comment = commentRepository.findById(commentId).orElseThrow();
-    
-    // 댓글 복구
-    comment.setIsDeleted(false);
-    comment.setDeletedAt(null);
-    if (comment.getStatus() == ContentStatus.DELETED) {
-        comment.setStatus(ContentStatus.ACTIVE);
-    }
-    Comment saved = commentRepository.save(comment);
-    
-    // commentCount 실시간 업데이트 (복구된 댓글은 카운트에 포함)
-    incrementBoardCommentCount(board);
-    boardRepository.save(board);
-    
-    return mapWithReactionCounts(saved);
-}
-```
-
-**설명**:
-- **처리 흐름**: 이메일 인증 확인 → 수정/삭제/복구 처리 → commentCount 업데이트
-- **주요 판단 기준**: `emailVerified` 필드 확인
-- **특징**: 
-  - 댓글 수정/삭제 시 이메일 인증 필수
-  - 댓글 복구 기능 제공 (관리자용)
-  - 삭제/복구 시 commentCount 실시간 업데이트
-
-#### 로직 7: 게시글 검색 (검색 타입별 분기 처리)
-```java
-// BoardService.java
-public BoardPageResponseDTO searchBoardsWithPaging(String keyword, String searchType, int page, int size) {
-    switch (searchType != null ? searchType.toUpperCase() : "TITLE_CONTENT") {
-        case "NICKNAME":
-            // 작성자 닉네임으로 검색 - JOIN 쿼리로 최적화 (2 Query → 1 Query)
-            boardPage = boardRepository.searchByNicknameWithPaging(trimmedKeyword, pageable);
-            break;
-        case "TITLE_CONTENT":
-        default:
-            // 제목+내용 통합 검색 (FULLTEXT 인덱스 활용)
-            boardPage = boardRepository.searchByKeywordWithPaging(trimmedKeyword, pageable);
-            break;
-    }
-}
-```
-
-**설명**:
-- **처리 흐름**: 검색 타입 확인 → 타입별 쿼리 실행 → 페이징 처리 → 배치 조회로 N+1 문제 해결
-- **주요 판단 기준**: 
-  - 검색 타입 (TITLE_CONTENT, NICKNAME)
-  - NICKNAME: Users.nickname JOIN으로 작성자 닉네임 검색
-- **특징**: 
-  - TITLE_CONTENT: FULLTEXT 인덱스 활용
-  - NICKNAME: DB 레벨 JOIN으로 1회 쿼리
-  - 기본값: TITLE_CONTENT
-
-### 2.2 서비스 메서드 구조
-
-#### BoardService
-| 메서드 | 설명 | 주요 로직 |
-|--------|------|-----------|
-| `getAllBoards()` | 게시글 목록 조회 | 배치 조회로 N+1 문제 해결 |
-| `getAllBoardsWithPaging()` | 게시글 목록 조회 (페이징) | 배치 조회로 N+1 문제 해결 |
-| `getAdminBoardsWithPagingOptimized()` | 게시글 목록 조회 (관리자용) | Specification + DB 페이징, status/deleted/category/q 필터 |
-| `getBoardForAdmin()` | 관리자용 단일 게시글 조회 | `findByIdWithUser()`, 조회수 증가 없음, 삭제된 게시글 포함 — `AdminBoardController` 전용 |
-| `getBoard()` | 게시글 상세 조회 | 조회수 증가 (중복 방지), 상세는 `@Cacheable` 미사용(조회수 실시간 반영) |
-| `getMyBoards()` | 내 게시글 조회 | 사용자별 게시글 조회 |
-| `createBoard()` | 게시글 생성 | 파일 첨부 처리, 캐시 무효화 |
-| `updateBoard()` | 게시글 수정 | 이메일 인증 확인, 파일 동기화, 캐시 무효화 |
-| `deleteBoard()` | 게시글 삭제 (소프트 삭제) | 이메일 인증 확인, 연관 댓글도 소프트 삭제 |
-| `restoreBoard()` | 게시글 복구 | 소프트 삭제 해제, 상태 복구 |
-| `updateBoardStatus()` | 게시글 상태 변경 | 관리자용 (ContentStatus.BLINDED, ACTIVE) |
-| `searchBoardsWithPaging()` | 게시글 검색 | 제목+내용(TITLE_CONTENT) 또는 닉네임(NICKNAME) 검색, 페이징 지원 |
-
-#### ReactionService
-| 메서드 | 설명 | 주요 로직 |
-|--------|------|-----------|
-| `reactToBoard()` | 게시글 반응 (좋아요/싫어요) | 토글 처리, 실시간 카운트 업데이트 |
-| `reactToComment()` | 댓글 반응 | 토글 처리 |
-| `getBoardSummary()` | 반응 요약 조회 | 좋아요/싫어요 수, 사용자 반응 여부 |
-
-#### CommentService
-| 메서드 | 설명 | 주요 로직 |
-|--------|------|-----------|
-| `getCommentsWithPaging()` | 댓글 목록 조회 (페이징) | 반응 수, 파일 배치 조회 포함 |
-| `getComments()` | 댓글 목록 조회 (페이징 없음) | 하위 호환용 |
-| `getCommentsForAdmin()` | 댓글 목록 조회 (관리자용) | 작성자 상태 체크 없이 조회 |
-| `addComment()` | 댓글 작성 | commentCount 증가, 파일 첨부, 알림 발송 |
-| `updateComment()` | 댓글 수정 | 이메일 인증 확인, 내용/파일 업데이트 (참고: 현재 컨트롤러 엔드포인트 미제공) |
-| `deleteComment()` | 댓글 삭제 | 이메일 인증 확인, 소프트 삭제, commentCount 감소 |
-| `restoreComment()` | 댓글 복구 | 소프트 삭제 해제, commentCount 증가 |
-| `updateCommentStatus()` | 댓글 상태 변경 | 관리자용 상태 변경 |
-
-#### BoardPopularityService
-| 메서드 | 설명 | 주요 로직 |
-|--------|------|-----------|
-| `getPopularBoards()` | 인기글 조회 | 스냅샷 조회 전략 (정확한 날짜 매칭 → 겹치는 기간 → 최근 스냅샷 → 생성) |
-| `generateSnapshots()` | 인기글 스냅샷 생성 | 배치 조회로 실시간 집계 (1000개 단위), 상위 30개 저장 |
-
-### 2.3 트랜잭션 처리
-- **트랜잭션 범위**: 
-  - 게시글 생성/수정/삭제: `@Transactional`
-  - 반응 추가/변경: `@Transactional`
-  - 댓글 작성/삭제: `@Transactional`
-  - 조회 메서드: `@Transactional(readOnly = true)`
-- **격리 수준**: 기본값 (READ_COMMITTED)
-- **롤백 조건**: 예외 발생 시 자동 롤백
-
-### 2.4 예외 처리
-- **처리하는 예외**: 
-  - `BoardNotFoundException`: 게시글을 찾을 수 없는 경우
-  - `CommentNotFoundException`: 댓글을 찾을 수 없는 경우
-  - `CommentNotBelongToBoardException`: 댓글이 해당 게시글에 속하지 않는 경우
-  - `BoardValidationException`: 반응 파라미터(userId, reactionType) 누락 등
-  - `EmailVerificationRequiredException`: 이메일 인증이 필요한 경우 (게시글/댓글 수정/삭제)
-  - `UserNotFoundException`: 사용자를 찾을 수 없는 경우
-- **예외 처리 전략**: 
-  - Service 레이어에서 예외 발생 시 Controller로 전파
-  - GlobalExceptionHandler에서 통합 처리
-- **이메일 인증 필수 작업 (Board 도메인)**:
-  - 게시글 수정/삭제 (`EmailVerificationPurpose.BOARD_EDIT`)
-  - 댓글 수정/삭제 (`EmailVerificationPurpose.COMMENT_EDIT`)
-- **참고**: 실종 제보 게시글의 이메일 인증 규칙은 [missingpet.md](missingpet.md)를 따릅니다.
-
----
-
-## 3. 아키텍처 설명
-
-### 3.1 도메인 구조
-```
-domain/board/
-  ├── controller/
-  │   ├── BoardController.java          # 게시글 API (/api/boards)
-  │   └── MissingPetBoardController.java # 실종 제보 API (/api/missing-pets) — 상세: [missingpet.md](missingpet.md)
-  # AdminBoardController는 domain/admin/controller에 위치 (/api/admin/boards)
-  ├── service/
-  │   ├── BoardService.java
-  │   ├── CommentService.java
-  │   ├── ReactionService.java
-  │   ├── BoardPopularityService.java
-  │   ├── BoardPopularityScheduler.java
-  │   ├── MissingPetBoardService.java      # 실종 제보 게시글
-  │   └── MissingPetCommentService.java    # 실종 제보 댓글
-  ├── repository/
-  │   ├── BoardRepository.java
-  │   ├── CommentRepository.java
-  │   ├── BoardReactionRepository.java
-  │   ├── CommentReactionRepository.java
-  │   ├── BoardViewLogRepository.java
-  │   ├── BoardPopularitySnapshotRepository.java
-  │   ├── MissingPetBoardRepository.java
-  │   └── MissingPetCommentRepository.java
-  ├── entity/
-  │   ├── Board.java
-  │   ├── Comment.java
-  │   ├── BoardReaction.java
-  │   ├── CommentReaction.java
-  │   ├── BoardViewLog.java
-  │   ├── BoardPopularitySnapshot.java
-  │   ├── MissingPetBoard.java
-  │   ├── MissingPetComment.java
-  │   ├── MissingPetStatus.java
-  │   └── MissingPetGender.java
-  ├── dto/
-  │   ├── BoardDTO.java
-  │   ├── BoardPageResponseDTO.java
-  │   ├── CommentDTO.java
-  │   ├── ReactionSummaryDTO.java
-  │   ├── MissingPetBoardDTO.java
-  │   ├── MissingPetBoardPageResponseDTO.java
-  │   ├── MissingPetCommentDTO.java
-  │   └── MissingPetCommentPageResponseDTO.java
-  ├── converter/
-  │   ├── BoardConverter.java
-  │   ├── CommentConverter.java
-  │   └── MissingPetConverter.java
-  └── exception/
-      ├── BoardNotFoundException.java
-      ├── BoardValidationException.java
-      ├── CommentNotFoundException.java
-      ├── CommentNotBelongToBoardException.java
-      └── MissingPetBoardNotFoundException.java
-```
-
-### 3.2 엔티티 구조
-
-#### Board (게시글)
-```java
-@Entity
-@Table(name = "board")
-public class Board extends BaseTimeEntity {
-    private Long idx;
-    private Users user;                    // 작성자
-    private String title;                  // 제목
-    private String content;                // 내용
-    private String category;               // 카테고리
-    private ContentStatus status;          // 상태 (ACTIVE, BLINDED, DELETED)
-    private Integer viewCount;             // 조회수
-    private Integer likeCount;             // 좋아요 수 (실시간 업데이트)
-    private Integer dislikeCount;           // 싫어요 수 (실시간 업데이트)
-    private Integer commentCount;          // 댓글 수 (실시간 업데이트)
-    private LocalDateTime lastReactionAt;  // 마지막 반응 시간
-    private Boolean isDeleted;
-    private LocalDateTime deletedAt;
-    private List<Comment> comments;        // 연관된 댓글 목록
-}
-```
-
-#### Comment (댓글)
-```java
-@Entity
-@Table(name = "comment")
-public class Comment extends BaseTimeEntity {
-    private Long idx;
-    private Board board;                   // 게시글
-    private Users user;                    // 작성자
-    private String content;                // 내용
-    private ContentStatus status;          // 상태 (ACTIVE, BLINDED, DELETED)
-    private LocalDateTime createdAt;
-    private Boolean isDeleted;
-    private LocalDateTime deletedAt;
-}
-```
-
-#### BoardReaction (게시글 반응)
-```java
-@Entity
-@Table(name = "board_reaction", uniqueConstraints = {
-        @UniqueConstraint(columnNames = { "board_idx", "user_idx" })
-})
-public class BoardReaction {
-    private Long idx;
-    private Board board;                   // 게시글
-    private Users user;                    // 사용자
-    private ReactionType reactionType;     // 반응 타입 (LIKE, DISLIKE)
-    private LocalDateTime createdAt;
-}
-```
-
-#### BoardViewLog (조회 로그)
-```java
-@Entity
-@Table(name = "board_view_log",
-       uniqueConstraints = @UniqueConstraint(columnNames = {"board_id", "user_id"}))
-public class BoardViewLog {
-    private Long id;
-    private Board board;                   // 게시글
-    private Users user;                    // 조회자
-    private LocalDateTime viewedAt;        // 조회 시간
-}
-```
-
-#### BoardPopularitySnapshot (인기글 스냅샷)
-```java
-@Entity
-@Table(name = "board_popularity_snapshot")
-public class BoardPopularitySnapshot {
-    private Long snapshotId;
-    private Board board;                    // 게시글
-    private PopularityPeriodType periodType; // 기간 타입 (WEEKLY, MONTHLY)
-    private LocalDate periodStartDate;      // 기간 시작일
-    private LocalDate periodEndDate;       // 기간 종료일
-    private Integer ranking;                // 순위
-    private Integer popularityScore;        // 인기도 점수
-    private Integer likeCount;              // 좋아요 수
-    private Integer commentCount;           // 댓글 수
-    private Integer viewCount;              // 조회수
-    private LocalDateTime createdAt;
-}
-```
-
-#### MissingPetBoard / MissingPetComment (실종 제보)
-- **상세 문서**: [missingpet.md](missingpet.md)
-- **엔티티**: MissingPetBoard (BaseTimeEntity 상속, status: MISSING/FOUND/RESOLVED), MissingPetComment
-- **API**: `/api/missing-pets`, Admin: `/api/admin/missing-pets`
-
-### 3.3 엔티티 관계도 (ERD)
-```mermaid
-erDiagram
-    Users ||--o{ Board : "작성"
-    Board ||--o{ Comment : "댓글"
-    Board ||--o{ BoardReaction : "반응"
-    Board ||--o{ BoardViewLog : "조회로그"
-    Board ||--o{ BoardPopularitySnapshot : "인기글스냅샷"
-    Comment ||--o{ CommentReaction : "반응"
-    Users ||--o{ Comment : "작성"
-    Users ||--o{ BoardReaction : "반응"
-    Users ||--o{ CommentReaction : "반응"
-    Users ||--o{ BoardViewLog : "조회"
-    Users ||--o{ MissingPetBoard : "작성"
-    MissingPetBoard ||--o{ MissingPetComment : "댓글"
-    Users ||--o{ MissingPetComment : "작성"
-```
-
-### 3.4 API 설계
-| 엔드포인트 | Method | 설명 | 요청/응답 |
-|-----------|--------|------|----------|
-| `/api/boards` | GET | 게시글 목록 (페이징) | `category`, `page`, `size` → `BoardPageResponseDTO` |
-| `/api/boards/{id}` | GET | 게시글 상세 | `viewerId` → `BoardDTO` |
-| `/api/boards` | POST | 게시글 작성 | `BoardDTO` → `BoardDTO` |
-| `/api/boards/{id}` | PUT | 게시글 수정 | `BoardDTO` → `BoardDTO` |
-| `/api/boards/{id}` | DELETE | 게시글 삭제 | - → `204 No Content` |
-| `/api/boards/search` | GET | 게시글 검색 | `keyword`, `searchType` (TITLE_CONTENT/NICKNAME, 기본값: TITLE_CONTENT), `page`, `size` → `BoardPageResponseDTO` |
-| `/api/boards/popular` | GET | 인기글 조회 | `period` (WEEKLY/MONTHLY, 기본값: WEEKLY) → `List<BoardPopularitySnapshotDTO>` |
-| `/api/boards/my-posts` | GET | 내 게시글 조회 | `userId` (필수) → `List<BoardDTO>` |
-| `/api/boards/{boardId}/comments` | GET | 댓글 목록 (페이징) | `page`, `size` → `CommentPageResponseDTO` |
-| `/api/boards/{boardId}/comments` | POST | 댓글 작성 | `CommentDTO` → `CommentDTO` |
-| `/api/boards/{boardId}/comments/{commentId}` | DELETE | 댓글 삭제 | - → `204 No Content` |
-| **참고**: 댓글 수정 기능은 서비스 레벨(`CommentService.updateComment()`)에서 구현되어 있으나, 현재 컨트롤러 엔드포인트는 제공되지 않습니다. |
-| `/api/boards/{boardId}/reactions` | POST | 게시글 반응 | `ReactionRequest` (userId, reactionType 필수) → `ReactionSummaryDTO` |
-| `/api/boards/{boardId}/comments/{commentId}/reactions` | POST | 댓글 반응 | `ReactionRequest` (userId, reactionType 필수) → `ReactionSummaryDTO` |
-
-**보안 참고**: `BoardController`의 일부 GET에 `@PreAuthorize("permitAll()")`가 있어도, `SecurityConfig`에서 `/api/**`는 기본적으로 인증이 필요합니다. 따라서 게시판 공개 조회도 로그인한 사용자만 호출할 수 있는 구성입니다(예외 경로를 추가하지 않은 한).
-
-### 관리자 (Admin) - domain/admin/controller/AdminBoardController
-| 엔드포인트 | Method | 설명 | 요청/응답 |
-|-----------|--------|------|----------|
-| `/api/admin/boards/{id}` | GET | 단일 게시글 조회 (조회수 증가 없음, 삭제된 글 포함) | - → `BoardDTO` |
-| `/api/admin/boards/paging` | GET | 게시글 목록 조회 (페이징, DB 레벨 필터링) | `status`, `deleted`, `category`, `q`, `page`, `size` → `BoardPageResponseDTO` |
-| `/api/admin/boards/{id}/blind` | PATCH | 게시글 블라인드 처리 | - → `BoardDTO` |
-| `/api/admin/boards/{id}/unblind` | PATCH | 게시글 블라인드 해제 | - → `BoardDTO` |
-| `/api/admin/boards/{id}/delete` | POST | 게시글 삭제 | - → `204 No Content` |
-| `/api/admin/boards/{id}/restore` | POST | 게시글 복구 | - → `BoardDTO` |
-| `/api/admin/boards/{boardId}/comments` | GET | 댓글 목록 조회 (관리자용) | `status`, `deleted` → `List<CommentDTO>` |
-| `/api/admin/boards/{boardId}/comments/{commentId}/blind` | PATCH | 댓글 블라인드 처리 | - → `CommentDTO` |
-| `/api/admin/boards/{boardId}/comments/{commentId}/unblind` | PATCH | 댓글 블라인드 해제 | - → `CommentDTO` |
-| `/api/admin/boards/{boardId}/comments/{commentId}/delete` | POST | 댓글 삭제 | - → `204 No Content` |
-| `/api/admin/boards/{boardId}/comments/{commentId}/restore` | POST | 댓글 복구 | - → `CommentDTO` |
-
-**구현 참고**: 위 삭제/복구는 각각 `BoardService.deleteBoard`, `CommentService.deleteComment` 등을 그대로 호출합니다. 따라서 서비스 구현상 작성자의 이메일 인증 검사가 적용되는 경우, 관리자 API에서도 동일하게 적용됩니다(정책 변경 시 서비스 분기 검토).
-
-### 3.5 관리자 도메인과의 연계
-- **AdminBoardController** (`domain/admin`): 게시글/댓글 관리 (블라인드, 삭제, 복구) - `getAdminBoardsWithPagingOptimized` 사용
-
-### 3.6 다른 도메인과의 연관관계
-- **User 도메인**: 
-  - Users가 게시글/댓글 작성
-  - Users가 반응 추가
-  - Users가 게시글 조회 (BoardViewLog)
-  - 게시글/댓글 수정/삭제 시 이메일 인증 확인 (`emailVerified` 필드)
-- **File 도메인**: 
-  - 게시글에 이미지 첨부 (AttachmentFile, targetType: BOARD)
-  - 댓글에 이미지 첨부 (targetType: COMMENT)
-- **Notification 도메인**: 
-  - 댓글 작성 시 게시글 작성자에게 `BOARD_COMMENT` 알림 (`CommentService`)
-  - 게시글/댓글 반응(`ReactionService`)은 현재 알림을 발송하지 않음
-- **Report 도메인**: 
-  - 게시글/댓글 신고
-  - 신고 처리 결과로 상태 변경 (BLINDED, DELETED)
-
-### 3.7 데이터 흐름
-```
-[사용자 요청] 
-  → [BoardController] 
-  → [BoardService] 
-  → [BoardRepository] 
-  → [Database]
-  → [BoardConverter] (Entity → DTO)
-  → [응답 반환]
-```
-
----
-
-## 4. 트러블슈팅
-
-### 4.1 N+1 문제 해결
-**문제**: 게시글 목록 조회 시 각 게시글의 좋아요/싫어요 수를 개별 쿼리로 조회하면 N+1 문제 발생
-**해결**: 배치 조회로 한 번에 모든 게시글의 반응 수를 조회
-**효과**: 1000개 게시글 조회 시 2001개 쿼리 → 3개 쿼리로 감소 (99.8% 개선)
-
-### 4.2 조회수 중복 방지
-**문제**: 같은 사용자가 새로고침할 때마다 조회수 증가
-**해결**: BoardViewLog 테이블에 사용자별 조회 기록 저장하여 중복 방지
-**효과**: 정확한 조회 수 추적, 중복 조회 방지
-
-### 4.3 반응 중복 방지
-**문제**: 동시에 같은 사용자가 좋아요/싫어요를 여러 번 클릭 시 중복 저장 가능
-**해결**: Unique 제약조건 (`board_idx`, `user_idx`) + 예외 처리
-**효과**: 동시 클릭 시에도 하나의 반응만 저장
-
-### 4.4 인기글 스냅샷 조회 전략
-**문제**: 스냅샷이 정확한 날짜로 매칭되지 않을 수 있음
-**해결**: 다단계 조회 전략 사용
-1. 정확한 날짜 매칭으로 조회 시도
-2. 기간이 겹치는 스냅샷 조회 시도
-3. 가장 최근 스냅샷 조회 시도
-4. 모든 시도 실패 시 새로 생성
-**효과**: 다양한 상황에서도 인기글을 안정적으로 제공
-
-### 4.5 인기글 스냅샷 생성 시 동시성 문제
-**문제**: 실시간 집계 시 동시성 문제로 인한 부정확한 카운트
-**해결**: 배치 조회로 실시간 집계 (1000개 단위로 분할)
-**효과**: 동시성 문제 없이 정확한 인기도 점수 계산
-
-### 4.6 인기글 스냅샷 생성 대상 카테고리
-**대상**: "자랑" 카테고리 게시글만 인기글 스냅샷 생성
-**레거시 호환**: "자랑" 카테고리로 조회 실패 시 "PRIDE" 카테고리로 재조회 시도
-**이유**: 특정 카테고리(자랑)의 인기글만 집계하여 성능 최적화 및 의미 있는 인기글 제공
-
----
-
-## 5. 성능 최적화
-
-### 5.1 DB 최적화
-
-#### 인덱스 전략
-
-**board 테이블**:
+# Board 도메인
+
+> 기준: 현재 코드를 단일 진실로 본다. 이 문서는 일반 커뮤니티 게시판과 일반 댓글만 다룬다. `MissingPetBoard`, `MissingPetComment`는 같은 `domain/board` 패키지에 있어도 실종 제보 도메인 문서에서 별도로 다룬다.
+
+## 1. 범위
+
+Board 도메인은 Petory 커뮤니티 게시글, 일반 댓글, 게시글/댓글 반응, 조회수, 인기글 스냅샷, 관리자 모더레이션을 담당한다.
+
+포함 범위:
+
+- 커뮤니티 게시글 목록/상세/작성/수정/삭제
+- 카테고리 필터링
+- 제목+내용 FULLTEXT 검색
+- 작성자 닉네임 검색
+- 일반 댓글 목록/작성/삭제
+- 게시글/댓글 좋아요·싫어요 토글
+- 게시글 조회수 중복 방지
+- 인기글 스냅샷 생성/조회
+- 첨부파일 단일/배치 조회 연동
+- 댓글 작성 알림 발송
+- 관리자 게시글/댓글 블라인드·삭제·복구
+
+비범위:
+
+- 실종 제보 게시글/댓글
+- Care 요청 댓글
+- 신고 생성/처리
+- 알림 전송 인프라 자체
+- 파일 저장소 구현 자체
+
+## 2. 주요 코드
+
+| 구분 | 주요 파일 |
+|---|---|
+| 사용자 API | `backend/main/java/com/linkup/Petory/domain/board/controller/BoardController.java` |
+| 관리자 API | `backend/main/java/com/linkup/Petory/domain/admin/controller/AdminBoardController.java` |
+| 게시글 서비스 | `backend/main/java/com/linkup/Petory/domain/board/service/BoardService.java` |
+| 댓글 서비스 | `backend/main/java/com/linkup/Petory/domain/board/service/CommentService.java` |
+| 반응 서비스 | `backend/main/java/com/linkup/Petory/domain/board/service/ReactionService.java` |
+| 인기글 서비스 | `backend/main/java/com/linkup/Petory/domain/board/service/BoardPopularityService.java` |
+| 인기글 스케줄러 | `backend/main/java/com/linkup/Petory/domain/board/service/BoardPopularityScheduler.java` |
+| 게시글 repository | `backend/main/java/com/linkup/Petory/domain/board/repository/SpringDataJpaBoardRepository.java` |
+| 댓글 repository | `backend/main/java/com/linkup/Petory/domain/board/repository/SpringDataJpaCommentRepository.java` |
+| 프론트 게시글 API | `frontend/src/api/boardApi.js` |
+| 프론트 댓글 API | `frontend/src/api/commentApi.js` |
+| 프론트 관리자 API | `frontend/src/api/communityAdminApi.js` |
+
+## 3. 핵심 엔티티
+
+### Board
+
+주요 필드:
+
+| 필드 | 의미 |
+|---|---|
+| `idx` | 게시글 PK |
+| `user` | 작성자 |
+| `title` | 제목 |
+| `content` | 본문 |
+| `category` | 카테고리 |
+| `status` | `ACTIVE`, `BLINDED`, `DELETED` 등 `ContentStatus` |
+| `viewCount` | 조회 수 캐시 |
+| `likeCount` | 좋아요 수 캐시 |
+| `dislikeCount` | 싫어요 수 캐시 |
+| `commentCount` | 댓글 수 캐시 |
+| `lastReactionAt` | 마지막 반응 추가/변경 시각 |
+| `isDeleted`, `deletedAt` | soft delete 상태 |
+
+삭제는 soft delete이며 `status=DELETED`, `isDeleted=true`, `deletedAt=now`로 처리한다.
+
+### Comment
+
+일반 커뮤니티 댓글이다.
+
+주요 필드:
+
+- `board`
+- `user`
+- `content`
+- `status`
+- `isDeleted`
+- `deletedAt`
+
+댓글도 soft delete를 사용한다. 게시글 삭제 시 해당 게시글의 활성 댓글을 bulk update로 함께 soft delete한다.
+
+### BoardReaction / CommentReaction
+
+게시글/댓글의 좋아요·싫어요 반응이다.
+
+반응 타입:
+
+- `LIKE`
+- `DISLIKE`
+
+같은 사용자가 같은 대상에 같은 반응을 다시 누르면 취소된다. 다른 반응을 누르면 타입이 변경된다.
+
+### BoardViewLog
+
+로그인 사용자의 게시글 조회 기록이다. 같은 사용자가 같은 게시글을 반복 조회해도 조회수가 계속 증가하지 않게 한다.
+
+비로그인 또는 viewerId가 없는 조회는 항상 조회수 증가 대상으로 처리된다.
+
+### BoardPopularitySnapshot
+
+인기글 스냅샷이다. 주간/월간 기간, ranking, popularityScore, like/comment/view count를 저장한다.
+
+## 4. 사용자 게시글 API
+
+### `/api/boards`
+
+| API | 인증 | 설명 |
+|---|---|---|
+| `GET /api/boards?category&page&size` | permitAll annotation | 게시글 목록 페이징 조회 |
+| `GET /api/boards/{id}?viewerId` | permitAll annotation | 게시글 상세 조회, 조회수 증가 처리 |
+| `GET /api/boards/popular?period=WEEKLY` | permitAll annotation | 인기글 스냅샷 조회 |
+| `POST /api/boards` | 인증 필요 | 게시글 생성 |
+| `PUT /api/boards/{id}` | 인증 필요 | 게시글 수정 |
+| `DELETE /api/boards/{id}` | 인증 필요 | 게시글 soft delete |
+| `GET /api/boards/my-posts?userId` | 인증 필요 | 특정 사용자 게시글 목록 |
+| `GET /api/boards/search?keyword&searchType&page&size` | permitAll annotation | 게시글 검색 |
+
+주의:
+
+- 컨트롤러에는 `@PreAuthorize("permitAll()")`가 붙어 있지만, `SecurityConfig`의 `/api/**` 인증 정책 때문에 실제 접근 가능 여부는 보안 설정도 함께 봐야 한다.
+- 생성은 현재 로그인 사용자의 `SecurityContext` subject를 사용한다. DTO의 userId를 신뢰하지 않는다.
+
+## 5. 댓글 API
+
+댓글은 별도 최상위 경로가 아니라 게시글 하위 경로에 있다.
+
+| API | 인증 | 설명 |
+|---|---|---|
+| `GET /api/boards/{boardId}/comments?page&size` | permitAll annotation | 댓글 목록 페이징 조회 |
+| `POST /api/boards/{boardId}/comments` | 인증 필요 | 댓글 작성 |
+| `DELETE /api/boards/{boardId}/comments/{commentId}` | 인증 필요 | 댓글 soft delete |
+
+서비스에는 `updateComment()`도 구현되어 있지만, 현재 사용자용 `BoardController`에는 댓글 수정 endpoint가 노출되어 있지 않다. 관리자용 상태 변경/복구 API는 별도 경로에 있다.
+
+댓글 작성 흐름:
+
+1. 게시글 존재 확인
+2. 현재 로그인 사용자 조회
+3. 댓글 저장
+4. 게시글 `commentCount`를 DB update로 `+1`
+5. 댓글 첨부파일이 있으면 File 도메인과 동기화
+6. 댓글 작성자가 게시글 작성자와 다르면 `BOARD_COMMENT` 알림 생성
+7. 반응 수와 첨부파일을 포함한 DTO 반환
+
+댓글 삭제 흐름:
+
+1. 게시글 존재 확인
+2. 댓글 존재 확인
+3. 댓글이 해당 게시글에 속하는지 확인
+4. 작성자 또는 관리자 권한 확인
+5. 댓글 작성자의 이메일 인증 여부 확인
+6. soft delete
+7. 게시글 `commentCount`를 DB update로 `-1`
+
+## 6. 반응 API
+
+| API | 인증 | 설명 |
+|---|---|---|
+| `POST /api/boards/{boardId}/reactions` | 인증 필요 | 게시글 좋아요/싫어요 토글 |
+| `POST /api/boards/{boardId}/comments/{commentId}/reactions` | 인증 필요 | 댓글 좋아요/싫어요 토글 |
+
+요청 body는 `ReactionRequest`이며 `userId`, `reactionType`을 포함한다.
+
+게시글 반응 정책:
+
+- 같은 반응 재클릭: 기존 반응 삭제, userReaction은 null.
+- 다른 반응 클릭: 기존 반응 타입 변경.
+- 신규 반응: insert.
+- 신규 insert는 `insertIgnore`를 사용해 중복 insert 경쟁을 완화한다.
+- 게시글 `likeCount`, `dislikeCount`는 DB 원자적 update로 delta 조정한다.
+- 반응 추가/변경 시 `lastReactionAt`을 업데이트한다.
+- 반응 취소 시 `lastReactionAt`은 유지한다.
+
+댓글 반응 정책:
+
+- 게시글 반응과 같은 토글 모델이다.
+- 댓글에는 현재 별도 count cache 필드가 없으므로 응답 summary는 reaction repository count로 만든다.
+- insert 경쟁 완화를 위해 `insertIgnore`를 사용한다.
+
+## 7. 조회수
+
+상세 조회 `GET /api/boards/{id}`에서 조회수를 처리한다.
+
+정책:
+
+- `viewerId`가 없으면 조회수를 증가시킨다.
+- `viewerId`가 있으면 `BoardViewLog`에 `boardId + userId` 기록을 `insertIgnore`로 넣는다.
+- insert 성공 시에만 `board.viewCount`를 DB update로 증가시킨다.
+- 이미 조회한 사용자면 조회수를 증가시키지 않는다.
+- 응답 DTO에는 증가가 반영된 조회수를 보정해서 내려준다.
+
+## 8. 검색
+
+### `TITLE_CONTENT`
+
+기본 검색 타입이다.
+
+쿼리:
+
 ```sql
--- 카테고리별 조회
-CREATE INDEX idx_board_category_deleted_created ON board(category, is_deleted, created_at);
-
--- 전체 게시글 조회 (최신순)
-CREATE INDEX idx_board_created_at_desc ON board(created_at);
-
--- 삭제 여부 및 생성일 조회
-CREATE INDEX idx_board_deleted_created ON board(is_deleted, created_at);
-
--- 상태별 조회
-CREATE INDEX idx_board_status ON board(status);
-
--- 검색 (제목, 내용) - Full-Text 인덱스
-CREATE FULLTEXT INDEX idx_board_title_content ON board(title, content);
-
--- 사용자별 게시글 조회
-CREATE INDEX idx_board_user_deleted_created ON board(user_idx, is_deleted, created_at);
+MATCH(b.title, b.content) AGAINST(:kw IN BOOLEAN MODE)
 ```
 
-**board_popularity_snapshot 테이블**:
-```sql
--- 게시글별 스냅샷 조회
-CREATE INDEX idx_snapshot_board_id ON board_popularity_snapshot(board_id);
+조건:
 
--- 기간별 스냅샷 조회
-CREATE INDEX idx_snapshot_range ON board_popularity_snapshot(period_type, period_start_date, period_end_date);
+- 삭제되지 않은 게시글
+- 삭제되지 않은 작성자
+- `ACTIVE` 상태 작성자
 
--- 최근 스냅샷 조회
-CREATE INDEX idx_snapshot_recent ON board_popularity_snapshot(period_type, period_end_date, ranking);
+정렬:
+
+- relevance 내림차순
+- `created_at` 내림차순
+
+### `NICKNAME`
+
+작성자 닉네임 검색이다.
+
+쿼리:
+
+```jpql
+u.nickname LIKE :nickname%
 ```
 
-**board_reaction 테이블**:
-```sql
--- 사용자별 반응 조회
-CREATE INDEX FKag3ixpa53bjp1p5s79myoscpr ON board_reaction(user_idx);
+앞쪽 와일드카드를 쓰지 않는 접두사 검색이다. 작성자 JOIN과 DB 페이징을 사용한다.
 
--- 게시글-사용자 조합 (Unique 제약조건)
-CREATE UNIQUE INDEX UKaymqx4hghgrqitkbplgp553u0 ON board_reaction(board_idx, user_idx);
+## 9. 목록/상세 매핑 최적화
+
+게시글 목록과 검색 결과는 `mapBoardsWithReactionsBatch()`를 사용한다.
+
+배치 매핑:
+
+1. 게시글 ID 목록 추출
+2. 게시글별 reaction count를 IN 배치 조회
+3. 게시글 첨부파일을 File 도메인에서 배치 조회
+4. DTO에 like/dislike/attachments/primary file URL 적용
+
+반응 count 조회는 500개 단위로 나눈다.
+
+댓글 목록은 `CommentService.getCommentsWithPaging()`에서 다음을 배치 조회한다.
+
+- 댓글 첨부파일
+- 댓글별 reaction count
+
+댓글 reaction count 역시 500개 단위로 나눈다.
+
+## 10. 작성/수정/삭제 권한
+
+게시글:
+
+- 생성: 인증 사용자.
+- 수정/삭제: 작성자 또는 `ADMIN`/`MASTER`.
+- 수정/삭제 시 작성자의 `emailVerified`가 true여야 한다.
+
+댓글:
+
+- 생성: 인증 사용자.
+- 수정/삭제: 작성자 또는 `ADMIN`/`MASTER`.
+- 수정/삭제 시 작성자의 `emailVerified`가 true여야 한다.
+
+이메일 인증 purpose:
+
+- 게시글 수정/삭제: `BOARD_EDIT`
+- 댓글 수정/삭제: `COMMENT_EDIT`
+
+## 11. 첨부파일
+
+Board/Comment는 File 도메인의 `AttachmentFileService`와 연동한다.
+
+게시글:
+
+- 생성/수정 요청의 `boardFilePath`가 있으면 `FileTargetType.BOARD` 단일 첨부로 동기화한다.
+- 목록/상세 DTO에는 batch 조회된 attachments와 primary file URL이 포함된다.
+
+댓글:
+
+- 작성/수정 요청의 `commentFilePath`가 있으면 `FileTargetType.COMMENT` 단일 첨부로 동기화한다.
+- 댓글 목록 DTO에는 batch 조회된 attachments와 primary file URL이 포함된다.
+
+## 12. 인기글 스냅샷
+
+인기글은 `BoardPopularityService`와 `BoardPopularityScheduler`가 담당한다.
+
+대상:
+
+- 기본 대상 카테고리는 `"자랑"`이다.
+- 레거시 호환을 위해 `"자랑"` 결과가 없으면 `"PRIDE"` 카테고리를 재시도한다.
+
+기간:
+
+- `WEEKLY`: 오늘 포함 최근 7일
+- `MONTHLY`: 오늘 포함 최근 30일
+
+점수:
+
+```text
+popularityScore = likes * 3 + comments * 2 + views
 ```
 
-**board_view_log 테이블**:
-```sql
--- 사용자별 조회 로그
-CREATE INDEX FKemjj96yrflacv5mtek2nipy22 ON board_view_log(user_id);
+집계:
 
--- 게시글-사용자 조합 (Unique 제약조건, 중복 방지)
-CREATE UNIQUE INDEX uk_board_view_log_board_user ON board_view_log(board_id, user_id);
-```
+- 후보 게시글 ID 목록을 만든다.
+- 좋아요 수, 댓글 수, 조회수를 독립 배치 쿼리로 조회한다.
+- 세 쿼리를 `CompletableFuture.supplyAsync()`로 병렬 실행한 뒤 `BoardCounts`로 합친다.
+- 점수 내림차순, 생성일 내림차순으로 상위 30개를 저장한다.
 
-**comment 테이블**:
-```sql
--- 게시글별 댓글 조회
-CREATE INDEX board_idx ON comment(board_idx);
+조회 fallback:
 
--- 상태별 댓글 조회
-CREATE INDEX idx_comment_status ON comment(status);
+1. 정확한 기간 스냅샷 조회
+2. 기간이 겹치는 스냅샷 조회
+3. 같은 period의 최근 스냅샷 조회
+4. 즉시 생성
+5. 그래도 없으면 최신 게시글 10개 fallback
 
--- 사용자별 댓글 조회
-CREATE INDEX user_idx ON comment(user_idx);
+스케줄:
 
-```
+- 매일 18:30 주간 스냅샷 생성
+- 매주 월요일 18:30 월간 스냅샷 생성
 
-**comment_reaction 테이블**:
-```sql
--- 사용자별 반응 조회
-CREATE INDEX idx_comment_reaction_user ON comment_reaction(user_idx);
+## 13. 관리자 API
 
--- 댓글-사용자 조합 (Unique 제약조건)
-CREATE UNIQUE INDEX uk_comment_reaction_comment_user ON comment_reaction(comment_idx, user_idx);
-```
+### `/api/admin/boards`
 
-**선정 이유**:
-- 자주 조회되는 컬럼 조합 (category, is_deleted, created_at)
-- WHERE 절에서 자주 사용되는 조건
-- JOIN에 사용되는 외래키 (user_idx, board_idx)
-- 검색 성능 향상 (title, content)
-- 중복 방지를 위한 Unique 제약조건 (board_reaction, board_view_log, comment_reaction)
+`ADMIN`, `MASTER` 접근 가능.
 
-#### 쿼리 최적화
-```sql
--- Before: 비효율적인 쿼리 (N+1)
-SELECT * FROM board WHERE is_deleted = false;
--- 각 게시글마다 개별 쿼리
-SELECT COUNT(*) FROM board_reaction WHERE board_idx = ? AND reaction_type = 'LIKE';
+| API | 설명 |
+|---|---|
+| `GET /api/admin/boards/paging` | 게시글 목록 페이징, status/deleted/category/q 필터 |
+| `GET /api/admin/boards/{id}` | 관리자용 단건 조회, 조회수 증가 없음 |
+| `PATCH /api/admin/boards/{id}/blind` | 게시글 블라인드 |
+| `PATCH /api/admin/boards/{id}/unblind` | 게시글 블라인드 해제 |
+| `POST /api/admin/boards/{id}/delete` | 게시글 soft delete |
+| `POST /api/admin/boards/{id}/restore` | 게시글 복구 |
+| `GET /api/admin/boards/{boardId}/comments` | 관리자용 댓글 목록 |
+| `PATCH /api/admin/boards/{boardId}/comments/{commentId}/blind` | 댓글 블라인드 |
+| `PATCH /api/admin/boards/{boardId}/comments/{commentId}/unblind` | 댓글 블라인드 해제 |
+| `POST /api/admin/boards/{boardId}/comments/{commentId}/delete` | 댓글 soft delete |
+| `POST /api/admin/boards/{boardId}/comments/{commentId}/restore` | 댓글 복구 |
 
--- After: 최적화된 쿼리 (배치 조회)
-SELECT * FROM board WHERE is_deleted = false ORDER BY created_at DESC LIMIT 20;
-SELECT board_idx, reaction_type, COUNT(*) 
-FROM board_reaction 
-WHERE board_idx IN (?, ?, ..., ?) 
-GROUP BY board_idx, reaction_type;
-```
+관리자 게시글 목록은 `Specification`으로 DB 레벨 필터링과 페이징을 수행한다.
 
-**개선 포인트**:
-- 배치 조회로 N+1 문제 해결
-- IN 절 사용으로 여러 게시글의 반응 수를 한 번에 조회
-- GROUP BY로 집계 성능 향상
+필터:
 
-#### N+1 문제 해결
-**문제**:
-```java
-// N+1 발생 코드
-List<Board> boards = boardRepository.findAll();
-for (Board board : boards) {
-    long likeCount = boardReactionRepository.countByBoardAndReactionType(board, ReactionType.LIKE);
-    // 각 게시글마다 개별 쿼리 발생
-}
-```
+- `deleted`
+- `category`
+- `status`
+- `q`
 
-**해결**:
-```java
-// 배치 조회 또는 Fetch Join 사용
-List<Long> boardIds = boards.stream().map(Board::getIdx).collect(Collectors.toList());
-Map<Long, Map<ReactionType, Long>> reactionCountsMap = getReactionCountsBatch(boardIds);
-```
+`q` 검색은 제목/내용 FULLTEXT와 작성자 username 접두사 검색을 조합한다.
 
-**효과**:
-- Before: N+1 쿼리 (예: 1001개)
-- After: 1~2 쿼리
+## 14. 도메인 간 연결
 
-#### 트랜잭션 최적화
-- **트랜잭션 범위 최소화**: 조회 메서드는 `@Transactional(readOnly = true)` 사용
-- **읽기 전용 트랜잭션 활용**: 조회 성능 향상
-- **배치 처리**: 인기글 스냅샷 생성 시 배치 단위로 처리
+User:
 
-### 5.2 애플리케이션 레벨 최적화
+- 게시글/댓글 작성자.
+- 수정/삭제 권한과 이메일 인증 확인.
+- 사용자 상태가 `ACTIVE`인 작성자 글/댓글만 일반 목록에 노출.
 
-#### 캐싱 전략
-```java
-// 게시글 상세 캐싱 - @Cacheable 제거됨 (조회수 실시간 반영을 위해)
-// public BoardDTO getBoard(long idx, Long viewerId) { ... }
+File:
 
-// boardList 캐시 - getAllBoards에서 비활성화 (개발 중 데이터 동기화)
-// @Cacheable(value = "boardList", key = "#category")
+- 게시글/댓글 첨부파일.
 
-// 캐시 무효화
-@Caching(evict = {
-    @CacheEvict(value = "boardDetail", key = "#idx"),
-    @CacheEvict(value = "boardList", allEntries = true)
-})
-public BoardDTO updateBoard(long idx, BoardDTO dto) {
-    // ...
-}
-```
+Notification:
 
-**캐시 적용 대상**:
-- boardDetail: 수정/삭제/댓글/반응 시 @CacheEvict로 무효화
-- boardList: 생성/수정/삭제 시 전체 무효화 (현재 getAllBoards에서는 비활성화)
+- 댓글 작성 시 게시글 작성자에게 `BOARD_COMMENT` 알림.
 
-**캐시 무효화 전략**:
-- 게시글 수정/삭제 시 상세 캐시 무효화
-- 게시글 생성/수정/삭제 시 목록 캐시 무효화
+Recommendation:
 
-#### 비동기 처리
-```java
-// 인기글 스냅샷 생성 (스케줄러)
-@Scheduled(cron = "0 30 18 * * ?") // 매일 18:30
-public void generateWeeklyPopularitySnapshots() {
-    generateSnapshots(PopularityPeriodType.WEEKLY);
-}
-```
+- 게시글 생성 시 `CommunityPostCreatedEvent`를 발행한다.
+- 추천 도메인은 이 이벤트를 intent signal 분석에 사용할 수 있다.
 
-**적용 사례**:
-- 인기글 스냅샷 생성: 스케줄러로 자동 실행
-- 알림 발송: 댓글 작성 시 비동기 처리
+Admin/Report:
 
-**효과**:
-- 사용자 요청 응답 시간 감소
-- 서버 부하 분산
+- 신고 처리는 별도 Report/Admin 도메인이지만, 관리자 모더레이션 API는 게시글/댓글 상태를 변경한다.
 
-#### 배치 처리
-```java
-// 대량 데이터 처리 시 배치 단위로 분할
-final int BATCH_SIZE = 500; // 반응 수 조회용
-for (int i = 0; i < boardIds.size(); i += BATCH_SIZE) {
-    int end = Math.min(i + BATCH_SIZE, boardIds.size());
-    List<Long> batch = boardIds.subList(i, end);
-    // 배치 처리
-}
-```
+## 15. 한계와 개선
 
-**배치 처리 구현**:
-- **반응 수 배치 조회**: `BoardService.getReactionCountsBatch()` 메서드
-  - 500개 단위로 분할하여 IN 절 크기 제한 고려
-  - `boardReactionRepository.countByBoardsGroupByReactionType()` 사용
-- **인기글 스냅샷 생성**: `BoardPopularityService`의 배치 조회 메서드들
-  - `getLikeCountsBatch()` : 1000개 단위로 좋아요 수 배치 조회
-  - `getCommentCountsBatch()` : 1000개 단위로 댓글 수 배치 조회
-  - `getViewCountsBatch()` : 1000개 단위로 조회수 배치 조회
+- 사용자용 `BoardController`에는 댓글 수정 endpoint가 없다. 서비스에는 `updateComment()`가 구현되어 있다.
+- reaction 요청 body의 `userId`를 사용한다. 현재 로그인 사용자와 일치하는지 서비스에서 별도 검증하지 않는다.
+- 조회수 중복 방지는 `viewerId` 파라미터 기반이다. 인증 컨텍스트 기반 자동 추출이 아니므로 클라이언트가 값을 넘기지 않으면 비로그인 조회처럼 증가한다.
+- 컨트롤러의 `permitAll()`과 보안 설정의 `/api/**` 인증 정책이 어긋날 수 있다.
+- 게시글 상세 캐시는 현재 실시간 조회수 반영을 위해 제거되어 있다. 캐시 재도입 시 조회수/반응/댓글 count 무효화 전략이 필요하다.
+- 인기글 병렬 집계는 기본 `ForkJoinPool`을 사용한다. 부하가 커지면 전용 executor 검토가 필요하다.
+- 관리자 댓글 목록 필터는 서비스가 전체 댓글을 가져온 뒤 컨트롤러에서 status/deleted를 필터링한다.
 
-### 5.3 성능 최적화 효과
+## 16. 관련 문서
 
-#### N+1 문제 해결
-- **Before**: 게시글 목록 조회 시 각 게시글마다 반응 수를 개별 쿼리로 조회 (N+1 문제)
-- **After**: 배치 조회로 한 번에 모든 게시글의 반응 수를 조회
-- **효과**: 쿼리 수 대폭 감소, 조회 성능 향상
-
-#### 인기글 스냅샷
-- **Before**: 매번 실시간 집계 (모든 게시글의 좋아요/댓글/조회수 집계)
-- **After**: 미리 계산된 스냅샷 조회
-- **효과**: 조회 성능 향상, DB 부하 감소
-
----
-
-## 6. 핵심 포인트 요약
-
-### 기술적 하이라이트
-1. **N+1 문제 해결**: 배치 조회로 쿼리 수 99.8% 감소 (2001개 → 3개)
-2. **조회수 중복 방지**: BoardViewLog로 정확한 조회 수 추적
-3. **인기글 스냅샷**: 미리 계산하여 조회 성능 향상, 다단계 조회 전략으로 안정성 확보
-4. **실시간 카운트 업데이트**: likeCount, commentCount 필드로 조회 성능 향상
-5. **캐싱 전략**: Spring Cache(`boardList` 등)로 목록 등 일부 경로에 캐시 적용 가능(설정에 따라 Redis 백엔드)
-6. **이메일 인증 통합**: 게시글/댓글 수정/삭제 시 이메일 인증 필수
-7. **댓글 기능 확장**: 댓글 수정, 복구 기능 추가
-8. **파일 첨부 지원**: 댓글에도 이미지 첨부 가능
-9. **관리자 기능**: 관리자용 조회 메서드로 작성자 상태 체크 없이 조회 가능
-10. **인기글 스냅샷 동시성 해결**: 배치 조회로 실시간 집계 시 동시성 문제 해결
+- [커뮤니티 게시판 아키텍처](<../architecture/board/커뮤니티 게시판 아키텍처.md>)
+- [Board 백엔드 성능 최적화](../refactoring/board/board-backend-performance-optimization.md)
+- [Board 인기글 스냅샷 배치 분석](../refactoring/board/board-popularity-snapshot-batch-analysis.md)
+- [Board 인기글 스냅샷 배치 리팩토링](../refactoring/board/board-popularity-snapshot-batch-refactoring.md)
+- [Board 인기글 스냅샷 N+1 리팩토링](../refactoring/board/board-popularity-snapshot-n-plus-one-refactoring.md)
+- [Comment reaction query troubleshooting](../refactoring/board/comment-reaction-query/troubleshooting.md)
+- [Board 성능 트러블슈팅](../troubleshooting/board/performance-optimization.md)
+- [Board 코드 중복 매핑](../troubleshooting/board/code-duplication-mapping.md)

@@ -1,1435 +1,318 @@
-# Location 도메인 - 포트폴리오 상세 설명
-
-## 1. 개요
-
-Location 도메인은 위치 기반 서비스 (병원, 카페, 공원, 펫샵 등) 정보 제공 및 리뷰 관리 도메인입니다. 지역 계층적 탐색, 위치 기반 검색, 거리 계산, 네이버맵 API 연동을 통해 사용자에게 위치 기반 서비스를 제공합니다.
-
-**주요 기능**:
-
-- 지역 계층적 탐색 (시도 → 시군구)
-- 위치 기반 반경 검색 (`findByRadius`: `ST_Within` 바운딩 + `ST_Distance_Sphere` 거리 조건, 응답 DTO에 Haversine 거리 포함 ✅)
-- 키워드: 위치·지역 분기에서는 이름 `LIKE`; 위치·지역 없이 키워드만 있을 때 **FULLTEXT** (`ft_search`, name/description/category1–3) ✅
-- 카테고리별 서비스 검색
-- 반경 검색 정렬 옵션 (`distance` 기본, `rating`, `reviews`, `score`; `reviews`는 `review_count` 캐시 사용, `score`는 DB 조회 후 `LocationServiceDTO.score`로 후처리 정렬)
-- 거리 계산 (Haversine 공식, 백엔드에서 계산 후 DTO 포함 ✅)
-- 하이브리드 데이터 로딩 전략 (초기 로드 + 클라이언트 필터링, 일관성 개선 ✅)
-- 위치 서비스 리뷰 시스템
-- 공공데이터 CSV 배치 임포트
-- 네이버맵 API 연동:
-  - 주소-좌표 변환(Geocoding)
-  - 좌표-주소 변환(역지오코딩)
-  - 길찾기(Directions API)
-- **UX 설계 원칙**:
-  - **"지도는 상태를 바꾸지 않는다"**: 지도 이동 시 자동 API 호출 제거, "이 지역 검색" 버튼으로 사용자 확인 후 실행
-  - **InitialLoadSearch vs UserTriggeredSearch 분리**: 시스템 주도 vs 사용자 주도 검색 구분
-  - **빈 상태 UX 처리**: 검색 결과 0개, 위치 권한 거부, 너무 넓은 범위 시 명확한 안내 및 대안 제시
-  - **개별 핀 마커 표시**: 클러스터링을 제거하고 모든 장소를 개별 핀(Pin)으로 표시하여 직관성 확보
-  - **마커-리스트 동기화**: 양방향 스크롤 및 하이라이트로 사용자 경험 향상
-  - **검색창 3단계 검색 fallback** (`UnifiedPetMapPage.js` `onSearch`):
-    1. **Geocoding 우선** — Naver Geocoding API(`/api/geocoding/search`)로 좌표 변환 시도. 성공하면 지도 중심 이동 + `keyword` 초기화 후 반경 검색. 읍면동·도로명 등 상세 주소 지원.
-    2. **지역명 감지** — geocoding 실패 시 끝글자 패턴으로 행정구역 판별(`구/군` → `sigungu`, `시(일반)` → `sigungu`, `도/특별시/광역시` → `sido`). `lat/lng` 없이 `sigungu=강남구` 형태로 백엔드 호출 → `findBySigungu()` 라우팅. 결과 시설 좌표 평균으로 지도 이동(`searchCenter` 불변 → radius 재검색 미발생).
-    3. **시설명 keyword 검색** — 위 두 경우 모두 해당 없으면 `keyword=검색어` + 현재 위치 반경 검색(`name LIKE '%keyword%'`).
-
-### 1.1 기준: 위치 서비스 통합 검색 (`GET /api/location-services/search`)
-
-**단일 진실**: `LocationServiceService.searchLocationServices` — 레거시 문서나 워크스페이스 규칙에 “키워드 최우선”이 남아 있어도, **현재 백엔드는 아래 순서**이다.
-
-1. `**latitude`·`longitude` 둘 다 있음** → 반경 검색. `radius`(m)는 생략 가능 — `null`이거나 `≤0`이면 서비스에서 **10000m**로 둔다. 이 분기에서 `keyword`·`category`는 SQL `WHERE`로 걸린다(이름은 `**LIKE '%keyword%'`**, FULLTEXT 아님). 정렬은 `sort=distance|rating|reviews`를 받으며 기본값은 `distance`.
-2. **위치 없고** `sido` / `sigungu` 중 하나라도 있음 → 지역 계층 검색(세부 우선순위는 §2.1). `keyword`·`category`도 SQL `WHERE`. (`eupmyeondong`·`roadName`은 API 파라미터 비활성화 — 프론트 미사용)
-3. **위치·지역 모두 없고 `keyword`만 있음** → **FULLTEXT** 전국 검색(`findByNameContaining`) — 위치 파라미터가 없을 때의 fallback.
-4. **아무 조건도 없음** → 전체 평점순(`findByOrderByRatingDesc`).
-
-**정규화**: `keyword`, `category`, 지역 문자열은 빈 문자열·공백만 → `null`로 바꿔 `:param IS NULL` 분기가 의도대로 동작하게 한다.
-
-**컨트롤러 `size`**: `null`이면 100건 상한, `≤0`이면 상한 없음(서비스에 `null`).
-
-**리팩·히스토리**: 전후 알고리즘 대조는 [주변서비스-현행vs설계안-비교.md](../refactoring/location/주변서비스-현행vs설계안-비교.md) — 동작 정의는 본 문서(§1.1)를 우선한다.
-
----
-
-## 2. 기능 설명
-
-### 2.1 지역 계층적 탐색
-
-**탐색 프로세스**:
-
-1. 시도 선택 (전국 17개 시도)
-2. 시군구 선택 (선택된 시도의 시군구)
-3. 해당 지역의 서비스 목록 표시
-
-**우선순위**: sigungu > sido > 전체 (`eupmyeondong`·`roadName` 직접 파라미터 비활성화 — 대신 검색창 geocoding으로 읍면동까지 좌표 변환 후 반경 검색으로 지원)
-
-### 2.2 위치 기반 반경 검색 (초기 로드용)
-
-**검색 프로세스**:
-
-1. 사용자 위치 확인 (GPS 또는 수동 입력)
-2. `**latitude`·`longitude`를 넘기면** 서비스가 위치(반경) 분기를 탄다. `radius`는 생략 가능 — 생략·0 이하이면 **10000m\*\*로 처리된다.
-3. `findByRadius`: 근사 사각형(`ST_Within`)+`ST_Distance_Sphere`로 반경 내 행 조회
-4. 응답 DTO에 Haversine 거리(m) 포함(반경 분기)
-5. `keyword`·`category`가 있으면 동일 쿼리의 SQL `WHERE`로 필터(이름 `LIKE`, 카테고리 등호)
-6. 정렬은 `sort` 기준으로 수행
-
-- `distance`: 거리순 → `rating DESC` → `idx ASC`
-- `rating`: 평점순 → 거리순 → `idx ASC`
-- `reviews`: `review_count` 내림차순 → 거리순 → 평점순 → `idx ASC`
-- `score`: DB 조회 시 `rating` 기준으로 쿼리 후 Java 후처리(`dto.getScore()` 내림차순)로 재정렬
-
-**특징 (제한적 사용)**:
-
-- **사용 시점**: 앱 초기 진입 시 사용자 주변 정보 제공 목적으로만 사용
-- **DB 쿼리**: `ST_Distance_Sphere` 함수 사용
-- **한계**: 지도 이동 시 검색 기준점이 계속 바뀌어 "아까 본 장소"가 사라지는 일관성 문제 발생
-- **대안**: 지도 탐색 시에는 **시도/시군구 기반 검색**을 주 전략으로 사용
-- **통합 검색 우선순위**: §1.1 참고 — **위치 → 지역 → 키워드 단독 FULLTEXT → 평점순** (키워드가 있어도 좌표가 있으면 반경 검색이 먼저다)
-
-### 2.3 하이브리드 데이터 로딩 전략 (개선됨)
-
-**전략 핵심**:
-
-> **"검색은 시군구 단위로, 필터링은 읍면동 단위로"**
-
-**로딩 프로세스** (프론트 UX 관점):
-
-1. **초기 진입**: 클라이언트가 `latitude`·`longitude`·`radius`(예: 5km)를 넘기면 위치 분기 — 백엔드는 `radius≤0`이면 **10000m**으로 치환
-2. **지도 이동/검색**: 지도 중심 좌표를 역지오코딩하여 **시도/시군구** 추출 후 해당 지역 전체 데이터 로드
-3. **읍면동 필터링**: 로드된 데이터 내에서 **클라이언트 사이드 필터링** 수행
-
-**컨트롤러·서비스** (`LocationServiceController` → `LocationServiceService`):
-
-- **우선순위**: §1.1과 동일 — **위치(lat+lng) → 지역 → 키워드 단독 FULLTEXT → 평점순**
-- **위치 분기**: `latitude`·`longitude`만 있으면 된다. `radius`는 선택이며, 없거나 `≤0`이면 서비스에서 **10000m**
-- `**size`**: 컨트롤러에서 null이면 **100\*\*, 0 이하이면 제한 없음(서비스에 null 전달)
-
-**✅ 일관성 개선 (2026-02-04)**:
-
-- **지역 선택 시 항상 백엔드 재요청**: 초기 로드 방식과 무관하게 동일한 검색 결과 제공
-- **문제 해결**: 초기 로드가 위치 기반이면 반경 밖 서비스 누락 문제 해결
-- **사용자 경험 향상**: 같은 지역 선택 시 항상 동일한 결과 제공
-
-**장점**:
-
-- **데이터 일관성**: 시군구 단위로 데이터를 가져오므로 지도 이동 시에도 마커가 유지됨
-- **검색 결과 일관성**: 지역 선택 시 항상 동일한 결과 제공 (초기 로드 방식과 무관)
-- **성능 최적화**: 인덱스가 잘 타는 `WHERE sido=? AND sigungu=?` 쿼리 사용으로 DB 부하 감소
-- **유연성**: 읍면동 경계의 모호함을 클라이언트 필터링으로 해결
-
-### 2.4 카테고리별 검색 및 키워드 검색
-
-**카테고리 필터링** (백엔드 SQL):
-
-- `category` 파라미터가 `category1` / `category2` / `category3` 중 하나와 일치하면 포함 (`OR` 조건)
-- 최대 결과 수 제한 지원 (`maxResults` / 컨트롤러 `size`)
-- 반경 검색에서는 `sort` 파라미터로 `distance`, `rating`, `reviews` 정렬 선택 가능
-
-**키워드** — 경로에 따라 다름:
-
-- **위치·지역 분기**: SQL에서 **이름** `LIKE '%keyword%'` (설명·FULLTEXT 아님). `SpringDataJpaLocationServiceRepository.findByRadius` 등 참고.
-- **키워드 단독 분기** (위치·지역 없음): **FULLTEXT** — `MATCH(name, description, category1, category2, category3) AGAINST(CONCAT(:keyword, '*') IN BOOLEAN MODE)`, 인덱스 `ft_search`.
-- **검증**: 키워드 단독 경로는 쿼리·인덱스 정합 확인됨 (2026-02-04)
-
-### 2.5 거리 계산 및 길찾기
-
-**거리 계산 프로세스**:
-
-1. 내 위치 확인 (GPS 또는 수동 입력)
-2. 각 서비스까지의 거리 계산 (Haversine 공식, 미터 단위)
-3. 거리 표시
-4. 길찾기 버튼 클릭 → 네이버맵 길찾기 연동
-
-### 2.6 위치 서비스 리뷰
-
-**리뷰 작성 프로세스**:
-
-1. 위치 서비스 선택
-2. 리뷰 작성 (평점 1-5, 내용)
-3. 중복 리뷰 방지 (한 서비스당 1개의 리뷰만 작성 가능)
-4. 서비스 평점 자동 업데이트
-5. 리뷰 작성/수정/삭제 시 `rating`, `review_count` 캐시를 함께 갱신
-
----
-
-## 3. 서비스 로직 설명
-
-### 3.1 핵심 비즈니스 로직
-
-#### 로직 1: 통합 검색·분기 (`searchLocationServices`)
-
-**구현**: `LocationServiceService.searchLocationServices` — 분기 순서·의미는 §1.1과 동일. 엔트리에서 `normalize()`로 빈 문자열을 `null`로 맞춘 뒤, `searchLocationServicesByLocation` / `searchLocationServicesByRegion` / `searchLocationServicesByKeyword` / `findByOrderByRatingDesc`로 위임한다.
-
-```java
-    public List<LocationServiceDTO> searchLocationServices(
-            String keyword,
-            Double latitude,
-            Double longitude,
-            Integer radius,
-            String sido,
-            String sigungu,
-            String category,
-            String sort,
-            Integer maxResults) {
-
-        // 빈 문자열("")을 null로 정규화 — SQL의 :param IS NULL 조건이 올바르게 작동하도록
-        keyword  = normalize(keyword);
-        category = normalize(category);
-        sido     = normalize(sido);
-        sigungu  = normalize(sigungu);
-        sort     = normalizeSort(sort);
-
-        boolean hasLocation = latitude != null && longitude != null;
-        boolean hasRegion = StringUtils.hasText(sido) || StringUtils.hasText(sigungu);
-        boolean hasKeyword = StringUtils.hasText(keyword);
-
-        // 1순위: 위치(반경) 우선
-        if (hasLocation) {
-            int radiusInMeters = (radius != null && radius > 0) ? radius : DEFAULT_RADIUS_METERS;
-            return searchLocationServicesByLocation(latitude, longitude, radiusInMeters,
-                    keyword, category, sort, maxResults);
-        }
-
-        // 2순위: 지역 계층 (eupmyeondong·roadName 비활성화 — 프론트 미사용)
-        if (hasRegion) {
-            return searchLocationServicesByRegion(sido, sigungu, keyword, category, maxResults);
-        }
-
-        // 3순위: 위치 없을 때 키워드 단독 FULLTEXT (fallback)
-        if (hasKeyword) {
-            return searchLocationServicesByKeyword(keyword, category, maxResults);
-        }
-
-        // 4순위: 전체 평점순
-        return searchLocationServicesByRegion(null, null, null, category, maxResults);
-    }
-```
-
-#### 로직 2: 지역·반경·키워드 단독 — DB에서 필터
-
-- `**searchLocationServicesByRegion**`: sigungu → sido → 없으면 전체 평점순. (`eupmyeondong`·`roadName` 분기는 비활성화 — 프론트 미사용) `keyword`·`category`는 각 네이티브 쿼리의 `WHERE`에서 처리(이름 `LIKE`, 카테고리 등호). 카테고리는 메모리 스트림 필터가 아니다.
-- `**searchLocationServicesByLocation**`: `findByRadius(..., keyword, category, sort)` 한 번에 조회 후 DTO 변환 시 **Haversine**으로 `distance` 설정(2026-02-03). 메인 location 화면은 이 반경 분기에서 `거리순 / 평점순 / 리뷰순` 정렬 UI를 제공한다.
-- `reviews` 정렬은 반경 검색 `ORDER BY`에서 `locationservice.review_count`를 사용하고, 동순위 보정은 `distance ASC`, `rating DESC`, `idx ASC` 순서다.
-- `**searchLocationServicesByKeyword`**: 위치·지역이 없을 때만 호출. `findByNameContaining(keyword, category)` — **FULLTEXT\*\* `MATCH ... AGAINST` + 카테고리 `WHERE`.
-
-**쿼리 정의**: `SpringDataJpaLocationServiceRepository` — 반경은 `ST_Within`(POLYGON 근사) + `ST_Distance_Sphere` + `keyword`/`category` 조건.
-
-**Soft Delete 조건**:
-
-- 모든 조회 쿼리에 `(isDeleted IS NULL OR isDeleted = false)` 조건 자동 적용
-- Native Query의 경우 `(is_deleted IS NULL OR is_deleted = 0)` 조건 사용
-- 삭제된 데이터는 조회되지 않으며, 평점 계산에서도 제외됨
-
-#### 로직 3: 거리 계산 (Haversine 공식)
-
-**구현 위치**: `LocationServiceService.calculateDistance()`
-
-```java
-public Double calculateDistance(Double lat1, Double lng1, Double lat2, Double lng2) {
-    if (lat1 == null || lng1 == null || lat2 == null || lng2 == null) {
-        return null;
-    }
-
-    final int R = 6371000; // 지구 반경 (미터)
-
-    double dLat = Math.toRadians(lat2 - lat1);
-    double dLng = Math.toRadians(lng2 - lng1);
-
-    double a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-            Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
-            Math.sin(dLng / 2) * Math.sin(dLng / 2);
-
-    double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-    return R * c; // 미터 단위
-}
-```
-
-**핵심 로직**:
-
-- **입력 검증**: 위도/경도가 null이면 null 반환
-- **Haversine 공식**: 지구 반경 6371000m 사용
-- **반환 단위**: 미터 단위
-- **사용 목적**: 내 위치에서 각 서비스까지의 거리 표시
-
-#### 로직 4: 네이버맵 지오코딩 (주소 → 좌표)
-
-**구현 위치**: `NaverMapService.addressToCoordinates()`, `GeocodingController.addressToCoordinates()`
-
-**핵심 로직**:
-
-- **API 호출**: 네이버 Geocoding API (`https://maps.apigw.ntruss.com/map-geocode/v2/geocode`)
-- **응답 파싱**: `addresses` 배열에서 첫 번째 결과의 `y`(위도), `x`(경도) 추출
-- **반환 형식**: `Double[]` 배열 `[latitude, longitude]`
-- **에러 처리**: API 키 미설정, 구독 필요 등 에러 처리
-- **주소 정리**: 컨트롤러에서 명시적 처리
-  - `+` 문자를 공백으로 변환 (`address.replace("+", " ")`)
-  - URL 디코딩 (`java.net.URLDecoder.decode(address, "UTF-8")`)
-- **응답 형식**: `{"latitude": ..., "longitude": ..., "success": true}`
-
-#### 로직 5: 네이버맵 역지오코딩 (좌표 → 주소)
-
-**구현 위치**: `NaverMapService.coordinatesToAddress()`
-
-**핵심 로직**:
-
-- **API 호출**: 네이버 역지오코딩 API (`https://naveropenapi.apigw.ntruss.com/map-reversegeocode/v2/gc`)
-- **응답 파싱**: `results` 배열에서 `region`(지번주소), `land`(도로명주소) 추출
-- **주소 조합**: 시도, 시군구, 읍면동, 리를 조합하여 지번주소 생성
-- **반환 형식**: `Map<String, Object>` (`address`, `roadAddress`, `jibunAddress`)
-
-#### 로직 6: 네이버맵 길찾기
-
-**구현 위치**: `NaverMapService.getDirections()`, `GeocodingController.getDirections()`
-
-**핵심 로직**:
-
-- **API 호출**: 네이버 Directions API (`https://maps.apigw.ntruss.com/map-direction/v1/driving`)
-- **경로 옵션**: `traoptimal`(최적, 기본값), `trafast`(최단), `tracomfort`(편한길)
-- **응답 파싱**: `route.traoptimal` 경로 정보 추출
-- **에러 처리**: API 키 미설정, 구독 필요 등 에러 처리
-- **좌표 형식**: 경도,위도 순서로 전달 (`start=경도,위도&goal=경도,위도`)
-- **파라미터 파싱**: 컨트롤러에서 `start`, `goal` 파라미터를 `,`로 분리하여 파싱
-- **기본값**: `option` 파라미터 기본값 "traoptimal"
-
-#### 로직 7: 리뷰 작성 및 평점 업데이트
-
-**구현 위치**: `LocationServiceReviewService.createReview()`
-
-**핵심 로직**:
-
-- **작성자 확인**: JWT `currentUserLoginId`로 `usersRepository.findByIdString()` 조회 — 요청 본문의 `userIdx`는 무시
-- **중복 리뷰 체크**: `existsByServiceIdxAndUserIdx()`로 중복 방지 (중복 시 `LocationReviewDuplicateException`)
-- **서비스/사용자 조회**: 없을 시 `LocationServiceNotFoundException` / `UserNotFoundException`
-- **이메일 인증 확인**: 리뷰 작성 시 이메일 인증 필요 (`EmailVerificationRequiredException`, `EmailVerificationPurpose.LOCATION_REVIEW`)
-- **리뷰 저장**: `LocationServiceReview` 엔티티 생성 및 저장
-- **평점 업데이트**: `updateServiceReviewStats()`로 서비스 평점·리뷰수 원자적 업데이트
-
-#### 로직 8: 리뷰 삭제 (Soft Delete)
-
-**구현 위치**: `LocationServiceReviewService.deleteReview()`
-
-```java
-@Transactional
-public void deleteReview(Long reviewIdx, String currentUserLoginId) {
-    Users actor = usersRepository.findByIdString(currentUserLoginId)
-            .orElseThrow(UserNotFoundException::new);
-
-    LocationServiceReview review = reviewRepository.findByIdWithUserAndService(reviewIdx)
-            .orElseThrow(LocationServiceReviewNotFoundException::new);
-
-    // 소유권 확인 — 작성자 본인만 삭제 가능
-    if (!review.getUser().getIdx().equals(actor.getIdx())) {
-        throw LocationServiceReviewForbiddenException.notOwner();
-    }
-
-    // 이미 삭제된 리뷰인지 확인
-    if (review.getIsDeleted() != null && review.getIsDeleted()) {
-        throw new LocationReviewAlreadyDeletedException();
-    }
-
-    // 이메일 인증 확인
-    Users user = review.getUser();
-    if (user.getEmailVerified() == null || !user.getEmailVerified()) {
-        throw new EmailVerificationRequiredException(
-                "리뷰 삭제를 위해 이메일 인증이 필요합니다.",
-                EmailVerificationPurpose.LOCATION_REVIEW);
-    }
-
-    // Soft Delete 처리
-    review.setIsDeleted(true);
-    review.setDeletedAt(LocalDateTime.now());
-    reviewRepository.save(review);
-
-    // 서비스 평점·리뷰수 업데이트
-    Long serviceIdx = review.getService().getIdx();
-    updateServiceReviewStats(serviceIdx);
-}
-```
-
-**핵심 로직**:
-
-- **소유권 확인**: 작성자 본인만 삭제 가능 (`LocationServiceReviewForbiddenException`)
-- **중복 삭제 방지**: 이미 삭제된 리뷰 재삭제 방지
-- **이메일 인증 확인**: 리뷰 삭제 시 이메일 인증 필요
-- **Soft Delete**: `isDeleted = true`, `deletedAt` 설정 (물리적 삭제 없음)
-- **평점·리뷰수 업데이트**: 삭제 후 `updateServiceReviewStats()` 호출
-
-**평점·리뷰수 업데이트 로직** (`updateServiceReviewStats()`):
-
-```java
-@Transactional
-public void updateServiceReviewStats(Long serviceIdx) {
-    serviceRepository.updateReviewStats(serviceIdx);
-}
-```
-
-**구현 방식**: `updateReviewStats()` 네이티브 쿼리로 `rating`(평균)과 `review_count`(soft delete 제외 건수)를 **단일 원자적 UPDATE**로 갱신한다. 기존 read-modify-write 방식(Lost Update 가능)에서 전환.
-
-#### 로직 10: Python batch JSON 적재 (`LocationImportService`)
-
-**입력**: `InputStream` 또는 파일 경로 → `List<LocationImportDto>` (Jackson 역직렬화)
-
-**처리 흐름:**
-
-1. `isValid()`: name·address 비어있으면 skip, lat·lng null이면 skip, status="폐업"이면 skip
-2. `existsByNameAndAddress()`: 중복이면 `duplicate++`
-3. `toEntity()`: category3에 한글 카테고리 레이블, `dataSource="BATCH_IMPORT"`, `petFriendly=true`
-4. `batchWriter.saveBatch(batch)`: `batchSize=500`(`app.location.import.batch-size`) 단위로 `@Transactional(REQUIRES_NEW)` 저장
-5. 반환: `SyncResult(total, saved, duplicate, skipped)`
-
-`**FacilitySyncScheduler`\*_: `@Scheduled(cron = "0 0 1 _ \* \*")`매일 01:00.`app.location.import.file-path`가 비어있으면 skip.
-
-**Repository 쿼리 조건**:
-
-- 모든 조회 쿼리에 `(isDeleted IS NULL OR isDeleted = false)` 조건 자동 적용
-- 삭제된 리뷰는 조회되지 않으며, 평점·리뷰수 계산에서도 제외됨
-
-#### 로직 9: 위치 서비스 삭제 (Soft Delete)
-
-**구현 위치**: `LocationServiceService.deleteService()`
-
-```java
-@Transactional
-public void deleteService(Long serviceIdx) {
-    LocationService service = locationServiceRepository.findById(serviceIdx)
-            .orElseThrow(LocationServiceNotFoundException::new);
-
-    // 이미 삭제된 서비스인지 확인
-    if (service.getIsDeleted() != null && service.getIsDeleted()) {
-        throw new LocationServiceAlreadyDeletedException();
-    }
-
-    // Soft Delete 처리
-    service.setIsDeleted(true);
-    service.setDeletedAt(LocalDateTime.now());
-    locationServiceRepository.save(service);
-}
-```
-
-**핵심 로직**:
-
-- **중복 삭제 방지**: 이미 삭제된 서비스 재삭제 방지
-- **Soft Delete**: `isDeleted = true`, `deletedAt` 설정 (물리적 삭제 없음)
-- **조회 제외**: 삭제된 서비스는 모든 조회 쿼리에서 자동 제외됨
-
-**Repository 쿼리 조건**:
-
-- 모든 조회 쿼리에 `(isDeleted IS NULL OR isDeleted = false)` 조건 자동 적용
-- Native Query의 경우 `(is_deleted IS NULL OR is_deleted = 0)` 조건 사용
-
-### 3.2 서비스 메서드 구조
-
-#### LocationServiceService
-
-| 메서드                               | 설명                    | 주요 로직                                                                                                                            |
-| ------------------------------------ | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `searchLocationServices()`           | 통합 검색 엔트리        | §1.1 분기 — 위치 → 지역 → 키워드 단독 FULLTEXT → 평점순, `normalize()`                                                               |
-| `searchLocationServicesByRegion()`   | 지역 계층별 서비스 검색 | sigungu→sido→평점순 (`eupmyeondong`·`roadName` 비활성화), `keyword`·`category`는 네이티브 `WHERE`, 최대 결과 수, Soft Delete 제외    |
-| `searchLocationServicesByLocation()` | 위치 기반 반경 검색     | `findByRadius`(ST_Within+ST_Distance_Sphere), `keyword`·`category` SQL, Haversine `distance` DTO                                     |
-| `searchLocationServicesByKeyword()`  | 키워드 단독(FULLTEXT)   | `findByNameContaining` — `MATCH...AGAINST`, 위치·지역 없을 때만                                                                      |
-| `calculateDistance()`                | 거리 계산               | Haversine 공식 (미터 단위)                                                                                                           |
-| `getPopularLocationServices()`       | 인기 서비스 조회        | `findTop10ByCategoryOrderByRatingDesc(category)`, category1/2/3 매칭, `@Cacheable` 적용, Soft Delete 제외 (컨트롤러 엔드포인트 없음) |
-| `deleteService()`                    | 서비스 삭제             | Soft Delete 처리 (`isDeleted = true`, `deletedAt` 설정)                                                                              |
-
-#### LocationServiceScoreScheduler
-
-| 메서드                   | 설명                | 주요 로직                                                                                   |
-| ------------------------ | ------------------- | ------------------------------------------------------------------------------------------- |
-| `recalculateAllScores()` | 전체 `score` 재계산 | 매일 자정(`0 0 0 * * *`), `score = 0.5 × rating × log10(reviewCount+1) + 0.2 × petFriendly` |
-
-#### NaverMapService
-
-| 메서드                   | 설명           | 주요 로직                                  |
-| ------------------------ | -------------- | ------------------------------------------ |
-| `addressToCoordinates()` | 주소→좌표 변환 | 네이버 Geocoding API 호출, 좌표 추출       |
-| `coordinatesToAddress()` | 좌표→주소 변환 | 네이버 역지오코딩 API 호출, 주소 조합      |
-| `getDirections()`        | 길찾기         | 네이버 Directions API 호출, 경로 정보 반환 |
-
-#### LocationServiceReviewService
-
-| 메서드                                                   | 설명                    | 주요 로직                                                                                                           |
-| -------------------------------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `createReview(reviewDTO, currentUserLoginId)`            | 리뷰 작성               | JWT 로그인 ID로 작성자 확인, 중복 체크 (`LocationReviewDuplicateException`), 이메일 인증 확인, 평점·리뷰수 업데이트 |
-| `updateReview(reviewIdx, reviewDTO, currentUserLoginId)` | 리뷰 수정               | 소유권 확인 (`LocationServiceReviewForbiddenException`), 이메일 인증 확인, 평점·리뷰수 업데이트                     |
-| `deleteReview(reviewIdx, currentUserLoginId)`            | 리뷰 삭제               | 소유권 확인, 중복 삭제 방지, 이메일 인증 확인, Soft Delete, 평점·리뷰수 업데이트                                    |
-| `getReviewsByService()`                                  | 서비스별 리뷰 목록 조회 | `findByServiceIdxOrderByCreatedAtDesc()`, Soft Delete 제외                                                          |
-| `getReviewsByUser()`                                     | 사용자별 리뷰 목록 조회 | `findByUserIdxOrderByCreatedAtDesc()`, Soft Delete 제외                                                             |
-| `updateServiceReviewStats()`                             | 서비스 평점·리뷰수 갱신 | `serviceRepository.updateReviewStats()` — 단일 원자적 DB UPDATE (`rating` + `review_count`)                         |
-
-### 3.3 트랜잭션 처리
-
-- **트랜잭션 범위**:
-  - 조회 메서드: 트랜잭션 없음 (읽기 전용)
-  - 서비스 삭제: `@Transactional` (Soft Delete)
-  - 리뷰 작성/수정/삭제: `@Transactional`
-  - 평점 업데이트: `@Transactional`
-- **격리 수준**: 기본값 (READ_COMMITTED)
-- **이메일 인증**: 리뷰 작성/수정/삭제 시 이메일 인증 확인 (`EmailVerificationRequiredException`, `EmailVerificationPurpose.LOCATION_REVIEW`)
-- **Soft Delete**:
-  - **서비스 삭제**: `isDeleted = true`, `deletedAt` 설정
-  - **리뷰 삭제**: `isDeleted = true`, `deletedAt` 설정
-  - **조회 제외**: 모든 조회 쿼리에서 `(isDeleted IS NULL OR isDeleted = false)` 조건 자동 적용
-  - **평점 계산**: 삭제된 리뷰는 평점 계산에서 제외
-
-### 3.4 예외 처리
-
-| 예외                                      | 발생 시점                                                                      |
-| ----------------------------------------- | ------------------------------------------------------------------------------ |
-| `LocationServiceNotFoundException`        | 서비스 조회 실패 (`deleteService`, `updateServiceReviewStats`, `createReview`) |
-| `LocationServiceAlreadyDeletedException`  | 이미 삭제된 서비스 재삭제 시도                                                 |
-| `LocationServiceReviewNotFoundException`  | 리뷰 조회 실패 (`updateReview`, `deleteReview`)                                |
-| `LocationServiceReviewForbiddenException` | 타인의 리뷰 수정/삭제 시도 (`updateReview`, `deleteReview`)                    |
-| `LocationReviewDuplicateException`        | 동일 서비스에 리뷰 중복 작성 (`createReview`)                                  |
-| `LocationReviewAlreadyDeletedException`   | 이미 삭제된 리뷰 재삭제 시도                                                   |
-| `UserNotFoundException`                   | 리뷰 작성/수정/삭제 시 JWT 사용자 조회 실패                                    |
-| `EmailVerificationRequiredException`      | 리뷰 작성/수정/삭제 시 이메일 미인증                                           |
-
----
-
-## 4. 아키텍처 설명
-
-> **역할 분담**: 이 절은 도메인 패키지 구조·엔티티·API를 한눈에 보기 위한 요약이다. **시스템 레이어·외부 연동·다이어그램**은 `docs/architecture/위치 기반 서비스 아키텍처.md`를 참고한다. (같은 내용을 두 파일에 길게 중복하지 않는다.)
-
-### 4.1 엔티티 구조
-
-#### LocationService (위치 서비스)
-
-**필드 요약 (엔티티 기준, 실제 코드와 동일)**
-
-| 필드                                          | 타입                          | 비고                                                                                             |
-| --------------------------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------ |
-| `idx`                                         | `Long`                        | PK, `@GeneratedValue(IDENTITY)`                                                                  |
-| `name`                                        | `String`                      | 필수, max 150                                                                                    |
-| `category1`, `category2`, `category3`         | `String`                      | 카테고리 계층                                                                                    |
-| `sido`, `sigungu`, `eupmyeondong`, `roadName` | `String`                      | 지역·도로명                                                                                      |
-| `address`                                     | `String`                      | 전체 주소                                                                                        |
-| `zipCode`                                     | `String`                      | 우편번호                                                                                         |
-| `latitude`, `longitude`                       | `Double`                      | 애플리케이션·DTO 기준 좌표                                                                       |
-| `phone`, `website`                            | `String`                      | 연락·웹                                                                                          |
-| `closedDay`, `operatingHours`                 | `String`                      | 휴무·운영시간                                                                                    |
-| `parkingAvailable`                            | `Boolean`                     | 주차                                                                                             |
-| `priceInfo`                                   | `String`                      | 가격 안내                                                                                        |
-| `petFriendly`                                 | `Boolean`                     | 기본 `false`                                                                                     |
-| `isPetOnly`                                   | `Boolean`                     | 반려 전용                                                                                        |
-| `petSize`, `petRestrictions`, `petExtraFee`   | `String`                      | 반려 정책                                                                                        |
-| `indoor`, `outdoor`                           | `Boolean`                     | 실내·실외                                                                                        |
-| `description`                                 | `String`                      | TEXT                                                                                             |
-| `rating`                                      | `Double`                      | 기본 `0.0`                                                                                       |
-| `reviewCount`                                 | `Integer`                     | `review_count` 컬럼, 기본 `0`. soft delete 제외 리뷰 수 캐시 — `updateReviewStats()` 원자적 갱신 |
-| `score`                                       | `Double`                      | 기본 `0.0`. `LocationServiceScoreScheduler`가 매일 자정 재계산 — `sort=score` 정렬의 기준값      |
-| `lastUpdated`                                 | `LocalDate`                   | 최종작성일                                                                                       |
-| `dataSource`                                  | `String`                      | 기본 `"PUBLIC"` (공공데이터), `"PET_DATA_API"` (FacilitySyncService 적재분)                      |
-| `isDeleted`                                   | `Boolean`                     | Soft delete, 기본 `false`                                                                        |
-| `deletedAt`                                   | `LocalDateTime`               | 삭제 시각                                                                                        |
-| `reviews`                                     | `List<LocationServiceReview>` | `@OneToMany`                                                                                     |
-
-**DB 전용 (엔티티 미매핑)**: 반경 검색용 `**location`\*\* 컬럼(`POINT`, SRID 4326)이 스키마에 존재하며, 네이티브 쿼리(`ST_Within`, `ST_Distance_Sphere`)에서만 사용한다. JPA 엔티티에는 `latitude`/`longitude`만 둔다.
-
-```java
-@Entity
-@Table(name = "locationservice")
-public class LocationService {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long idx;
-
-    @Column(nullable = false, length = 150)
-    private String name;
-
-    // 카테고리 계층 구조
-    @Column(name = "category1", length = 100)
-    private String category1; // 카테고리1 (대분류)
-
-    @Column(name = "category2", length = 100)
-    private String category2; // 카테고리2 (중분류)
-
-    @Column(name = "category3", length = 100)
-    private String category3; // 카테고리3 (소분류)
-
-    // 주소 구성 요소
-    @Column(name = "sido", length = 50)
-    private String sido; // 시도
-
-    @Column(name = "sigungu", length = 50)
-    private String sigungu; // 시군구
-
-    @Column(name = "eupmyeondong", length = 50)
-    private String eupmyeondong; // 읍면동
-
-    @Column(name = "road_name", length = 100)
-    private String roadName; // 도로명
-
-    @Column(name = "address", length = 255)
-    private String address; // 기본 주소
-
-    @Column(name = "zip_code", length = 10)
-    private String zipCode; // 우편번호
-
-    // 위치 정보 (DB에는 추가로 POINT `location` 컬럼 있음 — 엔티티 미매핑)
-    private Double latitude;
-    private Double longitude;
-
-    private String phone;
-    private String website;
-
-    // 운영 정보
-    @Column(name = "closed_day", length = 255)
-    private String closedDay; // 휴무일
-
-    @Column(name = "operating_hours", length = 255)
-    private String operatingHours; // 운영시간
-
-    @Column(name = "parking_available")
-    private Boolean parkingAvailable; // 주차 가능여부
-
-    @Column(name = "price_info", length = 255)
-    private String priceInfo; // 가격 정보
-
-    // 반려동물 정책
-    @Column(name = "pet_friendly")
-    @Builder.Default
-    private Boolean petFriendly = false; // 반려동물 동반 가능
-
-    @Column(name = "is_pet_only")
-    private Boolean isPetOnly; // 반려동물 전용
-
-    @Column(name = "pet_size", length = 100)
-    private String petSize; // 입장 가능 동물 크기
-
-    @Column(name = "pet_restrictions", length = 255)
-    private String petRestrictions; // 반려동물 제한사항
-
-    @Column(name = "pet_extra_fee", length = 255)
-    private String petExtraFee; // 애견 동반 추가 요금
-
-    @Column(name = "indoor")
-    private Boolean indoor; // 실내 여부
-
-    @Column(name = "outdoor")
-    private Boolean outdoor; // 실외 여부
-
-    @Column(columnDefinition = "TEXT")
-    private String description; // 서비스 설명
-
-    @Column(name = "rating")
-    @Builder.Default
-    private Double rating = 0.0; // 평균 평점
-
-    @Column(name = "review_count")
-    @Builder.Default
-    private Integer reviewCount = 0; // soft delete 제외 리뷰 수 캐시
-
-    @Column(name = "score")
-    @Builder.Default
-    private Double score = 0.0; // LocationServiceScoreScheduler 재계산 — sort=score 기준
-
-    @Column(name = "last_updated")
-    private LocalDate lastUpdated; // 최종작성일
-
-    @Column(name = "data_source", length = 50)
-    @Builder.Default
-    private String dataSource = "PUBLIC"; // 데이터 출처
-
-    // Soft Delete 필드
-    @Column(name = "is_deleted")
-    @Builder.Default
-    private Boolean isDeleted = false;
-
-    @Column(name = "deleted_at")
-    private LocalDateTime deletedAt;
-
-    @OneToMany(mappedBy = "service", cascade = CascadeType.ALL)
-    private List<LocationServiceReview> reviews;
-}
-```
-
-**특징**:
-
-- `BaseTimeEntity`를 상속하지 않음 (`createdAt`, `updatedAt` 없음, DB에 컬럼 없음)
-- 지역 계층 구조: sido → sigungu → eupmyeondong → roadName
-- 카테고리 계층 구조: category1 → category2 → category3
-- 반려동물 관련 필드: `petFriendly`, `isPetOnly`, `petSize`, `petRestrictions`, `petExtraFee`
-- 연락: `phone`, `website`
-- Soft Delete: `isDeleted`, `deletedAt` 필드로 Soft Delete 지원
-
-#### LocationServiceReview (위치 서비스 리뷰)
-
-```java
-@Entity
-@Table(name = "locationservicereview")
-public class LocationServiceReview extends BaseTimeEntity {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long idx;
-
-    @ManyToOne
-    @JoinColumn(name = "service_idx", nullable = false)
-    private LocationService service;
-
-    @ManyToOne
-    @JoinColumn(name = "user_idx", nullable = false)
-    private Users user;
-
-    @Column(nullable = false)
-    private Integer rating; // 평점 (1~5)
-
-    @Lob
-    private String comment; // 리뷰 내용
-
-    @Column(name = "is_deleted")
-    @Builder.Default
-    private Boolean isDeleted = false;
-
-    @Column(name = "deleted_at")
-    private LocalDateTime deletedAt;
-
-    // createdAt, updatedAt은 BaseTimeEntity에서 상속받음
-    // @EntityListeners가 자동으로 처리
-}
-```
-
-**특징**:
-
-- `BaseTimeEntity`를 상속하여 `createdAt`, `updatedAt` 자동 관리
-- Soft Delete: `isDeleted`, `deletedAt` 필드로 Soft Delete 지원
-- 중복 리뷰 방지: `existsByServiceIdxAndUserIdx()`로 체크
-
-### 4.2 도메인 구조
-
-```
-domain/location/
-  ├── controller/
-  │   ├── LocationServiceController.java         # GET /search, DELETE /{idx}
-  │   ├── LocationServiceAdminController.java     # POST /api/admin/location/sync
-  │   ├── LocationServiceReviewController.java
-  │   └── GeocodingController.java
-  # 관리자: domain/admin/controller/AdminLocationController.java → /api/admin/location-services
-  ├── service/
-  │   ├── LocationServiceService.java
-  │   ├── LocationServiceReviewService.java
-  │   ├── LocationServiceScoreScheduler.java     # 매일 자정 score 재계산
-  │   ├── LocationImportService.java             # Python batch JSON → DB upsert
-  │   ├── FacilitySyncScheduler.java             # 매일 01:00 importFromFile 호출
-  │   ├── PublicDataLocationService.java
-  │   ├── LocationServiceBatchWriter.java        # @Transactional(REQUIRES_NEW) 배치 저장
-  │   ├── LocationServiceAdminService.java
-  │   └── NaverMapService.java
-  ├── entity/
-  │   ├── LocationService.java
-  │   └── LocationServiceReview.java
-  ├── repository/
-  │   ├── LocationServiceRepository.java
-  │   └── LocationServiceReviewRepository.java
-  ├── converter/
-  │   ├── LocationServiceConverter.java
-  │   └── LocationServiceReviewConverter.java
-  ├── dto/
-  │   ├── LocationServiceDTO.java
-  │   ├── LocationImportDto.java                 # Python batch JSON 스키마
-  │   ├── LocationServiceReviewDTO.java
-  │   ├── LocationServiceLoadResponse.java
-  │   └── PublicDataLocationDTO.java
-  ├── exception/
-  │   ├── LocationServiceNotFoundException.java
-  │   ├── LocationServiceAlreadyDeletedException.java
-  │   ├── LocationServiceReviewNotFoundException.java
-  │   ├── LocationReviewDuplicateException.java
-  │   └── LocationReviewAlreadyDeletedException.java
-  └── util/
-      └── OperatingHoursParser.java
-```
-
-### 4.3 엔티티 관계도 (ERD)
-
-```mermaid
-erDiagram
-    LocationService ||--o{ LocationServiceReview : "리뷰"
-    Users ||--o{ LocationServiceReview : "작성"
-```
-
-### 4.4 API 설계
-
-#### REST API
-
-**참고**: 리뷰 관련 API는 클래스 레벨에 `@PreAuthorize("isAuthenticated()")` 적용되어 인증 필요
-
-| 엔드포인트                                           | Method | 설명                                                                                                                                                                                                                                                                   |
-| ---------------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/api/location-services/search`                      | GET    | 통합 검색 §1.1: **위치(lat+lng)** → **지역** → **키워드 단독 FULLTEXT** → 평점순. `radius` 생략·`≤0`이면 서비스에서 10000m. `size` 기본 100, `≤0`이면 전체. `sort` 값: `distance`(기본)·`rating`·`reviews`·`score`. 응답 `{"services","count"}`. **`/api/`** 인증 필요 |
-| `/api/location-services/{serviceIdx}`                | DELETE | 위치 서비스 삭제 (Soft Delete, `ADMIN`/`MASTER`, LocationServiceNotFoundException, LocationServiceAlreadyDeletedException)                                                                                                                                             |
-| `/api/location-service-reviews`                      | POST   | 리뷰 작성 (인증 필요, 클래스 레벨 `@PreAuthorize`, 응답: `{"review": {...}, "message": "..."}`)                                                                                                                                                                        |
-| `/api/location-service-reviews/{reviewIdx}`          | PUT    | 리뷰 수정 (인증 필요, 클래스 레벨 `@PreAuthorize`, 응답: `{"review": {...}, "message": "..."}`)                                                                                                                                                                        |
-| `/api/location-service-reviews/{reviewIdx}`          | DELETE | 리뷰 삭제 (인증 필요, Soft Delete, LocationServiceReviewNotFoundException, LocationReviewAlreadyDeletedException)                                                                                                                                                      |
-| `/api/location-service-reviews/service/{serviceIdx}` | GET    | 서비스별 리뷰 목록 조회 (Soft Delete 제외, 응답: `{"reviews": [...], "count": N}`)                                                                                                                                                                                     |
-| `/api/location-service-reviews/user/{userIdx}`       | GET    | 사용자별 리뷰 목록 조회 (Soft Delete 제외, 응답: `{"reviews": [...], "count": N}`)                                                                                                                                                                                     |
-| `/api/geocoding/address`                             | GET    | 주소→좌표 변환 (address 파라미터, 컨트롤러에서 명시적 URL 디코딩 처리, 응답: `{"latitude": ..., "longitude": ..., "success": true}`)                                                                                                                                   |
-| `/api/geocoding/coordinates`                         | GET    | 좌표→주소 변환 (lat, lng 파라미터)                                                                                                                                                                                                                                     |
-| `/api/geocoding/directions`                          | GET    | 길찾기 (start, goal, option 파라미터 기본값 "traoptimal", 경도,위도 순서)                                                                                                                                                                                              |
-
-#### 관리자 (`AdminLocationController`, `/api/admin/location-services`)
-
-| 엔드포인트                                             | Method | 설명                                                                                        |
-| ------------------------------------------------------ | ------ | ------------------------------------------------------------------------------------------- |
-| `/api/admin/location-services`                         | GET    | 목록 — `searchLocationServicesByRegion` + 선택 `q`(키워드, **SQL WHERE**), `ADMIN`/`MASTER` |
-| `/api/admin/location-services/load-data`               | POST   | 초기 데이터 로드 — `MASTER` 전용                                                            |
-| `/api/admin/location-services/import-public-data`      | POST   | CSV 업로드 임포트 — `MASTER`, `multipart/form-data`                                         |
-| `/api/admin/location-services/import-public-data-path` | POST   | CSV 경로 임포트 — `MASTER`                                                                  |
-
-#### 관리자 (`LocationServiceAdminController`, `/api/admin/location`)
-
-| 엔드포인트                   | Method | 설명                                                                                                                                               |
-| ---------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/api/admin/location/import` | POST   | Python batch JSON 파일 multipart 업로드 → `LocationImportService.importFromStream()`, `ADMIN`/`MASTER`. 응답: `{total, saved, duplicate, skipped}` |
-
-**보안 참고**: `SecurityConfig`에서 `/api/geocoding/`**는 `permitAll()`입니다. `/api/location-services/**`·`/api/location-service-reviews/**`는 기본적으로 `/api/**`규칙에 따라 **인증 필요**(리뷰 컨트롤러는`isAuthenticated()`).
-
-**지역 계층별 검색 요청 예시**:
-
-```http
-GET /api/location-services/search?sido=서울특별시&sigungu=노원구&category=동물약국&size=100
-```
-
-**위치 기반 검색 요청 예시** (`latitude`·`longitude`만 있어도 위치 분기 — `radius`는 선택):
-
-```http
-GET /api/location-services/search?latitude=37.5665&longitude=126.9780&radius=5000&category=동물약국&size=100
-# radius 생략 또는 ≤0 → 서비스에서 반경 10000m
-# size 생략 시 기본 100; 0 이하 → 전체
-```
-
-**좌표만 넘긴 경우** (반경 생략):
-
-```http
-GET /api/location-services/search?latitude=37.5665&longitude=126.9780
-# 위치 분기 O, 기본 반경 10000m
-```
-
-**지역 계층별 검색 응답 예시**:
+# Location 도메인
+
+> 기준: 현재 코드를 단일 진실로 본다. 리팩토링/트러블슈팅 문서는 배경과 히스토리로만 참고한다.
+
+## 1. 범위
+
+Location 도메인은 반려동물 관련 장소 데이터를 검색하고, 지도에 표시하고, 시설 리뷰를 관리하는 도메인이다.
+
+현재 사용자-facing 핵심 경로는 통합 지도 `주변서비스` 탭이다. 이 경로는 행정구역 계층 탐색보다 `lat/lng + radius` 반경 검색을 기본으로 사용한다. 지역 계층 검색과 FULLTEXT 검색은 백엔드에 남아 있지만, 메인 지도에서는 지역명 검색 또는 위치 정보가 없는 fallback 경로에 가깝다.
+
+포함 범위:
+
+- 위치 서비스 검색
+- 반경 기반 주변 시설 조회
+- 지역명 기반 시설 조회
+- 키워드 단독 FULLTEXT 검색
+- 카테고리 필터링
+- 지도 검색 기준 관리
+- 시설 리뷰 작성/수정/삭제/조회
+- 리뷰 평균 평점과 리뷰 수 캐시 갱신
+- 주소 검색, 주소-좌표 변환, 좌표-주소 변환, 길찾기
+- 관리자용 위치 서비스 목록 조회와 공공데이터 CSV 임포트
+
+비범위:
+
+- Meetup/Care의 지도 반경 조회 로직
+- 추천 signal 분석 자체
+- 단일 통합 지도 BFF API
+
+## 2. 주요 코드
+
+| 구분                       | 주요 파일                                                                                                    |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| 프론트 통합 지도           | `frontend/src/components/UnifiedMap/UnifiedPetMapPage.js`                                                    |
+| 통합 지도 API 어댑터       | `frontend/src/api/unifiedMapApi.js`                                                                          |
+| 위치 서비스 API 클라이언트 | `frontend/src/api/locationServiceApi.js`                                                                     |
+| 검색 컨트롤러              | `backend/main/java/com/linkup/Petory/domain/location/controller/LocationServiceController.java`              |
+| 검색 서비스                | `backend/main/java/com/linkup/Petory/domain/location/service/LocationServiceService.java`                    |
+| 검색 Repository            | `backend/main/java/com/linkup/Petory/domain/location/repository/SpringDataJpaLocationServiceRepository.java` |
+| 리뷰 컨트롤러              | `backend/main/java/com/linkup/Petory/domain/location/controller/LocationServiceReviewController.java`        |
+| 리뷰 서비스                | `backend/main/java/com/linkup/Petory/domain/location/service/LocationServiceReviewService.java`              |
+| 지오코딩 컨트롤러          | `backend/main/java/com/linkup/Petory/domain/location/controller/GeocodingController.java`                    |
+| Naver Maps 연동            | `backend/main/java/com/linkup/Petory/domain/location/service/NaverMapService.java`                           |
+| 관리자 Location API        | `backend/main/java/com/linkup/Petory/domain/admin/controller/AdminLocationController.java`                   |
+| 공공데이터 적재            | `backend/main/java/com/linkup/Petory/domain/location/service/PublicDataLocationService.java`                 |
+
+## 3. 검색 API
+
+### `GET /api/location-services/search`
+
+위치 서비스 검색의 단일 진입점이다.
+
+요청 파라미터:
+
+| 파라미터    | 단위/의미 | 비고                                                       |
+| ----------- | --------- | ---------------------------------------------------------- |
+| `latitude`  | 위도      | `longitude`와 함께 있으면 반경 검색                        |
+| `longitude` | 경도      | `latitude`와 함께 있으면 반경 검색                         |
+| `radius`    | 미터      | 없거나 `<= 0`이면 10,000m                                  |
+| `sido`      | 시도      | 위치 파라미터가 없을 때 지역 검색                          |
+| `sigungu`   | 시군구    | 위치 파라미터가 없을 때 지역 검색, `sido`보다 우선         |
+| `category`  | 카테고리  | `category1/2/3` 중 하나와 일치하면 포함                    |
+| `keyword`   | 검색어    | 경로에 따라 `LIKE` 또는 FULLTEXT                           |
+| `sort`      | 정렬      | `stable`, `distance`, `rating`, `reviews`, `score`         |
+| `size`      | 결과 상한 | 컨트롤러 기준 `null`이면 100, `<=0`이면 제한 없음으로 전달 |
+
+응답:
 
 ```json
 {
-  "services": [
-    {
-      "idx": 1,
-      "name": "노원동물병원",
-      "category1": "의료",
-      "category2": "동물병원",
-      "category3": "동물약국",
-      "sido": "서울특별시",
-      "sigungu": "노원구",
-      "eupmyeondong": "상계동",
-      "address": "서울특별시 노원구 상계로 123",
-      "latitude": 37.5665,
-      "longitude": 126.978,
-      "rating": 4.5
-    }
-  ],
-  "count": 1
+  "services": [],
+  "count": 0
 }
 ```
 
-**리뷰 작성 응답 예시**:
+### 검색 분기
 
-```json
-{
-  "review": {
-    "idx": 1,
-    "serviceIdx": 1,
-    "userIdx": 1,
-    "rating": 5,
-    "comment": "깨끗하고 친절합니다.",
-    "createdAt": "2024-01-10T10:00:00"
-  },
-  "message": "리뷰가 성공적으로 작성되었습니다."
-}
+현재 컨트롤러의 분기 순서는 다음과 같다.
+
+```text
+latitude + longitude 있음
+  -> 반경 검색
+
+위치 없음 + sigungu/sido 있음
+  -> 지역 검색
+
+위치 없음 + 지역 없음 + keyword 있음
+  -> FULLTEXT 키워드 검색
+
+조건 없음
+  -> 전체 평점순
 ```
 
-**리뷰 수정 응답 예시**:
+중요한 점:
 
-```json
-{
-  "review": {
-    "idx": 1,
-    "serviceIdx": 1,
-    "userIdx": 1,
-    "rating": 4,
-    "comment": "수정된 리뷰 내용",
-    "updatedAt": "2024-01-11T10:00:00"
-  },
-  "message": "리뷰가 성공적으로 수정되었습니다."
-}
-```
+- keyword가 있어도 `latitude + longitude`가 있으면 반경 검색이 우선이다.
+- 반경/지역 검색에서 keyword는 `name LIKE '%keyword%'` 조건이다.
+- FULLTEXT는 위치와 지역 파라미터가 모두 없는 keyword 단독 경로에서만 사용한다.
+- `category`는 세 경로 모두에서 SQL `WHERE` 조건으로 처리한다.
 
-**리뷰 삭제 응답 예시**:
+## 4. 메인 지도 경로
 
-```json
-{
-  "message": "리뷰가 성공적으로 삭제되었습니다."
-}
-```
+프론트 통합 지도는 `UnifiedPetMapPage`가 담당한다.
 
-**서비스 삭제 응답 예시**:
+핵심 상태:
 
-```json
-{
-  "message": "서비스가 성공적으로 삭제되었습니다."
-}
-```
+| 상태                | 의미                                |
+| ------------------- | ----------------------------------- |
+| `mapViewportCenter` | 사용자가 현재 보고 있는 지도 중심   |
+| `searchCenter`      | 서버에 실제 검색 기준으로 보낸 중심 |
+| `radius`            | UI 단위 km                          |
+| `locationKeyword`   | 주변서비스 검색어                   |
+| `locationCategory`  | 주변서비스 카테고리 필터            |
+| `locationSort`      | 주변서비스 정렬, 기본값 `stable`    |
 
-**서비스별 리뷰 목록 응답 예시**:
+주변서비스 탭은 `searchCenter` 기준으로 조회한다. 지도 드래그는 `mapViewportCenter`만 바꾸고, 바로 API를 다시 호출하지 않는다. 사용자가 `"이 지역 검색"`을 누르거나 검색/카테고리/정렬을 바꿀 때 `searchCenter`를 갱신한다.
 
-```json
-{
-  "reviews": [
-    {
-      "idx": 1,
-      "serviceIdx": 1,
-      "userIdx": 1,
-      "rating": 5,
-      "comment": "깨끗하고 친절합니다.",
-      "createdAt": "2024-01-10T10:00:00"
-    }
-  ],
-  "count": 1
-}
-```
-
-**지오코딩 요청 예시**:
-
-```http
-GET /api/geocoding/address?address=서울시 강남구
-```
-
-**지오코딩 응답 예시**:
-
-```json
-{
-  "latitude": 37.4979,
-  "longitude": 127.0276,
-  "success": true
-}
-```
-
-**길찾기 요청 예시**:
-
-```http
-GET /api/geocoding/directions?start=127.1058342,37.359708&goal=129.075986,35.179470&option=traoptimal
-# option 파라미터 생략 시 기본값 "traoptimal"
-GET /api/geocoding/directions?start=127.1058342,37.359708&goal=129.075986,35.179470
-```
-
-**길찾기 응답 예시**:
-
-```json
-{
-  "success": true,
-  "data": {
-    "route": {
-      "traoptimal": {
-        "summary": {
-          "distance": 123456,
-          "duration": 3600
-        }
-      }
-    }
-  }
-}
-```
-
----
-
-## 5. 프론트엔드 로직 설명
-
-### 5.1 핵심 UX 설계 원칙
-
-#### 원칙 1: "지도는 상태를 바꾸지 않는다"
-
-**핵심 문장**: 지도는 상태를 직접 변경하지 않고, 상태 변경 "의사"만 만든다
-
-**구현 방식**:
-
-- 지도 이동 → "이 지역 검색" 버튼 표시 (상태 변경 의사만 표시)
-- 사용자 확인 → 데이터 변경 (명시적 액션 후 실행)
-- 지도는 탐색 UI일 뿐, 데이터를 제어하지 않음
-
-**코드 예시**:
+`unifiedMapApi.fetchActiveMapItems()`는 주변서비스 탭에서 다음 값을 보낸다.
 
 ```javascript
-// handleMapIdle: 지도 이동 시 자동 API 호출 제거
-const handleMapIdle = useCallback((mapInfo) => {
-  if (isUserDrag) {
-    // ✅ 상태 변경 의사만 표시
-    setPendingSearchLocation(newCenter);
-    setShowSearchButton(true);
-    // ❌ 기존: 즉시 API 호출 (제거됨)
-  }
-}, []);
-
-// handleSearchButtonClick: 사용자 확인 후 검색 실행
-const handleSearchButtonClick = useCallback(() => {
-  // ✅ 지역 선택 상태 초기화 (위치 기반 검색으로 전환)
-  setSelectedSido("");
-  setSelectedSigungu("");
-  setSelectedEupmyeondong("");
-
-  // ✅ 사용자 확인 후 검색 실행
-  fetchServices({
-    latitude: pendingSearchLocation.lat,
-    longitude: pendingSearchLocation.lng,
-    radius: 5000, // 5km 반경
-  });
-}, [pendingSearchLocation]);
-```
-
-#### 원칙 2: InitialLoadSearch vs UserTriggeredSearch 분리
-
-**개념 분리**:
-
-| 구분                    | 성격        | 트리거           | 실행 방식      | 목적                          |
-| ----------------------- | ----------- | ---------------- | -------------- | ----------------------------- |
-| **InitialLoadSearch**   | 시스템 주도 | 페이지 진입 시   | 자동 실행      | 사용자에게 초기 컨텍스트 제공 |
-| **UserTriggeredSearch** | 사용자 주도 | 명시적 검색 액션 | 사용자 확인 후 | 사용자가 원하는 지역 탐색     |
-
-**구현 방식**:
-
-- `InitialLoadSearch`: `isInitialLoad: true` 플래그로 구분, 자동 실행
-- `UserTriggeredSearch`: "이 지역 검색" 버튼 클릭 시 실행, 지역 선택 상태 초기화
-
-**코드 예시**:
-
-```javascript
-// InitialLoadSearch (시스템 주도)
-useEffect(() => {
-  navigator.geolocation.getCurrentPosition((position) => {
-    const location = {
-      lat: position.coords.latitude,
-      lng: position.coords.longitude,
-    };
-    fetchServices({
-      isInitialLoad: true, // ✅ 구분자
-      latitude: location.lat,
-      longitude: location.lng,
-      radius: 5000, // 5km 반경
-    });
-  });
-}, []);
-
-// UserTriggeredSearch (사용자 주도)
-const handleSearchButtonClick = useCallback(() => {
-  fetchServices({
-    searchType: "USER_TRIGGERED", // ✅ 구분자
-    latitude: pendingSearchLocation.lat,
-    longitude: pendingSearchLocation.lng,
-    radius: 5000,
-  });
-}, [pendingSearchLocation]);
-```
-
-#### 원칙 3: 빈 상태 UX 처리
-
-**빈 상태 시나리오**:
-
-1. 검색 결과 0개
-2. 위치 권한 거부
-3. 너무 넓은 범위 (전국 단위)
-
-**구현 방식**:
-
-- 명확한 안내 메시지 표시
-- 대안 제시 (다른 지역 검색, 카테고리 변경 등)
-- 빈 상태도 하나의 "상태"로 인식
-
-**코드 예시**:
-
-```javascript
-// 빈 상태 컴포넌트
 {
-  services.length === 0 && (
-    <EmptyStateContainer>
-      <EmptyIcon>📍</EmptyIcon>
-      <EmptyTitle>이 지역에 표시할 장소가 없습니다</EmptyTitle>
-      <EmptyMessage>
-        다른 지역을 검색하거나 카테고리를 변경해보세요.
-      </EmptyMessage>
-      <EmptyActions>
-        <Button onClick={handleResetSearch}>전국 보기</Button>
-        <Button onClick={handleChangeCategory}>카테고리 변경</Button>
-      </EmptyActions>
-    </EmptyStateContainer>
-  );
+  latitude: lat,
+  longitude: lng,
+  radius: radiusKm * 1000,
+  keyword,
+  category,
+  sort,
+  size: 300
 }
 ```
 
-### 5.2 하이브리드 데이터 로딩 전략
+정책:
 
-**초기 로드 전략** (`LocationServiceMap.js`):
+- 프론트 UI의 반경은 km이다.
+- 백엔드 API의 `radius`는 m이다.
+- `unifiedMapApi`가 `radius * 1000`으로 단위를 변환한다.
+- Location 결과는 줌 레벨과 무관하게 `size=300`으로 고정한다.
+- Meetup/Care만 줌 레벨 기반 limit을 유지한다.
 
-1. **사용자 위치 확인**: `navigator.geolocation.getCurrentPosition()` 사용
-2. **전략 선택**:
+## 5. 검색창 fallback
 
-- 위치 있으면: 위치 기반 검색 (5km 반경) + 백엔드 카테고리 필터링
-- 위치 없으면: 전체 조회 + 백엔드 카테고리 필터링
+주변서비스 검색창은 한 번에 keyword만 보내지 않고 다음 순서로 fallback한다.
 
-3. **데이터 저장**: 조회된 데이터를 `allServices`에 저장
-4. **필터링**: 선택된 지역에 따라 클라이언트 필터링
+1. **Geocoding 우선**
+   - `geocodingApi.searchPlaces(kw)`로 주소/장소 좌표 변환을 시도한다.
+   - 성공하면 지도 중심과 검색 기준을 해당 좌표로 이동하고 keyword는 비운다.
 
-**지역 선택 로직**:
+2. **지역명 감지**
+   - geocoding 실패 후 `구/군/시/도/특별시/광역시` 패턴을 확인한다.
+   - 지역명으로 보이면 `sido` 또는 `sigungu` 파라미터로 직접 검색한다.
+   - 이 경로는 `lat/lng`를 보내지 않으므로 백엔드 지역 검색을 탄다.
 
-- **시도/시군구 선택**: 하드코딩된 중심 좌표 사용 (지오코딩 API 호출 없음)
-- **지오코딩 실패 시**: 시군구 중심 좌표로 fallback
+3. **시설명 keyword 검색**
+   - 위 두 경우가 아니면 현재 지도 중심 반경 안에서 keyword 필터 검색을 수행한다.
+   - 좌표가 함께 전달되므로 백엔드에서는 반경 검색 + `name LIKE` 경로가 된다.
 
-**하이브리드 필터링 전략** (개선됨):
+## 6. 반경 검색
 
-- **✅ 일관성 개선 (2026-02-04)**: 지역 선택 시 항상 백엔드 재요청하여 검색 결과 일관성 확보
-- **데이터 범위 확인**: 현재 로드된 데이터의 시도/시군구 범위 확인
-- **지역 선택 시**: 항상 백엔드 재요청 (초기 로드 방식과 무관하게 동일한 결과 제공)
-- **카테고리/키워드 변경 시**: 데이터 범위 내면 프론트엔드 필터링 (`filterServicesByRegion()`), 범위 밖이면 백엔드 재요청
+반경 검색은 `SpringDataJpaLocationServiceRepository.findByRadius`가 담당한다.
 
-**지역 선택 후 지도 이동 시나리오 처리**:
+쿼리 특징:
 
-- **문제**: 지역 선택 상태와 위치 기반 검색이 충돌
-- **해결**: "이 지역 검색" 버튼 클릭 시 지역 선택 상태 초기화 후 위치 기반 검색 실행
-- **설계 원칙**: 지역 선택 vs 위치 기반 검색은 상호 배타적
+- `ST_Within(ls.location, POLYGON(...))`으로 사각 후보를 먼저 줄인다.
+- `ST_Distance_Sphere(ls.location, POINT(...)) <= :radiusInMeters`로 실제 반경 조건을 적용한다.
+- `is_deleted = 0` 조건을 포함한다.
+- keyword는 `ls.name LIKE CONCAT('%', :keyword, '%')`로 처리한다.
+- category는 `category3`, `category2`, `category1` 중 하나와 일치하면 포함한다.
+- `LIMIT :limit`을 SQL에 직접 적용한다.
 
-### 5.3 지도 연동 (`MapContainer.js`)
+서비스 레이어는 응답 DTO에 표시할 거리 값을 Haversine 공식으로 다시 계산해 넣는다.
 
-**네이버맵 API**:
+## 7. 정렬
 
-- **API 키**: `ncpKeyId` 사용 (지도 표시만)
-- **마커 표시**: **전체 표시** (제한 없음, 클러스터링 없음)
-- **디자인**:
-  - 기본: Petory Green 색상의 날렵한 핀 Icon (SVG)
-  - 선택/호버: 크기 확대
-- **줌 레벨**: 카카오맵 레벨(1-14)을 네이버맵 줌(1-21)으로 변환
-- **사용자 위치 마커**: 파란색 원형 마커
+반경 검색의 `sort`는 다음 값을 받는다.
 
-**지도 이벤트 처리**:
+| 값         | 의미                                                       |
+| ---------- | ---------------------------------------------------------- |
+| `stable`   | 추천순. `rating DESC`, `review_count DESC`, `idx ASC` 중심 |
+| `distance` | 거리순. 거리 → 평점 → idx                                  |
+| `rating`   | 평점순. 평점 → 거리 → idx                                  |
+| `reviews`  | 리뷰순. 리뷰 수 → 거리 → 평점 → idx                        |
+| `score`    | score 내림차순                                             |
 
-- **드래그 시작**: `onMapDragStart` 콜백 호출 → `isProgrammaticMoveRef` 리셋
-- **드래그 완료**: `onMapIdle` 콜백 호출 → `isManualOperation` 플래그로 사용자 드래그 감지
-- **마커 클릭**: 서비스 상세 정보 표시 + 지도 이동 (최대 확대, 레벨 3)
+프론트 기본값은 `stable`이고 UI 라벨은 “추천순”이다. 거리순은 중심 좌표가 조금만 바뀌어도 결과 경계가 흔들릴 수 있으므로 기본 검색에는 안정적인 정렬을 사용한다.
 
-**프로그래매틱 이동 처리**:
+## 8. 지역 검색
 
-- **서비스 선택 시**: `isProgrammaticMoveRef.current = true` 설정
-- **API 재조회 방지**: 프로그래매틱 이동 중에는 `handleMapIdle`에서 API 호출 스킵
-- **플래그 리셋**: 지도 이동 완료 후 1초 지연 후 리셋
+지역 검색은 위치 파라미터가 없고 `sigungu` 또는 `sido`가 있을 때만 실행된다.
 
-**마커-리스트 동기화**:
+우선순위:
 
-- **마커 클릭**: 리스트에서 해당 항목 스크롤 (`scrollIntoView`)
-- **리스트 클릭**: 지도 이동 + 최대 확대 (레벨 3)
-- **하이라이트**: `data-service-idx` 속성으로 타겟팅
-
-### 5.4 거리 계산 및 표시
-
-**거리 계산**:
-
-- **Haversine 공식**: 프론트엔드에서 클라이언트 측 계산
-- **메모이제이션**: `useMemo`로 성능 최적화
-- **표시 형식**: 1000m 이상이면 km 단위, 미만이면 m 단위
-
-### 5.5 길찾기 기능
-
-**네이버맵 길찾기 연동**:
-
-- **Directions API 호출**: 백엔드를 통해 네이버 Directions API 호출
-- **경로 정보 표시**: 예상 소요 시간, 예상 거리 표시
-- **주소 변환**: 출발지 좌표를 주소로 변환 (역지오코딩)
-- **좌표 제거**: 좌표 대신 주소만 표시
-- **UI 개선**: 길찾기 화면과 상세페이지 닫기 버튼 통합 (하나의 닫기 버튼으로 두 가지 기능 처리)
-
-**코드 예시**:
-
-```javascript
-// 초기 로드 시 사용자 위치 주소 변환
-useEffect(() => {
-  if (userLocation) {
-    geocodingApi
-      .coordinatesToAddress(userLocation.lat, userLocation.lng)
-      .then((response) => {
-        if (response.success !== false && response.address) {
-          setStartLocationAddress(response.address);
-        }
-      });
-  }
-}, [userLocation]);
-
-// 길찾기 화면 닫기 버튼
-<CloseButton
-  onClick={() => {
-    // 길찾기 화면이 열려있으면 길찾기만 닫기, 아니면 상세페이지 전체 닫기
-    if (showDirections) {
-      setShowDirections(false);
-    } else {
-      setSelectedService(null);
-      setShowDirections(false);
-    }
-  }}
->
-  ✕
-</CloseButton>;
+```text
+sigungu -> sido -> 전체 평점순
 ```
 
-### 5.6 지도 확대/축소 레벨 관리
+현재 백엔드 repository에는 `findBySigungu`, `findBySido`, `findByOrderByRatingDesc`가 활성화되어 있다. `eupmyeondong`, `roadName` 직접 검색 쿼리는 코드상 비활성화되어 있고, 메인 지도에서는 상세 주소나 읍면동 입력을 geocoding으로 좌표화한 뒤 반경 검색으로 처리하는 쪽에 가깝다.
 
-**반경에 따른 지도 레벨 계산**:
+## 9. 키워드 단독 FULLTEXT
 
-```javascript
-const calculateMapLevelFromRadius = (radiusKm) => {
-  if (radiusKm <= 1) return 5; // 1km 이하
-  if (radiusKm <= 3) return 6; // 3km 이하
-  if (radiusKm <= 5) return 7; // 5km 이하 (초기 로드, "이 지역 검색")
-  if (radiusKm <= 10) return 8; // 10km 이하
-  if (radiusKm <= 20) return 9; // 20km 이하
-  return 10; // 20km 초과
-};
-```
+위치 파라미터도 지역 파라미터도 없고 keyword만 있을 때 `findByNameContaining`이 실행된다.
 
-**레벨 사용 규칙**:
-
-- **초기 로드**: 5km 반경 → 레벨 7
-- **"이 지역 검색" 버튼**: 5km 반경 → 레벨 7
-- **서비스 선택**: 최대 확대 → 레벨 3
-- **지역 선택**: 시도/시군구에 따라 적절한 레벨 설정
-
----
-
-## 6. 트랜잭션 처리
-
-### 6.1 트랜잭션 전략
-
-- **리뷰 작성/수정/삭제**: `@Transactional` - 리뷰 저장/수정/삭제와 평점 업데이트를 원자적으로 처리
-- **평점 업데이트**: `@Transactional` - 평균 평점 계산 및 업데이트를 원자적으로 처리
-- **조회 메서드**: 트랜잭션 없음 (읽기 전용)
-- **네이버맵 API 호출**: 트랜잭션 없이 처리 (외부 API 호출)
-- **리뷰 삭제**: Soft Delete 사용 (`isDeleted = true`, `deletedAt` 설정)
-
-### 6.2 동시성 제어
-
-- **리뷰 작성**: 중복 리뷰 체크 (`existsByServiceIdxAndUserIdx()`)로 동시성 문제 방지
-- **평점 업데이트**: 트랜잭션으로 평균 평점 계산 및 업데이트를 원자적으로 처리
-
----
-
-## 7. 성능 최적화
-
-### 7.1 DB 최적화
-
-#### 인덱스 전략
-
-**locationservice 테이블**:
+쿼리:
 
 ```sql
--- Full-Text 검색 (이름, 설명, 카테고리)
-CREATE FULLTEXT INDEX ft_search ON locationservice(name, description, category1, category2, category3);
-
--- 공간 인덱스 — 반경 검색 ST_Within · ST_Distance_Sphere 전용
-ALTER TABLE locationservice ADD SPATIAL INDEX idx_locationservice_location_spatial (location);
-
--- 지역 계층 복합 인덱스 — findBy* USE INDEX 힌트 사용
-CREATE INDEX idx_locationservice_sido_deleted_rating       ON locationservice (sido,         is_deleted, rating DESC);
-CREATE INDEX idx_locationservice_sigungu_deleted_rating    ON locationservice (sigungu,      is_deleted, rating DESC);
-CREATE INDEX idx_locationservice_eupmyeondong_deleted_rating ON locationservice (eupmyeondong, is_deleted, rating DESC);
-CREATE INDEX idx_road_name_deleted_rating                  ON locationservice (road_name,    is_deleted, rating DESC);
-
--- 주소 / 이름+주소 조회
-CREATE INDEX idx_address        ON locationservice(address);
-CREATE INDEX idx_name_address   ON locationservice(name, address);
-
--- 평점 정렬
-CREATE INDEX idx_rating_desc    ON locationservice(rating);
+MATCH(name, description, category1, category2, category3)
+AGAINST(CONCAT(:keyword, '*') IN BOOLEAN MODE)
 ```
 
-> **삭제된 인덱스**: `idx_lat_lng`(공간 인덱스와 중복), `idx_address_detail`(`idx_name_address`가 커버) — `locationservice-index-optimization.sql` 마이그레이션에서 DROP됨.
+사용 필드:
 
-**locationservicereview 테이블**:
+- `name`
+- `description`
+- `category1`
+- `category2`
+- `category3`
+
+주의:
+
+- 이 FULLTEXT 경로는 메인 지도 기본 검색 경로가 아니다.
+- 메인 지도에서 현재 좌표와 함께 검색하면 반경 검색 + `name LIKE` 경로가 된다.
+
+## 10. 리뷰
+
+리뷰 API는 `/api/location-service-reviews` 아래에 있다.
+
+| API                                                      | 설명                  |
+| -------------------------------------------------------- | --------------------- |
+| `POST /api/location-service-reviews`                     | 리뷰 생성             |
+| `PUT /api/location-service-reviews/{reviewIdx}`          | 리뷰 수정             |
+| `DELETE /api/location-service-reviews/{reviewIdx}`       | 리뷰 soft delete      |
+| `GET /api/location-service-reviews/service/{serviceIdx}` | 특정 서비스 리뷰 목록 |
+| `GET /api/location-service-reviews/user/{userIdx}`       | 특정 사용자 리뷰 목록 |
+
+정책:
+
+- 리뷰 API는 인증 사용자가 필요하다.
+- 리뷰 작성자는 JWT의 현재 사용자 기준이며, 요청 본문의 user 정보는 신뢰하지 않는다.
+- 한 사용자는 같은 서비스에 중복 리뷰를 작성할 수 없다.
+- 리뷰 작성/수정/삭제에는 이메일 인증이 필요하다.
+- 본인 리뷰만 수정/삭제할 수 있다.
+- 삭제는 soft delete다.
+
+리뷰 생성/수정/삭제 후 `LocationServiceReviewService.updateServiceReviewStats()`가 호출된다. repository는 DB 단일 UPDATE로 평균 평점과 리뷰 수를 갱신한다.
 
 ```sql
--- 서비스별 리뷰 조회
-CREATE INDEX service_idx ON locationservicereview(service_idx);
-
--- 사용자별 리뷰 조회
-CREATE INDEX user_idx ON locationservicereview(user_idx);
+UPDATE locationservice SET
+  rating = (SELECT COALESCE(AVG(r.rating), 0.0) ...),
+  review_count = (SELECT COUNT(*) ...)
+WHERE idx = :serviceIdx
 ```
 
-**선정 이유**:
+이 방식은 애플리케이션에서 평균을 읽고 다시 저장하는 read-modify-write 흐름보다 동시 리뷰 상황의 Lost Update 위험이 낮다.
 
-- 지역 계층(`sido/sigungu`) + `is_deleted` + `rating DESC` 복합 인덱스 → `findBy`\* 쿼리의 WHERE·ORDER BY 커버, `USE INDEX` 힌트로 확정 사용. (`eupmyeondong`·`road_name` 인덱스는 DB에 존재하나 검색 비활성화)
-- SPATIAL INDEX → `ST_Within`·`ST_Distance_Sphere` 반경 검색 가속 (`idx_lat_lng`은 중복이므로 DROP)
-- `ft_search` FULLTEXT → 키워드 단독 검색 경로 (`MATCH...AGAINST`)
-- `idx_address`, `idx_name_address` → 주소 조회·`LocationImportService` 중복 체크(`existsByNameAndAddress`)
-- `idx_rating_desc` → 평점 정렬
-- JOIN 외래키 (`service_idx`, `user_idx`) → 리뷰 목록 조회
+## 11. 지오코딩과 길찾기
 
-### 7.2 애플리케이션 레벨 최적화
+`GeocodingController`는 Naver Maps 연동을 서버에서 감싼다.
 
-#### 캐싱 전략
+| API                                                        | 설명               |
+| ---------------------------------------------------------- | ------------------ |
+| `GET /api/geocoding/address?address=...`                   | 주소를 좌표로 변환 |
+| `GET /api/geocoding/search?query=...`                      | 주소 키워드 검색   |
+| `GET /api/geocoding/coordinates?lat=...&lng=...`           | 좌표를 주소로 변환 |
+| `GET /api/geocoding/directions?start=lng,lat&goal=lng,lat` | 길찾기             |
 
-**구현 위치**: `LocationServiceService.getPopularLocationServices()`
+주의:
 
-```java
-@Cacheable(value = "popularLocationServices", key = "#category")
-public List<LocationServiceDTO> getPopularLocationServices(String category) {
-    return locationServiceRepository.findTop10ByCategoryOrderByRatingDesc(category)
-            .stream()
-            .map(locationServiceConverter::toDTO)
-            .collect(Collectors.toList());
-}
-```
+- 길찾기의 `start`, `goal`은 `경도,위도` 문자열이다.
+- Naver Maps 키는 프론트가 아니라 서버 설정에 둔다.
 
-**효과**: 인기 서비스 조회 시 캐싱으로 성능 향상
+## 12. 관리자와 데이터 적재
 
-#### 성능 측정 로깅
+관리자 API는 `/api/admin/location-services` 아래에 있다.
 
-**구현 위치**: `LocationServiceService` 검색 메서드들(통합 분기 §1.1)
+| API                                                         | 권한              | 설명                   |
+| ----------------------------------------------------------- | ----------------- | ---------------------- |
+| `GET /api/admin/location-services`                          | `ADMIN`, `MASTER` | 위치 서비스 목록 조회  |
+| `POST /api/admin/location-services/load-data`               | `MASTER`          | 초기 데이터 로드       |
+| `POST /api/admin/location-services/import-public-data`      | `MASTER`          | CSV 파일 업로드 임포트 |
+| `POST /api/admin/location-services/import-public-data-path` | `MASTER`          | CSV 파일 경로 임포트   |
 
-**측정 항목**:
+CSV 업로드는 확장자, Content-Type, 최대 크기 200MB를 검증한다. 공공데이터 적재는 `PublicDataLocationService`가 처리하고, 배치 저장은 별도 writer를 통해 트랜잭션을 분리한다.
 
-- DB 쿼리 실행 시간(키워드·카테고리 조건은 쿼리에 포함)
-- DTO 변환 시간
-- 전체 처리 시간
+## 13. 추천 도메인 연동
 
-**성능 분석**:
+Location 검색어는 `LocationSearchPerformedEvent`로 추천 도메인에 전달될 수 있다.
 
-- **쿼리 실행 시간**: 527ms (1021개 레코드 조회)
-- **DTO 변환 시간**: 15ms (1021개 레코드 변환)
-- **전체 처리 시간**: 548-549ms
-- **동시 요청 처리**: 여러 스레드에서 동시 요청 처리 가능 (nio-8080-exec-4, nio-8080-exec-5)
-- **캐시 효과**: 후속 요청 시 쿼리 시간 감소 (320ms로 단축)
+흐름:
 
-**최적화 포인트**:
+1. 인증 사용자가 keyword 검색을 수행한다.
+2. `LocationServiceService.publishSearchEvent()`가 현재 사용자를 확인한다.
+3. `LocationSearchPerformedEvent`가 발행된다.
+4. 추천 도메인이 사용자 intent signal을 갱신한다.
+5. 주변서비스 탭은 signal을 추천 카드로 보여준다.
+6. 추천 카드를 누르면 기존 Location `category` 검색으로 연결한다.
 
-- ST_Distance_Sphere 쿼리는 전체 테이블 스캔이 필요하므로 인덱스 최적화 중요
-- 대량 데이터 조회 시 DTO 변환 시간도 고려 필요
-- 동시 요청 처리 시 성능 일관성 유지
+추천 signal은 보조 기능이다. signal 조회가 실패하면 프론트는 빈 배열로 처리하고 Location 검색 자체는 계속 동작한다.
 
-#### 프론트엔드 최적화
+## 14. 한계와 개선
 
-- **하이브리드 데이터 로딩**: 초기에 클라이언트가 넘기는 반경(예: 5km) 또는 지역/전체 조회 + 클라이언트 필터링
-- **지역 필터링**: 현재 데이터 범위 내면 프론트엔드 필터링, 범위 밖이면 백엔드 재요청
-- **메모이제이션**: 거리 계산, 서비스 필터링 (`useMemo` 사용)
-- **배치 처리**: 마커 생성 시 배치 처리로 성능 개선 (50개씩)
-- **마커 개수 제한**: 최대 20개 마커만 표시 (UX 개선)
-- **"지도는 상태를 바꾸지 않는다" 원칙**: 지도 이동 시 자동 API 호출 제거, "이 지역 검색" 버튼으로 사용자 확인 후 실행
+- 메인 지도 기본 경로는 반경 검색 중심이다. 지역 계층 검색은 백엔드에 남아 있지만 현재 주 사용자 경로에서 적극적으로 쓰이지 않는다.
+- `eupmyeondong`, `roadName` 직접 검색 쿼리는 현재 비활성화되어 있다.
+- 위치/지역 검색의 keyword는 `name LIKE '%keyword%'`라 FULLTEXT 단독 검색과 검색 범위가 다르다.
+- `LIKE '%keyword%'`는 인덱스 효율이 낮지만, 반경/지역 후보를 먼저 줄인 뒤 적용하는 구조다.
+- 통합 지도 Location 결과는 `size=300`으로 고정되어 밀집 지역에서는 이후 후보가 잘릴 수 있다.
+- `stable` 정렬은 안정성 중심이며, 거리 가까움을 최우선으로 보장하지 않는다.
+- `LocationServiceController`, `LocationServiceReviewController`, `GeocodingController`에는 아직 수동 try-catch 응답 조립이 남아 있어 전역 예외 처리로 더 정리할 수 있다.
+- 뷰포트 바운딩 박스 검색은 현재 API 구조 변경 폭이 커서 장기 개선안으로 남아 있다.
 
-#### 네이버맵 API 최적화
+## 15. 관련 문서
 
-- **에러 처리**: API 키 미설정, 구독 필요 등 에러 처리
-- **로깅**: API 호출 및 응답 로깅으로 디버깅 지원
-- **주소 정리**: `+` 문자를 공백으로 변환, 공백 정규화
-- **URL 인코딩**: `UriComponentsBuilder.encode()`로 자동 처리
-- **응답 캐싱**: 필요 시 클라이언트 측에서 응답 캐싱 가능
-
----
-
-## 8. 핵심 포인트 요약
-
-### 8.0 통합 검색 (백엔드 `searchLocationServices`)
-
-§1.1과 동일: **위치(lat+lng) → 지역 파라미터 → 키워드 단독 FULLTEXT → 평점순**. `keyword`·`category`는 위치·지역 경로에서 SQL `WHERE`(이름 `LIKE` 등), 키워드만 있을 때만 FULLTEXT. 빈 문자열은 `normalize()`로 `null`.
-
-### 8.1 지역 계층적 탐색
-
-- **계층 구조**: 시도 → 시군구 (`eupmyeondong`·`roadName`은 엔티티·DB에 존재하나 검색 비활성화)
-- **우선순위 기반 조회**: sigungu > sido > 전체
-- **카테고리**: SQL에서 `category1` / `category2` / `category3` 중 하나와 일치하면 포함
-- **성능 측정**: 각 단계별 실행 시간 로깅
-
-### 8.2 위치 기반 반경 검색
-
-- **DB**: `ST_Within`(근사 POLYGON) + `ST_Distance_Sphere` 거리 상한 (`findByRadius` 네이티브 쿼리)
-- **반경 단위**: 미터(m). `**latitude`·`longitude`가 있으면 위치 분기**. `radius`가 `null`이거나 `≤0`이면 **서비스\*\*에서 10000m
-- **카테고리·키워드(이름)**: 네이티브 쿼리 `WHERE`에서 처리
-- **성능 측정**: 각 단계별 실행 시간 로깅 (DB 쿼리 시간, DTO 변환 시간)
-- **통합 검색 우선순위**: §1.1 — 키워드만 있어도 **좌표가 있으면 반경이 먼저**(키워드는 해당 쿼리에서 이름 `LIKE`)
-
-### 8.3 하이브리드·지역 UX (제품 방향 / 과거 개선 메모)
-
-- **백엔드**는 §8.0 — 지역(`sido` 등)만 넘기면 반경 없이도 지역 분기로 동일 쿼리 계열을 탄다.
-- **2026-02 일관성 개선** 등은 `docs/refactoring/location/하이브리드-전략-일관성-개선.md` — **지역 선택 시 재요청**·초기 로드 방식과 결과 맞추기 등 **별도 UI 흐름**을 전제로 한 기록이다.
-- **현행 통합 지도 UI**(`UnifiedPetMapPage`, §8.9)는 시도/시군구 드롭다운이 아니라 **중심 좌표·반경(km)** 중심이며, 지도 idle 시 중심이 바뀌면 **디바운스 후 API 재호출**된다 — "이동해도 API 안 함" 원칙과는 다르게 동작한다(통합 지도 한정).
-
-### 8.4 거리 계산
-
-- **Haversine 공식**: 지구 반경 6371000m 사용
-- **✅ 개선 완료 (2026-02-03)**: 백엔드에서 거리 계산 후 DTO에 포함하여 반환
-- **미터 단위 반환**: 내 위치에서 각 서비스까지의 거리 표시
-- **정확한 거리 계산**: 위도/경도 기반 정확한 거리 계산
-- **프론트엔드**: 백엔드 거리 정보 우선 사용, 없으면 클라이언트에서 계산 (하위 호환성)
-
-### 8.5 네이버맵 API 연동
-
-- **지오코딩**: 주소를 좌표로 변환 (`addressToCoordinates()`)
-  - 컨트롤러에서 명시적 URL 디코딩 처리 (`+` 문자를 공백으로 변환, `URLDecoder.decode()`)
-  - 응답 형식: `{"latitude": ..., "longitude": ..., "success": true}`
-- **역지오코딩**: 좌표를 주소로 변환 (`coordinatesToAddress()`)
-- **길찾기**: 출발지-도착지 경로 정보 제공 (`getDirections()`, 경도,위도 순서)
-  - `option` 파라미터 기본값 "traoptimal"
-  - 컨트롤러에서 `start`, `goal` 파라미터를 `,`로 분리하여 파싱
-- **에러 처리**: API 키 미설정, 구독 필요 등 에러 처리
-
-### 8.6 Soft Delete 시스템
-
-- **서비스 삭제**: `LocationService` 엔티티에 `isDeleted`, `deletedAt` 필드로 Soft Delete 지원
-- **리뷰 삭제**: `LocationServiceReview` 엔티티에 `isDeleted`, `deletedAt` 필드로 Soft Delete 지원
-- **조회 제외**: 모든 조회 쿼리에 `(isDeleted IS NULL OR isDeleted = false)` 조건 자동 적용
-  - JPQL: `(ls.isDeleted IS NULL OR ls.isDeleted = false)`
-  - Native Query: `(is_deleted IS NULL OR is_deleted = 0)`
-- **중복 삭제 방지**: 이미 삭제된 항목 재삭제 시 예외 발생
-- **평점 계산**: 삭제된 리뷰는 평균 평점 계산에서 자동 제외
-
-### 8.7 리뷰 시스템
-
-- **중복 리뷰 방지**: 한 서비스당 1개의 리뷰만 작성 가능 (`existsByServiceIdxAndUserIdx()`, 삭제된 리뷰 제외)
-- **이메일 인증**: 리뷰 작성/수정/삭제 시 이메일 인증 필요 (`EmailVerificationRequiredException`, `EmailVerificationPurpose.LOCATION_REVIEW`)
-- **평점 자동 업데이트**: 리뷰 작성/수정/삭제 시 서비스 평균 평점 자동 계산 및 업데이트 (삭제된 리뷰 제외)
-- **시간 관리**: `BaseTimeEntity`를 상속하여 `createdAt`, `updatedAt` 자동 관리
-- **Soft Delete**: `isDeleted`, `deletedAt` 필드로 Soft Delete 지원
-- **API 인증**: 클래스 레벨에 `@PreAuthorize("isAuthenticated()")` 적용
-- **응답 형식**: Map 형태로 감싸서 반환 (`{"review": {...}, "message": "..."}`, `{"reviews": [...], "count": N}`)
-
-### 8.8 성능 최적화
-
-- **인덱스 전략**: 지역 계층 복합 인덱스(`sido/sigungu + is_deleted + rating`)·FULLTEXT·공간 인덱스로 조회 성능 확보; `USE INDEX` 힌트로 옵티마이저 오선택 방지 (`eupmyeondong`·`road_name` 인덱스는 DB에 존재하나 검색 비활성화)
-- **캐싱**: 인기 서비스 `getPopularLocationServices`에 `@Cacheable`
-- **성능 측정 로깅**: `LocationServiceService` 검색 경로에서 DB·DTO 구간 로깅
-- **통합 지도**: 요청 디바운스(예: 300ms)·클라이언트 캐시 키(`UnifiedPetMapPage` `cacheRef`)로 중복 호출 완화
-
-### 8.9 프론트엔드: 통합 지도 (현행)
-
-**진입**: `UnifiedPetMapPage.js` + `unifiedMapApi.js` — 위치 탭에서 `locationServiceApi.searchPlaces` → `GET /api/location-services/search` (`latitude`, `longitude`, `radius` m, `keyword`, `category`).
-
-- **반경**: 기본 **5km** (`DEFAULT_RADIUS = 5`), UI에서 km 단위 → API에 `radius * 1000` m.
-- **초기 위치**: `navigator.geolocation`; 실패 시 기본 중심(서울 시청 근처 등 코드 상수).
-- **재조회**: `mapCenter`·`radius`·`locationKeyword`·`locationCategory` 변경 시 `fetchActiveMapItems` — **지도 idle**(`onMapIdle` → `setMapCenter`) 시에도 중심이 바뀌면 같은 효과로 재조회됨.
-- `**MapContainer.js`**: 네이버맵 `ncpKeyId`, 카카오식 `mapLevel`→줌 변환, **개별 핀\*\*(클러스터 비활성 주석), 사용자 위치·호버 마커.
-
-**과거 전용 페이지·useReducer·지역 드롭다운·“이 지역 검색” 위주 서술**은 코드베이스와 어긋날 수 있음 — 상세는 `docs/refactoring/location/상태-관리-개선.md`, `프론트엔드-검색-로직-단순화.md` 등.
-
-### 8.10 엔티티 설계 특징
-
-- **BaseTimeEntity 사용**: LocationServiceReview는 `BaseTimeEntity`를 상속하여 `createdAt`, `updatedAt` 자동 관리
-- **LocationService**: `createdAt`, `updatedAt` 없음 (DB에 컬럼 없음, 공공데이터 기반이므로)
-- **Soft Delete 필드**:
-  - `LocationService`: `isDeleted` (Boolean, 기본값 false), `deletedAt` (LocalDateTime)
-  - `LocationServiceReview`: `isDeleted` (Boolean, 기본값 false), `deletedAt` (LocalDateTime)
-- **지역 계층 구조**: sido → sigungu → eupmyeondong → roadName
-- **카테고리 계층 구조**: category1 → category2 → category3
-- **데이터 출처 관리**: `dataSource` 필드로 데이터 출처 구분
-  - `"PUBLIC"`: 공공데이터 CSV 배치 임포트 경로
-  - `"BATCH_IMPORT"`: Python batch CLI(`cli.py popular`) 출력 JSON을 `LocationImportService`가 적재 (매일 01:00 `FacilitySyncScheduler` 또는 관리자 multipart 업로드)
-- **추가 필드**: `phone`, `website` 필드 존재
-
----
-
-## 9. 리팩토링 문서 (최신: 2026-04)
-
-**현재 동작·API·분기 순서는 §1.1과 본문이 기준**이다. 아래 세 편은 설계안·대조·이슈 트래킹용이며, 히스토리·세부 논의는 각 파일에만 둔다.
-
-| 문서                                                                                                                       | 역할                                                                                                              |
-| -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| [주변서비스-알고리즘-설계안.md](../refactoring/location/주변서비스-알고리즘-설계안.md)                                     | 위치(또는 지역) 1차·필터는 DB 등 **설계 원칙**과 검색 모드 정리 (2026-04-12)                                      |
-| [주변서비스-현행vs설계안-비교.md](../refactoring/location/주변서비스-현행vs설계안-비교.md)                                 | 리팩 **전** 알고리즘과 **구현 결과** 나란히 비교 — 구현 후 동작은 `LocationServiceService`·§1.1 우선 (2026-04-12) |
-| [location-domain-potential-issues-refactoring.md](../refactoring/location/location-domain-potential-issues-refactoring.md) | 검색·임포트 경로 **잠재 이슈**·우선순위 메모 (2026-04-11)                                                         |
-
-**그 외**: 2026-02 전후 하이브리드 UX·FULLTEXT 검증·useReducer·거리 DTO·프론트 검색 분리 등은 `docs/refactoring/location/` 아래 개별 문서(예: `하이브리드-전략-일관성-개선.md`, `키워드-검색-품질-검증.md`, `상태-관리-개선.md`, `거리-계산-중복-제거.md`, `프론트엔드-검색-로직-단순화.md`)에 남아 있다.
+- [위치 기반 서비스 아키텍처](<../architecture/location/위치 기반 서비스 아키텍처.md>)
+- [Location 지도 결과 안정성 리팩토링](../refactoring/location/지도-결과-안정성-리팩토링.md)
+- [Location 프론트 검색 워크플로우 정리](../refactoring/location/지도-검색-워크플로우-정리.md)
+- [주변서비스 현행 vs 설계안 비교](../refactoring/location/주변서비스-현행vs설계안-비교.md)
+- [Location 도메인 초기 로드 성능 문제](../troubleshooting/location/initial-load-performance.md)
+- [지도 서비스 UX 개선 트러블슈팅](../troubleshooting/location/map-ux-improvement.md)
+- [Location 도메인 Fetch 전략 개선](<../refactoring/fetch-optimization/location/Fetch 전략 개선 (Fetch Join vs Batch Size).md>)
+- [Location 도메인 예외처리 리팩토링](../refactoring/exception/location/위치예외처리.md)

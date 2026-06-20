@@ -1,5 +1,6 @@
 package com.linkup.Petory.domain.board.repository;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -57,6 +58,22 @@ public interface MissingPetBoardRepository {
      * 페이징 지원 - 상태별 조회
      */
     Page<MissingPetBoard> findByStatusOrderByCreatedAtDesc(MissingPetStatus status, Pageable pageable);
+
+    /**
+     * 홈 실종 추천용 - 실종일 최신순 후보 조회
+     */
+    Page<MissingPetBoard> findHomeCandidatesByStatusOrderByLostDateDesc(MissingPetStatus status, Pageable pageable);
+
+    /**
+     * 홈 실종 추천용 - 좌표 바운딩 박스 내 실종일 최신순 후보 조회
+     */
+    Page<MissingPetBoard> findHomeCandidatesInBoundingBox(
+            MissingPetStatus status,
+            BigDecimal minLat,
+            BigDecimal maxLat,
+            BigDecimal minLng,
+            BigDecimal maxLng,
+            Pageable pageable);
 
     /**
      * [리팩토링] Admin 페이징 - Specification 기반 DB 레벨 필터링 (status, deleted, q)

@@ -29,17 +29,6 @@ public interface SpringDataJpaMeetupRepository extends JpaRepository<Meetup, Lon
     @Query("SELECT m FROM Meetup m JOIN FETCH m.organizer WHERE m.organizer.idx = :organizerIdx AND (m.isDeleted = false OR m.isDeleted IS NULL) ORDER BY m.createdAt DESC")
     List<Meetup> findByOrganizerIdxOrderByCreatedAtDesc(@Param("organizerIdx") Long organizerIdx);
 
-    @RepositoryMethod("모임: 지역 범위별 조회")
-    @Query("SELECT m FROM Meetup m JOIN FETCH m.organizer WHERE "
-            + "m.latitude BETWEEN :minLat AND :maxLat AND "
-            + "m.longitude BETWEEN :minLng AND :maxLng AND "
-            + "(m.isDeleted = false OR m.isDeleted IS NULL) "
-            + "ORDER BY m.date ASC")
-    List<Meetup> findByLocationRange(@Param("minLat") Double minLat,
-            @Param("maxLat") Double maxLat,
-            @Param("minLng") Double minLng,
-            @Param("maxLng") Double maxLng);
-
     @RepositoryMethod("모임: 키워드 FULLTEXT 검색 — idx 목록 반환 (N+1 방지용 1단계)")
     @Query(value = "SELECT m.idx FROM meetup m "
             + "WHERE (m.is_deleted = false OR m.is_deleted IS NULL) "

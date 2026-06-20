@@ -6,6 +6,7 @@ import jakarta.validation.Valid;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -28,6 +29,7 @@ import com.linkup.Petory.domain.board.service.BoardService;
 import com.linkup.Petory.domain.board.service.CommentService;
 import com.linkup.Petory.domain.board.service.BoardPopularityService;
 import com.linkup.Petory.domain.board.entity.PopularityPeriodType;
+import com.linkup.Petory.global.security.CustomUserDetails;
 
 import lombok.RequiredArgsConstructor;
 
@@ -70,8 +72,10 @@ public class BoardController {
     // 게시글 생성 (로그인 필요)
     @PostMapping
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<BoardDTO> createBoard(@Valid @RequestBody BoardDTO dto) {
-        return ResponseEntity.ok(boardService.createBoard(dto));
+    public ResponseEntity<BoardDTO> createBoard(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @Valid @RequestBody BoardDTO dto) {
+        return ResponseEntity.ok(boardService.createBoard(dto, userDetails.getLoginId()));
     }
 
     // 게시글 수정 (로그인 필요)
@@ -124,9 +128,10 @@ public class BoardController {
     @PreAuthorize("isAuthenticated()")
     @PostMapping("/{boardId}/comments")
     public ResponseEntity<CommentDTO> addComment(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable("boardId") Long boardId,
             @Valid @RequestBody CommentDTO dto) {
-        return ResponseEntity.ok(commentService.addComment(boardId, dto));
+        return ResponseEntity.ok(commentService.addComment(boardId, dto, userDetails.getLoginId()));
     }
 
     @PreAuthorize("isAuthenticated()")
