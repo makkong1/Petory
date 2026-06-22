@@ -80,12 +80,18 @@ public class PetIntentClient {
      * @param petType 반려동물 종류 힌트 (예: DOG). 없으면 null — Python 측에서 선택적 사용
      * @return 분석 성공 시 응답 DTO, 실패·빈 본문 시 {@link Optional#empty()}
      */
-    /** Python PetType enum(DOG|CAT|OTHER) 기준으로 Java petType을 정규화한다. */
+    /**
+     * Python PetType enum(DOG|CAT|OTHER) 기준으로 Java petType을 정규화한다.
+     */
     private static String normalizePetType(String petType) {
-        if (petType == null) return null;
+        if (petType == null) {
+            return null;
+        }
         return switch (petType) {
-            case "DOG", "CAT" -> petType;
-            default -> "OTHER";
+            case "DOG", "CAT" ->
+                petType;
+            default ->
+                "OTHER";
         };
     }
 

@@ -5,24 +5,24 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.linkup.Petory.domain.user.converter.PetConverter;
 import com.linkup.Petory.domain.user.converter.UsersConverter;
 import com.linkup.Petory.domain.user.dto.PetDTO;
-import com.linkup.Petory.domain.user.dto.UsersDTO;
 import com.linkup.Petory.domain.user.dto.UserPageResponseDTO;
+import com.linkup.Petory.domain.user.dto.UsersDTO;
 import com.linkup.Petory.domain.user.entity.EmailVerificationPurpose;
+import com.linkup.Petory.domain.user.entity.Pet;
 import com.linkup.Petory.domain.user.entity.Role;
 import com.linkup.Petory.domain.user.entity.UserStatus;
-import com.linkup.Petory.domain.user.entity.Pet;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.exception.DuplicateUserFieldException;
 import com.linkup.Petory.domain.user.exception.InvalidPasswordException;
@@ -51,8 +51,8 @@ public class UsersService {
     private boolean skipInDev;
 
     /**
-     * 전체 사용자 조회 (페이징 지원, 관리자용)
-     * [리팩토링] getAllUsers() 제거, 페이징만 사용 (GET /api/admin/users 엔드포인트 제거)
+     * 전체 사용자 조회 (페이징 지원, 관리자용) [리팩토링] getAllUsers() 제거, 페이징만 사용 (GET
+     * /api/admin/users 엔드포인트 제거)
      */
     @Transactional(readOnly = true)
     public UserPageResponseDTO getAllUsersWithPaging(int page, int size) {
@@ -90,8 +90,8 @@ public class UsersService {
     }
 
     /**
-     * 사용자 역할만 조회 (경량 조회용)
-     * [리팩토링] getUser(User+Pet) → findRoleByIdx(role 프로젝션만) - Admin 삭제 시 2+ 쿼리 → 1회
+     * 사용자 역할만 조회 (경량 조회용) [리팩토링] getUser(User+Pet) → findRoleByIdx(role 프로젝션만)
+     * - Admin 삭제 시 2+ 쿼리 → 1회
      */
     @Transactional(readOnly = true)
     public Optional<Role> getRoleById(Long idx) {
@@ -201,10 +201,12 @@ public class UsersService {
                 .orElseThrow(UserNotFoundException::new);
 
         // 기본 정보 업데이트
-        if (dto.getId() != null)
+        if (dto.getId() != null) {
             user.setId(dto.getId());
-        if (dto.getUsername() != null)
+        }
+        if (dto.getUsername() != null) {
             user.setUsername(dto.getUsername());
+        }
         if (dto.getNickname() != null && !dto.getNickname().isEmpty()) {
             // 닉네임 중복 확인
             usersRepository.findByNickname(dto.getNickname())
@@ -215,15 +217,18 @@ public class UsersService {
                     });
             user.setNickname(dto.getNickname());
         }
-        if (dto.getEmail() != null)
+        if (dto.getEmail() != null) {
             user.setEmail(dto.getEmail());
+        }
         if (dto.getRole() != null) {
             user.setRole(Enum.valueOf(com.linkup.Petory.domain.user.entity.Role.class, dto.getRole()));
         }
-        if (dto.getLocation() != null)
+        if (dto.getLocation() != null) {
             user.setLocation(dto.getLocation());
-        if (dto.getPetInfo() != null)
+        }
+        if (dto.getPetInfo() != null) {
             user.setPetInfo(dto.getPetInfo());
+        }
 
         // 비밀번호 업데이트 (값이 있을 때만)
         if (dto.getPassword() != null && !dto.getPassword().isEmpty()) {
@@ -245,8 +250,7 @@ public class UsersService {
     }
 
     /**
-     * 계정 복구 (관리자용)
-     * - AdminUserController에서 사용
+     * 계정 복구 (관리자용) - AdminUserController에서 사용
      */
     public UsersDTO restoreUser(long idx) {
         Users user = usersRepository.findById(idx)
@@ -257,9 +261,7 @@ public class UsersService {
     }
 
     /**
-     * 사용자 상태 관리 (관리자용)
-     * - 상태, 경고 횟수, 정지 기간만 업데이트
-     * - AdminUserController에서 사용
+     * 사용자 상태 관리 (관리자용) - 상태, 경고 횟수, 정지 기간만 업데이트 - AdminUserController에서 사용
      */
     public UsersDTO updateUserStatus(long idx, UsersDTO dto) {
         Users user = usersRepository.findById(idx)
@@ -293,10 +295,8 @@ public class UsersService {
     }
 
     // ========== 일반 사용자용 프로필 관리 메서드 ==========
-
     /**
-     * 자신의 프로필 조회 (펫 정보 포함)
-     * [리팩토링] Fetch Join - User + Pet 1회 쿼리
+     * 자신의 프로필 조회 (펫 정보 포함) [리팩토링] Fetch Join - User + Pet 1회 쿼리
      */
     @Transactional(readOnly = true)
     public UsersDTO getMyProfile(String userId) {
@@ -308,9 +308,8 @@ public class UsersService {
     }
 
     /**
-     * 사용자 프로필 조회 (펫 정보 포함, 관리자용)
-     * [리팩토링] Fetch Join - User + Pet 1회 쿼리
-     * - AdminUserController에서 사용
+     * 사용자 프로필 조회 (펫 정보 포함, 관리자용) [리팩토링] Fetch Join - User + Pet 1회 쿼리 -
+     * AdminUserController에서 사용
      */
     @Transactional(readOnly = true)
     public UsersDTO getUserWithPets(Long userIdx) {
@@ -340,9 +339,8 @@ public class UsersService {
     }
 
     /**
-     * 자신의 프로필 수정 (닉네임, 이메일, 전화번호, 위치, 펫 정보 등)
-     * [리팩토링] getMyProfile(User+Pet) + findByIdString → findByIdString 1회 (idx 검증 내부
-     * 통합)
+     * 자신의 프로필 수정 (닉네임, 이메일, 전화번호, 위치, 펫 정보 등) [리팩토링] getMyProfile(User+Pet) +
+     * findByIdString → findByIdString 1회 (idx 검증 내부 통합)
      */
     public UsersDTO updateMyProfile(String userId, UsersDTO dto) {
         Users user = usersRepository.findByIdString(userId)
