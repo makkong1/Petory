@@ -196,6 +196,7 @@
 | 리스트 API **페이지네이션** | 전량 조회는 데이터 증가 시 응답 크기·OOM 리스크. `Pageable` / 커서 기반 등 도입 |
 | **`@Valid` / `@Validated`** | DTO·쿼리 파라미터에 Bean Validation으로 **조기 실패·일관 메시지** |
 | **타임존** | `LocalDateTime.now()` 서버 로컬 의존 → `ZoneId`·UTC 저장·API 계약 명시 등 정책 결정 |
+| 자료구조/알고리즘 개선 후보 검증 | 도메인별 후보를 문제로 단정하지 않고 재현 테스트·EXPLAIN·성능 비교로 판정: [validation-matrix.md](./ds-algorithm/validation-matrix.md) |
 
 ### 2.2 Location
 
