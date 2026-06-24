@@ -113,12 +113,12 @@ ALTER TABLE meetup
         AFTER created_at;
 UPDATE meetup SET updated_at = created_at;
 
--- notification
-ALTER TABLE notification
+-- notifications
+ALTER TABLE notifications
     ADD COLUMN updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
         ON UPDATE CURRENT_TIMESTAMP
         AFTER created_at;
-UPDATE notification SET updated_at = created_at;
+UPDATE notifications SET updated_at = created_at;
 
 -- pet_coin_escrow
 ALTER TABLE pet_coin_escrow

@@ -3,11 +3,11 @@ package com.linkup.Petory.domain.notification.repository;
 import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.linkup.Petory.domain.notification.entity.Notification;
-import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.global.annotation.RepositoryMethod;
 
 /**
@@ -20,12 +20,19 @@ import com.linkup.Petory.global.annotation.RepositoryMethod;
 public interface SpringDataJpaNotificationRepository extends JpaRepository<Notification, Long> {
 
     @RepositoryMethod("알림: 사용자별 목록 조회")
-    List<Notification> findByUserOrderByCreatedAtDesc(Users user);
+    @Query("SELECT n FROM Notification n WHERE n.user.idx = :userId ORDER BY n.createdAt DESC")
+    List<Notification> findByUserIdOrderByCreatedAtDesc(@Param("userId") Long userId);
 
     @RepositoryMethod("알림: 사용자별 읽지 않은 목록 조회")
-    List<Notification> findByUserAndIsReadFalseOrderByCreatedAtDesc(Users user);
+    @Query("SELECT n FROM Notification n WHERE n.user.idx = :userId AND n.isRead = false ORDER BY n.createdAt DESC")
+    List<Notification> findByUserIdAndIsReadFalseOrderByCreatedAtDesc(@Param("userId") Long userId);
 
     @RepositoryMethod("알림: 사용자별 읽지 않은 개수 조회")
-    @Query("SELECT COUNT(n) FROM Notification n WHERE n.user = :user AND n.isRead = false")
-    Long countUnreadByUser(@Param("user") Users user);
+    @Query("SELECT COUNT(n) FROM Notification n WHERE n.user.idx = :userId AND n.isRead = false")
+    Long countUnreadByUserId(@Param("userId") Long userId);
+
+    @RepositoryMethod("알림: 사용자별 전체 읽음 bulk update")
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE Notification n SET n.isRead = true WHERE n.user.idx = :userId AND n.isRead = false")
+    int markAllAsReadByUserId(@Param("userId") Long userId);
 }
