@@ -6,7 +6,29 @@
 
 ---
 
-## 현재 인증 흐름
+## 현재 적용 상태
+
+2026-06-21 기준으로 1차 리팩터링 일부가 적용됐다.
+
+완료:
+
+- `CustomUserDetails` 추가
+- `UsersDetailsServiceImpl`이 Spring Security 기본 `User` 대신 `CustomUserDetails` 반환
+- `AuthenticatedUserIdResolver`가 `CustomUserDetails` principal이면 DB 재조회 없이 `idx` 반환
+- `UserProfileController`, `PetController`의 주요 사용자 API가 `@AuthenticationPrincipal CustomUserDetails` 사용
+- WebSocket 인증도 `UserDetailsService`를 거치므로 인증 객체의 principal은 `CustomUserDetails`
+
+남은 과제:
+
+- `JwtAuthenticationFilter`는 아직 `validateToken`, `isTokenExpired`, `getIdFromToken`으로 JWT를 여러 번 파싱한다.
+- `AuthController.validate`, `AuthController.logout`은 아직 Authorization header를 직접 파싱한다.
+- 여러 도메인 컨트롤러는 `@AuthenticationPrincipal`로 직접 전환하지 않고 `AuthenticatedUserIdResolver` 호환 경로를 유지한다.
+- 일부 서비스 레이어에는 아직 `SecurityContextHolder` 직접 접근이 남아 있다.
+- 이메일 인증 검사는 도메인별 서비스에 흩어져 있다.
+
+---
+
+## 리팩터링 전 문제 흐름
 
 ```text
 HTTP 요청
@@ -20,7 +42,7 @@ HTTP 요청
   -> 다시 SecurityContextHolder 또는 AuthenticatedUserIdResolver 사용
 ```
 
-현재 Access Token의 subject는 숫자 PK가 아니라 로그인용 문자열 ID다.
+Access Token의 subject는 숫자 PK가 아니라 로그인용 문자열 ID다.
 
 ```java
 // JwtUtil#createAccessToken
@@ -28,7 +50,7 @@ Jwts.builder()
         .subject(id)
 ```
 
-`UsersDetailsServiceImpl`은 사용자 조회 후 Spring Security 기본 `User`를 반환한다.
+리팩터링 전 `UsersDetailsServiceImpl`은 사용자 조회 후 Spring Security 기본 `User`를 반환했다.
 
 ```java
 return new org.springframework.security.core.userdetails.User(
@@ -37,7 +59,9 @@ return new org.springframework.security.core.userdetails.User(
         getAuthorities(user));
 ```
 
-이 구조에서는 principal 안에 `Users.idx`, `emailVerified`, `status`, `role` 같은 Petory 사용자 정보가 없다. 그래서 숫자 PK가 필요할 때 다시 DB를 조회한다.
+이 구조에서는 principal 안에 `Users.idx`, `emailVerified`, `status`, `role` 같은 Petory 사용자 정보가 없었다. 그래서 숫자 PK가 필요할 때 다시 DB를 조회했다.
+
+현재는 `UsersDetailsServiceImpl`이 `CustomUserDetails.from(user)`를 반환하므로 JWT 보호 API의 principal에 `idx`, `loginId`, `role`, `emailVerified`, `status`가 들어간다.
 
 ---
 
@@ -90,7 +114,7 @@ After:
   parseValidClaims once -> subject 추출 -> UserDetails 로드
 ```
 
-### 3. `AuthenticatedUserIdResolver`가 같은 요청에서 다시 DB 조회한다
+### 3. `AuthenticatedUserIdResolver`가 같은 요청에서 다시 DB 조회했다
 
 `AuthenticatedUserIdResolver.requireCurrentUserIdx()`는 `authentication.getName()`으로 로그인 ID를 얻고 다시 사용자를 조회한다.
 
@@ -101,14 +125,17 @@ Users user = usersRepository.findActiveByIdString(loginId)
 return user.getIdx();
 ```
 
-결과적으로 `JwtAuthenticationFilter`를 거친 요청에서 컨트롤러가 `requireCurrentUserIdx()`를 쓰면, 같은 사용자에 대해 최소 2회 조회가 발생한다.
+리팩터링 전에는 `JwtAuthenticationFilter`를 거친 요청에서 컨트롤러가 `requireCurrentUserIdx()`를 쓰면, 같은 사용자에 대해 최소 2회 조회가 발생했다.
+
+현재 resolver는 principal이 `CustomUserDetails`면 `userDetails.getIdx()`를 바로 반환한다. principal이 다른 타입일 때만 이전 방식으로 loginId를 다시 조회한다.
 
 ### 4. 현재 사용자 조회 방식이 여러 개로 갈라져 있다
 
 | 방식 | 사용 예 | 문제 |
 | --- | --- | --- |
-| `AuthenticatedUserIdResolver.requireCurrentUserIdx()` | Care, Chat, Notification, Admin 계열 컨트롤러 | 매번 loginId -> idx 변환 DB 조회 |
-| `SecurityContextHolder.getContext().getAuthentication()` 직접 사용 | `PetCoinController`, `UserProfileController`, `PetController`, Board/Comment 서비스 일부 | 인증 주체 접근 방식이 각 클래스에 중복 |
+| `@AuthenticationPrincipal CustomUserDetails` | `UserProfileController`, `PetController`, `PetCoinController`, Board 일부, Location review 일부 | 권장 경로. 다만 전 도메인에 일괄 적용되지는 않음 |
+| `AuthenticatedUserIdResolver.requireCurrentUserIdx()` | Care, Chat, Notification, Admin, Recommendation 계열 컨트롤러 | 호환 브리지. `CustomUserDetails`면 DB 재조회는 없지만 접근 방식은 아직 분산됨 |
+| `SecurityContextHolder.getContext().getAuthentication()` 직접 사용 | Board/Comment/MissingPet/Care/Location 서비스 일부, WebSocket 인터셉터 | 인증 주체 접근 방식이 각 클래스에 중복 |
 | Authorization 헤더 직접 파싱 | `AuthController.validate`, `AuthController.logout` | 이미 필터가 처리하는 JWT 파싱 로직과 중복 |
 | WebSocket 인터셉터 자체 인증 처리 | `WebSocketAuthenticationInterceptor`, `WebSocketAuthChannelInterceptor` | HTTP 인증과 유사 로직이 따로 존재 |
 
@@ -325,12 +352,12 @@ OAuth2 로그인 성공
 
 우선순위가 높은 곳:
 
-| 우선순위 | 대상 | 이유 |
+| 우선순위 | 대상 | 상태/이유 |
 | --- | --- | --- |
-| 1 | `PetCoinController`, `UserProfileController`, `PetController` | 직접 `SecurityContextHolder` 사용 중 |
-| 2 | `NotificationController`, `FcmTokenController` | 요청마다 단순 userIdx만 필요 |
-| 3 | `CareRequestController`, `ConversationController`, `ChatMessageController` | 기존 resolver 사용처 |
-| 4 | Admin 컨트롤러 | admin/master idx 기록 용도 |
+| 1 | `UserProfileController`, `PetController`, `PetCoinController` | 적용됨. `@AuthenticationPrincipal CustomUserDetails`로 현재 사용자 식별 |
+| 2 | `NotificationController`, `FcmTokenController` | resolver 사용 중. 요청마다 단순 userIdx만 필요 |
+| 3 | `CareRequestController`, `ConversationController`, `ChatMessageController` | resolver 사용 중. 점진 전환 후보 |
+| 4 | Admin 컨트롤러 | resolver 사용 중. admin/master idx 기록 용도 |
 
 예시:
 
@@ -463,14 +490,14 @@ String id = jwtUtil.getIdFromToken(token);
 
 ## 적용 순서 체크리스트
 
-- [ ] `CustomUserDetails` 생성
-- [ ] `UsersDetailsServiceImpl`이 `CustomUserDetails` 반환하도록 변경
+- [x] `CustomUserDetails` 생성
+- [x] `UsersDetailsServiceImpl`이 `CustomUserDetails` 반환하도록 변경
 - [ ] `JwtAuthenticationFilter`의 `validateToken -> getIdFromToken -> validateToken -> isTokenExpired` 중복 파싱 제거
-- [ ] `AuthenticatedUserIdResolver`가 `CustomUserDetails`면 DB 조회 없이 `idx` 반환하도록 변경
+- [x] `AuthenticatedUserIdResolver`가 `CustomUserDetails`면 DB 조회 없이 `idx` 반환하도록 변경
 - [ ] `JwtAuthenticationFilter` 동작 확인: principal 타입이 `CustomUserDetails`인지 테스트
-- [ ] `WebSocketAuthenticationInterceptor`, `WebSocketAuthChannelInterceptor`도 동일 principal을 쓰는지 확인
-- [ ] OAuth2 성공 후 발급된 JWT도 `CustomUserDetails` principal로 복원되는지 확인
-- [ ] 직접 `SecurityContextHolder`를 쓰는 컨트롤러부터 `@AuthenticationPrincipal`로 교체
+- [x] `WebSocketAuthenticationInterceptor`, `WebSocketAuthChannelInterceptor`도 동일 principal을 쓰는지 확인
+- [x] OAuth2 성공 후 발급된 JWT도 `CustomUserDetails` principal로 복원되는지 확인
+- [ ] 직접 `SecurityContextHolder`를 쓰는 컨트롤러부터 `@AuthenticationPrincipal`로 교체 (부분 적용: `UserProfileController`, `PetController`. 다른 도메인은 점진 전환)
 - [ ] `AuthController.logout`의 직접 토큰 파싱 제거 검토
 - [ ] 이메일 인증 반복 검사 공통화 검토
 - [ ] `./gradlew compileJava`
@@ -487,6 +514,7 @@ String id = jwtUtil.getIdFromToken(token);
 | 구분 | 파일 |
 | --- | --- |
 | JWT 인증 필터 | `backend/main/java/com/linkup/Petory/filter/JwtAuthenticationFilter.java` |
+| Petory principal | `backend/main/java/com/linkup/Petory/global/security/CustomUserDetails.java` |
 | UserDetails 생성 | `backend/main/java/com/linkup/Petory/domain/user/service/UsersDetailsServiceImpl.java` |
 | 현재 사용자 idx resolver | `backend/main/java/com/linkup/Petory/global/security/AuthenticatedUserIdResolver.java` |
 | Security 설정 | `backend/main/java/com/linkup/Petory/global/security/SecurityConfig.java` |
@@ -500,4 +528,4 @@ String id = jwtUtil.getIdFromToken(token);
 
 ## 한 줄 결론
 
-현재 문제는 JWT 자체보다 **SecurityContext principal이 Petory 사용자 모델을 담지 못해서, 현재 사용자 정보를 각 계층에서 다시 찾는 구조**다. 1차 개선은 JWT claim을 늘리는 것이 아니라 `CustomUserDetails`와 `@AuthenticationPrincipal`로 현재 사용자 식별 경로를 통일하는 것이다.
+초기 문제였던 “principal이 Petory 사용자 모델을 담지 못하는 구조”는 `CustomUserDetails` 도입으로 1차 해소됐다. 남은 과제는 JWT claims 중복 파싱 제거, `AuthController` 직접 토큰 파싱 정리, 그리고 resolver/직접 `SecurityContextHolder` 사용처를 `@AuthenticationPrincipal` 중심으로 점진 통일하는 것이다.

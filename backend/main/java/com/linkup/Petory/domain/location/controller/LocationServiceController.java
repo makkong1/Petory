@@ -33,10 +33,9 @@ public class LocationServiceController {
     /**
      * 통합 검색 — 파라미터 조합에 따라 4가지 경로로 분기
      *
-     * 1) latitude + longitude 있음  → 반경 검색   (지도 초기 로드 / "이 지역 검색")
-     * 2) sido / sigungu 있음        → 지역 검색   (강남구, 서울특별시 등 지역명)
-     * 3) keyword만 있음             → FULLTEXT    (시설명 전국 검색, fallback)
-     * 4) 아무것도 없음              → 전체 평점순
+     * 1) latitude + longitude 있음 → 반경 검색 (지도 초기 로드 / "이 지역 검색") 2) sido /
+     * sigungu 있음 → 지역 검색 (강남구, 서울특별시 등 지역명) 3) keyword만 있음 → FULLTEXT (시설명 전국
+     * 검색, fallback) 4) 아무것도 없음 → 전체 평점순
      */
     @GetMapping("/search")
     public ResponseEntity<Map<String, Object>> searchLocationServices(
