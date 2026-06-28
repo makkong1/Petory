@@ -1,13 +1,12 @@
 package com.linkup.Petory.domain.statistics.service;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -81,25 +80,9 @@ public class StatisticsService {
      * 결제 발생 시 오늘 통계에 매출·건수·평균 거래액을 즉시 반영한다.
      */
     @Transactional
+    @CacheEvict(value = "todayStats", key = "'today'")
     public void recordPayment(BigDecimal amount) {
-        LocalDate today = LocalDate.now();
-        try {
-            applyPayment(today, amount);
-        } catch (DataIntegrityViolationException e) {
-            // 동시 INSERT 경합: 상대방이 먼저 insert한 row에 락 잡고 재시도
-            applyPayment(today, amount);
-        }
-    }
-
-    private void applyPayment(LocalDate date, BigDecimal amount) {
-        DailyStatistics stats = dailyStatisticsRepository.findByStatDateForUpdate(date)
-                .orElse(DailyStatistics.builder().statDate(date).build());
-        BigDecimal newRevenue = stats.getTotalRevenue().add(amount);
-        long newCount = stats.getTransactionCount() + 1;
-        stats.setTotalRevenue(newRevenue);
-        stats.setTransactionCount(newCount);
-        stats.setAvgTransaction(newRevenue.divide(BigDecimal.valueOf(newCount), 2, RoundingMode.HALF_UP));
-        dailyStatisticsRepository.save(stats);
+        dailyStatisticsRepository.upsertPayment(LocalDate.now(), amount);
     }
 
     /**

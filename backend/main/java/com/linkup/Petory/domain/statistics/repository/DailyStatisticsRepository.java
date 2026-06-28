@@ -1,6 +1,7 @@
 package com.linkup.Petory.domain.statistics.repository;
 
 import com.linkup.Petory.domain.statistics.entity.DailyStatistics;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -15,5 +16,5 @@ public interface DailyStatisticsRepository {
     List<DailyStatistics> findByStatDateBetweenOrderByStatDateAsc(LocalDate startDate, LocalDate endDate);
     List<LocalDate> findStatDatesByDateRange(LocalDate startDate, LocalDate endDate);
     void deleteByStatDateBefore(LocalDate cutoffDate);
-    Optional<DailyStatistics> findByStatDateForUpdate(LocalDate statDate);
+    void upsertPayment(LocalDate statDate, BigDecimal amount);
 }

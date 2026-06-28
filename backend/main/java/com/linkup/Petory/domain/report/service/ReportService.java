@@ -186,7 +186,7 @@ public class ReportService {
             String sanctionReason = String.format("신고 #%d 처리: %s", reportId,
                     req.getAdminNote() != null ? req.getAdminNote() : report.getReason());
             userSanctionService.applySanctionFromReport(
-                    report.getTargetIdx(),
+                    resolveSanctionUserId(report),
                     req.getActionTaken(),
                     sanctionReason,
                     admin.getIdx(),
@@ -194,6 +194,29 @@ public class ReportService {
         }
 
         return reportConverter.toDTO(report);
+    }
+
+    private Long resolveSanctionUserId(Report report) {
+        return switch (report.getTargetType()) {
+            case BOARD -> boardRepository.findById(report.getTargetIdx())
+                    .map(board -> board.getUser().getIdx())
+                    .orElseThrow(ReportTargetNotFoundException::board);
+            case COMMENT -> commentRepository.findById(report.getTargetIdx())
+                    .map(comment -> comment.getUser().getIdx())
+                    .or(() -> missingPetCommentRepository.findById(report.getTargetIdx())
+                            .map(comment -> comment.getUser().getIdx()))
+                    .orElseThrow(ReportTargetNotFoundException::comment);
+            case MISSING_PET -> missingPetBoardRepository.findById(report.getTargetIdx())
+                    .map(board -> board.getUser().getIdx())
+                    .orElseThrow(ReportTargetNotFoundException::missingPet);
+            case PET_CARE_PROVIDER -> usersRepository.findById(report.getTargetIdx())
+                    .filter(provider -> provider.getRole() == Role.SERVICE_PROVIDER)
+                    .map(Users::getIdx)
+                    .orElseThrow(ReportTargetNotFoundException::provider);
+            case CARE_REVIEW -> careReviewRepository.findById(report.getTargetIdx())
+                    .map(review -> review.getReviewer().getIdx())
+                    .orElseThrow(ReportTargetNotFoundException::careReview);
+        };
     }
 
     private ReportDetailDTO.TargetPreview buildTargetPreview(Report report) {

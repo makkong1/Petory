@@ -1,5 +1,6 @@
 package com.linkup.Petory.domain.statistics.repository;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -66,7 +67,7 @@ public class JpaDailyStatisticsAdapter implements DailyStatisticsRepository {
     }
 
     @Override
-    public Optional<DailyStatistics> findByStatDateForUpdate(LocalDate statDate) {
-        return jpaRepository.findByStatDateForUpdate(statDate);
+    public void upsertPayment(LocalDate statDate, BigDecimal amount) {
+        jpaRepository.upsertPayment(statDate, amount);
     }
 }

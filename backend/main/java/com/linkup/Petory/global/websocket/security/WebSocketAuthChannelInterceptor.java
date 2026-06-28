@@ -14,6 +14,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.stereotype.Component;
 
+import com.linkup.Petory.global.security.CustomUserDetails;
 import com.linkup.Petory.util.JwtUtil;
 
 import java.util.HashMap;
@@ -67,6 +68,11 @@ public class WebSocketAuthChannelInterceptor implements ChannelInterceptor {
                 if (userId != null) {
                     try {
                         UserDetails userDetails = userDetailsService.loadUserByUsername(userId);
+                        if (!isUsableAccount(userDetails)) {
+                            log.warn("WebSocket 메시지 인증 실패: 제재 또는 비활성 계정 userId={}", userId);
+                            return null;
+                        }
+
                         auth = new UsernamePasswordAuthenticationToken(
                                 userDetails,
                                 null,
@@ -117,4 +123,10 @@ public class WebSocketAuthChannelInterceptor implements ChannelInterceptor {
         return message;
     }
 
+    private boolean isUsableAccount(UserDetails userDetails) {
+        if (userDetails instanceof CustomUserDetails customUserDetails) {
+            return customUserDetails.isEnabled() && customUserDetails.isAccountNonLocked();
+        }
+        return userDetails.isEnabled() && userDetails.isAccountNonLocked();
+    }
 }

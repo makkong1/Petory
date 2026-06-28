@@ -3,12 +3,12 @@ package com.linkup.Petory.domain.statistics;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -60,20 +60,9 @@ class StatisticsServiceTest {
 
     @Test
     void recordPayment_updatesRevenue() {
-        DailyStatistics today = DailyStatistics.builder()
-                .statDate(LocalDate.now())
-                .totalRevenue(BigDecimal.ZERO)
-                .transactionCount(0L)
-                .avgTransaction(BigDecimal.ZERO)
-                .build();
-        when(dailyStatisticsRepository.findByStatDate(LocalDate.now())).thenReturn(Optional.of(today));
-        when(dailyStatisticsRepository.save(any())).thenAnswer(i -> i.getArgument(0));
-
         statisticsService.recordPayment(new BigDecimal("30000"));
 
-        assertThat(today.getTotalRevenue()).isEqualTo(new BigDecimal("30000"));
-        assertThat(today.getTransactionCount()).isEqualTo(1L);
-        assertThat(today.getAvgTransaction()).isEqualTo(new BigDecimal("30000.00"));
+        verify(dailyStatisticsRepository).upsertPayment(LocalDate.now(), new BigDecimal("30000"));
     }
 
     @Test

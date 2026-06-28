@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Function;
@@ -19,6 +20,7 @@ import com.linkup.Petory.domain.statistics.entity.WeeklyStatistics;
 import com.linkup.Petory.domain.statistics.repository.DailyStatisticsRepository;
 import com.linkup.Petory.domain.statistics.repository.MonthlyStatisticsRepository;
 import com.linkup.Petory.domain.statistics.repository.WeeklyStatisticsRepository;
+import com.linkup.Petory.domain.user.repository.LoginEventRepository;
 
 import java.time.temporal.IsoFields;
 
@@ -38,6 +40,7 @@ public class StatisticsScheduler {
     private final WeeklyStatisticsRepository weeklyStatisticsRepository;
     private final MonthlyStatisticsRepository monthlyStatisticsRepository;
     private final StatisticsAggregator statisticsAggregator;
+    private final LoginEventRepository loginEventRepository;
 
     /**
      * 매일 00:05 실행. 전날 통계 집계 → 일요일이면 주간 롤업 → 월말이면 월간 롤업 → 1년 초과 데이터 삭제.
@@ -81,7 +84,8 @@ public class StatisticsScheduler {
 
         long completed = sumLong(days, DailyStatistics::getCompletedCares);
         long cancelled = sumLong(days, DailyStatistics::getCancelledCares);
-        long currentWau = sumLong(days, DailyStatistics::getActiveUsers);
+        long currentWau = loginEventRepository.countDistinctUsersBetween(monday.atStartOfDay(),
+                sunday.atTime(LocalTime.MAX));
         BigDecimal retentionRate = calcWeeklyRetention(year, weekNumber, currentWau);
         BigDecimal totalRevenue = sumRevenue(days);
         long txCount = sumLong(days, DailyStatistics::getTransactionCount);
@@ -127,7 +131,8 @@ public class StatisticsScheduler {
 
         long completed = sumLong(days, DailyStatistics::getCompletedCares);
         long cancelled = sumLong(days, DailyStatistics::getCancelledCares);
-        long currentMau = sumLong(days, DailyStatistics::getActiveUsers);
+        long currentMau = loginEventRepository.countDistinctUsersBetween(start.atStartOfDay(),
+                end.atTime(LocalTime.MAX));
         BigDecimal retention = calcMonthlyRetention(year, month, currentMau);
         BigDecimal churn = BigDecimal.valueOf(100).subtract(retention).max(BigDecimal.ZERO);
         BigDecimal totalRevenue = sumRevenue(days);
@@ -198,7 +203,8 @@ public class StatisticsScheduler {
     }
 
     private BigDecimal sumRevenue(List<DailyStatistics> days) {
-        return days.stream().map(DailyStatistics::getTotalRevenue)
+        return days.stream()
+                .map(day -> day.getTotalRevenue() == null ? BigDecimal.ZERO : day.getTotalRevenue())
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
