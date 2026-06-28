@@ -97,6 +97,8 @@ public class AuthService {
                     return InvalidRefreshTokenException.notFound();
                 });
 
+        ensureRefreshAllowed(user);
+
         // 만료 시간 확인
         if (user.getRefreshExpiration() == null ||
                 user.getRefreshExpiration().isBefore(LocalDateTime.now())) {
@@ -120,6 +122,28 @@ public class AuthService {
         UsersDTO userDTO = usersConverter.toDTO(user);
 
         return new TokenResponse(newAccessToken, refreshToken, userDTO);  // 기존 Refresh Token 유지
+    }
+
+    private void ensureRefreshAllowed(Users user) {
+        if (user.getStatus() == UserStatus.BANNED) {
+            user.setRefreshToken(null);
+            user.setRefreshExpiration(null);
+            usersRepository.save(user);
+            throw new UserBannedException();
+        }
+
+        if (user.getStatus() == UserStatus.SUSPENDED) {
+            if (user.getSuspendedUntil() != null && user.getSuspendedUntil().isAfter(LocalDateTime.now())) {
+                user.setRefreshToken(null);
+                user.setRefreshExpiration(null);
+                usersRepository.save(user);
+                throw new UserSuspendedException(user.getSuspendedUntil());
+            }
+
+            user.activate();
+            usersRepository.save(user);
+            log.info("만료된 이용제한 자동 해제(refresh): {}", user.getId());
+        }
     }
 
     /**
@@ -159,6 +183,16 @@ public class AuthService {
             // 만료 시간 확인
             if (user.getRefreshExpiration() == null ||
                     user.getRefreshExpiration().isBefore(LocalDateTime.now())) {
+                return false;
+            }
+
+            if (user.getStatus() == UserStatus.BANNED) {
+                return false;
+            }
+
+            if (user.getStatus() == UserStatus.SUSPENDED
+                    && user.getSuspendedUntil() != null
+                    && user.getSuspendedUntil().isAfter(LocalDateTime.now())) {
                 return false;
             }
 

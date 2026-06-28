@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.socket.WebSocketHandler;
 import org.springframework.web.socket.server.HandshakeInterceptor;
 
+import com.linkup.Petory.global.security.CustomUserDetails;
 import com.linkup.Petory.util.JwtUtil;
 
 import lombok.RequiredArgsConstructor;
@@ -77,6 +78,11 @@ public class WebSocketAuthenticationInterceptor implements HandshakeInterceptor 
                 if (userId != null) {
                     // 사용자 정보 로드
                     UserDetails userDetails = userDetailsService.loadUserByUsername(userId);
+                    if (!isUsableAccount(userDetails)) {
+                        log.warn("WebSocket 인증 실패: 제재 또는 비활성 계정 userId={}", userId);
+                        response.setStatusCode(org.springframework.http.HttpStatus.FORBIDDEN);
+                        return false;
+                    }
 
                     // 인증 객체 생성 및 저장
                     Authentication authentication = new UsernamePasswordAuthenticationToken(
@@ -118,5 +124,12 @@ public class WebSocketAuthenticationInterceptor implements HandshakeInterceptor 
         if (exception != null) {
             log.error("WebSocket 핸드셰이크 후 오류: {}", exception.getMessage());
         }
+    }
+
+    private boolean isUsableAccount(UserDetails userDetails) {
+        if (userDetails instanceof CustomUserDetails customUserDetails) {
+            return customUserDetails.isEnabled() && customUserDetails.isAccountNonLocked();
+        }
+        return userDetails.isEnabled() && userDetails.isAccountNonLocked();
     }
 }

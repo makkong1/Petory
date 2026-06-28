@@ -269,7 +269,12 @@ public class UsersService {
 
         // 상태 업데이트
         if (dto.getStatus() != null) {
-            user.setStatus(Enum.valueOf(UserStatus.class, dto.getStatus()));
+            UserStatus status = Enum.valueOf(UserStatus.class, dto.getStatus());
+            user.setStatus(status);
+            if (status == UserStatus.SUSPENDED || status == UserStatus.BANNED) {
+                user.setRefreshToken(null);
+                user.setRefreshExpiration(null);
+            }
         }
 
         // 경고 횟수 업데이트

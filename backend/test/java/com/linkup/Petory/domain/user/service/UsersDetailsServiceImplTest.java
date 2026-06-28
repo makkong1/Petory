@@ -3,7 +3,9 @@ package com.linkup.Petory.domain.user.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 import org.junit.jupiter.api.DisplayName;
@@ -16,6 +18,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
 import com.linkup.Petory.domain.user.entity.Role;
+import com.linkup.Petory.domain.user.entity.UserStatus;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 
@@ -45,6 +48,27 @@ class UsersDetailsServiceImplTest {
         assertThat(userDetails.getAuthorities())
                 .extracting("authority")
                 .containsExactly("ROLE_ADMIN");
+    }
+
+    @Test
+    @DisplayName("정상: 만료된 이용제한 사용자는 인증 주체 로드 시 ACTIVE로 전환된다")
+    void 정상_만료정지사용자_로드시_자동해제() {
+        Users user = Users.builder()
+                .id("expired-suspended-user")
+                .password("encoded-password")
+                .role(Role.USER)
+                .status(UserStatus.SUSPENDED)
+                .suspendedUntil(LocalDateTime.now().minusMinutes(1))
+                .build();
+        when(usersRepository.findActiveByIdString("expired-suspended-user")).thenReturn(Optional.of(user));
+        when(usersRepository.save(user)).thenReturn(user);
+
+        UserDetails userDetails = usersDetailsService.loadUserByUsername("expired-suspended-user");
+
+        assertThat(userDetails.isEnabled()).isTrue();
+        assertThat(user.getStatus()).isEqualTo(UserStatus.ACTIVE);
+        assertThat(user.getSuspendedUntil()).isNull();
+        verify(usersRepository).save(user);
     }
 
     @Test

@@ -1,12 +1,7 @@
 package com.linkup.Petory.filter;
 
-import com.linkup.Petory.util.JwtUtil;
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import java.io.IOException;
+
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -16,10 +11,20 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-import java.io.IOException;
+import com.linkup.Petory.global.security.CustomUserDetails;
+import com.linkup.Petory.util.JwtUtil;
+
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
-/** JWT 인증 필터. 요청마다 Authorization 헤더의 토큰을 검증하고 SecurityContext에 인증 정보를 설정한다. */
+/**
+ * JWT 인증 필터. 요청마다 Authorization 헤더의 토큰을 검증하고 SecurityContext에 인증 정보를 설정한다.
+ */
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
@@ -34,13 +39,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         try {
             String token = null;
-            
+
             // 1. 헤더에서 토큰 추출 (일반 요청)
             String authorizationHeader = request.getHeader("Authorization");
             if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
                 token = jwtUtil.extractTokenFromHeader(authorizationHeader);
             }
-            
+
             // 2. 쿼리 파라미터에서 토큰 추출 (SSE 등 헤더를 사용할 수 없는 경우)
             if (token == null) {
                 token = request.getParameter("token");
@@ -51,6 +56,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
                 if (id != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                     UserDetails userDetails = userDetailsService.loadUserByUsername(id);
+                    if (!isUsableAccount(userDetails)) {
+                        log.warn("JWT 인증 거부: 제재 또는 비활성 계정 userId={}", id);
+                        SecurityContextHolder.clearContext();
+                        filterChain.doFilter(request, response);
+                        return;
+                    }
 
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                             userDetails,
@@ -69,5 +80,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private boolean isUsableAccount(UserDetails userDetails) {
+        if (userDetails instanceof CustomUserDetails customUserDetails) {
+            return customUserDetails.isEnabled() && customUserDetails.isAccountNonLocked();
+        }
+        return userDetails.isEnabled() && userDetails.isAccountNonLocked();
     }
 }

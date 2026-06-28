@@ -5,6 +5,9 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
+
+import com.linkup.Petory.domain.user.entity.UserStatus;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 import com.linkup.Petory.global.security.CustomUserDetails;
@@ -22,6 +25,12 @@ public class UsersDetailsServiceImpl implements UserDetailsService {
     public UserDetails loadUserByUsername(String id) throws UsernameNotFoundException {
         Users user = usersRepository.findActiveByIdString(id)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with id: " + id));
+
+        if (user.getStatus() == UserStatus.SUSPENDED
+                && (user.getSuspendedUntil() == null || !user.getSuspendedUntil().isAfter(LocalDateTime.now()))) {
+            user.activate();
+            user = usersRepository.save(user);
+        }
 
         return CustomUserDetails.from(user);
     }

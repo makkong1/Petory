@@ -102,6 +102,7 @@ public class UserSanctionService {
         sanctionRepository.save(suspension);
 
         user.suspend(endsAt);
+        clearRefreshToken(user);
         usersRepository.save(user);
 
         return suspension;
@@ -132,6 +133,7 @@ public class UserSanctionService {
         sanctionRepository.save(ban);
 
         user.ban();
+        clearRefreshToken(user);
         usersRepository.save(user);
 
         return ban;
@@ -204,5 +206,10 @@ public class UserSanctionService {
                 // NONE, DELETE_CONTENT, OTHER는 제재 없음
             }
         }
+    }
+
+    private void clearRefreshToken(Users user) {
+        user.setRefreshToken(null);
+        user.setRefreshExpiration(null);
     }
 }
