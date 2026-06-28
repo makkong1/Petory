@@ -15,4 +15,5 @@ public interface DailyStatisticsRepository {
     List<DailyStatistics> findByStatDateBetweenOrderByStatDateAsc(LocalDate startDate, LocalDate endDate);
     List<LocalDate> findStatDatesByDateRange(LocalDate startDate, LocalDate endDate);
     void deleteByStatDateBefore(LocalDate cutoffDate);
+    Optional<DailyStatistics> findByStatDateForUpdate(LocalDate statDate);
 }
