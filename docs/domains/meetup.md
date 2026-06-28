@@ -1,845 +1,410 @@
-# Meetup 도메인 - 포트폴리오 상세 설명
+# Meetup 도메인
 
-## 1. 개요
+> 기준: 현재 코드를 단일 진실로 본다. 이 문서는 산책/오프라인 모임, 참가자 관리, 위치 기반 조회, 모임 채팅방 연동을 다룬다.
 
-Meetup 도메인은 오프라인 반려동물 모임 생성 및 참여 관리 도메인입니다. 사용자가 산책 모임을 생성하고 참여할 수 있으며, 위치 기반 검색, 최대 인원 제한, 채팅방 자동 연동 등의 기능을 제공합니다.
+## 1. 범위
 
-**주요 기능**:
+Meetup 도메인은 사용자가 오프라인 모임을 만들고, 다른 사용자가 참가/취소하며, 모임 채팅방과 상태 전이를 통해 모임 생명주기를 관리하는 도메인이다.
 
-- 모임 생성/조회/수정/삭제
-- 모임 참여/참여 취소
-- 최대 인원 제한 및 동시성 제어
-- 모임 상태 관리 (RECRUITING → CLOSED → COMPLETED)
-- 위치 기반 모임 검색 (반경 기반, 지역별)
+포함 범위:
+
+- 모임 목록/상세/생성/수정/삭제
+- 참여 가능한 모임 조회
+- 반경 기반 근처 모임 조회
+- 홈 화면 모임 추천
 - 키워드 검색
-- 그룹 채팅방 자동 생성 및 연동
+- 주최자별 모임 조회
+- 참가자 목록 조회
+- 모임 참가/참가 취소
+- 참가 여부 확인
+- 모임 히스토리 좋아요
+- 모임 상태 자동 전이
+- 모임 생성 후 그룹 채팅방 자동 생성
+- 채팅방 없는 모임 복구
+- 관리자 모임 조회/삭제/참가자 조회
 
----
+비범위:
 
-## 2. 기능 설명
+- 채팅 메시지 송수신
+- 사용자 프로필/펫 관리
+- 실제 지도 UI 구현
+- 알림 전송
+- 결제/정산
 
-### 2.1 모임 생성 및 참여
+## 2. 주요 코드
 
-**모임 생성 프로세스**:
+| 구분 | 주요 파일 |
+|---|---|
+| 사용자 API | `backend/main/java/com/linkup/Petory/domain/meetup/controller/MeetupController.java` |
+| 관리자 API | `backend/main/java/com/linkup/Petory/domain/admin/controller/AdminMeetupController.java` |
+| 관리자 facade | `backend/main/java/com/linkup/Petory/domain/admin/service/AdminCareAndMeetupFacade.java` |
+| 모임 서비스 | `backend/main/java/com/linkup/Petory/domain/meetup/service/MeetupService.java` |
+| 상태 전이 스케줄러 | `backend/main/java/com/linkup/Petory/domain/meetup/service/MeetupScheduler.java` |
+| 채팅방 이벤트 리스너 | `backend/main/java/com/linkup/Petory/domain/meetup/service/MeetupChatRoomEventListener.java` |
+| 채팅방 생성 서비스 | `backend/main/java/com/linkup/Petory/domain/meetup/service/MeetupChatRoomCreationService.java` |
+| 채팅방 복구 스케줄러 | `backend/main/java/com/linkup/Petory/domain/meetup/service/MeetupChatRoomRecoveryScheduler.java` |
+| 모임 repository | `backend/main/java/com/linkup/Petory/domain/meetup/repository/SpringDataJpaMeetupRepository.java` |
+| 참가자 repository | `backend/main/java/com/linkup/Petory/domain/meetup/repository/SpringDataJpaMeetupParticipantsRepository.java` |
+| 프론트 사용자 API | `frontend/src/api/meetupApi.js` |
+| 프론트 관리자 API | `frontend/src/api/meetupAdminApi.js` |
 
-1. 모임 정보 입력 (제목, 설명, 장소, 일시, 최대 인원)
+## 3. 핵심 엔티티
+
+### Meetup
+
+| 필드 | 의미 |
+|---|---|
+| `idx` | 모임 PK |
+| `title`, `description` | 제목/설명 |
+| `location` | 장소 주소 |
+| `latitude`, `longitude` | 위치 좌표 |
+| `date` | 모임 일시 |
+| `organizer` | 주최자 |
+| `maxParticipants` | 최대 참여 인원, 기본 10 |
+| `currentParticipants` | 현재 참여 인원 |
+| `status` | `RECRUITING`, `CLOSED`, `COMPLETED` |
+| `isDeleted`, `deletedAt` | soft delete 상태 |
+| `participants` | 참가자 목록 |
+
+생성 시 서비스에서 `currentParticipants=1`, `status=RECRUITING`으로 저장하고 주최자를 참가자로 추가한다.
+
+### MeetupParticipants
+
+모임 참가자 엔티티다.
+
+| 필드 | 의미 |
+|---|---|
+| `meetup` | 대상 모임 |
+| `user` | 참가자 |
+| `joinedAt` | 참가 시각 |
+| `liked` | 내 모임 히스토리 좋아요 여부 |
+
+`meetup + user` 복합 PK를 사용한다. 중복 참가의 최종 방어선 역할도 한다.
+
+## 4. 사용자 API
+
+`MeetupController`는 클래스 단위로 `@PreAuthorize("isAuthenticated()")`가 적용되어 있다.
+
+### `/api/meetups`
+
+| API | 설명 |
+|---|---|
+| `POST /api/meetups` | 모임 생성 |
+| `PUT /api/meetups/{meetupIdx}` | 모임 수정 |
+| `DELETE /api/meetups/{meetupIdx}` | 모임 soft delete |
+| `GET /api/meetups?page&size` | 전체 모임 페이징 조회 |
+| `GET /api/meetups/{meetupIdx}` | 모임 상세 조회 |
+| `GET /api/meetups/search?keyword` | 키워드 검색 |
+| `GET /api/meetups/available?page&size` | 참여 가능한 모임 Slice 조회 |
+| `GET /api/meetups/organizer/{organizerIdx}` | 주최자별 모임 조회 |
+| `GET /api/meetups/nearby?lat&lng&radius&maxResults` | 반경 기반 근처 모임 조회 |
+| `GET /api/meetups/home?lat&lng&size` | 홈 화면 모임 추천 |
+| `GET /api/meetups/{meetupIdx}/participants` | 참가자 목록 |
+| `POST /api/meetups/{meetupIdx}/participants` | 모임 참가 |
+| `DELETE /api/meetups/{meetupIdx}/participants` | 모임 참가 취소 |
+| `GET /api/meetups/{meetupIdx}/participants/check` | 내 참가 여부와 liked 조회 |
+| `PATCH /api/meetups/{meetupIdx}/history/like?liked=true` | 내 모임 히스토리 좋아요 변경 |
+
+응답은 대부분 `{ meetups, count, ... }`, `{ meetup }`, `{ participant }`, `{ history }` 형태의 map 응답이다.
+
+## 5. 모임 생성
+
+생성 흐름:
+
+1. authentication name으로 사용자 조회
 2. 이메일 인증 확인
-3. 날짜 검증 (현재 시간 이후)
-4. 모임 생성 및 주최자 자동 참여
-5. 그룹 채팅방 자동 생성 (주최자 ADMIN 역할)
+3. 모임 일시가 과거인지 검증
+4. `maxParticipants`가 없으면 10 사용
+5. `currentParticipants=1`, `status=RECRUITING`으로 모임 저장
+6. 주최자를 `MeetupParticipants`에 자동 저장
+7. 트랜잭션 커밋 후 `MeetupCreatedEvent` 발행
+8. 비동기 리스너가 그룹 채팅방 생성
 
-**모임 참여 프로세스**:
+이메일 인증 purpose:
 
-1. 모임 선택
-2. 이메일 인증 확인
-3. 중복 참여 체크
-4. 최대 인원 체크 (주최자 제외, DB 원자적 `incrementParticipantsIfAvailable`)
-5. `MeetupParticipants` 행 추가 및 인원 수 반영
-6. **채팅방**: `MeetupService.joinMeetup()`은 채팅을 건드리지 않음 — 산책모임 채팅 입장은 **`POST /api/chat/conversations/meetup/{meetupIdx}/join?userId=...`** (`ConversationService.joinMeetupChat`)를 **별도 호출**
+- `MEETUP`
 
-### 2.2 모임 상태 관리
+채팅방 생성은 모임 생성 트랜잭션과 분리된다. 채팅방 생성 실패가 모임 생성을 롤백하지 않는다.
 
-**`MeetupStatus` enum** (`RECRUITING`, `CLOSED`, `COMPLETED`):
+## 6. 수정과 삭제
 
-- 생성 시 기본값은 **`RECRUITING`** (`MeetupService.createMeetup`).
-- **자동 전이**: `MeetupScheduler.transitionMeetupStatuses()` — 매시 정각(`cron = "0 0 * * * ?"`) 실행.
-  - `closeFullRecruitingMeetups`: `RECRUITING`이면서 `currentParticipants >= maxParticipants`이고 아직 `date >= now`인 모임 → **`CLOSED`**
-  - `completePastMeetups`: `date < now`인 모임 → **`COMPLETED`** (이미 `COMPLETED` 제외)
-- 근처 모임 ID 조회 네이티브 쿼리는 **`COMPLETED`가 아닌** 모임만 (`status`가 null이면 통과).
+수정:
 
-### 2.3 위치 기반 검색
+- 주최자 또는 `ADMIN`/`MASTER`만 가능하다.
+- 제목, 설명, 위치, 좌표, 일시, 최대 인원을 부분 수정한다.
+- 일시는 현재 이후여야 한다.
+- `maxParticipants < 1`이면 거절한다.
+- `maxParticipants < currentParticipants`이면 거절한다.
 
-**반경 기반 검색** (`GET /api/meetups/nearby`, `radius` km, 기본 **5.0**, `maxResults` 기본 **500**, 서비스에서 **1~1000**으로 클램프):
+삭제:
 
-- `SpringDataJpaMeetupRepository.findNearbyMeetupIds`: Bounding Box + Haversine(6371km)로 ID만 조회·정렬·`LIMIT`
-- 이어서 `findByIdxInWithOrganizer(ids)`로 주최자 페치 후, **ID 순서를 유지**해 DTO 변환 (`MeetupService.getNearbyMeetups`)
-- **`m.date > now`**, **`status`가 `COMPLETED` 아님**, 소프트 삭제 제외
+- 주최자 또는 `ADMIN`/`MASTER`만 가능하다.
+- soft delete로 `isDeleted=true`, `deletedAt=now` 처리한다.
 
-**지역별 검색** (`GET /api/meetups/location`):
+관리자 전용 삭제는 `deleteMeetupForAdmin()`을 사용해 사용자 검증 없이 soft delete한다.
 
-- `minLat`~`maxLat`, `minLng`~`maxLng` 범위, 삭제 제외, **`date` 오름차순**
+## 7. 조회와 검색
 
-**키워드 검색** (`GET /api/meetups/search?keyword=`):
+### 전체 목록
 
-- `findByKeyword`: 제목·설명에 키워드 포함(JPQL `LIKE`, 구현은 `SpringDataJpaMeetupRepository` 참고)
+`getAllMeetups(Pageable)`은 `findAllNotDeleted(pageable)`을 사용한다.
 
----
+조건:
 
-## 3. 서비스 로직 설명
+- soft delete 제외
 
-### 3.1 핵심 비즈니스 로직
+조회 방식:
 
-#### 로직 1: 모임 생성
+- `@EntityGraph(attributePaths = "organizer")`로 주최자 N+1을 줄인다.
 
-**구현 위치**: `MeetupService.createMeetup()`
+### 상세
 
-```java
-@Transactional
-public MeetupDTO createMeetup(MeetupDTO meetupDTO, String userId) {
-    // 1. 사용자 확인
-    Users organizer = usersRepository.findByIdString(userId)
-            .orElseThrow(UserNotFoundException::new);
+`getMeetupById()`는 `findByIdWithDetails()`를 사용한다.
 
-    // 2. 이메일 인증 확인
-    if (organizer.getEmailVerified() == null || !organizer.getEmailVerified()) {
-        throw new EmailVerificationRequiredException(
-                "모임 생성을 위해 이메일 인증이 필요합니다.",
-                EmailVerificationPurpose.MEETUP);
-    }
+포함:
 
-    // 3. 날짜 검증
-    if (meetupDTO.getDate() != null && meetupDTO.getDate().isBefore(LocalDateTime.now())) {
-        throw MeetupValidationException.dateMustBeFuture();
-    }
+- 주최자
+- 참가자
+- 참가자 사용자
 
-    // 4. 모임 생성
-    Meetup meetup = Meetup.builder()
-            .title(meetupDTO.getTitle())
-            .description(meetupDTO.getDescription())
-            .location(meetupDTO.getLocation())
-            .latitude(meetupDTO.getLatitude())
-            .longitude(meetupDTO.getLongitude())
-            .date(meetupDTO.getDate())
-            .organizer(organizer)
-            .maxParticipants(meetupDTO.getMaxParticipants() != null ? meetupDTO.getMaxParticipants() : 10)
-            .currentParticipants(1)
-            .status(MeetupStatus.RECRUITING)
-            .build();
+### 참여 가능한 모임
 
-    Meetup savedMeetup = meetupRepository.save(meetup);
+`getAvailableMeetups(Pageable)`은 count 쿼리 없이 `Slice`로 반환한다.
 
-    // 5. 주최자를 자동으로 참가자에 추가 (인원은 이미 1로 설정됨)
-    MeetupParticipants organizerParticipant = MeetupParticipants.builder()
-            .meetup(savedMeetup)
-            .user(organizer)
-            .joinedAt(LocalDateTime.now())
-            .build();
-    meetupParticipantsRepository.save(organizerParticipant);
+조건:
 
-    // 6. 모임 생성 완료 이벤트 발행 (트랜잭션 커밋 후 비동기로 채팅방 생성 처리)
-    // 핵심 도메인(모임)과 파생 도메인(채팅방) 분리: 채팅방 생성 실패가 모임 생성까지 롤백하지 않음
-    // TransactionSynchronization을 사용하여 트랜잭션 커밋 후 이벤트 발행 보장
-    TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-        @Override
-        public void afterCommit() {
-            eventPublisher.publishEvent(new MeetupCreatedEvent(
-                    MeetupService.this,
-                    savedMeetup.getIdx(),
-                    organizer.getIdx(),
-                    savedMeetup.getTitle()));
-        }
-    });
+- `date > now`
+- `status = RECRUITING`
+- `currentParticipants < maxParticipants`
+- soft delete 제외
 
-    return converter.toDTO(savedMeetup);
-}
+정렬:
+
+- `date ASC`
+
+### 키워드 검색
+
+`searchMeetupsByKeyword(keyword)`는 FULLTEXT 기반 검색을 사용한다.
+
+흐름:
+
+1. native query로 title/description FULLTEXT 검색 후 id 목록 조회
+2. id 목록으로 주최자를 fetch join해 재조회
+3. 결과가 `MAX_LIST_SIZE=500`을 넘으면 잘라낸다.
+
+### 주최자별 조회
+
+`getMeetupsByOrganizer(organizerIdx)`는 주최자 id로 soft delete 제외 목록을 조회한다. 결과가 500개를 넘으면 잘라낸다.
+
+## 8. 위치 기반 조회와 홈 추천
+
+### 근처 모임 조회
+
+`GET /api/meetups/nearby`
+
+파라미터:
+
+- `lat`
+- `lng`
+- `radius`, 기본 5.0km
+- `maxResults`, 기본 500
+
+서비스 정책:
+
+- maxResults는 1~1000으로 보정한다.
+- `date > now`
+- `status != COMPLETED` 또는 status null
+- soft delete 제외
+- 좌표가 있는 모임만 포함
+
+쿼리:
+
+- `geo_point` 공간 컬럼
+- `ST_Within` bounding polygon
+- `ST_Distance_Sphere` 반경 검증
+- 거리 오름차순, 날짜 오름차순 정렬
+- id만 조회한 뒤 `findByIdxInWithOrganizer(ids)`로 주최자 fetch
+- id 순서를 유지해 DTO 변환
+
+응답 DTO의 `distance`는 미터 단위다.
+
+### 홈 추천
+
+`GET /api/meetups/home`
+
+좌표가 없으면 참여 가능한 모임을 `date ASC`로 조회한다.
+
+좌표가 있으면:
+
+1. 50km 반경 근처 모임을 `size * 3`개 후보로 조회한다.
+2. `RECRUITING` 상태만 남긴다.
+3. 거리, 날짜 긴급도, 남은 정원 점수를 계산한다.
+4. `score = 0.4 * distScore + 0.4 * urgencyScore + 0.2 * capacityScore`로 정렬한다.
+5. 결과가 없으면 참여 가능한 모임 fallback을 사용한다.
+
+점수:
+
+```text
+distScore     = max(0, 1 - distKm / 50)
+urgencyScore  = max(0, 1 - daysUntil / 30)
+capacityScore = 1 - currentParticipants / maxParticipants
 ```
 
-**핵심 로직**:
-
-- **사용자 조회**: `UserNotFoundException`
-- **이메일 인증 확인**: 모임 생성 시 이메일 인증 필요 (`EmailVerificationRequiredException`, `EmailVerificationPurpose.MEETUP`)
-- **날짜 검증**: 모임 일시는 현재 시간 이후여야 함 (`MeetupValidationException.dateMustBeFuture()`)
-- **주최자 자동 참여**: 주최자를 자동으로 참가자에 추가, `currentParticipants`를 1로 설정
-- **그룹 채팅방 자동 생성**: 이벤트 기반 비동기 처리 (`MeetupCreatedEvent`)
-  - `TransactionSynchronization`으로 트랜잭션 커밋 후 이벤트 발행
-  - `@Async` + `@Transactional(REQUIRES_NEW)`로 별도 트랜잭션에서 채팅방 생성
-  - 채팅방 생성 실패해도 모임 생성은 성공 (롤백되지 않음)
-  - `MeetupChatRoomEventListener`가 이벤트를 수신하여 채팅방 생성 및 주최자 ADMIN 역할 설정
-
-#### 로직 2: 모임 참여 (최대 인원 제한)
-
-**구현 위치**: `MeetupService.joinMeetup()`
-
-```java
-@Transactional
-public MeetupParticipantsDTO joinMeetup(Long meetupIdx, String userId) {
-    // 1. 모임 존재 확인 (organizer fetch로 N+1 방지)
-    Meetup meetup = meetupRepository.findByIdWithOrganizer(meetupIdx)
-            .orElseThrow(MeetupNotFoundException::new);
-
-    // 2. 사용자 확인
-    Users user = usersRepository.findByIdString(userId)
-            .orElseThrow(UserNotFoundException::new);
-
-    // 3. 이메일 인증 확인
-    if (user.getEmailVerified() == null || !user.getEmailVerified()) {
-        throw new EmailVerificationRequiredException(
-                "모임 참여를 위해 이메일 인증이 필요합니다.",
-                EmailVerificationPurpose.MEETUP);
-    }
-
-    Long userIdx = user.getIdx();
-
-    // 4. 중복 참여 체크
-    if (meetupParticipantsRepository.existsByMeetupIdxAndUserIdx(meetupIdx, userIdx)) {
-        throw MeetupConflictException.alreadyJoined();
-    }
-
-    // 5. 주최자가 아닌 경우에만 인원 증가 (원자적 UPDATE 쿼리)
-    if (!meetup.getOrganizer().getIdx().equals(userIdx)) {
-        // 원자적 UPDATE 쿼리로 조건부 증가 (RECRUITING 상태 + 인원 미달 조건 동시 체크)
-        int updated = meetupRepository.incrementParticipantsIfAvailable(meetupIdx, MeetupStatus.RECRUITING);
-        if (updated == 0) {
-            // RECRUITING 상태가 아니면 모집 마감, 상태는 맞지만 인원이 찼으면 fullCapacity
-            if (meetup.getStatus() != MeetupStatus.RECRUITING) {
-                throw MeetupConflictException.meetupNotRecruiting();
-            }
-            throw MeetupConflictException.fullCapacity();
-        }
-        // [리팩토링] findById 2회 호출 제거 → entityManager.refresh()로 영속성 컨텍스트 동기화
-        entityManager.refresh(meetup);
-    }
-
-    // 6. 참가자 추가
-    MeetupParticipants participant = MeetupParticipants.builder()
-            .meetup(meetup)
-            .user(user)
-            .joinedAt(LocalDateTime.now())
-            .build();
-
-    MeetupParticipants savedParticipant = meetupParticipantsRepository.save(participant);
-
-    return participantsConverter.toDTO(savedParticipant);
-}
-```
-
-**핵심 로직**:
-
-- **이메일 인증 확인**: 모임 참여 시 이메일 인증 필요 (`EmailVerificationPurpose.MEETUP`)
-- **상태 검증**: `RECRUITING` 상태가 아닌(`CLOSED`/`COMPLETED`) 모임에 참가 시도 → `MeetupConflictException.meetupNotRecruiting()` (errorCode: `MEETUP_NOT_RECRUITING`)
-- **중복 참여 체크**: `existsByMeetupIdxAndUserIdx()` → `MeetupConflictException.alreadyJoined()` (errorCode: `MEETUP_ALREADY_JOINED`)
-- **최대 인원 체크**: 주최자가 아닌 경우에만 → `MeetupConflictException.fullCapacity()` (인원 가득 시, errorCode: `MEETUP_FULL`)
-- **인원 증가**: 원자적 UPDATE 쿼리 사용 (`incrementParticipantsIfAvailable`)
-  - DB 레벨에서 **RECRUITING 상태 + 인원 미달** 두 조건을 동시에 체크 및 증가
-  - `UPDATE Meetup SET currentParticipants = currentParticipants + 1 WHERE idx = :meetupIdx AND currentParticipants < maxParticipants AND status = :recruiting`
-  - `updated == 0`이면 status 필드로 "모집 마감 vs 인원 초과" 역추론 후 분기
-- **동시성 제어**: 원자적 UPDATE 쿼리로 Race Condition 해결
-
-#### 로직 3: 모임 참여 취소
-
-**구현 위치**: `MeetupService.cancelMeetupParticipation()`
-
-```java
-@Transactional
-public void cancelMeetupParticipation(Long meetupIdx, String userId) {
-    // 1. 모임 존재 확인 (organizer fetch로 N+1 방지)
-    Meetup meetup = meetupRepository.findByIdWithOrganizer(meetupIdx)
-            .orElseThrow(MeetupNotFoundException::new);
-
-    // 2. 사용자 확인
-    Users user = usersRepository.findByIdString(userId)
-            .orElseThrow(UserNotFoundException::new);
-
-    Long userIdx = user.getIdx();
-
-    // 3. 주최자는 참가 취소 불가
-    if (meetup.getOrganizer().getIdx().equals(userIdx)) {
-        throw MeetupForbiddenException.organizerCannotCancel();
-    }
-
-    // 4. 참가자 확인 및 삭제
-    MeetupParticipants participant = meetupParticipantsRepository
-            .findByMeetupIdxAndUserIdx(meetupIdx, userIdx)
-            .orElseThrow(MeetupParticipantNotFoundException::new);
-
-    meetupParticipantsRepository.delete(participant);
-
-    // 5. currentParticipants 원자적 감소 (동시 취소 대비)
-    meetupRepository.decrementParticipantsIfPositive(meetupIdx);
-
-    // 6. 채팅방에서도 자동으로 나가기 (채팅 실패가 참가 취소를 막으면 안 됨)
-    try {
-        conversationService.leaveMeetupChat(meetupIdx, userIdx);
-    } catch (ApiException e) {
-        // 비즈니스 예외: warn 레벨
-        log.warn("채팅방 나가기 실패 (비즈니스): meetupIdx={}, userIdx={}, error={}", meetupIdx, userIdx, e.getMessage());
-    } catch (Exception e) {
-        // 예상치 못한 오류: error 레벨 (스택트레이스 포함)
-        log.error("채팅방 나가기 예상치 못한 오류: meetupIdx={}, userIdx={}", meetupIdx, userIdx, e);
-    }
-}
-```
-
-**핵심 로직**:
-
-- **주최자 보호**: 주최자는 참가 취소 불가 (`MeetupForbiddenException.organizerCannotCancel()`)
-- **참가자 조회**: `MeetupParticipantNotFoundException`
-- **참가자 삭제**: `MeetupParticipants` 엔티티 삭제
-- **인원 감소**: `decrementParticipantsIfPositive(meetupIdx)` — DB 원자적 UPDATE (`currentParticipants > 0` 조건)
-- **채팅방 나가기**: 채팅방에서도 자동으로 나가기 (`leaveMeetupChat()`)
-- **에러 처리**: `ApiException`(비즈니스 오류) → warn, `Exception`(예상치 못한 오류) → error(스택트레이스). 어느 경우든 모임 참여 취소는 성공으로 처리
-
-#### 로직 4: 모임 생성 이벤트 리스너 (채팅방 생성)
-
-**구현 위치**: `MeetupChatRoomEventListener.handleMeetupCreated()`
-
-```java
-@EventListener
-@Async
-@Transactional(propagation = Propagation.REQUIRES_NEW)
-public void handleMeetupCreated(MeetupCreatedEvent event) {
-    Long meetupIdx = event.getMeetupIdx();
-    Long organizerIdx = event.getOrganizerIdx();
-    String meetupTitle = event.getMeetupTitle();
-
-    try {
-        // 그룹 채팅방 생성 (주최자만 초기 참여)
-        conversationService.createConversation(
-            ConversationType.MEETUP,
-            RelatedType.MEETUP,
-            meetupIdx,
-            meetupTitle,
-            List.of(organizerIdx));
-
-        // 주최자를 ADMIN 역할로 설정
-        conversationService.setParticipantRole(
-            RelatedType.MEETUP,
-            meetupIdx,
-            organizerIdx,
-            ParticipantRole.ADMIN);
-    } catch (Exception e) {
-        // 채팅방 생성 실패해도 모임은 이미 생성됨 (롤백되지 않음)
-        log.error("모임 채팅방 생성 실패: meetupIdx={}, organizerIdx={}, error={}",
-            meetupIdx, organizerIdx, e.getMessage(), e);
-    }
-}
-```
-
-**핵심 로직**:
-
-- **이벤트 수신**: `MeetupCreatedEvent` 이벤트 수신
-- **비동기 처리**: `@Async`로 비동기 처리하여 모임 생성 응답 속도 향상
-- **별도 트랜잭션**: `@Transactional(REQUIRES_NEW)`로 모임 생성 트랜잭션과 분리
-- **채팅방 생성**: 그룹 채팅방 생성 및 주최자 ADMIN 역할 설정
-- **에러 처리**: 채팅방 생성 실패해도 모임 생성은 성공 (롤백되지 않음)
-
-#### 로직 5: 반경 기반 모임 조회
-
-**구현 위치**: `MeetupService.getNearbyMeetups()`
-
-**핵심 로직**:
-
-- **Haversine 공식**: 지구 반지름 6371km 사용
-- **필터링**: 미래 날짜만, COMPLETED 상태 제외, 소프트 삭제 제외
-- **쿼리**: `findNearbyMeetupIds`로 ID·정렬·LIMIT → `findByIdxInWithOrganizer`로 엔티티 로드 (주최자 N+1 방지)
-- **정렬**: 거리순 정렬, 같으면 날짜순 정렬
-- **기본값**: `radius` 5.0km, `maxResults` 500 (서비스에서 상한 1000)
-- **성능 측정**: `@Timed` 어노테이션으로 자동 측정 및 로깅
-
-### 3.2 서비스 메서드 구조
-
-#### MeetupService
-
-| 메서드                        | 설명                  | 주요 로직                                                                                                        |
-| ----------------------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `createMeetup()`              | 모임 생성             | 이메일 인증 확인, 날짜 검증, `currentParticipants=1`로 저장 후 주최자 참가자 행 추가, 커밋 후 채팅방 이벤트                                                  |
-| `updateMeetup()`              | 모임 수정             | `findByIdWithOrganizer()`(참가자 FETCH 불필요), **주최자 또는 `ADMIN`/`MASTER`** 검증, 날짜 과거 검증(`dateMustBeFuture`), `maxParticipants` 축소 검증(`maxBelowCurrent`)                    |
-| `deleteMeetup()`              | 모임 삭제             | `findByIdWithOrganizer()`, 동일 권한 검증 후 Soft Delete                                                                 |
-| `getAllMeetups()`             | 모든 모임 조회        | 비페이징: `findAllNotDeleted()` / 페이징: `findAllNotDeleted(Pageable)` — 목록 API는 페이징 버전 사용                                                                     |
-| `getMeetupById()`             | 특정 모임 조회        | `findByIdWithDetails()`, MeetupNotFoundException, organizer·participants 포함                                    |
-| `getNearbyMeetups()`          | 반경 기반 모임 조회   | `findNearbyMeetupIds` + `findByIdxInWithOrganizer`, Bounding Box + Haversine, `maxResults` 클램프, @Timed                                     |
-| `getMeetupsByLocation()`      | 지역별 모임 조회      | `findByLocationRange()`, 위도/경도 범위                                                                          |
-| `searchMeetupsByKeyword()`    | 키워드 검색           | `findByKeyword()` — 제목·설명 `LIKE` (구현: `SpringDataJpaMeetupRepository`)                                     |
-| `getAvailableMeetups()`       | 참여 가능한 모임 조회 (레거시, `@Deprecated`) | `Pageable.unpaged()` 전량 조회. 컨트롤러는 `getAvailableMeetups(Pageable)` 사용                                                               |
-| `getAvailableMeetups(Pageable)` | 참여 가능한 모임 Slice | `findAvailableMeetups(now, RECRUITING, pageable)` — `currentParticipants < maxParticipants AND status = RECRUITING` (DB 직접 비교, 메모리 페이징 없음)                                |
-| `getMeetupsByOrganizer()`     | 주최자별 모임 조회    | `findByOrganizerIdxOrderByCreatedAtDesc()`, 결과 상한 `MAX_LIST_SIZE(500)` 적용                                                                       |
-| `getMeetupsByLocation()`      | 지역별 모임 조회      | `findByLocationRange()`, 결과 상한 `MAX_LIST_SIZE(500)` 적용                                                                       |
-| `searchMeetupsByKeyword()`    | 키워드 검색           | `findByKeyword()`, 결과 상한 `MAX_LIST_SIZE(500)` 적용                                                                       |
-| `joinMeetup()`                | 모임 참여             | `meetupNotRecruiting()`(CLOSED/COMPLETED 시), `alreadyJoined()`, `fullCapacity()`, 원자적 UPDATE(RECRUITING+인원 조건), entityManager.refresh |
-| `cancelMeetupParticipation()` | 모임 참여 취소        | 주최자 보호, MeetupParticipantNotFoundException, 채팅방 나가기(ApiException/Exception 분리 catch)                         |
-| `getMeetupParticipants()`     | 참가자 목록 조회      | `findByIdWithOrganizer`로 모임 존재·삭제 여부 선확인 후 참가자 조회                                                                            |
-| `isUserParticipating()`       | 참여 여부 확인        | `findIdxByIdString` 경량 쿼리(Users 전체 로딩 없음), `existsByMeetupIdxAndUserIdx()`                                                           |
-| `deleteMeetupForAdmin()`      | 관리자용 모임 삭제    | `findById()` → Soft Delete. 사용자 검증 없음 — `AdminMeetupController` 전용                                                                    |
-| `getMeetupsForAdmin()`        | 관리자용 모임 목록    | `findAllForAdmin(status, keyword, pageable)` — `Page<MeetupDTO>` 반환                                                                          |
-
-### 3.3 트랜잭션 처리
-
-- **트랜잭션 범위**:
-  - 모임 생성/수정/삭제: `@Transactional`
-  - 모임 참여/취소: `@Transactional`
-  - 조회 메서드: `@Transactional(readOnly = true)` (클래스 레벨)
-- **격리 수준**: 기본값 (READ_COMMITTED)
-- **이메일 인증**: 모임 생성 및 참여 시 이메일 인증 확인 (`EmailVerificationRequiredException`, `EmailVerificationPurpose.MEETUP`)
-
-### 3.4 예외 처리
-
-| 예외                                 | 발생 시점                                                                                        |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------ |
-| `MeetupNotFoundException`            | 모임 조회 실패, updateMeetup, deleteMeetup, getMeetupById, joinMeetup, cancelMeetupParticipation |
-| `MeetupConflictException`            | `alreadyJoined()` (errorCode: `MEETUP_ALREADY_JOINED`): 중복 참여, `fullCapacity()` (errorCode: `MEETUP_FULL`): 인원 가득 참, `meetupNotRecruiting()` (errorCode: `MEETUP_NOT_RECRUITING`): CLOSED/COMPLETED 상태 모임 참가 시도 |
-| `MeetupForbiddenException`           | `organizerCannotCancel()`: 주최자 참가 취소 시도, `notOrganizer()`: 주최자·관리자가 아닌 사용자의 수정/삭제 시도 |
-| `MeetupParticipantNotFoundException` | 참가자 조회 실패 (cancelMeetupParticipation) |
-| `MeetupValidationException`          | `dateMustBeFuture()`: 모임 일시가 과거인 경우(생성·수정 모두 적용), `maxBelowCurrent()`: maxParticipants < currentParticipants, `invalidMaxParticipants()`: maxParticipants < 1 |
-| `UserNotFoundException`              | 사용자 조회 실패 (createMeetup, joinMeetup, cancelMeetupParticipation, isUserParticipating)      |
-| `UnauthenticatedException`           | 인증 정보 없음 (컨트롤러, Authentication null 시)                                                |
-
----
-
-## 4. 아키텍처 설명
-
-### 4.1 엔티티 구조
-
-#### Meetup (산책모임)
-
-```java
-@Entity
-@Table(name = "meetup")
-public class Meetup {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long idx;
-
-    @Column(nullable = false, length = 200)
-    private String title; // 모임 제목
-
-    @Lob
-    private String description; // 모임 내용
-
-    private String location; // 모임 장소 주소
-
-    private Double latitude; // 위도
-
-    private Double longitude; // 경도
-
-    @Column(nullable = false)
-    private LocalDateTime date; // 모임 일시
-
-    @ManyToOne
-    @JoinColumn(name = "organizer_idx", nullable = false)
-    private Users organizer; // 모임 주최자
-
-    @Builder.Default
-    private Integer maxParticipants = 10; // 최대 참여 인원
-
-    @Builder.Default
-    private Integer currentParticipants = 0; // 현재 참여자 수
-
-    @Enumerated(EnumType.STRING)
-    @Builder.Default
-    @Column(length = 20)
-    private MeetupStatus status = MeetupStatus.RECRUITING; // 모임 상태
-
-    // createdAt, updatedAt은 BaseTimeEntity에서 상속받음
-
-    @Column(name = "is_deleted")
-    @Builder.Default
-    private Boolean isDeleted = false;
-
-    @Column(name = "deleted_at")
-    private LocalDateTime deletedAt;
-
-    @OneToMany(mappedBy = "meetup", cascade = CascadeType.ALL)
-    @BatchSize(size = 50)  // 목록 조회 시 participants N+1 방지
-    private List<MeetupParticipants> participants; // 참여자 목록
-}
-```
-
-**특징**:
-
-- `BaseTimeEntity`를 상속받음 (`createdAt`, `updatedAt` 자동 관리)
-- Soft Delete: `isDeleted`, `deletedAt` 필드로 Soft Delete 지원
-- 복합 키 사용: `MeetupParticipants`는 `@IdClass`로 복합 키 사용
-
-#### MeetupParticipants (모임 참여자)
-
-```java
-@Entity
-@Table(name = "meetupparticipants")
-@IdClass(MeetupParticipantsId.class)
-public class MeetupParticipants {
-    @Id
-    @ManyToOne
-    @JoinColumn(name = "meetup_idx", nullable = false)
-    private Meetup meetup;
-
-    @Id
-    @ManyToOne
-    @JoinColumn(name = "user_idx", nullable = false)
-    private Users user;
-
-    private LocalDateTime joinedAt;
-
-    @PrePersist
-    protected void onCreate() {
-        this.joinedAt = LocalDateTime.now();
-    }
-}
-```
-
-**특징**:
-
-- 복합 키: `MeetupParticipantsId` 클래스로 복합 키 사용
-- 중복 참여 방지: 동일 `(meetup, user)` 조합은 PK로 DB에서 거절, 서비스에서 `exists` 선검사
-- `@PrePersist`로 `joinedAt` 자동 설정
-
-#### MeetupStatus (모임 상태)
-
-```java
-public enum MeetupStatus {
-    RECRUITING,  // 모집중
-    CLOSED,      // 마감
-    COMPLETED    // 종료
-}
-```
-
-### 4.2 도메인 구조
-
-```
-domain/meetup/
-  ├── annotation/
-  │   └── Timed.java
-  ├── aspect/
-  │   └── PerformanceAspect.java
-  ├── controller/
-  │   └── MeetupController.java
-  ├── service/
-  │   ├── MeetupService.java
-  │   ├── MeetupScheduler.java
-  │   └── MeetupChatRoomEventListener.java
-  ├── entity/
-  │   ├── Meetup.java
-  │   ├── MeetupParticipants.java
-  │   ├── MeetupParticipantsId.java
-  │   └── MeetupStatus.java (enum)
-  ├── event/
-  │   └── MeetupCreatedEvent.java
-  ├── repository/
-  │   ├── MeetupRepository.java
-  │   ├── MeetupParticipantsRepository.java
-  │   ├── JpaMeetupAdapter.java
-  │   ├── JpaMeetupParticipantsAdapter.java
-  │   ├── SpringDataJpaMeetupRepository.java
-  │   └── SpringDataJpaMeetupParticipantsRepository.java
-  ├── exception/
-  │   ├── MeetupNotFoundException.java
-  │   ├── MeetupConflictException.java
-  │   ├── MeetupForbiddenException.java
-  │   ├── MeetupParticipantNotFoundException.java
-  │   └── MeetupValidationException.java
-  ├── converter/
-  │   ├── MeetupConverter.java
-  │   └── MeetupParticipantsConverter.java
-  └── dto/
-      ├── MeetupDTO.java
-      └── MeetupParticipantsDTO.java
-```
-
-### 4.3 엔티티 관계도 (ERD)
-
-```mermaid
-erDiagram
-    Users ||--o{ Meetup : "주최"
-    Meetup ||--o{ MeetupParticipants : "참여자"
-    Users ||--o{ MeetupParticipants : "참여"
-```
-
-### 4.4 API 설계
-
-#### REST API
-
-**참고**: `MeetupController` 클래스에 `@PreAuthorize("isAuthenticated()")` — **모든 `/api/meetups/**`인증 필요**.`Authentication.getName()`은 **로그인 ID(문자열)** → `usersRepository.findByIdString`.
-
-**구현 참고**: `updateMeetup` / `deleteMeetup`은 서비스에서 **주최자 또는 `ADMIN`/`MASTER`** 인 경우만 허용 (`MeetupForbiddenException.notOrganizer()`).
-
-| 엔드포인트                                    | Method | 설명                                                                                             | 응답 형식                                  |
-| --------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------ | ------------------------------------------ |
-| `/api/meetups`                                | POST   | 모임 생성 (UserNotFoundException, MeetupValidationException, EmailVerificationRequiredException) | `{"meetup": {...}, "message": "..."}`      |
-| `/api/meetups/{meetupIdx}`                    | PUT    | 모임 수정 (MeetupNotFoundException, UserNotFoundException, `MeetupForbiddenException` 비권한 시)                                        | `{"meetup": {...}, "message": "..."}`      |
-| `/api/meetups/{meetupIdx}`                    | DELETE | 모임 삭제 (동일)                                        | `{"message": "..."}`                       |
-| `/api/meetups`                                | GET    | 모든 모임 조회 (`page`, `size`, 기본 0·20, `createdAt` DESC)                                                                                   | `meetups`, `count`, `totalElements`, `totalPages`, `page`, `size`           |
-| `/api/meetups/{meetupIdx}`                    | GET    | 특정 모임 조회                                                                                   | `{"meetup": {...}}`                        |
-| `/api/meetups/nearby`                         | GET    | 반경 기반 모임 조회 (`lat`, `lng`, `radius` 기본 5.0km, `maxResults` 기본 500)                             | `{"meetups": [...], "count": N}`           |
-| `/api/meetups/location`                       | GET    | 지역별 모임 조회 (minLat, maxLat, minLng, maxLng 파라미터)                                       | `{"meetups": [...], "count": N}`           |
-| `/api/meetups/search`                         | GET    | 키워드 검색 (keyword 파라미터)                                                                   | `{"meetups": [...], "count": N}`           |
-| `/api/meetups/available`                      | GET    | 참여 가능한 모임 (`page`, `size`, 기본 0·20, `date` ASC, Slice)                                                                            | `meetups`, `count`, `hasNext`, `page`, `size`           |
-| `/api/meetups/organizer/{organizerIdx}`       | GET    | 주최자별 모임 조회                                                                               | `{"meetups": [...], "count": N}`           |
-| `/api/meetups/{meetupIdx}/participants`       | GET    | 참가자 목록 조회                                                                                 | `{"participants": [...], "count": N}`      |
-| `/api/meetups/{meetupIdx}/participants`       | POST   | 모임 참여 (MeetupConflictException, MeetupNotFoundException, UserNotFoundException)              | `{"participant": {...}, "message": "..."}` |
-| `/api/meetups/{meetupIdx}/participants`       | DELETE | 모임 참여 취소 (MeetupForbiddenException, MeetupParticipantNotFoundException)                    | `{"message": "..."}`                       |
-| `/api/meetups/{meetupIdx}/participants/check` | GET    | 참여 여부 확인                                                                                   | `{"isParticipating": true/false}`          |
-
-#### 관리자 API (`/api/admin/meetups`, `@PreAuthorize("hasAnyRole('ADMIN','MASTER')")`)
-
-`AdminMeetupController` — `AdminCareAndMeetupFacade`를 경유해 서비스를 호출한다.
-
-| 엔드포인트 | Method | 설명 | 응답 |
-|-----------|--------|------|------|
-| `/api/admin/meetups` | GET | 모임 목록 (`status`, `q`, `page`/`size` 기본 0·20) — `getMeetupsForAdmin()` | `Page<MeetupDTO>` |
-| `/api/admin/meetups/{id}` | GET | 모임 상세 — `getMeetupById()` | `MeetupDTO` |
-| `/api/admin/meetups/{id}` | DELETE | 소프트 삭제 (`204 No Content`) — `deleteMeetupForAdmin()` (사용자 검증 없음) | `204 No Content` |
-| `/api/admin/meetups/{id}/participants` | GET | 참가자 목록 | `List<MeetupParticipantsDTO>` |
-
-#### 채팅 (Chat 도메인) — 모임과 별도 호출
-
-| 엔드포인트                                                     | Method | 설명                                                              |
-| -------------------------------------------------------------- | ------ | ----------------------------------------------------------------- |
-| `/api/chat/conversations/meetup/{meetupIdx}/join`              | POST   | 산책모임 채팅방 참여 (`userId` 쿼리) — 모임 참가 후 **별도** 호출 |
-| `/api/chat/conversations/meetup/{meetupIdx}/participant-count` | GET    | 채팅 참여 인원 수                                                 |
-
-**모임 생성 요청 예시**:
-
-```http
-POST /api/meetups
-Content-Type: application/json
-
-{
-  "title": "강아지 산책 모임",
-  "description": "한강공원에서 강아지 산책 모임을 가집니다.",
-  "location": "서울특별시 영등포구 한강공원",
-  "latitude": 37.5665,
-  "longitude": 126.9780,
-  "date": "2024-01-15T14:00:00",
-  "maxParticipants": 10
-}
-```
-
-**모임 생성 응답 예시**:
-
-```json
-{
-  "meetup": {
-    "idx": 1,
-    "title": "강아지 산책 모임",
-    "description": "한강공원에서 강아지 산책 모임을 가집니다.",
-    "location": "서울특별시 영등포구 한강공원",
-    "latitude": 37.5665,
-    "longitude": 126.978,
-    "date": "2024-01-15T14:00:00",
-    "maxParticipants": 10,
-    "currentParticipants": 1,
-    "status": "RECRUITING"
-  },
-  "message": "모임이 성공적으로 생성되었습니다."
-}
-```
-
-**반경 기반 모임 조회 요청 예시**:
-
-```http
-GET /api/meetups/nearby?lat=37.5665&lng=126.9780&radius=5.0
-# radius 파라미터 생략 시 기본값 5.0km
-GET /api/meetups/nearby?lat=37.5665&lng=126.9780
-```
-
-**반경 기반 모임 조회 응답 예시**:
-
-```json
-{
-  "meetups": [
-    {
-      "idx": 1,
-      "title": "강아지 산책 모임",
-      "location": "서울특별시 영등포구 한강공원",
-      "latitude": 37.5665,
-      "longitude": 126.978,
-      "date": "2024-01-15T14:00:00",
-      "maxParticipants": 10,
-      "currentParticipants": 5,
-      "status": "RECRUITING"
-    }
-  ],
-  "count": 1
-}
-```
-
-**모임 참여 응답 예시**:
-
-```json
-{
-  "participant": {
-    "meetupIdx": 1,
-    "userIdx": 2,
-    "joinedAt": "2024-01-10T10:00:00"
-  },
-  "message": "모임에 참가했습니다."
-}
-```
-
-**모임 참여 취소 응답 예시**:
-
-```json
-{
-  "message": "모임 참가를 취소했습니다."
-}
-```
-
-**참여 여부 확인 응답 예시**:
-
-```json
-{
-  "isParticipating": true
-}
-```
-
----
-
-## 5. 트랜잭션 처리
-
-### 5.1 트랜잭션 전략
-
-- **모임 생성**: `@Transactional` - 모임 생성, 주최자 참여를 원자적으로 처리
-  - 채팅방 생성은 이벤트 기반 비동기 처리로 분리 (`@Async` + `@Transactional(REQUIRES_NEW)`)
-  - 채팅방 생성 실패해도 모임 생성은 성공 (롤백되지 않음)
-- **모임 참여**: `@Transactional` - 중복 체크, 원자적 UPDATE 쿼리로 인원 증가, 참가자 추가를 원자적으로 처리
-- **모임 참여 취소**: `@Transactional` - 주최자 체크, 참가자 삭제, `decrementParticipantsIfPositive`로 인원 감소
-  - 채팅방 나가기는 try-catch로 처리하여 실패해도 모임 참여 취소는 성공
-- **조회 메서드**: `@Transactional(readOnly = true)` - 읽기 전용 최적화 (클래스 레벨)
-
-### 5.2 동시성 제어
-
-- **최대 인원 제한**: 원자적 UPDATE 쿼리 사용 (`incrementParticipantsIfAvailable`)
-  - DB 레벨에서 **RECRUITING 상태 + 인원 미달** 두 조건 동시 체크 및 증가 (Race Condition 해결)
-  - `UPDATE Meetup SET currentParticipants = currentParticipants + 1 WHERE idx = :meetupIdx AND currentParticipants < maxParticipants AND status = 'RECRUITING'`
-  - 주최자는 인원 체크 제외
-- **중복 참여 방지**: 사전 `exists` 검사 + PK `(meetup_idx, user_idx)`
-- **인원 수 업데이트**: 증가·감소 모두 원자적 UPDATE (`incrementParticipantsIfAvailable`, `decrementParticipantsIfPositive`)
-
----
-
-## 6. 트러블슈팅
-
----
-
-## 7. 성능 최적화
-
-### 7.1 DB 최적화
-
-#### 인덱스 전략
-
-**meetup 테이블**:
-
-```sql
--- 날짜별 모임 조회
-CREATE INDEX idx_meetup_date ON meetup(date);
-
--- 날짜 및 상태별 모임 조회
-CREATE INDEX idx_meetup_date_status ON meetup(date, status);
-
--- 위치 기반 검색
-CREATE INDEX idx_meetup_location ON meetup(latitude, longitude);
-
--- 상태별 모임 조회
-CREATE INDEX idx_meetup_status ON meetup(status);
-
--- 주최자별 모임 조회
-CREATE INDEX organizer_idx ON meetup(organizer_idx);
-```
-
-**meetupparticipants 테이블**:
-
-```sql
--- 사용자별 참여 모임 조회
-CREATE INDEX user_idx ON meetupparticipants(user_idx);
-
--- 복합 키 (Primary Key, 중복 참여 방지)
--- PRIMARY KEY (meetup_idx, user_idx)
-```
-
-**선정 이유**:
-
-- 자주 조회되는 컬럼 조합 (status, date)
-- WHERE 절에서 자주 사용되는 조건
-- JOIN에 사용되는 외래키 (organizer_idx)
-- 위치 기반 검색을 위한 인덱스 (latitude, longitude)
-- 복합 키로 중복 참여 방지
-
-### 7.2 애플리케이션 레벨 최적화
-
-#### 반경 기반 검색 최적화
-
-**구현 위치**: `MeetupService.getNearbyMeetups()`
-
-**최적화 사항**:
-
-- **DB 레벨 필터링**: Bounding Box 방식으로 인덱스 활용 (`idx_meetup_location`)
-- **거리 계산**: Haversine 공식으로 정확한 거리 계산 (DB 쿼리에서 수행)
-- **정렬**: 거리순 정렬, 같으면 날짜순 정렬
-- **필터링**: 좌표 있는 모임만, 미래 날짜만, COMPLETED 상태 제외
-- **성능 개선**: 전체 시간 43.8% 감소, DB 쿼리 40.7% 감소, 메모리 85.8% 감소
-
-#### 코드 중복 제거
-
-**구현 위치**: `MeetupService`
-
-**최적화 사항**:
-
-- **Stream 변환 공통 메서드**: `convertToDTOs()`, `convertToParticipantDTOs()` 추출
-  - 7개 메서드의 중복 Stream 변환 로직을 공통 메서드로 통합
-  - 유지보수성 향상 및 코드 가독성 개선
-- **중복 DB 쿼리 제거**: `joinMeetup()`에서 `entityManager.refresh()` 사용
-  - `findById()` 두 번 호출 제거하여 불필요한 DB 쿼리 제거
-
-**성능 측정**:
-
-- AOP 기반 자동 성능 측정 (`@Timed` 어노테이션)
-  - `PerformanceAspect`가 `@Timed` 어노테이션이 붙은 메서드의 실행 시간을 자동 측정
-  - List 결과인 경우 결과 건수도 함께 로깅
-  - 주요 조회 메서드에 적용: `getAllMeetups()`, `getNearbyMeetups()`, `getMeetupsByLocation()`, `searchMeetupsByKeyword()`, `getAvailableMeetups()`
-
-**코드 품질 개선**:
-
-- **Stream 변환 공통화**: `convertToDTOs()`, `convertToParticipantDTOs()` 메서드로 중복 코드 제거
-- **성능 측정 AOP화**: `@Timed` 어노테이션과 `PerformanceAspect`로 자동 성능 측정
-- **중복 쿼리 제거**: `entityManager.refresh()` 사용으로 불필요한 DB 쿼리 제거
-
-**개선 가능한 부분**:
-
-- 비페이징 `getAllMeetups()`(전체 목록)는 여전히 존재 — 공개 API는 `getAllMeetups(Pageable)` 사용
-
----
-
-## 8. 핵심 포인트 요약
-
-### 8.1 모임 생성 및 관리
-
-- **이메일 인증**: 모임 생성 및 참여 시 이메일 인증 필요
-- **날짜 검증**: 모임 일시는 현재 시간 이후여야 함
-- **주최자 자동 참여**: 주최자를 자동으로 참가자에 추가, `currentParticipants`를 1로 설정
-- **그룹 채팅방 자동 생성**: 이벤트 기반 비동기 처리
-  - `TransactionSynchronization`으로 트랜잭션 커밋 후 이벤트 발행
-  - `MeetupCreatedEvent` 발행 후 `MeetupChatRoomEventListener`가 채팅방 생성
-  - `@Async` + `@Transactional(REQUIRES_NEW)`로 별도 트랜잭션 처리
-  - 채팅방 생성 실패해도 모임 생성은 성공 (롤백되지 않음)
-- **Soft Delete**: 모임 삭제 시 `isDeleted = true`, `deletedAt` 설정
-
-### 8.2 모임 참여 및 취소
-
-- **중복 참여 방지**: `existsByMeetupIdxAndUserIdx` + PK `(meetup_idx, user_idx)`
-- **상태 검증**: `RECRUITING` 아닌 모임 참가 시 `meetupNotRecruiting()` (CLOSED/COMPLETED 모두 차단)
-- **최대 인원 제한**: 원자적 UPDATE 쿼리 (`incrementParticipantsIfAvailable`) — RECRUITING + 인원 미달 DB 동시 체크
-  - `updated == 0`이면 status로 역추론 → meetupNotRecruiting or fullCapacity 분기
-  - 주최자가 아닌 경우에만 인원 체크 및 증가
-  - 영속성 컨텍스트 동기화: `entityManager.refresh()`로 중복 DB 쿼리 제거
-- **주최자 보호**: 주최자는 참가 취소 불가
-- **채팅**: 모임 참가 API만으로 채팅방에 들어가지 않음 — **`joinMeetupChat`** 별도 호출. 참가 취소 시에만 `leaveMeetupChat` 시도(ApiException·Exception 분리 catch, 실패해도 취소는 성공)
-
-### 8.3 동시성 제어
-
-- **트랜잭션 보장**: `@Transactional`로 모임 참여/취소를 원자적으로 처리
-- **인원 수 업데이트**: 증가·감소 모두 원자적 UPDATE (`incrementParticipantsIfAvailable`, `decrementParticipantsIfPositive`)
-  - 증가: `UPDATE Meetup SET currentParticipants = currentParticipants + 1 WHERE idx = :meetupIdx AND currentParticipants < maxParticipants AND status = 'RECRUITING'`
-  - 감소: `UPDATE Meetup SET currentParticipants = currentParticipants - 1 WHERE idx = :meetupIdx AND currentParticipants > 0`
-- **중복 방지**: PK + `existsByMeetupIdxAndUserIdx`
-
-### 8.4 위치 기반 검색
-
-- **반경 기반 검색**: Haversine 공식으로 거리 계산, 거리순 정렬
-  - `radius` 파라미터 기본값 5.0km
-  - DB 레벨 필터링 (Bounding Box 방식으로 인덱스 활용)
-  - 성능 개선: 전체 시간 43.8% 감소, DB 쿼리 40.7% 감소, 메모리 85.8% 감소
-- **지역별 검색**: 위도/경도 범위로 모임 검색
-- **키워드 검색**: 제목/설명에 키워드 포함 모임 검색
-
-### 8.5 엔티티 설계 특징
-
-- **BaseTimeEntity 상속**: `createdAt`, `updatedAt` 자동 관리
-- **Soft Delete**: `isDeleted`, `deletedAt` 필드로 Soft Delete 지원
-- **복합 키**: `MeetupParticipants`는 `@IdClass`로 복합 키 사용
-- **상태**: `MeetupStatus` — `MeetupScheduler`가 매시 정각 `RECRUITING` 정원 마감 → `CLOSED`, 일시 경과 → `COMPLETED` 처리
-- **인원 수 관리**: `currentParticipants` 필드로 현재 참여자 수 관리
-
-### 8.6 채팅방 연동
-
-- **자동 생성**: 모임 생성 후 `MeetupCreatedEvent` → `MeetupChatRoomEventListener`가 `ConversationType.MEETUP` + `RelatedType.MEETUP` 채팅방 생성, 주최자 **ADMIN**
-- **참여**: 일반 참가자는 **`/api/chat/.../meetup/{meetupIdx}/join`** 로 채팅방 입장 (Meetup 도메인 `joinMeetup`과 분리)
-- **나가기**: 모임 참가 취소 시 `leaveMeetupChat` 호출 (실패해도 모임 취소는 성공)
+## 9. 참가와 취소
+
+### 참가
+
+`joinMeetup(meetupIdx, userId)` 흐름:
+
+1. 모임을 `findByIdWithLock()`으로 비관적 락 조회
+2. 사용자 조회
+3. 이메일 인증 확인
+4. 중복 참가 검사
+5. 주최자가 아니면 `incrementParticipantsIfAvailable()`로 원자적 인원 증가
+6. 증가 실패 시 status가 모집 중이 아니면 `meetupNotRecruiting`, 아니면 `fullCapacity`
+7. `entityManager.refresh(meetup)`으로 영속성 컨텍스트 동기화
+8. 참가자 row 저장
+9. PK 충돌이 발생하면 증가분을 원자적으로 감소시키고 `alreadyJoined` 반환
+
+동시성 방어:
+
+- 모임 row 비관적 락
+- 조건부 원자적 UPDATE
+- 참가자 복합 PK
+- PK 충돌 시 증가분 보정
+
+주의:
+
+- `joinMeetup()` 자체는 채팅방 입장을 호출하지 않는다.
+- 산책모임 채팅 입장은 Chat API `POST /api/chat/conversations/meetup/{meetupIdx}/join` 경로에서 처리된다.
+
+### 참가 취소
+
+`cancelMeetupParticipation(meetupIdx, userId)` 흐름:
+
+1. 모임과 주최자 조회
+2. 사용자 조회
+3. 주최자면 취소 불가
+4. 참가자 row 조회
+5. 참가자 삭제
+6. `decrementParticipantsIfPositive()`로 원자적 인원 감소
+7. `conversationService.leaveMeetupChat(meetupIdx, userIdx)` 호출
+8. 채팅방 나가기 실패는 로그만 남기고 참가 취소는 성공 처리
+
+## 10. 모임 히스토리와 좋아요
+
+참가자는 `MeetupParticipants.liked` 값을 가진다.
+
+기능:
+
+- `checkParticipation`: 내 참가 여부와 liked 상태 조회
+- `updateMyMeetupLike`: 참가 row의 liked 값 변경
+- `getMeetupHistory`: 사용자의 참여/주최 이력을 조회해 `MeetupHistoryDTO`로 변환
+
+주최자는 모임 생성 시 참가자로 저장되므로 히스토리에서 `ORGANIZER`로 표현된다.
+
+## 11. 상태 전이
+
+상태:
+
+- `RECRUITING`
+- `CLOSED`
+- `COMPLETED`
+
+`MeetupScheduler.transitionMeetupStatuses()`가 매시 정각 실행된다.
+
+전이:
+
+- 정원이 찬 `RECRUITING` 모임이고 `date >= now`이면 `CLOSED`
+- `date < now`이고 아직 `COMPLETED`가 아니면 `COMPLETED`
+
+전이는 bulk update로 처리된다.
+
+## 12. 채팅방 연동
+
+### 생성
+
+모임 생성 후:
+
+1. `TransactionSynchronization.afterCommit()`에서 `MeetupCreatedEvent` 발행
+2. `MeetupChatRoomEventListener`가 `@Async`로 이벤트 수신
+3. `MeetupChatRoomCreationService.createChatRoom()` 호출
+4. `ConversationCreatorService.createConversation(ConversationType.MEETUP, RelatedType.MEETUP, ...)`
+5. 주최자 participant role을 `ADMIN`으로 설정
+
+채팅방 생성은 최대 3회 retry된다. retry 소진 시 `@Recover`에서 로그를 남긴다.
+
+### 복구
+
+`MeetupChatRoomRecoveryScheduler`가 5분마다 실행된다.
+
+흐름:
+
+1. `findWithoutChatRoom()`으로 채팅방 없는 모임 조회
+2. 각 모임에 대해 `createChatRoom()` 재시도
+
+### 참가/나가기
+
+- 참가 시 Meetup 도메인은 채팅방 입장을 직접 호출하지 않는다.
+- 참가 취소 시 Meetup 도메인은 채팅방 나가기를 시도한다.
+- 채팅방 나가기 실패는 참가 취소를 막지 않는다.
+
+## 13. 관리자 API
+
+### `/api/admin/meetups`
+
+`ADMIN`, `MASTER` 접근 가능.
+
+| API | 설명 |
+|---|---|
+| `GET /api/admin/meetups?status&q&page&size` | 관리자 모임 페이징 조회 |
+| `GET /api/admin/meetups/{id}` | 관리자 단건 조회 |
+| `DELETE /api/admin/meetups/{id}` | 관리자 soft delete |
+| `GET /api/admin/meetups/{id}/participants` | 참가자 목록 조회 |
+
+관리자 목록:
+
+- q가 없으면 status 필터 JPQL
+- q가 있으면 title/description FULLTEXT + location LIKE
+- soft delete 제외
+
+관리자 삭제는 `AdminCareAndMeetupFacade`를 거쳐 감사 로그를 남긴다.
+
+## 14. 도메인 간 연결
+
+User:
+
+- 주최자, 참가자.
+- 생성/참가 시 이메일 인증.
+
+Chat:
+
+- 모임 생성 후 그룹 채팅방 자동 생성.
+- 참가 취소 시 채팅방 나가기.
+- 채팅방 없는 모임 복구.
+
+Admin:
+
+- 목록/삭제/참가자 조회와 감사 로그.
+
+Statistics:
+
+- 모임 생성 수, 참가 수 등 통계 집계에서 repository count 메서드를 사용한다.
+
+## 15. 한계와 개선
+
+- 참가 API와 채팅방 입장 API가 분리되어 있어 클라이언트가 둘 다 호출해야 한다.
+- 모임 생성 성공 후 채팅방 생성이 최종 실패해도 모임은 유지된다. 복구 스케줄러가 있지만 즉시 일관성은 아니다.
+- `getHomeMeetups()`의 최종 점수 계산은 애플리케이션에서 수행한다.
+- 키워드 검색과 주최자별 조회는 500개 상한으로 잘라낸다. 완전한 페이징 API로 전환 여지가 있다.
+- 참가 취소는 채팅방 나가기 실패를 롤백하지 않는다.
+- `CLOSED` 상태가 된 모임에서 참가자가 취소해 정원이 비어도 자동으로 `RECRUITING`으로 되돌리는 로직은 없다.
+
+## 16. 관련 문서
+
+- [산책 & 오프라인 모임 아키텍처](../architecture/meetup/산책 & 오프라인 모임 아키텍처.md)
+- [Meetup 백엔드 성능 최적화](../refactoring/meetup/meetup-backend-performance-optimization.md)
+- [Meetup 참가자 Race Condition](../troubleshooting/meetup/race-condition-participants.md)
+- [Meetup N+1 쿼리 이슈](../troubleshooting/meetup/n-plus-one-query-issue.md)
+- [Meetup 채팅방 복구 스케줄러 N+1](../refactoring/meetup/recovery-scheduler-n-plus-one.md)
+- [근처 모임 인덱스 분석](../refactoring/meetup/nearby-meetups/index-analysis.md)

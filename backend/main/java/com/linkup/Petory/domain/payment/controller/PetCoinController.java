@@ -5,8 +5,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -23,9 +22,9 @@ import com.linkup.Petory.domain.payment.entity.PetCoinTransaction;
 import com.linkup.Petory.domain.payment.repository.PetCoinTransactionRepository;
 import com.linkup.Petory.domain.payment.service.PetCoinService;
 import com.linkup.Petory.domain.user.entity.Users;
-import com.linkup.Petory.domain.user.exception.UnauthenticatedException;
 import com.linkup.Petory.domain.user.exception.UserNotFoundException;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
+import com.linkup.Petory.global.security.CustomUserDetails;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -52,8 +51,9 @@ public class PetCoinController {
      * 현재 사용자 코인 잔액 조회
      */
     @GetMapping("/balance")
-    public ResponseEntity<PetCoinBalanceResponse> getMyBalance() {
-        Users user = getCurrentUser();
+    public ResponseEntity<PetCoinBalanceResponse> getMyBalance(
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        Users user = loadUser(userDetails);
         Integer balance = petCoinService.getBalance(user);
         return ResponseEntity.ok(new PetCoinBalanceResponse(user.getIdx(), balance));
     }
@@ -63,8 +63,9 @@ public class PetCoinController {
      */
     @GetMapping("/transactions")
     public ResponseEntity<Page<PetCoinTransactionDTO>> getMyTransactions(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
             @PageableDefault(size = 20) Pageable pageable) {
-        Users user = getCurrentUser();
+        Users user = loadUser(userDetails);
         Page<PetCoinTransaction> transactions = transactionRepository
                 .findByUserOrderByCreatedAtDesc(user, pageable);
         return ResponseEntity.ok(transactions.map(transactionConverter::toDTO));
@@ -74,8 +75,10 @@ public class PetCoinController {
      * 거래 상세 조회 (상대방 정보 포함) GET /api/payment/transactions/{id}
      */
     @GetMapping("/transactions/{id}")
-    public ResponseEntity<PetCoinTransactionDetailDTO> getTransactionDetail(@PathVariable("id") Long id) {
-        Users user = getCurrentUser();
+    public ResponseEntity<PetCoinTransactionDetailDTO> getTransactionDetail(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable("id") Long id) {
+        Users user = loadUser(userDetails);
         PetCoinTransactionDetailDTO detail = petCoinService.getTransactionDetail(id, user);
         return ResponseEntity.ok(detail);
     }
@@ -89,8 +92,9 @@ public class PetCoinController {
     @PostMapping("/charge")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<PetCoinTransactionDTO> chargeCoins(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
             @Valid @RequestBody PetCoinChargeRequest request) {
-        Users user = getCurrentUser();
+        Users user = loadUser(userDetails);
 
         PetCoinTransaction transaction = petCoinService.chargeCoins(
                 user,
@@ -102,17 +106,8 @@ public class PetCoinController {
         return ResponseEntity.ok(transactionConverter.toDTO(transaction));
     }
 
-    /**
-     * 현재 로그인한 사용자 조회 (요청당 1회만 조회) [리팩토링] getCurrentUserId + findById →
-     * getCurrentUser 1회 조회로 User 중복 조회 제거
-     */
-    private Users getCurrentUser() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || authentication.getPrincipal() == null) {
-            throw new UnauthenticatedException("인증이 필요합니다.");
-        }
-        String userId = authentication.getName();
-        return usersRepository.findByIdString(userId)
-                .orElseThrow(() -> new UserNotFoundException());
+    private Users loadUser(CustomUserDetails userDetails) {
+        return usersRepository.findById(userDetails.getIdx())
+                .orElseThrow(UserNotFoundException::new);
     }
 }

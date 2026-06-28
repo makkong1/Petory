@@ -6,6 +6,7 @@ import java.util.Map;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -28,6 +29,7 @@ import com.linkup.Petory.domain.board.service.MissingPetCommentService;
 import com.linkup.Petory.domain.chat.dto.ConversationDTO;
 import com.linkup.Petory.domain.chat.service.ConversationService;
 import com.linkup.Petory.global.security.AuthenticatedUserIdResolver;
+import com.linkup.Petory.global.security.CustomUserDetails;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -102,8 +104,10 @@ public class MissingPetBoardController {
      * 서비스: MissingPetBoardService.createBoard()
      */
     @PostMapping
-    public ResponseEntity<MissingPetBoardDTO> createBoard(@RequestBody MissingPetBoardDTO request) {
-        MissingPetBoardDTO created = missingPetBoardService.createBoard(request);
+    public ResponseEntity<MissingPetBoardDTO> createBoard(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @RequestBody MissingPetBoardDTO request) {
+        MissingPetBoardDTO created = missingPetBoardService.createBoard(request, userDetails.getLoginId());
         return ResponseEntity.ok(created);
     }
 
@@ -181,9 +185,10 @@ public class MissingPetBoardController {
      */
     @PostMapping("/{id}/comments")
     public ResponseEntity<MissingPetCommentDTO> addComment(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable("id") Long id,
             @RequestBody MissingPetCommentDTO request) {
-        MissingPetCommentDTO created = missingPetCommentService.addComment(id, request);
+        MissingPetCommentDTO created = missingPetCommentService.addComment(id, request, userDetails.getLoginId());
         return ResponseEntity.ok(created);
     }
 

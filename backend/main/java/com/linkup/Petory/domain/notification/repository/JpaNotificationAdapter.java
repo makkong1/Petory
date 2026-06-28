@@ -7,7 +7,6 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Repository;
 
 import com.linkup.Petory.domain.notification.entity.Notification;
-import com.linkup.Petory.domain.user.entity.Users;
 
 import lombok.RequiredArgsConstructor;
 
@@ -37,28 +36,27 @@ public class JpaNotificationAdapter implements NotificationRepository {
 
     @SuppressWarnings("null")
     @Override
-    public List<Notification> saveAll(List<Notification> notifications) {
-        return jpaRepository.saveAll(notifications);
-    }
-
-    @SuppressWarnings("null")
-    @Override
     public Optional<Notification> findById(Long id) {
         return jpaRepository.findById(id);
     }
 
     @Override
-    public List<Notification> findByUserOrderByCreatedAtDesc(Users user) {
-        return jpaRepository.findByUserOrderByCreatedAtDesc(user);
+    public List<Notification> findByUserIdOrderByCreatedAtDesc(Long userId) {
+        return jpaRepository.findByUserIdOrderByCreatedAtDesc(userId);
     }
 
     @Override
-    public List<Notification> findByUserAndIsReadFalseOrderByCreatedAtDesc(Users user) {
-        return jpaRepository.findByUserAndIsReadFalseOrderByCreatedAtDesc(user);
+    public List<Notification> findByUserIdAndIsReadFalseOrderByCreatedAtDesc(Long userId) {
+        return jpaRepository.findByUserIdAndIsReadFalseOrderByCreatedAtDesc(userId);
     }
 
     @Override
-    public Long countUnreadByUser(Users user) {
-        return jpaRepository.countUnreadByUser(user);
+    public Long countUnreadByUserId(Long userId) {
+        return jpaRepository.countUnreadByUserId(userId);
+    }
+
+    @Override
+    public int markAllAsReadByUserId(Long userId) {
+        return jpaRepository.markAllAsReadByUserId(userId);
     }
 }

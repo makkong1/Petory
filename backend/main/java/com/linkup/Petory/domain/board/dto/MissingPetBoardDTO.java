@@ -37,6 +37,7 @@ public class MissingPetBoardDTO {
     private String lostLocation;
     private BigDecimal latitude;
     private BigDecimal longitude;
+    private Double distance; // 미터 단위, 위치 기반 홈 추천 응답에서만 설정
     private MissingPetStatus status;
     private String imageUrl;
     private LocalDateTime createdAt;

@@ -108,12 +108,12 @@ private List<MeetupParticipants> participants;
 | idx_meetup_status | (status) | BTREE | 상태 필터링 |
 | idx_meetup_date | (date) | BTREE | 날짜 범위 조회 |
 | idx_meetup_date_status | (date, status) | BTREE | 날짜+상태 복합 필터 |
-| idx_meetup_location | (latitude, longitude) | BTREE | 위치 기반 Bounding Box 거리 검색 |
+| idx_meetup_geo_point_spatial | (geo_point) | SPATIAL | 위치 기반 Bounding Box + 거리 검색 |
 
 ```sql
 CREATE INDEX idx_meetup_date ON meetup(date);
 CREATE INDEX idx_meetup_date_status ON meetup(date, status);
-CREATE INDEX idx_meetup_location ON meetup(latitude, longitude);
+ALTER TABLE meetup ADD SPATIAL INDEX idx_meetup_geo_point_spatial (geo_point);
 CREATE INDEX idx_meetup_status ON meetup(status);
 CREATE INDEX organizer_idx ON meetup(organizer_idx);
 ```
@@ -130,7 +130,7 @@ CREATE INDEX organizer_idx ON meetup(organizer_idx);
 
 `idx_meetupparticipants_user_liked_joined (user_idx, liked, joined_at)` 복합 인덱스는 "특정 사용자가 좋아요한 모임을 참가일 순으로 조회"하는 패턴에 최적화된 커버링 인덱스 후보다 — `WHERE user_idx = ? AND liked = ?` 조건에서 두 선행 컬럼이 고정값이고 `joined_at`이 정렬/범위 필터로 동작한다.
 
-**위치 기반 검색 Bounding Box 최적화** — `idx_meetup_location (latitude, longitude)` 활용, 3단계 리팩토링 실측:
+**위치 기반 검색 Bounding Box 최적화** — 현재는 `idx_meetup_geo_point_spatial (geo_point)` 공간 인덱스를 활용한다. 과거 3단계 리팩토링에서는 `idx_meetup_location (latitude, longitude)` B-tree 인덱스로 다음 개선을 확인했다:
 - 1단계 (인메모리 필터링): `idx_meetup_location` 미사용, 스캔 행 2958개
 - 2단계 (DB 쿼리, `IS NOT NULL` 조건): 인덱스 여전히 미사용, 스캔 행 동일
 - 3단계 (BETWEEN 조건으로 변경): 인덱스 활용, 스캔 행 117개 (96% 감소)

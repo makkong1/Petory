@@ -47,6 +47,14 @@
     {
       "dir": "pet-health-alert-mvp",
       "status": "pending"
+    },
+    {
+      "dir": "statistics-bug-fix",
+      "status": "completed"
+    },
+    {
+      "dir": "statistics-login-events",
+      "status": "completed"
     }
   ]
 }

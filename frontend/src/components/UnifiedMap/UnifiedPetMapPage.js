@@ -12,7 +12,9 @@ import LocationLayer from "./layers/LocationLayer";
 import MeetupLayer from "./layers/MeetupLayer";
 import CareLayer from "./layers/CareLayer";
 import { fetchActiveMapItems } from "../../api/unifiedMapApi";
+import { locationServiceApi } from "../../api/locationServiceApi";
 import { petRecommendationApi } from "../../api/petRecommendationApi";
+import { geocodingApi } from "../../api/geocodingApi";
 
 const SORT_LABELS = {
   stable: "추천순",
@@ -24,6 +26,16 @@ const SORT_LABELS = {
 const DEFAULT_CENTER = { lat: 37.5665, lng: 126.978 };
 const DEFAULT_RADIUS = 5;
 const EARTH_RADIUS_METERS = 6371000;
+
+// 검색어가 행정구역명이면 sigungu/sido API 파라미터 반환 (반경 검색 우회용)
+const detectRegionSearchParams = (kw) => {
+  const t = kw.trim();
+  if (/(특별시|광역시|자치시|자치도)$/.test(t)) return { sido: t };
+  if (/^.{2,}도$/.test(t)) return { sido: t }; // 경기도, 강원도 등
+  if (/[구군]$/.test(t)) return { sigungu: t };
+  if (/시$/.test(t)) return { sigungu: t }; // 수원시, 고양시 등
+  return null;
+};
 const MIN_SEARCH_AREA_THRESHOLD_METERS = 300;
 
 const calculateMapLevelFromRadius = (radiusKm) => {
@@ -496,17 +508,73 @@ const UnifiedPetMapPage = () => {
           sort={locationSort}
           hasPendingAreaChange={hasPendingAreaChange}
           radius={showRadius ? radius : undefined}
-          onSearch={(kw) => {
+          onSearch={async (kw) => {
+            if (!kw) {
+              setLocationKeyword("");
+              cacheRef.current = {};
+              commitLocationSearch(mapViewportCenter, "user-triggered");
+              return;
+            }
+            // geocoding 먼저 시도 — 주소·지역명(강남구, 묵동 등)이면 좌표로 변환해 지도 이동
+            try {
+              const geoResult = await geocodingApi.searchPlaces(kw);
+              const first = geoResult?.results?.[0];
+              if (first?.latitude && first?.longitude) {
+                const loc = { lat: first.latitude, lng: first.longitude };
+                setMapViewportCenter(loc);
+                setLocationKeyword("");
+                cacheRef.current = {};
+                commitLocationSearch(loc, "geocoding");
+                return;
+              }
+            } catch (_) {
+              // geocoding 실패 시 다음 fallback으로
+            }
+            // 지역명 감지 (구/군/시/도) → sigungu·sido 직접 검색
+            const regionParams = detectRegionSearchParams(kw);
+            if (regionParams) {
+              setLoading(true);
+              setError(null);
+              setSelectedItem(null);
+              try {
+                const res = await locationServiceApi.searchPlaces({
+                  ...regionParams,
+                  ...(locationCategory && { category: locationCategory }),
+                  size: 300,
+                });
+                const services = res?.data?.services ?? [];
+                setItems(services.map(svc => ({
+                  idx: svc.idx,
+                  name: svc.name || '',
+                  latitude: svc.latitude,
+                  longitude: svc.longitude,
+                  markerColor: '#4A90D9',
+                  id: `location-${svc.idx}`,
+                  type: 'location',
+                  title: svc.name || '',
+                  subtitle: svc.category || svc.address || svc.roadAddress || '',
+                  raw: svc,
+                })));
+                // 결과 시설들의 중심으로 지도 이동 (searchCenter는 건드리지 않아야 radius 재검색 방지)
+                const withCoords = services.filter(s => s.latitude && s.longitude);
+                if (withCoords.length > 0) {
+                  const avgLat = withCoords.reduce((sum, s) => sum + s.latitude, 0) / withCoords.length;
+                  const avgLng = withCoords.reduce((sum, s) => sum + s.longitude, 0) / withCoords.length;
+                  setMapViewportCenter({ lat: avgLat, lng: avgLng });
+                }
+              } catch (_) {
+                setItems([]);
+              } finally {
+                setLoading(false);
+              }
+              return;
+            }
+            // 최종 fallback: 시설명 keyword 검색
             setLocationKeyword(kw);
             cacheRef.current = {};
-            commitLocationSearch(
-              mapViewportCenter,
-              kw ? "keyword" : "user-triggered"
-            );
-            if (kw) {
-              window.clearTimeout(signalRefreshTimerRef.current);
-              signalRefreshTimerRef.current = window.setTimeout(refreshPetIntentSignals, 1500);
-            }
+            commitLocationSearch(mapViewportCenter, "keyword");
+            window.clearTimeout(signalRefreshTimerRef.current);
+            signalRefreshTimerRef.current = window.setTimeout(refreshPetIntentSignals, 1500);
           }}
           onCategoryPick={({ category: cat, groupId }) => {
             setLocationCategory(cat || "");

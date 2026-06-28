@@ -29,17 +29,6 @@ public interface SpringDataJpaMeetupRepository extends JpaRepository<Meetup, Lon
     @Query("SELECT m FROM Meetup m JOIN FETCH m.organizer WHERE m.organizer.idx = :organizerIdx AND (m.isDeleted = false OR m.isDeleted IS NULL) ORDER BY m.createdAt DESC")
     List<Meetup> findByOrganizerIdxOrderByCreatedAtDesc(@Param("organizerIdx") Long organizerIdx);
 
-    @RepositoryMethod("모임: 지역 범위별 조회")
-    @Query("SELECT m FROM Meetup m JOIN FETCH m.organizer WHERE "
-            + "m.latitude BETWEEN :minLat AND :maxLat AND "
-            + "m.longitude BETWEEN :minLng AND :maxLng AND "
-            + "(m.isDeleted = false OR m.isDeleted IS NULL) "
-            + "ORDER BY m.date ASC")
-    List<Meetup> findByLocationRange(@Param("minLat") Double minLat,
-            @Param("maxLat") Double maxLat,
-            @Param("minLng") Double minLng,
-            @Param("maxLng") Double maxLng);
-
     @RepositoryMethod("모임: 키워드 FULLTEXT 검색 — idx 목록 반환 (N+1 방지용 1단계)")
     @Query(value = "SELECT m.idx FROM meetup m "
             + "WHERE (m.is_deleted = false OR m.is_deleted IS NULL) "
@@ -79,19 +68,25 @@ public interface SpringDataJpaMeetupRepository extends JpaRepository<Meetup, Lon
             + "AND (m.isDeleted = false OR m.isDeleted IS NULL)")
     Optional<Meetup> findByIdWithOrganizer(@Param("idx") Long idx);
 
-    @RepositoryMethod("모임: 반경 기반 근처 모임 ID 목록 (정렬·LIMIT)")
+    @RepositoryMethod("모임: 반경 기반 근처 모임 ID 목록 (공간 인덱스 정렬·LIMIT)")
     @Query(value = "SELECT m.idx FROM meetup m "
             + "WHERE m.date > :currentDate "
             + "AND (m.status IS NULL OR m.status != 'COMPLETED') "
             + "AND (m.is_deleted = false OR m.is_deleted IS NULL) "
-            + "AND m.latitude BETWEEN (:lat - :radius / 111.0) AND (:lat + :radius / 111.0) "
-            + "AND m.longitude BETWEEN (:lng - :radius / (111.0 * cos(radians(:lat)))) AND (:lng + :radius / (111.0 * cos(radians(:lat)))) "
-            + "AND (6371 * acos(cos(radians(:lat)) * cos(radians(m.latitude)) * "
-            + "    cos(radians(m.longitude) - radians(:lng)) + "
-            + "    sin(radians(:lat)) * sin(radians(m.latitude)))) <= :radius "
-            + "ORDER BY (6371 * acos(cos(radians(:lat)) * cos(radians(m.latitude)) * "
-            + "         cos(radians(m.longitude) - radians(:lng)) + "
-            + "         sin(radians(:lat)) * sin(radians(m.latitude)))) ASC, m.date ASC "
+            + "AND m.latitude IS NOT NULL "
+            + "AND m.longitude IS NOT NULL "
+            + "AND ST_Within(m.geo_point, ST_GeomFromText("
+            + "CONCAT('POLYGON((', "
+            + ":lat - (:radius / 111.0), ' ', :lng - (:radius / (111.0 * COS(RADIANS(:lat)))), ', ', "
+            + ":lat - (:radius / 111.0), ' ', :lng + (:radius / (111.0 * COS(RADIANS(:lat)))), ', ', "
+            + ":lat + (:radius / 111.0), ' ', :lng + (:radius / (111.0 * COS(RADIANS(:lat)))), ', ', "
+            + ":lat + (:radius / 111.0), ' ', :lng - (:radius / (111.0 * COS(RADIANS(:lat)))), ', ', "
+            + ":lat - (:radius / 111.0), ' ', :lng - (:radius / (111.0 * COS(RADIANS(:lat)))), '))'), "
+            + "4326)) "
+            + "AND ST_Distance_Sphere(m.geo_point, ST_GeomFromText("
+            + "CONCAT('POINT(', :lat, ' ', :lng, ')'), 4326)) <= (:radius * 1000) "
+            + "ORDER BY ST_Distance_Sphere(m.geo_point, ST_GeomFromText("
+            + "CONCAT('POINT(', :lat, ' ', :lng, ')'), 4326)) ASC, m.date ASC "
             + "LIMIT :limit", nativeQuery = true)
     List<Long> findNearbyMeetupIds(@Param("lat") Double lat,
             @Param("lng") Double lng,

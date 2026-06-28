@@ -1,135 +1,204 @@
-# Recommendation 도메인 - 포트폴리오 상세 설명
+# Recommendation 도메인
 
-## 1. 개요
-
-Recommendation 도메인은 사용자의 최근 반려생활 입력을 분석해 주변서비스 탭에서 자연스럽게 추천 진입점을 제공하는 도메인입니다.
-
-현재 구현은 "새로운 장소 조회 시스템"을 만드는 방식이 아니라, 기존 Location 도메인의 주변서비스 검색에 사용자 의도 기반 추천 카드를 연결하는 방식입니다. 사용자가 커뮤니티 글, 케어 요청, 주변서비스 검색어를 남기면 Spring이 비동기 이벤트로 Python NLP 서버를 호출하고, 분석 결과를 `user_pet_intent_signal`에 저장합니다. 주변서비스 탭은 이 signal을 조회해 추천 카드를 보여주고, 카드 클릭 시 기존 `/api/location-services/search`를 `category` 필터로 실행합니다.
-
-**주요 기능**:
-
-- 커뮤니티 글, 케어 요청, 주변서비스 검색어 기반 의도 signal 수집
-- Python NLP 서버를 통한 반려생활 의도 분석
-- 원문 텍스트를 저장하지 않는 signal 저장 구조
-- 주변서비스 탭 추천 카드 표시
-- 추천 카드 클릭 시 Location 도메인의 카테고리 검색으로 연결
-- Python 서버 장애 시 원래 사용자 액션에 영향을 주지 않는 비동기 처리
+> 기준: 현재 `domain/petRecommendation`, `petory-nlp-server`, `frontend/src/api/petRecommendationApi.js`, `UnifiedMap` 코드.  
+> 역할: 사용자의 반려생활 입력을 NLP signal 또는 주변 시설 추천으로 변환한다.
 
 ---
 
-## 2. 추천 서비스 동작 흐름
+## 1. 도메인 책임
 
-### 2.1 전체 흐름
+Recommendation 도메인은 새로운 장소 DB를 따로 만들지 않는다. 기존 Location 도메인의 장소 검색 위에 사용자 의도 분석 결과를 얹는다.
 
-```mermaid
-flowchart LR
-    A["커뮤니티 글 / 케어 요청 / 주변서비스 검색어"] --> B["Spring Event 발행"]
-    B --> C["@Async EventListener"]
-    C --> D["Python NLP 서버"]
-    D --> E["intentDomain / intent / category / tags"]
-    E --> F["user_pet_intent_signal 저장"]
-    F --> G["주변서비스 탭 /signals 조회"]
-    G --> H["추천 카드 표시"]
-    H --> I["카드 클릭"]
-    I --> J["/api/location-services/search category 필터"]
-    J --> K["지도와 목록에 장소 표시"]
-```
+현재 책임은 두 갈래다.
 
-### 2.2 사용자 관점 시나리오
+1. **추천 카드 signal**
+   - 게시글, 케어 요청, 위치 검색어를 비동기로 분석한다.
+   - 분석 결과를 `user_pet_intent_signal`에 저장한다.
+   - 주변서비스 탭에서 `/api/pet-recommend/signals`로 조회해 추천 카드를 표시한다.
+   - 카드를 누르면 기존 Location 카테고리 검색으로 연결한다.
 
-1. 사용자가 주변서비스 검색창에 `강아지가 귀를 자꾸 긁어요`를 입력합니다.
-2. 기존 주변서비스 검색은 그대로 실행됩니다.
-3. 동시에 Spring이 `LocationSearchPerformedEvent`를 발행합니다.
-4. 비동기 listener가 Python NLP 서버에 텍스트 분석을 요청합니다.
-5. Python 서버가 `MEDICAL`, `동물병원` 같은 분석 결과를 반환합니다.
-6. confidence가 기준 이상이면 `user_pet_intent_signal`에 저장됩니다.
-7. 주변서비스 탭이 `/api/pet-recommend/signals`를 조회합니다.
-8. 화면에 `최근 건강 관련 고민이 있어 보여요. / 근처 동물병원 보기` 카드가 표시됩니다.
-9. 카드를 누르면 주변서비스 검색 카테고리가 `동물병원`으로 세팅되고, 기존 Location 검색 API가 실행됩니다.
+2. **즉시 시설 추천 API**
+   - `/api/pet-recommend?lat=&lng=&text=&radius=&petType=`로 텍스트와 좌표를 받는다.
+   - NLP 서버 분석 결과의 1순위 카테고리로 주변 장소를 조회한다.
+   - 인기도, 태그 일치, 거리, 평점, 리뷰 수를 점수화해 상위 시설을 반환한다.
+
+현재 프론트의 주 사용자 경로는 **추천 카드 signal** 중심이다. 즉시 시설 추천 API는 백엔드 API로 존재하지만, `frontend/src/api/petRecommendationApi.js`에는 아직 래퍼가 없다.
 
 ---
 
-## 3. 입력 수집 지점
+## 2. 주요 코드 위치
 
-### 3.1 커뮤니티 게시글
+### 2.1 Spring Backend
 
-커뮤니티 게시글 작성 시 게시글 제목과 내용을 기반으로 `CommunityPostCreatedEvent`를 발행합니다.
+| 영역 | 파일 |
+|---|---|
+| API | `domain/petRecommendation/controller/PetRecommendationController.java` |
+| NLP HTTP client | `domain/petRecommendation/client/PetIntentClient.java` |
+| signal 이벤트 리스너 | `domain/petRecommendation/service/PetIntentSignalEventListener.java` |
+| signal 저장/조회 | `domain/petRecommendation/service/UserPetIntentSignalService.java` |
+| 즉시 추천 서비스 | `domain/petRecommendation/service/PetRecommendationService.java` |
+| 점수 계산 | `domain/petRecommendation/scoring/PetRecommendScoreCalculator.java` |
+| 장소 상호작용 | `domain/petRecommendation/service/PlaceInteractionService.java` |
+| 건강 알림 | `domain/petRecommendation/service/PetHealthAlertNotificationHandler.java` |
+| 전용 async executor | `global/config/PetIntentAsyncConfig.java` |
 
-**의도**:
+### 2.2 Python NLP Server
 
-- 사용자가 질문이나 고민을 글로 남겼을 때 추천 signal 후보로 활용
-- 예: `고양이가 밥을 잘 안 먹어요`, `강아지가 귀를 자꾸 긁어요`
+| 영역 | 파일 |
+|---|---|
+| FastAPI 앱 | `petory-nlp-server/app/main.py` |
+| 분석 API | `petory-nlp-server/app/api/pet_intent_router.py` |
+| 요청/응답 스키마 | `petory-nlp-server/app/schemas/request.py`, `response.py` |
+| 의도 분류 | `petory-nlp-server/app/nlp/intent_classifier.py` |
+| 키워드 추출 | `petory-nlp-server/app/nlp/tokenizer.py` |
+| 태그 추출 | `petory-nlp-server/app/nlp/tag_extractor.py` |
+| 임베딩 모델 | `petory-nlp-server/app/nlp/embedding_model.py` |
+| 카테고리/긴급도 규칙 | `petory-nlp-server/app/rules/category_rules.py`, `urgency_rules.py` |
+| 학습 예시/태그 데이터 | `petory-nlp-server/app/data/intent_examples.yml`, `intent_tags.yml` |
 
-**처리 특징**:
+### 2.3 Frontend
 
-- 게시글 저장 응답을 막지 않도록 이벤트 기반으로 처리
-- Python 분석 실패 시 게시글 작성은 성공 상태로 유지
-
-### 3.2 케어 요청
-
-케어 요청 작성 시 요청 내용 기반으로 `CareRequestCreatedEvent`를 발행합니다.
-
-**의도**:
-
-- 돌봄, 미용, 위탁관리, 산책 등 실제 케어 요구에서 추천 signal 후보 추출
-- 예: `털이 많이 엉켰어요`, `며칠 맡길 곳이 필요해요`
-
-### 3.3 주변서비스 검색어
-
-주변서비스 검색창에 사용자가 키워드를 입력하면 `LocationSearchPerformedEvent`를 발행합니다.
-
-**구현 위치**: `LocationServiceService.publishSearchEvent`
-
-**의도**:
-
-- 가장 자연스럽게 추천이 체감되는 진입점
-- 검색어 자체가 반려생활 상황이면 이후 주변서비스 탭에서 추천 카드로 연결
-
-**주의**:
-
-- 로그인 사용자의 검색어만 signal 후보로 저장합니다.
-- 익명 사용자는 signal 저장 대상이 아닙니다.
-
-**NLP 호출 조건 (이벤트 리스너 내 2단계 필터)**:
-
-카테고리/정렬/반경 변경만으로도 같은 keyword로 Python이 반복 호출되는 문제를 차단합니다.
-
-```text
-LocationSearchPerformedEvent 수신
-  → [필터 1] 자연어 판단: length >= 7 AND 공백 포함 → 통과 시 계속
-  → [필터 2] Redis TTL dedup: 같은 user + keyword가 10분 내 분석됐으면 skip
-  → 통과한 경우만 Python 호출
-```
-
-| 검색어 예시          | 자연어 판단            | 결과              |
-| -------------------- | ---------------------- | ----------------- |
-| `"동물병원"`         | false (공백 없음)      | Python 호출 안 함 |
-| `"귀 치료"`          | false (4자, 너무 짧음) | Python 호출 안 함 |
-| `"강아지 귀 긁어요"` | true                   | Python 분석 후보  |
-
-**MVP 휴리스틱 한계**: 공백 없이 붙여 쓴 자연어(`"강아지가귀를긁어요"`)는 필터를 통과하지 못합니다.  
-과호출 방지를 우선하는 MVP 설계 결정입니다.
+| 영역 | 파일 |
+|---|---|
+| signal API | `frontend/src/api/petRecommendationApi.js` |
+| 주변서비스 화면 | `frontend/src/components/UnifiedMap/UnifiedPetMapPage.js` |
+| 추천 카드 UI | `frontend/src/components/UnifiedMap/controls/LocationControls.js` |
 
 ---
 
-## 4. Python NLP 서버
+## 3. API
 
-### 4.1 Endpoint
+### 3.1 즉시 추천 API
 
 ```http
+GET /api/pet-recommend?lat={lat}&lng={lng}&text={text}&radius={radius}&petType={petType}
+```
+
+| 파라미터 | 필수 | 설명 |
+|---|---:|---|
+| `lat` | O | 사용자 기준 위도 |
+| `lng` | O | 사용자 기준 경도 |
+| `text` | O | 분석할 자연어 텍스트. 최대 500자 |
+| `radius` | X | 검색 반경. 기본 3000m |
+| `petType` | X | `DOG`, `CAT` 또는 기타. Java client에서 `DOG/CAT` 외 값은 `OTHER`로 정규화 |
+
+흐름:
+
+1. `PetIntentClient.analyze(text, petType)` 호출
+2. NLP 실패 시 `fallbackRecommend()` 실행
+3. 분석 성공 시 `recommendedCategories[0]`을 primary category로 사용
+4. `LocationServiceRepository.findByRadius(..., category, "distance", 20)`
+5. 최근 30일 장소 상호작용으로 popularity score 계산
+6. `PetRecommendScoreCalculator`로 점수화
+7. 점수 내림차순 상위 10개 반환
+
+### 3.2 signal 조회 API
+
+```http
+GET /api/pet-recommend/signals
+Authorization: Bearer <JWT>
+```
+
+로그인 사용자의 만료되지 않은 signal을 최신순 최대 10건 반환한다.
+
+응답 예시:
+
+```json
+[
+  {
+    "intentDomain": "MEDICAL",
+    "intent": "MEDICAL_CONCERN",
+    "recommendedCategories": ["동물병원", "동물약국"],
+    "confidence": 0.92,
+    "urgency": "NORMAL",
+    "intentTags": ["ear", "scratch"],
+    "cardMessage": "최근 건강 관련 고민이 있어 보여요.",
+    "actionLabel": "근처 동물병원 보기",
+    "targetTab": "location",
+    "targetCategory": "동물병원"
+  }
+]
+```
+
+### 3.3 장소 상호작용 API
+
+```http
+POST /api/pet-recommend/interact?locationIdx={locationIdx}&type={VIEW|NAVIGATE|FAVORITE}
+Authorization: Bearer <JWT>
+```
+
+`PlaceInteractionLog`에 사용자-장소 행동을 저장한다. 즉시 추천 API의 popularity score 계산에 사용된다.
+
+현재 프론트 추천 카드 클릭은 `SignalInteractionLog`에 저장되지 않는다. `SignalInteractionLog` 엔티티와 테이블은 준비되어 있지만 저장 API/서비스 호출은 아직 없다.
+
+---
+
+## 4. Signal 수집 흐름
+
+### 4.1 입력 출처
+
+| sourceType | 발행 위치 | 분석 텍스트 | 트랜잭션 |
+|---|---|---|---|
+| `COMMUNITY` | `BoardService.createBoard()` | `title + " " + content` | `AFTER_COMMIT` |
+| `CARE` | `CareRequestService.createCareRequest()` | `title + " " + description`, `petType` 포함 | `AFTER_COMMIT` |
+| `LOCATION_SEARCH` | `LocationServiceService.publishSearchEvent()` | 위치 검색 `keyword` | 일반 `@EventListener` |
+
+커뮤니티/케어는 DB 커밋 이후 처리한다. 원 데이터가 롤백됐는데 signal만 남는 dangling signal을 막기 위해서다.
+
+위치 검색은 조회성 이벤트라 트랜잭션 없이 발행된다. 비로그인 사용자는 signal 대상이 아니다.
+
+### 4.2 Location 검색 NLP 호출 필터
+
+위치 검색은 검색어가 남아 있는 상태에서 카테고리, 정렬, 반경 변경으로도 API가 반복 호출될 수 있다. 그래서 NLP 호출 전에 두 단계 필터를 적용한다.
+
+1. 자연어 판단
+   - 정규화 후 길이 7자 이상
+   - 공백 포함
+   - 예: `"강아지 귀 긁어요"`는 통과, `"동물병원"`과 `"귀 치료"`는 skip
+
+2. Redis TTL dedup
+   - key: `nlp:loc-dedup:{userIdx}:{normalizedKeyword}`
+   - TTL: 10분
+   - 같은 사용자와 같은 검색어가 10분 안에 다시 들어오면 Python 호출 skip
+   - Redis 장애 시 fail-closed로 Python 호출도 skip
+
+이 필터는 Location 검색에만 적용된다. 게시글/케어 이벤트는 Redis dedup을 사용하지 않는다.
+
+### 4.3 비동기 실행 정책
+
+`PetIntentSignalEventListener`의 세 핸들러는 `@Async("petIntentExecutor")`를 사용한다.
+
+| 설정 | 값 |
+|---|---:|
+| core pool size | 2 |
+| max pool size | 6 |
+| queue capacity | 500 |
+| thread prefix | `pet-intent-` |
+| reject policy | warn 로그 후 폐기 |
+
+추천 signal은 부가 기능이다. executor 큐가 포화되면 일부 분석 작업은 폐기되고, 게시글 작성/케어 요청/위치 검색 자체는 실패하지 않는다.
+
+---
+
+## 5. Python NLP 서버 계약
+
+### 5.1 Endpoint
+
+```http
+GET /health
 POST /api/pet-intent/analyze
 ```
 
-### 4.2 요청 예시
+요청:
 
 ```json
 {
   "text": "강아지가 귀를 자꾸 긁어요",
-  "petType": null
+  "petType": "DOG"
 }
 ```
 
-### 4.3 응답 예시
+응답:
 
 ```json
 {
@@ -138,462 +207,245 @@ POST /api/pet-intent/analyze
   "recommendedCategories": ["동물병원", "동물약국"],
   "confidence": 0.92,
   "keywords": ["강아지", "귀", "긁"],
-  "urgency": "NORMAL",
   "intentTags": ["ear", "scratch"],
+  "urgency": "NORMAL",
   "message": "ear, scratch 불편 표현이 감지되었습니다. 정확한 진단은 수의사 상담이 필요합니다. 증상이 심하거나 지속된다면 가까운 동물병원에 문의하세요."
 }
 ```
 
-### 4.4 분석 방식
+confidence가 Python 1차 기준(`settings.confidence_threshold = 0.45`)보다 낮으면 `UNKNOWN`을 반환한다.
 
-Python 서버는 규칙 기반 키워드 매칭과 임베딩 기반 분류를 함께 사용합니다.
-
-- 명확한 키워드가 있으면 rule 우선 적용
-- rule로 판단하기 어려운 입력은 intent example과의 유사도 기반 분류
-- `sentence-transformers`가 설치되지 않은 환경에서도 테스트 가능한 fallback embedding 사용
-- `recommendedCategories`는 Location 도메인의 `category1`, `category2`, `category3` 값과 맞도록 반환
-- 서버 시작 시 embedding 모델과 intent centroid를 pre-load합니다 (`lifespan` startup hook). 첫 요청 timeout 방지.
-
-#### confidence 값 해석
-
-`confidence`는 분류 경로에 따라 의미가 다릅니다.
-
-| 분류 경로      | confidence 계산 방식                             | 현재 범위/특징          |
-| -------------- | ------------------------------------------------ | ----------------------- |
-| rule 매칭      | 규칙 매칭 강도 휴리스틱                          | 0.88~0.92 고정          |
-| embedding 분류 | 정규화 문장 벡터와 intent centroid의 dot product | 코사인 유사도 `[-1, 1]` |
-
-두 경로는 직접 경쟁하지 않습니다. rule이 먼저 적용되고, miss일 때만 embedding 분류로 넘어갑니다.
-
-### 4.5 NLP 호출 비동기 처리
-
-Spring의 `@Async` NLP 분석 작업은 전용 `petIntentExecutor`로 격리됩니다.
-
-```text
-petIntentExecutor 설정
-  corePoolSize  = 2    (평시 worker 수)
-  maxPoolSize   = 6    (queue 포화 후 최대)
-  queueCapacity = 500  (약 125초 분량 backlog 흡수)
-  reject 정책   = DiscardWithWarnPolicy (warn 로그 후 폐기)
-
-동작 순서: core(2) → queue(500) → max(6) → reject
+```json
+{
+  "intentDomain": "UNKNOWN",
+  "intent": "UNKNOWN",
+  "recommendedCategories": [],
+  "confidence": 0.32,
+  "keywords": [],
+  "intentTags": [],
+  "urgency": "NORMAL",
+  "message": "입력하신 내용으로 적합한 서비스를 찾기 어렵습니다. 카테고리를 직접 선택해 주세요.",
+  "suggestedCategories": ["동물병원", "미용", "반려동물용품"]
+}
 ```
 
-게시글/케어 작성과 알림·채팅방 생성 등 다른 `@Async` 작업이 서로 영향을 주지 않습니다.
+### 5.2 petType
 
-큐 포화 시 일부 signal 생성이 생략됩니다. 추천 signal은 부가 기능이므로 허용된 trade-off입니다.
+Python schema의 `PetType`은 현재 `DOG`, `CAT`, `OTHER`만 허용한다.
 
-### 4.6 대표 intentDomain
+Java `PetIntentClient`는 `DOG`, `CAT` 외 입력을 `OTHER`로 정규화한다. 예를 들어 `BIRD`, `RABBIT`, `HAMSTER`, `ETC`는 모두 Python에는 `OTHER`로 전달된다.
 
-| intentDomain       | 추천 카테고리 예시                             | 입력 예시                           |
-| ------------------ | ---------------------------------------------- | ----------------------------------- |
-| `MEDICAL`          | `동물병원`, `동물약국`                         | 귀를 긁어요, 토해요, 밥을 안 먹어요 |
-| `GROOMING`         | `미용`                                         | 털이 엉켰어요, 목욕이 필요해요      |
-| `SUPPLIES`         | `반려동물용품`                                 | 사료가 필요해요, 모래를 사야 해요   |
-| `FOOD_SNACK`       | `반려동물용품`                                 | 간식 추천, 사료 구매                |
-| `WALK_OUTING`      | `여행지`, `반려동반여행`                       | 산책할 곳, 나들이, 야외 공간        |
-| `CAFE_DINING`      | `카페`, `식당`                                 | 같이 갈 카페, 반려동물 동반 식당    |
-| `LODGING_TRAVEL`   | `호텔`, `펜션`                                 | 같이 여행, 숙소, 1박                |
-| `DAYCARE_BOARDING` | `위탁관리`                                     | 맡길 곳, 돌봄, 펫시터               |
-| `CULTURE_SPACE`    | `반려문화시설`, `미술관`, `박물관`, `문예회관` | 전시, 공연, 문화 공간               |
+현재 Python `classify(text, pet_type=None)`는 petType을 받지만 분류 로직에는 아직 사용하지 않는다. DOG/CAT별 규칙 분기를 위한 확장 포인트다.
+
+### 5.3 분석 방식
+
+Python 서버는 아래 순서로 분석한다.
+
+1. FastAPI lifespan에서 embedding model과 intent centroid warm-up
+2. Kiwi 형태소 분석으로 명사/동사 어간/형용사 어간/XR 추출
+3. `_RULES` 기반 규칙 매칭
+   - 구문 키워드는 원문 substring
+   - 짧은 한글 키워드는 형태소 exact match로 오탐 방지
+4. rule miss 시 `intent_examples.yml` centroid와 문장 임베딩 dot product 비교
+5. domain별 category 매핑
+6. 형태소 기반 intent tag 추출
+7. urgency rule 적용
+
+`sentence-transformers`가 설치되어 있으면 `jhgan/ko-sroberta-multitask`를 사용한다. 설치되어 있지 않으면 문자 n-gram hash 기반 fallback embedding을 사용한다.
+
+### 5.4 confidence 해석
+
+| 경로 | 값 의미 | 특징 |
+|---|---|---|
+| rule hit | 규칙 매칭 강도 휴리스틱 | 0.88~0.92 고정. 코사인 유사도 아님 |
+| embedding | 정규화 문장 벡터와 centroid의 dot product | 코사인 유사도 성격. Python 1차 기준 0.45 |
+
+두 값은 직접 비교하면 안 된다. rule이 먼저 적용되고, rule miss일 때만 embedding 경로로 간다.
+
+### 5.5 domain → category
+
+| intentDomain | 추천 카테고리 |
+|---|---|
+| `MEDICAL` | `동물병원`, `동물약국` |
+| `GROOMING` | `미용` |
+| `SUPPLIES` | `반려동물용품` |
+| `FOOD_SNACK` | `반려동물용품` |
+| `WALK_OUTING` | `여행지`, `반려동반여행` |
+| `CAFE_DINING` | `카페`, `식당` |
+| `LODGING_TRAVEL` | `호텔`, `펜션` |
+| `DAYCARE_BOARDING` | `위탁관리` |
+| `CULTURE_SPACE` | `반려문화시설`, `미술관`, `박물관`, `문예회관` |
+
+### 5.6 urgency
+
+| 조건 | urgency |
+|---|---|
+| `SUPPLIES`, `FOOD_SNACK`, `WALK_OUTING`, `CAFE_DINING`, `LODGING_TRAVEL`, `CULTURE_SPACE` | `LOW` |
+| MEDICAL 등에서 `응급`, `위급`, `쓰러`, `출혈`, `호흡`, `경련`, `발작`, `못 먹`, `며칠째`, `계속`, `심해` 등 포함 | `HIGH` |
+| 그 외 | `NORMAL` |
 
 ---
 
-## 5. Signal 저장
+## 6. Signal 저장 정책
 
-### 5.1 저장 테이블
+### 6.1 테이블
 
 ```sql
 user_pet_intent_signal
 ```
 
-### 5.2 저장 데이터
+| 컬럼 | 설명 |
+|---|---|
+| `user_idx` | signal 대상 사용자 |
+| `source_type` | `COMMUNITY`, `CARE`, `LOCATION_SEARCH` |
+| `source_id` | 원천 엔티티 ID. 위치 검색은 null |
+| `intent_domain` | NLP domain |
+| `intent` | NLP intent |
+| `recommended_categories` | 추천 카테고리 JSON |
+| `confidence` | 분석 confidence |
+| `urgency` | `HIGH`, `NORMAL`, `LOW`, null |
+| `intent_tags` | 태그 JSON |
+| `expires_at` | signal 만료 시각 |
 
-| 컬럼                     | 설명                                   |
-| ------------------------ | -------------------------------------- |
-| `user_idx`               | signal 대상 사용자                     |
-| `source_type`            | `COMMUNITY`, `CARE`, `LOCATION_SEARCH` |
-| `source_id`              | 원천 데이터 ID. 검색어 signal은 `null` |
-| `intent_domain`          | Python 분석 domain                     |
-| `intent`                 | Python 분석 intent                     |
-| `recommended_categories` | 추천 Location 카테고리 JSON            |
-| `confidence`             | 분석 신뢰도                            |
-| `urgency`                | NLP urgency_rules 결과 (`HIGH`\|`NORMAL`\|`LOW`\|null) |
-| `intent_tags`            | 분석 태그 JSON                         |
-| `created_at`             | 생성 시각                              |
-| `expires_at`             | 만료 시각                              |
+원문 텍스트는 저장하지 않는다. 저장되는 것은 분석 결과와 source 메타데이터뿐이다.
 
-### 5.3 개인정보 처리 기준
+### 6.2 저장 조건
 
-현재 구현은 원문 텍스트를 저장하지 않습니다. 저장되는 값은 분석 결과와 추천 카테고리, 태그입니다.
+`UserPetIntentSignalService.saveIfConfident()`는 다음 조건을 만족해야 저장한다.
 
-**저장하는 것**:
+1. 분석 결과가 null이 아님
+2. confidence가 Spring 2차 threshold 이상
+3. 같은 사용자에게 같은 `intentDomain`의 유효 signal이 아직 없음
+4. JSON 직렬화 성공
 
-- intent domain
-- intent
-- 추천 카테고리
-- confidence
-- urgency (HIGH/NORMAL/LOW)
-- intent tags
-- source type
-- 만료 시각
+Spring 2차 threshold:
 
-**저장하지 않는 것**:
+| domain | urgency | threshold |
+|---|---|---:|
+| `MEDICAL` | `HIGH` | 0.55 |
+| `MEDICAL` | 그 외 | 0.65 |
+| `FOOD_SNACK`, `SUPPLIES`, `WALK_OUTING`, `CAFE_DINING` | any | 0.45 |
+| 그 외 | any | 0.60 |
 
-- 커뮤니티 글 원문
-- 케어 요청 원문
-- 주변서비스 검색어 원문
+TTL:
 
-### 5.4 저장 조건
+| 조건 | TTL |
+|---|---:|
+| `MEDICAL` + `HIGH` | 1일 |
+| `MEDICAL` 그 외 | 3일 |
+| `LODGING_TRAVEL` | 14일 |
+| 그 외 | 7일 |
 
-`UserPetIntentSignalService.saveIfConfident`에서 다음 조건을 모두 만족해야 저장됩니다.
+### 6.3 signal 조회와 카드 문구
 
-1. `thresholdFor(domain, urgency)` 이상의 confidence (domain×urgency별 Spring 2차 필터)
-2. 같은 `(userIdx, intentDomain)` 조합의 유효 signal이 없을 것 (도메인별 중복 방지)
+`getActiveSignals()`는 만료되지 않은 signal을 최신순 최대 10건 가져온다.
 
-**domain×urgency confidence threshold**:
+응답 변환 시:
 
-| domain | urgency | threshold | 이유 |
-|--------|---------|-----------|------|
-| `MEDICAL` | `HIGH` | 0.55 | 위급 signal 누락 비용 > 오탐 비용 → threshold 완화 |
-| `MEDICAL` | NORMAL/LOW/null | 0.65 | MEDICAL 오탐 비용이 높아 기본값보다 엄격 |
-| `FOOD_SNACK`, `SUPPLIES`, `WALK_OUTING`, `CAFE_DINING` | any | 0.45 | Python 1차 필터와 동일 — 오탐 비용 낮음 |
-| 그 외 | any | 0.60 | 기본값 |
+- `recommended_categories` JSON을 리스트로 변환한다.
+- `intent_tags` JSON을 리스트로 변환한다.
+- 첫 번째 추천 카테고리를 `targetCategory`로 사용한다.
+- `targetTab`은 현재 항상 `location`이다.
+- `actionLabel`은 `"근처 {targetCategory} 보기"`다.
 
-**domain×urgency TTL**:
+대표 카드 메시지:
 
-| 조건 | TTL | 이유 |
-|------|-----|------|
-| `MEDICAL` + `HIGH` | 1일 | 위급 signal이 stale하게 남으면 안 됨 |
-| `MEDICAL` (NORMAL/LOW/null) | 3일 | 증상 signal stale 방지 |
-| `LODGING_TRAVEL` | 14일 | 여행 계획은 비교적 장기 |
-| 그 외 | 7일 | 기본값 |
-
-**confidence 이중 필터 설계**:
-
-- Python 1차: 0.45 미만 → UNKNOWN 반환
-- Spring 2차: `thresholdFor(domain, urgency)` 미만 → 저장 거부
-- 낮은 confidence 구간은 Python이 결과를 반환하더라도 Spring이 저장을 거부합니다.
-
-**confidence 수치 해석 주의**:
-
-- **규칙 경로 (rule hit)**: 키워드 매칭 성공 시 0.88~0.92 고정 반환. 코사인 유사도가 아닌 휴리스틱 값.
-- **임베딩 경로 (rule miss)**: 문장 임베딩 코사인 유사도 (정규화 벡터 기준 [-1,1]). 0.45는 이 경로의 Python 하한.
-- 두 경로의 confidence 수치는 직접 비교할 수 없으며, 두 경로는 서로 경쟁하지 않고 순차 적용됩니다 (rule miss 시에만 임베딩 경로 진입).
-
-### 5.5 조회 제한
-
-`GET /api/pet-recommend/signals`는 만료되지 않은 signal 중 최근 10건만 반환합니다.
+| domain | message |
+|---|---|
+| `MEDICAL` + `HIGH` | `위급할 수 있어요. 가까운 동물병원에 바로 문의하세요.` |
+| `MEDICAL` | `최근 건강 관련 고민이 있어 보여요.` |
+| `GROOMING` | `반려동물 미용이 필요해 보여요.` |
+| `SUPPLIES` | `반려동물 용품이 필요해 보여요.` |
+| `FOOD_SNACK` | `반려동물 먹거리가 필요해 보여요.` |
+| `WALK_OUTING` | `반려동물과 산책하기 좋은 곳을 찾아드릴게요.` |
+| `CAFE_DINING` | `반려동물과 나들이 어떠세요?` |
+| `LODGING_TRAVEL` | `여행 계획 중이신가요?` |
+| `DAYCARE_BOARDING` | `반려동물 돌봄 서비스가 필요해 보여요.` |
+| `CULTURE_SPACE` | `반려동물과 함께하는 문화 공간을 찾아보세요.` |
 
 ---
 
-## 6. 추천 카드 API
+## 7. 추천 점수 계산
 
-### 6.1 Endpoint
+즉시 추천 API의 시설 점수는 `PetRecommendScoreCalculator`가 계산한다.
 
-```http
-GET /api/pet-recommend/signals
-```
+| 항목 | 가중치 | 계산 |
+|---|---:|---|
+| 인기도 | 0.35 | 최근 30일 `PlaceInteractionLog` 건수를 로그 스케일로 0~1 정규화 |
+| 태그 일치 | 0.30 | `intentTags` 중 `locationTags`에 포함된 비율 |
+| 거리 | 0.20 | `1 - distanceM / radiusM`, 반경 밖은 0 |
+| 평점 | 0.10 | `rating / 5.0` |
+| 리뷰 수 | 0.05 | `log10(reviewCount + 1) / log10(1001)`, 1.0 상한 |
 
-### 6.2 응답 예시
-
-```json
-[
-  {
-    "intentDomain": "SUPPLIES",
-    "intent": "SUPPLIES_NEED",
-    "recommendedCategories": ["반려동물용품"],
-    "confidence": 0.88,
-    "urgency": "NORMAL",
-    "intentTags": ["supplies", "food"],
-    "cardMessage": "반려동물 용품이 필요해 보여요.",
-    "actionLabel": "근처 반려동물용품 보기",
-    "targetTab": "location",
-    "targetCategory": "반려동물용품"
-  }
-]
-```
-
-### 6.3 응답 필드 의미
-
-| 필드                    | 의미                                                       |
-| ----------------------- | ---------------------------------------------------------- |
-| `cardMessage`           | 사용자에게 보여줄 추천 이유 문장 (urgency HIGH 시 위급 문구) |
-| `actionLabel`           | 카드 안 CTA 문구                                           |
-| `targetTab`             | 이동 대상 탭. 현재는 `location`                            |
-| `targetCategory`        | Location 검색에 넘길 카테고리                              |
-| `recommendedCategories` | NLP가 추천한 카테고리 목록                                 |
-| `urgency`               | NLP 긴급도 (`HIGH`\|`NORMAL`\|`LOW`\|null)                 |
-| `intentTags`            | 점수 계산이나 향후 태그 매칭에 사용할 태그                 |
-
-`cardMessage`는 클릭 동작을 설명하는 문구가 아니라 순수 안내 문장입니다. 실제 액션은 `targetTab`, `targetCategory`, `actionLabel`로 표현합니다.
-
----
-
-## 7. 프론트 동작
-
-### 7.1 signal 조회
-
-주변서비스 탭이 활성화되면 프론트는 `/api/pet-recommend/signals`를 호출합니다.
-
-로그인 토큰이 없으면 호출하지 않고 빈 배열로 처리합니다.
-
-### 7.2 카드 표시
-
-`LocationControls`는 signal이 있으면 중분류/소분류 영역 아래에 추천 카드를 표시합니다.
-
-카드는 다음 두 부분으로 나뉩니다.
-
-- `cardMessage`: 추천 이유
-- `actionLabel`: 실제 클릭 CTA
-
-### 7.3 카드 클릭
-
-카드를 클릭하면 `targetCategory`를 `locationCategory`로 설정하고, 기존 주변서비스 검색을 다시 실행합니다.
-
-예를 들어 `targetCategory = "반려동물용품"`이면 기존 Location API가 아래 의미로 호출됩니다.
-
-```http
-GET /api/location-services/search?latitude={lat}&longitude={lng}&radius={radius}&category=반려동물용품
-```
-
-추천 서비스가 장소 목록을 직접 내려주지 않는 이유는 현재 지도 중심 좌표, 반경, 정렬 옵션이 프론트 상태에 있기 때문입니다. 추천 API는 "무엇을 보여줄지"를 알려주고, 실제 장소 조회는 Location 도메인이 담당합니다.
-
----
-
-## 8. 장애 처리
-
-### 8.1 Python 서버 장애
-
-Python 서버 호출은 비동기 이벤트 listener에서 수행됩니다. Python 서버가 꺼져 있거나 응답이 늦어도 커뮤니티 글 작성, 케어 요청 작성, 주변서비스 검색 자체는 실패하지 않습니다.
-
-`PetIntentClient`는 3초 timeout을 사용하며, 호출 실패 시 `Optional.empty()`를 반환합니다.
-
-### 8.2 Redis 장애 (Location 검색 fail-closed)
-
-Location 검색 이벤트의 Redis TTL dedup 체크 중 장애가 발생하면 **Python 호출을 생략**합니다 (fail-closed).
+최종 점수:
 
 ```text
-Redis setIfAbsent 예외 → warn 로그 → return (Python 호출 안 함)
+finalScore = round(weightedScore * 1000) / 10
 ```
 
-이유: 추천 signal은 부가 기능이므로 Redis 장애 시 Python까지 같이 호출해 부하를 늘리는 것보다 분석 생략이 더 안전합니다.
+0.0~100.0 범위의 소수점 한 자리 점수다.
 
-게시글/케어 이벤트는 Redis를 사용하지 않으므로 이 정책의 영향을 받지 않습니다.
+매칭 이유:
 
-### 8.3 signal 없음
-
-저장된 signal이 없거나 confidence가 낮으면 추천 카드는 표시되지 않습니다. 이 경우 주변서비스 탭의 기본 검색 기능은 그대로 동작합니다.
-
-### 8.4 비로그인 사용자
-
-비로그인 사용자는 signal 저장 및 추천 카드 조회 대상이 아닙니다. `/signals` 응답은 빈 배열로 처리됩니다.
-
-### 8.5 executor 큐 포화
-
-`petIntentExecutor` 큐(500)가 포화되면 NLP 분석 작업이 폐기됩니다. 추천 signal이 생성되지 않지만 게시글/케어 저장 등 핵심 기능에는 영향이 없습니다.
+- `nearby`: 거리 점수 0.7 이상
+- `high_rating`: 평점 점수 0.8 이상
+- `many_reviews`: 리뷰 50개 이상
+- `popular`: popularity 0.5 이상
+- `tag_match:{tag}`: 사용자 의도 태그와 시설 태그 일치
+- 아무 조건도 없으면 `in_radius`
 
 ---
 
-## 9. 점수 기반 장소 추천과의 관계
+## 8. 건강 알림 연동
 
-현재 주변서비스 탭 추천 카드는 "카테고리 진입점 추천"입니다. 즉, 사용자의 최근 입력을 보고 `동물병원`, `미용`, `반려동물용품` 같은 카테고리를 추천한 뒤 기존 Location 검색으로 연결합니다.
+signal 저장에 성공하면 `UserPetIntentSignalService`가 `SignalSavedEvent`를 발행한다.
 
-별도로 `/api/pet-recommend`는 텍스트와 좌표를 받아 주변 장소를 점수화하는 API입니다.
+`PetHealthAlertNotificationHandler`는 커밋 이후 비동기로 이벤트를 받고, `intentDomain=MEDICAL`, `urgency=HIGH`인 경우에만 알림을 생성한다.
 
-```http
-GET /api/pet-recommend?lat={lat}&lng={lng}&text={text}&radius={radius}
-```
+알림 내용:
 
-점수 계산은 `PetRecommendScoreCalculator`에서 처리합니다.
+- type: `PET_HEALTH_ALERT`
+- title: `반려동물 건강 알림`
+- content: `위급할 수 있어요. 가까운 동물병원에 바로 문의하세요.`
+- relatedType: `PET_INTENT_SIGNAL`
+- relatedId: signal id
 
----
-
-### 9.1 점수 계산 구조 (`PetRecommendScoreCalculator`)
-
-5가지 기준을 각각 0~1로 정규화한 뒤 가중합하여 **0.0~100.0 스케일의 최종 점수**를 산출합니다.
-
-#### 가중치
-
-| 항목                  | 가중치   | 설명                                     |
-| --------------------- | -------- | ---------------------------------------- |
-| 인기도 (popularity)   | **0.35** | DB에 저장된 장소 인기도 점수 (0~1)       |
-| 태그 일치 (tag match) | **0.30** | 사용자 의도 태그 ↔ 장소 태그 교집합 비율 |
-| 거리 (distance)       | **0.20** | 반경 중심에 가까울수록 높음              |
-| 평점 (rating)         | **0.10** | 5점 만점 기준 정규화                     |
-| 리뷰 수 (review)      | **0.05** | 로그 스케일로 포화 처리                  |
-
-> 가중치 합계 = 1.0
-
-#### 최종 점수 환산
-
-```
-finalScore = round(가중합 × 1000) / 10
-```
-
-가중합이 0.0~1.0이므로 finalScore는 0.0~100.0 범위, 소수점 첫째 자리까지 표현합니다.
+알림은 Notification 도메인의 SSE 흐름으로 전달된다. 프론트 `Navigation.js`는 `PET_HEALTH_ALERT` 알림 클릭 시 `navigateToHealthAlert` 이벤트를 발생시키고, `UnifiedPetMapPage`는 주변서비스 탭을 열어 `동물병원` 카테고리로 이동한다.
 
 ---
 
-### 9.2 항목별 정규화 방식
+## 9. 장애 처리
 
-#### 인기도
-
-```
-placeScore = dto.getPopularityScore()   // DB에서 이미 0~1로 계산된 값 그대로 사용
-```
-
-#### 태그 일치
-
-```
-tagScore = (intentTags 중 locationTags에 포함된 수) / intentTags.size()
-```
-
-예: 사용자 의도 태그 `["medical", "ear", "itching"]` 중 장소 태그에 `["medical", "ear"]` 2개 일치 → `2/3 ≈ 0.67`
-
-둘 중 하나라도 비어 있으면 0.0 반환.
-
-#### 거리
-
-```
-distanceScore = 1.0 - (distanceM / radiusM)   // 반경 초과 시 0.0
-```
-
-선형 감소 구조. 반경 경계에서 0, 중심에서 1.
-
-```
-거리 0m       → 1.0
-거리 반경/2   → 0.5
-거리 = 반경   → 0.0
-거리 > 반경   → 0.0
-```
-
-#### 평점
-
-```
-ratingScore = rating / 5.0
-```
-
-5점 만점 단순 정규화. 4.0점 → 0.8.
-
-#### 리뷰 수
-
-```
-reviewScore = min(log10(reviewCount + 1) / log10(1001), 1.0)
-```
-
-리뷰가 많을수록 높지만 로그 스케일로 증가가 완만해지며 1000개에서 1.0으로 포화됩니다. 리뷰 수 폭발로 점수가 왜곡되는 것을 방지하는 설계입니다.
-
-```
-리뷰 0개    → 0.0
-리뷰 10개   → ≈ 0.35
-리뷰 100개  → ≈ 0.67
-리뷰 1000개 → 1.0 (상한)
-```
+- Python 서버 호출 실패, timeout, 4xx/5xx는 `PetIntentClient`에서 `Optional.empty()`로 변환한다.
+- signal 수집 흐름에서는 분석 실패가 원 액션에 영향을 주지 않는다.
+- 즉시 추천 API는 NLP 실패 시 keyword fallback category를 추정해 Location 검색을 수행한다.
+- Location 검색 dedup 중 Redis 장애가 발생하면 Python 호출을 생략한다.
+- signal 저장 중 DB 오류나 JSON 직렬화 실패가 발생하면 warn 로그 후 skip한다.
+- 프론트 `petRecommendationApi.getSignals()`는 토큰이 없거나 API 실패 시 빈 배열을 반환한다.
 
 ---
 
-### 9.3 매칭 이유 (`matchReasons`)
+## 10. 현재 한계와 주의사항
 
-응답에 포함되는 추천 이유 라벨 목록입니다. 프론트에서 "왜 추천됐는지" 표시할 때 사용합니다.
-
-| 조건                         | 라벨                                           |
-| ---------------------------- | ---------------------------------------------- |
-| 거리 점수 ≥ 0.7              | `nearby`                                       |
-| 평점 점수 ≥ 0.8 (= 4점 이상) | `high_rating`                                  |
-| 리뷰 수 ≥ 50                 | `many_reviews`                                 |
-| 인기도 ≥ 0.5                 | `popular`                                      |
-| 태그 일치 항목마다           | `tag_match:{태그명}` (예: `tag_match:medical`) |
-| 위 조건 하나도 해당 없음     | `in_radius` (반경 내 존재한다는 최소 이유)     |
-
----
-
-### 9.4 현재 한계
-
-`popularityScore`와 태그 일치 점수는 장소 태그·인기도 데이터가 충분히 채워진 뒤 효과가 커집니다. 초기 단계에서는 거리·평점·리뷰 수 기반 검증이 중심이 됩니다.
+- 프론트 주 경로는 `/signals` 추천 카드다. `/api/pet-recommend` 즉시 추천 API는 백엔드에 있지만 프론트 래퍼가 없다.
+- `petType`은 Python까지 전달되지만 현재 분류 로직에는 사용되지 않는다.
+- Location 자연어 판단은 `길이 >= 7 && 공백 포함` MVP 휴리스틱이라 `"강아지가귀를긁어요"` 같은 붙여쓰기 자연어는 놓친다.
+- `SignalInteractionLog`는 엔티티/테이블/레포만 있고 추천 카드 클릭 저장 로직은 아직 없다.
+- NLP confidence는 rule 경로와 embedding 경로의 의미가 다르다.
+- 현재 `UNKNOWN` 응답은 Python confidence가 0.45 미만일 때만 나오고 Spring 기본 threshold가 0.60이라 저장되지 않는다. 다만 별도의 `intentDomain=UNKNOWN` 차단 조건은 없다.
+- 즉시 추천 API의 `fallbackRecommend()`는 점수 계산 없이 거리순 조회 DTO를 그대로 반환한다.
+- Python fallback embedding은 운영 품질용 모델이 아니라 dependency-light 테스트/로컬 fallback이다.
+- Simple keyword fallback과 rule 기반 분류는 의료 진단이 아니다. MEDICAL 문구도 수의사 상담을 안내하는 수준이다.
 
 ---
 
-## 10. 구현 파일
+## 11. DomainV2 페이지에 넣을 포인트
 
-### 10.1 Backend
-
-- `backend/main/java/com/linkup/Petory/global/config/PetIntentAsyncConfig.java` ← `petIntentExecutor` 전용 풀
-- `backend/main/java/com/linkup/Petory/domain/petRecommendation/controller/PetRecommendationController.java`
-- `backend/main/java/com/linkup/Petory/domain/petRecommendation/client/PetIntentClient.java`
-- `backend/main/java/com/linkup/Petory/domain/petRecommendation/service/PetIntentSignalEventListener.java` ← 자연어 필터, Redis dedup, fail-closed
-- `backend/main/java/com/linkup/Petory/domain/petRecommendation/service/UserPetIntentSignalService.java`
-- `backend/main/java/com/linkup/Petory/domain/petRecommendation/service/PetRecommendationService.java`
-- `backend/main/java/com/linkup/Petory/domain/petRecommendation/scoring/PetRecommendScoreCalculator.java`
-- `backend/main/java/com/linkup/Petory/domain/petRecommendation/entity/UserPetIntentSignal.java`
-- `backend/main/java/com/linkup/Petory/domain/petRecommendation/entity/SignalInteractionLog.java` ← 추천 카드 상호작용 로그 (CLICKED/DISMISSED/CONVERTED)
-- `backend/main/java/com/linkup/Petory/domain/petRecommendation/repository/UserPetIntentSignalRepository.java`
-- `backend/main/java/com/linkup/Petory/domain/petRecommendation/repository/SignalInteractionLogRepository.java`
-- `backend/main/java/com/linkup/Petory/domain/petRecommendation/repository/LocationInteractionCount.java` ← 타입 안전 프로젝션
-- `backend/main/java/com/linkup/Petory/domain/location/service/LocationServiceService.java`
-- `backend/main/resources/sql/migration/user-pet-intent-signal-table.sql`
-- `backend/main/resources/sql/migration/user-pet-intent-signal-add-urgency-column.sql` ← urgency 컬럼 추가
-- `backend/main/resources/sql/migration/signal-interaction-log-table.sql` ← signal 클릭 로그 테이블
-
-### 10.2 Frontend
-
-- `frontend/src/api/petRecommendationApi.js`
-- `frontend/src/components/UnifiedMap/UnifiedPetMapPage.js`
-- `frontend/src/components/UnifiedMap/controls/LocationControls.js`
-- `frontend/src/constants/locationCategoryTree.js`
-
-### 10.3 Python NLP Server
-
-- `petory-nlp-server/app/main.py`
-- `petory-nlp-server/app/api/pet_intent_router.py`
-- `petory-nlp-server/app/nlp/intent_classifier.py`
-- `petory-nlp-server/app/nlp/tag_extractor.py`
-- `petory-nlp-server/app/rules/category_rules.py`
-- `petory-nlp-server/app/rules/urgency_rules.py`
-- `petory-nlp-server/app/data/intent_examples.yml`
-- `petory-nlp-server/app/data/intent_tags.yml`
-
----
-
-## 11. 로컬 실행 체크
-
-### 11.1 필요한 서버
-
-- Spring Boot: `localhost:8080`
-- React: `localhost:3000`
-- Python NLP: `localhost:8000`
-- MySQL
-- Redis
-
-### 11.2 Python 서버 실행
-
-```bash
-cd petory-nlp-server
-PYTHONPATH=. uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
-```
-
-### 11.3 DB migration
-
-추천 카드가 표시되려면 `user_pet_intent_signal` 테이블이 필요합니다.
-
-```sql
--- backend/main/resources/sql/migration/user-pet-intent-signal-table.sql
-```
-
-### 11.4 동작 확인 절차
-
-1. Spring, React, Python 서버를 모두 실행합니다.
-2. 로그인합니다.
-3. 주변서비스 탭으로 이동합니다.
-4. 검색창에 `강아지가 귀를 자꾸 긁어요` 같은 문장을 입력합니다.
-5. 1-2초 뒤 추천 카드가 표시되는지 확인합니다.
-6. 추천 카드를 클릭합니다.
-7. 주변서비스 목록이 추천 카테고리 기준으로 필터링되는지 확인합니다.
-
----
-
-## 12. 후속 확장안
-
-현재 구현은 사용자 의도를 Location 카테고리로 변환해 주변서비스 추천 카드로 연결합니다. 이후에는 `targetTab`, `targetAction`, `constraints`를 활용해 케어 요청, 산책 모임, 실종 제보, 알레르기 조건 안내 같은 Petory 내부 행동 추천으로 확장할 수 있습니다.
-
-- [PetRecommendation 의도 기반 액션 라우팅 확장안](../refactoring/petRecommendation/intent-action-routing-proposal-2026-06-09.md)
+- 추천 도메인은 장소 추천 자체보다 “사용자 자연어 → Location 카테고리 진입점”을 만드는 구조다.
+- Spring은 사용자/DB/장소 검색/저장을 담당하고, Python은 의도 분석만 담당한다.
+- 커뮤니티/케어는 `AFTER_COMMIT`, 위치 검색은 자연어 필터+Redis dedup으로 NLP 호출을 제어한다.
+- NLP 작업은 `petIntentExecutor` 전용 bounded executor로 격리해 핵심 기능을 보호한다.
+- 원문 텍스트를 저장하지 않고 intent, category, confidence, tag, urgency만 저장한다.
+- confidence는 Python 1차 0.45, Spring 2차 domain×urgency threshold로 이중 필터링한다.
+- MEDICAL+HIGH signal은 `SignalSavedEvent`를 통해 건강 알림과 SSE로 연결된다.
+- `SignalInteractionLog`와 action routing은 확장 포인트이며, 현재 카드 클릭 저장은 미구현이다.

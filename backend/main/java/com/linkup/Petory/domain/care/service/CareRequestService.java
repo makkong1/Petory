@@ -3,20 +3,18 @@ package com.linkup.Petory.domain.care.service;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.stereotype.Service;
 
-import com.linkup.Petory.global.security.RoleConstants;
+import com.linkup.Petory.global.security.CustomUserDetails;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.linkup.Petory.domain.petRecommendation.event.CareRequestCreatedEvent;
 import com.linkup.Petory.domain.care.converter.CareRequestConverter;
 import com.linkup.Petory.domain.care.dto.CareRequestDTO;
 import com.linkup.Petory.domain.care.dto.CareRequestPageResponseDTO;
@@ -31,6 +29,7 @@ import com.linkup.Petory.domain.care.repository.CareRequestRepository;
 import com.linkup.Petory.domain.payment.entity.EscrowStatus;
 import com.linkup.Petory.domain.payment.entity.PetCoinEscrow;
 import com.linkup.Petory.domain.payment.service.PetCoinEscrowService;
+import com.linkup.Petory.domain.petRecommendation.event.CareRequestCreatedEvent;
 import com.linkup.Petory.domain.user.entity.EmailVerificationPurpose;
 import com.linkup.Petory.domain.user.entity.Pet;
 import com.linkup.Petory.domain.user.entity.Users;
@@ -39,6 +38,7 @@ import com.linkup.Petory.domain.user.exception.PetNotFoundException;
 import com.linkup.Petory.domain.user.exception.UserNotFoundException;
 import com.linkup.Petory.domain.user.repository.PetRepository;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
+import com.linkup.Petory.global.security.RoleConstants;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -59,13 +59,9 @@ public class CareRequestService {
      * 현재 사용자가 관리자(ADMIN 또는 MASTER)인지 확인
      */
     private boolean isAdmin() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || authentication.getAuthorities() == null) {
-            return false;
-        }
-        return authentication.getAuthorities().stream()
-                .map(GrantedAuthority::getAuthority)
-                .anyMatch(authority -> authority.equals(RoleConstants.ROLE_ADMIN) || authority.equals(RoleConstants.ROLE_MASTER));
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (!(auth != null && auth.getPrincipal() instanceof CustomUserDetails ud)) return false;
+        return ud.isAdmin();
     }
 
     /**
@@ -339,6 +335,7 @@ public class CareRequestService {
             // rollback-only 마킹 타이밍 충돌로 UnexpectedRollbackException 발생
             PetCoinEscrow escrow = petCoinEscrowService.findByCareRequest(request);
             if (escrow != null && escrow.getStatus() == EscrowStatus.HOLD) {
+                // 여기서 밑에 메서드에서 락을 획득
                 petCoinEscrowService.releaseToProvider(escrow);
                 log.info("거래 완료 시 제공자에게 코인 지급 완료: careRequestIdx={}, escrowIdx={}, amount={}",
                         request.getIdx(), escrow.getIdx(), escrow.getAmount());

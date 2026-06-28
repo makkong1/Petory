@@ -89,15 +89,7 @@ public class ChatMessageService {
 
         message = chatMessageRepository.save(message);
 
-        // 5. 참여자들의 읽지 않은 메시지 수 증가 (본인 제외)
-        // DB 레벨 원자적 증가로 Lost Update 방지
-        // 현재 (문제 있음)
-        // for (ConversationParticipant p : participants) {
-        // p.incrementUnreadCount();
-        // participantRepository.save(p);
-        // }
-
-        // 개선 (원자적 증가)
+        // 5. 참여자들의 읽지 않은 메시지 수 증가 (본인 제외) — DB 원자적 UPDATE로 Lost Update 방지
         participantRepository.incrementUnreadCount(conversationIdx, senderIdx);
 
         // 6. Conversation 메타데이터 업데이트

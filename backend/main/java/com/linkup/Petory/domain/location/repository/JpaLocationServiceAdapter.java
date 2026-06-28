@@ -74,15 +74,15 @@ public class JpaLocationServiceAdapter implements LocationServiceRepository {
         return jpaRepository.findBySido(sido, keyword, category, limit);
     }
 
-    @Override
-    public List<LocationService> findByEupmyeondong(String eupmyeondong, String keyword, String category, int limit) {
-        return jpaRepository.findByEupmyeondong(eupmyeondong, keyword, category, limit);
-    }
-
-    @Override
-    public List<LocationService> findByRoadName(String roadName, String keyword, String category, int limit) {
-        return jpaRepository.findByRoadName(roadName, keyword, category, limit);
-    }
+    // 읍면동·도로명 검색 — 프론트 미사용으로 비활성화
+    // @Override
+    // public List<LocationService> findByEupmyeondong(String eupmyeondong, String keyword, String category, int limit) {
+    //     return jpaRepository.findByEupmyeondong(eupmyeondong, keyword, category, limit);
+    // }
+    // @Override
+    // public List<LocationService> findByRoadName(String roadName, String keyword, String category, int limit) {
+    //     return jpaRepository.findByRoadName(roadName, keyword, category, limit);
+    // }
 
     @Override
     public void updateReviewStats(Long serviceIdx) {

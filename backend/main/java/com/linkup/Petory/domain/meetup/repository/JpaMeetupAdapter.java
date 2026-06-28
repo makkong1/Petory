@@ -43,15 +43,6 @@ public class JpaMeetupAdapter implements MeetupRepository {
     }
 
     @Override
-    public List<Meetup> findByLocationRange(
-            Double minLat,
-            Double maxLat,
-            Double minLng,
-            Double maxLng) {
-        return jpaRepository.findByLocationRange(minLat, maxLat, minLng, maxLng);
-    }
-
-    @Override
     public List<Meetup> findByKeyword(String keyword) {
         return jpaRepository.findByKeyword(keyword);
     }

@@ -11,6 +11,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.AllArgsConstructor;
@@ -62,5 +63,12 @@ public class LocationServiceReview extends BaseTimeEntity {
     public void softDelete() {
         this.isDeleted = true;
         this.deletedAt = java.time.LocalDateTime.now();
+    }
+
+    @PrePersist
+    protected void onCreate() {
+        if (this.isDeleted == null) {
+            this.isDeleted = false;
+        }
     }
 }

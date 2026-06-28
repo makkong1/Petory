@@ -4,8 +4,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -25,8 +24,8 @@ import com.linkup.Petory.domain.user.dto.UserProfileWithReviewsDTO;
 import com.linkup.Petory.domain.user.dto.UsersDTO;
 import com.linkup.Petory.domain.user.entity.EmailVerificationPurpose;
 import com.linkup.Petory.domain.user.exception.InvalidPasswordException;
-import com.linkup.Petory.domain.user.exception.UnauthenticatedException;
 import com.linkup.Petory.domain.user.exception.UserValidationException;
+import com.linkup.Petory.global.security.CustomUserDetails;
 import com.linkup.Petory.domain.user.service.EmailVerificationService;
 import com.linkup.Petory.domain.user.service.UsersService;
 import com.linkup.Petory.util.JwtUtil;
@@ -51,19 +50,6 @@ public class UserProfileController {
     private final EmailVerificationService emailVerificationService;
     private final JwtUtil jwtUtil;
 
-    /**
-     * 현재 로그인한 사용자의 ID 추출 (String - 로그인용 id 필드)
-     */
-    private String getCurrentUserId() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || authentication.getPrincipal() == null) {
-            throw new UnauthenticatedException();
-        }
-        // UserDetails의 username이 실제로는 userId (id 필드)
-        return authentication.getName();
-    }
-
-
     private boolean isServiceProvider(UsersDTO user) {
         return "SERVICE_PROVIDER".equals(user.getRole());
     }
@@ -79,8 +65,9 @@ public class UserProfileController {
      * [리팩토링] getReviewsByReviewee + getAverageRating 2회 → getReviewsWithAverage 1회
      */
     @GetMapping("/me")
-    public ResponseEntity<UserProfileWithReviewsDTO> getMyProfile() {
-        String userId = getCurrentUserId();
+    public ResponseEntity<UserProfileWithReviewsDTO> getMyProfile(
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        String userId = userDetails.getLoginId();
         UsersDTO user = usersService.getMyProfile(userId);
 
         Long userIdx = user.getIdx();
@@ -114,8 +101,10 @@ public class UserProfileController {
      * - 관리자(MASTER 포함)도 다른 사람의 프로필을 수정할 수 없음
      */
     @PutMapping("/me")
-    public ResponseEntity<UsersDTO> updateMyProfile(@RequestBody UsersDTO dto) {
-        String userId = getCurrentUserId();
+    public ResponseEntity<UsersDTO> updateMyProfile(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @RequestBody UsersDTO dto) {
+        String userId = userDetails.getLoginId();
         UsersDTO updated = usersService.updateMyProfile(userId, dto);
         return ResponseEntity.ok(updated);
     }
@@ -124,8 +113,10 @@ public class UserProfileController {
      * 비밀번호 변경
      */
     @PatchMapping("/me/password")
-    public ResponseEntity<Map<String, String>> changePassword(@RequestBody Map<String, String> request) {
-        String userId = getCurrentUserId();
+    public ResponseEntity<Map<String, String>> changePassword(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @RequestBody Map<String, String> request) {
+        String userId = userDetails.getLoginId();
         String currentPassword = request.get("currentPassword");
         String newPassword = request.get("newPassword");
 
@@ -141,8 +132,10 @@ public class UserProfileController {
      * 닉네임 변경
      */
     @PatchMapping("/me/username")
-    public ResponseEntity<UsersDTO> updateMyUsername(@RequestBody Map<String, String> request) {
-        String userId = getCurrentUserId();
+    public ResponseEntity<UsersDTO> updateMyUsername(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @RequestBody Map<String, String> request) {
+        String userId = userDetails.getLoginId();
         String newUsername = request.get("username");
 
         if (newUsername == null || newUsername.isEmpty()) {
@@ -157,8 +150,10 @@ public class UserProfileController {
      * 닉네임 설정 (소셜 로그인 사용자용)
      */
     @PostMapping("/me/nickname")
-    public ResponseEntity<UsersDTO> setNickname(@RequestBody Map<String, String> request) {
-        String userId = getCurrentUserId();
+    public ResponseEntity<UsersDTO> setNickname(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @RequestBody Map<String, String> request) {
+        String userId = userDetails.getLoginId();
         String nickname = request.get("nickname");
 
         if (nickname == null || nickname.trim().isEmpty()) {
@@ -195,8 +190,10 @@ public class UserProfileController {
      * 이메일 인증 메일 발송
      */
     @PostMapping("/email/verify")
-    public ResponseEntity<Map<String, Object>> sendVerificationEmail(@RequestBody Map<String, String> request) {
-        String userId = getCurrentUserId();
+    public ResponseEntity<Map<String, Object>> sendVerificationEmail(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @RequestBody Map<String, String> request) {
+        String userId = userDetails.getLoginId();
         String purposeStr = request.get("purpose");
 
         if (purposeStr == null || purposeStr.isEmpty()) {

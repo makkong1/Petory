@@ -4,7 +4,9 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -26,4 +28,9 @@ public interface SpringDataJpaDailyStatisticsRepository extends JpaRepository<Da
     List<LocalDate> findStatDatesByDateRange(@Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
 
     void deleteByStatDateBefore(LocalDate cutoffDate);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT d FROM DailyStatistics d WHERE d.statDate = :date")
+    @RepositoryMethod("일별 통계: 날짜로 조회 (비관적 락)")
+    Optional<DailyStatistics> findByStatDateForUpdate(@Param("date") LocalDate date);
 }

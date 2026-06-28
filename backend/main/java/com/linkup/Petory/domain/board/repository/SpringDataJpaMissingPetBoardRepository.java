@@ -1,5 +1,6 @@
 package com.linkup.Petory.domain.board.repository;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -52,8 +53,51 @@ public interface SpringDataJpaMissingPetBoardRepository extends JpaRepository<Mi
            countQuery = "SELECT COUNT(b) FROM MissingPetBoard b JOIN b.user u WHERE b.status = :status AND b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE'")
     Page<MissingPetBoard> findByStatusOrderByCreatedAtDesc(@Param("status") MissingPetStatus status, Pageable pageable);
 
+    @RepositoryMethod("실종 제보: 홈 추천 후보 조회 (실종일 최신순)")
+    @Query(value = "SELECT b FROM MissingPetBoard b JOIN FETCH b.user u "
+            + "WHERE b.status = :status "
+            + "AND b.isDeleted = false "
+            + "AND u.isDeleted = false "
+            + "AND u.status = 'ACTIVE' "
+            + "ORDER BY b.lostDate DESC, b.createdAt DESC",
+            countQuery = "SELECT COUNT(b) FROM MissingPetBoard b JOIN b.user u "
+                    + "WHERE b.status = :status "
+                    + "AND b.isDeleted = false "
+                    + "AND u.isDeleted = false "
+                    + "AND u.status = 'ACTIVE'")
+    Page<MissingPetBoard> findHomeCandidatesByStatusOrderByLostDateDesc(
+            @Param("status") MissingPetStatus status,
+            Pageable pageable);
+
+    @RepositoryMethod("실종 제보: 홈 추천 바운딩 박스 후보 조회")
+    @Query(value = "SELECT b FROM MissingPetBoard b JOIN FETCH b.user u "
+            + "WHERE b.status = :status "
+            + "AND b.isDeleted = false "
+            + "AND u.isDeleted = false "
+            + "AND u.status = 'ACTIVE' "
+            + "AND b.latitude IS NOT NULL "
+            + "AND b.longitude IS NOT NULL "
+            + "AND b.latitude BETWEEN :minLat AND :maxLat "
+            + "AND b.longitude BETWEEN :minLng AND :maxLng "
+            + "ORDER BY b.lostDate DESC, b.createdAt DESC",
+            countQuery = "SELECT COUNT(b) FROM MissingPetBoard b JOIN b.user u "
+                    + "WHERE b.status = :status "
+                    + "AND b.isDeleted = false "
+                    + "AND u.isDeleted = false "
+                    + "AND u.status = 'ACTIVE' "
+                    + "AND b.latitude IS NOT NULL "
+                    + "AND b.longitude IS NOT NULL "
+                    + "AND b.latitude BETWEEN :minLat AND :maxLat "
+                    + "AND b.longitude BETWEEN :minLng AND :maxLng")
+    Page<MissingPetBoard> findHomeCandidatesInBoundingBox(
+            @Param("status") MissingPetStatus status,
+            @Param("minLat") BigDecimal minLat,
+            @Param("maxLat") BigDecimal maxLat,
+            @Param("minLng") BigDecimal minLng,
+            @Param("maxLng") BigDecimal maxLng,
+            Pageable pageable);
+
     @RepositoryMethod("실종 제보: 작성자 ID 조회 (경량)")
     @Query("SELECT b.user.idx FROM MissingPetBoard b WHERE b.idx = :idx AND b.isDeleted = false")
     Optional<Long> findUserIdByIdx(@Param("idx") Long idx);
 }
-

@@ -53,15 +53,13 @@ public class AdminLocationController {
     public ResponseEntity<Map<String, Object>> listLocationServices(
             @RequestParam(value = "sido", required = false) String sido,
             @RequestParam(value = "sigungu", required = false) String sigungu,
-            @RequestParam(value = "eupmyeondong", required = false) String eupmyeondong,
-            @RequestParam(value = "roadName", required = false) String roadName,
             @RequestParam(value = "category", required = false) String category,
             @RequestParam(value = "size", required = false) Integer size,
             @RequestParam(value = "q", required = false) String q) {
 
         // keyword(q)는 SQL WHERE에서 처리 — Java 후처리 불필요
         List<LocationServiceDTO> services = locationServiceService.searchLocationServicesByRegion(
-                sido, sigungu, eupmyeondong, roadName, q, category, size);
+                sido, sigungu, q, category, size);
 
         Map<String, Object> response = new HashMap<>();
         response.put("services", services);

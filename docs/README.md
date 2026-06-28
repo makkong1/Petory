@@ -140,3 +140,4 @@ Controller → Service → Repository → Entity
 | 동시성 제어 | [control-strategies.md](./concurrency/control-strategies.md) |
 | 모바일 앱 & FCM | [09-mobile-capacitor.md](./deployment/09-mobile-capacitor.md) |
 | 배포 가이드 | [deployment/](./deployment/) |
+| 도메인 페이지 작성 워크플로우 | [workflow.md](./domain-page-drafts/workflow.md) |

@@ -30,6 +30,7 @@ public class MeetupDTO {
     private String location;
     private Double latitude;
     private Double longitude;
+    private Double distance; // 미터 단위, 위치 기반 조회 응답에서만 설정
     @NotNull
     private LocalDateTime date;
     private Long organizerIdx;

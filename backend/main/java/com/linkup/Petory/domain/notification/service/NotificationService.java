@@ -97,14 +97,11 @@ public class NotificationService {
      * 사용자의 알림 목록 조회
      */
     public List<NotificationDTO> getUserNotifications(Long userId) {
-        Users user = usersRepository.findById(userId)
-                .orElseThrow(UserNotFoundException::new);
-
         // Redis에서 먼저 조회 시도
         List<NotificationDTO> redisNotifications = getFromRedis(userId);
         if (redisNotifications != null && !redisNotifications.isEmpty()) {
             // Redis에 데이터가 있으면 DB와 병합하여 반환
-            List<NotificationDTO> dbNotifications = notificationRepository.findByUserOrderByCreatedAtDesc(user)
+            List<NotificationDTO> dbNotifications = notificationRepository.findByUserIdOrderByCreatedAtDesc(userId)
                     .stream()
                     .map(notificationConverter::toDTO)
                     .collect(Collectors.toList());
@@ -114,7 +111,7 @@ public class NotificationService {
         }
 
         // Redis에 없으면 DB에서 조회
-        return notificationRepository.findByUserOrderByCreatedAtDesc(user)
+        return notificationRepository.findByUserIdOrderByCreatedAtDesc(userId)
                 .stream()
                 .map(notificationConverter::toDTO)
                 .collect(Collectors.toList());
@@ -124,10 +121,7 @@ public class NotificationService {
      * 읽지 않은 알림 목록 조회
      */
     public List<NotificationDTO> getUnreadNotifications(Long userId) {
-        Users user = usersRepository.findById(userId)
-                .orElseThrow(UserNotFoundException::new);
-
-        return notificationRepository.findByUserAndIsReadFalseOrderByCreatedAtDesc(user)
+        return notificationRepository.findByUserIdAndIsReadFalseOrderByCreatedAtDesc(userId)
                 .stream()
                 .map(notificationConverter::toDTO)
                 .collect(Collectors.toList());
@@ -138,10 +132,7 @@ public class NotificationService {
      */
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public Long getUnreadCount(Long userId) {
-        Users user = usersRepository.findById(userId)
-                .orElseThrow(UserNotFoundException::new);
-
-        return notificationRepository.countUnreadByUser(user);
+        return notificationRepository.countUnreadByUserId(userId);
     }
 
     /**
@@ -169,14 +160,7 @@ public class NotificationService {
      */
     @Transactional
     public void markAllAsRead(Long userId) {
-        Users user = usersRepository.findById(userId)
-                .orElseThrow(UserNotFoundException::new);
-
-        List<Notification> unreadNotifications = notificationRepository
-                .findByUserAndIsReadFalseOrderByCreatedAtDesc(user);
-
-        unreadNotifications.forEach(notification -> notification.setIsRead(true));
-        notificationRepository.saveAll(unreadNotifications);
+        notificationRepository.markAllAsReadByUserId(userId);
 
         // Redis에서 해당 사용자의 모든 알림 제거
         String redisKey = REDIS_KEY_PREFIX + userId;
