@@ -113,13 +113,15 @@ backend/main/java/com/linkup/Petory/domain/statistics/
 
 ### 자동 배치
 
-`StatisticsScheduler.aggregateDailyStatistics()`는 매일 18:00에 실행된다.
+`StatisticsScheduler.aggregateDailyStatistics()`는 **매일 00:05**에 실행된다. (구 18:00 → 2026-06-28 변경, C0 임시 완화 목적)
+
+실제 집계는 `StatisticsAggregator.aggregateForDate(date)` 에 위임된다. (C2 self-invocation 수정을 위해 별도 빈으로 분리됨)
 
 ```text
-매일 18:00
+매일 00:05
   -> yesterday = LocalDate.now().minusDays(1)
   -> 최근 7일 누락 daily 감지 및 backfill
-  -> yesterday daily 집계
+  -> StatisticsAggregator.aggregateForDate(yesterday)
   -> yesterday가 일요일이면 weekly rollup
   -> yesterday가 월 마지막 날이면 monthly rollup
   -> 1년 초과 daily 삭제
@@ -130,7 +132,7 @@ backend/main/java/com/linkup/Petory/domain/statistics/
 | 지표 | Repository 메서드 |
 | --- | --- |
 | 신규 가입 | `UsersRepository.countByCreatedAtBetween` |
-| 활성 사용자 | `UsersRepository.countByLastLoginAtBetween` |
+| **활성 사용자** | **`LoginEventRepository.countDistinctUsersBetween`** (구: `UsersRepository.countByLastLoginAtBetween`) |
 | 신규 제공자 | `UsersRepository.countByRoleAndCreatedAtBetween` |
 | 신규 케어 요청 | `CareRequestRepository.countByCreatedAtBetween` |
 | 완료 케어 | `CareRequestRepository.countByCompletedAtBetween` |
@@ -141,11 +143,15 @@ backend/main/java/com/linkup/Petory/domain/statistics/
 | 신규 신고 | `ReportRepository.countByCreatedAtBetween` |
 | 처리 신고 | `ReportRepository.countByStatusAndUpdatedAtBetween(RESOLVED)` |
 
-### 중복 방지
+### merge 방식 (구: skip 방식)
 
-`aggregateStatisticsForDate(date)`는 먼저 `findByStatDate(date)`를 확인한다. 이미 row가 있으면 집계를 건너뛴다.
+`StatisticsAggregator.aggregateForDate(date)`는 `findByStatDate(date)` 로 기존 row를 먼저 찾는다.
 
-이 정책은 같은 날짜를 두 번 집계하지 않는 장점이 있지만, `recordPayment()`나 수동 backfill이 먼저 빈 daily row를 만들면 이후 자동 배치가 해당 날짜의 활동 지표를 채우지 못할 수 있다.
+- **기존 row 없음**: 새 `DailyStatistics` 생성 후 전체 지표 채움
+- **기존 row 있음 + 결제 데이터 없음**: 활동 지표 덮어쓰기 + 매출 필드 0 초기화
+- **기존 row 있음 + 결제 데이터 있음** (`transactionCount > 0`): 활동 지표만 덮어쓰기, 매출 필드 유지
+
+이로써 `recordPayment()`가 먼저 daily row를 생성해도 배치가 활동 지표를 채울 수 있다. (C1 수정)
 
 ---
 
@@ -159,7 +165,7 @@ backend/main/java/com/linkup/Petory/domain/statistics/
 | `getWeeklyStatistics(year)` | 특정 연도의 weekly row를 주차 오름차순 조회 |
 | `getMonthlyStatistics(year)` | 특정 연도의 monthly row를 월 오름차순 조회 |
 | `getTodaySnapshot()` | 오늘 daily row를 조회하고 없으면 빈 `DailyStatistics`로 응답. Redis `todayStats::today` 1분 캐시 |
-| `recordPayment(amount)` | 당일 매출, 거래 수, 평균 거래액 갱신 |
+| `recordPayment(amount)` | 당일 매출, 거래 수, 평균 거래액 갱신. `findByStatDateForUpdate`(비관적 락) 사용, `DataIntegrityViolationException` 시 1회 재시도 (C3 수정) |
 | `backfill(startDate, endDate)` | `StatisticsScheduler.backfill()`로 위임 |
 
 결제 연동:
@@ -255,49 +261,52 @@ backend/main/java/com/linkup/Petory/domain/statistics/
 
 ### 🔴 Critical
 
-**[DAU 원천 데이터 오류]** — 모든 활성 사용자 지표의 기반이 틀림
+**[DAU 원천 데이터 오류]** ✅ 수정됨 (2026-06-28, `statistics-login-events`)
 
-`activeUsers`는 `Users.lastLoginAt BETWEEN start AND end`로 집계한다.
-그런데 `lastLoginAt`은 로그인마다 현재 시각으로 **단순 덮어쓰기**된다(`AuthService.java:64`).
-배치가 18:00에 실행되므로, Day N에 로그인 후 Day N+1 09:00에 다시 로그인한 사용자는
-`lastLoginAt`이 Day N+1로 바뀌어 Day N DAU 쿼리 범위에서 이탈한다.
-매일 접속하는 충성 사용자일수록 DAU에서 빠질 가능성이 높다.
-근본 해결: 로그인 이벤트를 별도 `login_events` 테이블에 append 후 `DISTINCT user_id` count.
+~~`activeUsers`는 `Users.lastLoginAt BETWEEN start AND end`로 집계한다.~~
+~~그런데 `lastLoginAt`은 로그인마다 현재 시각으로 **단순 덮어쓰기**된다.~~
 
-**[결제-배치 충돌 → 활동 지표 영구 유실]** — 가장 심각
+→ `login_events` 테이블 append 후 `COUNT(DISTINCT user_id)` 집계로 전환 완료.
+→ cron 00:05 변경으로 race window도 최소화. 도입 이전 과거 통계 보정 불가 (섹션 10 참조).
 
-결제가 발생한 날 `recordPayment()`가 먼저 `DailyStatistics` row를 생성한다.
-다음날 18:00 배치가 같은 날짜를 조회하면 이미 row가 존재하므로 skip한다.
-결과: 해당 날의 `newUsers`, `activeUsers`, `newCareRequests` 등 모든 활동 지표가 영구 0.
+---
 
-```
-Day N — 결제 발생 → recordPayment() → DailyStatistics(N) 생성 (payment 필드만 있음)
-Day N+1 18:00 → aggregateStatisticsForDate(N) → 이미 있음 → skip
-→ Day N은 payment 데이터만 있고 활동 지표 전부 0
-```
+**[결제-배치 충돌 → 활동 지표 영구 유실]** ✅ 수정됨 (2026-06-28, `statistics-bug-fix`)
 
-**[Self-invocation으로 @Transactional 무력화]**
+~~결제가 발생한 날 `recordPayment()`가 먼저 row를 생성하면, 배치가 skip해 활동 지표가 영구 0이 됨.~~
 
-`StatisticsScheduler.backfill()`, `detectAndBackfillMissing()` 내부에서
-`aggregateStatisticsForDate()`를 `this.method()` 형태로 호출.
-Spring 프록시를 타지 않아 각 날짜별 트랜잭션 격리가 동작하지 않는다.
+→ `StatisticsAggregator.aggregateForDate()` merge 방식으로 전환. 기존 row 있어도 활동 지표를 항상 덮어쓴다.
 
-**[recordPayment 레이스 컨디션]**
+---
 
-동시 결제 진입 시 read-modify-write에 비관적 락이 없어 `totalRevenue` 유실 가능.
+**[Self-invocation으로 @Transactional 무력화]** ✅ 수정됨 (2026-06-28, `statistics-bug-fix`)
+
+~~`StatisticsScheduler` 내부에서 `this.aggregateStatisticsForDate()`를 호출해 Spring 프록시를 타지 못함.~~
+
+→ `StatisticsAggregator` 별도 빈 분리. 모든 집계 호출이 크로스-빈 호출로 변경됨.
+
+---
+
+**[recordPayment 레이스 컨디션]** ✅ 수정됨 (2026-06-28, `statistics-bug-fix`)
+
+~~동시 결제 진입 시 read-modify-write에 비관적 락이 없어 `totalRevenue` 유실 가능.~~
+
+→ `findByStatDateForUpdate` (`PESSIMISTIC_WRITE`) 추가. `DataIntegrityViolationException` 시 1회 재시도.
 
 ### 🟡 Warning
 
-**[WAU/MAU = DAU 합산]** — 비즈니스 지표 왜곡
+**[WAU/MAU = DAU 합산]** — 비즈니스 지표 왜곡 (미수정)
 
 `weeklyRetentionRate`, `monthlyRetentionRate`는 DAU 합산값끼리의 비율이며
 실제 WAU(고유 주간 활성 사용자) 대비 비율이 아니다.
 7일 모두 접속한 사용자 1명이 WAU=7로 집계된다.
+→ 별도 태스크 `statistics-wau-mau-distinct`로 분리 예정.
 
-**[ISO 53주차 미처리]**
+**[ISO 53주차 미처리]** ✅ 수정됨 (2026-06-28, `statistics-bug-fix`)
 
-`calcWeeklyRetention`에서 전 주 계산 시 `prevWeek = 52` 하드코딩.
-2020, 2026년 등 53주차가 있는 연도에서 마지막 주 retention이 오동작한다.
+~~`calcWeeklyRetention`에서 `prevWeek = 52` 하드코딩.~~
+
+→ `LocalDate.of(prevYear, 12, 28).get(WEEK_OF_WEEK_BASED_YEAR)` 동적 계산으로 교체.
 
 ### 🟢 Info
 
@@ -305,7 +314,6 @@ Spring 프록시를 타지 않아 각 날짜별 트랜잭션 격리가 동작하
 4. 관리자 통계 API에는 AdminAuditLog가 남지 않는다.
 5. 프론트 대시보드는 백엔드 중첩 DTO를 평면 필드처럼 읽고 있다.
 6. MissingPet, Comment, Location review, File 사용량은 현재 통계 지표에 없다.
-7. `StatisticsScheduler` cron이 18:00이지만 `DailyStatistics` Javadoc에는 "매일 자정"으로 기술돼 있다.
 
 ---
 
