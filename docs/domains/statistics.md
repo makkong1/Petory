@@ -251,20 +251,94 @@ backend/main/java/com/linkup/Petory/domain/statistics/
 
 ---
 
-## 9. 현재 한계
+## 9. 현재 한계 및 알려진 버그
 
-1. `recordPayment()`가 당일 daily row를 먼저 생성하면, 다음날 자동 배치가 같은 날짜를 skip해서 사용자/케어/커뮤니티/신고 지표가 채워지지 않을 수 있다.
-2. 수동 backfill도 이미 존재하는 날짜는 skip하므로, 잘못 생성된 daily row를 보정하지 못한다.
+### 🔴 Critical
+
+**[DAU 원천 데이터 오류]** — 모든 활성 사용자 지표의 기반이 틀림
+
+`activeUsers`는 `Users.lastLoginAt BETWEEN start AND end`로 집계한다.
+그런데 `lastLoginAt`은 로그인마다 현재 시각으로 **단순 덮어쓰기**된다(`AuthService.java:64`).
+배치가 18:00에 실행되므로, Day N에 로그인 후 Day N+1 09:00에 다시 로그인한 사용자는
+`lastLoginAt`이 Day N+1로 바뀌어 Day N DAU 쿼리 범위에서 이탈한다.
+매일 접속하는 충성 사용자일수록 DAU에서 빠질 가능성이 높다.
+근본 해결: 로그인 이벤트를 별도 `login_events` 테이블에 append 후 `DISTINCT user_id` count.
+
+**[결제-배치 충돌 → 활동 지표 영구 유실]** — 가장 심각
+
+결제가 발생한 날 `recordPayment()`가 먼저 `DailyStatistics` row를 생성한다.
+다음날 18:00 배치가 같은 날짜를 조회하면 이미 row가 존재하므로 skip한다.
+결과: 해당 날의 `newUsers`, `activeUsers`, `newCareRequests` 등 모든 활동 지표가 영구 0.
+
+```
+Day N — 결제 발생 → recordPayment() → DailyStatistics(N) 생성 (payment 필드만 있음)
+Day N+1 18:00 → aggregateStatisticsForDate(N) → 이미 있음 → skip
+→ Day N은 payment 데이터만 있고 활동 지표 전부 0
+```
+
+**[Self-invocation으로 @Transactional 무력화]**
+
+`StatisticsScheduler.backfill()`, `detectAndBackfillMissing()` 내부에서
+`aggregateStatisticsForDate()`를 `this.method()` 형태로 호출.
+Spring 프록시를 타지 않아 각 날짜별 트랜잭션 격리가 동작하지 않는다.
+
+**[recordPayment 레이스 컨디션]**
+
+동시 결제 진입 시 read-modify-write에 비관적 락이 없어 `totalRevenue` 유실 가능.
+
+### 🟡 Warning
+
+**[WAU/MAU = DAU 합산]** — 비즈니스 지표 왜곡
+
+`weeklyRetentionRate`, `monthlyRetentionRate`는 DAU 합산값끼리의 비율이며
+실제 WAU(고유 주간 활성 사용자) 대비 비율이 아니다.
+7일 모두 접속한 사용자 1명이 WAU=7로 집계된다.
+
+**[ISO 53주차 미처리]**
+
+`calcWeeklyRetention`에서 전 주 계산 시 `prevWeek = 52` 하드코딩.
+2020, 2026년 등 53주차가 있는 연도에서 마지막 주 retention이 오동작한다.
+
+### 🟢 Info
+
 3. 일별 테이블명은 `dailystatistics`이고 주/월 테이블명은 snake case라 명명 규칙이 일관되지 않다.
 4. 관리자 통계 API에는 AdminAuditLog가 남지 않는다.
 5. 프론트 대시보드는 백엔드 중첩 DTO를 평면 필드처럼 읽고 있다.
 6. MissingPet, Comment, Location review, File 사용량은 현재 통계 지표에 없다.
+7. `StatisticsScheduler` cron이 18:00이지만 `DailyStatistics` Javadoc에는 "매일 자정"으로 기술돼 있다.
 
 ---
 
-## 10. 관련 문서
+## 10. DAU 원천 전환 이력 (2026-06-28)
+
+### 배경
+`Users.lastLoginAt`은 로그인마다 덮어쓰이므로, 하루에 2회 이상 로그인한 사용자가 배치 실행 전에
+다시 로그인하면 전날 DAU에서 누락된다 (C0 버그 — `statistics-bug-fix` Step 5에서 cron 00:05로 임시 완화).
+
+### 수정 내용 (statistics-login-events)
+- `login_events` 테이블 신설 (append-only, 로그인 1회 = 행 1개)
+- 인덱스: `(user_id, login_at)`, `(login_at)` 복합/단일 인덱스
+- `AuthService.login()`, `OAuth2Service.processOAuth2Login()` 두 진입점에서 `LoginEvent` append 저장
+- `StatisticsAggregator.activeUsers` 집계 변경: `Users.lastLoginAt` → `COUNT(DISTINCT login_events.user_id)`
+
+### 보정 불가 범위
+- **도입 이전 (~ 2026-06-27) 일별 통계의 `active_users`**: 보정 불가.
+  - `Users.lastLoginAt`은 마지막 로그인 시각만 남기므로 역산 불가.
+  - 과거 `active_users` 값은 하루 2회 이상 로그인 사용자가 누락된 과소 집계임.
+  - 주간/월간 `active_users`도 DAU 합산 기반이므로 동일하게 과소 집계됨.
+- 관리자 대시보드에서 2026-06-28 이전 `active_users`를 "추정값"으로 레이블 처리 권장.
+
+### WAU/MAU activeUsers 잔존 한계
+현재 WAU/MAU `activeUsers` = 해당 기간 DAU 합산 (DISTINCT 아님).
+진정한 주/월 DISTINCT는 `login_events`를 기간 단위로 직접 GROUP BY해야 한다.
+이 개선은 별도 태스크(`statistics-wau-mau-distinct`)로 분리한다.
+
+---
+
+## 11. 관련 문서
 
 - `docs/architecture/관리자 대시보드 & 통계 시스템 아키텍처.md`
 - `docs/architecture/Redis_캐싱_전략.md`
 - `docs/domains/admin.md`
 - `docs/domains/payment.md`
+- `docs/refactoring/statistics/statistics-domain-review-2026-06-28.md` — 전체 리뷰 결과 및 개선 방향

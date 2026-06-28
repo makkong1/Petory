@@ -19,6 +19,7 @@ import com.linkup.Petory.domain.report.repository.ReportRepository;
 import com.linkup.Petory.domain.statistics.entity.DailyStatistics;
 import com.linkup.Petory.domain.statistics.repository.DailyStatisticsRepository;
 import com.linkup.Petory.domain.user.entity.Role;
+import com.linkup.Petory.domain.user.repository.LoginEventRepository;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -34,6 +35,7 @@ public class StatisticsAggregator {
 
     private final DailyStatisticsRepository dailyStatisticsRepository;
     private final UsersRepository usersRepository;
+    private final LoginEventRepository loginEventRepository;
     private final BoardRepository boardRepository;
     private final CareRequestRepository careRequestRepository;
     private final MeetupRepository meetupRepository;
@@ -54,7 +56,7 @@ public class StatisticsAggregator {
         long cancelled = careRequestRepository.countByStatusAndUpdatedAtBetween(CareRequestStatus.CANCELLED, start, end);
 
         stats.setNewUsers(usersRepository.countByCreatedAtBetween(start, end));
-        stats.setActiveUsers(usersRepository.countByLastLoginAtBetween(start, end));
+        stats.setActiveUsers(loginEventRepository.countDistinctUsersBetween(start, end));
         stats.setNewProviders(usersRepository.countByRoleAndCreatedAtBetween(Role.SERVICE_PROVIDER, start, end));
         stats.setNewCareRequests(careRequestRepository.countByCreatedAtBetween(start, end));
         stats.setCompletedCares(completed);
