@@ -3,12 +3,14 @@ package com.linkup.Petory.domain.user.service;
 import com.linkup.Petory.domain.user.converter.UsersConverter;
 import com.linkup.Petory.domain.user.dto.TokenResponse;
 import com.linkup.Petory.domain.user.dto.UsersDTO;
+import com.linkup.Petory.domain.user.entity.LoginEvent;
 import com.linkup.Petory.domain.user.entity.UserStatus;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.exception.InvalidRefreshTokenException;
 import com.linkup.Petory.domain.user.exception.UserBannedException;
 import com.linkup.Petory.domain.user.exception.UserNotFoundException;
 import com.linkup.Petory.domain.user.exception.UserSuspendedException;
+import com.linkup.Petory.domain.user.repository.LoginEventRepository;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 import com.linkup.Petory.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +28,7 @@ public class AuthService {
     private final JwtUtil jwtUtil;
     private final UsersRepository usersRepository;
     private final UsersConverter usersConverter;
+    private final LoginEventRepository loginEventRepository;
 
     /**
      * 로그인 - Access Token과 Refresh Token 발급
@@ -62,6 +65,8 @@ public class AuthService {
         user.setRefreshToken(refreshToken);
         user.setRefreshExpiration(LocalDateTime.now().plusDays(1));
         user.setLastLoginAt(LocalDateTime.now()); // 통계용: 마지막 로그인 시간 업데이트
+        loginEventRepository.save(LoginEvent.builder()
+                .user(user).loginAt(LocalDateTime.now()).loginMethod("LOCAL").build());
         usersRepository.save(user);
 
         log.info("로그인 성공: {}, Refresh Token 저장 완료", id);

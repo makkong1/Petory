@@ -2,11 +2,13 @@ package com.linkup.Petory.domain.user.service;
 
 import com.linkup.Petory.domain.user.dto.TokenResponse;
 import com.linkup.Petory.domain.user.dto.UsersDTO;
+import com.linkup.Petory.domain.user.entity.LoginEvent;
 import com.linkup.Petory.domain.user.entity.Provider;
 import com.linkup.Petory.domain.user.entity.Role;
 import com.linkup.Petory.domain.user.entity.SocialUser;
 import com.linkup.Petory.domain.user.entity.UserStatus;
 import com.linkup.Petory.domain.user.entity.Users;
+import com.linkup.Petory.domain.user.repository.LoginEventRepository;
 import com.linkup.Petory.domain.user.repository.SocialUserRepository;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 import com.linkup.Petory.util.JwtUtil;
@@ -33,6 +35,7 @@ public class OAuth2Service {
     private final SocialUserRepository socialUserRepository;
     private final UsersService usersService;
     private final JwtUtil jwtUtil;
+    private final LoginEventRepository loginEventRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
@@ -110,6 +113,8 @@ public class OAuth2Service {
         user.setRefreshToken(refreshToken);
         user.setRefreshExpiration(LocalDateTime.now().plusDays(1));
         user.setLastLoginAt(LocalDateTime.now());
+        loginEventRepository.save(LoginEvent.builder()
+                .user(user).loginAt(LocalDateTime.now()).loginMethod(provider.name()).build());
         usersRepository.save(user);
 
         UsersDTO userDTO = usersService.getUserById(user.getId());

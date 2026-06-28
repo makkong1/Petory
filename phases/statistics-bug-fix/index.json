@@ -1,0 +1,49 @@
+{
+  "task": "statistics-bug-fix",
+  "description": "Statistics \ub3c4\uba54\uc778 \ucf54\ub4dc \ub9ac\ubdf0(2026-06-28)\uc5d0\uc11c \ubc1c\uacac\ub41c Critical/Warning \ubc84\uadf8 \uc218\uc815. \ucd1d 5 step\uc73c\ub85c \uc790\uae30\uc644\uacb0 \ubd84\ub9ac.",
+  "source_doc": "docs/refactoring/statistics/statistics-domain-review-2026-06-28.md",
+  "steps": [
+    {
+      "step": 1,
+      "name": "C2 \u2014 StatisticsAggregator \ube48 \ubd84\ub9ac (Self-invocation \uc81c\uac70)",
+      "file": "step1.md",
+      "priority": "Critical",
+      "status": "completed",
+      "summary": "StatisticsAggregator \uc2e0\uaddc \ube48 \uc0dd\uc131. StatisticsScheduler\uc5d0\uc11c 6\uac1c \ub3c4\uba54\uc778 \ub808\ud3ec \uc81c\uac70, statisticsAggregator \uc8fc\uc785. 3\uacf3 self-invocation \u2192 aggregator.aggregateForDate() \ud06c\ub85c\uc2a4-\ube48 \ud638\ucd9c\ub85c \uc804\ud658"
+    },
+    {
+      "step": 2,
+      "name": "C1 \u2014 aggregateForDate skip\u2192merge \uc804\ud658 (\uacb0\uc81c-\ubc30\uce58 \ucda9\ub3cc \uc218\uc815)",
+      "file": "step2.md",
+      "priority": "Critical",
+      "status": "completed",
+      "summary": "StatisticsAggregator.aggregateForDate: skip \ub300\uc2e0 merge \ubc29\uc2dd \uc801\uc6a9. \uae30\uc874 row \uc788\uc73c\uba74 \ud65c\ub3d9 \uc9c0\ud45c UPDATE, hasPaymentData=false\uc77c \ub54c\ub9cc revenue 0 \ucd08\uae30\ud654"
+    },
+    {
+      "step": 3,
+      "name": "C3/W3 \u2014 recordPayment \ube44\uad00\uc801 \ub77d + DataIntegrityViolationException \uc7ac\uc2dc\ub3c4 \ucc98\ub9ac",
+      "file": "step3.md",
+      "priority": "Critical",
+      "status": "completed",
+      "summary": "DailyStatisticsRepository(\ud3ec\ud2b8/\uc5b4\ub311\ud130/SpringData) 3\uacf3\uc5d0 findByStatDateForUpdate \ucd94\uac00(@Lock PESSIMISTIC_WRITE). StatisticsService.recordPayment: applyPayment \ucd94\ucd9c + DataIntegrityViolationException 1\ud68c \uc7ac\uc2dc\ub3c4"
+    },
+    {
+      "step": 4,
+      "name": "W2 \u2014 ISO 53\uc8fc\ucc28 \uc218\uc815",
+      "file": "step4.md",
+      "priority": "Warning",
+      "status": "completed",
+      "summary": "StatisticsScheduler.calcWeeklyRetention: prevWeek=52 \ud558\ub4dc\ucf54\ub529 \u2192 LocalDate.of(prevYear,12,28).get(WEEK_OF_WEEK_BASED_YEAR)\ub85c \ub3d9\uc801 \uacc4\uc0b0"
+    },
+    {
+      "step": 5,
+      "name": "C0 \uc784\uc2dc \uc644\ud654 \u2014 cron 00:05 \ubcc0\uacbd (DAU \uc6d0\ucc9c \uc218\uc815\uc740 statistics-login-events \ud0dc\uc2a4\ud06c)",
+      "file": "step5.md",
+      "priority": "Warning (\uc784\uc2dc \uc644\ud654)",
+      "status": "completed",
+      "summary": "StatisticsScheduler cron 0 0 18\u21920 5 0, Javadoc \uc218\uc815. DailyStatistics Javadoc \uc790\uc815\u219200:05 \uc218\uc815"
+    }
+  ],
+  "follow_up_task": "statistics-login-events",
+  "follow_up_scope": "login_events \ud14c\uc774\ube14/migration, LoginEvent \uc5d4\ud2f0\ud2f0, AuthService\u00b7OAuth2Service append, DAU/WAU/MAU DISTINCT \uc9d1\uacc4 \uc804\ud658, \uacfc\uac70 \ud1b5\uacc4 \ubcf4\uc815 \ubd88\uac00 \ubc94\uc704 \uba85\uc2dc"
+}

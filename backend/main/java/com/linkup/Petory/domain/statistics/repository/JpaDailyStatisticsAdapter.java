@@ -64,4 +64,9 @@ public class JpaDailyStatisticsAdapter implements DailyStatisticsRepository {
     public void deleteByStatDateBefore(LocalDate cutoffDate) {
         jpaRepository.deleteByStatDateBefore(cutoffDate);
     }
+
+    @Override
+    public Optional<DailyStatistics> findByStatDateForUpdate(LocalDate statDate) {
+        return jpaRepository.findByStatDateForUpdate(statDate);
+    }
 }

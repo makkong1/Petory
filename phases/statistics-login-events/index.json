@@ -1,0 +1,38 @@
+{
+  "task": "statistics-login-events",
+  "description": "DAU 원천 데이터를 Users.lastLoginAt(덮어쓰기) → login_events(append) 테이블로 전환. C0 근본 수정.",
+  "steps": [
+    {
+      "step": 1,
+      "name": "LoginEvent 엔티티 + 레포지토리 3종 (Port / Adapter / SpringData)",
+      "file": "step1.md",
+      "priority": "Critical",
+      "status": "completed",
+      "summary": "LoginEvent 엔티티(login_events 테이블, user_id+login_at/login_at 인덱스), LoginEventRepository 포트, SpringDataJpaLoginEventRepository(DISTINCT COUNT JPQL), JpaLoginEventAdapter 생성"
+    },
+    {
+      "step": 2,
+      "name": "AuthService + OAuth2Service 로그인 이벤트 append",
+      "file": "step2.md",
+      "priority": "Critical",
+      "status": "completed",
+      "summary": "AuthService.login(): loginMethod=LOCAL append. OAuth2Service.processOAuth2Login(): loginMethod=provider.name() append. Users.lastLoginAt 유지"
+    },
+    {
+      "step": 3,
+      "name": "StatisticsAggregator DAU DISTINCT 집계 전환",
+      "file": "step3.md",
+      "priority": "Critical",
+      "status": "completed",
+      "summary": "StatisticsAggregator.activeUsers: usersRepository.countByLastLoginAtBetween → loginEventRepository.countDistinctUsersBetween(DISTINCT userId)"
+    },
+    {
+      "step": 4,
+      "name": "docs 업데이트 — 과거 통계 보정 불가 범위 명시",
+      "file": "step4.md",
+      "priority": "Info",
+      "status": "completed",
+      "summary": "docs/domains/statistics.md 섹션 10 추가: 도입 이전 active_users 보정 불가 범위, WAU/MAU 잔존 한계, 별도 태스크 분리 명시"
+    }
+  ]
+}
