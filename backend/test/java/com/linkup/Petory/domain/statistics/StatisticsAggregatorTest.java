@@ -13,7 +13,6 @@ import static org.mockito.ArgumentMatchers.eq;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -27,23 +26,20 @@ import com.linkup.Petory.domain.report.entity.ReportStatus;
 import com.linkup.Petory.domain.report.repository.ReportRepository;
 import com.linkup.Petory.domain.statistics.entity.DailyStatistics;
 import com.linkup.Petory.domain.statistics.repository.DailyStatisticsRepository;
-import com.linkup.Petory.domain.statistics.repository.MonthlyStatisticsRepository;
-import com.linkup.Petory.domain.statistics.repository.WeeklyStatisticsRepository;
-import com.linkup.Petory.domain.statistics.service.StatisticsScheduler;
+import com.linkup.Petory.domain.statistics.service.StatisticsAggregator;
 import com.linkup.Petory.domain.user.entity.Role;
+import com.linkup.Petory.domain.user.repository.LoginEventRepository;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 
 @ExtendWith(MockitoExtension.class)
-class StatisticsSchedulerTest {
+class StatisticsAggregatorTest {
 
     @Mock
     DailyStatisticsRepository dailyStatisticsRepository;
     @Mock
-    WeeklyStatisticsRepository weeklyStatisticsRepository;
-    @Mock
-    MonthlyStatisticsRepository monthlyStatisticsRepository;
-    @Mock
     UsersRepository usersRepository;
+    @Mock
+    LoginEventRepository loginEventRepository;
     @Mock
     BoardRepository boardRepository;
     @Mock
@@ -56,12 +52,12 @@ class StatisticsSchedulerTest {
     ReportRepository reportRepository;
 
     @InjectMocks
-    StatisticsScheduler scheduler;
+    StatisticsAggregator aggregator;
 
     @BeforeEach
     void setup() {
         lenient().when(usersRepository.countByCreatedAtBetween(any(), any())).thenReturn(5L);
-        lenient().when(usersRepository.countByLastLoginAtBetween(any(), any())).thenReturn(100L);
+        lenient().when(loginEventRepository.countDistinctUsersBetween(any(), any())).thenReturn(100L);
         lenient().when(usersRepository.countByRoleAndCreatedAtBetween(eq(Role.SERVICE_PROVIDER), any(), any()))
                 .thenReturn(2L);
         lenient().when(boardRepository.countByCreatedAtBetween(any(), any())).thenReturn(10L);
@@ -82,8 +78,9 @@ class StatisticsSchedulerTest {
     @Test
     void aggregateForDate_savesAllFields() {
         LocalDate date = LocalDate.of(2026, 4, 17);
-        scheduler.aggregateStatisticsForDate(date);
+        aggregator.aggregateForDate(date);
         verify(dailyStatisticsRepository).save(argThat(s -> s.getNewUsers() == 5L &&
+                s.getActiveUsers() == 100L &&
                 s.getCompletedCares() == 6L &&
                 s.getCancelledCares() == 1L &&
                 s.getNewProviders() == 2L &&
@@ -91,17 +88,28 @@ class StatisticsSchedulerTest {
     }
 
     @Test
-    void aggregateForDate_skipIfAlreadyExists() {
+    void aggregateForDate_mergesExistingRowAndPreservesPaymentFields() {
         LocalDate date = LocalDate.of(2026, 4, 17);
-        when(dailyStatisticsRepository.findByStatDate(date)).thenReturn(Optional.of(new DailyStatistics()));
-        scheduler.aggregateStatisticsForDate(date);
-        verify(dailyStatisticsRepository, never()).save(any());
+        DailyStatistics existing = DailyStatistics.builder()
+                .statDate(date)
+                .totalRevenue(new BigDecimal("50000"))
+                .transactionCount(2L)
+                .avgTransaction(new BigDecimal("25000.00"))
+                .build();
+        when(dailyStatisticsRepository.findByStatDate(date)).thenReturn(Optional.of(existing));
+
+        aggregator.aggregateForDate(date);
+
+        verify(dailyStatisticsRepository).save(argThat(s -> s.getNewUsers() == 5L &&
+                s.getTotalRevenue().compareTo(new BigDecimal("50000")) == 0 &&
+                s.getTransactionCount() == 2L &&
+                s.getAvgTransaction().compareTo(new BigDecimal("25000.00")) == 0));
     }
 
     @Test
     void careCompletionRate_calculatedCorrectly() {
         LocalDate date = LocalDate.of(2026, 4, 17);
-        scheduler.aggregateStatisticsForDate(date);
+        aggregator.aggregateForDate(date);
         verify(dailyStatisticsRepository)
                 .save(argThat(s -> s.getCareCompletionRate().compareTo(new BigDecimal("85.71")) == 0));
     }

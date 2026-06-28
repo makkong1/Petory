@@ -4,9 +4,8 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
-import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -29,8 +28,15 @@ public interface SpringDataJpaDailyStatisticsRepository extends JpaRepository<Da
 
     void deleteByStatDateBefore(LocalDate cutoffDate);
 
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("SELECT d FROM DailyStatistics d WHERE d.statDate = :date")
-    @RepositoryMethod("일별 통계: 날짜로 조회 (비관적 락)")
-    Optional<DailyStatistics> findByStatDateForUpdate(@Param("date") LocalDate date);
+    @Modifying
+    @RepositoryMethod("일별 통계: 결제 집계 upsert")
+    @Query(value = """
+            INSERT INTO dailystatistics (stat_date, total_revenue, transaction_count, avg_transaction)
+            VALUES (:date, :amount, 1, :amount)
+            ON DUPLICATE KEY UPDATE
+                avg_transaction = (COALESCE(total_revenue, 0) + :amount) / (transaction_count + 1),
+                total_revenue = COALESCE(total_revenue, 0) + :amount,
+                transaction_count = transaction_count + 1
+            """, nativeQuery = true)
+    void upsertPayment(@Param("date") LocalDate date, @Param("amount") java.math.BigDecimal amount);
 }

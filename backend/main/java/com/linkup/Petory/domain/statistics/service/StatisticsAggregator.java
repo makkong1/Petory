@@ -7,6 +7,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.linkup.Petory.domain.board.repository.BoardRepository;
@@ -42,7 +43,7 @@ public class StatisticsAggregator {
     private final MeetupParticipantsRepository meetupParticipantsRepository;
     private final ReportRepository reportRepository;
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void aggregateForDate(LocalDate date) {
         LocalDateTime start = date.atStartOfDay();
         LocalDateTime end = date.atTime(LocalTime.MAX);
