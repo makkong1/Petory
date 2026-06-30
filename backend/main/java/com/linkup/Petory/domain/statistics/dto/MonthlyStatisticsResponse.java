@@ -1,12 +1,17 @@
 package com.linkup.Petory.domain.statistics.dto;
 
-import com.linkup.Petory.domain.statistics.entity.MonthlyStatistics;
-import lombok.Builder;
-import lombok.Getter;
 import java.math.BigDecimal;
 
-@Getter @Builder
-/** 월간 통계 API 응답 DTO. 리텐션율(monthlyRetentionRate)과 이탈율(churnRate)을 포함한다. */
+import com.linkup.Petory.domain.statistics.entity.MonthlyStatistics;
+
+import lombok.Builder;
+import lombok.Getter;
+
+@Getter
+@Builder
+/**
+ * 월간 통계 API 응답 DTO. 리텐션율(monthlyRetentionRate)과 이탈율(churnRate)을 포함한다.
+ */
 public class MonthlyStatisticsResponse {
 
     private Integer year;
