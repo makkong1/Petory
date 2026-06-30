@@ -1,13 +1,18 @@
 package com.linkup.Petory.domain.statistics.dto;
 
-import com.linkup.Petory.domain.statistics.entity.DailyStatistics;
-import lombok.Builder;
-import lombok.Getter;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
-@Getter @Builder
-/** 일별 통계 API 응답 DTO. 사용자·케어·결제·커뮤니티·운영 섹션으로 그룹화된다. */
+import com.linkup.Petory.domain.statistics.entity.DailyStatistics;
+
+import lombok.Builder;
+import lombok.Getter;
+
+@Getter
+@Builder
+/**
+ * 일별 통계 API 응답 DTO. 사용자·케어·결제·커뮤니티·운영 섹션으로 그룹화된다.
+ */
 public class DailyStatisticsResponse {
 
     private LocalDate statDate;
@@ -17,37 +22,47 @@ public class DailyStatisticsResponse {
     private CommunityStats community;
     private ModerationStats moderation;
 
-    @Getter @Builder
+    @Getter
+    @Builder
     public static class UserStats {
+
         private Long newUsers;
         private Long activeUsers;
         private Long newProviders;
     }
 
-    @Getter @Builder
+    @Getter
+    @Builder
     public static class CareStats {
+
         private Long newRequests;
         private Long completed;
         private Long cancelled;
         private BigDecimal completionRate;
     }
 
-    @Getter @Builder
+    @Getter
+    @Builder
     public static class RevenueStats {
+
         private BigDecimal totalRevenue;
         private Long transactionCount;
         private BigDecimal avgTransaction;
     }
 
-    @Getter @Builder
+    @Getter
+    @Builder
     public static class CommunityStats {
+
         private Long newPosts;
         private Long newMeetups;
         private Long meetupParticipants;
     }
 
-    @Getter @Builder
+    @Getter
+    @Builder
     public static class ModerationStats {
+
         private Long newReports;
         private Long resolvedReports;
     }

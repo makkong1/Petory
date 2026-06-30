@@ -13,8 +13,11 @@ import lombok.RequiredArgsConstructor;
 @Repository
 @Primary
 @RequiredArgsConstructor
-/** MonthlyStatisticsRepository의 JPA 구현체(어댑터). */
+/**
+ * MonthlyStatisticsRepository의 JPA 구현체(어댑터).
+ */
 public class JpaMonthlyStatisticsAdapter implements MonthlyStatisticsRepository {
+
     private final SpringDataJpaMonthlyStatisticsRepository jpaRepository;
 
     @SuppressWarnings("null")
