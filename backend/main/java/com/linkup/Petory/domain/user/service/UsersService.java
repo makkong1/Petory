@@ -6,6 +6,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -24,6 +25,7 @@ import com.linkup.Petory.domain.user.entity.Pet;
 import com.linkup.Petory.domain.user.entity.Role;
 import com.linkup.Petory.domain.user.entity.UserStatus;
 import com.linkup.Petory.domain.user.entity.Users;
+import com.linkup.Petory.domain.user.event.UserSanctionAppliedEvent;
 import com.linkup.Petory.domain.user.exception.DuplicateUserFieldException;
 import com.linkup.Petory.domain.user.exception.InvalidPasswordException;
 import com.linkup.Petory.domain.user.exception.UserForbiddenException;
@@ -46,6 +48,7 @@ public class UsersService {
     private final PasswordEncoder passwordEncoder;
     // private final PetService petService;
     private final EmailVerificationService emailVerificationService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Value("${app.email-verification.skip-in-dev:false}")
     private boolean skipInDev;
@@ -266,6 +269,7 @@ public class UsersService {
     public UsersDTO updateUserStatus(long idx, UsersDTO dto) {
         Users user = usersRepository.findById(idx)
                 .orElseThrow(UserNotFoundException::new);
+        UserStatus appliedSanctionStatus = null;
 
         // 상태 업데이트
         if (dto.getStatus() != null) {
@@ -274,6 +278,7 @@ public class UsersService {
             if (status == UserStatus.SUSPENDED || status == UserStatus.BANNED) {
                 user.setRefreshToken(null);
                 user.setRefreshExpiration(null);
+                appliedSanctionStatus = status;
             }
         }
 
@@ -296,6 +301,12 @@ public class UsersService {
         }
 
         Users updated = usersRepository.save(user);
+        if (appliedSanctionStatus != null) {
+            eventPublisher.publishEvent(new UserSanctionAppliedEvent(
+                    updated.getIdx(),
+                    appliedSanctionStatus,
+                    appliedSanctionStatus == UserStatus.SUSPENDED ? updated.getSuspendedUntil() : null));
+        }
         return usersConverter.toDTO(updated);
     }
 

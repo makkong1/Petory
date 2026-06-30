@@ -30,7 +30,7 @@ public class UserSanctionMeetupEventListener {
     /**
      * 제재(SUSPENDED/BANNED 모두) 시 Meetup 후속 처리:
      * 1. 주최자의 RECRUITING 모임 취소
-     * 2. 참가 row 삭제 + 모임 채팅방 퇴장 처리
+     * 2. 진행 예정 모임의 일반 참가 row 삭제 + 인원 감소 + 모임 채팅방 퇴장 처리
      */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -57,14 +57,18 @@ public class UserSanctionMeetupEventListener {
     }
 
     private void cancelParticipation(Long userId) {
-        List<MeetupParticipants> participations = participantsRepository.findByUserIdxOrderByJoinedAtDesc(userId);
+        List<MeetupParticipants> participations = participantsRepository.findActiveUpcomingMeetupsByUser(userId);
         for (MeetupParticipants mp : participations) {
             Long meetupIdx = mp.getMeetup().getIdx();
+            if (mp.getMeetup().getOrganizer().getIdx().equals(userId)) {
+                continue;
+            }
             try {
                 // 채팅방 퇴장 먼저 처리
                 conversationService.leaveMeetupChat(meetupIdx, userId);
                 // 참가 row 삭제
                 participantsRepository.deleteById(new MeetupParticipantsId(meetupIdx, userId));
+                meetupRepository.decrementParticipantsIfPositive(meetupIdx);
                 log.info("제재 참가자 모임 참가 취소: meetupId={}, userId={}", meetupIdx, userId);
             } catch (Exception e) {
                 log.error("참가자 제재 취소 처리 실패: meetupId={}, userId={}, error={}",

@@ -82,6 +82,11 @@ public class JpaMeetupParticipantsAdapter implements MeetupParticipantsRepositor
     }
 
     @Override
+    public List<MeetupParticipants> findActiveUpcomingMeetupsByUser(Long userIdx) {
+        return jpaRepository.findActiveUpcomingMeetupsByUser(userIdx);
+    }
+
+    @Override
     public long countByJoinedAtBetween(LocalDateTime start, LocalDateTime end) {
         return jpaRepository.countByJoinedAtBetween(start, end);
     }

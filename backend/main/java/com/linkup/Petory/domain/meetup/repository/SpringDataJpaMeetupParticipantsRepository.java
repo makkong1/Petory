@@ -58,7 +58,17 @@ public interface SpringDataJpaMeetupParticipantsRepository extends JpaRepository
             "ORDER BY m.date ASC")
     List<MeetupParticipants> findUpcomingMeetupsByUser(@Param("userIdx") Long userIdx);
 
+    @RepositoryMethod("모임 참여자: 제재 후속 처리용 예정 모임 목록")
+    @Query("SELECT mp FROM MeetupParticipants mp " +
+            "JOIN FETCH mp.meetup m " +
+            "JOIN FETCH m.organizer " +
+            "JOIN FETCH mp.user " +
+            "WHERE mp.user.idx = :userIdx AND m.date > CURRENT_TIMESTAMP " +
+            "AND (m.status IS NULL OR m.status <> com.linkup.Petory.domain.meetup.entity.MeetupStatus.CANCELLED) " +
+            "AND (m.isDeleted = false OR m.isDeleted IS NULL) " +
+            "ORDER BY m.date ASC")
+    List<MeetupParticipants> findActiveUpcomingMeetupsByUser(@Param("userIdx") Long userIdx);
+
     @RepositoryMethod("모임 참여자: 기간별 참여 수 통계")
     long countByJoinedAtBetween(LocalDateTime start, LocalDateTime end);
 }
-

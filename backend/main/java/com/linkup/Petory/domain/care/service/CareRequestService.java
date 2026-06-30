@@ -159,6 +159,9 @@ public class CareRequestService {
         if (Boolean.TRUE.equals(request.getIsDeleted())) {
             throw new CareRequestNotFoundException();
         }
+        if (!isAdmin() && isSanctionedPreMatchRequest(request)) {
+            throw new CareRequestNotFoundException();
+        }
 
         return careRequestConverter.toDTO(request);
     }
@@ -331,6 +334,10 @@ public class CareRequestService {
         CareRequestStatus oldStatus = request.getStatus();
         CareRequestStatus newStatus = CareRequestStatus.valueOf(status);
 
+        if (!isAdmin() && isSettlementStatus(newStatus) && hasSanctionedCareParty(request)) {
+            throw CareForbiddenException.sanctioned();
+        }
+
         request.transitionTo(newStatus);
         CareRequest updated = careRequestRepository.save(request);
 
@@ -362,6 +369,28 @@ public class CareRequestService {
         }
 
         return careRequestConverter.toDTO(updated);
+    }
+
+    private boolean isSanctionedPreMatchRequest(CareRequest request) {
+        return request.getUser().isSanctioned()
+                && (request.getStatus() == CareRequestStatus.OPEN
+                || request.getStatus() == CareRequestStatus.CANCELLED);
+    }
+
+    private boolean isSettlementStatus(CareRequestStatus status) {
+        return status == CareRequestStatus.COMPLETED || status == CareRequestStatus.CANCELLED;
+    }
+
+    private boolean hasSanctionedCareParty(CareRequest request) {
+        if (request.getUser().isSanctioned()) {
+            return true;
+        }
+        if (request.getApplications() == null) {
+            return false;
+        }
+        return request.getApplications().stream()
+                .filter(app -> app.getStatus() == CareApplicationStatus.ACCEPTED)
+                .anyMatch(app -> app.getProvider().isSanctioned());
     }
 
     // 검색 기능
