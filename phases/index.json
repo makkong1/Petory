@@ -55,6 +55,10 @@
     {
       "dir": "statistics-login-events",
       "status": "completed"
+    },
+    {
+      "dir": "sanction-domain-enforcement",
+      "status": "pending"
     }
   ]
 }
