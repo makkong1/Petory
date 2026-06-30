@@ -117,7 +117,7 @@ public class JpaMeetupAdapter implements MeetupRepository {
 
     @Override
     public int completePastMeetups(LocalDateTime now) {
-        return jpaRepository.completePastMeetups(now, MeetupStatus.COMPLETED);
+        return jpaRepository.completePastMeetups(now, MeetupStatus.COMPLETED, MeetupStatus.CANCELLED);
     }
 
     @Override

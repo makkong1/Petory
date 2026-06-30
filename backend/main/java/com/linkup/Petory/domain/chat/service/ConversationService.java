@@ -513,6 +513,12 @@ public class ConversationService {
                         throw ChatForbiddenException.sanctionedPartyCannotConfirmDeal();
                 }
 
+                List<ConversationParticipant> allParticipants = participantRepository
+                                .findByConversationIdxAndStatus(conversationIdx, ParticipantStatus.ACTIVE);
+                if (allParticipants.stream().anyMatch(p -> p.getUser().isSanctioned())) {
+                        throw ChatForbiddenException.sanctionedPartyCannotConfirmDeal();
+                }
+
                 // 이미 거래 확정했는지 확인
                 if (Boolean.TRUE.equals(participant.getDealConfirmed())) {
                         throw new IllegalStateException("이미 거래 확정을 완료했습니다.");
@@ -524,9 +530,6 @@ public class ConversationService {
                 participantRepository.save(participant);
 
                 // 양쪽 모두 거래 확정했는지 확인
-                List<ConversationParticipant> allParticipants = participantRepository
-                                .findByConversationIdxAndStatus(conversationIdx, ParticipantStatus.ACTIVE);
-
                 boolean allConfirmed = allParticipants.stream()
                                 .allMatch(p -> Boolean.TRUE.equals(p.getDealConfirmed()));
 
@@ -568,6 +571,9 @@ public class ConversationService {
                                                 Users requester = careRequest.getUser();
                                                 Users provider = usersRepository.findById(providerId)
                                                                 .orElseThrow(UserNotFoundException::new);
+                                                if (requester.isSanctioned() || provider.isSanctioned()) {
+                                                        throw ChatForbiddenException.sanctionedPartyCannotConfirmDeal();
+                                                }
 
                                                 CareApplication finalApplication;
                                                 if (existingApplication == null) {

@@ -26,7 +26,9 @@ import jakarta.persistence.LockModeType;
 public interface SpringDataJpaMeetupRepository extends JpaRepository<Meetup, Long> {
 
     @RepositoryMethod("모임: 주최자별 목록 조회")
-    @Query("SELECT m FROM Meetup m JOIN FETCH m.organizer WHERE m.organizer.idx = :organizerIdx AND (m.isDeleted = false OR m.isDeleted IS NULL) ORDER BY m.createdAt DESC")
+    @Query("SELECT m FROM Meetup m JOIN FETCH m.organizer WHERE m.organizer.idx = :organizerIdx "
+            + "AND (m.status IS NULL OR m.status <> com.linkup.Petory.domain.meetup.entity.MeetupStatus.CANCELLED) "
+            + "AND (m.isDeleted = false OR m.isDeleted IS NULL) ORDER BY m.createdAt DESC")
     List<Meetup> findByOrganizerIdxOrderByCreatedAtDesc(@Param("organizerIdx") Long organizerIdx);
 
     @RepositoryMethod("모임: 이벤트 리스너용 주최자의 RECRUITING 모임 조회")
@@ -36,6 +38,7 @@ public interface SpringDataJpaMeetupRepository extends JpaRepository<Meetup, Lon
     @RepositoryMethod("모임: 키워드 FULLTEXT 검색 — idx 목록 반환 (N+1 방지용 1단계)")
     @Query(value = "SELECT m.idx FROM meetup m "
             + "WHERE (m.is_deleted = false OR m.is_deleted IS NULL) "
+            + "AND (m.status IS NULL OR m.status != 'CANCELLED') "
             + "AND MATCH(m.title, m.description) AGAINST(:keyword IN NATURAL LANGUAGE MODE) "
             + "ORDER BY m.date ASC", nativeQuery = true)
     List<Long> findIdxByFulltextKeyword(@Param("keyword") String keyword);
@@ -69,13 +72,14 @@ public interface SpringDataJpaMeetupRepository extends JpaRepository<Meetup, Lon
 
     @RepositoryMethod("모임: 단건 조회 (주최자 포함)")
     @Query("SELECT m FROM Meetup m JOIN FETCH m.organizer WHERE m.idx = :idx "
+            + "AND (m.status IS NULL OR m.status <> com.linkup.Petory.domain.meetup.entity.MeetupStatus.CANCELLED) "
             + "AND (m.isDeleted = false OR m.isDeleted IS NULL)")
     Optional<Meetup> findByIdWithOrganizer(@Param("idx") Long idx);
 
     @RepositoryMethod("모임: 반경 기반 근처 모임 ID 목록 (공간 인덱스 정렬·LIMIT)")
     @Query(value = "SELECT m.idx FROM meetup m "
             + "WHERE m.date > :currentDate "
-            + "AND (m.status IS NULL OR m.status != 'COMPLETED') "
+            + "AND (m.status IS NULL OR m.status NOT IN ('COMPLETED', 'CANCELLED')) "
             + "AND (m.is_deleted = false OR m.is_deleted IS NULL) "
             + "AND m.latitude IS NOT NULL "
             + "AND m.longitude IS NOT NULL "
@@ -100,6 +104,7 @@ public interface SpringDataJpaMeetupRepository extends JpaRepository<Meetup, Lon
 
     @RepositoryMethod("모임: ID 목록으로 조회 (주최자 페치, N+1 방지)")
     @Query("SELECT m FROM Meetup m JOIN FETCH m.organizer WHERE m.idx IN :ids "
+            + "AND (m.status IS NULL OR m.status <> com.linkup.Petory.domain.meetup.entity.MeetupStatus.CANCELLED) "
             + "AND (m.isDeleted = false OR m.isDeleted IS NULL)")
     List<Meetup> findByIdxInWithOrganizer(@Param("ids") Collection<Long> ids);
 
@@ -128,14 +133,18 @@ public interface SpringDataJpaMeetupRepository extends JpaRepository<Meetup, Lon
     int decrementParticipantsIfPositive(@Param("meetupIdx") Long meetupIdx);
 
     @RepositoryMethod("모임: 전체 목록 조회 (삭제 제외)")
-    @Query("SELECT m FROM Meetup m JOIN FETCH m.organizer WHERE m.isDeleted = false OR m.isDeleted IS NULL")
+    @Query("SELECT m FROM Meetup m JOIN FETCH m.organizer "
+            + "WHERE (m.status IS NULL OR m.status <> com.linkup.Petory.domain.meetup.entity.MeetupStatus.CANCELLED) "
+            + "AND (m.isDeleted = false OR m.isDeleted IS NULL)")
     List<Meetup> findAllNotDeleted();
 
     /**
      * 전체 목록 페이징 (JOIN FETCH 대신 EntityGraph — Pageable과 호환).
      */
     @EntityGraph(attributePaths = {"organizer"})
-    @Query("SELECT m FROM Meetup m WHERE (m.isDeleted = false OR m.isDeleted IS NULL)")
+    @Query("SELECT m FROM Meetup m "
+            + "WHERE (m.status IS NULL OR m.status <> com.linkup.Petory.domain.meetup.entity.MeetupStatus.CANCELLED) "
+            + "AND (m.isDeleted = false OR m.isDeleted IS NULL)")
     Page<Meetup> findAllNotDeleted(Pageable pageable);
 
     @EntityGraph(attributePaths = {"organizer"})
@@ -174,7 +183,9 @@ public interface SpringDataJpaMeetupRepository extends JpaRepository<Meetup, Lon
             + "LEFT JOIN FETCH m.organizer "
             + "LEFT JOIN FETCH m.participants p "
             + "LEFT JOIN FETCH p.user "
-            + "WHERE m.idx = :idx AND (m.isDeleted = false OR m.isDeleted IS NULL)")
+            + "WHERE m.idx = :idx "
+            + "AND (m.status IS NULL OR m.status <> com.linkup.Petory.domain.meetup.entity.MeetupStatus.CANCELLED) "
+            + "AND (m.isDeleted = false OR m.isDeleted IS NULL)")
     Optional<Meetup> findByIdWithDetails(@Param("idx") Long idx);
 
     @Modifying(clearAutomatically = true)
@@ -187,9 +198,13 @@ public interface SpringDataJpaMeetupRepository extends JpaRepository<Meetup, Lon
             @Param("closed") MeetupStatus closed);
 
     @Modifying(clearAutomatically = true)
-    @Query("UPDATE Meetup m SET m.status = :completed WHERE m.date < :now AND m.status <> :completed "
+    @Query("UPDATE Meetup m SET m.status = :completed WHERE m.date < :now "
+            + "AND m.status <> :completed AND m.status <> :cancelled "
             + "AND (m.isDeleted = false OR m.isDeleted IS NULL)")
-    int completePastMeetups(@Param("now") LocalDateTime now, @Param("completed") MeetupStatus completed);
+    int completePastMeetups(
+            @Param("now") LocalDateTime now,
+            @Param("completed") MeetupStatus completed,
+            @Param("cancelled") MeetupStatus cancelled);
 
     @RepositoryMethod("모임: 기간별 통계")
     long countByCreatedAtBetween(LocalDateTime start, LocalDateTime end);

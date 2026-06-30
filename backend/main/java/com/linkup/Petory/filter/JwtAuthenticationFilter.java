@@ -59,7 +59,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     if (!isUsableAccount(userDetails, request)) {
                         log.warn("JWT 인증 거부: 제재 또는 비활성 계정 userId={}", id);
                         SecurityContextHolder.clearContext();
-                        filterChain.doFilter(request, response);
+                        writeForbidden(response);
                         return;
                     }
 
@@ -99,5 +99,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private boolean isSuspendedReportException(HttpServletRequest request) {
         return "POST".equalsIgnoreCase(request.getMethod())
                 && "/api/reports".equals(request.getServletPath());
+    }
+
+    private void writeForbidden(HttpServletResponse response) throws IOException {
+        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+        response.setContentType("application/json;charset=UTF-8");
+        response.getWriter().write("{\"error\":\"제재 상태에서는 접근할 수 없습니다.\",\"status\":403}");
     }
 }
