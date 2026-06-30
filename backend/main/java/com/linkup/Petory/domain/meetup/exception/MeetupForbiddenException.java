@@ -23,4 +23,8 @@ public class MeetupForbiddenException extends ApiException {
     public static MeetupForbiddenException notOrganizer() {
         return new MeetupForbiddenException("모임 주최자만 수정하거나 삭제할 수 있습니다.");
     }
+
+    public static MeetupForbiddenException sanctioned() {
+        return new MeetupForbiddenException("제재된 사용자는 이 작업을 수행할 수 없습니다.");
+    }
 }

@@ -124,4 +124,9 @@ public class JpaMeetupAdapter implements MeetupRepository {
     public List<Meetup> findWithoutChatRoom() {
         return jpaRepository.findWithoutChatRoom();
     }
+
+    @Override
+    public List<Meetup> findRecruitingByOrganizerId(Long organizerIdx) {
+        return jpaRepository.findRecruitingByOrganizerIdx(organizerIdx, MeetupStatus.RECRUITING);
+    }
 }

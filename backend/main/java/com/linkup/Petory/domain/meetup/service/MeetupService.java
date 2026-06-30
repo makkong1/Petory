@@ -82,6 +82,11 @@ public class MeetupService {
         Users organizer = usersRepository.findByIdString(userId)
                 .orElseThrow(UserNotFoundException::new);
 
+        // 제재 상태 확인
+        if (organizer.isSanctioned()) {
+            throw MeetupForbiddenException.sanctioned();
+        }
+
         // 이메일 인증 확인
         if (organizer.getEmailVerified() == null || !organizer.getEmailVerified()) {
             throw new EmailVerificationRequiredException(
@@ -330,6 +335,11 @@ public class MeetupService {
         // 사용자 확인
         Users user = usersRepository.findByIdString(userId)
                 .orElseThrow(UserNotFoundException::new);
+
+        // 제재 상태 확인
+        if (user.isSanctioned()) {
+            throw MeetupForbiddenException.sanctioned();
+        }
 
         // 이메일 인증 확인
         if (user.getEmailVerified() == null || !user.getEmailVerified()) {
