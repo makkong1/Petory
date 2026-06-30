@@ -102,6 +102,13 @@ public class CustomUserDetails implements UserDetails {
                 && LocalDateTime.now().isBefore(suspendedUntil);
     }
 
+    /** status=SUSPENDED지만 suspendedUntil이 지난 경우 true */
+    public boolean isSuspensionExpired() {
+        return status == UserStatus.SUSPENDED
+                && suspendedUntil != null
+                && !LocalDateTime.now().isBefore(suspendedUntil);
+    }
+
     @Override
     public boolean isCredentialsNonExpired() {
         return true;
