@@ -86,6 +86,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (userDetails instanceof CustomUserDetails cud) {
             if (!cud.isAccountNonLocked()) return false;  // BANNED: 항상 거부
             if (cud.isEnabled()) return true;             // ACTIVE: 항상 허용
+            if (cud.isSuspensionExpired()) return true;    // 만료된 SUSPENDED: 조회 시점 기준 허용
             // SUSPENDED인 경우: POST /api/reports만 예외 허용
             if (cud.isCurrentlySuspended()) {
                 return isSuspendedReportException(request);

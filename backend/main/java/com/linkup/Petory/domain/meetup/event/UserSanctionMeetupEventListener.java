@@ -64,14 +64,19 @@ public class UserSanctionMeetupEventListener {
                 continue;
             }
             try {
-                // 채팅방 퇴장 먼저 처리
-                conversationService.leaveMeetupChat(meetupIdx, userId);
                 // 참가 row 삭제
                 participantsRepository.deleteById(new MeetupParticipantsId(meetupIdx, userId));
                 meetupRepository.decrementParticipantsIfPositive(meetupIdx);
                 log.info("제재 참가자 모임 참가 취소: meetupId={}, userId={}", meetupIdx, userId);
             } catch (Exception e) {
                 log.error("참가자 제재 취소 처리 실패: meetupId={}, userId={}, error={}",
+                        meetupIdx, userId, e.getMessage());
+                continue;
+            }
+            try {
+                conversationService.leaveMeetupChat(meetupIdx, userId);
+            } catch (Exception e) {
+                log.warn("제재 참가자 모임 채팅방 퇴장 실패 (참가 취소는 유지): meetupId={}, userId={}, error={}",
                         meetupIdx, userId, e.getMessage());
             }
         }
