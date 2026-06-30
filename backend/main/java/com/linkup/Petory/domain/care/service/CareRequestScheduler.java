@@ -6,6 +6,7 @@ import java.util.List;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import com.linkup.Petory.domain.care.entity.CareApplicationStatus;
 import com.linkup.Petory.domain.care.entity.CareRequest;
 import com.linkup.Petory.domain.care.entity.CareRequestStatus;
 import com.linkup.Petory.domain.care.repository.CareRequestRepository;
@@ -62,10 +63,9 @@ public class CareRequestScheduler {
 
         for (CareRequest request : expiredRequests) {
             try {
-                // IN_PROGRESS 케어에서 요청자가 제재 중이면 자동 완료 스킵 (관리자 검토 대상)
-                if (request.getStatus() == CareRequestStatus.IN_PROGRESS
-                        && request.getUser().isSanctioned()) {
-                    log.warn("자동 완료 스킵 (요청자 제재 중): careId={}, userId={}",
+                // 제재된 당사자가 있는 케어는 자동 완료하지 않음 (해제/관리자 검토 대상)
+                if (hasSanctionedParty(request)) {
+                    log.warn("자동 완료 스킵 (케어 당사자 제재 중): careId={}, requesterId={}",
                             request.getIdx(), request.getUser().getIdx());
                     continue;
                 }
@@ -88,6 +88,18 @@ public class CareRequestScheduler {
 
         log.info("펫케어 요청 상태 자동 업데이트 완료: 총 {}건 중 성공 {}건, 실패 {}건",
                 totalCount, successCount, failureCount);
+    }
+
+    private boolean hasSanctionedParty(CareRequest request) {
+        if (request.getUser().isSanctioned()) {
+            return true;
+        }
+        if (request.getApplications() == null) {
+            return false;
+        }
+        return request.getApplications().stream()
+                .filter(app -> app.getStatus() == CareApplicationStatus.ACCEPTED)
+                .anyMatch(app -> app.getProvider().isSanctioned());
     }
 
     /**

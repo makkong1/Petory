@@ -58,6 +58,11 @@ public interface MeetupParticipantsRepository {
     List<MeetupParticipants> findUpcomingMeetupsByUser(Long userIdx);
 
     /**
+     * 제재 후속 처리용: 취소되지 않은 진행 예정 모임 참가 목록
+     */
+    List<MeetupParticipants> findActiveUpcomingMeetupsByUser(Long userIdx);
+
+    /**
      * 통계용: 특정 기간 동안 참여한 인원 수
      */
     long countByJoinedAtBetween(LocalDateTime start, LocalDateTime end);

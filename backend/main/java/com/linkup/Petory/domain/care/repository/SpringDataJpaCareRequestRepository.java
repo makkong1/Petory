@@ -59,7 +59,11 @@ public interface SpringDataJpaCareRequestRepository extends JpaRepository<CareRe
 
     // 날짜가 지났고 특정 상태인 요청 조회 (스케줄러용)
     @RepositoryMethod("펫케어 요청: 만료된 요청 조회 (스케줄러)")
-    @Query("SELECT cr FROM CareRequest cr WHERE cr.date < :now AND cr.status IN :statuses")
+    @Query("SELECT DISTINCT cr FROM CareRequest cr "
+                    + "JOIN FETCH cr.user "
+                    + "LEFT JOIN FETCH cr.applications a "
+                    + "LEFT JOIN FETCH a.provider "
+                    + "WHERE cr.date < :now AND cr.status IN :statuses")
     List<CareRequest> findByDateBeforeAndStatusIn(
                     @Param("now") LocalDateTime now,
                     @Param("statuses") List<CareRequestStatus> statuses);
@@ -167,4 +171,3 @@ public interface SpringDataJpaCareRequestRepository extends JpaRepository<CareRe
     @RepositoryMethod("펫케어 요청: 상태+기간별 통계 (취소 케어 집계용)")
     long countByStatusAndUpdatedAtBetween(CareRequestStatus status, LocalDateTime start, LocalDateTime end);
 }
-
