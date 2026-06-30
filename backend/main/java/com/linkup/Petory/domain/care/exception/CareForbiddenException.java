@@ -43,4 +43,8 @@ public class CareForbiddenException extends ApiException {
     public static CareForbiddenException commentOwnerOnly() {
         return new CareForbiddenException("댓글 작성자 또는 관리자만 삭제할 수 있습니다.");
     }
+
+    public static CareForbiddenException sanctioned() {
+        return new CareForbiddenException("제재된 사용자는 이 작업을 수행할 수 없습니다.");
+    }
 }

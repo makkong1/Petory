@@ -36,5 +36,9 @@ public class ConversationDTO {
 
     // 마지막 메시지 정보
     private ChatMessageDTO lastMessage;
+
+    /** 채팅방 참여자 중 제재 중인 사용자가 있을 때 true. 프론트엔드 안내 표시용. */
+    @Builder.Default
+    private boolean hasSanctionedParticipant = false;
 }
 

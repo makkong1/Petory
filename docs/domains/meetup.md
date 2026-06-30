@@ -391,7 +391,32 @@ Statistics:
 
 - 모임 생성 수, 참가 수 등 통계 집계에서 repository count 메서드를 사용한다.
 
-## 15. 한계와 개선
+## 15. 제재 정책 (2026-06-28~)
+
+> 코드 기준: `MeetupService`, `UserSanctionMeetupEventListener`, `MeetupStatus`, `SpringDataJpaMeetupRepository`
+
+### 실시간 차단 (요청 진입 시점)
+
+| 시점 | 적용 대상 | 동작 |
+|------|-----------|------|
+| `POST /api/meetups` (모임 생성) | SUSPENDED·BANNED 사용자 | `MeetupForbiddenException.sanctioned()` (403) |
+| `POST /api/meetups/{id}/join` (모임 참가) | SUSPENDED·BANNED 사용자 | `MeetupForbiddenException.sanctioned()` (403) |
+
+### 제재 이벤트 후속 처리 (`UserSanctionAppliedEvent`)
+
+- **SUSPENDED·BANNED 모두** 이벤트 리스너(`UserSanctionMeetupEventListener`)가 실행된다.
+- `AFTER_COMMIT` 단계에서 `REQUIRES_NEW` 트랜잭션으로 실행된다.
+
+**주최자 처리:**
+- 해당 사용자가 주최한 `RECRUITING` 상태 모임을 모두 `CANCELLED`로 변경한다.
+- `MeetupStatus.CANCELLED`는 제재로 인한 취소를 나타내는 전용 상태다.
+
+**참가자 처리:**
+- 해당 사용자의 모든 `MeetupParticipants` 행을 순회한다.
+- 각 모임 채팅방에서 `leaveMeetupChat()` 호출 후 `MeetupParticipants` 행을 삭제한다.
+- 채팅 퇴장 실패는 개별 예외로 처리하고 나머지 모임은 계속 처리한다.
+
+## 16. 한계와 개선
 
 - 참가 API와 채팅방 입장 API가 분리되어 있어 클라이언트가 둘 다 호출해야 한다.
 - 모임 생성 성공 후 채팅방 생성이 최종 실패해도 모임은 유지된다. 복구 스케줄러가 있지만 즉시 일관성은 아니다.
@@ -400,7 +425,7 @@ Statistics:
 - 참가 취소는 채팅방 나가기 실패를 롤백하지 않는다.
 - `CLOSED` 상태가 된 모임에서 참가자가 취소해 정원이 비어도 자동으로 `RECRUITING`으로 되돌리는 로직은 없다.
 
-## 16. 관련 문서
+## 17. 관련 문서
 
 - [산책 & 오프라인 모임 아키텍처](../architecture/meetup/산책 & 오프라인 모임 아키텍처.md)
 - [Meetup 백엔드 성능 최적화](../refactoring/meetup/meetup-backend-performance-optimization.md)

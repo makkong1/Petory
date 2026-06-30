@@ -32,6 +32,14 @@ public class ChatForbiddenException extends ApiException {
         return new ChatForbiddenException("탈퇴한 사용자는 메시지를 보낼 수 없습니다.");
     }
 
+    public static ChatForbiddenException sanctionedUserCannotSend() {
+        return new ChatForbiddenException("제재된 사용자는 메시지를 보낼 수 없습니다.");
+    }
+
+    public static ChatForbiddenException sanctionedPartyCannotConfirmDeal() {
+        return new ChatForbiddenException("제재된 사용자가 포함된 케어는 거래 확정을 할 수 없습니다.");
+    }
+
     public static ChatForbiddenException notAllowedToCreateConversation() {
         return new ChatForbiddenException("채팅방 생성 요청에는 로그인한 사용자가 참여자 목록에 포함되어야 합니다.");
     }

@@ -126,6 +126,11 @@ public class ConversationService {
                                         dto.setParticipantCount(participants.size());
                                         if (!participants.isEmpty()) {
                                                 dto.setParticipants(participantConverter.toDTOList(participants));
+                                                // 제재 안내 플래그: 활성 참여자 중 제재 중인 사용자 존재 시 true
+                                                boolean hasSanctioned = participants.stream()
+                                                                .filter(p -> p.getStatus() == ParticipantStatus.ACTIVE)
+                                                                .anyMatch(p -> p.getUser().isSanctioned());
+                                                dto.setHasSanctionedParticipant(hasSanctioned);
                                         }
 
                                         // 마지막 메시지 추가
@@ -165,6 +170,10 @@ public class ConversationService {
                 dto.setParticipantCount(participants.size());
                 dto.setParticipants(participantConverter.toDTOList(participants));
                 dto.setUnreadCount(participant.getUnreadCount());
+                // 제재 안내 플래그
+                boolean hasSanctioned = participants.stream()
+                                .anyMatch(p -> p.getUser().isSanctioned());
+                dto.setHasSanctionedParticipant(hasSanctioned);
                 return dto;
         }
 
@@ -498,6 +507,11 @@ public class ConversationService {
                 ConversationParticipant participant = participantRepository
                                 .findByConversationIdxAndUserIdx(conversationIdx, userId)
                                 .orElseThrow(() -> new RuntimeException("Participant not found"));
+
+                // 제재 사용자 거래 확정 차단
+                if (participant.getUser().isSanctioned()) {
+                        throw ChatForbiddenException.sanctionedPartyCannotConfirmDeal();
+                }
 
                 // 이미 거래 확정했는지 확인
                 if (Boolean.TRUE.equals(participant.getDealConfirmed())) {

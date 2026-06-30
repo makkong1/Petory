@@ -1,0 +1,63 @@
+{
+  "task": "sanction-domain-enforcement",
+  "description": "\uc81c\uc7ac \uc0c1\ud0dc(SUSPENDED/BANNED) \ub3c4\uba54\uc778\ubcc4 \uc801\uc6a9. \uc778\uc99d \uc608\uc678(POST /api/reports) \u2192 \uc774\ubca4\ud2b8 \uc778\ud504\ub77c \u2192 Chat \uc804\uc1a1 \ucc28\ub2e8 \u2192 Care \u2192 Meetup \u2192 Chat DTO \uc21c\uc73c\ub85c \uc758\uc874\uc131 \uae30\ubc18 \uad6c\ud604.",
+  "source_doc": "docs/architecture/user/\uc81c\uc7ac \uc0c1\ud0dc \ub3c4\uba54\uc778 \uc601\ud5a5 \uc791\uc5c5 \ubaa9\ub85d 2026-06-28.md",
+  "steps": [
+    {
+      "step": 1,
+      "name": "SUSPENDED \uc0ac\uc6a9\uc790 POST /api/reports \uc778\uc99d \uc608\uc678 \ucc98\ub9ac",
+      "file": "step1.md",
+      "priority": "Critical",
+      "status": "completed",
+      "summary": "CustomUserDetails에 suspendedUntil + isCurrentlySuspended() 추가. JwtAuthenticationFilter.isUsableAccount()를 request 파라미터 버전으로 교체, POST /api/reports 예외 허용 로직 추가."
+    },
+    {
+      "step": 2,
+      "name": "User \uc81c\uc7ac \uc801\uc6a9 \uc774\ubca4\ud2b8 \uc778\ud504\ub77c (UserSanctionAppliedEvent + \ubc1c\ud589)",
+      "file": "step2.md",
+      "priority": "Critical",
+      "status": "completed",
+      "summary": "domain/user/event/UserSanctionAppliedEvent record \uc0dd\uc131. UserSanctionService\uc5d0 ApplicationEventPublisher \uc8fc\uc785, addSuspension/addBan \uc644\ub8cc \ud6c4 \uc774\ubca4\ud2b8 \ubc1c\ud589."
+    },
+    {
+      "step": 3,
+      "name": "Chat \uc11c\ube44\uc2a4 \ub808\ubca8 \uc81c\uc7ac \uac00\ub4dc (REST + WebSocket \ud1b5\ud569 \ucc28\ub2e8)",
+      "file": "step3.md",
+      "priority": "Critical",
+      "status": "completed",
+      "summary": "ChatForbiddenException\uc5d0 sanctionedUserCannotSend/sanctionedPartyCannotConfirmDeal \ucd94\uac00. ChatMessageService.sendMessage()\uc5d0 isSanctioned() \uac00\ub4dc \uc0bd\uc785 \u2014 REST\u00b7STOMP \ud1b5\ud569 \ucc28\ub2e8."
+    },
+    {
+      "step": 4,
+      "name": "Care \uc694\uccad\uc790/\uc81c\uacf5\uc790 \uc81c\uc7ac \uc815\ucc45 (\uc0dd\uc131 \ucc28\ub2e8 + nearby \ud544\ud130 + \uc2a4\ucf00\uc904\ub7ec \ubcf4\ub958 + BANNED \ucde8\uc18c \uc774\ubca4\ud2b8)",
+      "file": "step4.md",
+      "priority": "Critical",
+      "status": "completed",
+      "summary": "CareForbiddenException.sanctioned() \ucd94\uac00. createCareRequest/addComment\uc5d0 isSanctioned() \ucc28\ub2e8. nearby \ucffc\ub9ac\uc5d0 INNER JOIN users + u.status='ACTIVE' \ud544\ud130 \ucd94\uac00. CareRequestRepository.findOpenByUserId() \ucd94\uac00. \uc2a4\ucf00\uc904\ub7ec IN_PROGRESS \uc81c\uc7ac \uc2a4\ud0b5. UserSanctionCareEventListener(BANNED\u2192CANCELLED) \uc0dd\uc131."
+    },
+    {
+      "step": 5,
+      "name": "Meetup \uc8fc\ucd5c\uc790/\ucc38\uac00\uc790 \uc81c\uc7ac \uc815\ucc45 (\uc0dd\uc131/\ucc38\uac00 \ucc28\ub2e8 + \uc774\ubca4\ud2b8 \ud6c4\uc18d \ucde8\uc18c/\ucc38\uac00 \ud574\uc81c)",
+      "file": "step5.md",
+      "priority": "High",
+      "status": "completed",
+      "summary": "MeetupForbiddenException.sanctioned() \ucd94\uac00. createMeetup/joinMeetup isSanctioned() \ucc28\ub2e8. MeetupStatus.CANCELLED \ucd94\uac00. findRecruitingByOrganizerId() \ucd94\uac00(Repository/Adapter/JPA). UserSanctionMeetupEventListener \uc0dd\uc131(RECRUITING\u2192CANCELLED, \ucc38\uac00 row \uc0ad\uc81c+\ucc44\ud305 \ud1f4\uc7a5)."
+    },
+    {
+      "step": 6,
+      "name": "Chat DTO \uc548\ub0b4 \ud50c\ub798\uadf8 + \ub3c4\uba54\uc778 \uc561\uc158 \ucc28\ub2e8 (confirmCareDeal + hasSanctionedParticipant)",
+      "file": "step6.md",
+      "priority": "High",
+      "status": "completed",
+      "summary": "ConversationDTO\uc5d0 hasSanctionedParticipant \ucd94\uac00. \ubaa9\ub85d/\uc0c1\uc138 \uc870\ud68c \uc2dc \ud65c\uc131 \ucc38\uc5ec\uc790 isSanctioned() \ud50c\ub798\uadf8 \uc0b0\ucd9c. confirmCareDeal \uc9c4\uc785 \uc2dc \uc81c\uc7ac \uc0ac\uc6a9\uc790 \ucc28\ub2e8(sanctionedPartyCannotConfirmDeal)."
+    },
+    {
+      "step": 7,
+      "name": "\ubb38\uc11c \ud604\ud589\ud654 (care / meetup / chat \ub3c4\uba54\uc778 \ubb38\uc11c \ubc18\uc601)",
+      "file": "step7.md",
+      "priority": "Normal",
+      "status": "completed",
+      "summary": "docs/domains/care.md \u00a715 \uc81c\uc7ac \uc815\ucc45 \uc808 \ucd94\uac00(\uc2e0\uaddc \ucc28\ub2e8/BANNED \uc774\ubca4\ud2b8/\uc2a4\ucf00\uc904\ub7ec \ubcf4\ub958). docs/domains/meetup.md \u00a715 \uc81c\uc7ac \uc815\ucc45 \uc808 \ucd94\uac00(\uc0dd\uc131/\ucc38\uac00 \ucc28\ub2e8/CANCELLED \uc774\ubca4\ud2b8). docs/domains/chat.md \u00a78 \uc81c\uc7ac \uc815\ucc45 \uc808 \ucd94\uac00(sendMessage \ucc28\ub2e8/hasSanctionedParticipant/confirmCareDeal \ucc28\ub2e8). \uc791\uc5c5 \ubaa9\ub85d \ubb38\uc11c \u00a78 \uad6c\ud604 \ud604\ud669 \ud45c \ucd94\uac00."
+    }
+  ]
+}

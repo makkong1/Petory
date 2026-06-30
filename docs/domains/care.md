@@ -388,7 +388,29 @@ Statistics:
 
 - 완료 시각 `completedAt`과 Payment 지급 기록이 통계 집계에 사용된다.
 
-## 15. 한계와 개선
+## 15. 제재 정책 (2026-06-28~)
+
+> 코드 기준: `CareRequestService`, `CareRequestCommentService`, `CareRequestScheduler`, `UserSanctionCareEventListener`, `SpringDataJpaCareRequestRepository`
+
+### 실시간 차단 (요청 진입 시점)
+
+| 시점 | 적용 대상 | 동작 |
+|------|-----------|------|
+| `POST /api/care/requests` | SUSPENDED·BANNED 요청자 | `CareForbiddenException.sanctioned()` (403) |
+| 케어 댓글 작성 | SUSPENDED·BANNED 사용자 | `CareForbiddenException.sanctioned()` (403) |
+
+### 제재 이벤트 후속 처리 (`UserSanctionAppliedEvent`)
+
+- **BANNED** 시에만 이벤트 리스너(`UserSanctionCareEventListener`)가 실행된다.
+- `AFTER_COMMIT` 단계에서 `REQUIRES_NEW` 트랜잭션으로 실행된다.
+- 해당 사용자의 `OPEN` 상태 케어 요청을 모두 `CANCELLED`로 변경한다.
+- SUSPENDED 사용자의 OPEN 케어는 취소하지 않는다. 대신 `findNearbyCareRequests` 쿼리의 `INNER JOIN users u ON u.idx = cr.user_idx AND u.status = 'ACTIVE'` 조건으로 노출 목록에서 자동 제외된다.
+
+### 자동 완료 스케줄러 예외
+
+`CareRequestScheduler`가 `IN_PROGRESS` 케어를 자동 완료로 전환할 때, 요청자가 `isSanctioned()` 상태이면 해당 케어를 건너뛴다 (로그 남김, 수동 처리 대상).
+
+## 16. 한계와 개선
 
 - 별도 사용자-facing 케어 지원 신청/승인 API가 없다. 현재 매칭 전이는 채팅 거래 확정에 강하게 묶여 있다.
 - 채팅 거래 확정에서 에스크로 생성 실패를 롤백하지 않는다.
@@ -400,7 +422,7 @@ Statistics:
 - 가격 가이드 문서에 있는 시간/체급 기반 최소 코인 정책은 현재 서버 코드에 구현되어 있지 않다.
 - 스케줄러가 `OPEN` 상태의 만료 요청도 `COMPLETED`로 전환한다. 실제 매칭되지 않은 요청을 완료로 볼지 정책 확인이 필요하다.
 
-## 16. 관련 문서
+## 17. 관련 문서
 
 - [펫 케어 & 매칭 아키텍처](../architecture/care/펫 케어 & 매칭 아키텍처.md)
 - [펫케어 코인 관련 흐름](../architecture/care/펫케어 코인 관련 흐름.md)

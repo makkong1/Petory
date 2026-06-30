@@ -3,12 +3,15 @@ package com.linkup.Petory.domain.user.service;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.linkup.Petory.domain.report.entity.ReportActionType;
 import com.linkup.Petory.domain.user.entity.UserSanction;
+import com.linkup.Petory.domain.user.entity.UserStatus;
 import com.linkup.Petory.domain.user.entity.Users;
+import com.linkup.Petory.domain.user.event.UserSanctionAppliedEvent;
 import com.linkup.Petory.domain.user.exception.UserNotFoundException;
 import com.linkup.Petory.domain.user.repository.UserSanctionRepository;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
@@ -24,6 +27,7 @@ public class UserSanctionService {
 
     private final UserSanctionRepository sanctionRepository;
     private final UsersRepository usersRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     private static final int WARNING_THRESHOLD = 3; // 경고 3회 시 자동 이용제한
     private static final int AUTO_SUSPENSION_DAYS = 3; // 자동 이용제한 기간 (일)
@@ -105,6 +109,9 @@ public class UserSanctionService {
         clearRefreshToken(user);
         usersRepository.save(user);
 
+        eventPublisher.publishEvent(new UserSanctionAppliedEvent(user.getIdx(), UserStatus.SUSPENDED, endsAt));
+        log.info("제재 이벤트 발행(SUSPENDED): userId={}, until={}", user.getIdx(), endsAt);
+
         return suspension;
     }
 
@@ -135,6 +142,9 @@ public class UserSanctionService {
         user.ban();
         clearRefreshToken(user);
         usersRepository.save(user);
+
+        eventPublisher.publishEvent(new UserSanctionAppliedEvent(user.getIdx(), UserStatus.BANNED, null));
+        log.info("제재 이벤트 발행(BANNED): userId={}", user.getIdx());
 
         return ban;
     }

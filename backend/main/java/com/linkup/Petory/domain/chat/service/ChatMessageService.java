@@ -66,6 +66,11 @@ public class ChatMessageService {
             throw ChatForbiddenException.deletedUserCannotSend();
         }
 
+        // 제재 가드: WebSocket 기존 세션 포함, 메시지 전송 시점에 최신 DB 상태 확인
+        if (sender.isSanctioned()) {
+            throw ChatForbiddenException.sanctionedUserCannotSend();
+        }
+
         // 2. 채팅방 확인
         Conversation conversation = conversationRepository.findById(conversationIdx)
                 .orElseThrow(ConversationNotFoundException::new);
