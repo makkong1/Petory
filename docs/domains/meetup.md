@@ -62,7 +62,7 @@ Meetup 도메인은 사용자가 오프라인 모임을 만들고, 다른 사용
 | `organizer` | 주최자 |
 | `maxParticipants` | 최대 참여 인원, 기본 10 |
 | `currentParticipants` | 현재 참여 인원 |
-| `status` | `RECRUITING`, `CLOSED`, `COMPLETED` |
+| `status` | `RECRUITING`, `CLOSED`, `COMPLETED`, `CANCELLED` |
 | `isDeleted`, `deletedAt` | soft delete 상태 |
 | `participants` | 참가자 목록 |
 
@@ -152,6 +152,7 @@ Meetup 도메인은 사용자가 오프라인 모임을 만들고, 다른 사용
 조건:
 
 - soft delete 제외
+- 일반 사용자 조회에서는 `CANCELLED` 제외
 
 조회 방식:
 
@@ -166,6 +167,7 @@ Meetup 도메인은 사용자가 오프라인 모임을 만들고, 다른 사용
 - 주최자
 - 참가자
 - 참가자 사용자
+- 일반 사용자 상세 조회에서는 `CANCELLED` 제외
 
 ### 참여 가능한 모임
 
@@ -192,6 +194,8 @@ Meetup 도메인은 사용자가 오프라인 모임을 만들고, 다른 사용
 2. id 목록으로 주최자를 fetch join해 재조회
 3. 결과가 `MAX_LIST_SIZE=500`을 넘으면 잘라낸다.
 
+일반 키워드 검색은 `CANCELLED` 모임을 제외한다.
+
 ### 주최자별 조회
 
 `getMeetupsByOrganizer(organizerIdx)`는 주최자 id로 soft delete 제외 목록을 조회한다. 결과가 500개를 넘으면 잘라낸다.
@@ -213,7 +217,7 @@ Meetup 도메인은 사용자가 오프라인 모임을 만들고, 다른 사용
 
 - maxResults는 1~1000으로 보정한다.
 - `date > now`
-- `status != COMPLETED` 또는 status null
+- `status`가 `COMPLETED` 또는 `CANCELLED`가 아니거나 status null
 - soft delete 제외
 - 좌표가 있는 모임만 포함
 
@@ -310,15 +314,18 @@ capacityScore = 1 - currentParticipants / maxParticipants
 - `RECRUITING`
 - `CLOSED`
 - `COMPLETED`
+- `CANCELLED`
 
 `MeetupScheduler.transitionMeetupStatuses()`가 매시 정각 실행된다.
 
 전이:
 
 - 정원이 찬 `RECRUITING` 모임이고 `date >= now`이면 `CLOSED`
-- `date < now`이고 아직 `COMPLETED`가 아니면 `COMPLETED`
+- `date < now`이고 아직 `COMPLETED`가 아니며 `CANCELLED`도 아니면 `COMPLETED`
 
 전이는 bulk update로 처리된다.
+
+`CANCELLED`는 주최자 제재 등으로 취소된 모임을 나타내며, 스케줄러가 이후 `COMPLETED`로 덮어쓰지 않는다.
 
 ## 12. 채팅방 연동
 
@@ -400,7 +407,7 @@ Statistics:
 | 시점 | 적용 대상 | 동작 |
 |------|-----------|------|
 | `POST /api/meetups` (모임 생성) | SUSPENDED·BANNED 사용자 | `MeetupForbiddenException.sanctioned()` (403) |
-| `POST /api/meetups/{id}/join` (모임 참가) | SUSPENDED·BANNED 사용자 | `MeetupForbiddenException.sanctioned()` (403) |
+| `POST /api/meetups/{id}/participants` (모임 참가) | SUSPENDED·BANNED 사용자 | `MeetupForbiddenException.sanctioned()` (403) |
 
 ### 제재 이벤트 후속 처리 (`UserSanctionAppliedEvent`)
 
@@ -412,9 +419,12 @@ Statistics:
 - `MeetupStatus.CANCELLED`는 제재로 인한 취소를 나타내는 전용 상태다.
 
 **참가자 처리:**
-- 해당 사용자의 모든 `MeetupParticipants` 행을 순회한다.
-- 각 모임 채팅방에서 `leaveMeetupChat()` 호출 후 `MeetupParticipants` 행을 삭제한다.
-- 채팅 퇴장 실패는 개별 예외로 처리하고 나머지 모임은 계속 처리한다.
+- 해당 사용자의 취소되지 않은 진행 예정 모임 참가 row만 대상으로 한다.
+- 주최자 row는 주최자 모임 취소 정책으로 처리하고, 참가 취소 대상에서는 제외한다.
+- 참가 row를 삭제하고 `decrementParticipantsIfPositive()`로 인원 수를 원자적으로 감소시킨다.
+- 이후 모임 채팅방에서 `leaveMeetupChat()`을 시도한다.
+- 채팅 퇴장 실패는 로그만 남기고 참가 취소는 유지한다.
+- 과거 모임 히스토리 row는 삭제하지 않는다.
 
 ## 16. 한계와 개선
 
@@ -424,6 +434,7 @@ Statistics:
 - 키워드 검색과 주최자별 조회는 500개 상한으로 잘라낸다. 완전한 페이징 API로 전환 여지가 있다.
 - 참가 취소는 채팅방 나가기 실패를 롤백하지 않는다.
 - `CLOSED` 상태가 된 모임에서 참가자가 취소해 정원이 비어도 자동으로 `RECRUITING`으로 되돌리는 로직은 없다.
+- 제재로 `CANCELLED`된 모임은 일반 사용자 조회에서 제외되지만 관리자 조회에서는 상태 필터로 확인할 수 있다.
 
 ## 17. 관련 문서
 

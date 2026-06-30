@@ -5,6 +5,7 @@ import java.math.RoundingMode;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.temporal.IsoFields;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Function;
@@ -21,8 +22,6 @@ import com.linkup.Petory.domain.statistics.repository.DailyStatisticsRepository;
 import com.linkup.Petory.domain.statistics.repository.MonthlyStatisticsRepository;
 import com.linkup.Petory.domain.statistics.repository.WeeklyStatisticsRepository;
 import com.linkup.Petory.domain.user.repository.LoginEventRepository;
-
-import java.time.temporal.IsoFields;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -43,8 +42,8 @@ public class StatisticsScheduler {
     private final LoginEventRepository loginEventRepository;
 
     /**
-     * 매일 00:05 실행. 전날 통계 집계 → 일요일이면 주간 롤업 → 월말이면 월간 롤업 → 1년 초과 데이터 삭제.
-     * C0 임시 완화: 자정 직후 실행으로 DAU 집계 race window 최소화.
+     * 매일 00:05 실행. 전날 통계 집계 → 일요일이면 주간 롤업 → 월말이면 월간 롤업 → 1년 초과 데이터 삭제. C0 임시
+     * 완화: 자정 직후 실행으로 DAU 집계 race window 최소화.
      */
     @Scheduled(cron = "0 5 0 * * ?")
     @Transactional

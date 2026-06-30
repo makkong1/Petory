@@ -51,6 +51,7 @@ backend/main/java/com/linkup/Petory/domain/statistics/
   service/
     StatisticsService.java
     StatisticsScheduler.java
+    StatisticsAggregator.java
 ```
 
 관리자 API:
@@ -74,7 +75,7 @@ backend/main/java/com/linkup/Petory/domain/statistics/
 | --- | --- |
 | `statDate` | 집계 날짜, unique |
 | `newUsers` | 해당 날짜 신규 가입자 수 |
-| `activeUsers` | `lastLoginAt` 기준 활성 사용자 수 |
+| `activeUsers` | `login_events` 기준 해당 날짜 DISTINCT 활성 사용자 수 |
 | `newProviders` | 신규 `SERVICE_PROVIDER` 수 |
 | `newCareRequests` | 신규 케어 요청 수 |
 | `completedCares` | `completedAt` 기준 완료 케어 수 |
@@ -95,7 +96,8 @@ backend/main/java/com/linkup/Petory/domain/statistics/
 
 추가 필드:
 
-- `weeklyRetentionRate`: 현재 주 activeUsers 합계 / 이전 주 activeUsers 합계
+- `activeUsers`: `login_events` 기준 해당 주 DISTINCT 활성 사용자 수
+- `weeklyRetentionRate`: 현재 주 activeUsers / 이전 주 activeUsers
 - `startDate`, `endDate`: 해당 주 범위
 
 ### MonthlyStatistics
@@ -104,7 +106,8 @@ backend/main/java/com/linkup/Petory/domain/statistics/
 
 추가 필드:
 
-- `monthlyRetentionRate`: 현재 월 activeUsers 합계 / 이전 월 activeUsers 합계
+- `activeUsers`: `login_events` 기준 해당 월 DISTINCT 활성 사용자 수
+- `monthlyRetentionRate`: 현재 월 activeUsers / 이전 월 activeUsers
 - `churnRate`: `max(0, 100 - monthlyRetentionRate)`
 
 ---
@@ -113,9 +116,10 @@ backend/main/java/com/linkup/Petory/domain/statistics/
 
 ### 자동 배치
 
-`StatisticsScheduler.aggregateDailyStatistics()`는 **매일 00:05**에 실행된다. (구 18:00 → 2026-06-28 변경, C0 임시 완화 목적)
+`StatisticsScheduler.aggregateDailyStatistics()`는 **매일 00:05**에 실행된다. (구 18:00 → 2026-06-28 변경, 일자 경계 안정화 목적)
 
 실제 집계는 `StatisticsAggregator.aggregateForDate(date)` 에 위임된다. (C2 self-invocation 수정을 위해 별도 빈으로 분리됨)
+`aggregateForDate`는 `REQUIRES_NEW` 트랜잭션으로 실행되어 backfill 중 특정 날짜 실패가 다른 날짜 집계에 전파되지 않는다.
 
 ```text
 매일 00:05
@@ -153,6 +157,16 @@ backend/main/java/com/linkup/Petory/domain/statistics/
 
 이로써 `recordPayment()`가 먼저 daily row를 생성해도 배치가 활동 지표를 채울 수 있다. (C1 수정)
 
+### 주간/월간 activeUsers
+
+주간/월간 `activeUsers`는 daily `activeUsers` 합산이 아니라 `login_events`에서 해당 기간의
+DISTINCT 사용자를 직접 집계한다.
+
+| 롤업 | activeUsers 집계 |
+| --- | --- |
+| 주간 | `countDistinctUsersBetween(monday 00:00, sunday 23:59:59.999999999)` |
+| 월간 | `countDistinctUsersBetween(monthStart 00:00, monthEnd 23:59:59.999999999)` |
+
 ---
 
 ## 5. 조회/쓰기 서비스
@@ -165,7 +179,7 @@ backend/main/java/com/linkup/Petory/domain/statistics/
 | `getWeeklyStatistics(year)` | 특정 연도의 weekly row를 주차 오름차순 조회 |
 | `getMonthlyStatistics(year)` | 특정 연도의 monthly row를 월 오름차순 조회 |
 | `getTodaySnapshot()` | 오늘 daily row를 조회하고 없으면 빈 `DailyStatistics`로 응답. Redis `todayStats::today` 1분 캐시 |
-| `recordPayment(amount)` | 당일 매출, 거래 수, 평균 거래액 갱신. `findByStatDateForUpdate`(비관적 락) 사용, `DataIntegrityViolationException` 시 1회 재시도 (C3 수정) |
+| `recordPayment(amount)` | 당일 매출, 거래 수, 평균 거래액을 native upsert로 원자 갱신. `todayStats` 캐시 evict |
 | `backfill(startDate, endDate)` | `StatisticsScheduler.backfill()`로 위임 |
 
 결제 연동:
@@ -251,8 +265,8 @@ backend/main/java/com/linkup/Petory/domain/statistics/
 
 주의:
 
-- `recordPayment()`는 `todayStats` 캐시를 직접 evict하지 않는다.
-- `/summary`가 캐시된 직후 결제가 반영되면 최대 1분 동안 오래된 매출이 보일 수 있다.
+- `recordPayment()`는 `todayStats::today`를 evict한다.
+- `/summary`가 캐시된 직후 결제가 반영되면 다음 조회는 캐시 miss 후 최신 daily row를 다시 읽는다.
 - 현재 프론트는 `/summary`를 호출하지 않으므로 이 캐시는 백엔드 제공 API 기준의 캐시다.
 
 ---
@@ -284,6 +298,7 @@ backend/main/java/com/linkup/Petory/domain/statistics/
 ~~`StatisticsScheduler` 내부에서 `this.aggregateStatisticsForDate()`를 호출해 Spring 프록시를 타지 못함.~~
 
 → `StatisticsAggregator` 별도 빈 분리. 모든 집계 호출이 크로스-빈 호출로 변경됨.
+→ `aggregateForDate()`는 `REQUIRES_NEW`로 실행되어 날짜별 트랜잭션이 독립됨.
 
 ---
 
@@ -291,16 +306,17 @@ backend/main/java/com/linkup/Petory/domain/statistics/
 
 ~~동시 결제 진입 시 read-modify-write에 비관적 락이 없어 `totalRevenue` 유실 가능.~~
 
-→ `findByStatDateForUpdate` (`PESSIMISTIC_WRITE`) 추가. `DataIntegrityViolationException` 시 1회 재시도.
+→ `INSERT ... ON DUPLICATE KEY UPDATE` native upsert로 전환.
+→ 매출 합계, 거래 수, 평균 거래액을 DB 단일 문장으로 갱신하고 `todayStats` 캐시를 evict.
 
 ### 🟡 Warning
 
-**[WAU/MAU = DAU 합산]** — 비즈니스 지표 왜곡 (미수정)
+**[WAU/MAU = DAU 합산]** ✅ 수정됨 (2026-06-28, `statistics-bug-fix`)
 
-`weeklyRetentionRate`, `monthlyRetentionRate`는 DAU 합산값끼리의 비율이며
-실제 WAU(고유 주간 활성 사용자) 대비 비율이 아니다.
-7일 모두 접속한 사용자 1명이 WAU=7로 집계된다.
-→ 별도 태스크 `statistics-wau-mau-distinct`로 분리 예정.
+~~`weeklyRetentionRate`, `monthlyRetentionRate`는 DAU 합산값끼리의 비율이며
+실제 WAU/MAU가 아니었다.~~
+
+→ weekly/monthly `activeUsers`는 `login_events` 기간 내 DISTINCT 사용자 수로 직접 집계한다.
 
 **[ISO 53주차 미처리]** ✅ 수정됨 (2026-06-28, `statistics-bug-fix`)
 
@@ -321,25 +337,21 @@ backend/main/java/com/linkup/Petory/domain/statistics/
 
 ### 배경
 `Users.lastLoginAt`은 로그인마다 덮어쓰이므로, 하루에 2회 이상 로그인한 사용자가 배치 실행 전에
-다시 로그인하면 전날 DAU에서 누락된다 (C0 버그 — `statistics-bug-fix` Step 5에서 cron 00:05로 임시 완화).
+다시 로그인하면 전날 DAU에서 누락될 수 있었다 (C0 버그).
 
 ### 수정 내용 (statistics-login-events)
 - `login_events` 테이블 신설 (append-only, 로그인 1회 = 행 1개)
 - 인덱스: `(user_id, login_at)`, `(login_at)` 복합/단일 인덱스
 - `AuthService.login()`, `OAuth2Service.processOAuth2Login()` 두 진입점에서 `LoginEvent` append 저장
 - `StatisticsAggregator.activeUsers` 집계 변경: `Users.lastLoginAt` → `COUNT(DISTINCT login_events.user_id)`
+- weekly/monthly `activeUsers`도 기간 내 `COUNT(DISTINCT login_events.user_id)`로 전환
 
 ### 보정 불가 범위
 - **도입 이전 (~ 2026-06-27) 일별 통계의 `active_users`**: 보정 불가.
   - `Users.lastLoginAt`은 마지막 로그인 시각만 남기므로 역산 불가.
   - 과거 `active_users` 값은 하루 2회 이상 로그인 사용자가 누락된 과소 집계임.
-  - 주간/월간 `active_users`도 DAU 합산 기반이므로 동일하게 과소 집계됨.
+  - 도입 이전 주간/월간 `active_users`도 과거 daily/로그 이력 부재 때문에 정확한 재산정 불가.
 - 관리자 대시보드에서 2026-06-28 이전 `active_users`를 "추정값"으로 레이블 처리 권장.
-
-### WAU/MAU activeUsers 잔존 한계
-현재 WAU/MAU `activeUsers` = 해당 기간 DAU 합산 (DISTINCT 아님).
-진정한 주/월 DISTINCT는 `login_events`를 기간 단위로 직접 GROUP BY해야 한다.
-이 개선은 별도 태스크(`statistics-wau-mau-distinct`)로 분리한다.
 
 ---
 

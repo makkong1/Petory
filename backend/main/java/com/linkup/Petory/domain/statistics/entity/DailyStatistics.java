@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 import com.linkup.Petory.domain.common.BaseTimeEntity;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -23,7 +24,9 @@ import lombok.Setter;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-/** 하루 단위로 집계한 플랫폼 통계 스냅샷. 매일 00:05 스케줄러가 전날 데이터를 생성한다. */
+/**
+ * 하루 단위로 집계한 플랫폼 통계 스냅샷. 매일 00:05 스케줄러가 전날 데이터를 생성한다.
+ */
 public class DailyStatistics extends BaseTimeEntity {
 
     @Id
