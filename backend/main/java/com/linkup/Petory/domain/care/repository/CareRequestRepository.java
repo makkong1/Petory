@@ -120,4 +120,7 @@ public interface CareRequestRepository {
          * 통계용: 특정 기간 동안 특정 상태로 변경된 케어 요청 수 (updatedAt 기준)
          */
         long countByStatusAndUpdatedAtBetween(CareRequestStatus status, LocalDateTime start, LocalDateTime end);
+
+        /** 이벤트 리스너용: BANNED 사용자의 OPEN 케어 취소 처리 */
+        List<CareRequest> findOpenByUserId(Long userId);
 }

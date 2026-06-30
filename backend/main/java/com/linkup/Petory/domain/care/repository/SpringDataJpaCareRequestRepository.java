@@ -98,7 +98,10 @@ public interface SpringDataJpaCareRequestRepository extends JpaRepository<CareRe
 
     @RepositoryMethod("펫케어 요청: 반경 기반 근처 요청 조회")
     @Query(value = "SELECT cr.* FROM carerequest cr " +
+                    "INNER JOIN users u ON u.idx = cr.user_idx " +
                     "WHERE cr.is_deleted = false " +
+                    "AND u.status = 'ACTIVE' " +
+                    "AND u.is_deleted = false " +
                     "AND cr.latitude IS NOT NULL " +
                     "AND cr.status IN ('OPEN', 'IN_PROGRESS') " +
                     "AND cr.latitude BETWEEN (:lat - :radius / 111.0) AND (:lat + :radius / 111.0) " +
@@ -112,6 +115,9 @@ public interface SpringDataJpaCareRequestRepository extends JpaRepository<CareRe
                     @Param("lng") Double lng,
                     @Param("radius") Double radius,
                     @Param("limit") int limit);
+
+    /** 이벤트 리스너용: BANNED 사용자의 OPEN 케어 취소 처리 */
+    List<CareRequest> findByUser_IdxAndStatusAndIsDeletedFalse(Long userIdx, CareRequestStatus status);
 
     // 키워드 검색: FULLTEXT (인덱스 docs/migration/db/indexes.sql). 페이징은 Spring이 LIMIT/OFFSET 처리.
     @RepositoryMethod("펫케어 요청: 페이징 키워드 검색 (FULLTEXT)")

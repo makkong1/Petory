@@ -56,7 +56,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
                 if (id != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                     UserDetails userDetails = userDetailsService.loadUserByUsername(id);
-                    if (!isUsableAccount(userDetails)) {
+                    if (!isUsableAccount(userDetails, request)) {
                         log.warn("JWT 인증 거부: 제재 또는 비활성 계정 userId={}", id);
                         SecurityContextHolder.clearContext();
                         filterChain.doFilter(request, response);
@@ -82,10 +82,22 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
-    private boolean isUsableAccount(UserDetails userDetails) {
-        if (userDetails instanceof CustomUserDetails customUserDetails) {
-            return customUserDetails.isEnabled() && customUserDetails.isAccountNonLocked();
+    private boolean isUsableAccount(UserDetails userDetails, HttpServletRequest request) {
+        if (userDetails instanceof CustomUserDetails cud) {
+            if (!cud.isAccountNonLocked()) return false;  // BANNED: 항상 거부
+            if (cud.isEnabled()) return true;             // ACTIVE: 항상 허용
+            // SUSPENDED인 경우: POST /api/reports만 예외 허용
+            if (cud.isCurrentlySuspended()) {
+                return isSuspendedReportException(request);
+            }
+            return false;
         }
         return userDetails.isEnabled() && userDetails.isAccountNonLocked();
+    }
+
+    // POST /api/reports 예외: SUSPENDED 사용자가 신고를 생성할 수 있는 유일한 경로
+    private boolean isSuspendedReportException(HttpServletRequest request) {
+        return "POST".equalsIgnoreCase(request.getMethod())
+                && "/api/reports".equals(request.getServletPath());
     }
 }

@@ -63,6 +63,11 @@ public class CareRequestCommentService {
                 Users user = usersRepository.findById(dto.getUserId())
                                 .orElseThrow(() -> new UserNotFoundException());
 
+                // 제재 상태 확인
+                if (user.isSanctioned()) {
+                        throw CareForbiddenException.sanctioned();
+                }
+
                 // SERVICE_PROVIDER만 댓글 작성 가능
                 if (user.getRole() != Role.SERVICE_PROVIDER) {
                         throw CareForbiddenException.commentNotAllowed();

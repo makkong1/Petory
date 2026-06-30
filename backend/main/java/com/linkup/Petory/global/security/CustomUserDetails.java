@@ -1,5 +1,6 @@
 package com.linkup.Petory.global.security;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.Collections;
 
@@ -19,16 +20,18 @@ public class CustomUserDetails implements UserDetails {
     private final Role role;
     private final Boolean emailVerified;
     private final UserStatus status;
+    private final LocalDateTime suspendedUntil;
     private final Collection<? extends GrantedAuthority> authorities;
 
     private CustomUserDetails(Long idx, String loginId, String password,
-            Role role, Boolean emailVerified, UserStatus status) {
+            Role role, Boolean emailVerified, UserStatus status, LocalDateTime suspendedUntil) {
         this.idx = idx;
         this.loginId = loginId;
         this.password = password;
         this.role = role;
         this.emailVerified = emailVerified;
         this.status = status;
+        this.suspendedUntil = suspendedUntil;
         this.authorities = Collections.singleton(new SimpleGrantedAuthority("ROLE_" + role.name()));
     }
 
@@ -39,7 +42,8 @@ public class CustomUserDetails implements UserDetails {
                 user.getPassword(),
                 user.getRole(),
                 user.getEmailVerified(),
-                user.getStatus());
+                user.getStatus(),
+                user.getSuspendedUntil());
     }
 
     public Long getIdx() {
@@ -89,6 +93,13 @@ public class CustomUserDetails implements UserDetails {
     @Override
     public boolean isAccountNonLocked() {
         return status != UserStatus.BANNED;
+    }
+
+    /** status=SUSPENDED이고 suspendedUntil이 현재 시각 이후인 경우 true */
+    public boolean isCurrentlySuspended() {
+        return status == UserStatus.SUSPENDED
+                && suspendedUntil != null
+                && LocalDateTime.now().isBefore(suspendedUntil);
     }
 
     @Override

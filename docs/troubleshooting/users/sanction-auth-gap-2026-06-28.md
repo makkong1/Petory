@@ -8,15 +8,15 @@
 
 ## 2. 현재 코드 사실
 
-| 영역 | 현재 동작 |
-|---|---|
-| 일반 로그인 | `AuthController.login()`이 `AuthenticationManager.authenticate()`를 먼저 호출하고, 이후 `AuthService.login()`에서 `BANNED` / `SUSPENDED`를 검사한다. |
-| OAuth 로그인 | `OAuth2Service.processOAuth2Login()`에서 토큰 발급 전 `BANNED` / `SUSPENDED`를 검사한다. |
-| Access JWT 인증 | `JwtAuthenticationFilter`가 token 검증 후 `UserDetailsService.loadUserByUsername()`로 사용자 정보를 읽고 직접 `UsernamePasswordAuthenticationToken`을 만든다. |
-| Refresh token 재발급 | `AuthService.refreshAccessToken()`이 refresh token 유효성, DB 저장 여부, 만료만 확인하고 사용자 제재 상태는 확인하지 않는다. |
-| WebSocket 인증 | `WebSocketAuthenticationInterceptor`, `WebSocketAuthChannelInterceptor`도 JWT 검증 후 직접 인증 객체를 만든다. |
-| 사용자 상태 변경 | 관리자 상태 변경 API는 `Users.status`, `warningCount`, `suspendedUntil`을 직접 변경한다. |
-| 신고 제재 | `ReportService.handleReport()`는 `report.targetIdx`를 그대로 `UserSanctionService.applySanctionFromReport(userId, ...)`에 넘긴다. |
+| 영역                 | 현재 동작                                                                                                                                                     |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 일반 로그인          | `AuthController.login()`이 `AuthenticationManager.authenticate()`를 먼저 호출하고, 이후 `AuthService.login()`에서 `BANNED` / `SUSPENDED`를 검사한다.          |
+| OAuth 로그인         | `OAuth2Service.processOAuth2Login()`에서 토큰 발급 전 `BANNED` / `SUSPENDED`를 검사한다.                                                                      |
+| Access JWT 인증      | `JwtAuthenticationFilter`가 token 검증 후 `UserDetailsService.loadUserByUsername()`로 사용자 정보를 읽고 직접 `UsernamePasswordAuthenticationToken`을 만든다. |
+| Refresh token 재발급 | `AuthService.refreshAccessToken()`이 refresh token 유효성, DB 저장 여부, 만료만 확인하고 사용자 제재 상태는 확인하지 않는다.                                  |
+| WebSocket 인증       | `WebSocketAuthenticationInterceptor`, `WebSocketAuthChannelInterceptor`도 JWT 검증 후 직접 인증 객체를 만든다.                                                |
+| 사용자 상태 변경     | 관리자 상태 변경 API는 `Users.status`, `warningCount`, `suspendedUntil`을 직접 변경한다.                                                                      |
+| 신고 제재            | `ReportService.handleReport()`는 `report.targetIdx`를 그대로 `UserSanctionService.applySanctionFromReport(userId, ...)`에 넘긴다.                             |
 
 관련 파일:
 
@@ -144,15 +144,15 @@ WebSocket handshake와 STOMP channel interceptor도 JWT 검증 후 직접 `Usern
 
 ## 4. 우선 수정 순서
 
-| 순서 | 문제 | 이유 |
-|---|---|---|
-| 1 | refresh token 제재 검사 | access token 재발급 우회가 가장 큼 |
-| 2 | JWT 필터 제재 상태 검사 | 기존 access token의 남은 TTL 동안 API 접근 가능 |
-| 3 | WebSocket 인증 제재 상태 검사 | 케어/모임 채팅 흐름과 직접 연결 |
-| 4 | 정지/차단 시 refresh token 제거 | 제재 즉시성 보강 |
-| 5 | 만료 정지 로그인 자동 해제 흐름 정리 | 문서 정책과 실제 로그인 흐름 일치 필요 |
-| 6 | 신고 target -> 제재 대상 user resolve | 콘텐츠 신고에서 잘못된 사용자 제재 방지 |
-| 7 | 관리자 상태 변경을 제재 서비스 경유로 통일 | 제재 이력과 감사 일관성 확보 |
+| 순서 | 문제                                       | 이유                                            |
+| ---- | ------------------------------------------ | ----------------------------------------------- |
+| 1    | refresh token 제재 검사                    | access token 재발급 우회가 가장 큼              |
+| 2    | JWT 필터 제재 상태 검사                    | 기존 access token의 남은 TTL 동안 API 접근 가능 |
+| 3    | WebSocket 인증 제재 상태 검사              | 케어/모임 채팅 흐름과 직접 연결                 |
+| 4    | 정지/차단 시 refresh token 제거            | 제재 즉시성 보강                                |
+| 5    | 만료 정지 로그인 자동 해제 흐름 정리       | 문서 정책과 실제 로그인 흐름 일치 필요          |
+| 6    | 신고 target -> 제재 대상 user resolve      | 콘텐츠 신고에서 잘못된 사용자 제재 방지         |
+| 7    | 관리자 상태 변경을 제재 서비스 경유로 통일 | 제재 이력과 감사 일관성 확보                    |
 
 ## 5. 다음 작업
 
@@ -166,14 +166,14 @@ WebSocket handshake와 STOMP channel interceptor도 JWT 검증 후 직접 `Usern
 
 2026-06-28 1차 수정에서 인증/refresh/신고 매핑 계층을 먼저 보정했다.
 
-| 항목 | 상태 | 처리 |
-|---|---|---|
-| A1 refresh token 제재 우회 | 수정됨 | `refreshAccessToken()`에서 `BANNED` / 만료 전 `SUSPENDED`를 차단하고 refresh token을 제거한다. |
-| A2 기존 access token 제재 미반영 | 수정됨 | `JwtAuthenticationFilter`가 `CustomUserDetails.isEnabled()` / `isAccountNonLocked()`를 검사한 뒤 인증 객체를 등록한다. |
-| A3 WebSocket 제재 미반영 | 수정됨 | WebSocket handshake와 STOMP channel interceptor에서 제재/비활성 계정을 거부한다. |
-| A4 만료 정지 로그인 자동 해제 충돌 | 수정됨 | `UsersDetailsServiceImpl`이 만료된 `SUSPENDED` 사용자를 `ACTIVE`로 전환한 뒤 인증 주체를 만든다. |
-| A5 관리자 상태 변경 token 잔존 | 부분 수정 | 관리자 상태 변경으로 `SUSPENDED` / `BANNED`가 되면 refresh token을 제거한다. `UserSanction` 이력 통일은 남은 작업이다. |
-| A6 신고 제재 대상 매핑 | 수정됨 | `ReportService`가 target type별 콘텐츠 작성자 user idx를 resolve한 뒤 제재 서비스에 넘긴다. |
+| 항목                               | 상태      | 처리                                                                                                                   |
+| ---------------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------- |
+| A1 refresh token 제재 우회         | 수정됨    | `refreshAccessToken()`에서 `BANNED` / 만료 전 `SUSPENDED`를 차단하고 refresh token을 제거한다.                         |
+| A2 기존 access token 제재 미반영   | 수정됨    | `JwtAuthenticationFilter`가 `CustomUserDetails.isEnabled()` / `isAccountNonLocked()`를 검사한 뒤 인증 객체를 등록한다. |
+| A3 WebSocket 제재 미반영           | 수정됨    | WebSocket handshake와 STOMP channel interceptor에서 제재/비활성 계정을 거부한다.                                       |
+| A4 만료 정지 로그인 자동 해제 충돌 | 수정됨    | `UsersDetailsServiceImpl`이 만료된 `SUSPENDED` 사용자를 `ACTIVE`로 전환한 뒤 인증 주체를 만든다.                       |
+| A5 관리자 상태 변경 token 잔존     | 부분 수정 | 관리자 상태 변경으로 `SUSPENDED` / `BANNED`가 되면 refresh token을 제거한다. `UserSanction` 이력 통일은 남은 작업이다. |
+| A6 신고 제재 대상 매핑             | 수정됨    | `ReportService`가 target type별 콘텐츠 작성자 user idx를 resolve한 뒤 제재 서비스에 넘긴다.                            |
 
 추가/수정 테스트:
 

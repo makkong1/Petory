@@ -33,6 +33,9 @@ public interface MeetupRepository {
      */
     List<Meetup> findByOrganizerIdxOrderByCreatedAtDesc(Long organizerIdx);
 
+    /** 이벤트 리스너용: 특정 주최자의 RECRUITING 모임 목록 */
+    List<Meetup> findRecruitingByOrganizerId(Long organizerIdx);
+
     /**
      * 카테고리별 모임 조회 (제목이나 설명에 키워드 포함, 소프트 삭제 제외)
      */
