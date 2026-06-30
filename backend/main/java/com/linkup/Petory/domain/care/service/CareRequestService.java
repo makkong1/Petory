@@ -170,6 +170,11 @@ public class CareRequestService {
         Users user = usersRepository.findById(dto.getUserId())
                 .orElseThrow(() -> new UserNotFoundException());
 
+        // 제재 상태 확인
+        if (user.isSanctioned()) {
+            throw CareForbiddenException.sanctioned();
+        }
+
         // 이메일 인증 확인
         if (!Boolean.TRUE.equals(user.getEmailVerified())) {
             log.debug("이메일 인증 미완료: userId={}", dto.getUserId());

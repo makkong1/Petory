@@ -180,4 +180,9 @@ public class JpaCareRequestAdapter implements CareRequestRepository {
     public long countByStatusAndUpdatedAtBetween(CareRequestStatus status, LocalDateTime start, LocalDateTime end) {
         return jpaRepository.countByStatusAndUpdatedAtBetween(status, start, end);
     }
+
+    @Override
+    public List<CareRequest> findOpenByUserId(Long userId) {
+        return jpaRepository.findByUser_IdxAndStatusAndIsDeletedFalse(userId, CareRequestStatus.OPEN);
+    }
 }

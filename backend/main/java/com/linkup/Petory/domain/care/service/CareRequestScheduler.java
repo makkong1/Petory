@@ -62,6 +62,14 @@ public class CareRequestScheduler {
 
         for (CareRequest request : expiredRequests) {
             try {
+                // IN_PROGRESS 케어에서 요청자가 제재 중이면 자동 완료 스킵 (관리자 검토 대상)
+                if (request.getStatus() == CareRequestStatus.IN_PROGRESS
+                        && request.getUser().isSanctioned()) {
+                    log.warn("자동 완료 스킵 (요청자 제재 중): careId={}, userId={}",
+                            request.getIdx(), request.getUser().getIdx());
+                    continue;
+                }
+
                 // 서비스 메서드를 통해 상태 변경 (에스크로 처리 포함)
                 // 스케줄러는 시스템 작업이므로 currentUserId는 null
                 careRequestService.updateStatus(
