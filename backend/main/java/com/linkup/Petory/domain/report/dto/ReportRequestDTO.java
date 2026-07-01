@@ -12,7 +12,7 @@ import com.linkup.Petory.domain.report.entity.ReportTargetType;
 public record ReportRequestDTO(
     @NotNull ReportTargetType targetType,
     @NotNull Long targetIdx,
+    /** 신고자는 인증 주체에서 결정하며, 이 요청 바디 값은 서버에서 사용하지 않는다. */
     Long reporterId,
     @NotBlank String reason
 ) {}
-

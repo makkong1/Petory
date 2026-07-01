@@ -374,6 +374,7 @@ OAuth2 로그인은 Spring Security OAuth2 성공 후 `OAuth2SuccessHandler`가 
 - 정지/차단 적용 시 refresh token과 refresh 만료 시각을 제거한다.
 - refresh token 재발급, access token 인증 필터, WebSocket 인증 모두 현재 사용자 상태를 다시 확인한다.
 - `SUSPENDED` 사용자는 유효한 access token이 남아 있어도 일반 보호 API는 차단된다. 단 `POST /api/reports`는 신고 생성을 위해 예외 허용한다.
+- `POST /api/reports`의 신고자는 요청 body가 아니라 인증 주체 idx로 결정한다.
 - 제재 적용 시 `UserSanctionAppliedEvent`를 발행하고, Care/Meetup/Chat 후속 처리는 이 이벤트를 구독해 별도 트랜잭션에서 수행한다.
 - 이벤트 기반 후속 처리는 in-memory Spring event 기반이므로 1차 구현에서는 유실 가능성을 로그와 관리자 수동 재처리로 감수한다.
 - 경고는 `incrementWarningCount()` DB update로 원자적으로 증가한다.
@@ -426,7 +427,7 @@ OAuth2 로그인은 Spring Security OAuth2 성공 후 `OAuth2SuccessHandler`가 
 
 - 관리자 목록은 페이징 API만 사용한다.
 - 삭제 권한 검증에는 전체 User+Pet 조회 대신 role projection을 쓰는 경량 조회가 있다.
-- 관리자 상태 변경으로 `SUSPENDED` 또는 `BANNED`가 되면 refresh token을 제거하고 `UserSanctionAppliedEvent`를 발행한다. 단 이 경로는 `UserSanctionService`를 경유하지 않으므로 `UserSanction` 이력을 항상 남기지는 않는다.
+- 관리자 상태 변경으로 `BANNED`가 되거나, 미래 `suspendedUntil`이 있는 유효한 `SUSPENDED`가 되면 refresh token을 제거하고 `UserSanctionAppliedEvent`를 발행한다. `SUSPENDED`에는 미래 `suspendedUntil`이 필수다. 단 이 경로는 `UserSanctionService`를 경유하지 않으므로 `UserSanction` 이력을 항상 남기지는 않는다.
 
 ## 12. 성능과 리팩토링 포인트
 

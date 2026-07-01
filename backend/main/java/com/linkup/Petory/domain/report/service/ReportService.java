@@ -51,21 +51,21 @@ public class ReportService {
     private final UserSanctionService userSanctionService;
 
     @Transactional
-    public ReportDTO createReport(ReportRequestDTO request) {
+    public ReportDTO createReport(ReportRequestDTO request, Long reporterId) {
         if (request.targetType() == null) {
             throw ReportValidationException.targetTypeRequired();
         }
         if (request.targetIdx() == null) {
             throw ReportValidationException.targetIdxRequired();
         }
-        if (request.reporterId() == null) {
+        if (reporterId == null) {
             throw ReportValidationException.reporterRequired();
         }
         if (!StringUtils.hasText(request.reason())) {
             throw ReportValidationException.reasonRequired();
         }
 
-        Users reporter = usersRepository.findById(request.reporterId())
+        Users reporter = usersRepository.findById(reporterId)
                 .orElseThrow(UserNotFoundException::new);
 
         validateTarget(request.targetType(), request.targetIdx());

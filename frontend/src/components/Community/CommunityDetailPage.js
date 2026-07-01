@@ -240,7 +240,6 @@ const CommunityDetailPage = ({
       await reportApi.submit({
         targetType: 'BOARD',
         targetIdx: boardId,
-        reporterId: user.idx,
         reason: reason.trim(),
       });
       alert('신고가 접수되었습니다.');
@@ -271,7 +270,6 @@ const CommunityDetailPage = ({
         await reportApi.submit({
           targetType: 'COMMENT',
           targetIdx: commentId,
-          reporterId: user.idx,
           reason: reason.trim(),
         });
         alert('신고가 접수되었습니다.');
@@ -1333,4 +1331,3 @@ const CommentPaginationWrapper = styled.div`
   padding: ${props => props.theme.spacing.md} 0;
   margin-top: ${props => props.theme.spacing.sm};
 `;
-

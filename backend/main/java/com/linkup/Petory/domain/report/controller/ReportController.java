@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.*;
 import com.linkup.Petory.domain.report.dto.ReportDTO;
 import com.linkup.Petory.domain.report.dto.ReportRequestDTO;
 import com.linkup.Petory.domain.report.service.ReportService;
+import com.linkup.Petory.global.security.AuthenticatedUserIdResolver;
 
 import lombok.RequiredArgsConstructor;
 
@@ -23,6 +24,7 @@ import lombok.RequiredArgsConstructor;
 public class ReportController {
 
     private final ReportService reportService;
+    private final AuthenticatedUserIdResolver userIdResolver;
 
     /**
      * 신고 생성 (일반 사용자용)
@@ -30,6 +32,7 @@ public class ReportController {
     @PostMapping
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ReportDTO> createReport(@Valid @RequestBody ReportRequestDTO request) {
-        return ResponseEntity.ok(reportService.createReport(request));
+        long reporterId = userIdResolver.requireCurrentUserIdx();
+        return ResponseEntity.ok(reportService.createReport(request, reporterId));
     }
 }
