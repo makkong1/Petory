@@ -491,7 +491,6 @@ const CommunityBoard = () => {
       await reportApi.submit({
         targetType: 'BOARD',
         targetIdx: postIdx,
-        reporterId: user.idx,
         reason: reason.trim(),
       });
       alert('신고가 접수되었습니다.');

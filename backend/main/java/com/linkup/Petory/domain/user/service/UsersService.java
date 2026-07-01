@@ -1,5 +1,6 @@
 package com.linkup.Petory.domain.user.service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -269,16 +270,16 @@ public class UsersService {
     public UsersDTO updateUserStatus(long idx, UsersDTO dto) {
         Users user = usersRepository.findById(idx)
                 .orElseThrow(UserNotFoundException::new);
-        UserStatus appliedSanctionStatus = null;
+        boolean shouldClearRefreshToken = false;
+        UserStatus requestedSanctionStatus = null;
 
         // 상태 업데이트
         if (dto.getStatus() != null) {
             UserStatus status = Enum.valueOf(UserStatus.class, dto.getStatus());
             user.setStatus(status);
             if (status == UserStatus.SUSPENDED || status == UserStatus.BANNED) {
-                user.setRefreshToken(null);
-                user.setRefreshExpiration(null);
-                appliedSanctionStatus = status;
+                shouldClearRefreshToken = true;
+                requestedSanctionStatus = status;
             }
         }
 
@@ -292,6 +293,12 @@ public class UsersService {
             user.setSuspendedUntil(dto.getSuspendedUntil());
         }
 
+        validateSanctionStatus(user, requestedSanctionStatus, dto.getSuspendedUntil());
+        if (shouldClearRefreshToken) {
+            user.setRefreshToken(null);
+            user.setRefreshExpiration(null);
+        }
+
         // 역할 업데이트 (일반 사용자 → ADMIN 승격만)
         if (dto.getRole() != null) {
             // ADMIN/MASTER 역할 변경은 AdminUserManagementController에서만 가능
@@ -301,13 +308,34 @@ public class UsersService {
         }
 
         Users updated = usersRepository.save(user);
-        if (appliedSanctionStatus != null) {
+        if (requestedSanctionStatus != null && isAppliedSanction(updated)) {
             eventPublisher.publishEvent(new UserSanctionAppliedEvent(
                     updated.getIdx(),
-                    appliedSanctionStatus,
-                    appliedSanctionStatus == UserStatus.SUSPENDED ? updated.getSuspendedUntil() : null));
+                    updated.getStatus(),
+                    updated.getStatus() == UserStatus.SUSPENDED ? updated.getSuspendedUntil() : null));
         }
         return usersConverter.toDTO(updated);
+    }
+
+    private void validateSanctionStatus(
+            Users user,
+            UserStatus requestedSanctionStatus,
+            LocalDateTime requestedSuspendedUntil) {
+        boolean suspensionChanged = requestedSanctionStatus == UserStatus.SUSPENDED || requestedSuspendedUntil != null;
+        boolean invalidSuspension = user.getStatus() == UserStatus.SUSPENDED
+                && !isFutureSuspension(user.getSuspendedUntil());
+        if (suspensionChanged && invalidSuspension) {
+            throw new UserValidationException("이용제한 상태에는 미래의 suspendedUntil이 필요합니다.");
+        }
+    }
+
+    private boolean isAppliedSanction(Users user) {
+        return user.getStatus() == UserStatus.BANNED
+                || (user.getStatus() == UserStatus.SUSPENDED && isFutureSuspension(user.getSuspendedUntil()));
+    }
+
+    private boolean isFutureSuspension(LocalDateTime suspendedUntil) {
+        return suspendedUntil != null && suspendedUntil.isAfter(LocalDateTime.now());
     }
 
     // ========== 일반 사용자용 프로필 관리 메서드 ==========
