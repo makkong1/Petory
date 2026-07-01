@@ -161,7 +161,6 @@ const CommunityCommentDrawer = ({ isOpen, board, onClose, currentUser, onComment
       await reportApi.submit({
         targetType: 'COMMENT',
         targetIdx: commentId,
-        reporterId: currentUser.idx,
         reason: reason.trim(),
       });
       alert('신고가 접수되었습니다.');
@@ -680,4 +679,3 @@ const LoginNotice = styled.div`
   color: ${(props) => props.theme.colors.textSecondary};
   font-size: ${(props) => props.theme.typography.body1.fontSize};
 `;
-
