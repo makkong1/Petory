@@ -14,6 +14,10 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.stereotype.Component;
 
+import com.linkup.Petory.domain.chat.entity.ParticipantStatus;
+import com.linkup.Petory.domain.chat.repository.ConversationParticipantRepository;
+import com.linkup.Petory.domain.user.entity.Users;
+import com.linkup.Petory.domain.user.repository.UsersRepository;
 import com.linkup.Petory.global.security.CustomUserDetails;
 import com.linkup.Petory.util.JwtUtil;
 
@@ -32,8 +36,13 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class WebSocketAuthChannelInterceptor implements ChannelInterceptor {
 
+    private static final String CONVERSATION_TOPIC_PREFIX = "/topic/conversation/";
+    private static final String USER_DESTINATION_PREFIX = "/user/";
+
     private final JwtUtil jwtUtil;
     private final UserDetailsService userDetailsService;
+    private final ConversationParticipantRepository participantRepository;
+    private final UsersRepository usersRepository;
 
     @Override
     public Message<?> preSend(@NonNull Message<?> message, @NonNull MessageChannel channel) {
@@ -118,9 +127,72 @@ public class WebSocketAuthChannelInterceptor implements ChannelInterceptor {
                 log.warn("WebSocket 메시지 인증 실패: 인증 정보 없음, command={}", command);
                 return null;
             }
+
+            // SUBSCRIBE destination 인가 검증 — 인증된 사용자라도 참여한 대화방/본인 큐만 구독 가능
+            if (command == StompCommand.SUBSCRIBE && !isSubscriptionAuthorized(accessor)) {
+                log.warn("WebSocket 구독 인가 실패: userId={}, destination={}",
+                        resolveLoginId(accessor), accessor.getDestination());
+                return null;
+            }
         }
 
         return message;
+    }
+
+    /**
+     * SUBSCRIBE destination 인가 검증.
+     * - /topic/conversation/{idx}[/suffix] : 해당 대화방의 ACTIVE 참여자만 허용
+     * - /user/{loginId}/... : 본인 큐만 허용
+     * - 그 외 destination : 기존 동작 유지 (허용)
+     */
+    private boolean isSubscriptionAuthorized(StompHeaderAccessor accessor) {
+        String destination = accessor.getDestination();
+        String loginId = resolveLoginId(accessor);
+        if (destination == null || loginId == null) {
+            return false;
+        }
+
+        if (destination.startsWith(CONVERSATION_TOPIC_PREFIX)) {
+            Long conversationIdx = parseConversationIdx(destination);
+            if (conversationIdx == null) {
+                return false; // conversation 토픽인데 idx 파싱 불가 → 차단
+            }
+            Long userIdx = usersRepository.findByIdString(loginId)
+                    .map(Users::getIdx)
+                    .orElse(null);
+            if (userIdx == null) {
+                return false;
+            }
+            return participantRepository.findByConversationIdxAndUserIdx(conversationIdx, userIdx)
+                    .filter(p -> p.getStatus() == ParticipantStatus.ACTIVE)
+                    .filter(p -> !Boolean.TRUE.equals(p.getIsDeleted()))
+                    .isPresent();
+        }
+
+        if (destination.startsWith(USER_DESTINATION_PREFIX)) {
+            return destination.startsWith(USER_DESTINATION_PREFIX + loginId + "/");
+        }
+
+        return true;
+    }
+
+    private Long parseConversationIdx(String destination) {
+        String rest = destination.substring(CONVERSATION_TOPIC_PREFIX.length());
+        int slash = rest.indexOf('/');
+        String idxPart = slash >= 0 ? rest.substring(0, slash) : rest;
+        try {
+            return Long.parseLong(idxPart);
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private String resolveLoginId(StompHeaderAccessor accessor) {
+        Map<String, Object> attrs = accessor.getSessionAttributes();
+        if (attrs != null && attrs.get("userId") instanceof String loginId) {
+            return loginId;
+        }
+        return accessor.getUser() != null ? accessor.getUser().getName() : null;
     }
 
     private boolean isUsableAccount(UserDetails userDetails) {

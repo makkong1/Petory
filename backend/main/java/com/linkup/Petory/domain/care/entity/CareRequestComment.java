@@ -27,12 +27,12 @@ public class CareRequestComment extends BaseTimeEntity {
     private Long idx;
 
     /** 댓글이 달린 펫케어 요청 */
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "care_request_idx", nullable = false)
     private CareRequest careRequest;
 
     /** 댓글 작성자 (SERVICE_PROVIDER만 작성 가능) */
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_idx", nullable = false)
     private Users user;
 
