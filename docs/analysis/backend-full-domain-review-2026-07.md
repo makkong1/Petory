@@ -19,7 +19,8 @@
 - 1차(룰 기반 전수 스캔): Critical 3 / Warning 4 / Info 2 → §2~4
 - 2차(심화: 락 순서·핫 로우·인증 흐름·실시간 채널): Critical 1 / Warning 4 / Info 1 → §8
 - 3차(설정 레이어·장애 내성·테스트 현황): Warning 2 / Info 2 → §9
-  Critical 4건 존재 → 커밋 전 수정 대상. 각각 반나절 이내 분량.
+
+**✅ Critical 4건 전부 조치 완료** (2026-07-05, `feat-review-critical-fixes` 브랜치, harness 태스크 `phases/review-critical-fixes/`). 세부 내용은 각 항목 하단 참고.
 
 ---
 
@@ -36,6 +37,7 @@
   @JoinColumn(name = "user_idx", nullable = false)
   private Users user;
   ```
+- **✅ 조치 완료** (`perf: 부속 엔티티 @ManyToOne fetch=LAZY 전환 10곳`, 커밋 `77ec94ce`): 5개 엔티티 10곳 모두 LAZY 전환. OSIV off(`spring.jpa.open-in-view=false`) 환경이라 조회 경로를 전수 검증했고, 연관 접근이 전부 `@Transactional` 서비스 메서드 안에서 DTO 변환까지 완결되며 목록 쿼리는 기존 `JOIN FETCH`가 이미 있어 추가 쿼리 수정은 불필요했다. 관련 AC 테스트 54건 통과(잔여 실패 4건은 변경 전 베이스라인에서도 동일하게 실패해 무관함을 확인).
 
 ### [B1+B5] private 메서드에 `@Transactional` + self-invocation
 
@@ -47,6 +49,7 @@
   // @Transactional 제거 — 트랜잭션 경계는 processOAuth2Login이 소유
   private Users createOrLinkUser(...) {
   ```
+- **✅ 조치 완료** (`refactor(user): OAuth2Service 무시되는 private @Transactional 제거`, 커밋 `6ce0e39b`): 어노테이션 제거 + 경계 소유자 주석 추가. 클래스 내 동일 패턴(private + `@Transactional`) 추가 검출 0건. OAuth2 테스트 전체 통과.
 
 ### [B2] 트랜잭션 안에서 외부 I/O 호출 (FCM 푸시)
 
@@ -69,6 +72,8 @@
   ```
 
   이렇게 하면 롤백됐는데 푸시가 나가는 부작용도 함께 사라짐.
+
+- **✅ 조치 완료** (`refactor(notification): 알림 발송을 AFTER_COMMIT 비동기 리스너로 분리`, 커밋 `5a690aa3`): `NotificationCreatedEvent` + `NotificationDispatchListener`(`@Async` + `@TransactionalEventListener(AFTER_COMMIT)`, 채널별 try-catch) 신설. `createNotification`은 이벤트 발행만 하고 Redis/SSE/FCM 호출과 관련 필드는 서비스에서 제거(`saveToRedis` → `public cacheToRedis`로 리스너에 노출). 리스너 단위테스트 3건(채널 격리 검증 포함) + Notification 테스트 전체 통과. §9 [W-NOTI]도 이 조치로 함께 해결됨.
 
 ---
 
@@ -167,6 +172,7 @@
       }
   }
   ```
+- **✅ 조치 완료** (`fix(security): WebSocket SUBSCRIBE 목적지 인가 추가로 대화방 도청 차단`, 커밋 `adf342fe`): 인터셉터에 `isSubscriptionAuthorized` 추가 — `/topic/conversation/{idx}`는 `ConversationParticipantRepository.findByConversationIdxAndUserIdx`로 ACTIVE·비삭제 참여자만 허용, `/user/{loginId}/...`는 본인 큐만 허용, idx 파싱 불가 시 차단. 단위테스트 6건(도청 차단·LEFT 참여자 차단·타인 큐 차단 포함) + 채팅 회귀 테스트 통과.
 
 ### 🟡 Warning
 
