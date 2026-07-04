@@ -1,0 +1,43 @@
+{
+  "task": "review-critical-fixes",
+  "description": "\uc804\uccb4 \ub3c4\uba54\uc778 \ucf54\ub4dc \ub9ac\ubdf0(2026-07) Critical 4\uac74 \uc218\uc815. WS SUBSCRIBE \uc778\uac00 \ubd80\uc7ac(\ucc44\ud305 \ub3c4\uccad) + \uc54c\ub9bc \ubc1c\uc1a1 \ud2b8\ub79c\uc7ad\uc158 \ubd84\ub9ac(FCM/Redis/SSE \uc7a5\uc560 \uaca9\ub9ac) + @ManyToOne LAZY \uc804\ud658 10\uacf3 + OAuth2Service private @Transactional \uc81c\uac70.",
+  "source_doc": "docs/analysis/backend-full-domain-review-2026-07.md",
+  "steps": [
+    {
+      "step": 1,
+      "name": "Critical(\ubcf4\uc548) \u2014 WebSocket SUBSCRIBE \ubaa9\uc801\uc9c0 \uc778\uac00 (\ucc44\ud305 \ub3c4\uccad \ucc28\ub2e8)",
+      "file": "step1.md",
+      "priority": "Critical",
+      "status": "completed",
+      "started_at": "2026-07-04T20:11:03.542963",
+      "summary": "WebSocketAuthChannelInterceptor\uc5d0 SUBSCRIBE destination \uc778\uac00 \ucd94\uac00(/topic/conversation/{idx} ACTIVE \ucc38\uc5ec\uc790 \uac80\uc99d + /user \ubcf8\uc778 \ud050 \uac80\uc99d), \ub2e8\uc704\ud14c\uc2a4\ud2b8 6\uac74 \ud1b5\uacfc \ubc0f \ucc44\ud305 \ud68c\uadc0 \ud14c\uc2a4\ud2b8 \ud1b5\uacfc"
+    },
+    {
+      "step": 2,
+      "name": "Critical(\ud2b8\ub79c\uc7ad\uc158) \u2014 \uc54c\ub9bc \ubc1c\uc1a1(Redis/SSE/FCM)\uc744 AFTER_COMMIT \ube44\ub3d9\uae30 \ub9ac\uc2a4\ub108\ub85c \ubd84\ub9ac",
+      "file": "step2.md",
+      "priority": "Critical",
+      "status": "completed",
+      "started_at": "2026-07-05T00:03:11.350602",
+      "summary": "NotificationCreatedEvent + NotificationDispatchListener(@Async AFTER_COMMIT, \ucc44\ub110\ubcc4 try-catch) \uc2e0\uc124, createNotification\uc740 publishEvent\ub85c \ub300\uccb4(SSE/FCM \ud544\ub4dc \uc81c\uac70, saveToRedis\u2192public cacheToRedis), \ub9ac\uc2a4\ub108 \ub2e8\uc704\ud14c\uc2a4\ud2b8 3\uac74 + Notification \ud14c\uc2a4\ud2b8 \uc804\uccb4 \ud1b5\uacfc"
+    },
+    {
+      "step": 3,
+      "name": "Critical(JPA) \u2014 @ManyToOne fetch=LAZY \uc804\ud658 10\uacf3 + \uc870\ud68c \uacbd\ub85c \uac80\uc99d",
+      "file": "step3.md",
+      "priority": "Critical",
+      "status": "completed",
+      "started_at": "2026-07-05T00:05:49.603461",
+      "summary": "5\uac1c \uc5d4\ud2f0\ud2f0 10\uacf3 @ManyToOne LAZY \uc804\ud658 + OSIV-off \uc870\ud68c \uacbd\ub85c \uc804\uc218 \uac80\uc99d(\ubaa8\ub4e0 \uc811\uadfc\uc774 @Transactional \uc11c\ube44\uc2a4 \ub0b4 \uc644\uacb0, \ubaa9\ub85d \ucffc\ub9ac fetch join \uae30\uc874\uc7ac). AC \ud14c\uc2a4\ud2b8 54\uac74 \uc911 \uc2e0\uaddc \uc2e4\ud328 0\uac74(\uc794\uc5ec 4\uac74\uc740 stash \ubca0\uc774\uc2a4\ub77c\uc778\uc73c\ub85c \uc120\uc874\uc7ac \ud655\uc778). \ubd80\uc218: \ub85c\uceec DB \uc2a4\ud0a4\ub9c8 \ub4dc\ub9ac\ud504\ud2b8(updated_at \uceec\ub7fc 5\uac1c \ud14c\uc774\ube14 \ubd80\uc7ac) ALTER\ub85c \uc815\uc815"
+    },
+    {
+      "step": 4,
+      "name": "Critical(\ud2b8\ub79c\uc7ad\uc158) \u2014 OAuth2Service private @Transactional \uc81c\uac70",
+      "file": "step4.md",
+      "priority": "Critical",
+      "status": "completed",
+      "started_at": "2026-07-05T00:16:37.258187",
+      "summary": "OAuth2Service.createOrLinkUser의 무시되던 private @Transactional 제거 + 트랜잭션 경계 소유자 주석 명시. 클래스 내 동일 패턴 추가 검출 0건, OAuth2 테스트 전체 통과"
+    }
+  ]
+}

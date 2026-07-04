@@ -7,6 +7,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -16,6 +17,7 @@ import com.linkup.Petory.domain.notification.converter.NotificationConverter;
 import com.linkup.Petory.domain.notification.dto.NotificationDTO;
 import com.linkup.Petory.domain.notification.entity.Notification;
 import com.linkup.Petory.domain.notification.entity.NotificationType;
+import com.linkup.Petory.domain.notification.event.NotificationCreatedEvent;
 import com.linkup.Petory.domain.notification.exception.NotificationForbiddenException;
 import com.linkup.Petory.domain.notification.exception.NotificationNotFoundException;
 import com.linkup.Petory.domain.notification.repository.NotificationRepository;
@@ -31,22 +33,19 @@ public class NotificationService {
     private final UsersRepository usersRepository;
     private final NotificationConverter notificationConverter;
     private final RedisTemplate<String, Object> notificationRedisTemplate;
-    private final NotificationSseService sseService;
-    private final FcmService fcmService;
+    private final ApplicationEventPublisher eventPublisher;
 
     public NotificationService(
             NotificationRepository notificationRepository,
             UsersRepository usersRepository,
             NotificationConverter notificationConverter,
             @Qualifier("notificationRedisTemplate") RedisTemplate<String, Object> notificationRedisTemplate,
-            NotificationSseService sseService,
-            FcmService fcmService) {
+            ApplicationEventPublisher eventPublisher) {
         this.notificationRepository = notificationRepository;
         this.usersRepository = usersRepository;
         this.notificationConverter = notificationConverter;
         this.notificationRedisTemplate = notificationRedisTemplate;
-        this.sseService = sseService;
-        this.fcmService = fcmService;
+        this.eventPublisher = eventPublisher;
     }
 
     private static final String REDIS_KEY_PREFIX = "notification:";
@@ -81,14 +80,9 @@ public class NotificationService {
         Notification saved = notificationRepository.save(notification);
         NotificationDTO dto = notificationConverter.toDTO(saved);
 
-        // Redis에 실시간 알림 저장 (최신 알림 목록 관리)
-        saveToRedis(userId, dto);
-
-        // SSE를 통해 실시간 알림 전송 (앱 열려있을 때)
-        sseService.sendNotification(userId, dto);
-
-        // FCM 푸시 알림 발송 (앱 꺼져있을 때)
-        fcmService.sendToUser(userId, title, content);
+        // 부가 채널 발송(Redis 캐시/SSE/FCM)은 커밋 후 비동기 리스너에서 처리
+        // — 채널 장애가 호출 도메인 트랜잭션을 롤백시키지 않도록 분리 (NotificationDispatchListener)
+        eventPublisher.publishEvent(new NotificationCreatedEvent(userId, dto, title, content));
 
         return dto;
     }
@@ -168,10 +162,10 @@ public class NotificationService {
     }
 
     /**
-     * Redis에 알림 저장
+     * Redis에 알림 저장 (NotificationDispatchListener가 커밋 후 호출)
      */
     @SuppressWarnings("null")
-    private void saveToRedis(Long userId, NotificationDTO notification) {
+    public void cacheToRedis(Long userId, NotificationDTO notification) {
         String redisKey = REDIS_KEY_PREFIX + userId;
         List<NotificationDTO> existingNotifications = getFromRedis(userId);
 

@@ -138,6 +138,7 @@ Controller → Service → Repository → Entity
 | ERD | [erd.md](./architecture/erd.md) |
 | 성능 최적화 | [query-optimization.md](./performance/query-optimization.md) |
 | 동시성 제어 | [control-strategies.md](./concurrency/control-strategies.md) |
+| 백엔드 전체 도메인 코드 리뷰 (2026-07) | [backend-full-domain-review-2026-07.md](./analysis/backend-full-domain-review-2026-07.md) |
 | 모바일 앱 & FCM | [09-mobile-capacitor.md](./deployment/09-mobile-capacitor.md) |
 | 배포 가이드 | [deployment/](./deployment/) |
 | 도메인 페이지 작성 워크플로우 | [workflow.md](./domain-page-drafts/workflow.md) |

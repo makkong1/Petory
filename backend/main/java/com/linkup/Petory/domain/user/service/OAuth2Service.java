@@ -157,8 +157,9 @@ public class OAuth2Service {
 
     /**
      * 신규 소셜 로그인 사용자 생성 또는 기존 사용자와 연결
+     * 트랜잭션 경계는 public 진입점 processOAuth2Login이 소유한다.
+     * (private 메서드의 @Transactional은 Spring 프록시가 가로채지 못해 무시됨)
      */
-    @Transactional
     private Users createOrLinkUser(OAuth2User oauth2User, Provider provider, String providerId, String email,
             String name) {
         // 이메일로 기존 사용자 확인
