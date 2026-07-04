@@ -59,6 +59,10 @@
     {
       "dir": "sanction-domain-enforcement",
       "status": "pending"
+    },
+    {
+      "dir": "review-critical-fixes",
+      "status": "completed"
     }
   ]
 }
