@@ -72,6 +72,8 @@ public class LocationService {
     private Double longitude;
 
     private String phone;
+
+    @Column(length = 500)
     private String website;
 
     // 운영 정보 (openingTime, closingTime 제거, operating_hours 문자열로 통합)

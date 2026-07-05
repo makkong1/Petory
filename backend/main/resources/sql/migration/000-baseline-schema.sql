@@ -382,7 +382,7 @@ CREATE TABLE `locationservice` (
   `rating` double DEFAULT '0',
   `description` varchar(255) DEFAULT NULL,
   `phone` varchar(255) DEFAULT NULL,
-  `website` varchar(255) DEFAULT NULL,
+  `website` varchar(500) DEFAULT NULL,
   `pet_friendly` tinyint(1) DEFAULT '0',
   `coordinates` point DEFAULT NULL,
   `category1` varchar(100) DEFAULT NULL,
