@@ -207,7 +207,17 @@ public class OAuth2Service {
         // SocialUser에 Provider별 상세 정보 저장
         setSocialUserProviderData(socialUser, attributes, provider);
 
-        socialUserRepository.save(socialUser);
+        try {
+            socialUserRepository.save(socialUser);
+        } catch (DataIntegrityViolationException e) {
+            // 동시 요청이 먼저 같은 (provider, providerId) SocialUser 를 생성함 (DB 유니크 제약).
+            // 기존 행을 재조회해 이번 로그인의 provider 데이터로 갱신한다.
+            log.warn("SocialUser 동시 생성 충돌, 기존 행 재사용: provider={}, providerId={}", provider, providerId);
+            socialUser = socialUserRepository.findByProviderAndProviderId(provider, providerId)
+                    .orElseThrow(() -> e);
+            setSocialUserProviderData(socialUser, attributes, provider);
+            socialUserRepository.save(socialUser);
+        }
         log.info("SocialUser 저장 완료: provider={}, providerId={}", provider, providerId);
 
         return user;

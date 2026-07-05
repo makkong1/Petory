@@ -51,7 +51,7 @@ CREATE TABLE `board` (
   KEY `idx_board_created_at_desc` (`created_at` DESC),
   FULLTEXT KEY `idx_board_title_content` (`title`,`content`) /*!50100 WITH PARSER `ngram` */ ,
   CONSTRAINT `board_ibfk_1` FOREIGN KEY (`user_idx`) REFERENCES `users` (`idx`)
-) ENGINE=InnoDB AUTO_INCREMENT=28763 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=29663 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `board_popularity_snapshot`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -91,7 +91,7 @@ CREATE TABLE `board_reaction` (
   KEY `FKag3ixpa53bjp1p5s79myoscpr` (`user_idx`),
   CONSTRAINT `FKag3ixpa53bjp1p5s79myoscpr` FOREIGN KEY (`user_idx`) REFERENCES `users` (`idx`),
   CONSTRAINT `FKgjhpjoxw7tt1kyfimlomv872y` FOREIGN KEY (`board_idx`) REFERENCES `board` (`idx`)
-) ENGINE=InnoDB AUTO_INCREMENT=88505 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=94805 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `board_view_log`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -124,7 +124,7 @@ CREATE TABLE `careapplication` (
   KEY `provider_idx` (`provider_idx`),
   CONSTRAINT `careapplication_ibfk_1` FOREIGN KEY (`care_request_idx`) REFERENCES `carerequest` (`idx`),
   CONSTRAINT `careapplication_ibfk_2` FOREIGN KEY (`provider_idx`) REFERENCES `users` (`idx`)
-) ENGINE=InnoDB AUTO_INCREMENT=44 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=46 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `carerequest`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -153,7 +153,7 @@ CREATE TABLE `carerequest` (
   KEY `fk_carerequest_pet` (`pet_idx`),
   CONSTRAINT `carerequest_ibfk_1` FOREIGN KEY (`user_idx`) REFERENCES `users` (`idx`),
   CONSTRAINT `fk_carerequest_pet` FOREIGN KEY (`pet_idx`) REFERENCES `pets` (`idx`) ON DELETE SET NULL
-) ENGINE=InnoDB AUTO_INCREMENT=1053 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=1055 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `carerequest_comment`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -219,7 +219,7 @@ CREATE TABLE `chatmessage` (
   CONSTRAINT `chatmessage_ibfk_1` FOREIGN KEY (`conversation_idx`) REFERENCES `conversation` (`idx`) ON DELETE CASCADE,
   CONSTRAINT `chatmessage_ibfk_2` FOREIGN KEY (`sender_idx`) REFERENCES `users` (`idx`),
   CONSTRAINT `chatmessage_ibfk_3` FOREIGN KEY (`reply_to_message_idx`) REFERENCES `chatmessage` (`idx`) ON DELETE SET NULL
-) ENGINE=InnoDB AUTO_INCREMENT=470625 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=499025 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `comment`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -280,7 +280,7 @@ CREATE TABLE `conversation` (
   KEY `idx_conversation_related` (`related_type`,`related_idx`),
   KEY `idx_conversation_deleted` (`is_deleted`,`deleted_at`),
   CONSTRAINT `chk_related_fields` CHECK ((((`related_type` is null) and (`related_idx` is null)) or ((`related_type` is not null) and (`related_idx` is not null))))
-) ENGINE=InnoDB AUTO_INCREMENT=1061 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=1102 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `conversationparticipant`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -311,7 +311,7 @@ CREATE TABLE `conversationparticipant` (
   CONSTRAINT `conversationparticipant_ibfk_1` FOREIGN KEY (`conversation_idx`) REFERENCES `conversation` (`idx`) ON DELETE CASCADE,
   CONSTRAINT `conversationparticipant_ibfk_2` FOREIGN KEY (`user_idx`) REFERENCES `users` (`idx`),
   CONSTRAINT `conversationparticipant_ibfk_3` FOREIGN KEY (`last_read_message_idx`) REFERENCES `chatmessage` (`idx`) ON DELETE SET NULL
-) ENGINE=InnoDB AUTO_INCREMENT=2022 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=2109 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `dailystatistics`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -382,7 +382,7 @@ CREATE TABLE `locationservice` (
   `rating` double DEFAULT '0',
   `description` varchar(255) DEFAULT NULL,
   `phone` varchar(255) DEFAULT NULL,
-  `website` varchar(500) DEFAULT NULL,
+  `website` varchar(255) DEFAULT NULL,
   `pet_friendly` tinyint(1) DEFAULT '0',
   `coordinates` point DEFAULT NULL,
   `category1` varchar(100) DEFAULT NULL,
@@ -431,7 +431,7 @@ CREATE TABLE `locationservice` (
 /*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
 /*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;
 DELIMITER ;;
-/*!50003 CREATE*/ /*!50017 DEFINER=`root`@`localhost`*/ /*!50003 TRIGGER `trg_locationservice_set_location` BEFORE INSERT ON `locationservice` FOR EACH ROW SET NEW.location = IF(
+/*!50003 CREATE*/  /*!50003 TRIGGER `trg_locationservice_set_location` BEFORE INSERT ON `locationservice` FOR EACH ROW SET NEW.location = IF(
       NEW.latitude IS NOT NULL AND NEW.longitude IS NOT NULL,
       ST_GeomFromText(CONCAT('POINT(', NEW.latitude, ' ', NEW.longitude, ')'), 4326),
       ST_GeomFromText('POINT(0 0)', 4326)
@@ -450,7 +450,7 @@ DELIMITER ;
 /*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
 /*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;
 DELIMITER ;;
-/*!50003 CREATE*/ /*!50017 DEFINER=`root`@`localhost`*/ /*!50003 TRIGGER `trg_locationservice_set_location_update` BEFORE UPDATE ON `locationservice` FOR EACH ROW SET NEW.location = IF(
+/*!50003 CREATE*/  /*!50003 TRIGGER `trg_locationservice_set_location_update` BEFORE UPDATE ON `locationservice` FOR EACH ROW SET NEW.location = IF(
     NEW.latitude IS NOT NULL AND NEW.longitude IS NOT NULL,
     ST_GeomFromText(CONCAT('POINT(', NEW.latitude, ' ', NEW.longitude, ')'), 4326),
     ST_GeomFromText('POINT(0 0)', 4326)
@@ -494,7 +494,7 @@ CREATE TABLE `login_events` (
   KEY `idx_login_events_user_login_at` (`user_id`,`login_at`),
   KEY `idx_login_events_login_at` (`login_at`),
   CONSTRAINT `fk_login_events_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`idx`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=37 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=66 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `meetup`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -526,7 +526,7 @@ CREATE TABLE `meetup` (
   FULLTEXT KEY `idx_meetup_title_description` (`title`,`description`) /*!50100 WITH PARSER `ngram` */ ,
   CONSTRAINT `meetup_ibfk_1` FOREIGN KEY (`organizer_idx`) REFERENCES `users` (`idx`),
   CONSTRAINT `chk_participants` CHECK ((`current_participants` <= `max_participants`))
-) ENGINE=InnoDB AUTO_INCREMENT=47464 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=50496 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -537,7 +537,7 @@ CREATE TABLE `meetup` (
 /*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
 /*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;
 DELIMITER ;;
-/*!50003 CREATE*/ /*!50017 DEFINER=`root`@`localhost`*/ /*!50003 TRIGGER `trg_meetup_set_geo_point_insert` BEFORE INSERT ON `meetup` FOR EACH ROW SET NEW.geo_point = IF(
+/*!50003 CREATE*/  /*!50003 TRIGGER `trg_meetup_set_geo_point_insert` BEFORE INSERT ON `meetup` FOR EACH ROW SET NEW.geo_point = IF(
     NEW.latitude IS NOT NULL AND NEW.longitude IS NOT NULL,
     ST_GeomFromText(CONCAT('POINT(', NEW.latitude, ' ', NEW.longitude, ')'), 4326),
     ST_GeomFromText('POINT(0 0)', 4326)
@@ -556,7 +556,7 @@ DELIMITER ;
 /*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
 /*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;
 DELIMITER ;;
-/*!50003 CREATE*/ /*!50017 DEFINER=`root`@`localhost`*/ /*!50003 TRIGGER `trg_meetup_set_geo_point_update` BEFORE UPDATE ON `meetup` FOR EACH ROW SET NEW.geo_point = IF(
+/*!50003 CREATE*/  /*!50003 TRIGGER `trg_meetup_set_geo_point_update` BEFORE UPDATE ON `meetup` FOR EACH ROW SET NEW.geo_point = IF(
     NEW.latitude IS NOT NULL AND NEW.longitude IS NOT NULL,
     ST_GeomFromText(CONCAT('POINT(', NEW.latitude, ' ', NEW.longitude, ')'), 4326),
     ST_GeomFromText('POINT(0 0)', 4326)
@@ -610,7 +610,7 @@ CREATE TABLE `missing_pet_board` (
   KEY `idx_missing_pet_location` (`latitude`,`longitude`),
   KEY `idx_missing_pet_user` (`user_idx`,`is_deleted`,`created_at` DESC),
   CONSTRAINT `FKrid0u1qvm8e07etghggxnu1b1` FOREIGN KEY (`user_idx`) REFERENCES `users` (`idx`)
-) ENGINE=InnoDB AUTO_INCREMENT=405 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=423 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `missing_pet_comment`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -633,7 +633,7 @@ CREATE TABLE `missing_pet_comment` (
   KEY `idx_missing_pet_comment_board_is_deleted` (`board_idx`,`is_deleted`),
   CONSTRAINT `FKe3sca61815j9cxi608oxmrfjt` FOREIGN KEY (`user_idx`) REFERENCES `users` (`idx`),
   CONSTRAINT `FKpodx5stuchr73mrjgffir72ii` FOREIGN KEY (`board_idx`) REFERENCES `missing_pet_board` (`idx`)
-) ENGINE=InnoDB AUTO_INCREMENT=3041 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=3207 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `monthly_statistics`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -739,7 +739,7 @@ CREATE TABLE `pet_coin_transaction` (
   CONSTRAINT `pet_coin_transaction_ibfk_1` FOREIGN KEY (`user_idx`) REFERENCES `users` (`idx`) ON DELETE CASCADE,
   CONSTRAINT `chk_amount_positive` CHECK ((`amount` > 0)),
   CONSTRAINT `chk_balance_after` CHECK ((`balance_after` >= 0))
-) ENGINE=InnoDB AUTO_INCREMENT=544 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='펫코인 거래 내역';
+) ENGINE=InnoDB AUTO_INCREMENT=584 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='펫코인 거래 내역';
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `pet_vaccinations`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -865,7 +865,7 @@ CREATE TABLE `socialuser` (
   UNIQUE KEY `uk_socialuser_provider_providerid` (`provider`,`provider_id`),
   KEY `users_idx` (`users_idx`),
   CONSTRAINT `socialuser_ibfk_1` FOREIGN KEY (`users_idx`) REFERENCES `users` (`idx`)
-) ENGINE=InnoDB AUTO_INCREMENT=225 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=253 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `system_config`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -924,7 +924,7 @@ CREATE TABLE `user_sanctions` (
   KEY `idx_ends_at` (`ends_at`),
   CONSTRAINT `user_sanctions_ibfk_1` FOREIGN KEY (`user_idx`) REFERENCES `users` (`idx`),
   CONSTRAINT `user_sanctions_ibfk_2` FOREIGN KEY (`admin_idx`) REFERENCES `users` (`idx`)
-) ENGINE=InnoDB AUTO_INCREMENT=280 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=302 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `users`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -961,7 +961,7 @@ CREATE TABLE `users` (
   UNIQUE KEY `email` (`email`),
   UNIQUE KEY `uk_users_nickname` (`nickname`),
   CONSTRAINT `chk_pet_coin_balance` CHECK ((`pet_coin_balance` >= 0))
-) ENGINE=InnoDB AUTO_INCREMENT=17882 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=18998 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `weekly_statistics`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;

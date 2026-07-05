@@ -43,7 +43,8 @@ class PlaceInteractionServiceTest {
         assertThat(log.getUserIdx()).isEqualTo(1L);
         assertThat(log.getLocationIdx()).isEqualTo(42L);
         assertThat(log.getInteractionType()).isEqualTo("VIEW");
-        assertThat(log.getCreatedAt()).isNotNull();
+        // createdAt 은 BaseTimeEntity 의 JPA Auditing(@CreatedDate)이 실제 영속 시점에 채운다.
+        // 리포지토리를 목으로 대체한 단위 테스트에서는 영속 콜백이 실행되지 않으므로 검증 대상이 아니다.
     }
 
     // ===== getPopularityScores =====

@@ -1,13 +1,10 @@
 # GitHub에 코드를 올리거나 PR을 만들었을 때, GitHub 서버가 자동으로 실행할 작업 순서를 적어둔 파일
-# main 또는 dev 브랜치에 push되거나,
-# main 브랜치로 Pull Request가 생성/수정되면,
-
-# GitHub가 Ubuntu 가상 서버를 하나 만들고,
-# 그 안에서 프로젝트 코드를 내려받은 뒤,
-# JDK 17을 설치하고,
-# Gradle 캐시를 적용하고,
-# gradlew 실행 권한을 준 다음,
-# ./gradlew compileJava 명령으로 Java 코드가 컴파일되는지 검사한다.
+# main 또는 dev 브랜치에 push되거나, main/dev 브랜치로 Pull Request가 생성/수정되면 실행된다.
+#
+# MySQL 8.0 + Redis 7 서비스 컨테이너를 띄우고,
+# 실제 시크릿이 없는 CI 전용 더미 설정(.github/ci/application-ci.properties)을 사용해,
+# 스키마 스냅샷(.github/ci-schema.sql)을 로드한 뒤 전체 테스트(./gradlew test)를 실행한다.
+# (설정 파일은 gitignore 되어 CI 체크아웃에 없으므로 런타임에 복사해 넣는다)
 name: CI
 
 on:
@@ -20,6 +17,29 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: ci_root_pw
+          MYSQL_DATABASE: petory
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=15
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
 
     steps:
       - uses: actions/checkout@v4
@@ -40,8 +60,30 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
+      - name: Wait for MySQL and load schema
+        run: |
+          for i in $(seq 1 30); do
+            if mysqladmin ping -h 127.0.0.1 -P 3306 -uroot -pci_root_pw --silent 2>/dev/null; then
+              echo "MySQL is up"; break
+            fi
+            echo "waiting for MySQL... ($i/30)"; sleep 2
+          done
+          mysql -h 127.0.0.1 -P 3306 -uroot -pci_root_pw petory < .github/ci-schema.sql
+          echo "loaded tables: $(mysql -h 127.0.0.1 -P 3306 -uroot -pci_root_pw -N -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='petory';")"
+
+      - name: Prepare CI test config
+        run: cp .github/ci/application-ci.properties backend/main/resources/application.properties
+
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Build
-        run: ./gradlew compileJava --no-daemon
+      - name: Test
+        run: ./gradlew test --no-daemon
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report
+          path: build/reports/tests/test
+          if-no-files-found: ignore
