@@ -819,7 +819,11 @@ class BoardPerformanceComparisonTest {
     private Statistics getStatistics() {
         SessionFactory sessionFactory = entityManager.getEntityManagerFactory()
                 .unwrap(SessionFactory.class);
-        return sessionFactory.getStatistics();
+        Statistics stats = sessionFactory.getStatistics();
+        // 쿼리 수 측정이 이 성능 테스트의 전제다. generate_statistics 프로퍼티가 꺼진
+        // 환경(로컬/CI)에서도 카운트가 0으로 나오지 않도록 런타임에 통계를 활성화한다.
+        stats.setStatisticsEnabled(true);
+        return stats;
     }
 
     /**
