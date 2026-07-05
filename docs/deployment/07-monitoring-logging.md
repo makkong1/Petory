@@ -38,7 +38,7 @@ management.health.redis.enabled=true
 
 #### 주요 엔드포인트
 
-- `/api/actuator/health`: 헬스 체크
+- `/actuator/health`: 헬스 체크
 - `/api/actuator/metrics`: 메트릭 목록
 - `/api/actuator/prometheus`: Prometheus 메트릭
 
@@ -53,7 +53,7 @@ management.health.redis.enabled=true
 docker stats
 
 # 특정 컨테이너만
-docker stats petory-backend-prod petory-mysql-prod petory-redis-prod
+docker stats petory-app petory-mysql petory-redis
 
 # JSON 형식으로 출력
 docker stats --no-stream --format json
@@ -62,7 +62,7 @@ docker stats --no-stream --format json
 #### cAdvisor (선택)
 
 ```yaml
-# docker-compose.prod.yml에 추가
+# docker-compose.yml에 추가
 services:
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:latest
@@ -125,16 +125,16 @@ LOG_DIR="./logs/archive/$(date +%Y%m%d)"
 mkdir -p $LOG_DIR
 
 # Backend 로그
-docker logs petory-backend-prod --since 24h > $LOG_DIR/backend.log 2>&1
+docker logs petory-app --since 24h > $LOG_DIR/backend.log 2>&1
 
 # Frontend 로그
-docker logs petory-frontend-prod --since 24h > $LOG_DIR/frontend.log 2>&1
+docker logs petory-nginx --since 24h > $LOG_DIR/frontend.log 2>&1
 
 # MySQL 로그
-docker logs petory-mysql-prod --since 24h > $LOG_DIR/mysql.log 2>&1
+docker logs petory-mysql --since 24h > $LOG_DIR/mysql.log 2>&1
 
 # Redis 로그
-docker logs petory-redis-prod --since 24h > $LOG_DIR/redis.log 2>&1
+docker logs petory-redis --since 24h > $LOG_DIR/redis.log 2>&1
 
 # Nginx 로그
 docker logs petory-nginx-prod --since 24h > $LOG_DIR/nginx.log 2>&1
@@ -152,7 +152,7 @@ echo "✅ Logs collected in $LOG_DIR"
 #!/bin/bash
 # health-check-monitor.sh
 
-HEALTH_URL="http://localhost:8080/api/actuator/health"
+HEALTH_URL="http://localhost:8080/actuator/health"
 ALERT_EMAIL="admin@petory.com"
 
 if ! curl -f $HEALTH_URL > /dev/null 2>&1; then

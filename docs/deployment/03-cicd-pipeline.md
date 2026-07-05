@@ -240,21 +240,21 @@ jobs:
             cd /opt/petory
             
             # Pull latest images
-            docker-compose -f docker-compose.prod.yml pull
+            docker-compose -f docker-compose.yml pull
             
             # Backup current containers
-            docker-compose -f docker-compose.prod.yml down --timeout 30
+            docker-compose -f docker-compose.yml down --timeout 30
             
             # Update environment variables if needed
             # cp .env.example .env
             # nano .env
             
             # Start new containers
-            docker-compose -f docker-compose.prod.yml up -d
+            docker-compose -f docker-compose.yml up -d
             
             # Health check
             sleep 30
-            curl -f http://localhost:8080/api/actuator/health || exit 1
+            curl -f http://localhost:8080/actuator/health || exit 1
             
             # Clean up old images
             docker image prune -f
@@ -294,8 +294,8 @@ jobs:
           port: ${{ secrets.STAGING_PORT }}
           script: |
             cd /opt/petory-staging
-            docker-compose -f docker-compose.prod.yml pull
-            docker-compose -f docker-compose.prod.yml up -d
+            docker-compose -f docker-compose.yml pull
+            docker-compose -f docker-compose.yml up -d
             docker image prune -f
 ```
 
@@ -333,7 +333,7 @@ Repository Settings → Secrets and variables → Actions에서 다음을 설정
 #!/bin/bash
 set -e
 
-COMPOSE_FILE="docker-compose.prod.yml"
+COMPOSE_FILE="docker-compose.yml"
 PROJECT_DIR="/opt/petory"
 
 cd $PROJECT_DIR
@@ -351,7 +351,7 @@ echo "Waiting for health check..."
 sleep 30
 
 echo "Checking backend health..."
-if curl -f http://localhost:8080/api/actuator/health; then
+if curl -f http://localhost:8080/actuator/health; then
     echo "✅ Deployment successful"
 else
     echo "❌ Health check failed, rolling back..."
@@ -380,7 +380,7 @@ echo "Deployment completed"
     
     # Health check
     sleep 30
-    curl -f http://localhost:8081/api/actuator/health
+    curl -f http://localhost:8081/actuator/health
     
     # Nginx 설정 변경 (Green으로 전환)
     cp nginx/green.conf /etc/nginx/conf.d/default.conf
@@ -396,7 +396,7 @@ echo "Deployment completed"
 - name: Canary Deployment
   script: |
     # 10% 트래픽만 새 버전으로
-    docker-compose -f docker-compose.prod.yml up -d --scale backend=1
+    docker-compose -f docker-compose.yml up -d --scale app=2
     # Nginx에서 10%만 새 버전으로 라우팅
     
     # 모니터링 후 점진적 확대
@@ -432,7 +432,7 @@ echo "Deployment completed"
 - name: Post-deployment checks
   script: |
     # API 응답 시간 확인
-    response_time=$(curl -o /dev/null -s -w '%{time_total}' http://localhost:8080/api/actuator/health)
+    response_time=$(curl -o /dev/null -s -w '%{time_total}' http://localhost:8080/actuator/health)
     
     if (( $(echo "$response_time > 5.0" | bc -l) )); then
       echo "⚠️ High response time: ${response_time}s"
@@ -440,7 +440,7 @@ echo "Deployment completed"
     fi
     
     # 에러 로그 확인
-    error_count=$(docker logs petory-backend-prod --tail 100 | grep -i error | wc -l)
+    error_count=$(docker logs petory-app --tail 100 | grep -i error | wc -l)
     
     if [ $error_count -gt 10 ]; then
       echo "⚠️ High error count: $error_count"
@@ -467,9 +467,9 @@ fi
 
 echo "Rolling back to $PREVIOUS_IMAGE_TAG..."
 
-docker-compose -f docker-compose.prod.yml down
+docker-compose -f docker-compose.yml down
 docker tag petory-backend:$PREVIOUS_IMAGE_TAG petory-backend:latest
-docker-compose -f docker-compose.prod.yml up -d
+docker-compose -f docker-compose.yml up -d
 
 echo "Rollback completed"
 ```

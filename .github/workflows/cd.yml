@@ -1,0 +1,49 @@
+# main 브랜치에 push되면 Docker 이미지를 빌드해서
+# GitHub Container Registry(ghcr.io)에 자동으로 올린다.
+#
+# 여기까지가 지금 시점의 CD임: "코드가 main에 들어가면 최신 이미지가 항상 준비되어 있다."
+# 실제 서버에 자동 배포(ssh → docker pull → docker compose up)하는 마지막 단계는
+# 배포할 서버가 생긴 뒤에 이 워크플로우에 이어 붙인다 (아직 없음).
+name: CD (Build & Push Docker Images)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {} # 수동 실행 (Actions 탭 또는 gh workflow run) — main push 전 검증용
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - image: petory-app
+            context: .
+            dockerfile: Dockerfile
+          - image: petory-nlp-server
+            context: ./petory-nlp-server
+            dockerfile: petory-nlp-server/Dockerfile
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push ${{ matrix.image }}
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:latest
+            ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:${{ github.sha }}

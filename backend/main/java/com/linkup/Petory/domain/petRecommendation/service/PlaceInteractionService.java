@@ -22,7 +22,8 @@ import lombok.extern.slf4j.Slf4j;
 /**
  * 장소 상호작용 로그를 저장하고 추천용 인기 점수를 계산한다.
  *
- * <p>점수는 최근 30일 상호작용 건수를 로그 스케일로 0~1 사이로 정규화해 사용한다.
+ * <p>
+ * 점수는 최근 30일 상호작용 건수를 로그 스케일로 0~1 사이로 정규화해 사용한다.
  */
 public class PlaceInteractionService {
 

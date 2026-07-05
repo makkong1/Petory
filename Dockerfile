@@ -13,6 +13,7 @@ RUN chmod +x gradlew && ./gradlew dependencies --no-daemon -q 2>/dev/null || tru
 # 소스 복사 (sourceSets: backend/main/*)
 COPY backend backend
 
+
 RUN ./gradlew bootJar --no-daemon -q
 
 # ── Stage 2: Runtime ─────────────────────────────────────────
