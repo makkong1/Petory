@@ -1,9 +1,9 @@
-# Docker · Redis · 향후 배포
+# Docker · Redis · 전체 스택
 
 ## 📋 이 문서의 역할
 
-- **지금 실제로 쓰는 것**: 로컬에서 Redis를 Docker로 띄우고 Spring Boot(`spring.redis.*`)와 연결하는 방법
-- **아직 레포에 없는 것**: `Dockerfile`, `docker-compose.yml` 전체 스택 — **추가 시** 아래 [향후 계획](#향후-계획-dockerfile--compose--cicd)과 [CI/CD](./03-cicd-pipeline.md)를 맞추면 됨
+- **전체 스택(권장)**: 레포 루트의 `Dockerfile` + `docker-compose.yml`로 mysql·redis·app·nginx를 한 번에 기동 — 아래 [전체 스택 Docker Compose](#전체-스택-docker-compose) 참고
+- **로컬 개발용 Redis만 따로**: 백엔드는 `./gradlew bootRun`으로 호스트에서 직접 돌리고 Redis만 Docker로 띄우는 기존 방식 — 아래 [로컬 Redis (Docker, 수동 실행)](#로컬-redis-docker-수동-실행) 참고
 
 ---
 
@@ -48,9 +48,11 @@ docker exec -it petory-redis redis-cli
 
 | 항목                                         | 상태                                                                 |
 | -------------------------------------------- | -------------------------------------------------------------------- |
-| `docker/Dockerfile.*`, `docker-compose*.yml` | **미추가** (문서만으로 설계해 두었던 내용은 정리·축소함)             |
-| 로컬 Redis                                   | **`docker run`으로 수동 실행** (아래)                                |
-| Spring Boot ↔ Redis                          | `application.properties`의 **`spring.redis.*`** + `RedisConfig.java` |
+| `Dockerfile`(레포 루트)                      | **있음** — 멀티스테이지 빌드 (`eclipse-temurin:17-jdk-jammy` → `17-jre-jammy`), non-root 유저(`petory`)로 실행 |
+| `docker-compose.yml`(레포 루트)              | **있음** — `mysql`, `redis`, `app`, `nginx` 4개 서비스. `docker compose up --build -d`로 전체 스택 기동 검증 완료 |
+| DB 스키마 초기화                              | `sql/migration/000-baseline-schema.sql`이 `docker-entrypoint-initdb.d`로 마운트되어 최초 기동 시 자동 실행됨 (전체 스키마 baseline dump) |
+| 로컬 Redis만 단독 실행                        | `docker run`으로 수동 실행 가능 (아래, 백엔드를 호스트에서 `bootRun`으로 돌릴 때)                                |
+| Spring Boot ↔ Redis                          | `application.properties`(또는 `.env`)의 **`spring.redis.*`** + `RedisConfig.java` — `spring.data.redis.*` 아님 주의 |
 
 ---
 
@@ -97,41 +99,47 @@ spring.redis.password=${REDIS_PASSWORD:실제비밀번호}
 
 ## MySQL
 
-로컬에서는 보통 **호스트에 설치한 MySQL** 또는 별도 Docker 컨테이너를 씁니다.  
-전체 스택을 나중에 Compose로 묶을 때는 서비스 이름(예: `mysql`)과 JDBC URL(`jdbc:mysql://mysql:3306/...`)을 맞추면 됩니다.
+전체 스택을 Compose로 띄울 때는 `docker-compose.yml`의 `mysql` 서비스가 담당하며, 백엔드 컨테이너는 서비스 이름(`mysql`)과 JDBC URL(`jdbc:mysql://mysql:3306/...`)로 접속합니다 (`application-prod.properties`의 `${DB_HOST}`가 `docker-compose.yml`의 `environment.DB_HOST: mysql`로 채워짐).
+
+로컬에서 백엔드를 호스트에서 직접 돌릴 때는(방법 B) **호스트에 설치한 MySQL**을 씁니다.
 
 ---
 
-## 향후 계획: Dockerfile · Compose · CI/CD
+## 전체 스택 Docker Compose
 
-1. **Dockerfile (백엔드)**
+레포 루트의 `Dockerfile`/`docker-compose.yml` 구성:
 
-   - 레포 루트에 `build.gradle`, `settings.gradle`, `gradle/`, `backend/` 구조에 맞게 복사 후 `./gradlew bootJar` 등으로 JAR 생성
-   - 런타임은 JDK 17 이미지 등
-   - 이 레포는 소스가 `backend/main/java`에 있으므로 예전 문서의 `COPY backend/` 만으로는 부족할 수 있음 → **루트 기준 Gradle 빌드**로 맞출 것
+1. **Dockerfile (백엔드, 멀티스테이지)**
 
-2. **docker-compose**
+   - Build stage: `eclipse-temurin:17-jdk-jammy` — `gradlew`, `gradle/`, `build.gradle`, `settings.gradle`, `backend/` 복사 후 `./gradlew bootJar`
+   - Runtime stage: `eclipse-temurin:17-jre-jammy` — non-root 유저(`petory`)로 JAR 실행
+   - **주의**: `eclipse-temurin:17-*-alpine` 계열은 arm64(Apple Silicon Mac) 매니페스트가 없어 M시리즈 맥에서 빌드 자체가 실패함 → jammy(Debian 기반) 사용 필수
 
-   - `mysql`, `redis`, `backend`(빌드한 이미지), 필요 시 `frontend`·`nginx`
-   - 컨테이너 간 통신 시 DB/Redis 호스트명은 `localhost`가 아니라 **서비스 이름**
+2. **docker-compose.yml**
+
+   - 서비스: `mysql`, `redis`, `app`(빌드한 이미지), `nginx`
+   - 컨테이너 간 통신은 `localhost`가 아니라 **서비스 이름**(`mysql`, `redis`, `app`) 사용
+   - `mysql` 서비스는 `sql/migration/000-baseline-schema.sql`을 `docker-entrypoint-initdb.d`로 마운트 — MySQL 데이터 볼륨이 비어있을 때(최초 기동) 자동으로 전체 스키마가 생성됨. `sql/migration/applied/`(하위 폴더)는 MySQL이 하위 디렉토리를 스캔하지 않아 자동실행 대상에서 제외됨
+   - 로컬 macOS에서 네이티브 MySQL(3306)/Redis(6379)를 이미 쓰고 있으면 호스트 포트가 충돌 — `ports`를 `3307:3306`, `6380:6379` 등으로 조정 (컨테이너 간 통신엔 영향 없음)
 
 3. **GitHub Actions**
 
-   - 테스트·빌드 후 이미지 푸시, 서버에서 `docker compose pull && up` 등 — 상세는 [03-cicd-pipeline.md](./03-cicd-pipeline.md)
-   - **이미지·Compose 파일이 레포에 생긴 뒤** 워크플로의 빌드·배포 단계를 연결하는 것이 자연스러움
+   - 현재는 빌드·테스트까지 — 이미지 push, 서버에서 `docker compose pull && up`까지 이어지는 CD는 아직 없음. 상세는 [03-cicd-pipeline.md](./03-cicd-pipeline.md)
 
 4. **환경 변수**
-   - 배포 시 비밀번호·JWT 등은 GitHub Secrets + 서버 `.env` 등으로 분리 — [05-environment-variables.md](./05-environment-variables.md)
+   - `.env.example`을 `.env`로 복사해 채움 — [05-environment-variables.md](./05-environment-variables.md)
+   - OAuth2 client-id/secret, 메일 계정 등은 실제 값이 없어도 **더미값**은 넣어야 함 (비어 있으면 `ClientRegistrationRepository` 빈 생성 실패로 부팅 자체가 안 됨)
 
 ---
 
-## 참고로 남겨 두는 명령 (Compose 추가 후)
+## 자주 쓰는 명령
 
 ```bash
-docker compose up -d
-docker compose logs -f
-docker compose down
-docker compose down -v   # 볼륨까지 삭제 시 데이터 초기화 주의
+docker compose up --build -d   # 전체 스택 빌드+기동
+docker compose ps              # 상태 확인
+docker compose logs -f app     # 특정 서비스 로그
+docker compose down            # 컨테이너만 종료 (데이터 볼륨은 유지됨)
+docker compose down -v         # 볼륨까지 삭제 → 다음 up 때 DB가 완전히 새로 초기화됨
 ```
 
 `docker compose` / `docker-compose` 둘 중 설치된 쪽 사용 — [00-macos-local.md](./00-macos-local.md)

@@ -7,7 +7,7 @@ Petory 프로젝트의 실제 배포 프로세스를 단계별로 설명합니�
 **환경 구분**
 
 - **리눅스 서버(프로덕션/스테이징)**: 아래 `ssh`, `/opt/petory` 경로, `systemd`/cron 등은 **서버** 기준입니다.
-- **macOS(맥북)**: 로컬에서 Docker로만 연습할 때는 프로젝트 클론 경로(예: `~/project/Petory`)에서 `docker compose`를 실행하면 됩니다. [macOS 로컬 가이드](./00-macos-local.md) 참고. (레포에 Compose 파일이 없으면 [Docker 설정](./02-docker-configuration.md)대로 먼저 추가.)
+- **macOS(맥북)**: 로컬에서 Docker로만 연습할 때는 프로젝트 클론 경로(예: `~/project/Petory`)에서 `docker compose`를 실행하면 됩니다. [macOS 로컬 가이드](./00-macos-local.md) 참고. Compose 파일은 레포 루트의 `docker-compose.yml` — 상세는 [Docker 설정](./02-docker-configuration.md).
 
 ---
 
@@ -41,9 +41,8 @@ mkdir -p uploads
 # 로그 디렉토리
 mkdir -p logs
 
-# SSL 인증서 디렉토리
-mkdir -p docker/nginx/ssl
-mkdir -p docker/nginx/certbot
+# SSL 인증서 디렉토리 (docker-compose.yml의 nginx 서비스가 마운트하는 경로: ./nginx/ssl)
+mkdir -p nginx/ssl
 
 # 백업 디렉토리
 mkdir -p backups
@@ -52,14 +51,14 @@ mkdir -p backups
 ### 3. 환경 변수 파일 생성
 
 ```bash
-# .env 파일 생성
-cp .env.example .env.production
+# .env 파일 생성 (docker-compose.yml은 정확히 .env 파일명을 읽음)
+cp .env.example .env
 
 # 편집
-nano .env.production
+nano .env
 
 # 권한 설정
-chmod 600 .env.production
+chmod 600 .env
 ```
 
 ---
@@ -83,44 +82,40 @@ git pull origin main
 #### 2단계: 환경 변수 확인
 
 ```bash
-# .env 파일 존재 확인
-ls -la .env.production
-
-# 필수 변수 확인 (스크립트 실행)
-./scripts/validate-env.sh
+# .env 파일 존재 확인 (docker-compose.yml이 정확히 .env를 읽음)
+ls -la .env
 ```
 
-#### 3단계: Docker 이미지 빌드 (로컬 빌드인 경우)
+> `scripts/validate-env.sh` 같은 검증 스크립트는 레포에 **아직 없음** — 직접 만들어 쓸 경우 `.env.example`의 필수 키(DB_*, REDIS_*, JWT_SECRET 등) 목록을 기준으로 작성
+
+#### 3단계: 프론트엔드 빌드 (nginx가 서빙할 정적 파일 생성)
 
 ```bash
-# Backend 이미지 빌드
-docker build -f docker/Dockerfile.backend -t petory-backend:latest .
-
-# Frontend 이미지 빌드
-docker build -f docker/Dockerfile.frontend -t petory-frontend:latest .
+cd frontend
+npm ci
+npm run build   # frontend/build 생성 — docker-compose.yml의 nginx 서비스가 이 폴더를 볼륨으로 마운트함
+cd ..
 ```
 
 #### 4단계: 기존 컨테이너 중지
 
 ```bash
-# 기존 컨테이너 중지
-docker-compose -f docker-compose.prod.yml down --timeout 30
+docker compose down --timeout 30
 
 # 또는 특정 서비스만 재시작
-docker-compose -f docker-compose.prod.yml restart backend
+docker compose restart app
 ```
 
-#### 5단계: 새 컨테이너 시작
+#### 5단계: 이미지 빌드 + 새 컨테이너 시작
+
+레포에는 아직 이미지 레지스트리 push/pull 파이프라인이 없어서(CD 미구축), 서버에서 직접 빌드한다:
 
 ```bash
-# 환경 변수 파일 지정
-export $(cat .env.production | xargs)
+# mysql/redis/app/nginx 전체 빌드+기동 (app만 코드가 바뀌므로 사실상 app만 재빌드됨)
+docker compose up --build -d
 
-# 컨테이너 시작
-docker-compose -f docker-compose.prod.yml up -d
-
-# 또는 특정 서비스만 시작
-docker-compose -f docker-compose.prod.yml up -d backend frontend
+# 또는 app만 재빌드
+docker compose up --build -d app
 ```
 
 #### 6단계: Health Check
@@ -128,12 +123,9 @@ docker-compose -f docker-compose.prod.yml up -d backend frontend
 ```bash
 # Backend Health Check
 sleep 30
-curl -f http://localhost:8080/api/actuator/health
+curl -f http://localhost:8080/actuator/health
 
-# Frontend 확인
-curl -f http://localhost:3000
-
-# Nginx 확인
+# Nginx(프론트+리버스프록시) 확인
 curl -f http://localhost
 ```
 
@@ -141,13 +133,13 @@ curl -f http://localhost
 
 ```bash
 # 모든 컨테이너 로그
-docker-compose -f docker-compose.prod.yml logs -f
+docker compose logs -f
 
 # 특정 서비스 로그
-docker-compose -f docker-compose.prod.yml logs -f backend
+docker compose logs -f app
 
 # 최근 100줄
-docker-compose -f docker-compose.prod.yml logs --tail=100 backend
+docker compose logs --tail=100 app
 ```
 
 #### 8단계: 정리
@@ -170,128 +162,85 @@ GitHub Actions를 통한 자동 배포는 [CI/CD 파이프라인](./03-cicd-pipe
 
 ## 🔄 무중단 배포 스크립트
 
-### `scripts/deploy.sh`
+> **참고**: `scripts/deploy.sh` 같은 자동화 스크립트는 레포에 **아직 없음**. 지금은 이미지 레지스트리 push/pull(CD)이 없어서 서버에서 직접 `docker compose up --build`로 재빌드하는 방식 — 아래는 필요 시 만들어 쓸 수 있는 예시.
 
 ```bash
 #!/bin/bash
+# 예시: scripts/deploy.sh (레포에 없음, 참고용)
 set -e
 
-COMPOSE_FILE="docker-compose.prod.yml"
 PROJECT_DIR="/opt/petory"
-HEALTH_CHECK_URL="http://localhost:8080/api/actuator/health"
+HEALTH_CHECK_URL="http://localhost:8080/actuator/health"
 
 cd $PROJECT_DIR
 
 echo "🚀 Starting deployment..."
 
 # 1. 환경 변수 검증
-echo "📋 Validating environment variables..."
-if [ ! -f .env.production ]; then
-    echo "❌ .env.production file not found"
+if [ ! -f .env ]; then
+    echo "❌ .env file not found"
     exit 1
 fi
 
-# 2. 최신 이미지 Pull (Docker Hub에서)
-echo "📥 Pulling latest images..."
-docker-compose -f $COMPOSE_FILE pull || echo "⚠️ Image pull failed, using local images"
+# 2. 최신 코드 반영
+git pull origin main
 
 # 3. 백업 (선택적)
-echo "💾 Creating backup..."
 BACKUP_DIR="./backups/$(date +%Y%m%d_%H%M%S)"
 mkdir -p $BACKUP_DIR
-docker exec petory-mysql-prod mysqldump -u root -p${MYSQL_ROOT_PASSWORD} petory > $BACKUP_DIR/mysql_backup.sql 2>/dev/null || echo "⚠️ Backup skipped"
+docker exec petory-mysql mysqldump -u root -p${DB_ROOT_PASSWORD} petory > $BACKUP_DIR/mysql_backup.sql 2>/dev/null || echo "⚠️ Backup skipped"
 
-# 4. 기존 컨테이너 중지
-echo "🛑 Stopping current containers..."
-docker-compose -f $COMPOSE_FILE down --timeout 30
+# 4. 프론트엔드 재빌드
+(cd frontend && npm ci && npm run build)
 
-# 5. 새 컨테이너 시작
-echo "▶️ Starting new containers..."
-docker-compose -f $COMPOSE_FILE up -d
+# 5. 이미지 재빌드 + 컨테이너 교체
+docker compose up --build -d
 
-# 6. Health Check 대기
-echo "⏳ Waiting for services to be healthy..."
-sleep 30
-
-# 7. Health Check
-echo "🔍 Performing health check..."
+# 6. Health Check
+echo "⏳ Waiting for health check..."
 MAX_RETRIES=10
 RETRY_COUNT=0
-
 while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
     if curl -f $HEALTH_CHECK_URL > /dev/null 2>&1; then
         echo "✅ Health check passed"
         break
     fi
-    
     RETRY_COUNT=$((RETRY_COUNT + 1))
-    echo "⏳ Health check failed, retrying... ($RETRY_COUNT/$MAX_RETRIES)"
+    echo "⏳ retrying... ($RETRY_COUNT/$MAX_RETRIES)"
     sleep 10
 done
 
 if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
-    echo "❌ Health check failed after $MAX_RETRIES retries"
-    echo "🔄 Rolling back..."
-    
-    # 롤백: 이전 이미지 사용
-    docker-compose -f $COMPOSE_FILE down
-    docker tag petory-backend:previous petory-backend:latest 2>/dev/null || true
-    docker-compose -f $COMPOSE_FILE up -d
-    
-    echo "❌ Deployment failed, rolled back to previous version"
+    echo "❌ Health check failed — 아래 롤백 프로세스 참고"
     exit 1
 fi
 
-# 8. 정리
-echo "🧹 Cleaning up..."
 docker image prune -f
-
 echo "✅ Deployment completed successfully!"
-```
-
-### 실행 권한 부여
-
-```bash
-chmod +x scripts/deploy.sh
 ```
 
 ---
 
 ## 🔙 롤백 프로세스
 
-### 수동 롤백
+이미지 레지스트리/태그 관리가 아직 없으므로, **git 기준 이전 커밋으로 되돌려 재빌드**하는 방식이 현재로선 가장 현실적:
 
 ```bash
-#!/bin/bash
-# scripts/rollback.sh
-
 cd /opt/petory
 
-echo "🔄 Rolling back to previous version..."
+# 1. 이전 커밋으로 되돌리기 (직전 배포 커밋 해시 확인 후)
+git log --oneline -5
+git checkout <이전_커밋_해시>
 
-# 1. 기존 컨테이너 중지
-docker-compose -f docker-compose.prod.yml down
+# 2. 재빌드 + 재기동
+docker compose up --build -d
 
-# 2. 이전 이미지로 태그 변경
-PREVIOUS_TAG=$(docker images petory-backend --format "{{.Tag}}" | grep -v latest | head -1)
-
-if [ -z "$PREVIOUS_TAG" ]; then
-    echo "❌ No previous image found"
-    exit 1
-fi
-
-echo "📦 Rolling back to tag: $PREVIOUS_TAG"
-docker tag petory-backend:$PREVIOUS_TAG petory-backend:latest
-
-# 3. 컨테이너 재시작
-docker-compose -f docker-compose.prod.yml up -d
-
-# 4. Health Check
+# 3. Health Check
 sleep 30
-curl -f http://localhost:8080/api/actuator/health
-
-echo "✅ Rollback completed"
+curl -f http://localhost:8080/actuator/health
 ```
+
+> CI가 이미지를 레지스트리에 push하도록 확장되면(`03-cicd-pipeline.md` 참고), 그때는 `docker tag`/`docker pull`로 이전 이미지 태그를 되돌리는 방식으로 더 빠르게 롤백할 수 있음.
 
 ---
 
@@ -301,47 +250,47 @@ echo "✅ Rollback completed"
 
 ```bash
 # 컨테이너 상태
-docker-compose -f docker-compose.prod.yml ps
+docker compose ps
 
 # 리소스 사용량
 docker stats --no-stream
 
 # 네트워크 상태
 docker network ls
-docker network inspect petory_petory-network
+docker network inspect petory_default
 ```
 
 ### 2. 애플리케이션 로그 확인
 
 ```bash
 # Backend 로그
-docker logs petory-backend-prod --tail 100 -f
+docker logs petory-app --tail 100 -f
 
 # Frontend 로그
-docker logs petory-frontend-prod --tail 100 -f
+docker logs petory-nginx --tail 100 -f
 
 # MySQL 로그
-docker logs petory-mysql-prod --tail 100 -f
+docker logs petory-mysql --tail 100 -f
 
 # Redis 로그
-docker logs petory-redis-prod --tail 100 -f
+docker logs petory-redis --tail 100 -f
 ```
 
 ### 3. 데이터베이스 연결 확인
 
 ```bash
 # MySQL 연결 테스트
-docker exec -it petory-mysql-prod mysql -u petory -p
+docker exec -it petory-mysql mysql -u petory -p
 
 # Redis 연결 테스트
-docker exec -it petory-redis-prod redis-cli -a ${REDIS_PASSWORD} ping
+docker exec -it petory-redis redis-cli -a ${REDIS_PASSWORD} ping
 ```
 
 ### 4. API 엔드포인트 테스트
 
 ```bash
 # Health Check
-curl http://localhost:8080/api/actuator/health
+curl http://localhost:8080/actuator/health
 
 # API 테스트
 curl http://localhost/api/boards
@@ -355,26 +304,26 @@ curl http://localhost/api/boards
 
 ```bash
 # 로그 확인
-docker-compose -f docker-compose.prod.yml logs backend
+docker compose logs app
 
 # 컨테이너 상태 확인
 docker ps -a
 
 # 재시작
-docker-compose -f docker-compose.prod.yml restart backend
+docker compose restart app
 ```
 
 ### 데이터베이스 연결 오류
 
 ```bash
 # MySQL 상태 확인
-docker exec petory-mysql-prod mysqladmin ping -h localhost
+docker exec petory-mysql mysqladmin ping -h localhost
 
 # 네트워크 확인
-docker network inspect petory_petory-network
+docker network inspect petory_default
 
 # 환경 변수 확인
-docker exec petory-backend-prod env | grep SPRING_DATASOURCE
+docker exec petory-app env | grep SPRING_DATASOURCE
 ```
 
 ### 포트 충돌
@@ -390,7 +339,7 @@ lsof -nP -iTCP:3306 -sTCP:LISTEN
 ```
 
 ```yaml
-# 포트 변경 (docker-compose.prod.yml)
+# 포트 변경 (docker-compose.yml)
 ports:
   - "8081:8080"  # 외부 포트 변경
 ```

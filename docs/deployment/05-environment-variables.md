@@ -27,194 +27,120 @@ Petory 프로젝트의 환경 변수 관리 방법과 보안 전략을 설명합
 
 ```
 Petory/
-├── .env.example              # 환경 변수 템플릿
-├── .env.development          # 개발 환경 (로컬)
-├── .env.staging              # 스테이징 환경
-├── .env.production           # 프로덕션 환경 (서버에서만)
-└── docker/
-    └── .env.prod.example     # Docker Compose용 예시
+└── .env.example              # 환경 변수 템플릿 (레포 루트, 이거 하나뿐)
 ```
+
+실제로는 `.env.example` 하나만 있고, 이걸 `.env`로 복사해서 값을 채우면 `docker-compose.yml`이 그대로 읽는다. `application-prod.properties`가 `${DB_HOST}`처럼 **커스텀 이름의 플레이스홀더**를 직접 쓰기 때문에, Spring Boot의 relaxed binding 컨벤션(`SPRING_DATASOURCE_URL` 같은 자동 매핑 이름)이 아니라 **아래 실제 변수명 그대로** 맞춰야 인식된다.
 
 ---
 
 ## 🔧 Backend 환경 변수
 
-### `.env.example`
+### `.env.example`(실제 파일 전문)
 
 ```bash
-# ============================================
-# Application Profile
-# ============================================
-SPRING_PROFILES_ACTIVE=prod
+# ── MySQL ───────────────────────────────────────────────────
+DB_HOST=mysql
+DB_PORT=3306
+DB_NAME=petory
+DB_USERNAME=petory_app
+DB_PASSWORD=your_strong_db_password_here
+DB_ROOT_PASSWORD=your_strong_root_password_here
 
-# ============================================
-# Database Configuration
-# ============================================
-SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/petory
-SPRING_DATASOURCE_USERNAME=petory
-SPRING_DATASOURCE_PASSWORD=your_database_password
-SPRING_DATASOURCE_DRIVER_CLASS_NAME=com.mysql.cj.jdbc.Driver
+# ── Redis ───────────────────────────────────────────────────
+REDIS_HOST=redis
+REDIS_PORT=6379
+REDIS_PASSWORD=your_strong_redis_password_here
 
-# ============================================
-# JPA/Hibernate Configuration
-# ============================================
-SPRING_JPA_HIBERNATE_DDL_AUTO=none
-SPRING_JPA_SHOW_SQL=false
-SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT=org.hibernate.dialect.MySQL8Dialect
-SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL=false
+# ── JWT ─────────────────────────────────────────────────────
+# openssl rand -base64 64 로 생성 (최소 256bit = 32자 이상)
+JWT_SECRET=
+# Access JWT TTL (ms). 생략 시 900000(15분)
+# JWT_ACCESS_TOKEN_EXPIRATION_MS=900000
 
-# ============================================
-# Redis Configuration
-# ============================================
-SPRING_REDIS_HOST=redis
-SPRING_REDIS_PORT=6379
-SPRING_REDIS_PASSWORD=your_redis_password
-SPRING_REDIS_TIMEOUT=2000ms
+# ── 프론트엔드 URL ───────────────────────────────────────────
+FRONTEND_URL=https://your-domain.com
 
-# ============================================
-# JWT Configuration
-# ============================================
-JWT_SECRET=your_jwt_secret_key_minimum_256_bits_required_for_hs256
-JWT_REFRESH_SECRET=your_jwt_refresh_secret_key_minimum_256_bits_required
-JWT_ACCESS_TOKEN_VALIDITY=900000
-JWT_REFRESH_TOKEN_VALIDITY=86400000
+# ── Google / Naver OAuth2 ────────────────────────────────────
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+NAVER_CLIENT_ID=
+NAVER_CLIENT_SECRET=
 
-# ============================================
-# Email Configuration
-# ============================================
-SPRING_MAIL_HOST=smtp.gmail.com
-SPRING_MAIL_PORT=587
-SPRING_MAIL_USERNAME=your_email@gmail.com
-SPRING_MAIL_PASSWORD=your_app_specific_password
-SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH=true
-SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE=true
-SPRING_MAIL_FROM_ADDRESS=noreply@petory.com
+# ── 네이버 지도 API ──────────────────────────────────────────
+NAVER_MAP_CLIENT_ID=
+NAVER_MAP_CLIENT_SECRET=
 
-# ============================================
-# OAuth2 Configuration
-# ============================================
-# Google OAuth2
-SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_ID=your_google_client_id
-SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET=your_google_client_secret
-SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_REDIRECT_URI=https://your-domain.com/api/oauth2/callback/google
+# ── Gmail SMTP ──────────────────────────────────────────────
+MAIL_USERNAME=your-email@gmail.com
+MAIL_PASSWORD=
 
-# Naver OAuth2
-SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_NAVER_CLIENT_ID=your_naver_client_id
-SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_NAVER_CLIENT_SECRET=your_naver_client_secret
-SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_NAVER_REDIRECT_URI=https://your-domain.com/api/oauth2/callback/naver
+# ── 파일 업로드 ──────────────────────────────────────────────
+FILE_UPLOAD_DIR=/app/uploads
 
-# ============================================
-# File Upload Configuration
-# ============================================
-UPLOAD_DIR=/app/uploads
-MAX_FILE_SIZE=10485760
-ALLOWED_FILE_TYPES=jpg,jpeg,png,gif,pdf
+# ── Ollama (AI) ─────────────────────────────────────────────
+OLLAMA_BASE_URL=http://ollama:11434
+OLLAMA_MODEL=llama3
 
-# ============================================
-# External API Keys
-# ============================================
-# Naver Map API
-NAVER_MAP_CLIENT_ID=your_naver_map_client_id
-NAVER_MAP_CLIENT_SECRET=your_naver_map_client_secret
+# ── Pet Data API ─────────────────────────────────────────────
+PET_DATA_API_URL=http://localhost:8000
+PET_DATA_API_KEY=
 
-# ============================================
-# Server Configuration
-# ============================================
-SERVER_PORT=8080
-SERVER_ERROR_INCLUDE_MESSAGE=never
-SERVER_ERROR_INCLUDE_STACKTRACE=never
-
-# ============================================
-# Logging Configuration
-# ============================================
-LOGGING_LEVEL_ROOT=INFO
-LOGGING_LEVEL_COM_LINKUP_PETORY=INFO
-LOGGING_FILE_NAME=logs/petory.log
-LOGGING_FILE_MAX_SIZE=10MB
-LOGGING_FILE_MAX_HISTORY=30
+# ── Spring Boot Admin ────────────────────────────────────────
+ADMIN_SERVER_URL=http://localhost:8080/admin-ui
 ```
+
+> **필수 주의**: `GOOGLE_CLIENT_ID`/`SECRET`, `NAVER_CLIENT_ID`/`SECRET` 등이 비어 있으면 `ClientRegistrationRepository` 빈 생성 자체가 실패해서 앱이 부팅되지 않는다. 실제 OAuth2 자격증명이 없으면 더미 문자열이라도 채워야 한다. `JWT_SECRET`은 반드시 값을 채워야 함 (빈 값이면 부팅 실패).
 
 ---
 
 ## 🎨 Frontend 환경 변수
 
-### `frontend/.env.example`
+`frontend/`에 `.env`, `.env.production.local`, `.env.capacitor` 등이 상황별로 있음 (모두 gitignore 대상). 코드에서 실제로 읽는 변수(`process.env.REACT_APP_*` 기준 확인):
 
 ```bash
-# API Base URL
-REACT_APP_API_URL=http://localhost:8080/api
-
-# Environment
-REACT_APP_ENV=production
-
-# Naver Map API Key (Frontend에서 사용)
-REACT_APP_NAVER_MAP_CLIENT_ID=your_naver_map_client_id
-
-# WebSocket URL
-REACT_APP_WS_URL=ws://localhost:8080/ws
-
-# Feature Flags
-REACT_APP_ENABLE_CHAT=true
-REACT_APP_ENABLE_NOTIFICATIONS=true
+REACT_APP_API_BASE_URL=http://localhost:8080     # apiClient.js
+REACT_APP_NAVER_MAPS_CLIENT_ID=your_naver_map_client_id   # MapContainer.js, MiniMapPicker.js
+REACT_APP_NAVER_MAPS_KEY_ID=your_naver_map_key_id
+REACT_APP_DEMO_MODE=false                        # isDemoMode.js
 ```
 
-### Frontend 빌드 시 주입
-
-React는 빌드 타임에 환경 변수가 주입되므로, `REACT_APP_` 접두사가 필요합니다.
-
-```dockerfile
-# Dockerfile.frontend
-ARG REACT_APP_API_URL
-ARG REACT_APP_NAVER_MAP_CLIENT_ID
-
-ENV REACT_APP_API_URL=$REACT_APP_API_URL
-ENV REACT_APP_NAVER_MAP_CLIENT_ID=$REACT_APP_NAVER_MAP_CLIENT_ID
-
-RUN npm run build
-```
+React는 빌드 타임에 환경 변수가 주입되므로 `REACT_APP_` 접두사가 필요하고, `docker-compose.yml`에는 별도 프론트 빌드 스테이지가 없으므로(로컬에서 `npm run build`로 `frontend/build`를 만들어 nginx가 서빙) **빌드를 실행하는 시점**에 이 값들이 잡혀 있어야 한다.
 
 ---
 
 ## 🐳 Docker Compose 환경 변수
 
-### `docker-compose.prod.yml`
+### `docker-compose.yml`(실제 파일)
+
+실제 `docker-compose.yml`은 `.env`(레포 루트, `.env.example`을 복사해 채움)를 읽어서 각 서비스에 전달한다. 서비스명은 `mysql`/`redis`/`app`/`nginx` 4개뿐이고, `frontend`는 별도 서비스가 아니라 `app` 이미지 없이 `nginx`가 `frontend/build`를 정적으로 서빙한다.
 
 ```yaml
-version: '3.8'
-
 services:
   mysql:
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${MYSQL_DATABASE}
-      MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME:-petory}
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
 
   redis:
-    command: redis-server --requirepass ${REDIS_PASSWORD}
+    command: redis-server --requirepass ${REDIS_PASSWORD} ...
 
-  backend:
+  app:
+    env_file:
+      - .env          # JWT_SECRET, OAuth2/메일/네이버맵 등 나머지 값은 .env에서 그대로 주입
     environment:
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE}
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE}
-      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER}
-      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD}
-      SPRING_REDIS_HOST: redis
-      SPRING_REDIS_PASSWORD: ${REDIS_PASSWORD}
-      JWT_SECRET: ${JWT_SECRET}
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
-      SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME}
-      SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD}
-      # ... 기타 환경 변수
+      DB_HOST: mysql            # docker-compose가 서비스명으로 덮어씀 (.env의 DB_HOST=mysql과 동일)
+      REDIS_HOST: redis
+      SPRING_PROFILES_ACTIVE: prod
 
-  frontend:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.frontend
-      args:
-        REACT_APP_API_URL: ${REACT_APP_API_URL}
-        REACT_APP_NAVER_MAP_CLIENT_ID: ${REACT_APP_NAVER_MAP_CLIENT_ID}
+  nginx:
+    volumes:
+      - ./frontend/build:/usr/share/nginx/html:ro   # 프론트 빌드 결과물 정적 서빙
 ```
+
+`.env`에 필요한 키 전체 목록은 레포 루트 `.env.example` 참고 (`DB_*`, `REDIS_*`, `JWT_SECRET`, `GOOGLE_*`/`NAVER_*` OAuth2, `MAIL_*`, `NAVER_MAP_*` 등). **OAuth2 client-id/secret, 메일 계정 등은 실제 값이 없어도 더미값은 채워야 함** — 비어 있으면 `ClientRegistrationRepository` 빈 생성 실패로 앱이 아예 안 뜸.
 
 ---
 
@@ -250,9 +176,9 @@ chown app:app .env.production
 CI/CD에서 민감한 정보는 GitHub Secrets 사용:
 
 ```yaml
-# .github/workflows/cd-production.yml
+# .github/workflows/cd-production.yml (CD는 아직 없음, 추가 시 예시)
 env:
-  SPRING_DATASOURCE_PASSWORD: ${{ secrets.DB_PASSWORD }}
+  DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
   JWT_SECRET: ${{ secrets.JWT_SECRET }}
 ```
 
@@ -309,32 +235,22 @@ SERVER_ERROR_INCLUDE_STACKTRACE=never
 
 ## 📝 Spring Boot에서 환경 변수 사용
 
-### `application.properties`
+`application-prod.properties`(실제 파일)에서 커스텀 이름의 플레이스홀더를 직접 씀 — Spring Boot의 `SPRING_*` 자동 relaxed-binding이 아니라 **이 플레이스홀더 이름과 정확히 같은 환경변수**를 설정해야 반영된다.
 
 ```properties
-# 기본값 설정
-spring.datasource.url=${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/petory}
-spring.datasource.username=${SPRING_DATASOURCE_USERNAME:root}
-spring.datasource.password=${SPRING_DATASOURCE_PASSWORD:}
+spring.datasource.url=jdbc:mysql://${DB_HOST}:${DB_PORT:3306}/${DB_NAME:petory}?useSSL=true&...
+spring.datasource.username=${DB_USERNAME}
+spring.datasource.password=${DB_PASSWORD}
 
-# JWT
+spring.redis.host=${REDIS_HOST}
+spring.redis.port=${REDIS_PORT:6379}
+spring.redis.password=${REDIS_PASSWORD}
+
 jwt.secret=${JWT_SECRET}
-jwt.refresh-secret=${JWT_REFRESH_SECRET}
+jwt.expiration=900000
 ```
 
-### `@ConfigurationProperties` 사용
-
-```java
-@ConfigurationProperties(prefix = "jwt")
-@Getter
-@Setter
-public class JwtProperties {
-    private String secret;
-    private String refreshSecret;
-    private long accessTokenValidity;
-    private long refreshTokenValidity;
-}
-```
+> Refresh Token은 별도 시크릿으로 서명하는 게 아니라 **DB에 저장**해서 관리한다 (`jwt.refresh-secret` 같은 속성은 없음).
 
 ---
 
@@ -368,12 +284,12 @@ openssl rand -base64 24
 # validate-env.sh
 
 REQUIRED_VARS=(
-    "MYSQL_PASSWORD"
+    "DB_PASSWORD"
+    "DB_ROOT_PASSWORD"
     "REDIS_PASSWORD"
     "JWT_SECRET"
-    "JWT_REFRESH_SECRET"
-    "SPRING_MAIL_USERNAME"
-    "SPRING_MAIL_PASSWORD"
+    "MAIL_USERNAME"
+    "MAIL_PASSWORD"
 )
 
 MISSING_VARS=()

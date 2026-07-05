@@ -17,7 +17,7 @@
 
 1. [Docker Desktop](https://www.docker.com/products/docker-desktop/) 설치 후 실행합니다.
 2. 메뉴 **Settings → Resources**에서 CPU/메모리 할당(예: 메모리 4GB 이상)을 여유 있게 두면 MySQL·Spring 컨테이너가 덜 불안정합니다.
-3. **Apple Silicon**: 대부분의 공식 이미지(`mysql:8.0`, `redis:7-alpine`, `openjdk:17` 등)는 `linux/arm64`를 지원합니다. 커스텀 이미지가 `amd64`만 있으면 에뮬레이션으로 느려질 수 있습니다.
+3. **Apple Silicon**: `mysql:8.0`, `redis:7-alpine`, `nginx:alpine`은 `linux/arm64`를 지원합니다. **주의**: `eclipse-temurin:17-{jdk,jre}-alpine`은 amd64 전용이라 M시리즈 맥에서 빌드가 아예 실패합니다(`no match for platform in manifest`) — 이 레포의 `Dockerfile`은 `-jammy`(Debian 기반) 태그를 씁니다. 다른 이미지를 새로 추가할 땐 `docker manifest inspect <image>`로 arm64 지원 여부를 먼저 확인하는 게 안전합니다.
 
 ### Compose 명령 (v2)
 
@@ -43,10 +43,10 @@ cd ~/project/Petory   # 실제 경로에 맞게 수정
 
 ## 환경 변수
 
-로컬 개발은 주로 `backend/main/resources/application.properties`(gitignore일 수 있음)로 맞춥니다.  
-레포 루트에 `.env.example`은 **없을 수 있음** — Docker Compose 전체 스택을 추가하면 그때 `.env` 패턴을 두면 됨.
+로컬에서 호스트(bootRun)로 직접 돌릴 땐 `backend/main/resources/application.properties`(gitignore)로 맞춥니다.  
+Docker Compose 전체 스택을 쓸 땐 레포 루트의 `.env.example`을 `.env`로 복사해서 채웁니다.
 
-서버에서 `.env`만 쓸 때는 권한을 제한합니다.
+`.env` 권한은 제한해 둡니다.
 
 ```bash
 chmod 600 .env
@@ -56,13 +56,15 @@ chmod 600 .env
 
 ## 실행·중지 (개발용 Compose)
 
-`docker-compose.yml`이 **레포에 추가된 뒤**에만 아래가 해당합니다. 현재는 [02-docker-configuration.md](./02-docker-configuration.md) 참고.
-
 ```bash
-docker compose up -d
+docker compose up --build -d   # 최초 실행이거나 Dockerfile/코드가 바뀌었을 때
+docker compose up -d           # 이미지 변경 없이 재기동만 할 때
 docker compose logs -f
-docker compose down -v   # 볼륨 삭제 시 데이터 초기화 주의
+docker compose down            # 컨테이너만 종료, 볼륨(DB 데이터)은 유지
+docker compose down -v         # 볼륨까지 삭제 → 다음 up 때 DB가 baseline부터 새로 초기화됨
 ```
+
+상세는 [02-docker-configuration.md](./02-docker-configuration.md) 참고.
 
 ---
 
@@ -77,7 +79,7 @@ lsof -nP -iTCP:8080 -sTCP:LISTEN
 lsof -nP -iTCP:3306 -sTCP:LISTEN
 ```
 
-로 점유 프로세스를 확인한 뒤, 로컬에서 띄운 MySQL/다른 앱이 있으면 종료하거나 `docker-compose.yml`의 포트 매핑을 바꿉니다.
+로 점유 프로세스를 확인한 뒤, 로컬에서 띄운 MySQL/다른 앱이 있으면 종료하거나 `docker-compose.yml`의 포트 매핑을 바꿉니다 (예: `"3307:3306"`, `"6380:6379"`처럼 **호스트 쪽 포트만** 바꾸면 됨 — 컨테이너 간 통신은 서비스 이름 기반이라 영향 없음).
 
 ### 파일 공유·성능
 

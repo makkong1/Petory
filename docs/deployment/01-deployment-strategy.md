@@ -24,28 +24,25 @@ Petory 프로젝트는 **Docker 컨테이너 기반 배포**와 **Nginx를 이�
 │                        Production Server                     │
 │                                                              │
 │  ┌──────────────────────────────────────────────────────┐  │
-│  │                    Nginx (Port 80, 443)              │  │
+│  │            petory-nginx (Port 80, 443)               │  │
 │  │  - SSL/TLS Termination                               │  │
-│  │  - Static File Serving (Frontend)                    │  │
-│  │  - Reverse Proxy (Backend API)                       │  │
-│  │  - Load Balancing (Future)                           │  │
-│  └────────────────┬───────────────────────┬─────────────┘  │
-│                   │                       │                 │
-│         ┌─────────▼─────────┐  ┌─────────▼─────────┐      │
-│         │   Frontend        │  │    Backend        │      │
-│         │   Container       │  │   Container       │      │
-│         │   (React Build)   │  │  (Spring Boot)    │      │
-│         │   Port: 3000      │  │   Port: 8080      │      │
-│         └───────────────────┘  └─────────┬─────────┘      │
-│                                          │                 │
-│                          ┌───────────────┼───────────────┐ │
-│                          │               │               │ │
-│                 ┌────────▼──────┐ ┌──────▼──────┐       │ │
-│                 │  MySQL        │ │   Redis     │       │ │
-│                 │  Container    │ │  Container  │       │ │
-│                 │  Port: 3306   │ │  Port: 6379 │       │ │
-│                 └───────────────┘ └─────────────┘       │ │
-│                                                          │ │
+│  │  - frontend/build 정적 파일 직접 서빙 (별도 컨테이너 X)   │  │
+│  │  - Reverse Proxy (/api → backend:8080)               │  │
+│  └────────────────────────┬─────────────────────────────┘  │
+│                           │                                 │
+│                  ┌────────▼────────┐                        │
+│                  │  petory-app     │                        │
+│                  │  (Spring Boot)  │                        │
+│                  │  Port: 8080     │                        │
+│                  └────────┬────────┘                        │
+│                           │                                 │
+│              ┌────────────┼────────────┐                    │
+│              │                         │                    │
+│     ┌────────▼──────┐         ┌───────▼───────┐            │
+│     │ petory-mysql  │         │ petory-redis  │            │
+│     │  Port: 3306   │         │  Port: 6379   │            │
+│     └───────────────┘         └───────────────┘            │
+│                                                              │
 └──────────────────────────────────────────────────────────┘
 ```
 
@@ -60,15 +57,13 @@ Petory 프로젝트는 **Docker 컨테이너 기반 배포**와 **Nginx를 이�
   - Gzip 압축
   - 캐싱 정책
 
-#### 2. Frontend Container
-- **기반 이미지**: `nginx:alpine`
-- **내용**: React 빌드 결과물 (`/build`)
-- **포트**: 3000 (내부)
-- **외부 노출**: Nginx를 통해서만 접근
+#### 2. Frontend
+- **별도 컨테이너 없음**: `docker-compose.yml`의 `nginx` 서비스(`nginx:alpine`)가 `frontend/build` 결과물을 볼륨으로 마운트해 정적 파일을 직접 서빙 (`petory-nginx` 컨테이너 하나가 프론트 서빙 + 백엔드 리버스 프록시를 겸함)
 
 #### 3. Backend Container
-- **기반 이미지**: `openjdk:17-jdk-slim`
-- **애플리케이션**: Spring Boot JAR 파일
+- **기반 이미지**: `eclipse-temurin:17-jdk-jammy`(빌드) → `eclipse-temurin:17-jre-jammy`(런타임), 멀티스테이지
+  - Alpine 계열은 arm64(Apple Silicon) 매니페스트 미제공으로 M시리즈 맥 빌드 실패 → jammy 사용
+- **애플리케이션**: Spring Boot JAR 파일 (non-root 유저 `petory`로 실행)
 - **포트**: 8080 (내부)
 - **외부 노출**: Nginx를 통해서만 접근
 

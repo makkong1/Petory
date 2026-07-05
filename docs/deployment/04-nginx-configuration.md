@@ -131,7 +131,7 @@ server {
 
     # Backend API 프록시
     location /api {
-        proxy_pass http://backend:8080;
+        proxy_pass http://app:8080;
         proxy_http_version 1.1;
 
         # 헤더 설정
@@ -163,7 +163,7 @@ server {
 
     # WebSocket 프록시 (채팅 기능)
     location /ws {
-        proxy_pass http://backend:8080;
+        proxy_pass http://app:8080;
         proxy_http_version 1.1;
 
         # WebSocket 헤더
@@ -182,7 +182,7 @@ server {
 
     # 파일 업로드
     location /api/uploads {
-        proxy_pass http://backend:8080;
+        proxy_pass http://app:8080;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -192,8 +192,8 @@ server {
     }
 
     # Health Check (캐싱 제외)
-    location /api/actuator/health {
-        proxy_pass http://backend:8080;
+    location /actuator/health {
+        proxy_pass http://app:8080;
         proxy_set_header Host $host;
         proxy_cache off;
         access_log off;
@@ -207,7 +207,7 @@ server {
 
 ### Let's Encrypt 자동 갱신
 
-#### `docker-compose.prod.yml`에 certbot 추가
+#### `docker-compose.yml`에 certbot 추가
 
 ```yaml
 services:
@@ -235,8 +235,8 @@ services:
 #!/bin/bash
 # renew-ssl.sh
 
-docker-compose -f docker-compose.prod.yml run --rm certbot renew
-docker-compose -f docker-compose.prod.yml restart nginx
+docker-compose -f docker-compose.yml run --rm certbot renew
+docker-compose -f docker-compose.yml restart nginx
 ```
 
 #### Crontab 설정 (월 1회 갱신)
