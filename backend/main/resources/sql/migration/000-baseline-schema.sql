@@ -862,6 +862,7 @@ CREATE TABLE `socialuser` (
   `provider_phone` varchar(50) DEFAULT NULL COMMENT 'Provider별 전화번호 (네이버: mobile 또는 mobile_e164)',
   `provider_age_range` varchar(20) DEFAULT NULL COMMENT 'Provider별 나이대 (네이버: 20-29 형식)',
   PRIMARY KEY (`idx`),
+  UNIQUE KEY `uk_socialuser_provider_providerid` (`provider`,`provider_id`),
   KEY `users_idx` (`users_idx`),
   CONSTRAINT `socialuser_ibfk_1` FOREIGN KEY (`users_idx`) REFERENCES `users` (`idx`)
 ) ENGINE=InnoDB AUTO_INCREMENT=225 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
