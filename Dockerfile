@@ -1,5 +1,5 @@
 # ── Stage 1: Build ──────────────────────────────────────────
-FROM eclipse-temurin:17-jdk-alpine AS builder
+FROM eclipse-temurin:17-jdk-jammy AS builder
 WORKDIR /app
 
 # Gradle wrapper & build scripts 먼저 복사 (캐시 최적화)
@@ -16,11 +16,11 @@ COPY backend backend
 RUN ./gradlew bootJar --no-daemon -q
 
 # ── Stage 2: Runtime ─────────────────────────────────────────
-FROM eclipse-temurin:17-jre-alpine
+FROM eclipse-temurin:17-jre-jammy
 WORKDIR /app
 
 # 보안: 전용 유저로 실행 (root 금지)
-RUN addgroup -S petory && adduser -S petory -G petory
+RUN groupadd -r petory && useradd -r -g petory petory
 
 # 업로드 디렉토리
 RUN mkdir -p /app/uploads && chown petory:petory /app/uploads
