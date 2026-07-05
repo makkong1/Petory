@@ -119,6 +119,13 @@ public class UsersService {
     // 생성
     @Transactional
     public UsersDTO createUser(UsersDTO dto) {
+        // 공개 회원가입에서 선택 가능한 역할은 USER/SERVICE_PROVIDER로 제한
+        // (ADMIN/MASTER를 자가지정해 권한 상승하는 것을 방지)
+        if (dto.getRole() == null
+                || !(Role.USER.name().equals(dto.getRole()) || Role.SERVICE_PROVIDER.name().equals(dto.getRole()))) {
+            throw UserValidationException.invalidRole();
+        }
+
         // 닉네임 필수 검증
         String nickname = dto.getNickname();
         if (nickname == null || nickname.trim().isEmpty()) {

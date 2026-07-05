@@ -58,6 +58,10 @@ public class LocationServiceBatchWriter {
                     if (entityManager.contains(entity)) {
                         entityManager.detach(entity);
                     }
+                    // 배치 실패 전 IDENTITY가 이미 배정된 엔티티가 섞여 있으면
+                    // save()가 update로 오인해 실패한 행을 대상으로 UPDATE를 시도하다 실패함.
+                    // 신규 임포트는 전부 insert이므로 idx를 초기화해 항상 insert로 처리되게 함.
+                    entity.setIdx(null);
                     locationServiceRepository.save(entity);
                     saved++;
                 } catch (DataAccessException ex) {

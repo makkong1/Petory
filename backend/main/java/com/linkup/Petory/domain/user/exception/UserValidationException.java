@@ -43,4 +43,8 @@ public class UserValidationException extends ApiException {
     public static UserValidationException invalidPurpose(String purposeStr) {
         return new UserValidationException("유효하지 않은 인증 용도입니다: " + purposeStr);
     }
+
+    public static UserValidationException invalidRole() {
+        return new UserValidationException("회원가입 시 선택할 수 없는 역할입니다.");
+    }
 }
