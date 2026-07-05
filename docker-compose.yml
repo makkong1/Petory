@@ -42,6 +42,23 @@ services:
       timeout: 3s
       retries: 3
 
+  nlp-server:
+    build:
+      context: ./petory-nlp-server
+      dockerfile: Dockerfile
+    container_name: petory-nlp-server
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - nlp_model_cache:/home/nlp/.cache/huggingface
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
   app:
     build:
       context: .
@@ -53,12 +70,15 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      nlp-server:
+        condition: service_healthy
     env_file:
       - .env
     environment:
       DB_HOST: mysql
       REDIS_HOST: redis
       SPRING_PROFILES_ACTIVE: prod
+      PET_INTENT_BASE_URL: http://nlp-server:8000
     ports:
       - "8080:8080"
     volumes:
@@ -95,3 +115,4 @@ volumes:
   redis_data:
   uploads:
   nginx_logs:
+  nlp_model_cache:

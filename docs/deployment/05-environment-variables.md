@@ -82,15 +82,21 @@ FILE_UPLOAD_DIR=/app/uploads
 OLLAMA_BASE_URL=http://ollama:11434
 OLLAMA_MODEL=llama3
 
-# ── Pet Data API ─────────────────────────────────────────────
-PET_DATA_API_URL=http://localhost:8000
-PET_DATA_API_KEY=
-
 # ── Spring Boot Admin ────────────────────────────────────────
 ADMIN_SERVER_URL=http://localhost:8080/admin-ui
 ```
 
 > **필수 주의**: `GOOGLE_CLIENT_ID`/`SECRET`, `NAVER_CLIENT_ID`/`SECRET` 등이 비어 있으면 `ClientRegistrationRepository` 빈 생성 자체가 실패해서 앱이 부팅되지 않는다. 실제 OAuth2 자격증명이 없으면 더미 문자열이라도 채워야 한다. `JWT_SECRET`은 반드시 값을 채워야 함 (빈 값이면 부팅 실패).
+
+### petory-nlp-server 연동
+
+`.env.example`에는 없고, `docker-compose.yml`의 `app` 서비스 `environment`에 직접 박혀 있다 (컨테이너 토폴로지 값이라 `.env`로 뺄 필요가 없음):
+
+```yaml
+PET_INTENT_BASE_URL: http://nlp-server:8000
+```
+
+`application-prod.properties`의 `app.pet-intent.base-url=${PET_INTENT_BASE_URL:http://localhost:8000}`이 이 값을 받는다. (예전에 쓰였던 `PET_DATA_API_URL`/`PET_DATA_API_KEY`라는 이름은 실제 코드 어디에서도 참조되지 않는 죽은 변수였고, 실제 연동은 `PetIntentClient` + `app.pet-intent.base-url` 뿐이다.)
 
 ---
 

@@ -111,7 +111,7 @@ docker compose restart app
 레포에는 아직 이미지 레지스트리 push/pull 파이프라인이 없어서(CD 미구축), 서버에서 직접 빌드한다:
 
 ```bash
-# mysql/redis/app/nginx 전체 빌드+기동 (app만 코드가 바뀌므로 사실상 app만 재빌드됨)
+# mysql/redis/nlp-server/app/nginx 전체 빌드+기동 (보통 app만 코드가 바뀌므로 app만 재빌드됨)
 docker compose up --build -d
 
 # 또는 app만 재빌드

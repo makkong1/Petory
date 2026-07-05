@@ -36,12 +36,12 @@ Petory 프로젝트는 **Docker 컨테이너 기반 배포**와 **Nginx를 이�
 │                  │  Port: 8080     │                        │
 │                  └────────┬────────┘                        │
 │                           │                                 │
-│              ┌────────────┼────────────┐                    │
-│              │                         │                    │
-│     ┌────────▼──────┐         ┌───────▼───────┐            │
-│     │ petory-mysql  │         │ petory-redis  │            │
-│     │  Port: 3306   │         │  Port: 6379   │            │
-│     └───────────────┘         └───────────────┘            │
+│              ┌────────────┼────────────────────────┐        │
+│              │                         │            │        │
+│     ┌────────▼──────┐         ┌───────▼───────┐  ┌─▼───────────────────┐
+│     │ petory-mysql  │         │ petory-redis  │  │ petory-nlp-server   │
+│     │  Port: 3306   │         │  Port: 6379   │  │ FastAPI, Port: 8000 │
+│     └───────────────┘         └───────────────┘  └──────────────────────┘
 │                                                              │
 └──────────────────────────────────────────────────────────┘
 ```
@@ -76,6 +76,13 @@ Petory 프로젝트는 **Docker 컨테이너 기반 배포**와 **Nginx를 이�
 - **기반 이미지**: `redis:7-alpine`
 - **포트**: 6379 (내부)
 - **용도**: 캐싱, 알림 버퍼링
+
+#### 6. petory-nlp-server Container
+- **기반 이미지**: `python:3.9-slim` (자체 `petory-nlp-server/Dockerfile`)
+- **애플리케이션**: FastAPI + `sentence-transformers`/`kiwipiepy` 기반 한국어 반려생활 의도 분석
+- **포트**: 8000 (내부)
+- **연동**: `petory-app`의 `PetIntentClient`가 `POST /api/pet-intent/analyze` 호출 (`app.pet-intent.base-url=http://nlp-server:8000`)
+- **의존성**: `app`은 `depends_on`으로 이 컨테이너의 헬스체크(`/health`) 통과를 기다린 뒤 기동
 
 ---
 

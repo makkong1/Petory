@@ -22,7 +22,7 @@
 
 ## 🏗️ 배포 아키텍처
 
-`docker-compose.yml`(레포 루트)로 4개 컨테이너가 뜬다. 프론트엔드는 별도 컨테이너 없이, nginx가 `frontend/build` 정적 파일을 직접 서빙하면서 `/api` 등은 backend로 리버스 프록시한다.
+`docker-compose.yml`(레포 루트)로 5개 컨테이너가 뜬다. 프론트엔드는 별도 컨테이너 없이, nginx가 `frontend/build` 정적 파일을 직접 서빙하면서 `/api` 등은 backend로 리버스 프록시한다.
 
 ```
                     ┌─────────────┐
@@ -42,12 +42,13 @@
                     │  8080       │
                     └──────┬──────┘
                            │
-              ┌────────────┼────────────┐
-              │                         │
-       ┌──────▼──────┐         ┌───────▼───────┐
-       │ petory-mysql│         │ petory-redis  │
-       │  MySQL 8.0  │         │  Redis 7      │
-       └─────────────┘         └───────────────┘
+         ┌─────────────────┼─────────────────┐
+         │                 │                 │
+  ┌──────▼──────┐  ┌───────▼───────┐  ┌──────▼─────────────┐
+  │ petory-mysql│  │ petory-redis  │  │ petory-nlp-server   │
+  │  MySQL 8.0  │  │  Redis 7      │  │ FastAPI, 의도 분석    │
+  └─────────────┘  └───────────────┘  │  8000               │
+                                       └──────────────────────┘
 ```
 
 ---
@@ -68,7 +69,8 @@
 ### Infrastructure
 - **데이터베이스**: MySQL 8.0 — `docker-compose.yml`의 `mysql` 서비스. 최초 기동 시 `backend/main/resources/sql/migration/000-baseline-schema.sql`이 자동 실행되어 전체 스키마(테이블 40개)가 생성됨
 - **캐시**: Redis 7 — `docker-compose.yml`의 `redis` 서비스
-- **전체 스택 Compose**: 레포 루트 `docker-compose.yml`에 존재 (mysql·redis·app·nginx 4개 서비스)
+- **NLP 서버**: `petory-nlp-server`(FastAPI, Python 3.9) — `docker-compose.yml`의 `nlp-server` 서비스. 반려생활 의도 분석(`POST /api/pet-intent/analyze`) 담당, `app`이 `PetIntentClient`로 호출 (`app.pet-intent.base-url=http://nlp-server:8000`)
+- **전체 스택 Compose**: 레포 루트 `docker-compose.yml`에 존재 (mysql·redis·nlp-server·app·nginx 5개 서비스)
 - **CI/CD**: GitHub Actions ([문서](./03-cicd-pipeline.md)) — 현재는 빌드/테스트까지, 이미지 push·서버 자동배포(CD)는 아직 없음
 
 ---
@@ -83,7 +85,7 @@ cp .env.example .env
 # .env 편집: DB_PASSWORD, DB_ROOT_PASSWORD, REDIS_PASSWORD, JWT_SECRET 등 채우기
 # (OAuth2/메일 등 실제 자격증명 없으면 더미값이라도 넣어야 부팅됨 — SecurityConfig가 빈 값이면 실패)
 
-# 2. 전체 스택 기동 (mysql, redis, app, nginx)
+# 2. 전체 스택 기동 (mysql, redis, nlp-server, app, nginx)
 docker compose up --build -d
 
 # 3. 상태 확인
@@ -93,6 +95,7 @@ curl http://localhost:8080/actuator/health
 
 - macOS에서 로컬 네이티브 MySQL(3306)/Redis(6379)를 이미 쓰고 있으면 포트 충돌 남 → `docker-compose.yml`의 `ports`를 다른 값(예: `3307:3306`, `6380:6379`)으로 바꿔서 회피. 컨테이너 간 통신은 서비스명 기반이라 호스트 포트를 바꿔도 앱 동작엔 영향 없음.
 - nginx는 `nginx/ssl/`에 실제 인증서(`fullchain.pem` 등)가 없으면 기동 실패함 — 로컬 검증 목적이면 무시 가능, 실제 서버 배포 시 Let's Encrypt 등으로 발급 필요.
+- `nlp-server`는 `sentence-transformers`/`torch`/`kiwipiepy` 설치 때문에 최초 빌드가 오래 걸림(수 분). 임베딩 모델(`jhgan/ko-sroberta-multitask`)은 컨테이너 최초 기동 시 HuggingFace에서 다운로드하며 `nlp_model_cache` 볼륨에 캐시되어 이후 재기동은 빠름 (인터넷 연결 필요).
 - 상세: [Docker 설정](./02-docker-configuration.md)
 
 ### 방법 B: 로컬 네이티브 실행 (기존 개발 방식)
