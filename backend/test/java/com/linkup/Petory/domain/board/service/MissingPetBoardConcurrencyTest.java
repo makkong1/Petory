@@ -7,11 +7,15 @@ import com.linkup.Petory.domain.board.repository.MissingPetBoardRepository;
 import com.linkup.Petory.domain.board.repository.MissingPetCommentRepository;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
+import com.linkup.Petory.global.security.CustomUserDetails;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -121,6 +125,17 @@ class MissingPetBoardConcurrencyTest {
 
         boardRepository.flush();
         commentRepository.flush();
+
+        // deleteBoard() 는 SecurityContext 의 현재 사용자로 소유권을 검증한다(assertOwner).
+        // 게시글 작성자(testUser1)로 인증 상태를 설정해야 삭제가 허용된다.
+        CustomUserDetails principal = CustomUserDetails.from(testUser1);
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities()));
+    }
+
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
     }
 
     @Test
