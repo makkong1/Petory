@@ -65,6 +65,18 @@ git diff
 - staged + unstaged 변경사항을 모두 파악한다.
 - 비밀 파일(.env, credentials, application.properties 등)이 포함되면 **경고하고 제외**한다.
 
+### 1-1단계: 브랜치 확인 (main 직접 커밋 방지)
+
+이 저장소는 `dev` 브랜치에서 작업 → PR → `main` 병합 컨벤션을 쓴다(`git log`의 `Merge pull request #NNN from makkong1/dev` 이력 참고).
+
+```bash
+git branch --show-current
+```
+
+- 현재 브랜치가 `main`/`master`이면, 커밋 전에 반드시 사용자에게 알린다: "지금 main 브랜치입니다. dev로 전환해서 작업할까요, 아니면 이번만 main에 직접 커밋할까요?"
+- 사용자가 브랜치를 특정하지 않고 그냥 "커밋해/푸시해"라고만 했다면 **기본값은 dev로 전환**(`git checkout dev && git pull`) 후 커밋한다. main 직접 커밋은 사용자가 명시적으로 지시했을 때만(예: 문서 전용 변경, 긴급 hotfix) 예외로 허용한다.
+- 이미 `dev`나 `feature/*` 등 main이 아닌 브랜치에 있다면 이 단계는 통과, 바로 다음 단계로 진행한다.
+
 ### 2단계: 파일 필터링 (안전장치)
 
 변경된 파일 목록을 보여주고 커밋 범위를 확인한다:
