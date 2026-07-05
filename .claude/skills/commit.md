@@ -144,6 +144,19 @@ git commit -m "<선택된 메시지>"
 git push origin <current-branch>
 ```
 
+### 5-1단계: main 푸시 시 CI/CD 자동 확인
+
+**푸시 대상이 `main`이면**, push 직후 GitHub Actions가 실제로 트리거됐는지 확인하고 완료까지 지켜본다 (파일이 존재한다고 실행됐다고 가정하지 않는다):
+
+```bash
+gh run list --workflow=<트리거되는 워크플로우 파일명>.yml --limit 3
+gh run watch <run-id> --exit-status
+```
+
+- 트리거 안 됐으면(`gh run list`에 방금 push 시각의 run이 없으면) 워크플로우의 `on.push.branches`에 `main`이 포함되어 있는지, 파일이 실제로 main 브랜치에 존재하는지 확인한다.
+- `gh run watch`가 실패로 끝나면 로그(`gh run view <run-id> --log-failed`)를 확인해 원인을 요약해서 알린다. 조용히 넘어가지 않는다.
+- dev→main 병합 직후처럼 여러 워크플로우가 동시에 트리거될 수 있으면 각각 확인한다.
+
 ### 6단계: 결과 요약
 
 ```
@@ -152,6 +165,12 @@ git push origin <current-branch>
 - 📝 메시지: `feat(location): AI 추천 결과를 지도·리스트 순위로 시각화`
 - 📁 파일: 3개 (변경 2, 신규 1)
 - 🚀 푸시: origin/feature/ai-recommend ✅
+```
+
+**`main` 푸시였다면** CI/CD 실행 결과도 함께 보고한다:
+
+```
+- 🔄 CD (Build & Push Docker Images): ✅ 성공 (run 28734294862)
 ```
 
 ## 빠른 모드
