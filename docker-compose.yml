@@ -10,8 +10,9 @@ services:
       MYSQL_PASSWORD: ${DB_PASSWORD}
       TZ: Asia/Seoul
     ports:
-      - "3306:3306"
+      - "3307:3306"
     volumes:
+      # TODO: 로컬 볼륨 대신 관리형 클라우드 DB(RDS 등)로 이전 고려 (데이터를 로컬 디스크에 쌓아두지 않도록)
       - mysql_data:/var/lib/mysql
       - ./backend/main/resources/sql/migration:/docker-entrypoint-initdb.d:ro
     command:
@@ -32,7 +33,7 @@ services:
     restart: unless-stopped
     command: redis-server --requirepass ${REDIS_PASSWORD} --maxmemory 256mb --maxmemory-policy allkeys-lru
     ports:
-      - "6379:6379"
+      - "6380:6379"
     volumes:
       - redis_data:/data
     healthcheck:
