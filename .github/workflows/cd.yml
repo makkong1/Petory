@@ -9,7 +9,18 @@ name: CD (Build & Push Docker Images)
 on:
   push:
     branches: [main]
-  workflow_dispatch: {} # 수동 실행 (Actions 탭 또는 gh workflow run) — main push 전 검증용
+    # 두 이미지 중 하나라도 영향받는 경로가 바뀔 때만 트리거 (docs/skill 등 무관한
+    # main 푸시마다 무거운 이미지 재빌드가 도는 것을 방지)
+    paths:
+      - "Dockerfile"
+      - "build.gradle"
+      - "settings.gradle"
+      - "gradle/**"
+      - "gradlew"
+      - "backend/**"
+      - "petory-nlp-server/**"
+      - ".github/workflows/cd.yml"
+  workflow_dispatch: {} # 수동 실행 (Actions 탭 또는 gh workflow run) — main push 전 검증용, 경로 필터 무시하고 항상 실행됨
 
 permissions:
   contents: read
