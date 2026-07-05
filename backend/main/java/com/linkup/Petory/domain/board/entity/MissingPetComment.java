@@ -24,7 +24,7 @@ import lombok.Setter;
 
 /** 실종 반려동물 게시글 댓글. 목격 위치(주소·위도·경도)를 함께 기록할 수 있다. */
 @Entity
-@Table(name = "MissingPetComment")
+@Table(name = "missing_pet_comment")
 @Getter
 @Setter
 @NoArgsConstructor
