@@ -1,4 +1,4 @@
-package com.linkup.Petory.domain.user.controller;
+package com.linkup.Petory.domain.profile.controller;
 
 import java.util.List;
 import java.util.Map;
@@ -20,7 +20,7 @@ import com.linkup.Petory.domain.care.service.CareReviewService;
 import com.linkup.Petory.domain.location.service.LocationServiceReviewService;
 import com.linkup.Petory.domain.meetup.dto.MeetupHistoryDTO;
 import com.linkup.Petory.domain.meetup.service.MeetupService;
-import com.linkup.Petory.domain.user.dto.UserProfileWithReviewsDTO;
+import com.linkup.Petory.domain.profile.dto.UserProfileWithReviewsDTO;
 import com.linkup.Petory.domain.user.dto.UsersDTO;
 import com.linkup.Petory.domain.user.entity.EmailVerificationPurpose;
 import com.linkup.Petory.domain.user.exception.InvalidPasswordException;

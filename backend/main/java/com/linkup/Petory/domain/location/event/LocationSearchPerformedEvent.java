@@ -1,4 +1,4 @@
-package com.linkup.Petory.domain.petRecommendation.event;
+package com.linkup.Petory.domain.location.event;
 
 import lombok.Getter;
 import org.springframework.context.ApplicationEvent;

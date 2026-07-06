@@ -7,7 +7,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.linkup.Petory.domain.report.entity.ReportActionType;
+import com.linkup.Petory.domain.common.ReportActionType;
 import com.linkup.Petory.domain.user.entity.UserSanction;
 import com.linkup.Petory.domain.user.entity.UserStatus;
 import com.linkup.Petory.domain.user.entity.Users;

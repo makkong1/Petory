@@ -4,7 +4,7 @@ import com.linkup.Petory.domain.petRecommendation.client.PetIntentClient;
 import com.linkup.Petory.domain.petRecommendation.dto.PetIntentAnalyzeResponse;
 import com.linkup.Petory.domain.petRecommendation.event.CareRequestCreatedEvent;
 import com.linkup.Petory.domain.petRecommendation.event.CommunityPostCreatedEvent;
-import com.linkup.Petory.domain.petRecommendation.event.LocationSearchPerformedEvent;
+import com.linkup.Petory.domain.location.event.LocationSearchPerformedEvent;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.event.EventListener;

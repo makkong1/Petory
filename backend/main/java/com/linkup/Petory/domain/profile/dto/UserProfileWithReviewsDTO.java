@@ -1,10 +1,11 @@
-package com.linkup.Petory.domain.user.dto;
+package com.linkup.Petory.domain.profile.dto;
 
 import java.util.List;
 
 import com.linkup.Petory.domain.care.dto.CareReviewDTO;
 import com.linkup.Petory.domain.location.dto.LocationServiceReviewDTO;
 import com.linkup.Petory.domain.meetup.dto.MeetupHistoryDTO;
+import com.linkup.Petory.domain.user.dto.UsersDTO;
 
 import lombok.Data;
 import lombok.NoArgsConstructor;

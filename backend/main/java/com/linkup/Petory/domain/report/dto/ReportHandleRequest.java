@@ -1,6 +1,6 @@
 package com.linkup.Petory.domain.report.dto;
 
-import com.linkup.Petory.domain.report.entity.ReportActionType;
+import com.linkup.Petory.domain.common.ReportActionType;
 import com.linkup.Petory.domain.report.entity.ReportStatus;
 
 import lombok.Getter;
