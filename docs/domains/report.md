@@ -33,7 +33,7 @@ Report 도메인은 여러 도메인의 콘텐츠 또는 사용자를 하나의 
 | 신고 엔티티 | `domain/report/entity/Report.java` |
 | 대상 타입 enum | `domain/report/entity/ReportTargetType.java` |
 | 처리 상태 enum | `domain/report/entity/ReportStatus.java` |
-| 조치 enum | `domain/report/entity/ReportActionType.java` |
+| 조치 enum (공용) | `domain/common/ReportActionType.java` |
 | repository adapter | `domain/report/repository/JpaReportAdapter.java` |
 | Spring Data JPA | `domain/report/repository/SpringDataJpaReportRepository.java` |
 | 사용자 제재 연동 | `domain/user/service/UserSanctionService.java` |
@@ -147,6 +147,8 @@ REJECTED
 ERD 일부 문서에는 `REVIEWING`이 남아 있지만 현재 enum에는 없다.
 
 ### 4.4 ReportActionType
+
+report와 user(제재) 도메인이 공유하는 enum이라 `domain/common`에 둔다 (2026-07 이동 — `user→report` 역방향 의존 제거).
 
 ```java
 NONE

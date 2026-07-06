@@ -184,7 +184,7 @@ DISTINCT 사용자를 직접 집계한다.
 
 결제 연동:
 
-- `PetCoinEscrowService.releaseToProvider()`가 제공자 지급 후 `statisticsService.recordPayment(BigDecimal.valueOf(escrow.getAmount()))`를 호출한다.
+- `PetCoinEscrowService.releaseToProvider()`가 제공자 지급 후 `PaymentRecordedEvent`를 발행하고, `PaymentRecordedStatisticsListener`가 `@TransactionalEventListener(AFTER_COMMIT)` + `REQUIRES_NEW`로 `recordPayment(BigDecimal.valueOf(escrow.getAmount()))`를 호출한다. 통계 집계가 실패해도 이미 커밋된 코인 지급은 롤백되지 않는다 (2026-07 이벤트화).
 - 환불 흐름은 `recordPayment()`를 호출하지 않는다.
 
 ---

@@ -33,7 +33,7 @@ User 도메인은 인증, 사용자 프로필, 소셜 계정 연결, 이메일 �
 | ---------------------- | ---------------------------------------------------------------------------------------------- |
 | 인증 API               | `backend/main/java/com/linkup/Petory/domain/user/controller/AuthController.java`               |
 | 인증 서비스            | `backend/main/java/com/linkup/Petory/domain/user/service/AuthService.java`                     |
-| 프로필 API             | `backend/main/java/com/linkup/Petory/domain/user/controller/UserProfileController.java`        |
+| 프로필 API             | `backend/main/java/com/linkup/Petory/domain/profile/controller/UserProfileController.java`        |
 | 사용자 서비스          | `backend/main/java/com/linkup/Petory/domain/user/service/UsersService.java`                    |
 | OAuth2 서비스          | `backend/main/java/com/linkup/Petory/domain/user/service/OAuth2Service.java`                   |
 | OAuth2 성공 핸들러     | `backend/main/java/com/linkup/Petory/domain/user/handler/OAuth2SuccessHandler.java`            |
@@ -278,7 +278,7 @@ OAuth2 로그인은 Spring Security OAuth2 성공 후 `OAuth2SuccessHandler`가 
 내 프로필 조회:
 
 - `UsersService.getMyProfile()`은 `findByIdStringWithPets()` fetch join으로 User와 Pet을 한 번에 가져온다.
-- `UserProfileController`는 Care 리뷰 요약, Location 리뷰 요약, Meetup 히스토리를 조합해 `UserProfileWithReviewsDTO`로 응답한다.
+- `UserProfileController`(2026-07 의존 리팩토링으로 `domain/profile` 집계 계층으로 이동)는 Care 리뷰 요약, Location 리뷰 요약, Meetup 히스토리를 조합해 `UserProfileWithReviewsDTO`(`domain/profile/dto`)로 응답한다. 이 조합 조회가 `user→care/location/meetup` 역방향 의존을 만들어, 집계 계층으로 분리했다.
 - `SERVICE_PROVIDER`는 받은 Care 리뷰 기준, 일반 사용자는 작성한 Care 리뷰 기준으로 프로필 리뷰 모드를 구분한다.
 
 프로필 수정:
