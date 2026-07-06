@@ -2,6 +2,7 @@ package com.linkup.Petory.domain.payment.service;
 
 import java.math.BigDecimal;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -12,8 +13,8 @@ import com.linkup.Petory.domain.payment.entity.PetCoinEscrow;
 import com.linkup.Petory.domain.payment.exception.PaymentConflictException;
 import com.linkup.Petory.domain.payment.exception.PaymentValidationException;
 import com.linkup.Petory.domain.payment.exception.PetCoinEscrowNotFoundException;
+import com.linkup.Petory.domain.payment.event.PaymentRecordedEvent;
 import com.linkup.Petory.domain.payment.repository.PetCoinEscrowRepository;
-import com.linkup.Petory.domain.statistics.service.StatisticsService;
 import com.linkup.Petory.domain.user.entity.Users;
 
 import lombok.RequiredArgsConstructor;
@@ -29,7 +30,7 @@ public class PetCoinEscrowService {
 
     private final PetCoinEscrowRepository escrowRepository;
     private final PetCoinService petCoinService;
-    private final StatisticsService statisticsService;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * 에스크로 생성 (거래 확정 시)
@@ -102,7 +103,8 @@ public class PetCoinEscrowService {
                 escrow.getCareRequest().getIdx(),
                 String.format("펫케어 거래 완료 - 요청 ID: %d", escrow.getCareRequest().getIdx()));
 
-        statisticsService.recordPayment(BigDecimal.valueOf(escrow.getAmount()));
+        // 통계 집계는 결제 트랜잭션 커밋 후 비동기 처리 (실패해도 코인 지급은 롤백되지 않음)
+        eventPublisher.publishEvent(new PaymentRecordedEvent(BigDecimal.valueOf(escrow.getAmount())));
 
         PetCoinEscrow saved = escrowRepository.save(escrow);
 

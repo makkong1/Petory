@@ -3,7 +3,7 @@ package com.linkup.Petory.domain.petRecommendation.service;
 import com.linkup.Petory.domain.petRecommendation.client.PetIntentClient;
 import com.linkup.Petory.domain.petRecommendation.event.CareRequestCreatedEvent;
 import com.linkup.Petory.domain.petRecommendation.event.CommunityPostCreatedEvent;
-import com.linkup.Petory.domain.petRecommendation.event.LocationSearchPerformedEvent;
+import com.linkup.Petory.domain.location.event.LocationSearchPerformedEvent;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

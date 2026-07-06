@@ -3,6 +3,7 @@ package com.linkup.Petory.domain.report.entity;
 import java.time.LocalDateTime;
 
 import com.linkup.Petory.domain.common.BaseTimeEntity;
+import com.linkup.Petory.domain.common.ReportActionType;
 import com.linkup.Petory.domain.user.entity.Users;
 
 import jakarta.persistence.Column;

@@ -1,5 +1,14 @@
 # 위치서비스 공공데이터 CSV 배치 임포트 구현
 
+> ⚠️ **현행 기준 안내 (2026-07 검증)**: 이 문서는 **2026-05 구현 당시 기록**이며, 이후 리팩토링으로 아래 항목이 현재 코드와 다릅니다. **현재 사실의 단일 진실은 [`docs/domains/location.md`](../../domains/location.md)** 입니다.
+>
+> - 관리자 컨트롤러: ~~`LocationServiceAdminController`(location 패키지)~~ → **`AdminLocationController`(`domain/admin/controller`)** 로 이동
+> - 배치 저장: ~~`PublicDataLocationService`의 private `saveBatch`~~ → Spring AOP self-invocation 문제를 피하려 **별도 빈 `LocationServiceBatchWriter.saveBatch()`(`@Service`, `@Transactional(REQUIRES_NEW)`)** 로 분리. `PublicDataLocationService`는 `batchWriter.saveBatch(batch)`를 호출만 한다.
+> - 공간 컬럼명: ~~`coordinates`~~ → 실제 **`location`** (엔티티 주석이 자체 정정)
+> - CSV 크기 제한: ~~500MB~~ → 실제 **200MB**(`AdminLocationController.MAX_CSV_BYTES`)
+> - 중복 체크 메서드: ~~`existsByNameAndDetailAddress`~~ → 실제 **`existsByNameAndAddress`**
+> - `category` 별도 필드는 현재 없음 — `category1/2/3`만 존재
+
 ## 개요
 
 공공데이터 포털에서 제공하는 반려동물 관련 시설 정보 CSV 파일(약 7만건)을 배치로 임포트하여 `LocationService` 엔티티로 저장하는 기능을 구현했습니다.
@@ -21,7 +30,7 @@
 ```
 [프론트엔드] 
     ↓ (CSV 파일 업로드)
-[LocationServiceAdminController]
+[AdminLocationController]
     ↓ (MultipartFile)
 [PublicDataLocationService]
     ↓ (CSV 파싱 → DTO 변환 → 엔티티 변환)
@@ -32,7 +41,7 @@
 
 ### 주요 컴포넌트
 
-#### 1. LocationServiceAdminController
+#### 1. AdminLocationController
 - **역할**: REST API 엔드포인트 제공
 - **엔드포인트**: 
   - `POST /api/admin/location-services/import-public-data` (파일 업로드)
@@ -486,7 +495,7 @@ importPublicData: (file) => {
 ## 참고 파일
 
 - **서비스**: `backend/main/java/com/linkup/Petory/domain/location/service/PublicDataLocationService.java`
-- **컨트롤러**: `backend/main/java/com/linkup/Petory/domain/location/controller/LocationServiceAdminController.java`
+- **컨트롤러**: `backend/main/java/com/linkup/Petory/domain/admin/controller/AdminLocationController.java`
 - **DTO**: `backend/main/java/com/linkup/Petory/domain/location/dto/PublicDataLocationDTO.java`
 - **프론트엔드**: `frontend/src/components/Admin/sections/LocationServiceManagementSection.js`
 - **API**: `frontend/src/api/locationServiceApi.js`

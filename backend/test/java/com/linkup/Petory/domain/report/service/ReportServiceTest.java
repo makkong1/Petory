@@ -29,7 +29,7 @@ import com.linkup.Petory.domain.report.dto.ReportDTO;
 import com.linkup.Petory.domain.report.dto.ReportHandleRequest;
 import com.linkup.Petory.domain.report.dto.ReportRequestDTO;
 import com.linkup.Petory.domain.report.entity.Report;
-import com.linkup.Petory.domain.report.entity.ReportActionType;
+import com.linkup.Petory.domain.common.ReportActionType;
 import com.linkup.Petory.domain.report.entity.ReportStatus;
 import com.linkup.Petory.domain.report.entity.ReportTargetType;
 import com.linkup.Petory.domain.report.repository.ReportRepository;

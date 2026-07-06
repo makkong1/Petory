@@ -15,7 +15,7 @@ import com.linkup.Petory.domain.location.entity.LocationService;
 import com.linkup.Petory.domain.location.exception.LocationServiceAlreadyDeletedException;
 import com.linkup.Petory.domain.location.exception.LocationServiceNotFoundException;
 import com.linkup.Petory.domain.location.repository.LocationServiceRepository;
-import com.linkup.Petory.domain.petRecommendation.event.LocationSearchPerformedEvent;
+import com.linkup.Petory.domain.location.event.LocationSearchPerformedEvent;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 
 import lombok.RequiredArgsConstructor;
