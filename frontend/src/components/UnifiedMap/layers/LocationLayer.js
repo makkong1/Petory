@@ -8,7 +8,7 @@ import {
   InfoRow, InfoLabel, InfoValue, InfoGrid,
 } from '../shared/BaseInfoPanel';
 
-const LocationLayer = ({ selectedItem, onClose }) => {
+const LocationLayer = ({ selectedItem, onClose, docked = false }) => {
   const { user } = useAuth();
   const [reviews, setReviews] = useState([]);
   const [reviewLoading, setReviewLoading] = useState(false);
@@ -86,10 +86,17 @@ const LocationLayer = ({ selectedItem, onClose }) => {
   };
 
   return (
-    <InfoPanel $width="320px" $maxHeight="70vh">
+    <InfoPanel $docked={docked} $width="320px" $maxHeight="70vh">
       <PanelHeader>
-        <TypeBadge>🏥 {r.category || '시설'}</TypeBadge>
-        <CloseButton onClick={onClose} aria-label="닫기">✕</CloseButton>
+        <HeaderLeft>
+          {docked && (
+            <BackBtn onClick={onClose} aria-label="목록으로 돌아가기">←</BackBtn>
+          )}
+          <TypeBadge>🏥 {r.category || '시설'}</TypeBadge>
+        </HeaderLeft>
+        {!docked && (
+          <CloseButton onClick={onClose} aria-label="닫기">✕</CloseButton>
+        )}
       </PanelHeader>
 
       <PanelTitle>{selectedItem.title}</PanelTitle>
@@ -103,6 +110,7 @@ const LocationLayer = ({ selectedItem, onClose }) => {
       <Divider />
 
       <ScrollBody>
+        <Hero aria-hidden="true">🏥</Hero>
         <InfoGrid $padding="10px 14px">
           {r.address && <InfoRow><InfoLabel $minWidth="70px">주소</InfoLabel><InfoValue>{r.address}</InfoValue></InfoRow>}
           {r.phone && (
@@ -203,6 +211,19 @@ const LocationLayer = ({ selectedItem, onClose }) => {
         )}
         </ReviewSection>
       </ScrollBody>
+
+      <ActionBar>
+        {r.phone && (
+          <ActionPrimary href={`tel:${r.phone}`}>📞 전화하기</ActionPrimary>
+        )}
+        <ActionSecondary
+          href={`https://map.naver.com/p/search/${encodeURIComponent(selectedItem.title || '')}`}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          🧭 길찾기
+        </ActionSecondary>
+      </ActionBar>
     </InfoPanel>
   );
 };
@@ -210,6 +231,78 @@ const LocationLayer = ({ selectedItem, onClose }) => {
 export default LocationLayer;
 
 const InfoPanel = styled(BaseInfoPanel)``;
+
+const HeaderLeft = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+`;
+
+const BackBtn = styled.button`
+  border: none;
+  background: ${props => props.theme.colors.surface};
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  font-size: 16px;
+  color: ${props => props.theme.colors.text};
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  &:hover { background: ${props => props.theme.colors.surfaceHover}; }
+`;
+
+const Hero = styled.div`
+  height: 96px;
+  margin: 10px 14px 4px;
+  border-radius: 16px;
+  background: linear-gradient(
+    135deg,
+    ${props => props.theme.colors.surface},
+    ${props => props.theme.colors.background}
+  );
+  border: 1px solid ${props => props.theme.colors.borderLight};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40px;
+  flex-shrink: 0;
+`;
+
+const ActionBar = styled.div`
+  display: flex;
+  gap: 8px;
+  padding: 12px 14px;
+  border-top: 1px solid ${props => props.theme.colors.borderLight};
+  flex-shrink: 0;
+`;
+
+const ActionPrimary = styled.a`
+  flex: 1;
+  text-align: center;
+  padding: 11px;
+  border-radius: 12px;
+  background: ${props => props.theme.colors.domain.location};
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: none;
+`;
+
+const ActionSecondary = styled.a`
+  flex: 1;
+  text-align: center;
+  padding: 11px;
+  border-radius: 12px;
+  background: ${props => props.theme.colors.surface};
+  color: ${props => props.theme.colors.text};
+  border: 1px solid ${props => props.theme.colors.border};
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: none;
+`;
 
 const TypeBadge = styled.span`
   font-size: 12px;

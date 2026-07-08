@@ -1,4 +1,4 @@
-import styled, { keyframes } from 'styled-components';
+import styled, { keyframes, css } from 'styled-components';
 
 const slideInRight = keyframes`
   from { transform: translateX(100%); opacity: 0; }
@@ -11,29 +11,44 @@ const slideInUp = keyframes`
 `;
 
 export const InfoPanel = styled.div`
-  position: absolute;
-  bottom: 0;
-  right: 0;
-  width: ${props => props.$width || '300px'};
-  max-height: ${props => props.$maxHeight || '65vh'};
-  background: ${props => props.theme.colors.surfaceElevated + 'EB'};
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-radius: 20px;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  z-index: 500;
-  border: 1px solid ${props => props.theme.colors.border};
-  box-shadow: ${props => props.theme.shadows.xl};
-  animation: ${slideInRight} 0.25s cubic-bezier(0, 0, 0.2, 1);
+  ${props =>
+    props.$docked
+      ? /* 하단 시트 등 부모 컨테이너를 그대로 채우는 도킹 모드 (자체 chrome 없음) */
+        css`
+          position: relative;
+          width: 100%;
+          flex: 1;
+          min-height: 0;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+        `
+      : /* 기본: 지도 위에 떠 있는 플로팅 패널 */
+        css`
+          position: absolute;
+          bottom: 0;
+          right: 0;
+          width: ${props.$width || '300px'};
+          max-height: ${props.$maxHeight || '65vh'};
+          background: ${props.theme.colors.surfaceElevated + 'EB'};
+          backdrop-filter: blur(20px);
+          -webkit-backdrop-filter: blur(20px);
+          border-radius: 20px;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+          z-index: 500;
+          border: 1px solid ${props.theme.colors.border};
+          box-shadow: ${props.theme.shadows.xl};
+          animation: ${slideInRight} 0.25s cubic-bezier(0, 0, 0.2, 1);
 
-  @media (max-width: 600px) {
-    width: 100%;
-    border-radius: 20px;
-    max-height: 60vh;
-    animation: ${slideInUp} 0.25s cubic-bezier(0, 0, 0.2, 1);
-  }
+          @media (max-width: 600px) {
+            width: 100%;
+            border-radius: 20px;
+            max-height: 60vh;
+            animation: ${slideInUp} 0.25s cubic-bezier(0, 0, 0.2, 1);
+          }
+        `}
 `;
 
 export const PanelHeader = styled.div`
