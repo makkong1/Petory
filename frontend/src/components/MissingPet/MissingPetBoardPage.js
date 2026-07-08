@@ -335,48 +335,59 @@ const MissingPetBoardPage = () => {
             </EmptyAction>
           </EmptyState>
         ) : (
-          <div style={{ position: 'relative' }}>
-            <BoardGrid>
-              {boards.map((board) => (
-                <BoardCard key={board.idx} onClick={() => handleCardClick(board)}>
-                  <CardImageArea>
-                    {board.imageUrl
-                      ? <img src={board.imageUrl} alt={board.petName || board.title || '반려동물'} onError={e => { e.target.style.display = 'none'; }} />
-                      : <CardImagePlaceholder>🐾</CardImagePlaceholder>
-                    }
-                    <ImageStatusBadge $found={board.status === 'FOUND'}>
-                      {board.status === 'FOUND' ? '발견됨' : board.status === 'RESOLVED' ? '완료' : '실종중'}
-                    </ImageStatusBadge>
-                  </CardImageArea>
-                  <CardInfo>
-                    {board.petName && <CardPetName>{board.petName}</CardPetName>}
-                    <CardMetaInfo>
-                      {board.species && <span>{board.species}</span>}
-                      {board.breed && <span>{board.breed}</span>}
-                      {board.color && <span>{board.color}</span>}
-                      {board.gender && <span>{board.gender === 'M' ? '수컷' : '암컷'}</span>}
-                    </CardMetaInfo>
-                    {board.lostDate && <LostDate>{board.lostDate}</LostDate>}
-                  </CardInfo>
-                  <CardBody>
-                    <CardTitleRow>
-                      <CardTitle>{board.title}</CardTitle>
-                      <CardNumber>#{board.idx}</CardNumber>
-                    </CardTitleRow>
-                    {board.lostLocation && (
-                      <LostLocation>실종 위치: {board.lostLocation}</LostLocation>
+          <MissingList>
+            {boards.map((board) => {
+              const info = getElapsedInfo(board.lostDate);
+              const isMissing = board.status === 'MISSING';
+              const golden = isMissing && info && info.level === 'critical';
+              const metaLine = [
+                board.species,
+                board.breed,
+                board.color,
+                board.gender && (board.gender === 'M' ? '수컷' : '암컷'),
+              ].filter(Boolean).join(' · ');
+              return (
+                <MissingRow key={board.idx} onClick={() => handleCardClick(board)}>
+                  <RowThumb>
+                    {board.imageUrl ? (
+                      <img
+                        src={board.imageUrl}
+                        alt={board.petName || board.title || '반려동물'}
+                        onError={(e) => { e.target.style.display = 'none'; }}
+                      />
+                    ) : (
+                      <span aria-hidden="true">🐾</span>
                     )}
-                    {board.content && <Description>{board.content}</Description>}
-                  </CardBody>
-                  <CardFooter>
-                    <Reporter>제보자: {board.username || '알 수 없음'}</Reporter>
-                    <CommentCount>댓글 {board.commentCount ?? 0}개</CommentCount>
-                  </CardFooter>
-                </BoardCard>
-              ))}
-            </BoardGrid>
-            <ReportFAB onClick={openCreateForm}>+</ReportFAB>
-          </div>
+                  </RowThumb>
+                  <RowMain>
+                    <RowTop>
+                      <StatusBadge $status={board.status}>
+                        {statusLabel[board.status] || '실종'}
+                      </StatusBadge>
+                      {isMissing && info && (
+                        golden ? (
+                          <GoldenBadge>⏱ 골든타임 · {info.text}</GoldenBadge>
+                        ) : (
+                          <ElapsedText>실종 {info.text.replace(' 경과', '째')}</ElapsedText>
+                        )
+                      )}
+                    </RowTop>
+                    <RowTitle>
+                      {board.petName && <PetName>{board.petName}</PetName>}
+                      {board.title}
+                    </RowTitle>
+                    <RowSub>
+                      {metaLine}
+                      {board.lostLocation ? `${metaLine ? ' · ' : ''}📍${board.lostLocation}` : ''}
+                    </RowSub>
+                  </RowMain>
+                  <RowRight>
+                    <CommentMeta>💬 {board.commentCount ?? 0}</CommentMeta>
+                  </RowRight>
+                </MissingRow>
+              );
+            })}
+          </MissingList>
         )}
 
         {totalCount > 0 && (
@@ -387,6 +398,7 @@ const MissingPetBoardPage = () => {
               pageSize={pageSize}
               onPageChange={handlePageChange}
               loading={loading}
+              showEdges
             />
           </PaginationWrapper>
         )}
@@ -548,6 +560,137 @@ const UpdatedAt = styled.div`
   font-size: ${(props) => props.theme.typography.body2.fontSize};
 `;
 
+/* ── 컴팩트 리스트(실종 제보) ── */
+const MissingList = styled.div`
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 4px 20px 24px;
+
+  @media (max-width: 768px) {
+    padding: 4px 14px 24px;
+  }
+`;
+
+const MissingRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 6px;
+  border-bottom: 1px solid ${(props) => props.theme.colors.borderLight};
+  cursor: pointer;
+  transition: background 0.15s ease;
+
+  &:hover {
+    background: ${(props) => props.theme.colors.surfaceHover};
+  }
+
+  @media (max-width: 768px) {
+    gap: 11px;
+  }
+`;
+
+const RowThumb = styled.div`
+  width: 66px;
+  height: 66px;
+  border-radius: 12px;
+  flex-shrink: 0;
+  overflow: hidden;
+  background: ${(props) => props.theme.colors.surface};
+  border: 1px solid ${(props) => props.theme.colors.borderLight};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  @media (max-width: 768px) {
+    width: 58px;
+    height: 58px;
+    font-size: 24px;
+  }
+`;
+
+const RowMain = styled.div`
+  flex: 1;
+  min-width: 0;
+`;
+
+const RowTop = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 5px;
+`;
+
+const StatusBadge = styled.span`
+  font-size: 11px;
+  font-weight: 800;
+  padding: 3px 9px;
+  border-radius: 999px;
+  color: #fff;
+  background: ${(props) =>
+    props.$status === 'FOUND'
+      ? props.theme.colors.status.found
+      : props.$status === 'RESOLVED'
+      ? props.theme.colors.textMuted
+      : props.theme.colors.status.missing};
+`;
+
+const GoldenBadge = styled.span`
+  font-size: 11px;
+  font-weight: 800;
+  padding: 3px 9px;
+  border-radius: 8px;
+  color: ${(props) => props.theme.colors.status.missing};
+  background: ${(props) => props.theme.colors.status.missing + '1F'};
+`;
+
+const ElapsedText = styled.span`
+  font-size: 11.5px;
+  font-weight: 700;
+  color: ${(props) => props.theme.colors.textSecondary};
+`;
+
+const RowTitle = styled.div`
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: ${(props) => props.theme.colors.text};
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 4px;
+`;
+
+const PetName = styled.span`
+  color: ${(props) => props.theme.colors.status.missing};
+  margin-right: 6px;
+`;
+
+const RowSub = styled.div`
+  font-size: 12.5px;
+  color: ${(props) => props.theme.colors.textSecondary};
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+`;
+
+const RowRight = styled.div`
+  flex-shrink: 0;
+  text-align: right;
+`;
+
+const CommentMeta = styled.span`
+  font-size: 12px;
+  font-weight: 600;
+  color: ${(props) => props.theme.colors.textSecondary};
+`;
+
 const EmptyState = styled.div`
   text-align: center;
   padding: ${(props) => props.theme.spacing.xl};
@@ -562,172 +705,28 @@ const EmptyState = styled.div`
   }
 `;
 
-const BoardGrid = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 16px;
-
-  @media (min-width: 769px) {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 16px;
-    padding: 24px;
-    max-width: 1200px;
-    margin: 0 auto;
-  }
-`;
-
-const BoardCard = styled.div`
-  background: ${(props) => props.theme.colors.surfaceElevated};
-  border-radius: 16px;
-  overflow: hidden;
-  border: 1px solid ${(props) => props.theme.colors.borderLight};
-  box-shadow: 0 2px 12px ${(props) => props.theme.colors.shadow};
-  cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-  position: relative;
-  display: grid;
-  grid-template-rows: auto 1fr auto;
-
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px ${(props) => props.theme.colors.shadowHover};
-  }
-`;
-
-const CardImageArea = styled.div`
-  width: 100%;
-  aspect-ratio: 4 / 3;
-  background: ${(props) => props.theme.colors.surfaceHover};
-  overflow: hidden;
-  position: relative;
-
-  img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-`;
-
-const CardImagePlaceholder = styled.div`
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 48px;
-  background: linear-gradient(135deg, #EF444422, #EF444444);
-`;
-
-const ImageStatusBadge = styled.span`
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  padding: 4px 10px;
-  border-radius: 50px;
-  font-size: 11px;
-  font-weight: 700;
-  background: ${(props) => props.$found
-    ? props.theme.colors.successSoft
-    : props.theme.colors.errorSoft};
-  color: ${(props) => props.$found
-    ? props.theme.colors.success
-    : props.theme.colors.error};
-  border: 1px solid ${(props) => props.$found
-    ? props.theme.colors.success + '44'
-    : props.theme.colors.error + '44'};
-`;
-
-
-const CardInfo = styled.div`
-  padding: 14px 16px;
-`;
-
-const CardPetName = styled.div`
-  font-size: 16px;
-  font-weight: 700;
-  color: ${(props) => props.theme.colors.text};
-  margin-bottom: 4px;
-`;
-
-const CardMetaInfo = styled.div`
-  font-size: 12px;
-  color: ${(props) => props.theme.colors.textSecondary};
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-`;
-
-const CardBody = styled.div`
-  padding: ${(props) => props.theme.spacing.lg};
-  display: flex;
-  flex-direction: column;
-  gap: ${(props) => props.theme.spacing.sm};
-`;
 
 
 
 
-const LostDate = styled.span`
-  font-size: ${(props) => props.theme.typography.body2.fontSize};
-  color: ${(props) => props.theme.colors.textSecondary};
-`;
-
-const CardTitleRow = styled.div`
-  display: flex;
-  align-items: center;
-  gap: ${props => props.theme.spacing.sm};
-  flex-wrap: wrap;
-  margin-bottom: ${props => props.theme.spacing.md};
-`;
-
-const CardTitle = styled.h2`
-  margin: 0;
-  font-size: ${(props) => props.theme.typography.h4.fontSize};
-  color: ${(props) => props.theme.colors.text};
-  flex: 1;
-  min-width: 0;
-`;
-
-const CardNumber = styled.span`
-  color: ${props => props.theme.colors.textLight};
-  font-size: ${props => props.theme.typography.body2.fontSize || '0.9rem'};
-  font-weight: 500;
-  white-space: nowrap;
-`;
 
 
-const LostLocation = styled.div`
-  font-weight: 600;
-  color: ${(props) => props.theme.colors.text};
-`;
 
-const Description = styled.p`
-  margin: 0;
-  color: ${(props) => props.theme.colors.textSecondary};
-  line-height: 1.5;
-`;
 
-const CardFooter = styled.div`
-  padding: 0 ${(props) => props.theme.spacing.lg} ${(props) => props.theme.spacing.lg};
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: ${(props) => props.theme.typography.body2.fontSize};
-  color: ${(props) => props.theme.colors.textSecondary};
-`;
 
-const Reporter = styled.span`
-  font-weight: 600;
-  color: ${(props) => props.theme.colors.text};
-`;
 
-const CommentCount = styled.span`
-  display: inline-flex;
-  align-items: center;
-  gap: ${(props) => props.theme.spacing.xs};
-`;
+
+
+
+
+
+
+
+
+
+
+
+
 
 const EmptyAction = styled.button`
   margin-top: ${(props) => props.theme.spacing.lg};
@@ -846,31 +845,5 @@ const PaginationWrapper = styled.div`
   margin-top: ${props => props.theme.spacing.lg};
 `;
 
-const ReportFAB = styled.button`
-  position: fixed;
-  bottom: calc(72px + env(safe-area-inset-bottom, 0px));
-  right: 20px;
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
-  color: white;
-  border: none;
-  font-size: 24px;
-  cursor: pointer;
-  box-shadow: 0 4px 16px rgba(239, 68, 68, 0.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: transform 0.2s ease;
-  z-index: 50;
-
-  &:hover { transform: scale(1.1); }
-
-  @media (min-width: 769px) {
-    bottom: 32px;
-    right: 32px;
-  }
-`;
 
 
