@@ -449,8 +449,8 @@ const ChargeButton = styled.button`
 const ErrorMessage = styled.div`
   padding: 12px 24px;
   margin: 0 24px;
-  background: #fee;
-  color: #c33;
+  background: ${props => props.theme.colors.errorSoft};
+  color: ${props => props.theme.colors.errorDark};
   border-radius: 8px;
   font-size: 14px;
   text-align: center;
@@ -459,8 +459,8 @@ const ErrorMessage = styled.div`
 const SuccessMessage = styled.div`
   padding: 12px 24px;
   margin: 0 24px;
-  background: #efe;
-  color: #3c3;
+  background: ${props => props.theme.colors.successSoft};
+  color: ${props => props.theme.colors.successDark};
   border-radius: 8px;
   font-size: 14px;
   text-align: center;

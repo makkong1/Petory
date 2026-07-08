@@ -3,6 +3,7 @@ import styled from 'styled-components';
 import { activityApi } from '../../api/activityApi';
 import { useAuth } from '../../contexts/AuthContext';
 import PageNavigation from '../Common/PageNavigation';
+import EmptyState from '../Common/ui/EmptyState';
 
 const ActivityPage = () => {
   const { user } = useAuth();
@@ -269,11 +270,11 @@ const ActivityPage = () => {
   if (!user) {
     return (
       <Container>
-        <EmptyMessage>
-          <div className="icon">🔒</div>
-          <h3>로그인이 필요합니다</h3>
-          <p>내 활동 내역을 보려면 로그인해주세요.</p>
-        </EmptyMessage>
+        <EmptyState
+          icon="🔒"
+          title="로그인이 필요해요"
+          description="내 활동 내역을 보려면 로그인해주세요."
+        />
       </Container>
     );
   }
@@ -322,11 +323,11 @@ const ActivityPage = () => {
 
       <ActivityList>
         {filteredActivities.length === 0 ? (
-          <EmptyMessage>
-            <div className="icon">📭</div>
-            <h3>활동 내역이 없습니다</h3>
-            <p>게시글을 작성하거나 댓글을 남겨보세요!</p>
-          </EmptyMessage>
+          <EmptyState
+            icon="📭"
+            title="활동 내역이 없어요"
+            description="게시글을 작성하거나 댓글을 남겨보세요!"
+          />
         ) : (
           <>
             {groupedActivities.map(group => (
@@ -642,22 +643,6 @@ const ErrorMessage = styled.div`
     &:hover {
       background: ${props => props.theme.colors.primaryDark};
     }
-  }
-`;
-
-const EmptyMessage = styled.div`
-  text-align: center;
-  padding: ${props => props.theme.spacing.xxl};
-  color: ${props => props.theme.colors.textSecondary};
-  
-  .icon {
-    font-size: 48px;
-    margin-bottom: ${props => props.theme.spacing.lg};
-  }
-  
-  h3 {
-    color: ${props => props.theme.colors.text};
-    margin-bottom: ${props => props.theme.spacing.sm};
   }
 `;
 

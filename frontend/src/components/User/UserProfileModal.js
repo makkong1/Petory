@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { userProfileApi, petApiClient } from '../../api/userApi';
 import { uploadApi } from '../../api/uploadApi';
 import { meetupApi } from '../../api/meetupApi';
+import EmptyState from '../Common/ui/EmptyState';
 
 const UserProfileModal = ({ isOpen, userId, onClose, onUpdated }) => {
   const { user } = useAuth();
@@ -552,9 +553,11 @@ const UserProfileModal = ({ isOpen, userId, onClose, onUpdated }) => {
                   {petsLoading ? (
                     <LoadingMessage>펫 목록을 불러오는 중...</LoadingMessage>
                   ) : pets.length === 0 ? (
-                    <EmptyMessage>
-                      등록된 펫이 없습니다. "펫 추가" 버튼을 눌러 펫을 등록해주세요.
-                    </EmptyMessage>
+                    <EmptyState
+                      icon="🐾"
+                      title="등록된 펫이 없어요"
+                      description='"펫 추가" 버튼으로 우리 아이를 등록해주세요'
+                    />
                   ) : (
                     <PetList>
                       {pets.map((pet) => (
@@ -643,7 +646,7 @@ const UserProfileModal = ({ isOpen, userId, onClose, onUpdated }) => {
               )}
 
               {profile.reviewCount === 0 && (
-                <EmptyReviewsMessage>아직 펫케어 리뷰가 없습니다.</EmptyReviewsMessage>
+                <EmptyState icon="⭐" title="아직 펫케어 리뷰가 없어요" padding="32px 24px" iconSize="36px" />
               )}
 
               {profile.locationServiceReviewCount > 0 && (
@@ -1142,13 +1145,6 @@ const RemoveImageButton = styled.button`
   }
 `;
 
-const EmptyMessage = styled.div`
-  text-align: center;
-  padding: ${(props) => props.theme.spacing.xl};
-  color: ${(props) => props.theme.colors.textSecondary};
-  font-style: italic;
-`;
-
 const PetList = styled.div`
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
@@ -1350,9 +1346,3 @@ const ReviewDate = styled.div`
   color: ${(props) => props.theme.colors.textSecondary};
 `;
 
-const EmptyReviewsMessage = styled.div`
-  text-align: center;
-  padding: ${(props) => props.theme.spacing.xl};
-  color: ${(props) => props.theme.colors.textSecondary};
-  font-style: italic;
-`;

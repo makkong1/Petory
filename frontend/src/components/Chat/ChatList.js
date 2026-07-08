@@ -2,6 +2,7 @@ import React from 'react';
 import styled from 'styled-components';
 import ConversationItem from './ConversationItem';
 import ChatTabs, { CONVERSATION_TYPES } from './ChatTabs';
+import EmptyState from '../Common/ui/EmptyState';
 
 const ChatList = ({ 
   conversations = [], 
@@ -23,11 +24,15 @@ const ChatList = ({
         {loading ? (
           <LoadingMessage>로딩 중...</LoadingMessage>
         ) : filteredConversations.length === 0 ? (
-          <EmptyMessage>
-            {activeTab === CONVERSATION_TYPES.ALL 
-              ? '채팅방이 없습니다'
-              : '해당 카테고리의 채팅방이 없습니다'}
-          </EmptyMessage>
+          <EmptyState
+            icon="💬"
+            title={activeTab === CONVERSATION_TYPES.ALL
+              ? '아직 대화가 없어요'
+              : '해당 카테고리의 채팅방이 없어요'}
+            description={activeTab === CONVERSATION_TYPES.ALL
+              ? '케어 요청이나 모임에 참여하면 채팅방이 생겨요'
+              : undefined}
+          />
         ) : (
           filteredConversations.map((conversation) => (
             <ConversationItem
@@ -81,13 +86,6 @@ const LoadingMessage = styled.div`
   padding: 40px 20px;
   text-align: center;
   color: ${({ theme }) => theme.colors.textSecondary};
-  font-size: 14px;
-`;
-
-const EmptyMessage = styled.div`
-  padding: 60px 20px;
-  text-align: center;
-  color: ${({ theme }) => theme.colors.textLight};
   font-size: 14px;
 `;
 
