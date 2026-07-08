@@ -1,6 +1,10 @@
 import React, { useState, useRef } from 'react';
 import styled from 'styled-components';
 import { locationServiceApi } from '../../../api/locationServiceApi';
+import {
+  SectionHeader, SectionTitle, SectionSubtitle,
+  StatGrid, StatCard, StatLabel, StatValue,
+} from '../ui/AdminUI';
 
 const LocationServiceManagementSection = () => {
   const [selectedFile, setSelectedFile] = useState(null);
@@ -42,10 +46,10 @@ const LocationServiceManagementSection = () => {
 
   return (
     <Wrapper>
-      <Header>
-        <Title>지역 서비스 관리</Title>
-        <Subtitle>등록된 장소, 리뷰, 외부 API 캐시를 관리합니다.</Subtitle>
-      </Header>
+      <SectionHeader>
+        <SectionTitle>지역 서비스 관리</SectionTitle>
+        <SectionSubtitle>등록된 장소, 리뷰, 외부 API 캐시를 관리합니다.</SectionSubtitle>
+      </SectionHeader>
 
       {/* ── 공공데이터 CSV 임포트 ── */}
       <Card>
@@ -82,16 +86,16 @@ const LocationServiceManagementSection = () => {
         {importError && <ErrorMessage>{importError}</ErrorMessage>}
 
         {importResult && (
-          <ResultBox>
+          <>
             <ResultTitle>임포트 결과</ResultTitle>
-            <ResultList>
-              <ResultItem>총 읽은 라인: <strong>{importResult.totalRead}</strong></ResultItem>
-              <ResultItem>저장된 개수: <strong>{importResult.saved}</strong></ResultItem>
-              <ResultItem>중복 스킵: <strong>{importResult.duplicate}</strong></ResultItem>
-              <ResultItem>검증 실패 스킵: <strong>{importResult.skipped}</strong></ResultItem>
-              <ResultItem>에러 발생: <strong>{importResult.error}</strong></ResultItem>
-            </ResultList>
-          </ResultBox>
+            <StatGrid>
+              <StatCard><StatLabel>총 읽은 라인</StatLabel><StatValue>{Number(importResult.totalRead || 0).toLocaleString()}</StatValue></StatCard>
+              <StatCard><StatLabel>저장</StatLabel><StatValue $accent>{Number(importResult.saved || 0).toLocaleString()}</StatValue></StatCard>
+              <StatCard><StatLabel>중복 스킵</StatLabel><StatValue>{Number(importResult.duplicate || 0).toLocaleString()}</StatValue></StatCard>
+              <StatCard><StatLabel>검증 실패</StatLabel><StatValue>{Number(importResult.skipped || 0).toLocaleString()}</StatValue></StatCard>
+              <StatCard><StatLabel>에러</StatLabel><StatValue>{Number(importResult.error || 0).toLocaleString()}</StatValue></StatCard>
+            </StatGrid>
+          </>
         )}
       </Card>
     </Wrapper>
@@ -106,19 +110,8 @@ const Wrapper = styled.div`
   gap: ${props => props.theme.spacing.lg};
 `;
 
-const Header = styled.div`
-  margin-bottom: ${props => props.theme.spacing.lg};
-`;
 
-const Title = styled.h1`
-  font-size: ${props => props.theme.typography.h2.fontSize};
-  font-weight: ${props => props.theme.typography.h2.fontWeight};
-  margin-bottom: ${props => props.theme.spacing.xs};
-`;
 
-const Subtitle = styled.p`
-  color: ${props => props.theme.colors.textSecondary};
-`;
 
 const Card = styled.div`
   border-radius: ${props => props.theme.borderRadius.md};
@@ -205,12 +198,6 @@ const ErrorMessage = styled.div`
   margin-bottom: ${props => props.theme.spacing.md};
 `;
 
-const ResultBox = styled.div`
-  margin-top: ${props => props.theme.spacing.md};
-  padding: ${props => props.theme.spacing.md};
-  background: ${props => props.theme.colors.surfaceSoft};
-  border-radius: ${props => props.theme.borderRadius.sm};
-`;
 
 const ResultTitle = styled.h4`
   font-size: ${props => props.theme.typography.h4.fontSize};
@@ -219,14 +206,4 @@ const ResultTitle = styled.h4`
   color: ${props => props.theme.colors.text};
 `;
 
-const ResultList = styled.ul`
-  list-style: none;
-  padding: 0;
-  margin: 0;
-`;
 
-const ResultItem = styled.li`
-  padding: ${props => props.theme.spacing.xs} 0;
-  color: ${props => props.theme.colors.textSecondary};
-  strong { color: ${props => props.theme.colors.text}; font-weight: 600; }
-`;

@@ -2,7 +2,24 @@ import React, { useEffect, useState } from 'react';
 import styled from 'styled-components';
 import { reportApi } from '../../../api/reportApi';
 import { communityAdminApi } from '../../../api/communityAdminApi';
+import { StatusPill } from '../ui/AdminUI';
 
+// 신고 상태 → pill tone/라벨
+const REPORT_STATUS_META = {
+  PENDING: { tone: 'pending', label: '미처리' },
+  RESOLVED: { tone: 'success', label: '처리완료' },
+  REJECTED: { tone: 'neutral', label: '반려' },
+};
+
+// 대상 게시글 상태 → pill tone/라벨
+const targetStatusMeta = (status, deleted) => {
+  if (deleted) return { tone: 'danger', label: '삭제됨' };
+  if (status === 'BLINDED') return { tone: 'warning', label: '블라인드' };
+  if (status === 'ACTIVE' || status === 'MISSING' || status === 'FOUND') {
+    return { tone: 'success', label: status === 'ACTIVE' ? '정상' : status };
+  }
+  return status ? { tone: 'neutral', label: status } : null;
+};
 
 const ReportDetailModal = ({ reportId, onClose, onHandled }) => {
   const [loading, setLoading] = useState(true);
@@ -162,7 +179,17 @@ const ReportDetailModal = ({ reportId, onClose, onHandled }) => {
               <Row><Label>대상</Label><Value>{detail?.report?.targetType} #{detail?.report?.targetIdx}</Value></Row>
               <Row><Label>신고자</Label><Value>{detail?.report?.reporterName || '-'} (#{detail?.report?.reporterId})</Value></Row>
               <Row><Label>사유</Label><Value>{detail?.report?.reason}</Value></Row>
-              <Row><Label>상태</Label><Value>{detail?.report?.status}</Value></Row>
+              <Row>
+                <Label>상태</Label>
+                <Value>
+                  {(() => {
+                    const m = REPORT_STATUS_META[detail?.report?.status];
+                    return m
+                      ? <StatusPill $tone={m.tone}>{m.label}</StatusPill>
+                      : (detail?.report?.status || '-');
+                  })()}
+                </Value>
+              </Row>
             </Section>
             <Section>
               <SectionTitle>대상 미리보기</SectionTitle>
@@ -180,9 +207,12 @@ const ReportDetailModal = ({ reportId, onClose, onHandled }) => {
                 {detail?.target?.authorName && (
                   <PreviewMeta>작성자: {detail?.target?.authorName}</PreviewMeta>
                 )}
-                {targetStatus && (
-                  <PreviewMeta>상태: {targetStatus} {targetDeleted ? '(삭제됨)' : ''}</PreviewMeta>
-                )}
+                {(() => {
+                  const m = targetStatusMeta(targetStatus, targetDeleted);
+                  return m ? (
+                    <PreviewMeta>상태: <StatusPill $tone={m.tone}>{m.label}</StatusPill></PreviewMeta>
+                  ) : null;
+                })()}
               </PreviewCard>
               {detail?.report?.targetType === 'BOARD' && detail?.target?.id && (
                 <BoardActions>
