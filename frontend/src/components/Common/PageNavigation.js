@@ -14,6 +14,7 @@ const PageNavigation = ({
   onPageChange,
   loading = false,
   showTotal = true,
+  showEdges = false,
 }) => {
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const [inputValue, setInputValue] = useState(String(currentPage + 1));
@@ -31,6 +32,18 @@ const PageNavigation = ({
   const handleNext = () => {
     if (currentPage < totalPages - 1 && !loading) {
       onPageChange(currentPage + 1);
+    }
+  };
+
+  const handleFirst = () => {
+    if (currentPage > 0 && !loading) {
+      onPageChange(0);
+    }
+  };
+
+  const handleLast = () => {
+    if (currentPage < totalPages - 1 && !loading) {
+      onPageChange(totalPages - 1);
     }
   };
 
@@ -66,6 +79,16 @@ const PageNavigation = ({
     <Wrapper>
       {showTotal && <TotalText>총 {totalCount.toLocaleString()}건</TotalText>}
       <NavGroup>
+        {showEdges && (
+          <NavButton
+            type="button"
+            onClick={handleFirst}
+            disabled={currentPage <= 0 || loading}
+            aria-label="맨 앞 페이지"
+          >
+            «
+          </NavButton>
+        )}
         <NavButton
           type="button"
           onClick={handlePrev}
@@ -96,6 +119,16 @@ const PageNavigation = ({
         >
           다음
         </NavButton>
+        {showEdges && (
+          <NavButton
+            type="button"
+            onClick={handleLast}
+            disabled={currentPage >= totalPages - 1 || loading}
+            aria-label="맨 뒤 페이지"
+          >
+            »
+          </NavButton>
+        )}
       </NavGroup>
     </Wrapper>
   );
