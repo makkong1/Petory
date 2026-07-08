@@ -139,7 +139,6 @@ const CommunityPostModal = ({ isOpen, onClose, onSubmit, loading, currentUser, i
                 <option value="질문">질문</option>
                 <option value="정보">정보</option>
                 <option value="후기">후기</option>
-                <option value="모임">모임</option>
                 <option value="공지">공지</option>
               </Select>
             </Field>

@@ -95,7 +95,6 @@ const CommunityBoard = () => {
     { key: '질문', label: '질문', icon: '❓', color: categoryColors.question },
     { key: '정보공유', label: '정보공유', icon: '📢', color: categoryColors.info },
     { key: '후기', label: '후기', icon: '📝', color: categoryColors.review },
-    { key: '모임', label: '모임', icon: '🤝', color: categoryColors.meetup },
     { key: '공지', label: '공지', icon: '📢', color: categoryColors.notice },
   ], [categoryColors]);
 
