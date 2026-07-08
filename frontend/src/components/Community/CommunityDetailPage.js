@@ -662,6 +662,7 @@ const CommunityDetailPage = ({
                   pageSize={commentPageSize}
                   onPageChange={handleCommentPageChange}
                   loading={loadingComments}
+                  showEdges
                 />
               </CommentPaginationWrapper>
             )}

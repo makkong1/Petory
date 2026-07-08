@@ -302,9 +302,12 @@ const MissingPetBoardDetail = ({
               </StatusBadge>
               {board.status === 'MISSING' && (() => {
                 const elapsed = getElapsedInfo(board.lostDate);
-                return elapsed ? (
-                  <UrgencyBadge level={elapsed.level}>{elapsed.text}</UrgencyBadge>
-                ) : null;
+                if (!elapsed) return null;
+                return elapsed.level === 'critical' ? (
+                  <GoldenBadge>⏱ 골든타임 · {elapsed.text}</GoldenBadge>
+                ) : (
+                  <ElapsedText>실종 {elapsed.text.replace(' 경과', '째')}</ElapsedText>
+                );
               })()}
               <DetailTitle>{board.title}</DetailTitle>
             </DetailTitleRow>
@@ -511,6 +514,7 @@ const MissingPetBoardDetail = ({
                     pageSize={commentPageSize}
                     onPageChange={handleCommentPageChange}
                     loading={loadingComments}
+                    showEdges
                   />
                 </CommentPaginationWrapper>
               )}
@@ -852,29 +856,23 @@ const ContentBox = styled.div`
   box-sizing: border-box;
 `;
 
-const UrgencyBadge = styled.span.withConfig({
-  shouldForwardProp: (prop) => prop !== 'level',
-})`
-  padding: ${(props) => props.theme.spacing.xs} ${(props) => props.theme.spacing.sm};
-  border-radius: ${(props) => props.theme.borderRadius.pill};
+/* 골든타임(실종 72h 이내) 강조 뱃지 — 리스트와 통일 */
+const GoldenBadge = styled.span`
+  padding: ${(props) => props.theme.spacing.xs} ${(props) => props.theme.spacing.md};
+  border-radius: ${(props) => props.theme.borderRadius.md};
+  font-size: ${(props) => props.theme.typography.caption.fontSize};
+  font-weight: 800;
+  white-space: nowrap;
+  color: ${(props) => props.theme.colors.status.missing};
+  background: ${(props) => props.theme.colors.status.missing + '1F'};
+`;
+
+/* 그 외: 중립 '실종 N일째' */
+const ElapsedText = styled.span`
   font-size: ${(props) => props.theme.typography.caption.fontSize};
   font-weight: 700;
   white-space: nowrap;
-  animation: ${(props) => props.level === 'critical' ? 'urgencyPulse 2s infinite' : 'none'};
-  color: ${(props) => props.theme.colors.textInverse};
-  background: ${(props) => {
-    switch (props.level) {
-      case 'critical': return props.theme.colors.error;
-      case 'urgent': return props.theme.colors.warning;
-      case 'warning': return props.theme.colors.info;
-      default: return props.theme.colors.textMuted;
-    }
-  }};
-
-  @keyframes urgencyPulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.7; }
-  }
+  color: ${(props) => props.theme.colors.textSecondary};
 `;
 
 const StatusBadge = styled.span.withConfig({
