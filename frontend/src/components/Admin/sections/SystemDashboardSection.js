@@ -14,6 +14,16 @@ import {
   BarChart,
   Bar
 } from 'recharts';
+import {
+  SectionHeader, SectionTitle, SectionSubtitle,
+  StatGrid, StatCard, StatLabel, StatValue,
+} from '../ui/AdminUI';
+
+// 차트 시리즈 색 (새 브랜드 팔레트)
+const C_PRIMARY = '#E8714A';
+const C_BLUE = '#3B82F6';
+const C_GREEN = '#10B981';
+const C_RED = '#EF4444';
 
 const SystemDashboardSection = () => {
   const { checkRole } = usePermission();
@@ -88,11 +98,11 @@ const SystemDashboardSection = () => {
 
   return (
     <Wrapper>
-      <Header>
+      <SectionHeader>
         <HeaderContent>
           <div>
-            <Title>전체 시스템 대시보드</Title>
-            <Subtitle>일/주/월 기준 주요 지표를 한눈에 확인합니다.</Subtitle>
+            <SectionTitle>전체 시스템 대시보드</SectionTitle>
+            <SectionSubtitle>일/주/월 기준 주요 지표를 한눈에 확인합니다.</SectionSubtitle>
           </div>
           {isMaster && (
             <InitButton
@@ -108,43 +118,19 @@ const SystemDashboardSection = () => {
             {initMessage}
           </InitMessage>
         )}
-      </Header>
+      </SectionHeader>
 
       {/* 1. 상단 요약 카드 */}
-      <Grid>
-        <MetricCard>
-          <MetricLabel>신규 가입자 (오늘)</MetricLabel>
-          <MetricValue>{summary.newUsers}명</MetricValue>
-        </MetricCard>
-        <MetricCard>
-          <MetricLabel>활성 사용자 (DAU)</MetricLabel>
-          <MetricValue>{summary.activeUsers}명</MetricValue>
-        </MetricCard>
-        <MetricCard>
-          <MetricLabel>새 게시글</MetricLabel>
-          <MetricValue>{summary.newPosts}개</MetricValue>
-        </MetricCard>
-        <MetricCard>
-          <MetricLabel>새 케어 요청</MetricLabel>
-          <MetricValue>{summary.newCareRequests}건</MetricValue>
-        </MetricCard>
-        <MetricCard>
-          <MetricLabel>새 모임</MetricLabel>
-          <MetricValue>{summary.newMeetups}개</MetricValue>
-        </MetricCard>
-        <MetricCard>
-          <MetricLabel>모임 참여</MetricLabel>
-          <MetricValue>{summary.meetupParticipants}명</MetricValue>
-        </MetricCard>
-        <MetricCard>
-          <MetricLabel>신규 신고</MetricLabel>
-          <MetricValue>{summary.newReports}건</MetricValue>
-        </MetricCard>
-        <MetricCard>
-          <MetricLabel>오늘 매출 (예상)</MetricLabel>
-          <MetricValue>₩ {(summary.totalRevenue ?? 0).toLocaleString()}</MetricValue>
-        </MetricCard>
-      </Grid>
+      <StatGrid>
+        <StatCard><StatLabel>신규 가입자 (오늘)</StatLabel><StatValue $accent>{summary.newUsers}명</StatValue></StatCard>
+        <StatCard><StatLabel>활성 사용자 (DAU)</StatLabel><StatValue $accent>{summary.activeUsers}명</StatValue></StatCard>
+        <StatCard><StatLabel>새 게시글</StatLabel><StatValue>{summary.newPosts}개</StatValue></StatCard>
+        <StatCard><StatLabel>새 케어 요청</StatLabel><StatValue>{summary.newCareRequests}건</StatValue></StatCard>
+        <StatCard><StatLabel>새 모임</StatLabel><StatValue>{summary.newMeetups}개</StatValue></StatCard>
+        <StatCard><StatLabel>모임 참여</StatLabel><StatValue>{summary.meetupParticipants}명</StatValue></StatCard>
+        <StatCard><StatLabel>신규 신고</StatLabel><StatValue>{summary.newReports}건</StatValue></StatCard>
+        <StatCard><StatLabel>오늘 매출 (예상)</StatLabel><StatValue>₩ {(summary.totalRevenue ?? 0).toLocaleString()}</StatValue></StatCard>
+      </StatGrid>
 
       {/* 2. 중단 차트 영역 */}
       <ChartSection>
@@ -158,11 +144,11 @@ const SystemDashboardSection = () => {
               <YAxis yAxisId="right" orientation="right" />
               <Tooltip />
               <Legend />
-              <Line yAxisId="left" type="monotone" dataKey="newUsers" name="신규 가입" stroke="#FF7E36" activeDot={{ r: 8 }} />
-              <Line yAxisId="left" type="monotone" dataKey="newMeetups" name="새 모임" stroke="#4A90E2" />
+              <Line yAxisId="left" type="monotone" dataKey="newUsers" name="신규 가입" stroke={C_PRIMARY} activeDot={{ r: 8 }} />
+              <Line yAxisId="left" type="monotone" dataKey="newMeetups" name="새 모임" stroke={C_BLUE} />
 
-              <Line yAxisId="right" type="monotone" dataKey="activeUsers" name="활성 유저" stroke="#4CAF50" />
-              <Line yAxisId="right" type="monotone" dataKey="newReports" name="신고" stroke="#F44336" />
+              <Line yAxisId="right" type="monotone" dataKey="activeUsers" name="활성 유저" stroke={C_GREEN} />
+              <Line yAxisId="right" type="monotone" dataKey="newReports" name="신고" stroke={C_RED} />
             </LineChart>
           </ResponsiveContainer>
         </ChartContainer>
@@ -176,10 +162,10 @@ const SystemDashboardSection = () => {
               <YAxis />
               <Tooltip />
               <Legend />
-              <Bar dataKey="newPosts" name="게시글" stackId="a" fill="#FF7E36" />
-              <Bar dataKey="newCareRequests" name="케어 요청" stackId="a" fill="#4A90E2" />
-              <Bar dataKey="newMeetups" name="모임" stackId="a" fill="#4CAF50" />
-              <Bar dataKey="newReports" name="신고" stackId="a" fill="#F44336" />
+              <Bar dataKey="newPosts" name="게시글" stackId="a" fill={C_PRIMARY} />
+              <Bar dataKey="newCareRequests" name="케어 요청" stackId="a" fill={C_BLUE} />
+              <Bar dataKey="newMeetups" name="모임" stackId="a" fill={C_GREEN} />
+              <Bar dataKey="newReports" name="신고" stackId="a" fill={C_RED} />
             </BarChart>
           </ResponsiveContainer>
         </ChartContainer>
@@ -191,10 +177,6 @@ const SystemDashboardSection = () => {
 export default SystemDashboardSection;
 
 const Wrapper = styled.div``;
-
-const Header = styled.div`
-  margin-bottom: ${props => props.theme.spacing.lg};
-`;
 
 const HeaderContent = styled.div`
   display: flex;
@@ -236,42 +218,11 @@ const InitMessage = styled.div`
     : props.theme.colors.error};
 `;
 
-const Title = styled.h1`
-  font-size: ${props => props.theme.typography.h2.fontSize};
-  font-weight: ${props => props.theme.typography.h2.fontWeight};
-  margin-bottom: ${props => props.theme.spacing.xs};
-`;
 
-const Subtitle = styled.p`
-  color: ${props => props.theme.colors.textSecondary};
-`;
 
-const Grid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: ${props => props.theme.spacing.lg};
-  margin-bottom: ${props => props.theme.spacing.xl};
-`;
 
-const MetricCard = styled.div`
-  border-radius: ${props => props.theme.borderRadius.md};
-  padding: ${props => props.theme.spacing.md};
-  background: ${props => props.theme.colors.surfaceSoft};
-  border: 1px solid ${props => props.theme.colors.border};
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-`;
 
-const MetricLabel = styled.div`
-  font-size: ${props => props.theme.typography.caption.fontSize};
-  color: ${props => props.theme.colors.textSecondary};
-  margin-bottom: ${props => props.theme.spacing.xs};
-`;
 
-const MetricValue = styled.div`
-  font-size: ${props => props.theme.typography.h4.fontSize};
-  font-weight: ${props => props.theme.typography.h4.fontWeight};
-  color: ${props => props.theme.colors.primary};
-`;
 
 const ChartSection = styled.div`
   display: grid;
