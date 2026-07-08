@@ -199,8 +199,8 @@ const CloseButton = styled.button`
 const ErrorMessage = styled.div`
   padding: 12px 24px;
   margin: 0 24px;
-  background: #fee;
-  color: #c33;
+  background: ${props => props.theme.colors.errorSoft};
+  color: ${props => props.theme.colors.errorDark};
   border-radius: 8px;
   font-size: 14px;
 `;
