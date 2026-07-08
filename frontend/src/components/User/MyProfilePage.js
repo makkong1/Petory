@@ -3,6 +3,7 @@ import styled from 'styled-components';
 import { useAuth } from '../../contexts/AuthContext';
 import { petApiClient } from '../../api/userApi';
 import { uploadApi } from '../../api/uploadApi';
+import EmptyState from '../Common/ui/EmptyState';
 
 const MyProfilePage = () => {
   const { user } = useAuth();
@@ -315,6 +316,14 @@ const MyProfilePage = () => {
     UNKNOWN: '미확인',
   };
 
+  const roleLabels = {
+    USER: '일반',
+    SERVICE_PROVIDER: '서비스',
+    ADMIN: '관리자',
+    MASTER: '마스터',
+  };
+  const roleLabel = roleLabels[user?.role] || '일반';
+
   if (!user) {
     return (
       <Container>
@@ -325,18 +334,31 @@ const MyProfilePage = () => {
 
   return (
     <Container>
+      <Title>내 프로필</Title>
       <Header>
-        <Title>내 프로필</Title>
-        <UserInfo>
-          <UserName>{user.nickname || '사용자'}</UserName>
-          <UserEmail>{user.email || ''}</UserEmail>
-          {user.petCoinBalance !== undefined && (
-            <UserCoinBalance>
-              <CoinIcon>💰</CoinIcon>
-              {user.petCoinBalance?.toLocaleString() || 0} 코인
-            </UserCoinBalance>
-          )}
-        </UserInfo>
+        <HeaderTop>
+          <Avatar>{(user.nickname || '사용자').charAt(0)}</Avatar>
+          <UserInfo>
+            <UserName>{user.nickname || '사용자'}</UserName>
+            <UserEmail>{user.email || ''}</UserEmail>
+          </UserInfo>
+        </HeaderTop>
+        <StatsRow>
+          <Stat>
+            <StatValue>{pets.length}</StatValue>
+            <StatLabel>반려동물</StatLabel>
+          </Stat>
+          <StatDivider />
+          <Stat>
+            <StatValue>{(user.petCoinBalance ?? 0).toLocaleString()}</StatValue>
+            <StatLabel>코인</StatLabel>
+          </Stat>
+          <StatDivider />
+          <Stat>
+            <StatValue>{roleLabel}</StatValue>
+            <StatLabel>등급</StatLabel>
+          </Stat>
+        </StatsRow>
       </Header>
 
       <PetSection>
@@ -624,9 +646,11 @@ const MyProfilePage = () => {
         {loading ? (
           <LoadingMessage>펫 목록을 불러오는 중...</LoadingMessage>
         ) : pets.length === 0 ? (
-          <EmptyMessage>
-            등록된 펫이 없습니다. 위의 "펫 추가" 버튼을 눌러 펫을 등록해주세요.
-          </EmptyMessage>
+          <EmptyState
+            icon="🐾"
+            title="아직 등록된 펫이 없어요"
+            description='위의 "펫 추가" 버튼으로 우리 아이를 등록해주세요'
+          />
         ) : (
           <PetList>
             {pets.map((pet) => (
@@ -680,49 +704,99 @@ const Container = styled.div`
   padding: ${(props) => props.theme.spacing.xl};
 `;
 
-const Header = styled.div`
-  margin-bottom: ${(props) => props.theme.spacing.xl};
-  padding-bottom: ${(props) => props.theme.spacing.lg};
-  border-bottom: 2px solid ${(props) => props.theme.colors.border};
+const Title = styled.h1`
+  margin: 0 0 ${(props) => props.theme.spacing.lg} 0;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: ${(props) => props.theme.colors.text};
 `;
 
-const Title = styled.h1`
-  margin: 0 0 ${(props) => props.theme.spacing.md} 0;
+const Header = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-bottom: ${(props) => props.theme.spacing['3xl']};
+  padding: 20px;
+  background: ${(props) => props.theme.colors.surface};
+  border: 1px solid ${(props) => props.theme.colors.border};
+  border-radius: ${(props) => props.theme.borderRadius.xl};
+`;
+
+const HeaderTop = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 18px;
+`;
+
+const StatsRow = styled.div`
+  display: flex;
+  align-items: stretch;
+  padding-top: 18px;
+  border-top: 1px solid ${(props) => props.theme.colors.border};
+`;
+
+const Stat = styled.div`
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+`;
+
+const StatValue = styled.div`
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
   color: ${(props) => props.theme.colors.text};
+  font-variant-numeric: tabular-nums;
+`;
+
+const StatLabel = styled.div`
+  font-size: 12px;
+  font-weight: 500;
+  color: ${(props) => props.theme.colors.textSecondary};
+`;
+
+const StatDivider = styled.div`
+  width: 1px;
+  align-self: center;
+  height: 28px;
+  background: ${(props) => props.theme.colors.border};
+`;
+
+const Avatar = styled.div`
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+  border-radius: ${(props) => props.theme.borderRadius.xl};
+  background: ${(props) => props.theme.colors.gradient};
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  font-weight: 700;
 `;
 
 const UserInfo = styled.div`
   display: flex;
   flex-direction: column;
-  gap: ${(props) => props.theme.spacing.xs};
+  align-items: flex-start;
+  gap: 3px;
+  min-width: 0;
 `;
 
 const UserName = styled.div`
-  font-size: 1.2rem;
-  font-weight: 600;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
   color: ${(props) => props.theme.colors.text};
 `;
 
 const UserEmail = styled.div`
-  font-size: 0.9rem;
+  font-size: 13px;
   color: ${(props) => props.theme.colors.textSecondary};
-`;
-
-const UserCoinBalance = styled.div`
-  display: flex;
-  align-items: center;
-  gap: ${(props) => props.theme.spacing.xs};
-  color: ${(props) => props.theme.colors.primary || '#FF7E36'};
-  font-size: 1rem;
-  font-weight: 600;
-  padding: ${(props) => props.theme.spacing.xs} ${(props) => props.theme.spacing.md};
-  background: ${(props) => props.theme.colors.surfaceElevated || '#f8f9fa'};
-  border-radius: ${(props) => props.theme.borderRadius.md};
-  margin-top: ${(props) => props.theme.spacing.xs};
-`;
-
-const CoinIcon = styled.span`
-  font-size: 1rem;
 `;
 
 const PetSection = styled.div`
@@ -909,16 +983,23 @@ const PetList = styled.div`
 const PetCard = styled.div`
   background: ${(props) => props.theme.colors.surfaceElevated};
   padding: ${(props) => props.theme.spacing.lg};
-  border-radius: ${(props) => props.theme.borderRadius.md};
+  border-radius: ${(props) => props.theme.borderRadius.xl};
   border: 1px solid ${(props) => props.theme.colors.border};
   display: flex;
   flex-direction: column;
+  transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+
+  &:hover {
+    border-color: ${(props) => props.theme.colors.primaryLight};
+    transform: translateY(-2px);
+    box-shadow: ${(props) => props.theme.shadows.md};
+  }
 `;
 
 const PetImageWrapper = styled.div`
   width: 100%;
   aspect-ratio: 1;
-  border-radius: ${(props) => props.theme.borderRadius.md};
+  border-radius: ${(props) => props.theme.borderRadius.lg};
   overflow: hidden;
   background: ${(props) => props.theme.colors.borderLight || '#e1e5e9'};
   margin-bottom: ${(props) => props.theme.spacing.md};
@@ -944,16 +1025,19 @@ const PetHeader = styled.div`
 
 const PetName = styled.h3`
   margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
   color: ${(props) => props.theme.colors.text};
 `;
 
 const PetTypeBadge = styled.span`
-  padding: ${(props) => props.theme.spacing.xs} ${(props) => props.theme.spacing.sm};
-  background: ${(props) => props.theme.colors.primary};
-  color: white;
-  border-radius: ${(props) => props.theme.borderRadius.full};
-  font-size: 0.85rem;
-  font-weight: 500;
+  padding: 4px 10px;
+  background: ${(props) => props.theme.colors.primarySoft};
+  color: ${(props) => props.theme.colors.primary};
+  border-radius: ${(props) => props.theme.borderRadius.pill};
+  font-size: 12px;
+  font-weight: 600;
 `;
 
 const PetInfo = styled.div`
@@ -1005,15 +1089,6 @@ const LoadingMessage = styled.div`
   text-align: center;
   padding: ${(props) => props.theme.spacing.xl};
   color: ${(props) => props.theme.colors.textSecondary};
-`;
-
-const EmptyMessage = styled.div`
-  text-align: center;
-  padding: ${(props) => props.theme.spacing.xl};
-  color: ${(props) => props.theme.colors.textSecondary};
-  background: ${(props) => props.theme.colors.surfaceElevated};
-  border-radius: ${(props) => props.theme.borderRadius.md};
-  border: 1px dashed ${(props) => props.theme.colors.border};
 `;
 
 const Message = styled.div`

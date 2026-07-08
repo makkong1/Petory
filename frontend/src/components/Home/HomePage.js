@@ -5,42 +5,22 @@ import { locationServiceApi } from '../../api/locationServiceApi';
 import { meetupApi } from '../../api/meetupApi';
 import { missingPetApi } from '../../api/missingPetApi';
 import { boardApi } from '../../api/boardApi';
+import HomeMap from './HomeMap';
 
-const SectionRow = ({ title, emoji, color, items, loading, onViewAll, getLabel }) => (
-  <SectionWrap>
-    <SectionHeader>
-      <SectionLabel $color={color}>{emoji} {title}</SectionLabel>
-      <ViewAllBtn onClick={onViewAll}>전체보기 →</ViewAllBtn>
-    </SectionHeader>
-    {loading ? (
-      <HScroll>
-        {[1, 2, 3, 4].map((i) => <SkeletonCard key={i} />)}
-      </HScroll>
-    ) : items.length === 0 ? (
-      <EmptyRow>등록된 항목이 없어요</EmptyRow>
-    ) : (
-      <HScroll>
-        {items.map((item, idx) => {
-          const { title: cardTitle, sub } = getLabel(item);
-          return (
-            <HCard key={idx} $color={color} onClick={onViewAll}>
-              <HCardImg $color={color} />
-              <HCardBody>
-                <HCardTitle>{cardTitle}</HCardTitle>
-                <HCardSub>{sub}</HCardSub>
-              </HCardBody>
-            </HCard>
-          );
-        })}
-      </HScroll>
-    )}
-  </SectionWrap>
-);
+// 날짜 기반으로 매일 바뀌는 반려 케어 팁 (서버 데이터 없이 로테이션)
+const CARE_TIPS = [
+  { icon: '☀️', text: '산책하기 좋은 날이에요. 우리 아이와 나가볼까요?' },
+  { icon: '💧', text: '물그릇, 신선한 물로 갈아주는 거 잊지 마세요.' },
+  { icon: '🦴', text: '오늘도 간식은 적당히! 건강한 하루 되세요.' },
+  { icon: '🐾', text: '발바닥 패드 상태도 가끔 확인해 주세요.' },
+  { icon: '🧸', text: '짧은 놀이 시간이 아이의 스트레스를 줄여줘요.' },
+];
 
 const HomePage = ({ setActiveTab }) => {
   const { user } = useAuth();
   const isAdmin = user && (user.role === 'ADMIN' || user.role === 'MASTER');
   const nickname = user?.nickname || '사용자';
+  const careTip = CARE_TIPS[new Date().getDate() % CARE_TIPS.length];
 
   const [sections, setSections] = useState({
     missing:   { items: [], loading: true, error: false },
@@ -100,60 +80,96 @@ const HomePage = ({ setActiveTab }) => {
       .catch(() => setError('community'));
   }, [geo]);
 
+  const missing = sections.missing;
+  const community = sections.community;
+  const meetupCount = sections.meetup.items.length;
+
+  const renderRows = (state, mapRow, emptyText) => {
+    if (state.loading) {
+      return [1, 2, 3].map((i) => <SkeletonRow key={i} />);
+    }
+    if (state.items.length === 0) {
+      return <TileEmpty>{emptyText}</TileEmpty>;
+    }
+    return state.items.slice(0, 3).map(mapRow);
+  };
+
   return (
     <PageWrapper>
-      <PageContainer>
-        <Header>
-          <HeaderLeft>
+      <Dashboard>
+        <TopBar>
+          <Greeting>
+            안녕하세요, <strong>{nickname}</strong>님 👋
+            <SubGreeting>오늘도 반려동물과 함께하는 하루 되세요</SubGreeting>
+          </Greeting>
+          <TopRight>
+            <Bell>🔔</Bell>
             <Avatar>{nickname.charAt(0)}</Avatar>
-            <HeaderText>
-              <Greeting>안녕하세요, {nickname}님! 🐾</Greeting>
-              <SubGreeting>오늘도 함께해서 행복해요</SubGreeting>
-            </HeaderText>
-          </HeaderLeft>
-          <NotificationBtn>🔔</NotificationBtn>
-        </Header>
+          </TopRight>
+        </TopBar>
 
-        <SectionRow
-          title="실종신고" emoji="🔴" color="#EF4444"
-          items={sections.missing.items}
-          loading={sections.missing.loading}
-          onViewAll={() => setActiveTab('missing-pets')}
-          getLabel={(item) => ({
-            title: item.petName || item.title || '',
-            sub: [item.breed, item.lostDate].filter(Boolean).join(' · '),
-          })}
-        />
-        <SectionRow
-          title="주변 서비스" emoji="📍" color="#3B82F6"
-          items={sections.service.items}
-          loading={sections.service.loading}
-          onViewAll={() => setActiveTab('unified-map')}
-          getLabel={(item) => ({
-            title: item.name || '',
-            sub: item.category || '',
-          })}
-        />
-        <SectionRow
-          title="모임" emoji="👥" color="#10B981"
-          items={sections.meetup.items}
-          loading={sections.meetup.loading}
-          onViewAll={() => setActiveTab('unified-map')}
-          getLabel={(item) => ({
-            title: item.title || '',
-            sub: `${item.currentParticipants ?? 0}/${item.maxParticipants ?? 0}명`,
-          })}
-        />
-        <SectionRow
-          title="커뮤니티" emoji="💬" color="#8B5CF6"
-          items={sections.community.items}
-          loading={sections.community.loading}
-          onViewAll={() => setActiveTab('community')}
-          getLabel={(item) => ({
-            title: item.boardTitle || item.title || '',
-            sub: `❤️ ${item.likeCount ?? 0}  👁 ${item.viewCount ?? 0}`,
-          })}
-        />
+        <Bento>
+          <MapTile onClick={() => setActiveTab('unified-map')}>
+            <HomeMap coords={geo.coords} services={sections.service.items} />
+            <MapLabel>📍 내 주변</MapLabel>
+            <MapCta>주변 서비스 보기 →</MapCta>
+          </MapTile>
+
+          <CareTile>
+            <TileLabel>오늘의 케어 팁</TileLabel>
+            <CareBig><span>{careTip.icon}</span>{careTip.text}</CareBig>
+          </CareTile>
+
+          <StatTile>
+            <TileLabel>펫코인</TileLabel>
+            <StatNum>{(user?.petCoinBalance ?? 0).toLocaleString()}<small> C</small></StatNum>
+          </StatTile>
+
+          <StatTile onClick={() => setActiveTab('unified-map')}>
+            <TileLabel>모임</TileLabel>
+            <StatNum>{meetupCount}<small> 개</small></StatNum>
+            <StatHint>내 주변 모집 중</StatHint>
+          </StatTile>
+
+          <ListTile>
+            <TileHead>
+              <TileHeadTitle><TileDot $c="#EF4444" />실종신고</TileHeadTitle>
+              <More onClick={() => setActiveTab('missing-pets')}>전체 →</More>
+            </TileHead>
+            {renderRows(
+              missing,
+              (item, idx) => (
+                <MiniRow key={idx} onClick={() => setActiveTab('missing-pets')}>
+                  <MiniMain>
+                    <MiniTitle>{item.petName || item.title || '이름 없음'}</MiniTitle>
+                    <MiniSub>{[item.breed, item.region].filter(Boolean).join(' · ') || '실종 신고'}</MiniSub>
+                  </MiniMain>
+                  <MiniMeta>{item.lostDate || ''}</MiniMeta>
+                </MiniRow>
+              ),
+              '주변 실종 신고가 없어요'
+            )}
+          </ListTile>
+
+          <ListTile>
+            <TileHead>
+              <TileHeadTitle><TileDot $c="#8B5CF6" />인기 커뮤니티</TileHeadTitle>
+              <More onClick={() => setActiveTab('community')}>전체 →</More>
+            </TileHead>
+            {renderRows(
+              community,
+              (item, idx) => (
+                <MiniRow key={idx} onClick={() => setActiveTab('community')}>
+                  <MiniMain>
+                    <MiniTitle>{item.boardTitle || item.title || '제목 없음'}</MiniTitle>
+                  </MiniMain>
+                  <MiniMeta>❤ {item.likeCount ?? 0}</MiniMeta>
+                </MiniRow>
+              ),
+              '인기 글이 아직 없어요'
+            )}
+          </ListTile>
+        </Bento>
 
         {isAdmin && (
           <AdminSection>
@@ -170,7 +186,7 @@ const HomePage = ({ setActiveTab }) => {
             </AdminGrid>
           </AdminSection>
         )}
-      </PageContainer>
+      </Dashboard>
     </PageWrapper>
   );
 };
@@ -181,221 +197,295 @@ export default HomePage;
 
 const PageWrapper = styled.div`
   min-height: 100vh;
-  background: ${props => props.theme.colors.surfaceSoft};
-  display: flex;
-  justify-content: center;
+  background: ${(p) => p.theme.colors.background};
 `;
 
-const PageContainer = styled.div`
-  width: 100%;
-  max-width: 430px;
-  min-height: 100vh;
-  background: ${props => props.theme.colors.background};
-  overflow-x: hidden;
-  padding-bottom: 24px;
+const Dashboard = styled.div`
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 24px 22px 40px;
 
-  @media (min-width: 769px) {
-    max-width: 860px;
+  @media (max-width: 600px) {
+    padding: 20px 16px 28px;
   }
 `;
 
-const Header = styled.div`
+const TopBar = styled.div`
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  padding: 20px 20px 12px;
+  margin-bottom: 20px;
 `;
 
-const HeaderLeft = styled.div`
+const Greeting = styled.h1`
+  margin: 0;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: ${(p) => p.theme.colors.text};
+  line-height: 1.3;
+
+  strong { color: ${(p) => p.theme.colors.primary}; font-weight: 800; }
+`;
+
+const SubGreeting = styled.div`
+  font-size: 13px;
+  font-weight: 400;
+  color: ${(p) => p.theme.colors.textSecondary};
+  margin-top: 5px;
+`;
+
+const TopRight = styled.div`
   display: flex;
   align-items: center;
   gap: 12px;
-`;
-
-const Avatar = styled.div`
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: ${props => props.theme.colors.primary};
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18px;
-  font-weight: 700;
   flex-shrink: 0;
 `;
 
-const HeaderText = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-`;
-
-const Greeting = styled.span`
-  font-size: 16px;
-  font-weight: 700;
-  color: ${props => props.theme.colors.text};
-  line-height: 1.2;
-`;
-
-const SubGreeting = styled.span`
-  font-size: 13px;
-  color: ${props => props.theme.colors.textSecondary};
-  line-height: 1.2;
-`;
-
-const NotificationBtn = styled.button`
+const Bell = styled.button`
   background: none;
   border: none;
-  font-size: 22px;
+  font-size: 20px;
   cursor: pointer;
   padding: 4px;
   line-height: 1;
 `;
 
-
-/* ── SectionRow header ───────────────────────────────────────── */
-
-const SectionHeader = styled.div`
+const Avatar = styled.div`
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: ${(p) => p.theme.colors.primary};
+  color: #fff;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 14px;
-  margin-bottom: 10px;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 700;
+  flex-shrink: 0;
 `;
 
-const SectionLabel = styled.span`
+/* ── Bento grid ─────────────────────────────────────────────── */
+
+const Bento = styled.div`
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 1fr;
+
+  @media (min-width: 600px) {
+    grid-template-columns: repeat(2, 1fr);
+    grid-auto-rows: 130px;
+  }
+  @media (min-width: 1000px) {
+    grid-template-columns: repeat(4, 1fr);
+    grid-auto-rows: 132px;
+  }
+`;
+
+const Tile = styled.div`
+  background: ${(p) => p.theme.colors.surfaceElevated};
+  border: 1px solid ${(p) => p.theme.colors.border};
+  border-radius: 18px;
+  padding: 16px 17px;
+  overflow: hidden;
+`;
+
+const TileLabel = styled.div`
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: ${(p) => p.theme.colors.textSecondary};
+  margin-bottom: 9px;
+`;
+
+const MapTile = styled(Tile)`
+  position: relative;
+  padding: 0;
+  min-height: 210px;
+  cursor: pointer;
+  background: linear-gradient(135deg, #dfe7e6, #eef1ec);
+  transition: transform 200ms ${(p) => p.theme.easing?.spring || 'ease'}, box-shadow 200ms ease;
+
+  &:hover { transform: translateY(-2px); box-shadow: ${(p) => p.theme.shadows.md}; }
+
+  @media (min-width: 600px) { grid-column: span 2; grid-row: span 2; min-height: 0; }
+`;
+
+const MapLabel = styled.div`
+  position: absolute;
+  top: 15px;
+  left: 16px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #2d3b39;
+  background: #ffffffd9;
+  padding: 6px 11px;
+  border-radius: 999px;
+`;
+
+const MapCta = styled.div`
+  position: absolute;
+  bottom: 15px;
+  left: 16px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #2d3b39;
+  background: #ffffffd9;
+  padding: 7px 13px;
+  border-radius: 999px;
+`;
+
+const CareTile = styled(Tile)`
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: ${(p) => p.theme.colors.primarySoft};
+  border-color: transparent;
+
+  @media (min-width: 600px) { grid-column: span 2; }
+`;
+
+const CareBig = styled.div`
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
   font-size: 15px;
   font-weight: 700;
-  color: ${(p) => p.$color || p.theme.colors.text};
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+  color: ${(p) => p.theme.colors.primaryDark};
+
+  span { font-size: 19px; line-height: 1.2; flex-shrink: 0; }
 `;
 
-const ViewAllBtn = styled.button`
+const StatTile = styled(Tile).attrs((p) => ({ as: p.onClick ? 'button' : 'div' }))`
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  font-family: inherit;
+  cursor: ${(p) => (p.onClick ? 'pointer' : 'default')};
+  transition: border-color 200ms ease, transform 200ms ease;
+
+  ${(p) => p.onClick && `&:hover { border-color: ${p.theme.colors.primaryLight}; transform: translateY(-2px); }`}
+`;
+
+const StatNum = styled.div`
+  font-size: 27px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: ${(p) => p.theme.colors.text};
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+
+  small { font-size: 14px; font-weight: 700; color: ${(p) => p.theme.colors.textSecondary}; }
+`;
+
+const StatHint = styled.div`
+  font-size: 11.5px;
+  color: ${(p) => p.theme.colors.textSecondary};
+  margin-top: 6px;
+`;
+
+const ListTile = styled(Tile)`
+  display: flex;
+  flex-direction: column;
+
+  @media (min-width: 600px) { grid-column: span 2; grid-row: span 2; }
+`;
+
+const TileHead = styled.div`
+  display: flex;
+  align-items: center;
+  margin-bottom: 6px;
+`;
+
+const TileHeadTitle = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: ${(p) => p.theme.colors.text};
+`;
+
+const TileDot = styled.span`
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: ${(p) => p.$c || p.theme.colors.primary};
+  flex-shrink: 0;
+`;
+
+const More = styled.button`
+  margin-left: auto;
   background: none;
   border: none;
-  font-size: 13px;
+  font-size: 12px;
   color: ${(p) => p.theme.colors.textSecondary};
   cursor: pointer;
-  padding: 0;
+  padding: 2px;
 `;
 
-/* ── Admin Section ───────────────────────────────────────────── */
-
-const AdminSection = styled.div`
-  margin: 32px 20px 0;
-  padding-top: 24px;
-  border-top: 1px solid ${props => props.theme.colors.border};
-`;
-
-const AdminSectionTitle = styled.div`
-  font-size: 15px;
-  font-weight: 700;
-  color: ${props => props.theme.colors.textSecondary};
-  margin-bottom: 14px;
-`;
-
-const AdminGrid = styled.div`
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-`;
-
-const AdminCard = styled.div`
-  background: ${props => props.theme.colors.surface};
-  border: 1.5px solid ${props => props.theme.colors.border};
-  border-radius: 16px;
-  padding: 16px;
-  cursor: pointer;
-  text-align: center;
-  transition: border-color 150ms ease;
-  &:hover { border-color: ${props => props.theme.colors.primary}; }
-`;
-
-const AdminCardIcon = styled.div`
-  font-size: 24px;
-  margin-bottom: 8px;
-`;
-
-const AdminCardName = styled.div`
-  font-size: 13px;
-  font-weight: 600;
-  color: ${props => props.theme.colors.text};
-`;
-
-/* ── SectionRow ─────────────────────────────────────────────── */
-
-const SectionWrap = styled.div`
-  background: ${(p) => p.theme.colors.surface};
-  border-radius: 16px;
-  margin: 8px 16px;
-  padding: 14px 0 14px;
-  box-shadow: ${(p) => p.theme.shadows.sm};
-`;
-
-const HScroll = styled.div`
+const MiniRow = styled.div`
   display: flex;
+  align-items: center;
   gap: 10px;
-  overflow-x: auto;
-  padding: 0 14px;
-  scrollbar-width: none;
-  &::-webkit-scrollbar { display: none; }
-`;
-
-const HCard = styled.div`
-  flex-shrink: 0;
-  width: 120px;
-  border-radius: 12px;
-  overflow: hidden;
-  background: ${(p) => p.theme.colors.background};
-  border: 1px solid ${(p) => p.theme.colors.border};
+  padding: 11px 0;
+  border-bottom: 1px solid ${(p) => p.theme.colors.borderLight};
   cursor: pointer;
-  transition: transform 150ms ease;
-  &:hover { transform: translateY(-2px); }
+
+  &:last-child { border-bottom: none; }
+  &:hover .mini-title { color: ${(p) => p.theme.colors.primary}; }
 `;
 
-const HCardImg = styled.div`
-  height: 80px;
-  background: linear-gradient(
-    135deg,
-    ${(p) => p.$color}99 0%,
-    ${(p) => p.$color}33 100%
-  );
+const MiniMain = styled.div`
+  min-width: 0;
+  flex: 1;
 `;
 
-const HCardBody = styled.div`
-  padding: 8px 9px 9px;
-`;
-
-const HCardTitle = styled.div`
-  font-size: 12px;
+const MiniTitle = styled.div.attrs({ className: 'mini-title' })`
+  font-size: 13.5px;
   font-weight: 600;
   color: ${(p) => p.theme.colors.text};
-  margin-bottom: 3px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  transition: color 150ms ease;
 `;
 
-const HCardSub = styled.div`
-  font-size: 10px;
+const MiniSub = styled.div`
+  font-size: 11.5px;
   color: ${(p) => p.theme.colors.textSecondary};
+  margin-top: 2px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 `;
 
-const EmptyRow = styled.div`
-  font-size: 13px;
-  color: ${(p) => p.theme.colors.textMuted};
-  padding: 16px 14px;
+const MiniMeta = styled.div`
+  font-size: 11.5px;
+  color: ${(p) => p.theme.colors.textSecondary};
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
 `;
 
-const SkeletonCard = styled.div`
-  flex-shrink: 0;
-  width: 120px;
-  height: 130px;
-  border-radius: 12px;
+const TileEmpty = styled.div`
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px 0;
+  font-size: 12.5px;
+  color: ${(p) => p.theme.colors.textMuted};
+`;
+
+const SkeletonRow = styled.div`
+  height: 14px;
+  margin: 13px 0;
+  border-radius: 6px;
   background: linear-gradient(
     90deg,
     ${(p) => p.theme.colors.border} 25%,
@@ -408,4 +498,48 @@ const SkeletonCard = styled.div`
     0%   { background-position: -200px 0; }
     100% { background-position: calc(200px + 100%) 0; }
   }
+`;
+
+/* ── Admin Section ───────────────────────────────────────────── */
+
+const AdminSection = styled.div`
+  margin: 30px 0 0;
+  padding-top: 24px;
+  border-top: 1px solid ${(p) => p.theme.colors.border};
+`;
+
+const AdminSectionTitle = styled.div`
+  font-size: 15px;
+  font-weight: 700;
+  color: ${(p) => p.theme.colors.textSecondary};
+  margin-bottom: 14px;
+`;
+
+const AdminGrid = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  max-width: 420px;
+`;
+
+const AdminCard = styled.div`
+  background: ${(p) => p.theme.colors.surface};
+  border: 1.5px solid ${(p) => p.theme.colors.border};
+  border-radius: 16px;
+  padding: 16px;
+  cursor: pointer;
+  text-align: center;
+  transition: border-color 150ms ease;
+  &:hover { border-color: ${(p) => p.theme.colors.primary}; }
+`;
+
+const AdminCardIcon = styled.div`
+  font-size: 24px;
+  margin-bottom: 8px;
+`;
+
+const AdminCardName = styled.div`
+  font-size: 13px;
+  font-weight: 600;
+  color: ${(p) => p.theme.colors.text};
 `;
