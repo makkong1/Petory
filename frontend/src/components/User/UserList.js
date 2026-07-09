@@ -238,6 +238,7 @@ const UserList = ({ showHeader = true }) => {
                 <th>이메일</th>
                 <th>역할</th>
                 <th>삭제됨</th>
+                <th>휴면</th>
                 <th>가입일</th>
                 <th>액션</th>
               </tr>
@@ -253,6 +254,7 @@ const UserList = ({ showHeader = true }) => {
                     <RoleBadge role={user.role}>{user.role}</RoleBadge>
                   </td>
                   <td>{user.isDeleted ? 'Y' : 'N'}</td>
+                  <td>{user.isDormant ? 'Y' : 'N'}</td>
                   <td>{formatDateTime(user.createdAt)}</td>
                   <td>
                     <Actions>
