@@ -18,14 +18,14 @@ const DEMO_REFRESH_TOKEN = 'demo-refresh-token';
 const api = createAuthAxios(AUTH_BASE);
 
 export const authApi = {
-  login: async (id, password) => {
+  login: async (id, password, confirmReactivate = false) => {
     if (isDemoMode()) {
       setToken(DEMO_TOKEN);
       setRefreshToken(DEMO_REFRESH_TOKEN);
       return { accessToken: DEMO_TOKEN, refreshToken: DEMO_REFRESH_TOKEN, user: DEMO_USER };
     }
     try {
-      const response = await api.post('/login', { id, password });
+      const response = await api.post('/login', { id, password, confirmReactivate });
       const { accessToken, refreshToken } = response.data;
 
       if (accessToken) {

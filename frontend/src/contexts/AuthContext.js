@@ -142,9 +142,9 @@ export const AuthProvider = ({ children }) => {
     };
   }, []);
 
-  const login = async (username, password) => {
+  const login = async (username, password, confirmReactivate = false) => {
     try {
-      const response = await authApi.login(username, password);
+      const response = await authApi.login(username, password, confirmReactivate);
       // accessToken과 refreshToken은 authApi.login에서 자동 저장됨
       setUser(response.user);
       setIsAuthenticated(true);

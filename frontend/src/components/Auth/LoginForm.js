@@ -51,10 +51,26 @@ const LoginForm = ({ onSwitchToRegister }) => {
       await login(formData.id, formData.password);
 
       setSuccess('로그인 성공!');
-      
+
     } catch (error) {
+      if (error.response?.data?.errorCode === 'USER_DORMANT') {
+        const confirmed = window.confirm(
+          '장기간 미접속으로 휴면 처리된 계정입니다. 재활성화하시겠습니까?'
+        );
+        if (confirmed) {
+          try {
+            await login(formData.id, formData.password, true);
+            setSuccess('계정이 재활성화되었습니다. 로그인 성공!');
+          } catch (reactivateError) {
+            console.error('재활성화 실패:', reactivateError);
+            setError(reactivateError.response?.data?.message || '재활성화 중 오류가 발생했습니다.');
+          }
+        }
+        setLoading(false);
+        return;
+      }
       console.error('로그인 실패:', error);
-      setError(error.response?.data?.error || '로그인 중 오류가 발생했습니다.');
+      setError(error.response?.data?.message || error.response?.data?.error || '로그인 중 오류가 발생했습니다.');
     } finally {
       setLoading(false);
     }
