@@ -70,7 +70,7 @@ const UserList = ({ showHeader = true }) => {
   };
 
   const handleDeleteUser = async (id) => {
-    if (window.confirm('정말로 이 계정을 삭제(소프트 삭제)하시겠습니까?\n삭제된 계정은 복구할 수 있습니다.')) {
+    if (window.confirm('정말로 이 계정을 탈퇴 처리하시겠습니까?\n탈퇴 후에는 복구할 수 없으며, 아이디/닉네임/이메일은 다른 사용자가 재사용할 수 있게 됩니다.')) {
       try {
         await userApi.deleteUser(id);
         setUsersData((prev) => {
@@ -89,30 +89,6 @@ const UserList = ({ showHeader = true }) => {
         alert('계정이 삭제되었습니다.');
       } catch (err) {
         alert('계정 삭제에 실패했습니다.');
-      }
-    }
-  };
-
-  const handleRestoreUser = async (id) => {
-    if (window.confirm('이 계정을 복구하시겠습니까?')) {
-      try {
-        await userApi.restoreUser(id);
-        setUsersData((prev) => {
-          if (prev.map[id]) {
-            return {
-              ...prev,
-              map: {
-                ...prev.map,
-                [id]: { ...prev.map[id], isDeleted: false, deletedAt: null }
-              }
-            };
-          }
-          return prev;
-        });
-        fetchUsers(page);
-        alert('계정이 복구되었습니다.');
-      } catch (err) {
-        alert('계정 복구에 실패했습니다.');
       }
     }
   };
@@ -281,10 +257,8 @@ const UserList = ({ showHeader = true }) => {
                   <td>
                     <Actions>
                       <ViewButton onClick={() => handleEditUser(user)}>상태 관리</ViewButton>
-                      {!user.isDeleted ? (
+                      {!user.isDeleted && (
                         <DangerButton onClick={() => handleDeleteUser(user.idx)}>삭제</DangerButton>
-                      ) : (
-                        <ActionBtn onClick={() => handleRestoreUser(user.idx)}>복구</ActionBtn>
                       )}
                     </Actions>
                   </td>
@@ -472,20 +446,6 @@ const ViewButton = styled.button`
   cursor: pointer;
   font-size: ${props => props.theme.typography.caption.fontSize};
   color: ${props => props.theme.colors.text};
-
-  &:hover {
-    background: ${props => props.theme.colors.surfaceHover};
-  }
-`;
-
-const ActionBtn = styled.button`
-  padding: 6px 10px;
-  border: 1px solid ${props => props.theme.colors.border};
-  background: ${props => props.theme.colors.background};
-  color: ${props => props.theme.colors.text};
-  border-radius: ${props => props.theme.borderRadius.sm};
-  cursor: pointer;
-  font-size: ${props => props.theme.typography.caption.fontSize};
 
   &:hover {
     background: ${props => props.theme.colors.surfaceHover};

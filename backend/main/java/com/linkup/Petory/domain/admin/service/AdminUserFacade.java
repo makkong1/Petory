@@ -71,13 +71,6 @@ public class AdminUserFacade {
         auditService.log(adminIdx, "USER_DELETE", "USER", targetId, null);
     }
 
-    @Transactional
-    public UsersDTO restoreUser(Long targetId, Long adminIdx) {
-        UsersDTO result = usersService.restoreUser(targetId);
-        auditService.log(adminIdx, "USER_RESTORE", "USER", targetId, null);
-        return result;
-    }
-
     public List<UsersDTO> getAdminUsers() {
         return usersConverter.toDTOList(
                 usersRepository.findAllForAdmin("ADMIN", null, null, Pageable.unpaged()).getContent()

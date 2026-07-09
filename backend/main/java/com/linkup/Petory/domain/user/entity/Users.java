@@ -106,14 +106,17 @@ public class Users extends BaseTimeEntity {
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Pet> pets; // 등록한 애완동물 목록
 
+    /**
+     * 회원 탈퇴. 복구 불가 - id/username/nickname/email은 UNIQUE 제약이 걸려있어
+     * 값을 유지하면 다른 사용자가 영구히 재사용할 수 없으므로 즉시 익명화한다.
+     */
     public void softDelete() {
         this.isDeleted = true;
         this.deletedAt = LocalDateTime.now();
-    }
-
-    public void restore() {
-        this.isDeleted = false;
-        this.deletedAt = null;
+        this.id = "withdrawn_" + this.idx;
+        this.username = "withdrawn_" + this.idx;
+        this.nickname = "탈퇴한사용자_" + this.idx;
+        this.email = "withdrawn_" + this.idx + "@deleted.petory";
     }
 
     public void suspend(LocalDateTime until) {

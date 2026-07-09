@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/admin/users")
 @RequiredArgsConstructor
 @PreAuthorize("hasAnyRole('ADMIN', 'MASTER')")
-/** 관리자용 일반 사용자 목록 조회·상태 변경·삭제·복구 API. [ADMIN, MASTER] */
+/** 관리자용 일반 사용자 목록 조회·상태 변경·삭제 API. [ADMIN, MASTER] */
 public class AdminUserController {
 
     private final AdminUserFacade adminUserFacade;
@@ -45,11 +45,5 @@ public class AdminUserController {
         Long adminIdx = userIdResolver.requireCurrentUserIdx();
         adminUserFacade.deleteUser(id, adminIdx);
         return ResponseEntity.noContent().build();
-    }
-
-    @PostMapping("/{id}/restore")
-    public ResponseEntity<UsersDTO> restoreUser(@PathVariable("id") Long id) {
-        Long adminIdx = userIdResolver.requireCurrentUserIdx();
-        return ResponseEntity.ok(adminUserFacade.restoreUser(id, adminIdx));
     }
 }
