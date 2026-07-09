@@ -348,6 +348,57 @@ if (token == null) {
 - `backend/main/java/com/linkup/Petory/filter/JwtAuthenticationFilter.java`
 - `docs/refactoring/JWT-토큰-리팩토링-백로그.md`
 
+### F. 휴면 계정
+
+핵심 문구:
+
+탈퇴(`isDeleted`)와 별개로, 1년간 로그인하지 않은 계정은 매일 자정 배치가 `isDormant`/`dormantAt`으로 휴면 전환한다. 제재 상태(`UserStatus`)와는 독립적인 필드라 "정지 중이면서 동시에 휴면"도 표현 가능하다. 휴면 계정은 일반 로그인에서만 차단하며(OAuth2 제외), 본인이 로그인을 재시도해 확인하면 즉시 재활성화된다 — 관리자가 대신 풀어줄 수 없다.
+
+코드 스니펫 후보:
+
+```java
+@Modifying
+@Query("UPDATE Users u SET u.isDormant = true, u.dormantAt = :now " +
+       "WHERE u.isDormant = false AND u.isDeleted = false AND (" +
+       "  (u.lastLoginAt IS NOT NULL AND u.lastLoginAt < :cutoff) OR " +
+       "  (u.lastLoginAt IS NULL AND u.createdAt < :cutoff)" +
+       ")")
+int markDormantUsers(@Param("cutoff") LocalDateTime cutoff, @Param("now") LocalDateTime now);
+```
+
+로그인 차단 + 재활성화:
+
+```java
+if (Boolean.TRUE.equals(user.getIsDormant())) {
+    if (!confirmReactivate) {
+        throw new UserDormantException();
+    }
+    user.setIsDormant(false);
+    user.setDormantAt(null);
+}
+```
+
+스케줄러:
+
+```java
+@Scheduled(cron = "0 0 0 * * *")
+public void markDormantUsers() {
+    userDormantService.markDormantUsers();
+}
+```
+
+주의 문구:
+
+- 새 엔드포인트를 만들지 않고 기존 `POST /api/auth/login`에 `confirmReactivate` 필드만 추가했다. 비밀번호는 컨트롤러의 `authenticationManager.authenticate()`에서 이미 검증되므로 재활성화 시 추가 인증 절차가 없다.
+- 가입 후 한 번도 로그인 안 한 계정은 `lastLoginAt`이 null이라 `createdAt` 기준으로 판정한다.
+
+근거:
+
+- `backend/main/java/com/linkup/Petory/domain/user/service/UserDormantService.java`
+- `backend/main/java/com/linkup/Petory/domain/user/scheduler/UserDormantScheduler.java`
+- `backend/main/java/com/linkup/Petory/domain/user/exception/UserDormantException.java`
+- `docs/superpowers/specs/2026-07-09-dormant-account-design.md`
+
 ---
 
 ## 4. `section#limits` - 한계와 운영 메모

@@ -73,6 +73,7 @@ User 도메인은 인증, 사용자 프로필, 소셜 계정 연결, 이메일 �
 | `petCoinBalance`                      | 펫코인 잔액                                         |
 | `suspendedUntil`                      | 정지 만료 시각                                      |
 | `isDeleted`, `deletedAt`              | soft delete 상태                                    |
+| `isDormant`, `dormantAt`              | 휴면 상태 (1년 미로그인 시 배치로 자동 전환)         |
 | `refreshToken`, `refreshExpiration`   | DB에 저장되는 refresh token 상태                    |
 | `lastLoginAt`                         | 통계용 마지막 로그인 시각                           |
 
@@ -143,7 +144,7 @@ User 도메인은 인증, 사용자 프로필, 소셜 계정 연결, 이메일 �
 | API                              | 설명                                     |
 | -------------------------------- | ---------------------------------------- |
 | `POST /api/auth/register`        | 일반 회원가입                            |
-| `POST /api/auth/login`           | 로그인, access/refresh token 발급        |
+| `POST /api/auth/login`           | 로그인, access/refresh token 발급. `confirmReactivate=true`로 휴면 계정 본인 확인 재활성화 |
 | `POST /api/auth/validate`        | Authorization header의 access token 검증 |
 | `POST /api/auth/refresh`         | refresh token으로 access token 재발급    |
 | `POST /api/auth/logout`          | refresh token 제거                       |
