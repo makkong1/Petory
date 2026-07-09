@@ -127,14 +127,12 @@ idx_audit_admin_created (admin_idx, created_at)
 | GET | `/api/admin/users/paging` | 사용자 페이징 목록. `role`, `status`, `q`, `page`, `size` |
 | GET | `/api/admin/users/{id}` | 사용자 상세 |
 | PATCH | `/api/admin/users/{id}/status` | 사용자 상태/경고/정지 정보 변경 |
-| DELETE | `/api/admin/users/{id}` | 일반 사용자 soft delete |
-| POST | `/api/admin/users/{id}/restore` | 사용자 복구 |
+| DELETE | `/api/admin/users/{id}` | 일반 사용자 탈퇴 처리 (복구 불가, id/username/nickname/email 즉시 익명화) |
 
 감사 로그:
 
 - `USER_STATUS_UPDATE`
 - `USER_DELETE`
-- `USER_RESTORE`
 
 `deleteUser()`는 대상 role이 `ADMIN` 또는 `MASTER`이면 실패한다. 관리자 계정 삭제는 MASTER 전용 경로를 써야 한다.
 

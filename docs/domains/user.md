@@ -17,7 +17,7 @@ User 도메인은 인증, 사용자 프로필, 소셜 계정 연결, 이메일 �
 - 이메일 인증 및 비밀번호 재설정 메일 발송
 - 반려동물 CRUD와 소유권 검증
 - 사용자 제재 상태 확인, 경고, 정지, 차단
-- 관리자용 사용자 조회/상태 변경/삭제/복구
+- 관리자용 사용자 조회/상태 변경/삭제 (탈퇴는 복구 불가)
 - MASTER 전용 관리자 계정 관리
 
 비범위:
@@ -408,8 +408,7 @@ OAuth2 로그인은 Spring Security OAuth2 성공 후 `OAuth2SuccessHandler`가 
 | `GET /api/admin/users/paging`        | 사용자 목록 페이징 조회, role/status/q 필터 |
 | `GET /api/admin/users/{id}`          | 사용자 단건 조회                            |
 | `PATCH /api/admin/users/{id}/status` | 상태, 경고 수, 정지 기간 변경               |
-| `DELETE /api/admin/users/{id}`       | 사용자 soft delete                          |
-| `POST /api/admin/users/{id}/restore` | 사용자 복구                                 |
+| `DELETE /api/admin/users/{id}`       | 사용자 탈퇴 처리 (복구 불가)                |
 
 ### `/api/master/admin-users`
 
