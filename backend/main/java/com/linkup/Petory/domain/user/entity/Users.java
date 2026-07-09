@@ -100,6 +100,14 @@ public class Users extends BaseTimeEntity {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
+    // 휴면 계정 관련 필드 (제재 상태 UserStatus와 독립적)
+    @Column(name = "is_dormant")
+    @Builder.Default
+    private Boolean isDormant = false;
+
+    @Column(name = "dormant_at")
+    private LocalDateTime dormantAt;
+
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<UserSanction> sanctions;
 

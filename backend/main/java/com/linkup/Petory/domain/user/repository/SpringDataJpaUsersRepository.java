@@ -80,13 +80,28 @@ public interface SpringDataJpaUsersRepository extends JpaRepository<Users, Long>
 
     /**
      * 경고 횟수 원자적 증가 (동시성 문제 해결)
-     * 
+     *
      * @return 업데이트된 행 수
      */
     @RepositoryMethod("사용자: 경고 횟수 증가")
     @Modifying
     @Query("UPDATE Users u SET u.warningCount = u.warningCount + 1 WHERE u.idx = :userId")
     int incrementWarningCount(@Param("userId") Long userId);
+
+    /**
+     * 휴면 계정 일괄 전환 (배치용)
+     * lastLoginAt이 있으면 그 값을, 없으면(가입 후 미로그인) createdAt을 기준으로 판정
+     *
+     * @return 업데이트된 행 수
+     */
+    @RepositoryMethod("사용자: 휴면 계정 일괄 전환 (배치)")
+    @Modifying
+    @Query("UPDATE Users u SET u.isDormant = true, u.dormantAt = :now " +
+           "WHERE u.isDormant = false AND u.isDeleted = false AND (" +
+           "  (u.lastLoginAt IS NOT NULL AND u.lastLoginAt < :cutoff) OR " +
+           "  (u.lastLoginAt IS NULL AND u.createdAt < :cutoff)" +
+           ")")
+    int markDormantUsers(@Param("cutoff") LocalDateTime cutoff, @Param("now") LocalDateTime now);
 
     /**
      * 비관적 락을 사용한 사용자 조회 (동시성 제어용)

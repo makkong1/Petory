@@ -950,6 +950,8 @@ CREATE TABLE `users` (
   `suspended_until` datetime DEFAULT NULL,
   `is_deleted` tinyint(1) DEFAULT '0',
   `deleted_at` datetime DEFAULT NULL,
+  `is_dormant` tinyint(1) DEFAULT '0',
+  `dormant_at` datetime DEFAULT NULL,
   `profile_image` varchar(500) DEFAULT NULL COMMENT '프로필 이미지 URL (구글 picture, 네이버 profile_image)',
   `birth_date` varchar(20) DEFAULT NULL COMMENT '생년월일 (네이버: birthyear + birthday 조합, 형식: YYYY-MM-DD)',
   `gender` varchar(10) DEFAULT NULL COMMENT '성별 (네이버: M/F, 구글: 제공 안 함)',
