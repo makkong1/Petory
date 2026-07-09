@@ -112,6 +112,14 @@ public class OAuth2Service {
         // DB에 refresh token 저장
         user.setRefreshToken(refreshToken);
         user.setRefreshExpiration(LocalDateTime.now().plusDays(1));
+
+        // 휴면 계정 해제 - OAuth2 로그인은 차단하지 않되, 성공적인 로그인 자체가 활성 상태의 증거이므로 플래그를 정리한다
+        if (Boolean.TRUE.equals(user.getIsDormant())) {
+            user.setIsDormant(false);
+            user.setDormantAt(null);
+            log.info("OAuth2 로그인으로 휴면 계정 자동 해제: {}", user.getId());
+        }
+
         user.setLastLoginAt(LocalDateTime.now());
         loginEventRepository.save(LoginEvent.builder()
                 .user(user).loginAt(LocalDateTime.now()).loginMethod(provider.name()).build());
