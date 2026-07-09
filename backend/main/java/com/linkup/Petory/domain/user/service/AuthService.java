@@ -10,6 +10,7 @@ import com.linkup.Petory.domain.user.exception.InvalidRefreshTokenException;
 import com.linkup.Petory.domain.user.exception.UserBannedException;
 import com.linkup.Petory.domain.user.exception.UserNotFoundException;
 import com.linkup.Petory.domain.user.exception.UserSuspendedException;
+import com.linkup.Petory.domain.user.exception.UserDormantException;
 import com.linkup.Petory.domain.user.repository.LoginEventRepository;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 import com.linkup.Petory.util.JwtUtil;
@@ -34,7 +35,7 @@ public class AuthService {
      * 로그인 - Access Token과 Refresh Token 발급
      */
     @Transactional
-    public TokenResponse login(String id, String password) {
+    public TokenResponse login(String id, String password, boolean confirmReactivate) {
         Users user = usersRepository.findActiveByIdString(id)
                 .orElseThrow(UserNotFoundException::new);
 
@@ -53,6 +54,16 @@ public class AuthService {
                 usersRepository.save(user);
                 log.info("만료된 이용제한 자동 해제: {}", id);
             }
+        }
+
+        // 휴면 상태 확인 - 본인 확인(confirmReactivate) 없이는 로그인 차단
+        if (Boolean.TRUE.equals(user.getIsDormant())) {
+            if (!confirmReactivate) {
+                throw new UserDormantException();
+            }
+            user.setIsDormant(false);
+            user.setDormantAt(null);
+            log.info("휴면 계정 재활성화: {}", id);
         }
 
         // Access Token 생성 (15분)

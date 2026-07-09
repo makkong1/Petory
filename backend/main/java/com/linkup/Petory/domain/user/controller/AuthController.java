@@ -52,7 +52,8 @@ public class AuthController {
                         loginRequest.id(),
                         loginRequest.password()));
         // AuthService를 통해 로그인 처리 (Access Token + Refresh Token 발급)
-        TokenResponse tokenResponse = authService.login(loginRequest.id(), loginRequest.password());
+        TokenResponse tokenResponse = authService.login(
+                loginRequest.id(), loginRequest.password(), loginRequest.confirmReactivate());
 
         Map<String, Object> response = new HashMap<>();
         response.put("accessToken", tokenResponse.accessToken());

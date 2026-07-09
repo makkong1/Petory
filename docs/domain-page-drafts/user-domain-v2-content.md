@@ -45,11 +45,11 @@ User 도메인은 Petory에서 로그인만 담당하는 얇은 계층이 아니
 
 ```javascript
 const corePillars = [
-  'JWT 인증',
-  'OAuth 계정 연결',
-  'Pet 소유 검증',
-  '제재 상태 동기화',
-  '보안 트레이드오프',
+  "JWT 인증",
+  "OAuth 계정 연결",
+  "Pet 소유 검증",
+  "제재 상태 동기화",
+  "보안 트레이드오프",
 ];
 ```
 
@@ -61,30 +61,30 @@ const corePillars = [
 
 첨부 JSX의 구조 테이블은 사용 가능하다. 아래처럼 현재 코드 기준으로 조금 더 구체화하면 좋다.
 
-| 항목 | 현재 코드 기준 |
-|---|---|
-| Access 인증 | JWT Bearer, subject는 `Users.id` |
-| Access TTL | `jwt.access-token-expiration-ms`, 기본 15분 |
-| Refresh 저장 | `Users.refreshToken`, `refreshExpiration` |
-| Refresh TTL | 1일, refresh 성공 시 기존 refresh 유지 |
-| OAuth 연결 | `provider + providerId` 우선, 없으면 동일 email 계정 연결 |
-| OAuth 신규 ID | provider/providerId + UUID 8자리 suffix, 충돌 시 최대 3회 재시도 |
-| OAuth callback | access/refresh token을 query parameter로 redirect |
-| Email 인증 | JWT token + Redis pre-registration 상태 24시간 |
-| Pet 소유 검증 | JWT subject `Users.id`와 `pet.user.id` 비교 |
-| 제재 상태 | 로그인/OAuth 진입 시 검사, 만료 정지는 로그인 시점 + 자정 스케줄러에서 해제 |
-| 관리자 사용자 목록 | paging API, role/status/q 필터 |
-| soft delete 중복 | 탈퇴 사용자 nickname/username/email은 중복 검사에서 제외 |
+| 항목               | 현재 코드 기준                                                              |
+| ------------------ | --------------------------------------------------------------------------- |
+| Access 인증        | JWT Bearer, subject는 `Users.id`                                            |
+| Access TTL         | `jwt.access-token-expiration-ms`, 기본 15분                                 |
+| Refresh 저장       | `Users.refreshToken`, `refreshExpiration`                                   |
+| Refresh TTL        | 1일, refresh 성공 시 기존 refresh 유지                                      |
+| OAuth 연결         | `provider + providerId` 우선, 없으면 동일 email 계정 연결                   |
+| OAuth 신규 ID      | provider/providerId + UUID 8자리 suffix, 충돌 시 최대 3회 재시도            |
+| OAuth callback     | access/refresh token을 query parameter로 redirect                           |
+| Email 인증         | JWT token + Redis pre-registration 상태 24시간                              |
+| Pet 소유 검증      | JWT subject `Users.id`와 `pet.user.id` 비교                                 |
+| 제재 상태          | 로그인/OAuth 진입 시 검사, 만료 정지는 로그인 시점 + 자정 스케줄러에서 해제 |
+| 관리자 사용자 목록 | paging API, role/status/q 필터                                              |
+| soft delete 중복   | 탈퇴 사용자 nickname/username/email은 중복 검사에서 제외                    |
 
 ### 2-2. 성능 테이블
 
 첨부 JSX의 성능 수치는 사용 가능하다. 단, 측정 조건을 반드시 함께 둔다.
 
-| 지표 | Before | After |
-|---|---|---|
-| 채팅방 목록 관련 쿼리 수 | 21개 | 4개 |
-| 실행 시간 | 305ms | 55ms |
-| 메모리 사용량 | 0.58MB | 0.13MB |
+| 지표                     | Before | After  |
+| ------------------------ | ------ | ------ |
+| 채팅방 목록 관련 쿼리 수 | 21개   | 4개    |
+| 실행 시간                | 305ms  | 55ms   |
+| 메모리 사용량            | 0.58MB | 0.13MB |
 
 보조 설명:
 
@@ -348,6 +348,59 @@ if (token == null) {
 - `backend/main/java/com/linkup/Petory/filter/JwtAuthenticationFilter.java`
 - `docs/refactoring/JWT-토큰-리팩토링-백로그.md`
 
+### F. 휴면 계정
+
+핵심 문구:
+
+탈퇴(`isDeleted`)와 별개로, 1년간 로그인하지 않은 계정은 매일 자정 배치가 `isDormant`/`dormantAt`으로 휴면 전환한다. 제재 상태(`UserStatus`)와는 독립적인 필드라 "정지 중이면서 동시에 휴면"도 표현 가능하다. 휴면 계정은 일반 로그인에서만 차단하며(OAuth2 제외), 본인이 로그인을 재시도해 확인하면 즉시 재활성화된다 — 관리자가 대신 풀어줄 수 없다.
+
+`lastLoginAt`은 개인로그인/OAuth2 로그인이 같은 `Users` row를 공유해서 갱신하므로, 계정을 연동해 둔 사용자가 한쪽 채널만 꾸준히 써도 휴면 전환 자체가 발생하지 않는다. 이미 휴면인 상태에서 OAuth2로 로그인하면 차단 없이 플래그만 조용히 해제되는데, 이는 OAuth2가 이미 제3자 인증을 거쳐 로그인 성공 자체를 본인 확인으로 볼 수 있기 때문이다 (비밀번호 탈취 위험이 있는 개인로그인과는 신뢰 수준이 다름). OAuth2 자체의 차단/재활성화 확인 플로우는 작업량 대비 이득이 크지 않아 의도적으로 범위에서 제외했다.
+
+코드 스니펫 후보:
+
+```java
+@Modifying
+@Query("UPDATE Users u SET u.isDormant = true, u.dormantAt = :now " +
+       "WHERE u.isDormant = false AND u.isDeleted = false AND (" +
+       "  (u.lastLoginAt IS NOT NULL AND u.lastLoginAt < :cutoff) OR " +
+       "  (u.lastLoginAt IS NULL AND u.createdAt < :cutoff)" +
+       ")")
+int markDormantUsers(@Param("cutoff") LocalDateTime cutoff, @Param("now") LocalDateTime now);
+```
+
+로그인 차단 + 재활성화:
+
+```java
+if (Boolean.TRUE.equals(user.getIsDormant())) {
+    if (!confirmReactivate) {
+        throw new UserDormantException();
+    }
+    user.setIsDormant(false);
+    user.setDormantAt(null);
+}
+```
+
+스케줄러:
+
+```java
+@Scheduled(cron = "0 0 0 * * *")
+public void markDormantUsers() {
+    userDormantService.markDormantUsers();
+}
+```
+
+주의 문구:
+
+- 새 엔드포인트를 만들지 않고 기존 `POST /api/auth/login`에 `confirmReactivate` 필드만 추가했다. 비밀번호는 컨트롤러의 `authenticationManager.authenticate()`에서 이미 검증되므로 재활성화 시 추가 인증 절차가 없다.
+- 가입 후 한 번도 로그인 안 한 계정은 `lastLoginAt`이 null이라 `createdAt` 기준으로 판정한다.
+
+근거:
+
+- `backend/main/java/com/linkup/Petory/domain/user/service/UserDormantService.java`
+- `backend/main/java/com/linkup/Petory/domain/user/scheduler/UserDormantScheduler.java`
+- `backend/main/java/com/linkup/Petory/domain/user/exception/UserDormantException.java`
+- `docs/superpowers/specs/2026-07-09-dormant-account-design.md`
+
 ---
 
 ## 4. `section#limits` - 한계와 운영 메모
@@ -382,17 +435,17 @@ if (token == null) {
 
 ```javascript
 const PETORY_USER_ARCH_DOC =
-  'https://github.com/makkong1/Petory/blob/dev/docs/architecture/user/%EC%82%AC%EC%9A%A9%EC%9E%90%20%EC%9D%B8%EC%A6%9D%20%EB%B0%8F%20%ED%94%84%EB%A1%9C%ED%95%84%20%EC%95%84%ED%82%A4%ED%85%8D%EC%B2%98.md';
+  "https://github.com/makkong1/Petory/blob/dev/docs/architecture/user/%EC%82%AC%EC%9A%A9%EC%9E%90%20%EC%9D%B8%EC%A6%9D%20%EB%B0%8F%20%ED%94%84%EB%A1%9C%ED%95%84%20%EC%95%84%ED%82%A4%ED%85%8D%EC%B2%98.md";
 const PETORY_AUTH_SERVICE =
-  'https://github.com/makkong1/Petory/blob/dev/backend/main/java/com/linkup/Petory/domain/user/service/AuthService.java';
+  "https://github.com/makkong1/Petory/blob/dev/backend/main/java/com/linkup/Petory/domain/user/service/AuthService.java";
 const PETORY_OAUTH2_SERVICE =
-  'https://github.com/makkong1/Petory/blob/dev/backend/main/java/com/linkup/Petory/domain/user/service/OAuth2Service.java';
+  "https://github.com/makkong1/Petory/blob/dev/backend/main/java/com/linkup/Petory/domain/user/service/OAuth2Service.java";
 const PETORY_PET_SERVICE =
-  'https://github.com/makkong1/Petory/blob/dev/backend/main/java/com/linkup/Petory/domain/user/service/PetService.java';
+  "https://github.com/makkong1/Petory/blob/dev/backend/main/java/com/linkup/Petory/domain/user/service/PetService.java";
 const PETORY_USER_SANCTION_SERVICE =
-  'https://github.com/makkong1/Petory/blob/dev/backend/main/java/com/linkup/Petory/domain/user/service/UserSanctionService.java';
+  "https://github.com/makkong1/Petory/blob/dev/backend/main/java/com/linkup/Petory/domain/user/service/UserSanctionService.java";
 const PETORY_JWT_FILTER =
-  'https://github.com/makkong1/Petory/blob/dev/backend/main/java/com/linkup/Petory/filter/JwtAuthenticationFilter.java';
+  "https://github.com/makkong1/Petory/blob/dev/backend/main/java/com/linkup/Petory/filter/JwtAuthenticationFilter.java";
 ```
 
 ### 문서 근거

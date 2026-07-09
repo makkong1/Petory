@@ -127,4 +127,11 @@ public interface UsersRepository {
      * 통계용: 특정 기간 동안 특정 역할로 가입한 사용자 수 (createdAt 기준)
      */
     long countByRoleAndCreatedAtBetween(Role role, LocalDateTime start, LocalDateTime end);
+
+    /**
+     * 휴면 계정 일괄 전환 (배치용) - 마지막 로그인 또는 가입일이 cutoff 이전인 활성 사용자를 휴면 처리
+     *
+     * @return 업데이트된 행 수
+     */
+    int markDormantUsers(LocalDateTime cutoff, LocalDateTime now);
 }

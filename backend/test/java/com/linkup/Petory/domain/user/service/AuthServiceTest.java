@@ -24,6 +24,7 @@ import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.exception.InvalidRefreshTokenException;
 import com.linkup.Petory.domain.user.exception.UserBannedException;
 import com.linkup.Petory.domain.user.exception.UserSuspendedException;
+import com.linkup.Petory.domain.user.exception.UserDormantException;
 import com.linkup.Petory.domain.user.repository.LoginEventRepository;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 import com.linkup.Petory.util.JwtUtil;
@@ -175,6 +176,48 @@ class AuthServiceTest {
 
         assertThat(user.getRefreshToken()).isNull();
         assertThat(user.getRefreshExpiration()).isNull();
+        verify(usersRepository).save(user);
+    }
+
+    @Test
+    @DisplayName("예외: 휴면 계정은 confirmReactivate 없이 로그인할 수 없다")
+    void 예외_휴면계정_재활성화확인없이_로그인차단() {
+        Users user = Users.builder()
+                .id("dormant-user")
+                .role(Role.USER)
+                .status(UserStatus.ACTIVE)
+                .isDormant(true)
+                .dormantAt(LocalDateTime.now().minusDays(1))
+                .build();
+        when(usersRepository.findActiveByIdString("dormant-user")).thenReturn(Optional.of(user));
+
+        assertThatThrownBy(() -> authService.login("dormant-user", "password", false))
+                .isInstanceOf(UserDormantException.class);
+
+        assertThat(user.getIsDormant()).isTrue();
+    }
+
+    @Test
+    @DisplayName("정상: 휴면 계정은 confirmReactivate=true면 즉시 재활성화되며 로그인에 성공한다")
+    void 정상_휴면계정_재활성화확인시_로그인성공() {
+        Users user = Users.builder()
+                .id("dormant-user")
+                .role(Role.USER)
+                .status(UserStatus.ACTIVE)
+                .isDormant(true)
+                .dormantAt(LocalDateTime.now().minusDays(1))
+                .build();
+        UsersDTO dto = UsersDTO.builder().id("dormant-user").build();
+        when(usersRepository.findActiveByIdString("dormant-user")).thenReturn(Optional.of(user));
+        when(jwtUtil.createAccessToken("dormant-user")).thenReturn("access-token");
+        when(jwtUtil.createRefreshToken()).thenReturn("refresh-token");
+        when(usersConverter.toDTO(user)).thenReturn(dto);
+
+        TokenResponse response = authService.login("dormant-user", "password", true);
+
+        assertThat(response.accessToken()).isEqualTo("access-token");
+        assertThat(user.getIsDormant()).isFalse();
+        assertThat(user.getDormantAt()).isNull();
         verify(usersRepository).save(user);
     }
 }

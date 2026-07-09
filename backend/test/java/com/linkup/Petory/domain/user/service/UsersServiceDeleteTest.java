@@ -76,6 +76,30 @@ class UsersServiceDeleteTest {
     }
 
     @Test
+    @DisplayName("정상: 탈퇴 시 id/username/nickname/email을 익명화해 재사용 가능하게 한다")
+    void 정상_탈퇴시_고유필드_익명화() {
+        Users user = Users.builder()
+                .idx(1L)
+                .id("user-1")
+                .username("user-1")
+                .nickname("닉네임1")
+                .email("user-1@test.local")
+                .password("encoded")
+                .role(Role.USER)
+                .status(UserStatus.ACTIVE)
+                .isDeleted(false)
+                .build();
+        when(usersRepository.findById(1L)).thenReturn(Optional.of(user));
+
+        usersService.deleteUser(1L);
+
+        assertThat(user.getId()).isNotEqualTo("user-1");
+        assertThat(user.getUsername()).isNotEqualTo("user-1");
+        assertThat(user.getNickname()).isNotEqualTo("닉네임1");
+        assertThat(user.getEmail()).isNotEqualTo("user-1@test.local");
+    }
+
+    @Test
     @DisplayName("예외: 관리자 상태 변경에서 SUSPENDED는 미래 suspendedUntil이 필요하다")
     void 예외_정지상태_미래해제일_필수() {
         Users user = baseUser();

@@ -261,17 +261,6 @@ public class UsersService {
     }
 
     /**
-     * 계정 복구 (관리자용) - AdminUserController에서 사용
-     */
-    public UsersDTO restoreUser(long idx) {
-        Users user = usersRepository.findById(idx)
-                .orElseThrow(UserNotFoundException::new);
-        user.restore();
-        Users restored = usersRepository.save(user);
-        return usersConverter.toDTO(restored);
-    }
-
-    /**
      * 사용자 상태 관리 (관리자용) - 상태, 경고 횟수, 정지 기간만 업데이트 - AdminUserController에서 사용
      */
     public UsersDTO updateUserStatus(long idx, UsersDTO dto) {

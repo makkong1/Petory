@@ -153,4 +153,9 @@ public class JpaUsersAdapter implements UsersRepository {
     public long countByRoleAndCreatedAtBetween(Role role, LocalDateTime start, LocalDateTime end) {
         return jpaRepository.countByRoleAndCreatedAtBetween(role, start, end);
     }
+
+    @Override
+    public int markDormantUsers(LocalDateTime cutoff, LocalDateTime now) {
+        return jpaRepository.markDormantUsers(cutoff, now);
+    }
 }

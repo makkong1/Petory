@@ -41,4 +41,8 @@ public class UsersDTO {
     // 소프트 삭제 관련 필드
     private Boolean isDeleted;
     private LocalDateTime deletedAt;
+
+    // 휴면 계정 관련 필드
+    private Boolean isDormant;
+    private LocalDateTime dormantAt;
 }

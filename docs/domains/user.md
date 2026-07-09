@@ -17,7 +17,7 @@ User 도메인은 인증, 사용자 프로필, 소셜 계정 연결, 이메일 �
 - 이메일 인증 및 비밀번호 재설정 메일 발송
 - 반려동물 CRUD와 소유권 검증
 - 사용자 제재 상태 확인, 경고, 정지, 차단
-- 관리자용 사용자 조회/상태 변경/삭제/복구
+- 관리자용 사용자 조회/상태 변경/삭제 (탈퇴는 복구 불가)
 - MASTER 전용 관리자 계정 관리
 
 비범위:
@@ -73,6 +73,7 @@ User 도메인은 인증, 사용자 프로필, 소셜 계정 연결, 이메일 �
 | `petCoinBalance`                      | 펫코인 잔액                                         |
 | `suspendedUntil`                      | 정지 만료 시각                                      |
 | `isDeleted`, `deletedAt`              | soft delete 상태                                    |
+| `isDormant`, `dormantAt`              | 휴면 상태 (1년 미로그인 시 배치로 자동 전환)         |
 | `refreshToken`, `refreshExpiration`   | DB에 저장되는 refresh token 상태                    |
 | `lastLoginAt`                         | 통계용 마지막 로그인 시각                           |
 
@@ -143,7 +144,7 @@ User 도메인은 인증, 사용자 프로필, 소셜 계정 연결, 이메일 �
 | API                              | 설명                                     |
 | -------------------------------- | ---------------------------------------- |
 | `POST /api/auth/register`        | 일반 회원가입                            |
-| `POST /api/auth/login`           | 로그인, access/refresh token 발급        |
+| `POST /api/auth/login`           | 로그인, access/refresh token 발급. `confirmReactivate=true`로 휴면 계정 본인 확인 재활성화 |
 | `POST /api/auth/validate`        | Authorization header의 access token 검증 |
 | `POST /api/auth/refresh`         | refresh token으로 access token 재발급    |
 | `POST /api/auth/logout`          | refresh token 제거                       |
@@ -408,8 +409,7 @@ OAuth2 로그인은 Spring Security OAuth2 성공 후 `OAuth2SuccessHandler`가 
 | `GET /api/admin/users/paging`        | 사용자 목록 페이징 조회, role/status/q 필터 |
 | `GET /api/admin/users/{id}`          | 사용자 단건 조회                            |
 | `PATCH /api/admin/users/{id}/status` | 상태, 경고 수, 정지 기간 변경               |
-| `DELETE /api/admin/users/{id}`       | 사용자 soft delete                          |
-| `POST /api/admin/users/{id}/restore` | 사용자 복구                                 |
+| `DELETE /api/admin/users/{id}`       | 사용자 탈퇴 처리 (복구 불가)                |
 
 ### `/api/master/admin-users`
 

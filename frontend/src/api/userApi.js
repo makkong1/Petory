@@ -49,11 +49,8 @@ export const userApi = {
   updateUser: (id, userData) =>
     isDemoMode() ? mockResolve({ idx: id, ...userData }) : api.put(`/${id}`, userData),
 
-  // 유저 삭제 (소프트 삭제)
+  // 유저 삭제 (탈퇴, 복구 불가)
   deleteUser: (id) => (isDemoMode() ? mockResolve({}) : api.delete(`/${id}`)),
-
-  // 계정 복구
-  restoreUser: (id) => (isDemoMode() ? mockResolve({}) : api.post(`/${id}/restore`)),
 
   // 상태 관리 (상태, 경고 횟수, 정지 기간만 업데이트)
   updateUserStatus: (id, userData) =>
