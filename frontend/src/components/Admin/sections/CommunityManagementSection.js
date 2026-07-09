@@ -2,6 +2,19 @@ import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import styled from 'styled-components';
 import { communityAdminApi } from '../../../api/communityAdminApi';
 import PageNavigation from '../../Common/PageNavigation';
+import {
+  SectionHeader, SectionTitle, SectionSubtitle,
+  Toolbar, Spacer, FieldLabel, Select, Search,
+  TableWrap, Table, Th, Td, TableMessage,
+  StatusPill, RowBtn, RowBtnDanger, RowActions,
+} from '../ui/AdminUI';
+
+// 게시글 상태 → pill tone/라벨
+const boardStatusMeta = (row) => {
+  if (row.deleted) return { tone: 'danger', label: '삭제됨' };
+  if (row.status === 'BLINDED') return { tone: 'warning', label: '블라인드' };
+  return { tone: 'success', label: '게시' };
+};
 
 const CommunityManagementSection = () => {
   const [status, setStatus] = useState('ALL'); // ALL | ACTIVE | BLINDED | DELETED
@@ -220,31 +233,28 @@ const CommunityManagementSection = () => {
 
   return (
     <Wrapper>
-      <Header>
-        <Title>커뮤니티 관리</Title>
-        <Subtitle>게시글 상태(블라인드/삭제)와 검색·필터를 지원합니다. (댓글/인기 탭은 다음 단계에서 추가)</Subtitle>
-      </Header>
+      <SectionHeader>
+        <SectionTitle>커뮤니티 관리</SectionTitle>
+        <SectionSubtitle>게시글 상태(블라인드/삭제)와 검색·필터를 지원합니다.</SectionSubtitle>
+      </SectionHeader>
 
-      <Filters>
-        <Group>
-          <Label>상태</Label>
+      <Toolbar>
+        <div><FieldLabel>상태</FieldLabel>
           <Select value={status} onChange={e => setStatus(e.target.value)}>
             <option value="ALL">전체</option>
             <option value="ACTIVE">게시</option>
             <option value="BLINDED">블라인드</option>
             <option value="DELETED">삭제됨</option>
           </Select>
-        </Group>
-        <Group>
-          <Label>삭제여부</Label>
+        </div>
+        <div><FieldLabel>삭제</FieldLabel>
           <Select value={deleted} onChange={e => setDeleted(e.target.value)}>
             <option value="">전체</option>
             <option value="false">미삭제</option>
             <option value="true">삭제됨</option>
           </Select>
-        </Group>
-        <Group>
-          <Label>카테고리</Label>
+        </div>
+        <div><FieldLabel>카테고리</FieldLabel>
           <Select value={category} onChange={e => setCategory(e.target.value)}>
             <option value="ALL">전체</option>
             <option value="일상">일상</option>
@@ -252,97 +262,91 @@ const CommunityManagementSection = () => {
             <option value="질문">질문</option>
             <option value="정보">정보</option>
             <option value="후기">후기</option>
-            <option value="모임">모임</option>
             <option value="공지">공지</option>
           </Select>
-        </Group>
-        <Group style={{ flex: 1 }}>
-          <Label>검색</Label>
-          <Input
-            placeholder="제목/내용/작성자"
-            value={q}
-            onChange={e => setQ(e.target.value)}
-          />
-        </Group>
-        <Group>
-          <Label>페이지 크기</Label>
-          <Select value={pageSize} onChange={handlePageSizeChange}>
-            <option value={20}>20개씩</option>
-            <option value={50}>50개씩</option>
-            <option value={100}>100개씩</option>
-          </Select>
-        </Group>
-        <Group>
-          <Refresh onClick={() => fetchBoards(0, true)}>새로고침</Refresh>
-        </Group>
-      </Filters>
+        </div>
+        <Search
+          placeholder="제목/내용/작성자 검색…"
+          value={q}
+          onChange={e => setQ(e.target.value)}
+        />
+        <Spacer />
+        <Select value={pageSize} onChange={handlePageSizeChange}>
+          <option value={20}>20개씩</option>
+          <option value={50}>50개씩</option>
+          <option value={100}>100개씩</option>
+        </Select>
+        <RowBtn onClick={() => fetchBoards(0, true)}>새로고침</RowBtn>
+      </Toolbar>
 
-      {totalCount > 0 && (
-        <PaginationWrapper>
-          <PageNavigation
-            currentPage={page}
-            totalCount={totalCount}
-            pageSize={pageSize}
-            onPageChange={handlePageChange}
-            loading={loading}
-          />
-        </PaginationWrapper>
-      )}
-
-      <Card>
-        {loading && boardsData.order.length === 0 ? (
-          <Info>로딩 중...</Info>
-        ) : error ? (
-          <Info>{error}</Info>
-        ) : rows.length === 0 ? (
-          <Info>데이터가 없습니다.</Info>
-        ) : (
-          <>
+      {loading && boardsData.order.length === 0 ? (
+        <TableMessage>로딩 중...</TableMessage>
+      ) : error ? (
+        <TableMessage>{error}</TableMessage>
+      ) : rows.length === 0 ? (
+        <TableMessage>데이터가 없습니다.</TableMessage>
+      ) : (
+        <>
+          <TableWrap>
             <Table>
               <thead>
                 <tr>
-                  <th>ID</th>
-                  <th>작성자</th>
-                  <th>제목</th>
-                  <th>카테고리</th>
-                  <th>상태</th>
-                  <th>삭제됨</th>
-                  <th>생성일</th>
-                  <th>액션</th>
+                  <Th $align="right">ID</Th>
+                  <Th>작성자</Th>
+                  <Th>제목</Th>
+                  <Th>카테고리</Th>
+                  <Th $align="center">상태</Th>
+                  <Th>생성일</Th>
+                  <Th $align="center">액션</Th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row) => (
-                  <tr key={row.idx}>
-                    <td>{row.idx}</td>
-                    <td>{row.username || '-'}</td>
-                    <td className="ellipsis">{row.title || '-'}</td>
-                    <td>{row.category || '-'}</td>
-                    <td>{row.status || '-'}</td>
-                    <td>{row.deleted ? 'Y' : 'N'}</td>
-                    <td>{row.createdAt ? new Date(row.createdAt).toLocaleString() : '-'}</td>
-                    <td>
-                      <Actions>
-                        {row.status !== 'BLINDED' && !row.deleted && (
-                          <Btn onClick={() => onBlind(row)}>블라인드</Btn>
-                        )}
-                        {row.status === 'BLINDED' && !row.deleted && (
-                          <Btn onClick={() => onUnblind(row)}>해제</Btn>
-                        )}
-                        {!row.deleted ? (
-                          <Danger onClick={() => onDeleteSoft(row)}>삭제</Danger>
-                        ) : (
-                          <Btn onClick={() => onRestore(row)}>복구</Btn>
-                        )}
-                      </Actions>
-                    </td>
-                  </tr>
-                ))}
+                {rows.map((row) => {
+                  const meta = boardStatusMeta(row);
+                  return (
+                    <tr key={row.idx}>
+                      <Td $align="right" $mono $muted>#{row.idx}</Td>
+                      <Td>{row.username || '-'}</Td>
+                      <Td $ellipsis $strong>{row.title || '-'}</Td>
+                      <Td $muted>{row.category || '-'}</Td>
+                      <Td $align="center"><StatusPill $tone={meta.tone}>{meta.label}</StatusPill></Td>
+                      <Td $muted>{row.createdAt ? new Date(row.createdAt).toLocaleString('ko-KR') : '-'}</Td>
+                      <Td $align="center">
+                        <RowActions>
+                          {row.status !== 'BLINDED' && !row.deleted && (
+                            <RowBtn onClick={() => onBlind(row)}>블라인드</RowBtn>
+                          )}
+                          {row.status === 'BLINDED' && !row.deleted && (
+                            <RowBtn onClick={() => onUnblind(row)}>해제</RowBtn>
+                          )}
+                          {!row.deleted ? (
+                            <RowBtnDanger onClick={() => onDeleteSoft(row)}>삭제</RowBtnDanger>
+                          ) : (
+                            <RowBtn onClick={() => onRestore(row)}>복구</RowBtn>
+                          )}
+                        </RowActions>
+                      </Td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </Table>
-          </>
-        )}
-      </Card>
+          </TableWrap>
+
+          {totalCount > 0 && (
+            <PaginationWrap>
+              <PageNavigation
+                currentPage={page}
+                totalCount={totalCount}
+                pageSize={pageSize}
+                onPageChange={handlePageChange}
+                loading={loading}
+                showEdges
+              />
+            </PaginationWrap>
+          )}
+        </>
+      )}
     </Wrapper>
   );
 };
@@ -351,121 +355,25 @@ export default CommunityManagementSection;
 
 const Wrapper = styled.div``;
 
-const Header = styled.div`
-  margin-bottom: ${props => props.theme.spacing.lg};
+const PaginationWrap = styled.div`
+  margin-top: ${p => p.theme.spacing.md};
 `;
 
-const Title = styled.h1`
-  font-size: ${props => props.theme.typography.h2.fontSize};
-  font-weight: ${props => props.theme.typography.h2.fontWeight};
-  margin-bottom: ${props => props.theme.spacing.xs};
-`;
 
-const Subtitle = styled.p`
-  color: ${props => props.theme.colors.textSecondary};
-`;
 
-const Filters = styled.div`
-  display: flex;
-  gap: ${props => props.theme.spacing.md};
-  align-items: center;
-  margin-bottom: ${props => props.theme.spacing.md};
-  flex-wrap: wrap;
-`;
 
-const Group = styled.div`
-  display: flex;
-  align-items: center;
-  gap: ${props => props.theme.spacing.xs};
-`;
 
-const Label = styled.span`
-  color: ${props => props.theme.colors.text};
-  font-size: ${props => props.theme.typography.caption.fontSize};
-`;
 
-const Select = styled.select`
-  padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.sm};
-  border: 1px solid ${props => props.theme.colors.border};
-  border-radius: ${props => props.theme.borderRadius.sm};
-  background: ${props => props.theme.colors.surface};
-  color: ${props => props.theme.colors.text};
-`;
 
-const Input = styled.input`
-  width: 240px;
-  padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.sm};
-  border: 1px solid ${props => props.theme.colors.border};
-  border-radius: ${props => props.theme.borderRadius.sm};
-  background: ${props => props.theme.colors.surface};
-  color: ${props => props.theme.colors.text};
-`;
 
-const Refresh = styled.button`
-  padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.md};
-  border: 1px solid ${props => props.theme.colors.border};
-  background: ${props => props.theme.colors.background};
-  color: ${props => props.theme.colors.text};
-  border-radius: ${props => props.theme.borderRadius.sm};
-  cursor: pointer;
-  
-  &:hover {
-    background: ${props => props.theme.colors.surfaceHover};
-  }
-`;
 
-const Card = styled.div`
-  border-radius: ${props => props.theme.borderRadius.md};
-  border: 1px solid ${props => props.theme.colors.border};
-  padding: ${props => props.theme.spacing.lg};
-  background: ${props => props.theme.colors.surface};
-`;
 
-const Table = styled.table`
-  width: 100%;
-  border-collapse: collapse;
-  font-size: ${props => props.theme.typography.caption.fontSize};
-  th, td { padding: 8px 10px; border-bottom: 1px solid ${props => props.theme.colors.border}; }
-  th { color: ${props => props.theme.colors.text}; text-align: left; white-space: nowrap; }
-  td.ellipsis { max-width: 420px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-`;
 
-const PaginationWrapper = styled.div`
-  margin-bottom: ${props => props.theme.spacing.md};
-`;
 
-const Info = styled.div`
-  padding: ${props => props.theme.spacing.lg};
-  text-align: center;
-  color: ${props => props.theme.colors.textSecondary};
-`;
 
-const Actions = styled.div`
-  display: flex;
-  gap: ${props => props.theme.spacing.xs};
-`;
 
-const Btn = styled.button`
-  padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.sm};
-  border: 1px solid ${props => props.theme.colors.border};
-  background: ${props => props.theme.colors.background};
-  color: ${props => props.theme.colors.text};
-  border-radius: ${props => props.theme.borderRadius.sm};
-  cursor: pointer;
-  
-  &:hover {
-    background: ${props => props.theme.colors.surfaceHover};
-  }
-`;
 
-const Danger = styled.button`
-  padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.sm};
-  border: 1px solid ${props => props.theme.colors.error};
-  color: ${props => props.theme.colors.error};
-  background: transparent;
-  border-radius: ${props => props.theme.borderRadius.sm};
-  cursor: pointer;
-`;
+
 
 
 

@@ -1,6 +1,22 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import styled from 'styled-components';
 import { meetupAdminApi } from '../../../api/meetupAdminApi.js';
+import PageNavigation from '../../Common/PageNavigation';
+import {
+  SectionHeader, SectionTitle, SectionSubtitle,
+  Toolbar, Spacer, FieldLabel, Select, Search,
+  TableWrap, Table, Th, Td, TableMessage,
+  StatusPill, RowBtn, RowBtnDanger, RowActions,
+} from '../ui/AdminUI';
+
+// 모임 상태 → pill tone/라벨
+const MEETUP_STATUS_META = {
+  RECRUITING: { tone: 'pending', label: '모집중' },
+  FULL: { tone: 'warning', label: '마감' },
+  ONGOING: { tone: 'progress', label: '진행중' },
+  COMPLETED: { tone: 'success', label: '완료' },
+  CANCELLED: { tone: 'neutral', label: '취소됨' },
+};
 
 const MeetupManagementSection = () => {
   const [status, setStatus] = useState('');
@@ -68,85 +84,91 @@ const MeetupManagementSection = () => {
 
   return (
     <Wrapper>
-      <Header>
-        <Title>산책 모임 관리</Title>
-        <Subtitle>모임과 참여자를 조회하고 관리합니다.</Subtitle>
-      </Header>
+      <SectionHeader>
+        <SectionTitle>산책 모임 관리</SectionTitle>
+        <SectionSubtitle>모임과 참여자를 조회하고 관리합니다.</SectionSubtitle>
+      </SectionHeader>
 
-      <Filters>
-        <Group>
-          <Label>상태</Label>
+      <Toolbar>
+        <div><FieldLabel>상태</FieldLabel>
           <Select value={status} onChange={e => { setStatus(e.target.value); setPage(0); }}>
             {statusOptions.map(opt => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
           </Select>
-        </Group>
-        <Group style={{ flex: 1 }}>
-          <Label>검색</Label>
-          <Input
-            placeholder="제목/내용/위치/주최자"
-            value={q}
-            onChange={e => { setQ(e.target.value); setPage(0); }}
-          />
-        </Group>
-        <Group>
-          <Refresh onClick={fetchMeetups}>새로고침</Refresh>
-        </Group>
-      </Filters>
+        </div>
+        <Search
+          placeholder="제목/내용/위치/주최자 검색…"
+          value={q}
+          onChange={e => { setQ(e.target.value); setPage(0); }}
+        />
+        <Spacer />
+        <RowBtn onClick={fetchMeetups}>새로고침</RowBtn>
+      </Toolbar>
 
-      <Card>
-        {loading && meetups.length === 0 ? (
-          <Info>로딩 중...</Info>
-        ) : error ? (
-          <Info>{error}</Info>
-        ) : meetups.length === 0 ? (
-          <Info>데이터가 없습니다.</Info>
-        ) : (
-          <Table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>주최자</th>
-                <th>제목</th>
-                <th>위치</th>
-                <th>날짜</th>
-                <th>인원</th>
-                <th>상태</th>
-                <th>생성일</th>
-                <th>액션</th>
-              </tr>
-            </thead>
-            <tbody>
-              {meetups.map((item) => (
-                <tr key={item.idx}>
-                  <td>{item.idx}</td>
-                  <td>{item.organizerName || '-'}</td>
-                  <td className="ellipsis">{item.title || '-'}</td>
-                  <td className="ellipsis">{item.location || '-'}</td>
-                  <td>{item.date ? new Date(item.date).toLocaleString() : '-'}</td>
-                  <td>{item.currentParticipants || 0} / {item.maxParticipants || 0}</td>
-                  <td>{item.status || '-'}</td>
-                  <td>{item.createdAt ? new Date(item.createdAt).toLocaleString() : '-'}</td>
-                  <td>
-                    <Actions>
-                      <Btn onClick={() => handleShowParticipants(item.idx)}>참가자</Btn>
-                      <Danger onClick={() => handleDelete(item.idx)}>삭제</Danger>
-                    </Actions>
-                  </td>
+      {loading && meetups.length === 0 ? (
+        <TableMessage>로딩 중...</TableMessage>
+      ) : error ? (
+        <TableMessage>{error}</TableMessage>
+      ) : meetups.length === 0 ? (
+        <TableMessage>데이터가 없습니다.</TableMessage>
+      ) : (
+        <>
+          <TableWrap>
+            <Table>
+              <thead>
+                <tr>
+                  <Th $align="right">ID</Th>
+                  <Th>주최자</Th>
+                  <Th>제목</Th>
+                  <Th>위치</Th>
+                  <Th>날짜</Th>
+                  <Th $align="right">인원</Th>
+                  <Th $align="center">상태</Th>
+                  <Th>생성일</Th>
+                  <Th $align="center">액션</Th>
                 </tr>
-              ))}
-            </tbody>
-          </Table>
-        )}
-      </Card>
+              </thead>
+              <tbody>
+                {meetups.map((item) => {
+                  const meta = MEETUP_STATUS_META[item.status] || { tone: 'neutral', label: item.status || '-' };
+                  return (
+                    <tr key={item.idx}>
+                      <Td $align="right" $mono $muted>#{item.idx}</Td>
+                      <Td>{item.organizerName || '-'}</Td>
+                      <Td $ellipsis $strong>{item.title || '-'}</Td>
+                      <Td $ellipsis={220} $muted>{item.location || '-'}</Td>
+                      <Td $muted>{item.date ? new Date(item.date).toLocaleString('ko-KR') : '-'}</Td>
+                      <Td $align="right" $mono>{item.currentParticipants || 0} / {item.maxParticipants || 0}</Td>
+                      <Td $align="center"><StatusPill $tone={meta.tone}>{meta.label}</StatusPill></Td>
+                      <Td $muted>{item.createdAt ? new Date(item.createdAt).toLocaleString('ko-KR') : '-'}</Td>
+                      <Td $align="center">
+                        <RowActions>
+                          <RowBtn onClick={() => handleShowParticipants(item.idx)}>참가자</RowBtn>
+                          <RowBtnDanger onClick={() => handleDelete(item.idx)}>삭제</RowBtnDanger>
+                        </RowActions>
+                      </Td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </Table>
+          </TableWrap>
 
-      {totalPages > 1 && (
-        <PaginationRow>
-          <PageBtn onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}>이전</PageBtn>
-          <span>{page + 1} / {totalPages}</span>
-          <PageBtn onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}>다음</PageBtn>
-        </PaginationRow>
+          {totalPages > 1 && (
+            <PaginationWrap>
+              <PageNavigation
+                currentPage={page}
+                totalCount={totalPages * PAGE_SIZE}
+                pageSize={PAGE_SIZE}
+                onPageChange={setPage}
+                loading={loading}
+                showEdges
+                showTotal={false}
+              />
+            </PaginationWrap>
+          )}
+        </>
       )}
 
       {showParticipants && (
@@ -158,24 +180,26 @@ const MeetupManagementSection = () => {
             </ModalHeader>
             <ModalBody>
               {participants.length === 0 ? (
-                <Info>참가자가 없습니다.</Info>
+                <TableMessage>참가자가 없습니다.</TableMessage>
               ) : (
-                <Table>
-                  <thead>
-                    <tr>
-                      <th>사용자명</th>
-                      <th>참가일시</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {participants.map((p, idx) => (
-                      <tr key={idx}>
-                        <td>{p.username || '-'}</td>
-                        <td>{p.joinedAt ? new Date(p.joinedAt).toLocaleString() : '-'}</td>
+                <TableWrap>
+                  <Table>
+                    <thead>
+                      <tr>
+                        <Th>사용자명</Th>
+                        <Th>참가일시</Th>
                       </tr>
-                    ))}
-                  </tbody>
-                </Table>
+                    </thead>
+                    <tbody>
+                      {participants.map((p, idx) => (
+                        <tr key={idx}>
+                          <Td $strong>{p.username || '-'}</Td>
+                          <Td $muted>{p.joinedAt ? new Date(p.joinedAt).toLocaleString('ko-KR') : '-'}</Td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </Table>
+                </TableWrap>
               )}
             </ModalBody>
           </ModalContent>
@@ -189,117 +213,20 @@ export default MeetupManagementSection;
 
 const Wrapper = styled.div``;
 
-const Header = styled.div`
-  margin-bottom: ${props => props.theme.spacing.lg};
-`;
 
-const Title = styled.h1`
-  font-size: ${props => props.theme.typography.h2.fontSize};
-  font-weight: ${props => props.theme.typography.h2.fontWeight};
-  margin-bottom: ${props => props.theme.spacing.xs};
-`;
 
-const Subtitle = styled.p`
-  color: ${props => props.theme.colors.textSecondary};
-`;
 
-const Filters = styled.div`
-  display: flex;
-  gap: ${props => props.theme.spacing.md};
-  align-items: center;
-  margin-bottom: ${props => props.theme.spacing.md};
-  flex-wrap: wrap;
-`;
 
-const Group = styled.div`
-  display: flex;
-  align-items: center;
-  gap: ${props => props.theme.spacing.xs};
-`;
 
-const Label = styled.span`
-  color: ${props => props.theme.colors.text};
-  font-size: ${props => props.theme.typography.caption.fontSize};
-`;
 
-const Select = styled.select`
-  padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.sm};
-  border: 1px solid ${props => props.theme.colors.border};
-  border-radius: ${props => props.theme.borderRadius.sm};
-  background: ${props => props.theme.colors.surface};
-  color: ${props => props.theme.colors.text};
-`;
 
-const Input = styled.input`
-  width: 240px;
-  padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.sm};
-  border: 1px solid ${props => props.theme.colors.border};
-  border-radius: ${props => props.theme.borderRadius.sm};
-  background: ${props => props.theme.colors.surface};
-  color: ${props => props.theme.colors.text};
-`;
 
-const Refresh = styled.button`
-  padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.md};
-  border: 1px solid ${props => props.theme.colors.border};
-  background: ${props => props.theme.colors.background};
-  color: ${props => props.theme.colors.text};
-  border-radius: ${props => props.theme.borderRadius.sm};
-  cursor: pointer;
-  
-  &:hover {
-    background: ${props => props.theme.colors.surfaceHover};
-  }
-`;
 
-const Card = styled.div`
-  border-radius: ${props => props.theme.borderRadius.md};
-  border: 1px solid ${props => props.theme.colors.border};
-  padding: ${props => props.theme.spacing.lg};
-  background: ${props => props.theme.colors.surface};
-`;
 
-const Table = styled.table`
-  width: 100%;
-  border-collapse: collapse;
-  font-size: ${props => props.theme.typography.caption.fontSize};
-  th, td { padding: 8px 10px; border-bottom: 1px solid ${props => props.theme.colors.border}; }
-  th { color: ${props => props.theme.colors.text}; text-align: left; white-space: nowrap; }
-  td.ellipsis { max-width: 420px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-`;
 
-const Info = styled.div`
-  padding: ${props => props.theme.spacing.lg};
-  text-align: center;
-  color: ${props => props.theme.colors.textSecondary};
-`;
 
-const Actions = styled.div`
-  display: flex;
-  gap: ${props => props.theme.spacing.xs};
-`;
 
-const Btn = styled.button`
-  padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.sm};
-  border: 1px solid ${props => props.theme.colors.border};
-  background: ${props => props.theme.colors.background};
-  color: ${props => props.theme.colors.text};
-  border-radius: ${props => props.theme.borderRadius.sm};
-  cursor: pointer;
-  
-  &:hover {
-    background: ${props => props.theme.colors.surfaceHover};
-  }
-`;
 
-const Danger = styled.button`
-  padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.sm};
-  border: 1px solid ${props => props.theme.colors.error};
-  color: ${props => props.theme.colors.error};
-  background: transparent;
-  border-radius: ${props => props.theme.borderRadius.sm};
-  cursor: pointer;
-`;
 
 const ModalOverlay = styled.div`
   position: fixed;
@@ -353,19 +280,8 @@ const ModalBody = styled.div`
   overflow-y: auto;
 `;
 
-const PaginationRow = styled.div`
-  display: flex;
-  align-items: center;
-  gap: ${props => props.theme.spacing.sm};
-  justify-content: center;
-  margin-top: ${props => props.theme.spacing.md};
-`;
 
-const PageBtn = styled.button`
-  padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.sm};
-  border: 1px solid ${props => props.theme.colors.border};
-  border-radius: 4px;
-  background: ${props => props.disabled ? props.theme.colors.surfaceSoft : props.theme.colors.surface};
-  color: ${props => props.disabled ? props.theme.colors.textLight : props.theme.colors.text};
-  cursor: ${props => props.disabled ? 'not-allowed' : 'pointer'};
+
+const PaginationWrap = styled.div`
+  margin-top: 12px;
 `;

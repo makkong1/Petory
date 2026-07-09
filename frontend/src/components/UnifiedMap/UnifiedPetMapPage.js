@@ -410,6 +410,22 @@ const UnifiedPetMapPage = () => {
   const displayItems = items;
   const mapServices = items;
 
+  // "반경 내 결과 없음" 토스트 — 검색 결과가 비면 중앙에 띄우고 3초 뒤 자동 소멸
+  const [emptyToast, setEmptyToast] = useState(false);
+  useEffect(() => {
+    const isEmpty =
+      !loading && !error && !!mapViewportCenter && displayItems.length === 0;
+    if (!isEmpty) {
+      setEmptyToast(false);
+      return;
+    }
+    setEmptyToast(true);
+    const t = setTimeout(() => setEmptyToast(false), 3000);
+    return () => clearTimeout(t);
+    // mapViewportCenter는 존재 여부만 사용(패닝 시 재트리거 방지)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, error, displayItems.length]);
+
   const handleLocationResultClick = useCallback((item) => {
     setSelectedItem(item);
     setHoveredLocationItem(item);
@@ -419,6 +435,18 @@ const UnifiedPetMapPage = () => {
   }, []);
 
   const renderMobileBottomSheet = () => {
+    // 주변시설 상세: 목록 시트를 확장해 상세를 표시 (별도 패널 없이 목록↔상세 전환)
+    if (activeLayer === "location" && selectedItem?.type === "location") {
+      return (
+        <LocationResultSheet $expanded>
+          <LocationLayer
+            docked
+            selectedItem={selectedItem}
+            onClose={() => setSelectedItem(null)}
+          />
+        </LocationResultSheet>
+      );
+    }
     if (activeLayer !== "location" && activeLayer !== "meetup" && activeLayer !== "care") {
       return null;
     }
@@ -446,7 +474,16 @@ const UnifiedPetMapPage = () => {
           </div>
           <ResultSheetMeta>{sheetItems.length}개</ResultSheetMeta>
         </ResultSheetHeader>
-        <ResultList>
+        <ResultList
+          onWheel={(e) => {
+            // 데스크톱 가로 목록: 세로 마우스 휠을 가로 스크롤로 변환
+            const el = e.currentTarget;
+            if (el.scrollWidth <= el.clientWidth) return;
+            if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+              el.scrollLeft += e.deltaY;
+            }
+          }}
+        >
           {sheetItems.map((item, index) => {
             const isSelected = selectedItem?.id === item.id;
             return (
@@ -618,7 +655,7 @@ const UnifiedPetMapPage = () => {
   const renderInfoPanel = () => {
     if (!selectedItem) return null;
     const props = { selectedItem, onClose: () => setSelectedItem(null) };
-    if (selectedItem.type === "location") return <LocationLayer {...props} />;
+    // location 상세는 하단 시트 확장으로 표시 (renderMobileBottomSheet)
     if (selectedItem.type === "meetup")
       return <MeetupLayer {...props} onRefresh={handleMeetupCreated} />;
     if (selectedItem.type === "care") return <CareLayer {...props} />;
@@ -627,169 +664,8 @@ const UnifiedPetMapPage = () => {
 
   return (
     <PageWrapper>
-      <DomainTabHeader
-        activeLayer={activeLayer}
-        onTabChange={handleTabChange}
-      />
-
       <ContentRow>
-        {/* ── 데스크톱 전용 좌측 패널 ── */}
-        <LeftPanel>
-          <LeftPanelTop>
-            {/* location 탭: 반경 필터가 LocationControls 내부 CompactFilterRow에 통합 */}
-            {activeLayer !== "location" && (
-              <RadiusFilter
-                radius={radius}
-                onRadiusChange={handleRadiusChange}
-              />
-            )}
-            {renderLayerControls(activeLayer === "location")}
-          </LeftPanelTop>
-
-          {/* location 탭: 결과 목록 */}
-          {activeLayer === "location" && (
-            <LeftPanelResults>
-              {loading && <PanelStatusMsg>검색 중...</PanelStatusMsg>}
-              {!loading &&
-                !error &&
-                displayItems.length === 0 &&
-                mapViewportCenter && (
-                  <PanelStatusMsg>
-                    반경 {radius}km 내 결과가 없습니다.
-                  </PanelStatusMsg>
-                )}
-              {!loading && !error && displayItems.length > 0 && (
-                <>
-                  <PanelResultHeader>
-                    <div>
-                      <PanelResultTitle>주변 시설</PanelResultTitle>
-                      <PanelResultSubtitle>
-                        {searchMode === "initial"
-                          ? "초기 검색"
-                          : "현재 검색 기준"}{" "}
-                        · 반경 {radius}km · {SORT_LABELS[locationSort]}
-                      </PanelResultSubtitle>
-                    </div>
-                    <PanelResultCount>{displayItems.length}개</PanelResultCount>
-                  </PanelResultHeader>
-                  <PanelResultList>
-                    {displayItems.map((item, index) => {
-                      const isSelected = selectedItem?.id === item.id;
-                      return (
-                        <ResultCard
-                          key={item.id}
-                          type="button"
-                          $selected={isSelected}
-                          onClick={() => {
-                            handleLocationResultClick(item);
-                          }}
-                          onMouseEnter={() => setHoveredLocationItem(item)}
-                          onMouseLeave={() =>
-                            setHoveredLocationItem((current) =>
-                              current?.id === item.id ? null : current
-                            )
-                          }
-                        >
-                          <ResultCardTop>
-                            <ResultCardTitle>
-                              {item.title || item.name || `시설 ${index + 1}`}
-                            </ResultCardTitle>
-                            {item.distanceM != null ? (
-                              <ResultDistance>{item.distanceM}m</ResultDistance>
-                            ) : (
-                              item.raw?.distance != null && (
-                                <ResultDistance>
-                                  {Math.round(item.raw.distance)}m
-                                </ResultDistance>
-                              )
-                            )}
-                          </ResultCardTop>
-                          <ResultCardSubtitle>
-                            {item.subtitle ||
-                              item.raw?.address ||
-                              "주소 정보 없음"}
-                          </ResultCardSubtitle>
-                        </ResultCard>
-                      );
-                    })}
-                  </PanelResultList>
-                </>
-              )}
-            </LeftPanelResults>
-          )}
-
-          {(activeLayer === "meetup" || activeLayer === "care") && (
-            <LeftPanelResults>
-              {loading && <PanelStatusMsg>검색 중...</PanelStatusMsg>}
-              {!loading &&
-                !error &&
-                items.length === 0 &&
-                mapViewportCenter && (
-                  <PanelStatusMsg>
-                    반경 {radius}km 내 항목이 없습니다.
-                    펫케어·모임은 지도 반경 검색 시{" "}
-                    <strong>위도·경도가 저장된</strong> 것만 목록에 나옵니다.
-                  </PanelStatusMsg>
-                )}
-              {!loading && !error && items.length > 0 && (
-                <>
-                  <PanelResultHeader>
-                    <div>
-                      <PanelResultTitle>
-                        {activeLayer === "meetup" ? "주변 모임" : "주변 펫케어"}
-                      </PanelResultTitle>
-                      <PanelResultSubtitle>
-                        반경 {radius}km · 지도 중심 기준
-                      </PanelResultSubtitle>
-                    </div>
-                    <PanelResultCount>{items.length}개</PanelResultCount>
-                  </PanelResultHeader>
-                  <PanelResultList>
-                    {items.map((item, index) => {
-                      const isSelected = selectedItem?.id === item.id;
-                      const sub =
-                        item.subtitle ||
-                        item.raw?.address ||
-                        (item.raw?.description
-                          ? String(item.raw.description).slice(0, 100).trim()
-                          : "상세는 항목을 눌러 확인");
-                      return (
-                        <ResultCard
-                          key={item.id}
-                          type="button"
-                          $selected={isSelected}
-                          onClick={() => handleLocationResultClick(item)}
-                          onMouseEnter={() => setHoveredLocationItem(item)}
-                          onMouseLeave={() =>
-                            setHoveredLocationItem((current) =>
-                              current?.id === item.id ? null : current
-                            )
-                          }
-                        >
-                          <ResultCardTop>
-                            <ResultCardTitle>
-                              {item.title ||
-                                item.name ||
-                                `${activeLayer === "meetup" ? "모임" : "케어"} ${index + 1}`}
-                            </ResultCardTitle>
-                            {item.raw?.distance != null && (
-                              <ResultDistance>
-                                {Math.round(item.raw.distance)}m
-                              </ResultDistance>
-                            )}
-                          </ResultCardTop>
-                          <ResultCardSubtitle>{sub}</ResultCardSubtitle>
-                        </ResultCard>
-                      );
-                    })}
-                  </PanelResultList>
-                </>
-              )}
-            </LeftPanelResults>
-          )}
-        </LeftPanel>
-
-        {/* ── 지도 영역 ── */}
+        {/* ── 지도 영역 (풀블리드) ── */}
         <MapWrapper>
           {mapViewportCenter ? (
             <MapContainer
@@ -808,19 +684,33 @@ const UnifiedPetMapPage = () => {
             <MapInitLoading>🗺️ 위치 정보를 가져오는 중...</MapInitLoading>
           )}
 
-          {/* 모바일 전용 컨트롤 오버레이 */}
-          <ControlsOverlay>
-            {renderLayerControls(true)}
-          </ControlsOverlay>
+          {/* 지도 위 상단 플로팅: 도메인 전환 + 검색/필터 (전 화면 공통) */}
+          <TopOverlay>
+            <DomainTabHeader
+              activeLayer={activeLayer}
+              onTabChange={handleTabChange}
+            />
+            <OverlayControls>
+              {activeLayer !== "location" && (
+                <RadiusFilter
+                  radius={radius}
+                  onRadiusChange={handleRadiusChange}
+                />
+              )}
+              {renderLayerControls(true)}
+            </OverlayControls>
+          </TopOverlay>
 
-          <MyLocationFAB
-            onClick={handleMoveToMyLocation}
-            disabled={locating}
-            title="내 위치로 이동"
-            aria-label="내 위치로 이동"
-          >
-            <span aria-hidden="true">{locating ? "⏳" : "📍"}</span>
-          </MyLocationFAB>
+          {selectedItem?.type !== "location" && (
+            <MyLocationFAB
+              onClick={handleMoveToMyLocation}
+              disabled={locating}
+              title="내 위치로 이동"
+              aria-label="내 위치로 이동"
+            >
+              <span aria-hidden="true">{locating ? "⏳" : "📍"}</span>
+            </MyLocationFAB>
+          )}
 
           {loading && <LoadingBar aria-label="데이터 조회 중" />}
 
@@ -835,12 +725,9 @@ const UnifiedPetMapPage = () => {
             <ErrorBanner onClick={() => setError(null)}>{error} ✕</ErrorBanner>
           )}
 
-          {!loading &&
-            !error &&
-            displayItems.length === 0 &&
-            mapViewportCenter && (
-              <EmptyBanner>반경 {radius}km 내 결과가 없습니다.</EmptyBanner>
-            )}
+          {emptyToast && (
+            <EmptyBanner>반경 {radius}km 내 결과가 없습니다.</EmptyBanner>
+          )}
 
           {renderInfoPanel()}
           {renderLocationResults()}
@@ -901,25 +788,47 @@ const MapInitLoading = styled.div`
   z-index: 10;
 `;
 
-/* 모바일 전용 컨트롤 오버레이 — 데스크톱은 LeftPanel이 대체 */
-const ControlsOverlay = styled.div`
-  @media (min-width: 769px) {
-    display: none;
-  }
-
+/* 지도 위 상단 플로팅 컨트롤 (전 화면 공통) — 솔리드 바 대신 떠 있는 알약 */
+const TopOverlay = styled.div`
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   z-index: 200;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  background: ${(props) => props.theme.colors.surface + "E8"};
-  border-bottom: 1px solid ${(props) => props.theme.colors.border};
-  box-shadow: 0 2px 12px ${(props) => props.theme.colors.shadow};
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 16px 0;
   pointer-events: none;
   > * {
     pointer-events: auto;
+  }
+
+  @media (max-width: 768px) {
+    padding: 12px 12px 0;
+    gap: 8px;
+  }
+`;
+
+/* 검색 + 조건(필터)을 하단 목록 시트처럼 커다란 박스에 담는다 */
+const OverlayControls = styled.div`
+  width: 100%;
+  max-width: 760px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 24px;
+  background: ${(props) => props.theme.colors.surface + "F2"};
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid ${(props) => props.theme.colors.border};
+  box-shadow: ${(props) => props.theme.shadows.xl};
+
+  @media (max-width: 768px) {
+    padding: 12px 12px;
+    border-radius: 20px;
   }
 `;
 
@@ -927,7 +836,7 @@ const ControlsOverlay = styled.div`
 const MyLocationFAB = styled.button`
   position: absolute;
   right: 20px;
-  bottom: 110px;
+  bottom: 248px; /* 데스크톱 하단 결과 시트(약 220px) 위로 */
   z-index: 300;
   width: 52px;
   height: 52px;
@@ -1025,33 +934,43 @@ const ErrorBanner = styled.div`
   white-space: nowrap;
 `;
 
+const toastPop = keyframes`
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.94); }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+`;
+
+/* 중앙 토스트 — 결과 없음 알림 (3초 후 자동 소멸) */
 const EmptyBanner = styled.div`
   position: absolute;
-  top: 12px;
+  top: 50%;
   left: 50%;
-  transform: translateX(-50%);
-  background: ${(props) => props.theme.colors.surface};
-  color: ${(props) => props.theme.colors.textSecondary};
+  transform: translate(-50%, -50%);
+  background: ${(props) => props.theme.colors.surfaceElevated + "F2"};
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: ${(props) => props.theme.colors.text};
   border: 1px solid ${(props) => props.theme.colors.border};
-  padding: 8px 16px;
-  border-radius: 8px;
-  font-size: 13px;
+  padding: 13px 24px;
+  border-radius: 999px;
+  font-size: 13.5px;
+  font-weight: 600;
   z-index: 400;
   white-space: nowrap;
+  box-shadow: ${(props) => props.theme.shadows.xl};
+  pointer-events: none;
+  animation: ${toastPop} 0.2s cubic-bezier(0, 0, 0.2, 1);
 `;
 
 const LocationResultSheet = styled.section`
-  /* 모바일 전용 — 데스크톱은 LeftPanel 내 결과 목록이 대체 */
-  @media (min-width: 769px) {
-    display: none !important;
-  }
-
+  /* A형 몰입 레이아웃: 데스크톱은 하단 풀폭 시트(가로 카드), 모바일은 하단 도킹 시트 */
   position: absolute;
   left: 16px;
-  width: 392px;
+  right: 16px;
   bottom: 16px;
+  /* 상세 확장 시 위로 커져 상세를 표시 */
+  top: ${(props) => (props.$expanded ? "150px" : "auto")};
+  height: ${(props) => (props.$expanded ? "auto" : "220px")};
   z-index: 230;
-  top: 236px;
   border-radius: 24px;
   background: ${(props) => props.theme.colors.surface + "F2"};
   backdrop-filter: blur(20px);
@@ -1062,19 +981,15 @@ const LocationResultSheet = styled.section`
   display: flex;
   flex-direction: column;
 
-  @media (min-width: 1024px) {
-    width: 392px;
-    bottom: 16px;
-  }
-
   @media (max-width: 768px) {
     left: 12px;
     right: 12px;
-    width: auto;
-    top: auto;
+    top: ${(props) => (props.$expanded ? "150px" : "auto")};
+    height: auto;
     bottom: calc(72px + env(safe-area-inset-bottom, 0px));
-    min-height: 272px;
-    max-height: calc(100dvh - 220px);
+    min-height: ${(props) => (props.$expanded ? "0" : "272px")};
+    max-height: ${(props) =>
+      props.$expanded ? "none" : "calc(100dvh - 220px)"};
     border-radius: 24px 24px 18px 18px;
   }
 `;
@@ -1121,20 +1036,30 @@ const ResultSheetMeta = styled.span`
 
 const ResultList = styled.div`
   display: flex;
-  flex-direction: column;
-  gap: 10px;
+  flex-direction: row;
+  gap: 12px;
   flex: 1;
-  overflow-y: auto;
+  overflow-x: auto;
+  overflow-y: hidden;
   padding: 14px 16px 18px;
 
   @media (max-width: 768px) {
+    flex-direction: column;
+    overflow-x: hidden;
+    overflow-y: auto;
+    gap: 10px;
     padding-bottom: 22px;
   }
 `;
 
 const ResultCard = styled.button`
-  width: 100%;
+  width: 280px;
+  flex-shrink: 0;
   text-align: left;
+
+  @media (max-width: 768px) {
+    width: 100%;
+  }
   border: 1px solid
     ${(props) =>
       props.$selected
@@ -1192,84 +1117,10 @@ const ResultDistance = styled.span`
   border-radius: 999px;
 `;
 
-/* ── 데스크톱 2단 레이아웃 ── */
-
+/* 지도 풀블리드 래퍼 */
 const ContentRow = styled.div`
   display: flex;
-  flex-direction: row;
   flex: 1;
   overflow: hidden;
 `;
 
-const LeftPanel = styled.aside`
-  width: 320px;
-  flex-shrink: 0;
-  border-right: 1px solid ${(props) => props.theme.colors.border};
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background: ${(props) => props.theme.colors.surface};
-
-  @media (max-width: 768px) {
-    display: none;
-  }
-`;
-
-const LeftPanelTop = styled.div`
-  flex-shrink: 0;
-  border-bottom: 1px solid ${(props) => props.theme.colors.border};
-`;
-
-const LeftPanelResults = styled.div`
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  min-height: 0;
-`;
-
-const PanelResultHeader = styled.div`
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  padding: 14px 16px 10px;
-  border-bottom: 1px solid ${(props) => props.theme.colors.borderLight};
-  flex-shrink: 0;
-`;
-
-const PanelResultTitle = styled.h3`
-  margin: 0;
-  font-size: 15px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  color: ${(props) => props.theme.colors.text};
-`;
-
-const PanelResultSubtitle = styled.p`
-  margin: 4px 0 0;
-  font-size: 11px;
-  color: ${(props) => props.theme.colors.textSecondary};
-`;
-
-const PanelResultCount = styled.span`
-  font-size: 12px;
-  font-weight: 700;
-  color: ${(props) => props.theme.colors.textSecondary};
-  flex-shrink: 0;
-`;
-
-const PanelResultList = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  flex: 1;
-  overflow-y: auto;
-  padding: 12px 14px 16px;
-`;
-
-const PanelStatusMsg = styled.div`
-  padding: 28px 16px;
-  text-align: center;
-  color: ${(props) => props.theme.colors.textSecondary};
-  font-size: 13px;
-`;

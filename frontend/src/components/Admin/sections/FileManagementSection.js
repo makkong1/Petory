@@ -1,6 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import styled from 'styled-components';
 import { fileAdminApi } from '../../../api/fileAdminApi.js';
+import {
+  SectionHeader, SectionTitle, SectionSubtitle,
+  Toolbar, Spacer, FieldLabel, Select, Search,
+  TableWrap, Table, Th, Td, TableMessage,
+  RowBtn, RowBtnDanger, RowActions,
+  StatGrid, StatCard, StatLabel, StatValue,
+} from '../ui/AdminUI';
 
 const FileManagementSection = () => {
   const [targetType, setTargetType] = useState('');
@@ -82,113 +89,98 @@ const FileManagementSection = () => {
 
   return (
     <Wrapper>
-      <Header>
-        <Title>파일 관리</Title>
-        <Subtitle>업로드된 파일들을 조회하고 관리합니다.</Subtitle>
-      </Header>
+      <SectionHeader>
+        <SectionTitle>파일 관리</SectionTitle>
+        <SectionSubtitle>업로드된 파일들을 조회하고 관리합니다.</SectionSubtitle>
+      </SectionHeader>
 
       {statistics && (
-        <StatsCard>
-          <StatsTitle>파일 통계</StatsTitle>
-          <StatsGrid>
-            <StatItem>
-              <StatLabel>전체 파일</StatLabel>
-              <StatValue>{statistics.totalFiles || 0}</StatValue>
-            </StatItem>
-            {statistics.filesByType && Object.entries(statistics.filesByType).map(([type, count]) => (
-              <StatItem key={type}>
-                <StatLabel>{type}</StatLabel>
-                <StatValue>{count}</StatValue>
-              </StatItem>
-            ))}
-          </StatsGrid>
-        </StatsCard>
+        <StatGrid>
+          <StatCard>
+            <StatLabel>전체 파일</StatLabel>
+            <StatValue $accent>{(statistics.totalFiles || 0).toLocaleString()}</StatValue>
+          </StatCard>
+          {statistics.filesByType && Object.entries(statistics.filesByType).map(([type, count]) => (
+            <StatCard key={type}>
+              <StatLabel>{type}</StatLabel>
+              <StatValue>{Number(count).toLocaleString()}</StatValue>
+            </StatCard>
+          ))}
+        </StatGrid>
       )}
 
-      <Filters>
-        <Group>
-          <Label>타겟 타입</Label>
+      <Toolbar>
+        <div><FieldLabel>타겟 타입</FieldLabel>
           <Select value={targetType} onChange={e => setTargetType(e.target.value)}>
             {targetTypeOptions.map(opt => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
           </Select>
-        </Group>
-        <Group>
-          <Label>타겟 ID</Label>
-          <Input
-            type="number"
-            placeholder="타겟 ID"
-            value={targetIdx}
-            onChange={e => setTargetIdx(e.target.value)}
-          />
-        </Group>
-        <Group style={{ flex: 1 }}>
-          <Label>검색</Label>
-          <Input
-            placeholder="파일 경로/타입"
-            value={q}
-            onChange={e => setQ(e.target.value)}
-          />
-        </Group>
-        <Group>
-          <Refresh onClick={fetchFiles}>새로고침</Refresh>
-        </Group>
-      </Filters>
+        </div>
+        <Search
+          type="number"
+          placeholder="타겟 ID"
+          value={targetIdx}
+          onChange={e => setTargetIdx(e.target.value)}
+          style={{ minWidth: 110 }}
+        />
+        <Search
+          placeholder="파일 경로/타입 검색…"
+          value={q}
+          onChange={e => setQ(e.target.value)}
+        />
+        <Spacer />
+        {targetType && targetIdx && (
+          <RowBtnDanger onClick={handleDeleteByTarget}>타겟의 모든 파일 삭제</RowBtnDanger>
+        )}
+        <RowBtn onClick={fetchFiles}>새로고침</RowBtn>
+      </Toolbar>
 
-      {targetType && targetIdx && (
-        <ActionBar>
-          <Danger onClick={handleDeleteByTarget}>
-            타겟의 모든 파일 삭제
-          </Danger>
-        </ActionBar>
-      )}
-
-      <Card>
-        {loading && files.length === 0 ? (
-          <Info>로딩 중...</Info>
-        ) : error ? (
-          <Info>{error}</Info>
-        ) : files.length === 0 ? (
-          <Info>데이터가 없습니다.</Info>
-        ) : (
+      {loading && files.length === 0 ? (
+        <TableMessage>로딩 중...</TableMessage>
+      ) : error ? (
+        <TableMessage>{error}</TableMessage>
+      ) : files.length === 0 ? (
+        <TableMessage>데이터가 없습니다.</TableMessage>
+      ) : (
+        <TableWrap>
           <Table>
             <thead>
               <tr>
-                <th>ID</th>
-                <th>타겟 타입</th>
-                <th>타겟 ID</th>
-                <th>파일 경로</th>
-                <th>파일 타입</th>
-                <th>생성일</th>
-                <th>액션</th>
+                <Th $align="right">ID</Th>
+                <Th>타겟 타입</Th>
+                <Th $align="right">타겟 ID</Th>
+                <Th>파일 경로</Th>
+                <Th>파일 타입</Th>
+                <Th>생성일</Th>
+                <Th $align="center">액션</Th>
               </tr>
             </thead>
             <tbody>
               {files.map((file) => (
                 <tr key={file.idx}>
-                  <td>{file.idx}</td>
-                  <td>{file.targetType || '-'}</td>
-                  <td>{file.targetIdx || '-'}</td>
-                  <td className="ellipsis">{file.filePath || '-'}</td>
-                  <td>{file.fileType || '-'}</td>
-                  <td>{file.createdAt ? new Date(file.createdAt).toLocaleString() : '-'}</td>
-                  <td>
-                    <Actions>
+                  <Td $align="right" $mono $muted>#{file.idx}</Td>
+                  <Td>{file.targetType || '-'}</Td>
+                  <Td $align="right" $mono>{file.targetIdx || '-'}</Td>
+                  <Td $ellipsis $mono>{file.filePath || '-'}</Td>
+                  <Td $muted>{file.fileType || '-'}</Td>
+                  <Td $muted>{file.createdAt ? new Date(file.createdAt).toLocaleString('ko-KR') : '-'}</Td>
+                  <Td $align="center">
+                    <RowActions>
                       {file.downloadUrl && (
-                        <Btn as="a" href={file.downloadUrl} target="_blank" rel="noopener noreferrer">
+                        <RowBtn as="a" href={file.downloadUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
                           보기
-                        </Btn>
+                        </RowBtn>
                       )}
-                      <Danger onClick={() => handleDelete(file.idx)}>삭제</Danger>
-                    </Actions>
-                  </td>
+                      <RowBtnDanger onClick={() => handleDelete(file.idx)}>삭제</RowBtnDanger>
+                    </RowActions>
+                  </Td>
                 </tr>
               ))}
             </tbody>
           </Table>
-        )}
-      </Card>
+        </TableWrap>
+      )}
     </Wrapper>
   );
 };
@@ -197,157 +189,24 @@ export default FileManagementSection;
 
 const Wrapper = styled.div``;
 
-const Header = styled.div`
-  margin-bottom: ${props => props.theme.spacing.lg};
-`;
 
-const Title = styled.h1`
-  font-size: ${props => props.theme.typography.h2.fontSize};
-  font-weight: ${props => props.theme.typography.h2.fontWeight};
-  margin-bottom: ${props => props.theme.spacing.xs};
-`;
 
-const Subtitle = styled.p`
-  color: ${props => props.theme.colors.textSecondary};
-`;
 
-const StatsCard = styled.div`
-  border-radius: ${props => props.theme.borderRadius.md};
-  border: 1px solid ${props => props.theme.colors.border};
-  padding: ${props => props.theme.spacing.lg};
-  background: ${props => props.theme.colors.surface};
-  margin-bottom: ${props => props.theme.spacing.lg};
-`;
 
-const StatsTitle = styled.h3`
-  font-size: ${props => props.theme.typography.h4.fontSize};
-  font-weight: ${props => props.theme.typography.h4.fontWeight};
-  margin-bottom: ${props => props.theme.spacing.md};
-`;
 
-const StatsGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: ${props => props.theme.spacing.md};
-`;
 
-const StatItem = styled.div`
-  padding: ${props => props.theme.spacing.sm};
-  background: ${props => props.theme.colors.surfaceSoft};
-  border-radius: ${props => props.theme.borderRadius.sm};
-`;
 
-const StatLabel = styled.div`
-  font-size: ${props => props.theme.typography.caption.fontSize};
-  color: ${props => props.theme.colors.textSecondary};
-  margin-bottom: ${props => props.theme.spacing.xs};
-`;
 
-const StatValue = styled.div`
-  font-size: ${props => props.theme.typography.h4.fontSize};
-  font-weight: 600;
-  color: ${props => props.theme.colors.text};
-`;
 
-const Filters = styled.div`
-  display: flex;
-  gap: ${props => props.theme.spacing.md};
-  align-items: center;
-  margin-bottom: ${props => props.theme.spacing.md};
-  flex-wrap: wrap;
-`;
 
-const Group = styled.div`
-  display: flex;
-  align-items: center;
-  gap: ${props => props.theme.spacing.xs};
-`;
 
-const Label = styled.span`
-  color: ${props => props.theme.colors.text};
-  font-size: ${props => props.theme.typography.caption.fontSize};
-`;
 
-const Select = styled.select`
-  padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.sm};
-  border: 1px solid ${props => props.theme.colors.border};
-  border-radius: ${props => props.theme.borderRadius.sm};
-  background: ${props => props.theme.colors.surface};
-  color: ${props => props.theme.colors.text};
-`;
 
-const Input = styled.input`
-  width: 120px;
-  padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.sm};
-  border: 1px solid ${props => props.theme.colors.border};
-  border-radius: ${props => props.theme.borderRadius.sm};
-  background: ${props => props.theme.colors.surface};
-  color: ${props => props.theme.colors.text};
-`;
 
-const Refresh = styled.button`
-  padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.md};
-  border: 1px solid ${props => props.theme.colors.border};
-  background: ${props => props.theme.colors.background};
-  color: ${props => props.theme.colors.text};
-  border-radius: ${props => props.theme.borderRadius.sm};
-  cursor: pointer;
-  
-  &:hover {
-    background: ${props => props.theme.colors.surfaceHover};
-  }
-`;
 
-const ActionBar = styled.div`
-  margin-bottom: ${props => props.theme.spacing.md};
-`;
 
-const Card = styled.div`
-  border-radius: ${props => props.theme.borderRadius.md};
-  border: 1px solid ${props => props.theme.colors.border};
-  padding: ${props => props.theme.spacing.lg};
-  background: ${props => props.theme.colors.surface};
-`;
 
-const Table = styled.table`
-  width: 100%;
-  border-collapse: collapse;
-  font-size: ${props => props.theme.typography.caption.fontSize};
-  th, td { padding: 8px 10px; border-bottom: 1px solid ${props => props.theme.colors.border}; }
-  th { color: ${props => props.theme.colors.text}; text-align: left; white-space: nowrap; }
-  td.ellipsis { max-width: 420px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-`;
 
-const Info = styled.div`
-  padding: ${props => props.theme.spacing.lg};
-  text-align: center;
-  color: ${props => props.theme.colors.textSecondary};
-`;
 
-const Actions = styled.div`
-  display: flex;
-  gap: ${props => props.theme.spacing.xs};
-`;
 
-const Btn = styled.button`
-  padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.sm};
-  border: 1px solid ${props => props.theme.colors.border};
-  background: ${props => props.theme.colors.background};
-  color: ${props => props.theme.colors.text};
-  border-radius: ${props => props.theme.borderRadius.sm};
-  cursor: pointer;
-  text-decoration: none;
-  
-  &:hover {
-    background: ${props => props.theme.colors.surfaceHover};
-  }
-`;
 
-const Danger = styled.button`
-  padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.sm};
-  border: 1px solid ${props => props.theme.colors.error};
-  color: ${props => props.theme.colors.error};
-  background: transparent;
-  border-radius: ${props => props.theme.borderRadius.sm};
-  cursor: pointer;
-`;
