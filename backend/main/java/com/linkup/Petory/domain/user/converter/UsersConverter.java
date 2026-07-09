@@ -42,6 +42,8 @@ public class UsersConverter {
                 .emailVerified(user.getEmailVerified())
                 .isDeleted(user.getIsDeleted())
                 .deletedAt(user.getDeletedAt())
+                .isDormant(user.getIsDormant())
+                .dormantAt(user.getDormantAt())
                 .build();
     }
 
