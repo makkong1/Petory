@@ -403,7 +403,9 @@ public class MissingPetBoardService {
                 Join<MissingPetBoard, Users> userJoin = root.join("user", JoinType.LEFT);
                 return cb.or(
                         cb.like(cb.lower(root.get("title")), keyword),
-                        cb.like(cb.lower(root.get("content")), keyword),
+                        // content는 @Lob(CLOB) 매핑이라 lower()에 직접 적용 불가(FunctionArgumentException).
+                        // 테이블 콜레이션이 utf8mb4_0900_ai_ci(대소문자 미구분)라 lower() 없이도 결과는 동일.
+                        cb.like(root.get("content"), keyword),
                         cb.like(cb.lower(root.get("petName")), keyword),
                         cb.like(cb.lower(userJoin.get("username")), keyword));
             };

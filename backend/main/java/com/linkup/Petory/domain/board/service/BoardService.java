@@ -544,11 +544,15 @@ public class BoardService {
                 Join<Board, Users> userJoin = root.join("user", JoinType.LEFT);
                 return cb.or(
                         cb.gt(
-                                cb.function("MATCH", Double.class,
+                                // cb.function("MATCH", ...)은 "MATCH(a,b,c)" 한 덩어리로만 렌더링되어
+                                // MySQL의 "MATCH(cols) AGAINST(expr)" 2-괄호 구문을 만들 수 없었다
+                                // (AGAINST 자체가 누락되어 SQL 문법 오류 발생).
+                                // MySqlFunctionContributor에 등록한 패턴 함수로 대체.
+                                cb.function("matchAgainst", Double.class,
                                         root.get("title"), root.get("content"),
                                         cb.literal(trimmed)),
                                 0.0),
-                        cb.like(cb.lower(userJoin.get("username")), trimmed.toLowerCase() + "%"));
+                        cb.like(cb.lower(userJoin.get("username")), trimmed.toLowerCase() + "%", '\\'));
             };
             spec = spec == null ? searchSpec : spec.and(searchSpec);
         }
