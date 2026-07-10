@@ -10,6 +10,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Repository;
 
+import com.linkup.Petory.domain.board.dto.BoardListItemDTO;
 import com.linkup.Petory.domain.board.entity.Board;
 import com.linkup.Petory.domain.user.entity.Users;
 
@@ -115,6 +116,21 @@ public class JpaBoardAdapter implements BoardRepository {
     @Override
     public Page<Board> searchByNicknameWithPaging(String nickname, Pageable pageable) {
         return jpaRepository.searchByNicknameWithPaging(nickname, pageable);
+    }
+
+    @Override
+    public Page<BoardListItemDTO> findBoardListItems(Pageable pageable) {
+        return jpaRepository.findBoardListItems(pageable);
+    }
+
+    @Override
+    public Page<BoardListItemDTO> findBoardListItemsByCategory(String category, Pageable pageable) {
+        return jpaRepository.findBoardListItemsByCategory(category, pageable);
+    }
+
+    @Override
+    public Page<BoardListItemDTO> searchBoardListItemsByNickname(String nickname, Pageable pageable) {
+        return jpaRepository.searchBoardListItemsByNickname(nickname, pageable);
     }
 
     @Override

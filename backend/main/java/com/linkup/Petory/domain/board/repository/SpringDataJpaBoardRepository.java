@@ -13,6 +13,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.linkup.Petory.domain.board.dto.BoardListItemDTO;
 import com.linkup.Petory.domain.board.entity.Board;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.global.annotation.RepositoryMethod;
@@ -67,6 +68,32 @@ public interface SpringDataJpaBoardRepository extends JpaRepository<Board, Long>
                     + "AND u.status = 'ACTIVE' "
                     + "AND MATCH(b.title, b.content) AGAINST(:kw IN BOOLEAN MODE)", nativeQuery = true)
     Page<Board> searchByKeywordWithPaging(@Param("kw") String keyword, Pageable pageable);
+
+    // ── [오버페칭 제거] 목록 projection ──
+    // 기존 목록 쿼리는 JOIN FETCH b.user 로 작성자(Users) 27컬럼 전체를 로딩했으나,
+    // 화면이 쓰는 작성자 3컬럼(idx/username/location)만 SELECT 하도록 생성자 표현식으로 전환한다.
+    // WHERE/ORDER는 대응하는 엔티티 쿼리와 동일. 리액션/첨부는 서비스가 배치로 사후 주입한다.
+    String BOARD_LIST_ITEM_SELECT =
+            "SELECT new com.linkup.Petory.domain.board.dto.BoardListItemDTO(" +
+            "  b.idx, b.title, b.content, b.category, b.status, b.createdAt, b.isDeleted, b.deletedAt, " +
+            "  b.commentCount, b.likeCount, b.dislikeCount, b.viewCount, b.lastReactionAt, " +
+            "  u.idx, u.username, u.location) " +
+            "FROM Board b JOIN b.user u ";
+
+    @RepositoryMethod("게시글: 전체 목록 페이징 (projection)")
+    @Query(BOARD_LIST_ITEM_SELECT +
+           "WHERE b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY b.createdAt DESC")
+    Page<BoardListItemDTO> findBoardListItems(Pageable pageable);
+
+    @RepositoryMethod("게시글: 카테고리별 목록 페이징 (projection)")
+    @Query(BOARD_LIST_ITEM_SELECT +
+           "WHERE b.category = :category AND b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY b.createdAt DESC")
+    Page<BoardListItemDTO> findBoardListItemsByCategory(@Param("category") String category, Pageable pageable);
+
+    @RepositoryMethod("게시글: 작성자 닉네임 검색 페이징 (projection)")
+    @Query(BOARD_LIST_ITEM_SELECT +
+           "WHERE u.nickname LIKE :nickname% AND b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY b.createdAt DESC")
+    Page<BoardListItemDTO> searchBoardListItemsByNickname(@Param("nickname") String nickname, Pageable pageable);
 
     @RepositoryMethod("게시글: 카테고리+기간별 조회")
     List<Board> findByCategoryAndCreatedAtBetween(String category, LocalDateTime start, LocalDateTime end);

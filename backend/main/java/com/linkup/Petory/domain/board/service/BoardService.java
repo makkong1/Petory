@@ -24,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.linkup.Petory.domain.board.converter.BoardConverter;
 import com.linkup.Petory.domain.board.dto.BoardDTO;
+import com.linkup.Petory.domain.board.dto.BoardListItemDTO;
 import com.linkup.Petory.domain.board.dto.BoardPageResponseDTO;
 import com.linkup.Petory.domain.board.entity.Board;
 import com.linkup.Petory.domain.board.entity.ReactionType;
@@ -102,14 +103,15 @@ public class BoardService {
     }
 
     // 전체 게시글 조회 (페이징 지원)
+    // [오버페칭 제거] 목록 projection - 작성자(Users) 27컬럼 JOIN FETCH → 3컬럼 SELECT
     public BoardPageResponseDTO getAllBoardsWithPaging(String category, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
-        Page<Board> boardPage;
+        Page<BoardListItemDTO> boardPage;
 
         if (category != null && !category.equals("ALL")) { // 카테고리 필터링
-            boardPage = boardRepository.findByCategoryAndIsDeletedFalseOrderByCreatedAtDesc(category, pageable);
+            boardPage = boardRepository.findBoardListItemsByCategory(category, pageable);
         } else {
-            boardPage = boardRepository.findAllByIsDeletedFalseOrderByCreatedAtDesc(pageable); // 전체
+            boardPage = boardRepository.findBoardListItems(pageable); // 전체
         }
 
         if (boardPage.isEmpty()) {
@@ -124,7 +126,7 @@ public class BoardService {
         }
 
         // 배치 조회로 N+1 문제 해결
-        List<BoardDTO> boardDTOs = mapBoardsWithReactionsBatch(boardPage.getContent());
+        List<BoardDTO> boardDTOs = mapBoardListItemsBatch(boardPage.getContent());
 
         return new BoardPageResponseDTO(
                 boardDTOs,
@@ -292,23 +294,27 @@ public class BoardService {
 
         String trimmedKeyword = keyword.trim();
         Pageable pageable = PageRequest.of(page, size);
-        Page<Board> boardPage;
+        String type = searchType != null ? searchType.toUpperCase() : "TITLE_CONTENT";
 
-        // 검색 타입에 따라 다른 쿼리 실행
-        // B: TITLE/CONTENT 개별 검색 제거 → TITLE_CONTENT(FULLTEXT)로 통합
-        // C: NICKNAME 검색 최적화 → JOIN 쿼리 1번으로 DB 레벨 페이징
-        switch (searchType != null ? searchType.toUpperCase() : "TITLE_CONTENT") {
-            case "NICKNAME":
-                // 작성자 닉네임으로 검색 - JOIN 쿼리로 최적화 (2 Query → 1 Query)
-                log.info("🔍 [BoardService.searchBoardsWithPaging] 닉네임 검색: keyword = {}", trimmedKeyword);
-                boardPage = boardRepository.searchByNicknameWithPaging(trimmedKeyword, pageable);
-                break;
-            case "TITLE_CONTENT":
-            default:
-                // 제목+내용 통합 검색 (FULLTEXT 인덱스 활용)
-                boardPage = boardRepository.searchByKeywordWithPaging(trimmedKeyword, pageable);
-                break;
+        // C: NICKNAME 검색 - [오버페칭 제거] projection 경로 (작성자 3컬럼, 2 Query → 1 Query)
+        if ("NICKNAME".equals(type)) {
+            log.info("🔍 [BoardService.searchBoardsWithPaging] 닉네임 검색: keyword = {}", trimmedKeyword);
+            Page<BoardListItemDTO> itemPage = boardRepository.searchBoardListItemsByNickname(trimmedKeyword, pageable);
+            if (itemPage.isEmpty()) {
+                return new BoardPageResponseDTO(new ArrayList<>(), 0, 0, page, size, false, false);
+            }
+            return new BoardPageResponseDTO(
+                    mapBoardListItemsBatch(itemPage.getContent()),
+                    itemPage.getTotalElements(),
+                    itemPage.getTotalPages(),
+                    page,
+                    size,
+                    itemPage.hasNext(),
+                    itemPage.hasPrevious());
         }
+
+        // B: TITLE_CONTENT 통합 검색 (FULLTEXT, nativeQuery) - 엔티티 경로 유지 (native SELECT b.* 특성상 projection 미적용)
+        Page<Board> boardPage = boardRepository.searchByKeywordWithPaging(trimmedKeyword, pageable);
 
         if (boardPage.isEmpty()) {
             return new BoardPageResponseDTO(
@@ -393,10 +399,32 @@ public class BoardService {
         if (boards.isEmpty()) {
             return new ArrayList<>();
         }
+        return enrichBoardDTOs(boards.stream()
+                .map(boardConverter::toDTO)
+                .collect(Collectors.toList()));
+    }
 
+    /**
+     * [오버페칭 제거] 목록 projection(BoardListItemDTO) 기반 매핑.
+     * 작성자(Users) 전체 엔티티 로딩 없이 base DTO를 만든 뒤, 엔티티 경로와 동일한 배치 enrichment를 적용한다.
+     */
+    private List<BoardDTO> mapBoardListItemsBatch(List<BoardListItemDTO> items) {
+        if (items.isEmpty()) {
+            return new ArrayList<>();
+        }
+        return enrichBoardDTOs(items.stream()
+                .map(boardConverter::toDTO)
+                .collect(Collectors.toList()));
+    }
+
+    /**
+     * base BoardDTO 목록에 좋아요/싫어요 카운트·첨부파일을 배치로 사후 주입한다 (목록 N+1 방지).
+     * 엔티티 경로(mapBoardsWithReactionsBatch)와 projection 경로(mapBoardListItemsBatch)가 공유한다.
+     */
+    private List<BoardDTO> enrichBoardDTOs(List<BoardDTO> dtos) {
         // 게시글 ID 목록 추출
-        List<Long> boardIds = boards.stream()
-                .map(Board::getIdx)
+        List<Long> boardIds = dtos.stream()
+                .map(BoardDTO::getIdx)
                 .collect(Collectors.toList());
 
         // 1. 좋아요/싫어요 카운트 배치 조회
@@ -406,22 +434,12 @@ public class BoardService {
         Map<Long, List<FileDTO>> attachmentsMap = attachmentFileService.getAttachmentsBatch(
                 FileTargetType.BOARD, boardIds);
 
-        // 3. 게시글 DTO 변환 및 반응 정보 매핑
-        return boards.stream()
-                .map(board -> {
-                    BoardDTO dto = boardConverter.toDTO(board);
-
-                    // 좋아요/싫어요 카운트 설정 (공통 메서드 사용)
-                    Map<ReactionType, Long> counts = reactionCountsMap.getOrDefault(
-                            board.getIdx(), new HashMap<>());
-                    applyReactionCounts(dto, counts);
-
-                    // 첨부파일 설정 (공통 메서드 사용)
-                    applyAttachmentInfo(dto, board.getIdx(), attachmentsMap);
-
-                    return dto;
-                })
-                .collect(Collectors.toList());
+        // 3. 반응 정보·첨부파일 매핑 (공통 메서드 사용)
+        for (BoardDTO dto : dtos) {
+            applyReactionCounts(dto, reactionCountsMap.getOrDefault(dto.getIdx(), new HashMap<>()));
+            applyAttachmentInfo(dto, dto.getIdx(), attachmentsMap);
+        }
+        return dtos;
     }
 
     /**
