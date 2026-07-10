@@ -12,6 +12,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import com.linkup.Petory.domain.user.dto.AdminUserListDTO;
 import com.linkup.Petory.domain.user.entity.Role;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.global.annotation.RepositoryMethod;
@@ -143,6 +144,26 @@ public interface SpringDataJpaUsersRepository extends JpaRepository<Users, Long>
            "(:keyword IS NULL OR u.username LIKE %:keyword% OR u.nickname LIKE %:keyword% OR u.email LIKE %:keyword%) " +
            "ORDER BY u.createdAt DESC")
     Page<Users> findAllForAdmin(
+            @Param("role") String role,
+            @Param("status") String status,
+            @Param("keyword") String keyword,
+            Pageable pageable);
+
+    /**
+     * [오버페칭 제거] 관리자 목록 전용 projection 조회.
+     * 기존 findAllForAdmin은 Users 27컬럼 전체 + socialUsers 배치 쿼리(총 2쿼리)를 로딩했으나,
+     * 화면/모달이 쓰는 12컬럼만 SELECT 해 단일 쿼리로 축소한다. WHERE/ORDER는 findAllForAdmin과 동일.
+     */
+    @RepositoryMethod("사용자: 관리자 목록 projection 조회 (경량)")
+    @Query("SELECT new com.linkup.Petory.domain.user.dto.AdminUserListDTO(" +
+           "  u.idx, u.id, u.nickname, u.username, u.email, CAST(u.role AS string), " +
+           "  u.isDeleted, u.isDormant, u.createdAt, CAST(u.status AS string), u.warningCount, u.suspendedUntil) " +
+           "FROM Users u WHERE " +
+           "(:role IS NULL OR CAST(u.role AS string) = :role) AND " +
+           "(:status IS NULL OR CAST(u.status AS string) = :status) AND " +
+           "(:keyword IS NULL OR u.username LIKE %:keyword% OR u.nickname LIKE %:keyword% OR u.email LIKE %:keyword%) " +
+           "ORDER BY u.createdAt DESC")
+    Page<AdminUserListDTO> findAdminUserListItems(
             @Param("role") String role,
             @Param("status") String status,
             @Param("keyword") String keyword,

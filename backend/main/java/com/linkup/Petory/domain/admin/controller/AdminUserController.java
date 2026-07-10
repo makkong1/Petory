@@ -1,7 +1,7 @@
 package com.linkup.Petory.domain.admin.controller;
 
 import com.linkup.Petory.domain.admin.service.AdminUserFacade;
-import com.linkup.Petory.domain.user.dto.UserPageResponseDTO;
+import com.linkup.Petory.domain.user.dto.AdminUserPageResponseDTO;
 import com.linkup.Petory.domain.user.dto.UsersDTO;
 import com.linkup.Petory.global.security.AuthenticatedUserIdResolver;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +20,7 @@ public class AdminUserController {
     private final AuthenticatedUserIdResolver userIdResolver;
 
     @GetMapping("/paging")
-    public ResponseEntity<UserPageResponseDTO> getUsers(
+    public ResponseEntity<AdminUserPageResponseDTO> getUsers(
             @RequestParam(name = "role", required = false) String role,
             @RequestParam(name = "status", required = false) String status,
             @RequestParam(name = "q", required = false) String q,

@@ -10,6 +10,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
+import com.linkup.Petory.domain.user.dto.AdminUserListDTO;
 import com.linkup.Petory.domain.user.entity.Role;
 import com.linkup.Petory.domain.user.entity.Users;
 
@@ -147,6 +148,11 @@ public class JpaUsersAdapter implements UsersRepository {
     @Override
     public Page<Users> findAllForAdmin(String role, String status, String keyword, Pageable pageable) {
         return jpaRepository.findAllForAdmin(role, status, keyword, pageable);
+    }
+
+    @Override
+    public Page<AdminUserListDTO> findAdminUserListItems(String role, String status, String keyword, Pageable pageable) {
+        return jpaRepository.findAdminUserListItems(role, status, keyword, pageable);
     }
 
     @Override

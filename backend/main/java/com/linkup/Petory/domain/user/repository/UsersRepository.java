@@ -7,6 +7,7 @@ import java.time.LocalDateTime;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import com.linkup.Petory.domain.user.dto.AdminUserListDTO;
 import com.linkup.Petory.domain.user.entity.Role;
 import com.linkup.Petory.domain.user.entity.Users;
 
@@ -122,6 +123,11 @@ public interface UsersRepository {
      * 관리자용 사용자 목록 페이징 (role / status / 키워드 복합 필터)
      */
     Page<Users> findAllForAdmin(String role, String status, String keyword, Pageable pageable);
+
+    /**
+     * 관리자용 사용자 목록 페이징 (projection - 화면/모달이 쓰는 12컬럼만 조회)
+     */
+    Page<AdminUserListDTO> findAdminUserListItems(String role, String status, String keyword, Pageable pageable);
 
     /**
      * 통계용: 특정 기간 동안 특정 역할로 가입한 사용자 수 (createdAt 기준)

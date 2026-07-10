@@ -13,8 +13,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.linkup.Petory.domain.user.dto.UserPageResponseDTO;
-import com.linkup.Petory.domain.user.dto.UsersDTO;
+import com.linkup.Petory.domain.user.dto.AdminUserListDTO;
+import com.linkup.Petory.domain.user.dto.AdminUserPageResponseDTO;
 import com.linkup.Petory.domain.user.entity.Role;
 import com.linkup.Petory.domain.user.entity.UserStatus;
 import com.linkup.Petory.domain.user.entity.Users;
@@ -102,8 +102,8 @@ class AdminUserFacadeGetUsersTest {
     }
 
     private List<String> resultUsernames(String role, String status, String keyword) {
-        UserPageResponseDTO page = adminUserFacade.getUsers(role, status, keyword, 0, 1000);
-        return page.getUsers().stream().map(UsersDTO::getUsername).collect(Collectors.toList());
+        AdminUserPageResponseDTO page = adminUserFacade.getUsers(role, status, keyword, 0, 1000);
+        return page.getUsers().stream().map(AdminUserListDTO::getUsername).collect(Collectors.toList());
     }
 
     @Test

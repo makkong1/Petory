@@ -2,7 +2,8 @@
 package com.linkup.Petory.domain.admin.service;
 
 import com.linkup.Petory.domain.user.converter.UsersConverter;
-import com.linkup.Petory.domain.user.dto.UserPageResponseDTO;
+import com.linkup.Petory.domain.user.dto.AdminUserListDTO;
+import com.linkup.Petory.domain.user.dto.AdminUserPageResponseDTO;
 import com.linkup.Petory.domain.user.dto.UsersDTO;
 import com.linkup.Petory.domain.user.entity.Role;
 import com.linkup.Petory.domain.user.entity.Users;
@@ -34,11 +35,12 @@ public class AdminUserFacade {
     private final PasswordEncoder passwordEncoder;
     private final AdminAuditService auditService;
 
-    public UserPageResponseDTO getUsers(String role, String status, String keyword, int page, int size) {
+    public AdminUserPageResponseDTO getUsers(String role, String status, String keyword, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
-        Page<Users> userPage = usersRepository.findAllForAdmin(role, status, keyword, pageable);
-        return UserPageResponseDTO.builder()
-                .users(usersConverter.toDTOList(userPage.getContent()))
+        // [오버페칭 제거] 목록은 화면/모달이 쓰는 12컬럼만 projection 조회 (기존: 27컬럼 + socialUsers 배치)
+        Page<AdminUserListDTO> userPage = usersRepository.findAdminUserListItems(role, status, keyword, pageable);
+        return AdminUserPageResponseDTO.builder()
+                .users(userPage.getContent())
                 .totalCount(userPage.getTotalElements())
                 .totalPages(userPage.getTotalPages())
                 .currentPage(page)
