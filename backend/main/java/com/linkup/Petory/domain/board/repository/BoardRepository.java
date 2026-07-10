@@ -8,6 +8,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 
+import com.linkup.Petory.domain.board.dto.BoardListItemDTO;
 import com.linkup.Petory.domain.board.entity.Board;
 import com.linkup.Petory.domain.user.entity.Users;
 
@@ -63,6 +64,13 @@ public interface BoardRepository {
 
         // 작성자 닉네임으로 검색 (페이징) - JOIN 쿼리로 최적화
         Page<Board> searchByNicknameWithPaging(String nickname, Pageable pageable);
+
+        // ── [오버페칭 제거] 목록 projection (작성자 3컬럼만) ──
+        Page<BoardListItemDTO> findBoardListItems(Pageable pageable);
+
+        Page<BoardListItemDTO> findBoardListItemsByCategory(String category, Pageable pageable);
+
+        Page<BoardListItemDTO> searchBoardListItemsByNickname(String nickname, Pageable pageable);
 
         // FULLTEXT 인덱스 사용 쿼리 (제목+내용) - 페이징 - 작성자도 활성 상태여야 함
         Page<Board> searchByKeywordWithPaging(String keyword, Pageable pageable);

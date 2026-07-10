@@ -7,6 +7,7 @@ import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import com.linkup.Petory.domain.care.dto.CareRequestListView;
 import com.linkup.Petory.domain.care.entity.CareRequest;
 import com.linkup.Petory.domain.care.entity.CareRequestStatus;
 import com.linkup.Petory.domain.user.entity.Users;
@@ -106,9 +107,9 @@ public interface CareRequestRepository {
         Page<CareRequest> searchWithPaging(String keyword, Pageable pageable);
 
         /**
-         * 반경 기반 근처 케어 요청 조회 (지도 표출용)
+         * 반경 기반 근처 케어 요청 조회 (지도 표출용) - [오버페칭 제거] 목록 projection 반환
          */
-        List<CareRequest> findNearby(double lat, double lng, double radiusKm, int limit);
+        List<CareRequestListView> findNearby(double lat, double lng, double radiusKm, int limit);
 
         /**
          * 관리자용 케어 요청 페이징 (status / deleted / keyword 복합 필터)

@@ -40,6 +40,10 @@
 
 - [카타시안 곱(Fetch Join 행 폭증) 발생 확인](./catesian/cartesian-product-verification.md) — 어떤 조회에서 SQL 행이 불어나는지 코드 기준 정리
 
+## 컬럼·필드 과다조회 점검 (DTO Projection 검토)
+
+- [DTO Projection 검토 (컬럼·필드 과다조회)](./column-projection-review.md) — N+1(쿼리 수) 축과 별개로, 목록 조회가 필요 이상으로 넓은 컬럼/연관 데이터를 가져오는지 점검. CareRequest 1순위.
+
 ---
 
 ## 도메인별 문서

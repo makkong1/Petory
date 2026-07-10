@@ -14,6 +14,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
+import com.linkup.Petory.domain.care.dto.CareRequestListView;
 import com.linkup.Petory.domain.care.entity.CareRequest;
 import com.linkup.Petory.domain.care.entity.CareRequestStatus;
 import com.linkup.Petory.domain.user.entity.Users;
@@ -164,7 +165,7 @@ public class JpaCareRequestAdapter implements CareRequestRepository {
     }
 
     @Override
-    public List<CareRequest> findNearby(double lat, double lng, double radiusKm, int limit) {
+    public List<CareRequestListView> findNearby(double lat, double lng, double radiusKm, int limit) {
         return jpaRepository.findNearbyCareRequests(lat, lng, radiusKm, limit);
     }
 

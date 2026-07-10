@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.linkup.Petory.domain.care.dto.CareRequestDTO;
+import com.linkup.Petory.domain.care.dto.CareRequestListView;
 import com.linkup.Petory.domain.care.dto.CareRequestPageResponseDTO;
 import com.linkup.Petory.domain.care.service.CareRequestService;
 import com.linkup.Petory.global.security.AuthenticatedUserIdResolver;
@@ -42,7 +43,7 @@ public class CareRequestController {
 
     // 반경 기반 근처 케어 요청 조회 (지도 표출용)
     @GetMapping("/nearby")
-    public ResponseEntity<List<CareRequestDTO>> getNearby(
+    public ResponseEntity<List<CareRequestListView>> getNearby(
             @RequestParam(value = "lat") double lat,
             @RequestParam(value = "lng") double lng,
             @RequestParam(value = "radius", defaultValue = "5.0") double radius,

@@ -6,6 +6,7 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
 import com.linkup.Petory.domain.board.dto.BoardDTO;
+import com.linkup.Petory.domain.board.dto.BoardListItemDTO;
 import com.linkup.Petory.domain.board.entity.Board;
 
 import lombok.RequiredArgsConstructor;
@@ -37,6 +38,31 @@ public class BoardConverter {
                 .dislikes(board.getDislikeCount() != null ? board.getDislikeCount() : 0)
                 .views(board.getViewCount() != null ? board.getViewCount() : 0)
                 .lastReactionAt(board.getLastReactionAt())
+                .build();
+    }
+
+    /**
+     * 목록 projection(BoardListItemDTO) → BoardDTO 기본 매핑.
+     * 리액션/첨부파일은 서비스가 배치로 사후 주입하므로 여기서는 채우지 않는다(엔티티 toDTO와 동일 계약).
+     */
+    public BoardDTO toDTO(BoardListItemDTO item) {
+        return BoardDTO.builder()
+                .idx(item.getIdx())
+                .title(item.getTitle())
+                .content(item.getContent())
+                .category(item.getCategory())
+                .status(item.getStatus() != null ? item.getStatus().name() : null)
+                .createdAt(item.getCreatedAt())
+                .deleted(item.getIsDeleted())
+                .deletedAt(item.getDeletedAt())
+                .userId(item.getUserId())
+                .username(item.getUsername())
+                .userLocation(item.getUserLocation())
+                .commentCount(item.getCommentCount() != null ? item.getCommentCount() : 0)
+                .likes(item.getLikeCount() != null ? item.getLikeCount() : 0)
+                .dislikes(item.getDislikeCount() != null ? item.getDislikeCount() : 0)
+                .views(item.getViewCount() != null ? item.getViewCount() : 0)
+                .lastReactionAt(item.getLastReactionAt())
                 .build();
     }
 
