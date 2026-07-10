@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.linkup.Petory.domain.care.converter.CareRequestConverter;
 import com.linkup.Petory.domain.care.dto.CareRequestDTO;
+import com.linkup.Petory.domain.care.dto.CareRequestListView;
 import com.linkup.Petory.domain.care.dto.CareRequestPageResponseDTO;
 import com.linkup.Petory.domain.care.entity.CareApplicationStatus;
 import com.linkup.Petory.domain.care.entity.CareRequest;
@@ -67,13 +68,12 @@ public class CareRequestService {
     /**
      * 반경 기반 근처 케어 요청 조회 (지도 표출용)
      */
+    // [오버페칭 제거] 지도 목록은 projection(CareRequestListView)을 그대로 반환한다.
+    // 기존엔 native로 엔티티를 읽어 컨버터가 작성자 전체·중첩 pet·applications(@BatchSize)까지 채웠다.
     @Transactional(readOnly = true)
-    public List<CareRequestDTO> getNearby(double lat, double lng, double radiusKm, int limit) {
+    public List<CareRequestListView> getNearby(double lat, double lng, double radiusKm, int limit) {
         int effectiveLimit = Math.min(Math.max(limit, 1), 500);
-        return careRequestRepository.findNearby(lat, lng, radiusKm, effectiveLimit)
-                .stream()
-                .map(careRequestConverter::toDTO)
-                .toList();
+        return careRequestRepository.findNearby(lat, lng, radiusKm, effectiveLimit);
     }
 
     // 전체 케어 요청 조회 (필터링 포함) - 작성자도 활성 상태여야 함

@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import com.linkup.Petory.domain.care.dto.CareRequestListView;
 import com.linkup.Petory.domain.care.entity.CareRequest;
 import com.linkup.Petory.global.annotation.RepositoryMethod;
 import com.linkup.Petory.domain.care.entity.CareRequestStatus;
@@ -101,9 +102,18 @@ public interface SpringDataJpaCareRequestRepository extends JpaRepository<CareRe
            countQuery = "SELECT COUNT(cr) FROM CareRequest cr JOIN cr.user u WHERE cr.status = :status AND cr.isDeleted = false AND u.isDeleted = false AND (u.status = 'ACTIVE' OR (u.status = 'SUSPENDED' AND u.suspendedUntil <= CURRENT_TIMESTAMP)) AND (:location IS NULL OR :location = '' OR (u.location IS NOT NULL AND u.location LIKE CONCAT(:location, '%')))")
     Page<CareRequest> findByStatusAndIsDeletedFalseWithPaging(@Param("status") CareRequestStatus status, @Param("location") String location, Pageable pageable);
 
-    @RepositoryMethod("펫케어 요청: 반경 기반 근처 요청 조회")
-    @Query(value = "SELECT cr.* FROM carerequest cr " +
+    // [오버페칭 제거] 지도(getNearby) 전용 projection.
+    // 기존 SELECT cr.* + 컨버터가 작성자 전체·중첩 pet(파일 조회)·applications(@BatchSize 추가 쿼리)까지 로딩했으나,
+    // 지도 레이어가 실제로 쓰는 14컬럼만 JOIN·SELECT 한다(연관 오버페칭+컬럼 오버페칭 동시 제거). WHERE/ORDER는 기존과 동일.
+    @RepositoryMethod("펫케어 요청: 반경 기반 근처 요청 조회 (projection)")
+    @Query(value = "SELECT cr.idx AS idx, cr.title AS title, cr.description AS description, cr.`date` AS `date`, " +
+                    "  cr.schedule_mode AS scheduleMode, cr.estimated_duration_minutes AS estimatedDurationMinutes, " +
+                    "  cr.offered_coins AS offeredCoins, cr.status AS status, " +
+                    "  cr.latitude AS latitude, cr.longitude AS longitude, cr.address AS address, " +
+                    "  u.idx AS userId, u.username AS username, p.pet_name AS petName " +
+                    "FROM carerequest cr " +
                     "INNER JOIN users u ON u.idx = cr.user_idx " +
+                    "LEFT JOIN pets p ON p.idx = cr.pet_idx " +
                     "WHERE cr.is_deleted = false " +
                     "AND (u.status = 'ACTIVE' OR (u.status = 'SUSPENDED' AND u.suspended_until <= NOW())) " +
                     "AND u.is_deleted = false " +
@@ -116,7 +126,7 @@ public interface SpringDataJpaCareRequestRepository extends JpaRepository<CareRe
                     "    sin(radians(:lat)) * sin(radians(cr.latitude)))) <= :radius " +
                     "ORDER BY cr.created_at DESC " +
                     "LIMIT :limit", nativeQuery = true)
-    List<CareRequest> findNearbyCareRequests(@Param("lat") Double lat,
+    List<CareRequestListView> findNearbyCareRequests(@Param("lat") Double lat,
                     @Param("lng") Double lng,
                     @Param("radius") Double radius,
                     @Param("limit") int limit);
