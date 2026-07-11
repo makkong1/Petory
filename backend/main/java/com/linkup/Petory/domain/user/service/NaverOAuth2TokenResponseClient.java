@@ -19,7 +19,10 @@ import org.springframework.web.client.RestTemplate;
 
 import lombok.extern.slf4j.Slf4j;
 
-/** 네이버 전용 OAuth2 액세스 토큰 응답 클라이언트. 네이버의 비표준 응답 형식을 직접 파싱해 OAuth2AccessTokenResponse로 변환한다. */
+/**
+ * 네이버 전용 OAuth2 액세스 토큰 응답 클라이언트. 네이버의 비표준 응답 형식을 직접 파싱해
+ * OAuth2AccessTokenResponse로 변환한다.
+ */
 @Slf4j
 @Component
 public class NaverOAuth2TokenResponseClient
@@ -78,7 +81,7 @@ public class NaverOAuth2TokenResponseClient
             ResponseEntity<Map<String, Object>> response = restOperations.exchange(
                     requestEntity,
                     new ParameterizedTypeReference<Map<String, Object>>() {
-                    });
+            });
 
             // 응답 본문 확인
             Map<String, Object> responseBody = response.getBody();
@@ -136,11 +139,11 @@ public class NaverOAuth2TokenResponseClient
             // 추가 파라미터
             Map<String, Object> additionalParameters = new LinkedHashMap<>();
             responseBody.forEach((key, value) -> {
-                if (!OAuth2ParameterNames.ACCESS_TOKEN.equals(key) &&
-                        !OAuth2ParameterNames.TOKEN_TYPE.equals(key) &&
-                        !OAuth2ParameterNames.EXPIRES_IN.equals(key) &&
-                        !OAuth2ParameterNames.REFRESH_TOKEN.equals(key) &&
-                        !OAuth2ParameterNames.SCOPE.equals(key)) {
+                if (!OAuth2ParameterNames.ACCESS_TOKEN.equals(key)
+                        && !OAuth2ParameterNames.TOKEN_TYPE.equals(key)
+                        && !OAuth2ParameterNames.EXPIRES_IN.equals(key)
+                        && !OAuth2ParameterNames.REFRESH_TOKEN.equals(key)
+                        && !OAuth2ParameterNames.SCOPE.equals(key)) {
                     additionalParameters.put(key, value);
                 }
             });

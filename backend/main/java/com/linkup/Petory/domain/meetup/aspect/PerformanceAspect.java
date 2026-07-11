@@ -12,6 +12,7 @@ import java.lang.reflect.Method;
 
 /**
  * 성능 측정을 위한 AOP Aspect
+ *
  * @Timed 어노테이션이 붙은 메서드의 실행 시간을 측정하고 로깅합니다.
  */
 @Aspect
@@ -24,17 +25,17 @@ public class PerformanceAspect {
         MethodSignature signature = (MethodSignature) joinPoint.getSignature();
         Method method = signature.getMethod();
         Timed timed = method.getAnnotation(Timed.class);
-        
-        String methodName = timed.value().isEmpty() 
-                ? joinPoint.getSignature().toShortString() 
+
+        String methodName = timed.value().isEmpty()
+                ? joinPoint.getSignature().toShortString()
                 : timed.value();
-        
+
         long startTime = System.currentTimeMillis();
-        
+
         try {
             Object result = joinPoint.proceed();
             long executionTime = System.currentTimeMillis() - startTime;
-            
+
             // 결과가 List인 경우 크기도 로깅
             if (result instanceof java.util.List) {
                 int size = ((java.util.List<?>) result).size();
@@ -42,7 +43,7 @@ public class PerformanceAspect {
             } else {
                 log.info("[성능 측정] {} - 실행시간: {}ms", methodName, executionTime);
             }
-            
+
             return result;
         } catch (Throwable e) {
             long executionTime = System.currentTimeMillis() - startTime;

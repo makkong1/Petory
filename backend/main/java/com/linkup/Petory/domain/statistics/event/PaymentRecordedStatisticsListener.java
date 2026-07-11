@@ -11,8 +11,8 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
- * 에스크로 지급 완료 후 결제액을 일별 통계에 집계한다.
- * AFTER_COMMIT + REQUIRES_NEW: 통계 집계(non-critical)가 실패해도 이미 커밋된 코인 지급은 롤백되지 않는다.
+ * 에스크로 지급 완료 후 결제액을 일별 통계에 집계한다. AFTER_COMMIT + REQUIRES_NEW: 통계
+ * 집계(non-critical)가 실패해도 이미 커밋된 코인 지급은 롤백되지 않는다.
  */
 @Component
 @RequiredArgsConstructor

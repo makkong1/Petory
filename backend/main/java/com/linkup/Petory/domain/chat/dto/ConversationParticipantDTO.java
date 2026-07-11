@@ -2,17 +2,20 @@ package com.linkup.Petory.domain.chat.dto;
 
 import java.time.LocalDateTime;
 
-import lombok.Data;
-import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-/** 대화방 참여자 응답 DTO. 역할·읽음 상태·거래 확인 여부 및 탈퇴 사용자 표시 플래그를 포함한다. */
+/**
+ * 대화방 참여자 응답 DTO. 역할·읽음 상태·거래 확인 여부 및 탈퇴 사용자 표시 플래그를 포함한다.
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class ConversationParticipantDTO {
+
     private Long idx;
     private Long conversationIdx;
     private Long userIdx;

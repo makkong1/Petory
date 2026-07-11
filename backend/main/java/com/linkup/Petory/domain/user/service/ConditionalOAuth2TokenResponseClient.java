@@ -7,8 +7,8 @@ import org.springframework.security.oauth2.core.endpoint.OAuth2AccessTokenRespon
 import org.springframework.stereotype.Component;
 
 /**
- * Provider별로 다른 TokenResponseClient를 사용하는 래퍼 클라이언트
- * Naver는 커스텀 클라이언트 사용, Google 등은 기본 클라이언트 사용
+ * Provider별로 다른 TokenResponseClient를 사용하는 래퍼 클라이언트 Naver는 커스텀 클라이언트 사용, Google
+ * 등은 기본 클라이언트 사용
  */
 @Slf4j
 @Component

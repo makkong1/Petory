@@ -27,13 +27,12 @@ public interface SpringDataJpaAttachmentFileRepository extends JpaRepository<Att
     List<AttachmentFile> findByTargetTypeAndTargetIdxIn(FileTargetType targetType, List<Long> targetIndices);
 
     @RepositoryMethod("첨부파일: 관리자 필터 페이징 조회")
-    @Query("SELECT f FROM AttachmentFile f WHERE " +
-           "(:targetType IS NULL OR CAST(f.targetType AS string) = :targetType) AND " +
-           "(:keyword IS NULL OR f.filePath LIKE %:keyword% OR f.fileType LIKE %:keyword%) " +
-           "ORDER BY f.createdAt DESC")
+    @Query("SELECT f FROM AttachmentFile f WHERE "
+            + "(:targetType IS NULL OR CAST(f.targetType AS string) = :targetType) AND "
+            + "(:keyword IS NULL OR f.filePath LIKE %:keyword% OR f.fileType LIKE %:keyword%) "
+            + "ORDER BY f.createdAt DESC")
     Page<AttachmentFile> findAllForAdmin(
             @Param("targetType") String targetType,
             @Param("keyword") String keyword,
             Pageable pageable);
 }
-

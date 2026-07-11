@@ -47,4 +47,3 @@ public interface AttachmentFileRepository {
      */
     Page<AttachmentFile> findAllForAdmin(String targetType, String keyword, Pageable pageable);
 }
-

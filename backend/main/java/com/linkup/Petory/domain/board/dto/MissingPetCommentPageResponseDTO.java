@@ -9,11 +9,12 @@ import java.util.List;
  * </p>
  */
 public record MissingPetCommentPageResponseDTO(
-                List<MissingPetCommentDTO> comments,
-                long totalCount,
-                int totalPages,
-                int currentPage,
-                int pageSize,
-                boolean hasNext,
-                boolean hasPrevious) {
+        List<MissingPetCommentDTO> comments,
+        long totalCount,
+        int totalPages,
+        int currentPage,
+        int pageSize,
+        boolean hasNext,
+        boolean hasPrevious) {
+
 }

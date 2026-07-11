@@ -9,7 +9,9 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 
-/** 채팅방 없이 생성된 모임에 채팅방을 복구하는 스케줄러. 5분 주기로 실행된다. */
+/**
+ * 채팅방 없이 생성된 모임에 채팅방을 복구하는 스케줄러. 5분 주기로 실행된다.
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -21,7 +23,9 @@ public class MeetupChatRoomRecoveryScheduler {
     @Scheduled(fixedDelay = 300_000)
     public void recoverMissingChatRooms() {
         List<Meetup> orphans = meetupRepository.findWithoutChatRoom();
-        if (orphans.isEmpty()) return;
+        if (orphans.isEmpty()) {
+            return;
+        }
 
         log.warn("채팅방 없는 모임 감지: {}건 복구 시작", orphans.size());
         for (Meetup meetup : orphans) {

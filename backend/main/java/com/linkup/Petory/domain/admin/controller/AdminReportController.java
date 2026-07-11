@@ -4,7 +4,13 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import com.linkup.Petory.domain.admin.service.AdminReportFacade;
 import com.linkup.Petory.domain.report.dto.AdminReportPageResponseDTO;
@@ -18,10 +24,8 @@ import com.linkup.Petory.global.security.AuthenticatedUserIdResolver;
 import lombok.RequiredArgsConstructor;
 
 /**
- * 신고 관리 컨트롤러 (관리자용)
- * - ADMIN과 MASTER 모두 접근 가능
- * - 신고 목록 조회, 상세 조회, 처리
- * - 일반 사용자 신고 생성은 ReportController에서 처리
+ * 신고 관리 컨트롤러 (관리자용) - ADMIN과 MASTER 모두 접근 가능 - 신고 목록 조회, 상세 조회, 처리 - 일반 사용자 신고
+ * 생성은 ReportController에서 처리
  */
 @RestController
 @RequestMapping("/api/admin/reports")
@@ -43,10 +47,9 @@ public class AdminReportController {
     /**
      * 게시글/댓글/실종 제보 등 신고 목록 조회 (관리자용)
      *
-     * 예:
-     * - 전체: GET /api/admin/reports?page=0&size=20
-     * - 게시글 신고만: GET /api/admin/reports?targetType=BOARD
-     * - 게시글 신고 중 미처리만: GET /api/admin/reports?targetType=BOARD&status=PENDING
+     * 예: - 전체: GET /api/admin/reports?page=0&size=20 - 게시글 신고만: GET
+     * /api/admin/reports?targetType=BOARD - 게시글 신고 중 미처리만: GET
+     * /api/admin/reports?targetType=BOARD&status=PENDING
      */
     @GetMapping
     public ResponseEntity<AdminReportPageResponseDTO> getReports(

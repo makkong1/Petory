@@ -16,7 +16,9 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-/** 시스템 설정(SystemConfig) 조회·변경을 담당하는 퍼사드. MASTER 권한 전용. */
+/**
+ * 시스템 설정(SystemConfig) 조회·변경을 담당하는 퍼사드. MASTER 권한 전용.
+ */
 public class AdminSystemFacade {
 
     private final SystemConfigRepository configRepository;
@@ -37,9 +39,9 @@ public class AdminSystemFacade {
     public void upsertConfig(String key, String value, String description, Long adminIdx) {
         SystemConfig config = configRepository.findByConfigKey(key)
                 .orElseGet(() -> SystemConfig.builder()
-                        .configKey(key)
-                        .description(description)
-                        .build());
+                .configKey(key)
+                .description(description)
+                .build());
         config.setConfigValue(value);
         if (description != null) {
             config.setDescription(description);

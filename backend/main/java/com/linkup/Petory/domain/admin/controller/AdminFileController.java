@@ -5,7 +5,12 @@ import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import com.linkup.Petory.domain.admin.service.AdminFileFacade;
 import com.linkup.Petory.domain.file.dto.FileDTO;
@@ -17,7 +22,9 @@ import lombok.RequiredArgsConstructor;
 @RequestMapping("/api/admin/files")
 @RequiredArgsConstructor
 @PreAuthorize("hasAnyRole('ADMIN','MASTER')")
-/** 관리자용 첨부파일 목록 조회·삭제 API. [ADMIN, MASTER] */
+/**
+ * 관리자용 첨부파일 목록 조회·삭제 API. [ADMIN, MASTER]
+ */
 public class AdminFileController {
 
     private final AdminFileFacade adminFileFacade;

@@ -4,8 +4,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * OAuth2에서 받아온 모든 데이터를 임시로 저장하는 전역 컬렉터
- * DB에 저장하지 않는 값들도 확인할 수 있도록 함
+ * OAuth2에서 받아온 모든 데이터를 임시로 저장하는 전역 컬렉터 DB에 저장하지 않는 값들도 확인할 수 있도록 함
  */
 public class OAuth2DataCollector {
 

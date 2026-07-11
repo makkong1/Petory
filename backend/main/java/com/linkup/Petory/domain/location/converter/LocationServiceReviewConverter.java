@@ -11,8 +11,9 @@ import org.springframework.stereotype.Component;
 public class LocationServiceReviewConverter {
 
     public LocationServiceReviewDTO toDTO(LocationServiceReview review) {
-        if (review == null)
+        if (review == null) {
             return null;
+        }
 
         return LocationServiceReviewDTO.builder()
                 .idx(review.getIdx())
@@ -31,15 +32,16 @@ public class LocationServiceReviewConverter {
 
     /**
      * DTO를 Entity로 변환 (service와 user 엔티티 필요)
-     * 
-     * @param dto     변환할 DTO
+     *
+     * @param dto 변환할 DTO
      * @param service LocationService 엔티티 (필수)
-     * @param user    Users 엔티티 (필수)
+     * @param user Users 엔티티 (필수)
      * @return LocationServiceReview 엔티티
      */
     public LocationServiceReview toEntity(LocationServiceReviewDTO dto, LocationService service, Users user) {
-        if (dto == null)
+        if (dto == null) {
             return null;
+        }
 
         return LocationServiceReview.builder()
                 .idx(dto.getIdx())
@@ -53,17 +55,17 @@ public class LocationServiceReviewConverter {
     }
 
     /**
-     * DTO를 Entity로 변환 (service와 user 없이 - 불완전한 엔티티)
-     * 주의: 이 메서드는 service와 user가 설정되지 않은 불완전한 엔티티를 반환합니다.
-     * 일반적으로는 toEntity(dto, service, user)를 사용하세요.
-     * 
+     * DTO를 Entity로 변환 (service와 user 없이 - 불완전한 엔티티) 주의: 이 메서드는 service와 user가
+     * 설정되지 않은 불완전한 엔티티를 반환합니다. 일반적으로는 toEntity(dto, service, user)를 사용하세요.
+     *
      * @param dto 변환할 DTO
      * @return LocationServiceReview 엔티티 (service와 user가 null)
      */
     @Deprecated
     public LocationServiceReview toEntity(LocationServiceReviewDTO dto) {
-        if (dto == null)
+        if (dto == null) {
             return null;
+        }
 
         return LocationServiceReview.builder()
                 .idx(dto.getIdx())

@@ -14,7 +14,9 @@ import com.linkup.Petory.global.security.CustomUserDetails;
 
 import lombok.RequiredArgsConstructor;
 
-/** Spring Security UserDetailsService 구현체. 로그인 ID로 사용자를 조회해 인증에 사용한다. */
+/**
+ * Spring Security UserDetailsService 구현체. 로그인 ID로 사용자를 조회해 인증에 사용한다.
+ */
 @Service
 @RequiredArgsConstructor
 public class UsersDetailsServiceImpl implements UserDetailsService {

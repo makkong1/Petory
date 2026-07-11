@@ -21,10 +21,9 @@ import jakarta.persistence.LockModeType;
 
 /**
  * Spring Data JPA 전용 인터페이스입니다.
- * 
- * 이 인터페이스는 JpaUsersAdapter 내부에서만 사용되며,
- * 도메인 레이어에서는 직접 사용하지 않습니다.
- * 
+ *
+ * 이 인터페이스는 JpaUsersAdapter 내부에서만 사용되며, 도메인 레이어에서는 직접 사용하지 않습니다.
+ *
  * JPA 특화 기능(쿼리 메서드, JPQL 등)은 이 인터페이스에 정의합니다.
  */
 public interface SpringDataJpaUsersRepository extends JpaRepository<Users, Long> {
@@ -42,9 +41,8 @@ public interface SpringDataJpaUsersRepository extends JpaRepository<Users, Long>
     Optional<Users> findByEmail(@Param("email") String email);
 
     /**
-     * 닉네임/사용자명/이메일 중복 검사 (1회 쿼리로 통합)
-     * [리팩토링] findByNickname + findByUsername + findByEmail 3회 → 1회
-     * 탈퇴하지 않은 사용자만 조회 (Soft Delete 필터링)
+     * 닉네임/사용자명/이메일 중복 검사 (1회 쿼리로 통합) [리팩토링] findByNickname + findByUsername +
+     * findByEmail 3회 → 1회 탈퇴하지 않은 사용자만 조회 (Soft Delete 필터링)
      */
     @RepositoryMethod("사용자: 닉네임/username/email 중복 검사")
     @Query("SELECT u FROM Users u WHERE (u.nickname = :nickname OR u.username = :username OR u.email = :email) AND (u.isDeleted = false OR u.isDeleted IS NULL)")
@@ -90,23 +88,22 @@ public interface SpringDataJpaUsersRepository extends JpaRepository<Users, Long>
     int incrementWarningCount(@Param("userId") Long userId);
 
     /**
-     * 휴면 계정 일괄 전환 (배치용)
-     * lastLoginAt이 있으면 그 값을, 없으면(가입 후 미로그인) createdAt을 기준으로 판정
+     * 휴면 계정 일괄 전환 (배치용) lastLoginAt이 있으면 그 값을, 없으면(가입 후 미로그인) createdAt을 기준으로
+     * 판정
      *
      * @return 업데이트된 행 수
      */
     @RepositoryMethod("사용자: 휴면 계정 일괄 전환 (배치)")
     @Modifying
-    @Query("UPDATE Users u SET u.isDormant = true, u.dormantAt = :now " +
-           "WHERE u.isDormant = false AND u.isDeleted = false AND (" +
-           "  (u.lastLoginAt IS NOT NULL AND u.lastLoginAt < :cutoff) OR " +
-           "  (u.lastLoginAt IS NULL AND u.createdAt < :cutoff)" +
-           ")")
+    @Query("UPDATE Users u SET u.isDormant = true, u.dormantAt = :now "
+            + "WHERE u.isDormant = false AND u.isDeleted = false AND ("
+            + "  (u.lastLoginAt IS NOT NULL AND u.lastLoginAt < :cutoff) OR "
+            + "  (u.lastLoginAt IS NULL AND u.createdAt < :cutoff)"
+            + ")")
     int markDormantUsers(@Param("cutoff") LocalDateTime cutoff, @Param("now") LocalDateTime now);
 
     /**
-     * 비관적 락을 사용한 사용자 조회 (동시성 제어용)
-     * 코인 차감 시 Race Condition 방지를 위해 사용
+     * 비관적 락을 사용한 사용자 조회 (동시성 제어용) 코인 차감 시 Race Condition 방지를 위해 사용
      */
     @RepositoryMethod("사용자: 비관적 락 조회 (동시성 제어)")
     @Lock(LockModeType.PESSIMISTIC_WRITE)
@@ -114,35 +111,33 @@ public interface SpringDataJpaUsersRepository extends JpaRepository<Users, Long>
     Optional<Users> findByIdForUpdate(@Param("idx") Long idx);
 
     /**
-     * 사용자 역할만 조회 (경량 조회용, 삭제 권한 검증 등)
-     * [리팩토링] getUser(User+Pet) 대체 - role 프로젝션만 SELECT
+     * 사용자 역할만 조회 (경량 조회용, 삭제 권한 검증 등) [리팩토링] getUser(User+Pet) 대체 - role 프로젝션만
+     * SELECT
      */
     @RepositoryMethod("사용자: 역할만 조회 (경량)")
     @Query("SELECT u.role FROM Users u WHERE u.idx = :idx")
     Optional<Role> findRoleByIdx(@Param("idx") Long idx);
 
     /**
-     * 사용자 단건 조회 (펫 포함, Fetch Join)
-     * [리팩토링] getUserWithPets - User + Pet 1회 쿼리
+     * 사용자 단건 조회 (펫 포함, Fetch Join) [리팩토링] getUserWithPets - User + Pet 1회 쿼리
      */
     @RepositoryMethod("사용자: idx로 조회 (펫 포함)")
     @Query("SELECT DISTINCT u FROM Users u LEFT JOIN FETCH u.pets WHERE u.idx = :idx")
     Optional<Users> findByIdWithPets(@Param("idx") Long idx);
 
     /**
-     * 사용자 단건 조회 (펫 포함, Fetch Join)
-     * [리팩토링] getMyProfile - User + Pet 1회 쿼리
+     * 사용자 단건 조회 (펫 포함, Fetch Join) [리팩토링] getMyProfile - User + Pet 1회 쿼리
      */
     @RepositoryMethod("사용자: id(String)로 조회 (펫 포함)")
     @Query("SELECT DISTINCT u FROM Users u LEFT JOIN FETCH u.pets WHERE u.id = :userId")
     Optional<Users> findByIdStringWithPets(@Param("userId") String userId);
 
     @RepositoryMethod("사용자: 관리자 필터 페이징 조회")
-    @Query("SELECT u FROM Users u WHERE " +
-           "(:role IS NULL OR CAST(u.role AS string) = :role) AND " +
-           "(:status IS NULL OR CAST(u.status AS string) = :status) AND " +
-           "(:keyword IS NULL OR u.username LIKE %:keyword% OR u.nickname LIKE %:keyword% OR u.email LIKE %:keyword%) " +
-           "ORDER BY u.createdAt DESC")
+    @Query("SELECT u FROM Users u WHERE "
+            + "(:role IS NULL OR CAST(u.role AS string) = :role) AND "
+            + "(:status IS NULL OR CAST(u.status AS string) = :status) AND "
+            + "(:keyword IS NULL OR u.username LIKE %:keyword% OR u.nickname LIKE %:keyword% OR u.email LIKE %:keyword%) "
+            + "ORDER BY u.createdAt DESC")
     Page<Users> findAllForAdmin(
             @Param("role") String role,
             @Param("status") String status,
@@ -150,19 +145,19 @@ public interface SpringDataJpaUsersRepository extends JpaRepository<Users, Long>
             Pageable pageable);
 
     /**
-     * [오버페칭 제거] 관리자 목록 전용 projection 조회.
-     * 기존 findAllForAdmin은 Users 27컬럼 전체 + socialUsers 배치 쿼리(총 2쿼리)를 로딩했으나,
-     * 화면/모달이 쓰는 12컬럼만 SELECT 해 단일 쿼리로 축소한다. WHERE/ORDER는 findAllForAdmin과 동일.
+     * [오버페칭 제거] 관리자 목록 전용 projection 조회. 기존 findAllForAdmin은 Users 27컬럼 전체 +
+     * socialUsers 배치 쿼리(총 2쿼리)를 로딩했으나, 화면/모달이 쓰는 12컬럼만 SELECT 해 단일 쿼리로 축소한다.
+     * WHERE/ORDER는 findAllForAdmin과 동일.
      */
     @RepositoryMethod("사용자: 관리자 목록 projection 조회 (경량)")
-    @Query("SELECT new com.linkup.Petory.domain.user.dto.AdminUserListDTO(" +
-           "  u.idx, u.id, u.nickname, u.username, u.email, CAST(u.role AS string), " +
-           "  u.isDeleted, u.isDormant, u.createdAt, CAST(u.status AS string), u.warningCount, u.suspendedUntil) " +
-           "FROM Users u WHERE " +
-           "(:role IS NULL OR CAST(u.role AS string) = :role) AND " +
-           "(:status IS NULL OR CAST(u.status AS string) = :status) AND " +
-           "(:keyword IS NULL OR u.username LIKE %:keyword% OR u.nickname LIKE %:keyword% OR u.email LIKE %:keyword%) " +
-           "ORDER BY u.createdAt DESC")
+    @Query("SELECT new com.linkup.Petory.domain.user.dto.AdminUserListDTO("
+            + "  u.idx, u.id, u.nickname, u.username, u.email, CAST(u.role AS string), "
+            + "  u.isDeleted, u.isDormant, u.createdAt, CAST(u.status AS string), u.warningCount, u.suspendedUntil) "
+            + "FROM Users u WHERE "
+            + "(:role IS NULL OR CAST(u.role AS string) = :role) AND "
+            + "(:status IS NULL OR CAST(u.status AS string) = :status) AND "
+            + "(:keyword IS NULL OR u.username LIKE %:keyword% OR u.nickname LIKE %:keyword% OR u.email LIKE %:keyword%) "
+            + "ORDER BY u.createdAt DESC")
     Page<AdminUserListDTO> findAdminUserListItems(
             @Param("role") String role,
             @Param("status") String status,

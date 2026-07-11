@@ -5,8 +5,7 @@ import org.springframework.http.HttpStatus;
 import com.linkup.Petory.global.exception.ApiException;
 
 /**
- * 휴면 처리된 계정이 재활성화 확인 없이 로그인을 시도할 때 발생하는 예외.
- * HTTP 403 Forbidden
+ * 휴면 처리된 계정이 재활성화 확인 없이 로그인을 시도할 때 발생하는 예외. HTTP 403 Forbidden
  */
 public class UserDormantException extends ApiException {
 

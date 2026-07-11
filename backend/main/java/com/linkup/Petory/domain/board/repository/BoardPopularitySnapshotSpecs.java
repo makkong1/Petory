@@ -16,8 +16,8 @@ public final class BoardPopularitySnapshotSpecs {
     }
 
     /**
-     * 기간이 겹치는 스냅샷 조회 조건
-     * 조건: periodType 일치 AND 스냅샷 시작일 <= 조회 종료일 AND 스냅샷 종료일 >= 조회 시작일
+     * 기간이 겹치는 스냅샷 조회 조건 조건: periodType 일치 AND 스냅샷 시작일 <= 조회 종료일 AND 스냅샷 종료일 >=
+     * 조회 시작일
      */
     public static Specification<BoardPopularitySnapshot> periodOverlaps(
             PopularityPeriodType periodType,

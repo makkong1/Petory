@@ -10,10 +10,9 @@ import com.linkup.Petory.global.annotation.RepositoryMethod;
 
 /**
  * Spring Data JPA 전용 인터페이스입니다.
- * 
- * 이 인터페이스는 JpaSocialUserAdapter 내부에서만 사용되며,
- * 도메인 레이어에서는 직접 사용하지 않습니다.
- * 
+ *
+ * 이 인터페이스는 JpaSocialUserAdapter 내부에서만 사용되며, 도메인 레이어에서는 직접 사용하지 않습니다.
+ *
  * JPA 특화 기능(쿼리 메서드, JPQL 등)은 이 인터페이스에 정의합니다.
  */
 public interface SpringDataJpaSocialUserRepository extends JpaRepository<SocialUser, Long> {
@@ -21,4 +20,3 @@ public interface SpringDataJpaSocialUserRepository extends JpaRepository<SocialU
     @RepositoryMethod("소셜 사용자: Provider+ProviderId로 조회")
     Optional<SocialUser> findByProviderAndProviderId(Provider provider, String providerId);
 }
-

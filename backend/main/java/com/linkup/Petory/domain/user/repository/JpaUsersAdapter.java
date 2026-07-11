@@ -18,15 +18,14 @@ import lombok.RequiredArgsConstructor;
 
 /**
  * UsersRepository의 JPA 구현체(어댑터)입니다.
- * 
- * 이 클래스는 Spring Data JPA를 사용하여 UsersRepository 인터페이스를 구현합니다.
- * 나중에 다른 DB나 DBMS로 변경할 경우, 이 어댑터와 유사한 새 클래스를 만들고
- * 
+ *
+ * 이 클래스는 Spring Data JPA를 사용하여 UsersRepository 인터페이스를 구현합니다. 나중에 다른 DB나 DBMS로
+ * 변경할 경우, 이 어댑터와 유사한 새 클래스를 만들고
+ *
  * @Primary 어노테이션을 옮기면 됩니다.
- * 
- *          예시:
- *          - MyBatis로 변경: MyBatisUsersAdapter 생성 후 @Primary 이동
- *          - MongoDB로 변경: MongoUsersAdapter 생성 후 @Primary 이동
+ *
+ * 예시: - MyBatis로 변경: MyBatisUsersAdapter 생성 후 @Primary 이동 - MongoDB로 변경:
+ * MongoUsersAdapter 생성 후 @Primary 이동
  */
 @Repository
 @Primary

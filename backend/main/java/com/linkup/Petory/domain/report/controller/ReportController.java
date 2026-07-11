@@ -14,9 +14,7 @@ import com.linkup.Petory.global.security.AuthenticatedUserIdResolver;
 import lombok.RequiredArgsConstructor;
 
 /**
- * 신고 컨트롤러 (일반 사용자용)
- * - 일반 사용자가 신고를 생성할 때 사용
- * - 관리자 기능은 AdminReportController에서 처리
+ * 신고 컨트롤러 (일반 사용자용) - 일반 사용자가 신고를 생성할 때 사용 - 관리자 기능은 AdminReportController에서 처리
  */
 @RestController
 @RequestMapping("/api/reports")

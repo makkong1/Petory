@@ -6,7 +6,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "signal_interaction_log", indexes = {
-    @Index(name = "idx_signal_log_user",   columnList = "user_idx, created_at"),
+    @Index(name = "idx_signal_log_user", columnList = "user_idx, created_at"),
     @Index(name = "idx_signal_log_signal", columnList = "signal_id"),
     @Index(name = "idx_signal_log_domain", columnList = "intent_domain, interaction_type")
 })
@@ -44,12 +44,14 @@ public class SignalInteractionLog {
 
     @PrePersist
     protected void onCreate() {
-        if (createdAt == null) createdAt = LocalDateTime.now();
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
     }
 
     public enum InteractionType {
-        CLICKED,    // 추천 카드 클릭 (카테고리 검색/액션 진입)
-        DISMISSED,  // 추천 카드 닫기/숨기기
+        CLICKED, // 추천 카드 클릭 (카테고리 검색/액션 진입)
+        DISMISSED, // 추천 카드 닫기/숨기기
         CONVERTED   // 작성/검색 완료까지 추적 (Phase 2 이후 추가)
     }
 }

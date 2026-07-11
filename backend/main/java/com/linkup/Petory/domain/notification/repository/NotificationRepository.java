@@ -12,6 +12,7 @@ import com.linkup.Petory.domain.notification.entity.Notification;
  * MyBatis, NoSQL 등)로 교체 가능하도록 설계되었습니다.
  *
  * 구현체: - JpaNotificationAdapter: JPA 기반 구현체 - 다른 DB로 변경 시 새로운 어댑터를 만들고
+ *
  * @Primary를 옮기면 됩니다.
  */
 public interface NotificationRepository {

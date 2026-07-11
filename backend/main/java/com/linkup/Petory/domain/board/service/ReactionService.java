@@ -7,21 +7,21 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.linkup.Petory.domain.board.exception.BoardNotFoundException;
-import com.linkup.Petory.domain.board.exception.CommentNotFoundException;
-import com.linkup.Petory.domain.user.entity.Users;
-import com.linkup.Petory.domain.user.exception.UserNotFoundException;
-import com.linkup.Petory.domain.user.repository.UsersRepository;
 import com.linkup.Petory.domain.board.dto.ReactionSummaryDTO;
 import com.linkup.Petory.domain.board.entity.Board;
 import com.linkup.Petory.domain.board.entity.BoardReaction;
 import com.linkup.Petory.domain.board.entity.Comment;
 import com.linkup.Petory.domain.board.entity.CommentReaction;
 import com.linkup.Petory.domain.board.entity.ReactionType;
+import com.linkup.Petory.domain.board.exception.BoardNotFoundException;
+import com.linkup.Petory.domain.board.exception.CommentNotFoundException;
 import com.linkup.Petory.domain.board.repository.BoardReactionRepository;
 import com.linkup.Petory.domain.board.repository.BoardRepository;
 import com.linkup.Petory.domain.board.repository.CommentReactionRepository;
 import com.linkup.Petory.domain.board.repository.CommentRepository;
+import com.linkup.Petory.domain.user.entity.Users;
+import com.linkup.Petory.domain.user.exception.UserNotFoundException;
+import com.linkup.Petory.domain.user.repository.UsersRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -69,13 +69,23 @@ public class ReactionService {
         // 원자적 카운트 조정
         int likeDelta = 0;
         int dislikeDelta = 0;
-        if (previousReactionType == ReactionType.LIKE) likeDelta--;
-        else if (previousReactionType == ReactionType.DISLIKE) dislikeDelta--;
-        if (currentReactionType == ReactionType.LIKE) likeDelta++;
-        else if (currentReactionType == ReactionType.DISLIKE) dislikeDelta++;
+        if (previousReactionType == ReactionType.LIKE) {
+            likeDelta--; 
+        }else if (previousReactionType == ReactionType.DISLIKE) {
+            dislikeDelta--;
+        }
+        if (currentReactionType == ReactionType.LIKE) {
+            likeDelta++; 
+        }else if (currentReactionType == ReactionType.DISLIKE) {
+            dislikeDelta++;
+        }
 
-        if (likeDelta != 0) boardRepository.adjustLikeCount(boardId, likeDelta);
-        if (dislikeDelta != 0) boardRepository.adjustDislikeCount(boardId, dislikeDelta);
+        if (likeDelta != 0) {
+            boardRepository.adjustLikeCount(boardId, likeDelta);
+        }
+        if (dislikeDelta != 0) {
+            boardRepository.adjustDislikeCount(boardId, dislikeDelta);
+        }
 
         // 반환값: 메모리 내 기존 값 + delta (DB 재조회 불필요)
         int newLikeCount = Math.max(0, (board.getLikeCount() != null ? board.getLikeCount() : 0) + likeDelta);
@@ -146,7 +156,10 @@ public class ReactionService {
                 userReaction);
     }
 
-    /** [리팩토링] reactToBoard 반환용 - count 2회 + find 1회 제거, 엔티티 likeCount/dislikeCount 사용 */
+    /**
+     * [리팩토링] reactToBoard 반환용 - count 2회 + find 1회 제거, 엔티티
+     * likeCount/dislikeCount 사용
+     */
     private ReactionSummaryDTO buildBoardSummaryFromCounts(int likeCount, int dislikeCount,
             ReactionType userReaction) {
         return new ReactionSummaryDTO(likeCount, dislikeCount, userReaction);
@@ -167,7 +180,10 @@ public class ReactionService {
                 userReaction);
     }
 
-    /** [리팩토링] reactToComment 반환용 - findByCommentAndUser 1회 제거, userReaction 계산값 전달 */
+    /**
+     * [리팩토링] reactToComment 반환용 - findByCommentAndUser 1회 제거, userReaction 계산값
+     * 전달
+     */
     private ReactionSummaryDTO buildCommentSummaryWithUserReaction(Comment comment, ReactionType userReaction) {
         long likeCount = commentReactionRepository.countByCommentAndReactionType(comment, ReactionType.LIKE);
         long dislikeCount = commentReactionRepository.countByCommentAndReactionType(comment, ReactionType.DISLIKE);

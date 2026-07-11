@@ -1,18 +1,31 @@
 package com.linkup.Petory.domain.admin.entity;
 
 import com.linkup.Petory.domain.common.BaseTimeEntity;
-import jakarta.persistence.*;
-import lombok.*;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Entity
 @Table(name = "system_config",
-    indexes = @Index(name = "idx_system_config_key", columnList = "config_key", unique = true))
+        indexes = @Index(name = "idx_system_config_key", columnList = "config_key", unique = true))
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-/** key-value 형태의 시스템 설정 엔티티. MASTER 권한으로 런타임에 값을 변경할 수 있다. */
+/**
+ * key-value 형태의 시스템 설정 엔티티. MASTER 권한으로 런타임에 값을 변경할 수 있다.
+ */
 public class SystemConfig extends BaseTimeEntity {
 
     @Id

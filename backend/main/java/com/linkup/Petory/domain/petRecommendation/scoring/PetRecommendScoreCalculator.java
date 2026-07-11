@@ -25,11 +25,12 @@ public class PetRecommendScoreCalculator {
     /**
      * 후보 시설의 최종 추천 점수를 계산한다.
      *
-     * <p>인기도·태그일치·거리·평점·리뷰수를 각각 0~1로 정규화한 뒤 가중합하여
-     * 0.0~100.0 스케일의 finalScore와 매칭 이유 목록을 담은 DTO를 반환한다.
+     * <p>
+     * 인기도·태그일치·거리·평점·리뷰수를 각각 0~1로 정규화한 뒤 가중합하여 0.0~100.0 스케일의 finalScore와 매칭 이유
+     * 목록을 담은 DTO를 반환한다.
      *
-     * @param dto       점수를 계산할 시설 후보
-     * @param radiusM   검색 반경(미터). 거리 점수 정규화 기준으로 사용
+     * @param dto 점수를 계산할 시설 후보
+     * @param radiusM 검색 반경(미터). 거리 점수 정규화 기준으로 사용
      * @param intentTags 사용자 의도 태그 목록. 시설 태그와 교집합 비율로 태그 점수 산출
      */
     public PetRecommendFacilityDto calcScore(
@@ -66,8 +67,7 @@ public class PetRecommendScoreCalculator {
     }
 
     /**
-     * 거리 점수를 계산한다. 반경 경계에서 0, 중심에서 1인 선형 감소 구조.
-     * 반경 초과 시 0 반환.
+     * 거리 점수를 계산한다. 반경 경계에서 0, 중심에서 1인 선형 감소 구조. 반경 초과 시 0 반환.
      */
     private double calcDistanceScore(double distanceM, int radiusM) {
         if (distanceM >= radiusM) {
@@ -76,14 +76,15 @@ public class PetRecommendScoreCalculator {
         return 1.0 - (distanceM / radiusM);
     }
 
-    /** 5점 만점 평점을 0~1로 정규화한다. */
+    /**
+     * 5점 만점 평점을 0~1로 정규화한다.
+     */
     private double calcRatingScore(double rating) {
         return rating / 5.0;
     }
 
     /**
-     * 리뷰 수를 로그 스케일로 0~1 정규화한다.
-     * 리뷰 1000개 이상에서 1.0으로 포화되어 과도한 가중치를 방지한다.
+     * 리뷰 수를 로그 스케일로 0~1 정규화한다. 리뷰 1000개 이상에서 1.0으로 포화되어 과도한 가중치를 방지한다.
      */
     private double calcReviewScore(int reviewCount) {
         if (reviewCount <= 0) {
@@ -93,8 +94,7 @@ public class PetRecommendScoreCalculator {
     }
 
     /**
-     * 사용자 의도 태그 중 시설 태그와 일치하는 비율을 반환한다.
-     * 예: 의도 태그 4개 중 2개 일치 → 0.5
+     * 사용자 의도 태그 중 시설 태그와 일치하는 비율을 반환한다. 예: 의도 태그 4개 중 2개 일치 → 0.5
      */
     private double calcTagMatchScore(List<String> locationTags, List<String> intentTags) {
         if (locationTags == null || locationTags.isEmpty()
@@ -106,9 +106,9 @@ public class PetRecommendScoreCalculator {
     }
 
     /**
-     * 추천 이유 라벨 목록을 생성한다. 프론트에서 "왜 추천됐는지" 표시에 사용.
-     * nearby / high_rating / many_reviews / popular / tag_match:{태그} 조합.
-     * 해당 조건이 하나도 없으면 최소 이유로 in_radius를 반환한다.
+     * 추천 이유 라벨 목록을 생성한다. 프론트에서 "왜 추천됐는지" 표시에 사용. nearby / high_rating /
+     * many_reviews / popular / tag_match:{태그} 조합. 해당 조건이 하나도 없으면 최소 이유로
+     * in_radius를 반환한다.
      */
     private List<String> buildMatchReasons(
             PetRecommendFacilityDto dto, double distanceScore, double ratingScore,

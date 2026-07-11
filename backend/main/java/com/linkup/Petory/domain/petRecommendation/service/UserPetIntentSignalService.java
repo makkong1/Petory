@@ -56,11 +56,11 @@ import lombok.extern.slf4j.Slf4j;
 public class UserPetIntentSignalService {
 
     private static final Map<String, Double> DOMAIN_THRESHOLDS = Map.of(
-        "MEDICAL",          0.65,  // urgency=HIGH 시 thresholdFor()에서 0.55로 완화
-        "FOOD_SNACK",       0.45,  // Python 1차 필터와 동일 — 오탐 비용 낮음
-        "SUPPLIES",         0.45,
-        "WALK_OUTING",      0.45,
-        "CAFE_DINING",      0.45
+            "MEDICAL", 0.65, // urgency=HIGH 시 thresholdFor()에서 0.55로 완화
+            "FOOD_SNACK", 0.45, // Python 1차 필터와 동일 — 오탐 비용 낮음
+            "SUPPLIES", 0.45,
+            "WALK_OUTING", 0.45,
+            "CAFE_DINING", 0.45
     );
     private static final double DEFAULT_THRESHOLD = 0.60;
     /**
@@ -226,26 +226,35 @@ public class UserPetIntentSignalService {
     }
 
     /**
-     * intentDomain + urgency 기반 카드 본문.
-     * MEDICAL+HIGH는 위급 문구, 나머지는 기존 도메인별 문구.
+     * intentDomain + urgency 기반 카드 본문. MEDICAL+HIGH는 위급 문구, 나머지는 기존 도메인별 문구.
      * Phase 1에서 constraints 파라미터 추가 예정.
      */
     private String buildCardMessage(String domain, String urgency,
             @SuppressWarnings("unused") List<String> categories) {
         boolean isHigh = "HIGH".equals(urgency);
         return switch (domain != null ? domain : "") {
-            case "MEDICAL"         -> isHigh
-                    ? "위급할 수 있어요. 가까운 동물병원에 바로 문의하세요."
-                    : "최근 건강 관련 고민이 있어 보여요.";
-            case "GROOMING"        -> "반려동물 미용이 필요해 보여요.";
-            case "CAFE_DINING"     -> "반려동물과 나들이 어떠세요?";
-            case "LODGING_TRAVEL"  -> "여행 계획 중이신가요?";
-            case "SUPPLIES"        -> "반려동물 용품이 필요해 보여요.";
-            case "FOOD_SNACK"      -> "반려동물 먹거리가 필요해 보여요.";
-            case "WALK_OUTING"     -> "반려동물과 산책하기 좋은 곳을 찾아드릴게요.";
-            case "DAYCARE_BOARDING"-> "반려동물 돌봄 서비스가 필요해 보여요.";
-            case "CULTURE_SPACE"   -> "반려동물과 함께하는 문화 공간을 찾아보세요.";
-            default                -> "최근 입력을 바탕으로 추천합니다.";
+            case "MEDICAL" ->
+                isHigh
+                ? "위급할 수 있어요. 가까운 동물병원에 바로 문의하세요."
+                : "최근 건강 관련 고민이 있어 보여요.";
+            case "GROOMING" ->
+                "반려동물 미용이 필요해 보여요.";
+            case "CAFE_DINING" ->
+                "반려동물과 나들이 어떠세요?";
+            case "LODGING_TRAVEL" ->
+                "여행 계획 중이신가요?";
+            case "SUPPLIES" ->
+                "반려동물 용품이 필요해 보여요.";
+            case "FOOD_SNACK" ->
+                "반려동물 먹거리가 필요해 보여요.";
+            case "WALK_OUTING" ->
+                "반려동물과 산책하기 좋은 곳을 찾아드릴게요.";
+            case "DAYCARE_BOARDING" ->
+                "반려동물 돌봄 서비스가 필요해 보여요.";
+            case "CULTURE_SPACE" ->
+                "반려동물과 함께하는 문화 공간을 찾아보세요.";
+            default ->
+                "최근 입력을 바탕으로 추천합니다.";
         };
     }
 }

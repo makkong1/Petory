@@ -10,7 +10,9 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/** 채팅 메시지 응답 DTO. 발신자 정보·읽음 상태·파일 첨부·답장 메시지를 포함한다. */
+/**
+ * 채팅 메시지 응답 DTO. 발신자 정보·읽음 상태·파일 첨부·답장 메시지를 포함한다.
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

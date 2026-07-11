@@ -9,11 +9,13 @@ import lombok.Getter;
 /**
  * 게시글 목록 전용 읽기 모델(Read Model).
  *
- * <p>목록 화면(CommunityBoard)이 쓰는 게시글 본문 필드 + 작성자 3필드(idx/username/location)만 담는다.
- * 기존 목록 쿼리는 {@code JOIN FETCH b.user}로 작성자(Users) 27컬럼 전체를 로딩했으나,
- * JPQL 생성자 표현식 projection으로 작성자 3컬럼만 SELECT 하기 위한 목적의 DTO다.
+ * <p>
+ * 목록 화면(CommunityBoard)이 쓰는 게시글 본문 필드 + 작성자 3필드(idx/username/location)만 담는다. 기존
+ * 목록 쿼리는 {@code JOIN FETCH b.user}로 작성자(Users) 27컬럼 전체를 로딩했으나, JPQL 생성자 표현식
+ * projection으로 작성자 3컬럼만 SELECT 하기 위한 목적의 DTO다.
  *
- * <p>리액션 카운트(좋아요/싫어요)와 첨부파일은 서비스 레이어가 배치로 사후 주입하므로 여기 담지 않는다.
+ * <p>
+ * 리액션 카운트(좋아요/싫어요)와 첨부파일은 서비스 레이어가 배치로 사후 주입하므로 여기 담지 않는다.
  */
 @Getter
 public class BoardListItemDTO {

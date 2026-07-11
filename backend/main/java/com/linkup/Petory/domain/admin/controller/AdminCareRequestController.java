@@ -1,19 +1,29 @@
 package com.linkup.Petory.domain.admin.controller;
 
-import com.linkup.Petory.domain.admin.service.AdminCareAndMeetupFacade;
-import com.linkup.Petory.domain.care.dto.CareRequestDTO;
-import com.linkup.Petory.global.security.AuthenticatedUserIdResolver;
-import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.linkup.Petory.domain.admin.service.AdminCareAndMeetupFacade;
+import com.linkup.Petory.domain.care.dto.CareRequestDTO;
+import com.linkup.Petory.global.security.AuthenticatedUserIdResolver;
+
+import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api/admin/care-requests")
 @RequiredArgsConstructor
 @PreAuthorize("hasAnyRole('ADMIN','MASTER')")
-/** 관리자용 케어 요청 목록 조회·상태 변경·삭제·복구 API. [ADMIN, MASTER] */
+/**
+ * 관리자용 케어 요청 목록 조회·상태 변경·삭제·복구 API. [ADMIN, MASTER]
+ */
 public class AdminCareRequestController {
 
     private final AdminCareAndMeetupFacade facade;

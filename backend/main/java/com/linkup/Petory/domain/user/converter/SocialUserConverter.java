@@ -7,7 +7,9 @@ import com.linkup.Petory.domain.user.entity.Provider;
 import com.linkup.Petory.domain.user.entity.SocialUser;
 import com.linkup.Petory.domain.user.entity.Users;
 
-/** SocialUser 엔티티 ↔ SocialUserDTO 변환기. */
+/**
+ * SocialUser 엔티티 ↔ SocialUserDTO 변환기.
+ */
 @Component
 public class SocialUserConverter {
 

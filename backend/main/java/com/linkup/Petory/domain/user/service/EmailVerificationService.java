@@ -19,8 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.concurrent.TimeUnit;
 
 /**
- * 이메일 인증 서비스
- * 단일 통합 시스템으로 모든 용도의 이메일 인증 처리
+ * 이메일 인증 서비스 단일 통합 시스템으로 모든 용도의 이메일 인증 처리
  */
 @Slf4j
 @Service
@@ -41,8 +40,8 @@ public class EmailVerificationService {
 
     /**
      * 이메일 인증 메일 발송
-     * 
-     * @param userId  사용자 ID
+     *
+     * @param userId 사용자 ID
      * @param purpose 인증 용도
      */
     public void sendVerificationEmail(String userId, EmailVerificationPurpose purpose) {
@@ -70,7 +69,7 @@ public class EmailVerificationService {
 
     /**
      * 회원가입 전 이메일 인증 메일 발송 (이메일 기반)
-     * 
+     *
      * @param email 이메일 주소
      */
     public void sendPreRegistrationVerificationEmail(String email) {
@@ -107,7 +106,7 @@ public class EmailVerificationService {
 
     /**
      * 비밀번호 재설정 이메일 발송 (이메일 기반, 인증 불필요)
-     * 
+     *
      * @param email 이메일 주소
      */
     public void sendPasswordResetEmail(String email) {
@@ -130,7 +129,7 @@ public class EmailVerificationService {
 
     /**
      * 회원가입 전 이메일 인증 완료 처리 (Redis에 저장)
-     * 
+     *
      * @param token 인증 토큰
      * @return 인증된 이메일 주소
      */
@@ -176,7 +175,7 @@ public class EmailVerificationService {
 
     /**
      * 회원가입 전 이메일 인증 완료 여부 확인
-     * 
+     *
      * @param email 이메일 주소
      * @return 인증 완료 여부
      */
@@ -188,7 +187,7 @@ public class EmailVerificationService {
 
     /**
      * 회원가입 완료 후 Redis에서 인증 상태 삭제
-     * 
+     *
      * @param email 이메일 주소
      */
     public void removePreRegistrationVerification(String email) {
@@ -199,7 +198,7 @@ public class EmailVerificationService {
 
     /**
      * 이메일 인증 처리
-     * 
+     *
      * @param token 인증 토큰
      * @return 인증 용도 (리다이렉트용)
      */
@@ -240,7 +239,7 @@ public class EmailVerificationService {
 
     /**
      * 이메일 인증 여부 확인
-     * 
+     *
      * @param userId 사용자 ID
      * @throws EmailVerificationRequiredException 인증이 필요한 경우
      */
@@ -260,7 +259,7 @@ public class EmailVerificationService {
 
     /**
      * 이메일 인증 여부 확인 (boolean 반환)
-     * 
+     *
      * @param userId 사용자 ID
      * @return 인증 여부
      */

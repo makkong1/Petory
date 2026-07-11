@@ -66,4 +66,3 @@ public interface ReportRepository {
      */
     long countByStatusAndUpdatedAtBetween(ReportStatus status, LocalDateTime start, LocalDateTime end);
 }
-

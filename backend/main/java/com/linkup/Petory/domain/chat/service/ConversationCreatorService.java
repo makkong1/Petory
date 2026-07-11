@@ -47,7 +47,8 @@ public class ConversationCreatorService {
     /**
      * 채팅방 생성. 호출부 트랜잭션과 분리(REQUIRES_NEW).
      *
-     * @param actingUserId 요청을 수행하는 사용자(토큰 기준). 반드시 {@code participantUserIds}에 포함되어야 한다.
+     * @param actingUserId 요청을 수행하는 사용자(토큰 기준). 반드시 {@code participantUserIds}에
+     * 포함되어야 한다.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public ConversationDTO createConversation(
@@ -60,7 +61,7 @@ public class ConversationCreatorService {
 
         List<Users> participants = participantUserIds.stream()
                 .map(userId -> usersRepository.findById(userId)
-                        .orElseThrow(UserNotFoundException::new))
+                .orElseThrow(UserNotFoundException::new))
                 .collect(Collectors.toList());
 
         if (!participants.stream().map(Users::getIdx).anyMatch(actingUserId::equals)) {

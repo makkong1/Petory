@@ -40,8 +40,8 @@ public interface MissingPetCommentRepository {
     List<MissingPetComment> findByBoardAndIsDeletedFalseOrderByCreatedAtAsc(MissingPetBoard board);
 
     /**
-     * 게시글의 댓글 수 조회 (COUNT 쿼리 - N건 로드 방지)
-     * [리팩토링] findByBoard + size() → COUNT 쿼리 1회
+     * 게시글의 댓글 수 조회 (COUNT 쿼리 - N건 로드 방지) [리팩토링] findByBoard + size() → COUNT 쿼리
+     * 1회
      */
     long countByBoardAndIsDeletedFalse(MissingPetBoard board);
 
@@ -52,6 +52,7 @@ public interface MissingPetCommentRepository {
 
     /**
      * 게시글별 댓글 수 배치 조회 (N+1 문제 해결)
+     *
      * @param boardIds 게시글 ID 목록
      * @return [게시글 ID, 댓글 수] 쌍의 리스트
      */
@@ -63,8 +64,9 @@ public interface MissingPetCommentRepository {
     Page<MissingPetComment> findByBoardIdAndIsDeletedFalseOrderByCreatedAtAsc(Long boardId, Pageable pageable);
 
     /**
-     * 게시글의 모든 미삭제 댓글 일괄 소프트 삭제 (배치 UPDATE)
-     * [리팩토링] N건 루프 save → 1회 UPDATE 쿼리 (missing-pet-backend-performance-optimization.md)
+     * 게시글의 모든 미삭제 댓글 일괄 소프트 삭제 (배치 UPDATE) [리팩토링] N건 루프 save → 1회 UPDATE 쿼리
+     * (missing-pet-backend-performance-optimization.md)
+     *
      * @return 업데이트된 행 수
      */
     int softDeleteAllByBoardIdx(Long boardIdx, LocalDateTime deletedAt);

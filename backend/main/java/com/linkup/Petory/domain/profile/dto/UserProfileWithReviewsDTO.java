@@ -12,12 +12,15 @@ import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 
-/** 사용자 프로필 + 케어 리뷰 + 위치 서비스 리뷰 + 모임 이력 통합 응답 DTO. */
+/**
+ * 사용자 프로필 + 케어 리뷰 + 위치 서비스 리뷰 + 모임 이력 통합 응답 DTO.
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class UserProfileWithReviewsDTO {
+
     private UsersDTO user;
     private List<CareReviewDTO> reviews;
     private String careReviewMode;

@@ -16,4 +16,5 @@ public record BoardPageResponseDTO(
         int pageSize,
         boolean hasNext,
         boolean hasPrevious) {
+
 }

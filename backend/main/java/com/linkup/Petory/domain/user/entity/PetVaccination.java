@@ -17,7 +17,6 @@ import com.linkup.Petory.domain.common.BaseTimeEntity;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-
 public class PetVaccination extends BaseTimeEntity {
 
     @Id

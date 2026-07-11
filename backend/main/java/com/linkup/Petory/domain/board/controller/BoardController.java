@@ -2,8 +2,6 @@ package com.linkup.Petory.domain.board.controller;
 
 import java.util.List;
 
-import jakarta.validation.Valid;
-
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -19,18 +17,19 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.linkup.Petory.domain.board.dto.BoardDTO;
 import com.linkup.Petory.domain.board.dto.BoardPageResponseDTO;
+import com.linkup.Petory.domain.board.dto.BoardPopularitySnapshotDTO;
 import com.linkup.Petory.domain.board.dto.CommentDTO;
 import com.linkup.Petory.domain.board.dto.CommentPageResponseDTO;
 import com.linkup.Petory.domain.board.dto.ReactionRequest;
 import com.linkup.Petory.domain.board.dto.ReactionSummaryDTO;
-import com.linkup.Petory.domain.board.dto.BoardPopularitySnapshotDTO;
-import com.linkup.Petory.domain.board.service.ReactionService;
+import com.linkup.Petory.domain.board.entity.PopularityPeriodType;
+import com.linkup.Petory.domain.board.service.BoardPopularityService;
 import com.linkup.Petory.domain.board.service.BoardService;
 import com.linkup.Petory.domain.board.service.CommentService;
-import com.linkup.Petory.domain.board.service.BoardPopularityService;
-import com.linkup.Petory.domain.board.entity.PopularityPeriodType;
+import com.linkup.Petory.domain.board.service.ReactionService;
 import com.linkup.Petory.global.security.CustomUserDetails;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 @RestController
@@ -112,9 +111,9 @@ public class BoardController {
     }
 
     /**
-     * 댓글 목록 조회 (페이징 지원)
-     * GET /api/boards/{boardId}/comments?page={page}&size={size}
-     * 서비스: CommentService.getCommentsWithPaging()
+     * 댓글 목록 조회 (페이징 지원) GET
+     * /api/boards/{boardId}/comments?page={page}&size={size} 서비스:
+     * CommentService.getCommentsWithPaging()
      */
     @PreAuthorize("permitAll()")
     @GetMapping("/{boardId}/comments")

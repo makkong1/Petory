@@ -5,8 +5,7 @@ import org.springframework.http.HttpStatus;
 import com.linkup.Petory.global.exception.ApiException;
 
 /**
- * 댓글이 해당 게시글에 속하지 않을 때 발생하는 예외.
- * HTTP 400 Bad Request
+ * 댓글이 해당 게시글에 속하지 않을 때 발생하는 예외. HTTP 400 Bad Request
  */
 public class CommentNotBelongToBoardException extends ApiException {
 

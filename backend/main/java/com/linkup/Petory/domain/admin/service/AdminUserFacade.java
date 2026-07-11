@@ -1,6 +1,16 @@
 // backend/main/java/com/linkup/Petory/domain/admin/service/AdminUserFacade.java
 package com.linkup.Petory.domain.admin.service;
 
+import java.util.List;
+
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.linkup.Petory.domain.user.converter.UsersConverter;
 import com.linkup.Petory.domain.user.dto.AdminUserListDTO;
 import com.linkup.Petory.domain.user.dto.AdminUserPageResponseDTO;
@@ -10,23 +20,17 @@ import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.exception.UserNotFoundException;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 import com.linkup.Petory.domain.user.service.UsersService;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-/** 관리자용 일반 사용자·관리자 계정 조회·상태 변경·생성·삭제를 처리하는 퍼사드. */
+/**
+ * 관리자용 일반 사용자·관리자 계정 조회·상태 변경·생성·삭제를 처리하는 퍼사드.
+ */
 public class AdminUserFacade {
 
     private final UsersRepository usersRepository;

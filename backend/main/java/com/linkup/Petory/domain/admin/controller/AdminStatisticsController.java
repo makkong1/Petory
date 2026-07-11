@@ -1,23 +1,32 @@
 package com.linkup.Petory.domain.admin.controller;
 
+import java.time.LocalDate;
+import java.util.List;
+
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
 import com.linkup.Petory.domain.statistics.dto.DailyStatisticsResponse;
 import com.linkup.Petory.domain.statistics.dto.MonthlyStatisticsResponse;
 import com.linkup.Petory.domain.statistics.dto.TodaySnapshotResponse;
 import com.linkup.Petory.domain.statistics.dto.WeeklyStatisticsResponse;
 import com.linkup.Petory.domain.statistics.service.StatisticsService;
+
 import lombok.RequiredArgsConstructor;
-import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
-import java.time.LocalDate;
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/admin/statistics")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('MASTER')")
-/** 관리자용 일별·주간·월간 통계 조회 및 backfill API. [MASTER] */
+/**
+ * 관리자용 일별·주간·월간 통계 조회 및 backfill API. [MASTER]
+ */
 public class AdminStatisticsController {
 
     private final StatisticsService statisticsService;
@@ -26,8 +35,12 @@ public class AdminStatisticsController {
     public ResponseEntity<List<DailyStatisticsResponse>> getDailyStatistics(
             @RequestParam(name = "startDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(name = "endDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
-        if (endDate == null) endDate = LocalDate.now();
-        if (startDate == null) startDate = endDate.minusDays(29);
+        if (endDate == null) {
+            endDate = LocalDate.now();
+        }
+        if (startDate == null) {
+            startDate = endDate.minusDays(29);
+        }
         return ResponseEntity.ok(statisticsService.getDailyStatistics(startDate, endDate));
     }
 

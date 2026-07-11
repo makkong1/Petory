@@ -17,11 +17,13 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-/** 사용자 로그인 이벤트 기록. append-only — 삭제·수정 없이 쌓기만 한다. */
+/**
+ * 사용자 로그인 이벤트 기록. append-only — 삭제·수정 없이 쌓기만 한다.
+ */
 @Entity
 @Table(name = "login_events", indexes = {
-        @Index(name = "idx_login_events_user_login_at", columnList = "user_id, login_at"),
-        @Index(name = "idx_login_events_login_at", columnList = "login_at")
+    @Index(name = "idx_login_events_user_login_at", columnList = "user_id, login_at"),
+    @Index(name = "idx_login_events_login_at", columnList = "login_at")
 })
 @Getter
 @NoArgsConstructor
@@ -40,7 +42,9 @@ public class LoginEvent {
     @Column(name = "login_at", nullable = false)
     private LocalDateTime loginAt;
 
-    /** LOCAL / GOOGLE / NAVER / KAKAO */
+    /**
+     * LOCAL / GOOGLE / NAVER / KAKAO
+     */
     @Column(name = "login_method", length = 16, nullable = false)
     private String loginMethod;
 }

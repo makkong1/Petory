@@ -12,9 +12,9 @@ import com.linkup.Petory.domain.user.entity.Users;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -30,7 +30,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/** 실종 반려동물 게시글 엔티티. 반려동물 특징·실종 위치·현황(MISSING/FOUND/RESOLVED)을 관리한다. */
+/**
+ * 실종 반려동물 게시글 엔티티. 반려동물 특징·실종 위치·현황(MISSING/FOUND/RESOLVED)을 관리한다.
+ */
 @Entity
 @Table(name = "missing_pet_board")
 @Getter

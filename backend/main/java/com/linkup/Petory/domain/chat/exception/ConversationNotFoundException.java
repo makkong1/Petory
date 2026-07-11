@@ -5,8 +5,7 @@ import org.springframework.http.HttpStatus;
 import com.linkup.Petory.global.exception.ApiException;
 
 /**
- * 채팅방을 찾을 수 없을 때 발생하는 예외.
- * HTTP 404 Not Found
+ * 채팅방을 찾을 수 없을 때 발생하는 예외. HTTP 404 Not Found
  */
 public class ConversationNotFoundException extends ApiException {
 

@@ -22,62 +22,62 @@ import com.linkup.Petory.global.annotation.RepositoryMethod;
 public interface SpringDataJpaChatMessageRepository extends JpaRepository<ChatMessage, Long> {
 
     @RepositoryMethod("채팅 메시지: 채팅방별 페이징 조회")
-    @Query("SELECT m FROM ChatMessage m " +
-           "JOIN FETCH m.sender s " +
-           "LEFT JOIN FETCH m.replyToMessage " +
-           "WHERE m.conversation.idx = :conversationIdx " +
-           "  AND m.isDeleted = false " +
-           "  AND s.isDeleted = false " +
-           "ORDER BY m.createdAt DESC")
+    @Query("SELECT m FROM ChatMessage m "
+            + "JOIN FETCH m.sender s "
+            + "LEFT JOIN FETCH m.replyToMessage "
+            + "WHERE m.conversation.idx = :conversationIdx "
+            + "  AND m.isDeleted = false "
+            + "  AND s.isDeleted = false "
+            + "ORDER BY m.createdAt DESC")
     Page<ChatMessage> findByConversationIdxOrderByCreatedAtDesc(
-        @Param("conversationIdx") Long conversationIdx,
-        Pageable pageable);
+            @Param("conversationIdx") Long conversationIdx,
+            Pageable pageable);
 
     @RepositoryMethod("채팅 메시지: 채팅방별 커서 페이징 조회")
-    @Query("SELECT m FROM ChatMessage m " +
-           "JOIN FETCH m.sender s " +
-           "LEFT JOIN FETCH m.replyToMessage " +
-           "WHERE m.conversation.idx = :conversationIdx " +
-           "  AND m.createdAt < :beforeDate " +
-           "  AND m.isDeleted = false " +
-           "  AND s.isDeleted = false " +
-           "ORDER BY m.createdAt DESC")
+    @Query("SELECT m FROM ChatMessage m "
+            + "JOIN FETCH m.sender s "
+            + "LEFT JOIN FETCH m.replyToMessage "
+            + "WHERE m.conversation.idx = :conversationIdx "
+            + "  AND m.createdAt < :beforeDate "
+            + "  AND m.isDeleted = false "
+            + "  AND s.isDeleted = false "
+            + "ORDER BY m.createdAt DESC")
     List<ChatMessage> findByConversationIdxAndCreatedAtBeforeOrderByCreatedAtDesc(
-        @Param("conversationIdx") Long conversationIdx,
-        @Param("beforeDate") LocalDateTime beforeDate,
-        Pageable pageable);
+            @Param("conversationIdx") Long conversationIdx,
+            @Param("beforeDate") LocalDateTime beforeDate,
+            Pageable pageable);
 
     @RepositoryMethod("채팅 메시지: 채팅방별 시점 이후 페이징 (재참여)")
-    @Query("SELECT m FROM ChatMessage m " +
-           "JOIN FETCH m.sender s " +
-           "LEFT JOIN FETCH m.replyToMessage " +
-           "WHERE m.conversation.idx = :conversationIdx " +
-           "  AND m.createdAt >= :afterDate " +
-           "  AND m.isDeleted = false " +
-           "  AND s.isDeleted = false " +
-           "ORDER BY m.createdAt DESC")
+    @Query("SELECT m FROM ChatMessage m "
+            + "JOIN FETCH m.sender s "
+            + "LEFT JOIN FETCH m.replyToMessage "
+            + "WHERE m.conversation.idx = :conversationIdx "
+            + "  AND m.createdAt >= :afterDate "
+            + "  AND m.isDeleted = false "
+            + "  AND s.isDeleted = false "
+            + "ORDER BY m.createdAt DESC")
     Page<ChatMessage> findByConversationIdxAndCreatedAtAfterOrderByCreatedAtDesc(
-        @Param("conversationIdx") Long conversationIdx,
-        @Param("afterDate") LocalDateTime afterDate,
-        Pageable pageable);
+            @Param("conversationIdx") Long conversationIdx,
+            @Param("afterDate") LocalDateTime afterDate,
+            Pageable pageable);
 
     @RepositoryMethod("채팅 메시지: 채팅방별 전체 조회")
-    @Query("SELECT m FROM ChatMessage m " +
-           "JOIN FETCH m.sender s " +
-           "LEFT JOIN FETCH m.replyToMessage " +
-           "WHERE m.conversation.idx = :conversationIdx " +
-           "  AND m.isDeleted = false " +
-           "  AND s.isDeleted = false " +
-           "ORDER BY m.createdAt DESC")
+    @Query("SELECT m FROM ChatMessage m "
+            + "JOIN FETCH m.sender s "
+            + "LEFT JOIN FETCH m.replyToMessage "
+            + "WHERE m.conversation.idx = :conversationIdx "
+            + "  AND m.isDeleted = false "
+            + "  AND s.isDeleted = false "
+            + "ORDER BY m.createdAt DESC")
     List<ChatMessage> findByConversationIdxOrderByCreatedAtDesc(@Param("conversationIdx") Long conversationIdx);
 
     @RepositoryMethod("채팅 메시지: 채팅방별 최신 메시지 조회")
-    @Query("SELECT m FROM ChatMessage m " +
-           "JOIN FETCH m.sender s " +
-           "WHERE m.conversation.idx = :conversationIdx " +
-           "  AND m.isDeleted = false " +
-           "  AND s.isDeleted = false " +
-           "ORDER BY m.createdAt DESC")
+    @Query("SELECT m FROM ChatMessage m "
+            + "JOIN FETCH m.sender s "
+            + "WHERE m.conversation.idx = :conversationIdx "
+            + "  AND m.isDeleted = false "
+            + "  AND s.isDeleted = false "
+            + "ORDER BY m.createdAt DESC")
     ChatMessage findTopByConversationIdxOrderByCreatedAtDesc(@Param("conversationIdx") Long conversationIdx);
 
     @RepositoryMethod("채팅 메시지: 발신자별 조회")
@@ -85,27 +85,27 @@ public interface SpringDataJpaChatMessageRepository extends JpaRepository<ChatMe
 
     @RepositoryMethod("채팅 메시지: 채팅방+타입별 조회")
     List<ChatMessage> findByConversationAndMessageTypeAndIsDeletedFalse(
-        Conversation conversation,
-        MessageType messageType);
+            Conversation conversation,
+            MessageType messageType);
 
     @RepositoryMethod("채팅 메시지: 채팅방별 읽지 않은 메시지 수")
-    @Query("SELECT COUNT(m) FROM ChatMessage m " +
-           "WHERE m.conversation.idx = :conversationIdx " +
-           "  AND m.sender.idx != :userId " +
-           "  AND m.isDeleted = false")
+    @Query("SELECT COUNT(m) FROM ChatMessage m "
+            + "WHERE m.conversation.idx = :conversationIdx "
+            + "  AND m.sender.idx != :userId "
+            + "  AND m.isDeleted = false")
     Long countUnreadMessages(@Param("conversationIdx") Long conversationIdx, @Param("userId") Long userId);
 
     @RepositoryMethod("채팅 메시지: 채팅방별 최신 메시지 배치 조회")
-    @Query("SELECT m FROM ChatMessage m " +
-           "JOIN FETCH m.sender s " +
-           "WHERE m.conversation.idx IN :conversationIdxs " +
-           "  AND m.isDeleted = false " +
-           "  AND s.isDeleted = false " +
-           "  AND m.idx IN (" +
-           "    SELECT MAX(m2.idx) FROM ChatMessage m2 " +
-           "    WHERE m2.conversation.idx = m.conversation.idx " +
-           "      AND m2.isDeleted = false" +
-           "  )")
+    @Query("SELECT m FROM ChatMessage m "
+            + "JOIN FETCH m.sender s "
+            + "WHERE m.conversation.idx IN :conversationIdxs "
+            + "  AND m.isDeleted = false "
+            + "  AND s.isDeleted = false "
+            + "  AND m.idx IN ("
+            + "    SELECT MAX(m2.idx) FROM ChatMessage m2 "
+            + "    WHERE m2.conversation.idx = m.conversation.idx "
+            + "      AND m2.isDeleted = false"
+            + "  )")
     List<ChatMessage> findLatestMessagesByConversationIdxs(@Param("conversationIdxs") List<Long> conversationIdxs);
 
     @RepositoryMethod("채팅 메시지: FULLTEXT 검색 — idx 목록 (인덱스 docs/migration/db/indexes.sql)")
@@ -126,4 +126,3 @@ public interface SpringDataJpaChatMessageRepository extends JpaRepository<ChatMe
             + "WHERE m.idx IN :ids")
     List<ChatMessage> findByIdxInWithAssociations(@Param("ids") Collection<Long> ids);
 }
-

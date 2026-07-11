@@ -14,12 +14,15 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/** 실종 반려동물 게시글 응답 DTO. 반려동물 특징·실종 위치·댓글 목록·첨부파일을 포함한다. */
+/**
+ * 실종 반려동물 게시글 응답 DTO. 반려동물 특징·실종 위치·댓글 목록·첨부파일을 포함한다.
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class MissingPetBoardDTO {
+
     private Long idx;
     private Long userId;
     private String username;

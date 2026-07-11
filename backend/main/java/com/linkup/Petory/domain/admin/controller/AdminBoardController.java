@@ -6,7 +6,14 @@ import java.util.stream.Collectors;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import com.linkup.Petory.domain.board.dto.BoardDTO;
 import com.linkup.Petory.domain.board.dto.BoardPageResponseDTO;
@@ -21,14 +28,17 @@ import lombok.RequiredArgsConstructor;
 @RequestMapping("/api/admin/boards")
 @RequiredArgsConstructor
 @PreAuthorize("hasAnyRole('ADMIN','MASTER')")
-/** 관리자용 게시글·댓글 조회·블라인드·삭제·복구 API. [ADMIN, MASTER] */
+/**
+ * 관리자용 게시글·댓글 조회·블라인드·삭제·복구 API. [ADMIN, MASTER]
+ */
 public class AdminBoardController {
 
     private final BoardService boardService;
     private final CommentService commentService;
 
     /**
-     * [리팩토링] listBoards(페이징 없음) 제거, listBoardsWithPaging → getAdminBoardsWithPagingOptimized (DB 레벨 필터링)
+     * [리팩토링] listBoards(페이징 없음) 제거, listBoardsWithPaging →
+     * getAdminBoardsWithPagingOptimized (DB 레벨 필터링)
      */
     @GetMapping("/paging")
     public ResponseEntity<BoardPageResponseDTO> listBoardsWithPaging(
@@ -42,10 +52,8 @@ public class AdminBoardController {
     }
 
     /**
-     * 관리자용 단일 게시글 조회 (조회수 증가 없음)
-     * [리팩토링] listBoards 전체 로드 제거 → getBoard(id) 단건 조회로 대체
-     * GET /api/admin/boards/{id}
-     * - 삭제된 게시글도 조회 가능
+     * 관리자용 단일 게시글 조회 (조회수 증가 없음) [리팩토링] listBoards 전체 로드 제거 → getBoard(id) 단건
+     * 조회로 대체 GET /api/admin/boards/{id} - 삭제된 게시글도 조회 가능
      */
     @GetMapping("/{id}")
     public ResponseEntity<BoardDTO> getBoard(@PathVariable("id") Long id) {

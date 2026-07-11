@@ -5,8 +5,7 @@ import org.springframework.http.HttpStatus;
 import com.linkup.Petory.global.exception.ApiException;
 
 /**
- * 닉네임, 이메일, 사용자명 등 중복 시 발생하는 예외.
- * HTTP 409 Conflict
+ * 닉네임, 이메일, 사용자명 등 중복 시 발생하는 예외. HTTP 409 Conflict
  */
 public class DuplicateUserFieldException extends ApiException {
 
@@ -36,7 +35,9 @@ public class DuplicateUserFieldException extends ApiException {
         this.field = field;
     }
 
-    /** 알 수 없는 제약조건 위반 시 (Race Condition 등) */
+    /**
+     * 알 수 없는 제약조건 위반 시 (Race Condition 등)
+     */
     public DuplicateUserFieldException(String message) {
         super(message, HttpStatus.CONFLICT, ERROR_CODE);
         this.field = null;

@@ -5,8 +5,7 @@ import org.springframework.http.HttpStatus;
 import com.linkup.Petory.global.exception.ApiException;
 
 /**
- * 이미 해당 서비스에 리뷰를 작성했을 때 발생하는 예외.
- * HTTP 409 Conflict
+ * 이미 해당 서비스에 리뷰를 작성했을 때 발생하는 예외. HTTP 409 Conflict
  */
 public class LocationReviewDuplicateException extends ApiException {
 

@@ -1,19 +1,30 @@
 package com.linkup.Petory.domain.admin.controller;
 
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
 import com.linkup.Petory.domain.admin.service.AdminUserFacade;
 import com.linkup.Petory.domain.user.dto.AdminUserPageResponseDTO;
 import com.linkup.Petory.domain.user.dto.UsersDTO;
 import com.linkup.Petory.global.security.AuthenticatedUserIdResolver;
+
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/admin/users")
 @RequiredArgsConstructor
 @PreAuthorize("hasAnyRole('ADMIN', 'MASTER')")
-/** 관리자용 일반 사용자 목록 조회·상태 변경·삭제 API. [ADMIN, MASTER] */
+/**
+ * 관리자용 일반 사용자 목록 조회·상태 변경·삭제 API. [ADMIN, MASTER]
+ */
 public class AdminUserController {
 
     private final AdminUserFacade adminUserFacade;

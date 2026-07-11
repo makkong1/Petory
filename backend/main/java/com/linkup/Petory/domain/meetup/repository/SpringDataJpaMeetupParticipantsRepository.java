@@ -22,12 +22,12 @@ public interface SpringDataJpaMeetupParticipantsRepository extends JpaRepository
     List<MeetupParticipants> findByMeetupIdxOrderByJoinedAtAsc(@Param("meetupIdx") Long meetupIdx);
 
     @RepositoryMethod("모임 참여자: 사용자별 참여 모임 목록")
-    @Query("SELECT mp FROM MeetupParticipants mp " +
-           "JOIN FETCH mp.meetup m " +
-           "JOIN FETCH m.organizer o " +
-           "JOIN FETCH mp.user u " +
-           "WHERE mp.user.idx = :userIdx AND (m.isDeleted = false OR m.isDeleted IS NULL) " +
-           "ORDER BY mp.joinedAt DESC")
+    @Query("SELECT mp FROM MeetupParticipants mp "
+            + "JOIN FETCH mp.meetup m "
+            + "JOIN FETCH m.organizer o "
+            + "JOIN FETCH mp.user u "
+            + "WHERE mp.user.idx = :userIdx AND (m.isDeleted = false OR m.isDeleted IS NULL) "
+            + "ORDER BY mp.joinedAt DESC")
     List<MeetupParticipants> findByUserIdxOrderByJoinedAtDesc(@Param("userIdx") Long userIdx);
 
     @RepositoryMethod("모임 참여자: 모임별 참여자 수")
@@ -40,33 +40,33 @@ public interface SpringDataJpaMeetupParticipantsRepository extends JpaRepository
     Optional<MeetupParticipants> findByMeetupIdxAndUserIdx(Long meetupIdx, Long userIdx);
 
     @RepositoryMethod("모임 참여자: 모임+사용자로 조회 (모임/사용자 페치)")
-    @Query("SELECT mp FROM MeetupParticipants mp " +
-            "JOIN FETCH mp.meetup m " +
-            "JOIN FETCH m.organizer " +
-            "JOIN FETCH mp.user " +
-            "WHERE m.idx = :meetupIdx AND mp.user.idx = :userIdx " +
-            "AND (m.isDeleted = false OR m.isDeleted IS NULL)")
+    @Query("SELECT mp FROM MeetupParticipants mp "
+            + "JOIN FETCH mp.meetup m "
+            + "JOIN FETCH m.organizer "
+            + "JOIN FETCH mp.user "
+            + "WHERE m.idx = :meetupIdx AND mp.user.idx = :userIdx "
+            + "AND (m.isDeleted = false OR m.isDeleted IS NULL)")
     Optional<MeetupParticipants> findByMeetupIdxAndUserIdxWithDetails(@Param("meetupIdx") Long meetupIdx,
             @Param("userIdx") Long userIdx);
 
     @RepositoryMethod("모임 참여자: 사용자별 예정 모임 목록")
-    @Query("SELECT mp FROM MeetupParticipants mp " +
-            "JOIN FETCH mp.meetup m " +
-            "JOIN FETCH m.organizer " +
-            "JOIN FETCH mp.user " +
-            "WHERE mp.user.idx = :userIdx AND m.date > CURRENT_TIMESTAMP " +
-            "ORDER BY m.date ASC")
+    @Query("SELECT mp FROM MeetupParticipants mp "
+            + "JOIN FETCH mp.meetup m "
+            + "JOIN FETCH m.organizer "
+            + "JOIN FETCH mp.user "
+            + "WHERE mp.user.idx = :userIdx AND m.date > CURRENT_TIMESTAMP "
+            + "ORDER BY m.date ASC")
     List<MeetupParticipants> findUpcomingMeetupsByUser(@Param("userIdx") Long userIdx);
 
     @RepositoryMethod("모임 참여자: 제재 후속 처리용 예정 모임 목록")
-    @Query("SELECT mp FROM MeetupParticipants mp " +
-            "JOIN FETCH mp.meetup m " +
-            "JOIN FETCH m.organizer " +
-            "JOIN FETCH mp.user " +
-            "WHERE mp.user.idx = :userIdx AND m.date > CURRENT_TIMESTAMP " +
-            "AND (m.status IS NULL OR m.status <> com.linkup.Petory.domain.meetup.entity.MeetupStatus.CANCELLED) " +
-            "AND (m.isDeleted = false OR m.isDeleted IS NULL) " +
-            "ORDER BY m.date ASC")
+    @Query("SELECT mp FROM MeetupParticipants mp "
+            + "JOIN FETCH mp.meetup m "
+            + "JOIN FETCH m.organizer "
+            + "JOIN FETCH mp.user "
+            + "WHERE mp.user.idx = :userIdx AND m.date > CURRENT_TIMESTAMP "
+            + "AND (m.status IS NULL OR m.status <> com.linkup.Petory.domain.meetup.entity.MeetupStatus.CANCELLED) "
+            + "AND (m.isDeleted = false OR m.isDeleted IS NULL) "
+            + "ORDER BY m.date ASC")
     List<MeetupParticipants> findActiveUpcomingMeetupsByUser(@Param("userIdx") Long userIdx);
 
     @RepositoryMethod("모임 참여자: 기간별 참여 수 통계")
