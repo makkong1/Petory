@@ -1,4 +1,4 @@
-package com.linkup.Petory.domain.payment.controller;
+package com.linkup.Petory.domain.admin.controller;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
