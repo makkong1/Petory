@@ -4,7 +4,6 @@ import java.util.List;
 import java.util.Optional;
 import java.time.LocalDateTime;
 
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -12,7 +11,6 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import com.linkup.Petory.domain.user.dto.AdminUserListDTO;
 import com.linkup.Petory.domain.user.entity.Role;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.global.annotation.RepositoryMethod;
@@ -132,37 +130,8 @@ public interface SpringDataJpaUsersRepository extends JpaRepository<Users, Long>
     @Query("SELECT DISTINCT u FROM Users u LEFT JOIN FETCH u.pets WHERE u.id = :userId")
     Optional<Users> findByIdStringWithPets(@Param("userId") String userId);
 
-    @RepositoryMethod("사용자: 관리자 필터 페이징 조회")
-    @Query("SELECT u FROM Users u WHERE "
-            + "(:role IS NULL OR CAST(u.role AS string) = :role) AND "
-            + "(:status IS NULL OR CAST(u.status AS string) = :status) AND "
-            + "(:keyword IS NULL OR u.username LIKE %:keyword% OR u.nickname LIKE %:keyword% OR u.email LIKE %:keyword%) "
-            + "ORDER BY u.createdAt DESC")
-    Page<Users> findAllForAdmin(
-            @Param("role") String role,
-            @Param("status") String status,
-            @Param("keyword") String keyword,
-            Pageable pageable);
-
-    /**
-     * [오버페칭 제거] 관리자 목록 전용 projection 조회. 기존 findAllForAdmin은 Users 27컬럼 전체 +
-     * socialUsers 배치 쿼리(총 2쿼리)를 로딩했으나, 화면/모달이 쓰는 12컬럼만 SELECT 해 단일 쿼리로 축소한다.
-     * WHERE/ORDER는 findAllForAdmin과 동일.
-     */
-    @RepositoryMethod("사용자: 관리자 목록 projection 조회 (경량)")
-    @Query("SELECT new com.linkup.Petory.domain.user.dto.AdminUserListDTO("
-            + "  u.idx, u.id, u.nickname, u.username, u.email, CAST(u.role AS string), "
-            + "  u.isDeleted, u.isDormant, u.createdAt, CAST(u.status AS string), u.warningCount, u.suspendedUntil) "
-            + "FROM Users u WHERE "
-            + "(:role IS NULL OR CAST(u.role AS string) = :role) AND "
-            + "(:status IS NULL OR CAST(u.status AS string) = :status) AND "
-            + "(:keyword IS NULL OR u.username LIKE %:keyword% OR u.nickname LIKE %:keyword% OR u.email LIKE %:keyword%) "
-            + "ORDER BY u.createdAt DESC")
-    Page<AdminUserListDTO> findAdminUserListItems(
-            @Param("role") String role,
-            @Param("status") String status,
-            @Param("keyword") String keyword,
-            Pageable pageable);
+    // 관리자 필터 페이징(findAllForAdmin·findAdminUserListItems)은 QueryDSL로 이관됨(JpaUsersAdapter).
+    // :param IS NULL OR 안티패턴 제거 + WHERE 절 공유 목적. 이력: docs/refactoring/querydsl/
 
     @RepositoryMethod("사용자: 역할+기간별 통계 (신규 서비스 제공자 집계용)")
     long countByRoleAndCreatedAtBetween(Role role, LocalDateTime start, LocalDateTime end);
