@@ -5,8 +5,11 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.context.annotation.Primary;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
+import com.linkup.Petory.domain.report.dto.ReportDTO;
 import com.linkup.Petory.domain.report.entity.Report;
 import com.linkup.Petory.domain.report.entity.ReportStatus;
 import com.linkup.Petory.domain.report.entity.ReportTargetType;
@@ -75,8 +78,8 @@ public class JpaReportAdapter implements ReportRepository {
     }
 
     @Override
-    public List<Report> findReportsWithFilters(ReportTargetType targetType, ReportStatus status) {
-        return jpaRepository.findReportsWithFilters(targetType, status);
+    public Page<ReportDTO> findReportListItems(ReportTargetType targetType, ReportStatus status, Pageable pageable) {
+        return jpaRepository.findReportListItems(targetType, status, pageable);
     }
 
     @Override
