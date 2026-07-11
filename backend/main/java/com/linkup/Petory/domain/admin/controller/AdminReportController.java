@@ -1,12 +1,13 @@
 package com.linkup.Petory.domain.admin.controller;
 
-import java.util.List;
-
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import com.linkup.Petory.domain.admin.service.AdminReportFacade;
+import com.linkup.Petory.domain.report.dto.AdminReportPageResponseDTO;
 import com.linkup.Petory.domain.report.dto.ReportDTO;
 import com.linkup.Petory.domain.report.dto.ReportDetailDTO;
 import com.linkup.Petory.domain.report.dto.ReportHandleRequest;
@@ -43,15 +44,18 @@ public class AdminReportController {
      * 게시글/댓글/실종 제보 등 신고 목록 조회 (관리자용)
      *
      * 예:
-     * - 전체: GET /api/admin/reports
+     * - 전체: GET /api/admin/reports?page=0&size=20
      * - 게시글 신고만: GET /api/admin/reports?targetType=BOARD
      * - 게시글 신고 중 미처리만: GET /api/admin/reports?targetType=BOARD&status=PENDING
      */
     @GetMapping
-    public ResponseEntity<List<ReportDTO>> getReports(
+    public ResponseEntity<AdminReportPageResponseDTO> getReports(
             @RequestParam(value = "targetType", required = false) ReportTargetType targetType,
-            @RequestParam(value = "status", required = false) ReportStatus status) {
-        return ResponseEntity.ok(adminReportFacade.getReports(targetType, status));
+            @RequestParam(value = "status", required = false) ReportStatus status,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "20") int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        return ResponseEntity.ok(adminReportFacade.getReports(targetType, status, pageable));
     }
 
     /**

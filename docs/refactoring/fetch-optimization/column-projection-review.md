@@ -80,8 +80,8 @@
 | **Meetup** | `GET /api/meetups` | 컬럼(organizer 28) + 연관(`participants` 전체) | organizer 2개 + currentParticipants | `MeetupLayer.js`가 참가자를 **별도 API**로 조회(embed 미사용, grep 확인) | 목록 DTO에서 `participants` 제거 | 5 |
 | **Board** ✅적용완료 | `GET /boards` (페이징·닉네임검색) | 컬럼(user 27) | user 3개 | CommunityBoard가 content 포함 사용. 리액션/첨부는 서비스가 배치 사후주입 | `BoardListItemDTO` 생성자 projection(페이징 all/category+닉네임검색). native FULLTEXT·동적 Specification·비페이징 경로는 엔티티 유지 | 6 |
 | ConversationParticipant | 채팅방 참여자 목록 | 컬럼(user 28) | username/isDeleted 2개 | ChatMessage와 동일 패턴, 빈도 낮음 | 목록 projection | 7 |
-| Report | 신고 목록 | 컬럼(JOIN FETCH 없이도 `@BatchSize`로 전체 로딩) | reporter/handledBy username 각 1개 | JOIN FETCH 유무와 무관하게 발생하는 패턴 사례 | 목록 projection | 8 |
-| LocationServiceReview | 리뷰 목록 | 컬럼(user 28, `service` 34) | username 1개(프론트 실사용) | `LocationLayer.js:171`가 `username` 사용(단 `nickname`은 DTO에 없어 항상 undefined) | 목록 projection | 9 |
+| **Report** ✅적용완료 | `GET /api/admin/reports` | 연관(`reporter`·`handledBy` `@BatchSize` 전체 로딩) + **unpaged** | reporter/handledBy username·idx | 관리자 전용·저빈도이나 **전건 반환(List)이라 신고 누적수에 비례**해 폭증 | **페이징 + JPQL 생성자 projection** (§2차 점검) | 8 |
+| **LocationServiceReview** ✅적용완료 | `GET /api/location-service-reviews/service/{id}` | 컬럼(user 28) + **unpaged** | username 1개(프론트 실사용) | `LocationLayer.js`가 `username` 사용. **전건 반환이라 인기 장소 리뷰수에 비례** | **페이징 + JPQL 생성자 projection** (§2차 점검) | 9 |
 
 **조사했지만 대상 아님**: `LocationService`(34필드 중 33개 실사용), `Notification`(9컬럼, `getIdx()`만 사용), `AdminAuditLog`/`AttachmentFile`/`SocialUser`/`PlaceInteractionLog`/`SignalInteractionLog`/`UserPetIntentSignal` — 컬럼 수가 작거나 큰 연관을 로딩하지 않음.
 
@@ -254,6 +254,30 @@ sender는 `username/isDeleted` 2필드, `replyToMessage`는 `idx`만 projection 
 | CareRequest(지도) | ✅ | native 인터페이스 projection `CareRequestListView`(14필드) | `CareRequestNearbyProjectionTest` 2건 |
 
 HTTP 엔드포인트 레벨(응답 바이트·시간)도 `git stash` 전/후 비교로 실측 완료(§6).
+
+---
+
+## 8. 2차 점검 (2026-07-11) — Report·Review 추가 적용 & 미적용 도메인 사유
+
+1차에서 남긴 후보(우선순위 7~9)를 다시 훑다가 **판정 오류를 하나 잡았다.** Report·LocationServiceReview를 "저빈도·소량"이라 스킵 후보로 뒀는데, "소량"은 **지금 더미 DB가 비어서** 그렇게 보였을 뿐이고 **두 목록 모두 `List` 반환 = unpaged**였다. 즉 데이터가 쌓이면 조회량이 행 수에 비례해 커지는 구조라, 여기선 "빈도"가 아니라 **페이징 부재**가 근본 문제였다. → **페이징을 먼저 넣고 projection을 함께 적용**했다.
+
+| 케이스 | 상태 | 기법 | 검증 |
+| --- | --- | --- | --- |
+| **Report(관리자)** | ✅ | 페이징 + JPQL 생성자 projection `findReportListItems`(reporter/handledBy idx·username만) + 응답 래퍼 `AdminReportPageResponseDTO`. 프론트는 이미 클라이언트 슬라이싱 중이던 `ReportManagementSection`을 서버 페이징으로 전환 | `ReportListProjectionTest` 2건 |
+| **LocationServiceReview(장소별)** | ✅ | 페이징 + JPQL 생성자 projection `findReviewListItems`(user idx·username만, serviceName은 `CAST(NULL AS string)`). 평균·총개수는 페이지 무관 전체 집계로 별도 제공. 프론트 `LocationLayer`는 '첫 페이지 + 더보기' 누적으로 전환 | `LocationReviewListProjectionTest` 2건 |
+
+- **정렬 변경(주의)**: Report는 기존에 전건 인메모리 집계로 "신고횟수 DESC" 정렬했으나(=바로 이 unpaged 낭비의 원인), 페이징 후 DB `createdAt DESC`(최신순)로 바꿨다. 인메모리 집계하던 `reportCount`는 프론트 소비처가 없어 제거(projection에서 `CAST(NULL AS integer)`).
+- **Review UX 변경**: 장소 패널이 전체 리뷰를 한 번에 그리던 것을 '더보기' 누적으로 바꾸고, 클라이언트가 배열로 계산하던 평균/개수를 **서버 집계값**으로 대체(페이지 누적과 무관하게 총계가 안 흔들림).
+
+### 나머지 도메인 — 적용 안 한 이유
+
+| 도메인 | 판정 | 사유 |
+| --- | --- | --- |
+| **ConversationParticipant** | 스킵(정당) | 저빈도 + **규모가 구조적으로 bounded**(1:1=2명, 그룹도 소수) → 데이터가 늘어도 한 방 참여자 수는 안 늘어남. Report·Review와 달리 "소량"이 데이터 아티팩트가 아님. projection 이득 < DTO/쿼리 중복 비용. |
+| **ChatMessage** | 보류 | 남은 것 중 **유일한 고빈도**(채팅 스크롤)이고 `LEFT JOIN FETCH replyToMessage`가 답장 `@Lob content`까지 통째 로딩하는 실질 낭비가 있어 값어치는 가장 큼. 그러나 컨버터가 답장 미리보기·읽음·첨부를 **서비스 레이어에서 사후 주입**하는 구조(Board enrichment와 유사)라 projection 도입 비용·회귀위험이 커서 보류. 착수 시 Board처럼 enrichment 공유 리팩터 선행 필요. |
+| **Meetup** | 보류(선택) | 목록(`findAllNotDeleted`)은 이미 `@EntityGraph(organizer)`로 **페이징**돼 폭주 위험 없음. 남은 건 컨버터가 `getParticipants()`를 호출해 발생하는 @BatchSize 연관 오버페칭뿐인데, 프론트가 참가자를 **별도 API**로 조회하므로 목록 컨버터에서 호출만 빼면 저비용 제거 가능(필수 아님, 회귀 확인 후). |
+
+> 이번 2차 점검의 교훈: **"저빈도라 스킵"의 근거를 빈도(아키텍처)와 규모(데이터 의존)로 분리**해야 한다. 규모 근거는 unpaged 여부·현재 데이터량에 오염되기 쉽다 — Report·Review가 그 사례였다.
 
 ---
 

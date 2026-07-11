@@ -18,9 +18,11 @@ export const locationServiceReviewApi = {
   deleteReview: (reviewIdx) =>
     isDemoMode() ? mockResolve({}) : api.delete(`/${reviewIdx}`),
 
-  // 특정 서비스의 리뷰 목록 조회
-  getReviewsByService: (serviceIdx) =>
-    isDemoMode() ? mockResolve({ reviews: [] }) : api.get(`/service/${serviceIdx}`),
+  // 특정 서비스의 리뷰 목록 조회 (서버 페이징: page/size)
+  getReviewsByService: (serviceIdx, page = 0, size = 20) =>
+    isDemoMode()
+      ? mockResolve({ reviews: [], count: 0, averageRating: null, hasNext: false })
+      : api.get(`/service/${serviceIdx}`, { params: { page, size } }),
 
   // 특정 사용자의 리뷰 목록 조회
   getReviewsByUser: (userIdx) =>

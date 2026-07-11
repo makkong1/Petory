@@ -4,8 +4,11 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.context.annotation.Primary;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
+import com.linkup.Petory.domain.location.dto.LocationServiceReviewDTO;
 import com.linkup.Petory.domain.location.entity.LocationServiceReview;
 
 import lombok.RequiredArgsConstructor;
@@ -32,8 +35,8 @@ public class JpaLocationServiceReviewAdapter implements LocationServiceReviewRep
     }
 
     @Override
-    public List<LocationServiceReview> findByServiceIdxOrderByCreatedAtDesc(Long serviceIdx) {
-        return jpaRepository.findByServiceIdxOrderByCreatedAtDesc(serviceIdx);
+    public Page<LocationServiceReviewDTO> findReviewListItems(Long serviceIdx, Pageable pageable) {
+        return jpaRepository.findReviewListItems(serviceIdx, pageable);
     }
 
     @Override

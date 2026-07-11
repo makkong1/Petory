@@ -25,6 +25,7 @@ const ReportManagementSection = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [reports, setReports] = useState([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [selectedReportId, setSelectedReportId] = useState(null);
   const [page, setPage] = useState(0);
 
@@ -42,15 +43,19 @@ const ReportManagementSection = () => {
     { key: 'REJECTED', label: '반려(REJECTED)' },
   ];
 
-  const fetchReports = async () => {
+  // 서버 페이징: 현재 페이지만 조회한다(전건 조회 후 클라이언트 슬라이싱 X).
+  const fetchReports = async (pageArg) => {
     try {
       setLoading(true);
       setError(null);
       const response = await reportApi.getReports({
         targetType: activeTargetType,
         status: statusFilter,
+        page: pageArg,
+        size: PAGE_SIZE,
       });
-      setReports(response.data || []);
+      setReports(response.data?.reports || []);
+      setTotalCount(response.data?.totalCount || 0);
     } catch (err) {
       console.error('신고 목록 조회 실패:', err);
       setError('신고 목록을 불러오지 못했습니다.');
@@ -59,10 +64,15 @@ const ReportManagementSection = () => {
     }
   };
 
-  // 대상 타입 + 상태 조합으로 신고 목록 조회
+  const handlePageChange = (nextPage) => {
+    setPage(nextPage);
+    fetchReports(nextPage);
+  };
+
+  // 대상 타입 + 상태 변경 시 첫 페이지부터 다시 조회
   useEffect(() => {
     setPage(0);
-    fetchReports();
+    fetchReports(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTargetType, statusFilter]);
 
@@ -73,8 +83,6 @@ const ReportManagementSection = () => {
     const pad = (n) => String(n).padStart(2, '0');
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
   };
-
-  const pagedReports = reports.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
 
   return (
     <Wrapper>
@@ -130,7 +138,7 @@ const ReportManagementSection = () => {
                 </tr>
               </thead>
               <tbody>
-                {pagedReports.map(report => {
+                {reports.map(report => {
                   const meta = STATUS_META[report.status] || { tone: 'neutral', label: report.status };
                   const handled = report.status === 'RESOLVED' || report.status === 'REJECTED';
                   return (
@@ -167,9 +175,9 @@ const ReportManagementSection = () => {
           <PaginationWrap>
             <PageNavigation
               currentPage={page}
-              totalCount={reports.length}
+              totalCount={totalCount}
               pageSize={PAGE_SIZE}
-              onPageChange={setPage}
+              onPageChange={handlePageChange}
               loading={loading}
               showEdges
             />
@@ -181,7 +189,7 @@ const ReportManagementSection = () => {
         <ReportDetailModal
           reportId={selectedReportId}
           onClose={() => setSelectedReportId(null)}
-          onHandled={fetchReports}
+          onHandled={() => fetchReports(page)}
         />
       )}
     </Wrapper>

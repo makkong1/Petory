@@ -13,8 +13,8 @@ export const reportApi = {
    * - targetType: 'BOARD' | 'COMMENT' | 'MISSING_PET' | 'PET_CARE_PROVIDER'
    * - status: 'PENDING' | 'RESOLVED' | 'REJECTED'
    */
-  getReports: ({ targetType, status } = {}) => {
-    const params = {};
+  getReports: ({ targetType, status, page = 0, size = 20 } = {}) => {
+    const params = { page, size };
     if (targetType) params.targetType = targetType;
     if (status && status !== 'ALL') params.status = status;
     return adminApi.get('', { params });

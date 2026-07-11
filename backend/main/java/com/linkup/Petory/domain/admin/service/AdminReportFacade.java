@@ -1,10 +1,10 @@
 package com.linkup.Petory.domain.admin.service;
 
-import java.util.List;
-
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.linkup.Petory.domain.report.dto.AdminReportPageResponseDTO;
 import com.linkup.Petory.domain.report.dto.ReportDTO;
 import com.linkup.Petory.domain.report.dto.ReportDetailDTO;
 import com.linkup.Petory.domain.report.dto.ReportHandleRequest;
@@ -29,8 +29,8 @@ public class AdminReportFacade {
         return reportService.getReportDetail(reportId);
     }
 
-    public List<ReportDTO> getReports(ReportTargetType targetType, ReportStatus status) {
-        return reportService.getReports(targetType, status);
+    public AdminReportPageResponseDTO getReports(ReportTargetType targetType, ReportStatus status, Pageable pageable) {
+        return reportService.getReports(targetType, status, pageable);
     }
 
     @Transactional

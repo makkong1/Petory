@@ -4,6 +4,10 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
+import com.linkup.Petory.domain.report.dto.ReportDTO;
 import com.linkup.Petory.domain.report.entity.Report;
 import com.linkup.Petory.domain.report.entity.ReportStatus;
 import com.linkup.Petory.domain.report.entity.ReportTargetType;
@@ -48,9 +52,9 @@ public interface ReportRepository {
     List<Report> findByTargetTypeAndStatusOrderByCreatedAtDesc(ReportTargetType targetType, ReportStatus status);
 
     /**
-     * 필터 조건에 맞는 신고 목록 조회
+     * 필터 조건에 맞는 신고 목록 projection 페이징 조회 (관리자용)
      */
-    List<Report> findReportsWithFilters(ReportTargetType targetType, ReportStatus status);
+    Page<ReportDTO> findReportListItems(ReportTargetType targetType, ReportStatus status, Pageable pageable);
 
     /**
      * 통계용: 특정 기간 동안 접수된 신고 수

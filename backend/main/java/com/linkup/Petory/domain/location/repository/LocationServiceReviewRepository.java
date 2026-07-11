@@ -3,6 +3,10 @@ package com.linkup.Petory.domain.location.repository;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
+import com.linkup.Petory.domain.location.dto.LocationServiceReviewDTO;
 import com.linkup.Petory.domain.location.entity.LocationServiceReview;
 
 /**
@@ -18,9 +22,9 @@ public interface LocationServiceReviewRepository {
     Optional<LocationServiceReview> findByIdWithUserAndService(Long idx);
 
     /**
-     * 특정 서비스의 모든 리뷰 조회
+     * 특정 서비스의 리뷰 목록 projection 페이징 조회
      */
-    List<LocationServiceReview> findByServiceIdxOrderByCreatedAtDesc(Long serviceIdx);
+    Page<LocationServiceReviewDTO> findReviewListItems(Long serviceIdx, Pageable pageable);
 
     /**
      * 특정 사용자의 리뷰 조회
