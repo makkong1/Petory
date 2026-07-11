@@ -4,6 +4,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -14,6 +17,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.linkup.Petory.domain.location.dto.LocationServiceReviewDTO;
@@ -105,13 +109,21 @@ public class LocationServiceReviewController {
     }
 
     @GetMapping("/service/{serviceIdx}")
-    public ResponseEntity<Map<String, Object>> getReviewsByService(@PathVariable("serviceIdx") Long serviceIdx) {
+    public ResponseEntity<Map<String, Object>> getReviewsByService(
+            @PathVariable("serviceIdx") Long serviceIdx,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "20") int size) {
         try {
-            List<LocationServiceReviewDTO> reviews = reviewService.getReviewsByService(serviceIdx);
+            Pageable pageable = PageRequest.of(page, size);
+            Page<LocationServiceReviewDTO> reviewPage = reviewService.getReviewsByService(serviceIdx, pageable);
 
+            // count/averageRating은 페이지가 아닌 전체 집계 → '더보기' 누적 UI에서도 총계가 흔들리지 않는다.
             Map<String, Object> response = new HashMap<>();
-            response.put("reviews", reviews);
-            response.put("count", reviews.size());
+            response.put("reviews", reviewPage.getContent());
+            response.put("count", reviewPage.getTotalElements());
+            response.put("averageRating", reviewService.getAverageRatingByService(serviceIdx));
+            response.put("currentPage", reviewPage.getNumber());
+            response.put("hasNext", reviewPage.hasNext());
 
             return ResponseEntity.ok(response);
         } catch (Exception e) {

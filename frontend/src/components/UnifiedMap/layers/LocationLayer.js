@@ -8,37 +8,69 @@ import {
   InfoRow, InfoLabel, InfoValue, InfoGrid,
 } from '../shared/BaseInfoPanel';
 
+const REVIEW_PAGE_SIZE = 20;
+
 const LocationLayer = ({ selectedItem, onClose, docked = false }) => {
   const { user } = useAuth();
   const [reviews, setReviews] = useState([]);
+  const [reviewTotal, setReviewTotal] = useState(0);
+  const [reviewAvg, setReviewAvg] = useState(null);
+  const [reviewPage, setReviewPage] = useState(0);
+  const [reviewHasNext, setReviewHasNext] = useState(false);
   const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewLoadingMore, setReviewLoadingMore] = useState(false);
   const [reviewText, setReviewText] = useState('');
   const [reviewRating, setReviewRating] = useState(5);
   const [editingReview, setEditingReview] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
+  // 서버 페이징 리뷰 로더. append=true면 '더보기'로 다음 페이지를 누적, 아니면 첫 페이지로 교체.
+  // 평균/총개수는 서버 전체 집계(count/averageRating)를 그대로 쓴다(페이지 누적과 무관하게 정확).
+  const loadReviews = (serviceIdx, pageArg, append) => {
+    if (!serviceIdx) return;
+    if (append) setReviewLoadingMore(true); else setReviewLoading(true);
+    locationServiceReviewApi.getReviewsByService(serviceIdx, pageArg, REVIEW_PAGE_SIZE)
+      .then(res => {
+        const data = res.data || {};
+        const list = data.reviews || [];
+        setReviews(prev => (append ? [...prev, ...list] : list));
+        setReviewTotal(data.count ?? list.length);
+        setReviewAvg(data.averageRating ?? null);
+        setReviewHasNext(!!data.hasNext);
+        setReviewPage(pageArg);
+      })
+      .catch(() => {
+        if (!append) {
+          setReviews([]);
+          setReviewTotal(0);
+          setReviewAvg(null);
+          setReviewHasNext(false);
+        }
+      })
+      .finally(() => {
+        if (append) setReviewLoadingMore(false); else setReviewLoading(false);
+      });
+  };
+
   useEffect(() => {
     if (!selectedItem) return;
     setReviews([]);
+    setReviewTotal(0);
+    setReviewAvg(null);
+    setReviewHasNext(false);
     setEditingReview(null);
     setReviewText('');
     setReviewRating(5);
     const idx = selectedItem.raw?.idx;
     if (!idx) return;
-
-    setReviewLoading(true);
-    locationServiceReviewApi.getReviewsByService(idx)
-      .then(res => setReviews(res.data?.reviews || res.data || []))
-      .catch(() => setReviews([]))
-      .finally(() => setReviewLoading(false));
+    loadReviews(idx, 0, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedItem]);
 
   if (!selectedItem) return null;
   const r = selectedItem.raw;
 
-  const avgRating = reviews.length
-    ? (reviews.reduce((s, rv) => s + (rv.rating || 0), 0) / reviews.length).toFixed(1)
-    : null;
+  const avgRating = reviewAvg != null ? Number(reviewAvg).toFixed(1) : null;
 
   const handleSubmitReview = async (e) => {
     e.preventDefault();
@@ -57,8 +89,7 @@ const LocationLayer = ({ selectedItem, onClose, docked = false }) => {
           comment: reviewText,
         });
       }
-      const res = await locationServiceReviewApi.getReviewsByService(r.idx);
-      setReviews(res.data?.reviews || res.data || []);
+      loadReviews(r.idx, 0, false);
       setReviewText('');
       setReviewRating(5);
       setEditingReview(null);
@@ -73,7 +104,7 @@ const LocationLayer = ({ selectedItem, onClose, docked = false }) => {
     if (!window.confirm('리뷰를 삭제할까요?')) return;
     try {
       await locationServiceReviewApi.deleteReview(reviewIdx);
-      setReviews(prev => prev.filter(rv => rv.idx !== reviewIdx));
+      loadReviews(r.idx, 0, false);
     } catch (err) {
       console.error('리뷰 삭제 실패:', err);
     }
@@ -103,7 +134,7 @@ const LocationLayer = ({ selectedItem, onClose, docked = false }) => {
       {avgRating && (
         <RatingRow>
           <StarRating value={Number(avgRating)} />
-          <RatingText>{avgRating} ({reviews.length}개 리뷰)</RatingText>
+          <RatingText>{avgRating} ({reviewTotal}개 리뷰)</RatingText>
         </RatingRow>
       )}
 
@@ -157,7 +188,7 @@ const LocationLayer = ({ selectedItem, onClose, docked = false }) => {
 
         {/* 리뷰 섹션 */}
         <ReviewSection>
-        <ReviewTitle>리뷰 ({reviews.length})</ReviewTitle>
+        <ReviewTitle>리뷰 ({reviewTotal})</ReviewTitle>
 
         {reviewLoading ? (
           <ReviewEmpty>불러오는 중...</ReviewEmpty>
@@ -182,6 +213,16 @@ const LocationLayer = ({ selectedItem, onClose, docked = false }) => {
               </ReviewItem>
             ))}
           </ReviewList>
+        )}
+
+        {reviewHasNext && (
+          <LoadMoreButton
+            type="button"
+            onClick={() => loadReviews(r.idx, reviewPage + 1, true)}
+            disabled={reviewLoadingMore}
+          >
+            {reviewLoadingMore ? '불러오는 중...' : '더보기'}
+          </LoadMoreButton>
         )}
 
         {user && (
@@ -429,6 +470,20 @@ const ReviewEmpty = styled.div`
   font-size: 12px;
   color: ${props => props.theme.colors.textSecondary};
   padding: 8px 0;
+`;
+
+const LoadMoreButton = styled.button`
+  width: 100%;
+  margin-top: 8px;
+  padding: 8px 0;
+  background: none;
+  border: 1px solid ${props => props.theme.colors.border};
+  border-radius: 8px;
+  color: ${props => props.theme.colors.textSecondary};
+  font-size: 12px;
+  cursor: pointer;
+  &:hover:not(:disabled) { color: ${props => props.theme.colors.primary}; border-color: ${props => props.theme.colors.primary}; }
+  &:disabled { opacity: 0.6; cursor: default; }
 `;
 
 const ReviewForm = styled.form`
