@@ -8,11 +8,16 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.support.PageableExecutionUtils;
 import org.springframework.stereotype.Repository;
 
 import com.linkup.Petory.domain.user.dto.AdminUserListDTO;
+import com.linkup.Petory.domain.user.entity.QUsers;
 import com.linkup.Petory.domain.user.entity.Role;
 import com.linkup.Petory.domain.user.entity.Users;
+import com.querydsl.core.BooleanBuilder;
+import com.querydsl.core.types.Projections;
+import com.querydsl.jpa.impl.JPAQueryFactory;
 
 import lombok.RequiredArgsConstructor;
 
@@ -33,6 +38,7 @@ import lombok.RequiredArgsConstructor;
 public class JpaUsersAdapter implements UsersRepository {
 
     private final SpringDataJpaUsersRepository jpaRepository;
+    private final JPAQueryFactory queryFactory;
 
     @SuppressWarnings("null")
     @Override
@@ -146,12 +152,61 @@ public class JpaUsersAdapter implements UsersRepository {
 
     @Override
     public Page<Users> findAllForAdmin(String role, String status, String keyword, Pageable pageable) {
-        return jpaRepository.findAllForAdmin(role, status, keyword, pageable);
+        QUsers u = QUsers.users;
+        BooleanBuilder where = adminUserFilter(u, role, status, keyword);
+        var content = queryFactory
+                .selectFrom(u)
+                .where(where)
+                .orderBy(u.createdAt.desc());
+        if (pageable.isPaged()) {
+            content.offset(pageable.getOffset()).limit(pageable.getPageSize());
+        }
+        List<Users> rows = content.fetch();
+        return PageableExecutionUtils.getPage(rows, pageable, () -> countAdminUsers(u, where));
     }
 
     @Override
     public Page<AdminUserListDTO> findAdminUserListItems(String role, String status, String keyword, Pageable pageable) {
-        return jpaRepository.findAdminUserListItems(role, status, keyword, pageable);
+        QUsers u = QUsers.users;
+        BooleanBuilder where = adminUserFilter(u, role, status, keyword);
+        var content = queryFactory
+                .select(Projections.constructor(AdminUserListDTO.class,
+                        u.idx, u.id, u.nickname, u.username, u.email, u.role.stringValue(),
+                        u.isDeleted, u.isDormant, u.createdAt, u.status.stringValue(),
+                        u.warningCount, u.suspendedUntil))
+                .from(u)
+                .where(where)
+                .orderBy(u.createdAt.desc());
+        if (pageable.isPaged()) {
+            content.offset(pageable.getOffset()).limit(pageable.getPageSize());
+        }
+        List<AdminUserListDTO> rows = content.fetch();
+        return PageableExecutionUtils.getPage(rows, pageable, () -> countAdminUsers(u, where));
+    }
+
+    /**
+     * 관리자 목록 조회 공통 필터. 파라미터가 null이면 해당 조건을 WHERE에 넣지 않는다(기존 JPQL의 :param IS
+     * NULL OR 안티패턴 제거). findAllForAdmin·findAdminUserListItems가 이 조건을 공유한다.
+     */
+    private BooleanBuilder adminUserFilter(QUsers u, String role, String status, String keyword) {
+        BooleanBuilder where = new BooleanBuilder();
+        if (role != null) {
+            where.and(u.role.stringValue().eq(role));
+        }
+        if (status != null) {
+            where.and(u.status.stringValue().eq(status));
+        }
+        if (keyword != null) {
+            where.and(u.username.contains(keyword)
+                    .or(u.nickname.contains(keyword))
+                    .or(u.email.contains(keyword)));
+        }
+        return where;
+    }
+
+    private long countAdminUsers(QUsers u, BooleanBuilder where) {
+        Long count = queryFactory.select(u.count()).from(u).where(where).fetchOne();
+        return count == null ? 0L : count;
     }
 
     @Override
