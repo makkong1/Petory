@@ -1,13 +1,32 @@
 package com.linkup.Petory.domain.board.entity;
 
-import com.linkup.Petory.domain.common.ContentStatus;
-import com.linkup.Petory.domain.user.entity.Users;
-import jakarta.persistence.*;
-import lombok.*;
 import java.time.LocalDateTime;
 import java.util.List;
 
 import com.linkup.Petory.domain.common.BaseTimeEntity;
+import com.linkup.Petory.domain.common.ContentStatus;
+import com.linkup.Petory.domain.user.entity.Users;
+
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.Lob;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Entity
 @Table(name = "board")
@@ -46,11 +65,12 @@ public class Board extends BaseTimeEntity {
     @Column(name = "like_count")
     private Integer likeCount = 0;
 
-    /** [리팩토링] buildBoardSummary count 쿼리 제거 - dislikeCount 엔티티 필드로 실시간 업데이트 */
+    /**
+     * [리팩토링] buildBoardSummary count 쿼리 제거 - dislikeCount 엔티티 필드로 실시간 업데이트
+     */
     @Builder.Default
     @Column(name = "dislike_count")
     private Integer dislikeCount = 0;
-
 
     @Builder.Default
     @Column(name = "comment_count")

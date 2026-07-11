@@ -111,8 +111,8 @@ public class AuthService {
         ensureRefreshAllowed(user);
 
         // 만료 시간 확인
-        if (user.getRefreshExpiration() == null ||
-                user.getRefreshExpiration().isBefore(LocalDateTime.now())) {
+        if (user.getRefreshExpiration() == null
+                || user.getRefreshExpiration().isBefore(LocalDateTime.now())) {
             log.warn("❌ Refresh Token 만료됨: userId={}, 만료시간={}",
                     user.getId(), user.getRefreshExpiration());
             // 만료된 Refresh Token 삭제
@@ -192,8 +192,8 @@ public class AuthService {
             }
 
             // 만료 시간 확인
-            if (user.getRefreshExpiration() == null ||
-                    user.getRefreshExpiration().isBefore(LocalDateTime.now())) {
+            if (user.getRefreshExpiration() == null
+                    || user.getRefreshExpiration().isBefore(LocalDateTime.now())) {
                 return false;
             }
 

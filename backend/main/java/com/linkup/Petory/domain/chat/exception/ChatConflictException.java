@@ -5,8 +5,7 @@ import org.springframework.http.HttpStatus;
 import com.linkup.Petory.global.exception.ApiException;
 
 /**
- * 채팅 도메인 충돌(중복, 상태 불일치) 시 발생하는 예외.
- * HTTP 409 Conflict
+ * 채팅 도메인 충돌(중복, 상태 불일치) 시 발생하는 예외. HTTP 409 Conflict
  */
 public class ChatConflictException extends ApiException {
 

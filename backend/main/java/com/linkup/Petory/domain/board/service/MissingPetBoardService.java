@@ -14,36 +14,32 @@ import org.springframework.data.domain.Sort.Direction;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-
-import com.linkup.Petory.global.security.CustomUserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import com.linkup.Petory.domain.board.converter.MissingPetConverter;
-import com.linkup.Petory.domain.board.exception.MissingPetBoardNotFoundException;
-import com.linkup.Petory.domain.board.exception.MissingPetForbiddenException;
-import com.linkup.Petory.global.security.RoleConstants;
 import com.linkup.Petory.domain.board.dto.MissingPetBoardDTO;
 import com.linkup.Petory.domain.board.dto.MissingPetBoardPageResponseDTO;
 import com.linkup.Petory.domain.board.dto.MissingPetCommentDTO;
 import com.linkup.Petory.domain.board.dto.MissingPetCommentPageResponseDTO;
 import com.linkup.Petory.domain.board.entity.MissingPetBoard;
 import com.linkup.Petory.domain.board.entity.MissingPetStatus;
-import com.linkup.Petory.domain.user.entity.EmailVerificationPurpose;
-import com.linkup.Petory.domain.user.entity.Users;
-import com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException;
-import com.linkup.Petory.domain.user.exception.UserNotFoundException;
-
-import jakarta.persistence.criteria.Join;
-import jakarta.persistence.criteria.JoinType;
-
+import com.linkup.Petory.domain.board.exception.MissingPetBoardNotFoundException;
+import com.linkup.Petory.domain.board.exception.MissingPetForbiddenException;
 import com.linkup.Petory.domain.board.repository.MissingPetBoardRepository;
 import com.linkup.Petory.domain.file.dto.FileDTO;
 import com.linkup.Petory.domain.file.entity.FileTargetType;
 import com.linkup.Petory.domain.file.service.AttachmentFileService;
+import com.linkup.Petory.domain.user.entity.EmailVerificationPurpose;
+import com.linkup.Petory.domain.user.entity.Users;
+import com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException;
+import com.linkup.Petory.domain.user.exception.UserNotFoundException;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
+import com.linkup.Petory.global.security.CustomUserDetails;
 
+import jakarta.persistence.criteria.Join;
+import jakarta.persistence.criteria.JoinType;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -62,7 +58,9 @@ public class MissingPetBoardService {
 
     private boolean isAdmin() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!(auth != null && auth.getPrincipal() instanceof CustomUserDetails ud)) return false;
+        if (!(auth != null && auth.getPrincipal() instanceof CustomUserDetails ud)) {
+            return false;
+        }
         return ud.isAdmin();
     }
 
@@ -77,14 +75,10 @@ public class MissingPetBoardService {
     }
 
     /**
-     * 실종 제보 목록 조회 (페이징 지원)
-     * 엔드포인트: GET /api/missing-pets?page={page}&size={size}&status={status}
-     * - 상태별 필터링 지원 (status 파라미터)
-     * - 페이징 지원 (page, size 파라미터)
-     * - 최신순 정렬
-     * - 게시글 파일 배치 조회 (N+1 문제 해결)
-     * - 댓글 수 배치 조회 (N+1 문제 해결)
-     * - 댓글은 포함하지 않음 (조인 폭발 방지)
+     * 실종 제보 목록 조회 (페이징 지원) 엔드포인트: GET
+     * /api/missing-pets?page={page}&size={size}&status={status} - 상태별 필터링 지원
+     * (status 파라미터) - 페이징 지원 (page, size 파라미터) - 최신순 정렬 - 게시글 파일 배치 조회 (N+1 문제
+     * 해결) - 댓글 수 배치 조회 (N+1 문제 해결) - 댓글은 포함하지 않음 (조인 폭발 방지)
      */
     public MissingPetBoardPageResponseDTO getBoardsWithPaging(MissingPetStatus status, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
@@ -146,14 +140,11 @@ public class MissingPetBoardService {
     }
 
     /**
-     * 실종 제보 상세 조회 (댓글 페이징 지원)
-     * 엔드포인트: GET
+     * 실종 제보 상세 조회 (댓글 페이징 지원) 엔드포인트: GET
      * /api/missing-pets/{id}?commentPage={commentPage}&commentSize={commentSize}
-     * - 게시글, 작성자 정보 조회
-     * - 게시글 파일 조회
-     * - 댓글 페이징 처리 (commentPage, commentSize 파라미터)
-     * - commentPage, commentSize가 모두 제공되면 댓글 페이징 조회
-     * - 제공되지 않으면 댓글 제외 (빈 리스트, 댓글 수만 포함)
+     * - 게시글, 작성자 정보 조회 - 게시글 파일 조회 - 댓글 페이징 처리 (commentPage, commentSize 파라미터)
+     * - commentPage, commentSize가 모두 제공되면 댓글 페이징 조회 - 제공되지 않으면 댓글 제외 (빈 리스트, 댓글
+     * 수만 포함)
      */
     public MissingPetBoardDTO getBoard(Long id, Integer commentPage, Integer commentSize) {
         // 게시글 + 작성자만 조회 (댓글 제외)
@@ -193,10 +184,7 @@ public class MissingPetBoardService {
     }
 
     /**
-     * 실종 제보 작성
-     * 엔드포인트: POST /api/missing-pets
-     * - 이메일 인증 필수
-     * - 게시글 이미지 업로드 지원
+     * 실종 제보 작성 엔드포인트: POST /api/missing-pets - 이메일 인증 필수 - 게시글 이미지 업로드 지원
      */
     @Transactional
     public MissingPetBoardDTO createBoard(MissingPetBoardDTO dto, String currentUserLoginId) {
@@ -236,10 +224,7 @@ public class MissingPetBoardService {
     }
 
     /**
-     * 실종 제보 수정
-     * 엔드포인트: PUT /api/missing-pets/{id}
-     * - 이메일 인증 필수
-     * - 게시글 이미지 수정 지원
+     * 실종 제보 수정 엔드포인트: PUT /api/missing-pets/{id} - 이메일 인증 필수 - 게시글 이미지 수정 지원
      */
     @Transactional
     public MissingPetBoardDTO updateBoard(Long id, MissingPetBoardDTO dto) {
@@ -306,8 +291,8 @@ public class MissingPetBoardService {
     }
 
     /**
-     * [리팩토링] 게시글 작성자 ID만 조회 (경량) - startMissingPetChat 등
-     * getBoard 전체 조회 대신 프로젝션 쿼리 1회
+     * [리팩토링] 게시글 작성자 ID만 조회 (경량) - startMissingPetChat 등 getBoard 전체 조회 대신 프로젝션
+     * 쿼리 1회
      */
     public Long getUserIdByBoardIdx(Long boardIdx) {
         return missingPetBoardRepository.findUserIdByIdx(boardIdx)
@@ -315,9 +300,8 @@ public class MissingPetBoardService {
     }
 
     /**
-     * 실종 제보 상태 변경
-     * 엔드포인트: PATCH /api/missing-pets/{id}/status
-     * - 상태: MISSING(실종), FOUND(발견), RESOLVED(종료)
+     * 실종 제보 상태 변경 엔드포인트: PATCH /api/missing-pets/{id}/status - 상태: MISSING(실종),
+     * FOUND(발견), RESOLVED(종료)
      */
     @Transactional
     public MissingPetBoardDTO updateStatus(Long id, MissingPetStatus status) {
@@ -329,10 +313,8 @@ public class MissingPetBoardService {
     }
 
     /**
-     * 실종 제보 삭제 (소프트 삭제)
-     * 엔드포인트: DELETE /api/missing-pets/{id}
-     * - 이메일 인증 필수
-     * - 게시글과 관련 댓글 모두 소프트 삭제
+     * 실종 제보 삭제 (소프트 삭제) 엔드포인트: DELETE /api/missing-pets/{id} - 이메일 인증 필수 - 게시글과
+     * 관련 댓글 모두 소프트 삭제
      */
     @Transactional
     public void deleteBoard(Long id) {
@@ -359,9 +341,8 @@ public class MissingPetBoardService {
     }
 
     /**
-     * [리팩토링] 실종 제보 복구 (관리자용)
-     * 엔드포인트: POST /api/admin/missing-pets/{id}/restore
-     * - isDeleted = false, deletedAt = null 설정
+     * [리팩토링] 실종 제보 복구 (관리자용) 엔드포인트: POST /api/admin/missing-pets/{id}/restore -
+     * isDeleted = false, deletedAt = null 설정
      */
     @Transactional
     public MissingPetBoardDTO restoreBoard(Long id) {
@@ -374,10 +355,8 @@ public class MissingPetBoardService {
     }
 
     /**
-     * [리팩토링] 관리자용 실종 제보 조회 (페이징 + DB 레벨 필터링)
-     * - 메모리 필터링 제거 → Specification + DB 페이징
-     * - status, deleted, q 필터 지원
-     * - 삭제된 게시글/작성자 비활성 사용자 게시글도 조회 가능
+     * [리팩토링] 관리자용 실종 제보 조회 (페이징 + DB 레벨 필터링) - 메모리 필터링 제거 → Specification + DB
+     * 페이징 - status, deleted, q 필터 지원 - 삭제된 게시글/작성자 비활성 사용자 게시글도 조회 가능
      */
     public MissingPetBoardPageResponseDTO getAdminBoardsWithPaging(
             MissingPetStatus status, Boolean deleted, String q, int page, int size) {
@@ -467,15 +446,12 @@ public class MissingPetBoardService {
     }
 
     /**
-     * 게시글 DTO 매핑 (파일 정보 포함)
-     * 단일 게시글 조회 시 사용
+     * 게시글 DTO 매핑 (파일 정보 포함) 단일 게시글 조회 시 사용
      */
     /**
-     * 홈 화면 실종신고 추천.
-     * score = 0.6 * recencyScore + 0.4 * distScore
-     * recencyScore = max(0, 1 - daysSinceLost / 14)
-     * distScore    = max(0, 1 - distKm / 20)
-     * 좌표 있으면 20km 반경 후보 우선, 부족하면 lostDate DESC로 보충
+     * 홈 화면 실종신고 추천. score = 0.6 * recencyScore + 0.4 * distScore recencyScore =
+     * max(0, 1 - daysSinceLost / 14) distScore = max(0, 1 - distKm / 20) 좌표 있으면
+     * 20km 반경 후보 우선, 부족하면 lostDate DESC로 보충
      */
     public List<MissingPetBoardDTO> getHomeMissing(Double lat, Double lng, int size) {
         int limit = Math.max(size, 1);
@@ -551,15 +527,16 @@ public class MissingPetBoardService {
         double latDelta = radiusKm / 111.0;
         double cosLat = Math.cos(Math.toRadians(lat));
         double lngDelta = Math.abs(cosLat) < 0.000001 ? 180.0 : radiusKm / (111.0 * cosLat);
-        return new double[] {
-                lat - latDelta,
-                lat + latDelta,
-                lng - lngDelta,
-                lng + lngDelta
+        return new double[]{
+            lat - latDelta,
+            lat + latDelta,
+            lng - lngDelta,
+            lng + lngDelta
         };
     }
 
     private record ScoredMissingPet(MissingPetBoard board, double distanceKm, double score) {
+
     }
 
     private double haversineKm(double lat1, double lng1, double lat2, double lng2) {

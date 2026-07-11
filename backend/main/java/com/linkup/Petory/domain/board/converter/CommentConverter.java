@@ -5,7 +5,9 @@ import org.springframework.stereotype.Component;
 import com.linkup.Petory.domain.board.dto.CommentDTO;
 import com.linkup.Petory.domain.board.entity.Comment;
 
-/** Comment 엔티티 → CommentDTO 변환기. */
+/**
+ * Comment 엔티티 → CommentDTO 변환기.
+ */
 @Component
 public class CommentConverter {
 

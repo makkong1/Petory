@@ -5,8 +5,7 @@ import org.springframework.http.HttpStatus;
 import com.linkup.Petory.global.exception.ApiException;
 
 /**
- * Refresh Token 관련 오류 시 발생하는 예외.
- * HTTP 401 Unauthorized
+ * Refresh Token 관련 오류 시 발생하는 예외. HTTP 401 Unauthorized
  */
 public class InvalidRefreshTokenException extends ApiException {
 

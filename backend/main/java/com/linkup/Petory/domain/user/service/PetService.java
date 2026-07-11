@@ -58,13 +58,13 @@ public class PetService {
     public PetDTO getPet(Long petIdx, String ownerUserId) {
         Pet pet = petRepository.findById(petIdx)
                 .orElseThrow(PetNotFoundException::new);
-        
+
         if (pet.getIsDeleted()) {
             throw new PetNotFoundException("삭제된 반려동물입니다.");
         }
 
         assertPetOwnedBy(pet, ownerUserId);
-        
+
         return petConverter.toDTO(pet);
     }
 
@@ -88,17 +88,17 @@ public class PetService {
         pet.setUser(user);
 
         Pet saved = petRepository.save(pet);
-        
+
         // 펫 이미지 파일 동기화
         if (dto.getProfileImageUrl() != null && !dto.getProfileImageUrl().trim().isEmpty()) {
             attachmentFileService.syncSingleAttachment(
-                FileTargetType.PET, 
-                saved.getIdx(), 
-                dto.getProfileImageUrl(), 
-                null
+                    FileTargetType.PET,
+                    saved.getIdx(),
+                    dto.getProfileImageUrl(),
+                    null
             );
         }
-        
+
         return petConverter.toDTO(saved);
     }
 
@@ -122,7 +122,7 @@ public class PetService {
         if (dto.getPetType() != null) {
             PetType newPetType = PetType.valueOf(dto.getPetType());
             pet.setPetType(newPetType);
-            
+
             // ETC 타입으로 변경하거나, 이미 ETC인데 breed가 비어있으면 검증
             if (newPetType == PetType.ETC) {
                 String breed = dto.getBreed() != null ? dto.getBreed() : pet.getBreed();
@@ -134,7 +134,7 @@ public class PetService {
         if (dto.getBreed() != null) {
             pet.setBreed(dto.getBreed());
         }
-        
+
         // ETC 타입인데 breed가 비어있는 경우 재검증
         if (pet.getPetType() == PetType.ETC && (pet.getBreed() == null || pet.getBreed().trim().isEmpty())) {
             throw UserValidationException.petBreedRequired();
@@ -168,7 +168,7 @@ public class PetService {
         }
 
         Pet updated = petRepository.save(pet);
-        
+
         // 펫 이미지 파일 동기화
         // DTO에 profileImageUrl이 명시적으로 전달된 경우에만 동기화
         if (dto.getProfileImageUrl() != null) {
@@ -179,15 +179,15 @@ public class PetService {
             } else {
                 // 이미지 URL이 있는 경우 File 테이블에 동기화
                 attachmentFileService.syncSingleAttachment(
-                    FileTargetType.PET, 
-                    updated.getIdx(), 
-                    imageUrl, 
-                    null
+                        FileTargetType.PET,
+                        updated.getIdx(),
+                        imageUrl,
+                        null
                 );
             }
         }
         // DTO에 profileImageUrl이 null인 경우는 기존 값 유지 (File 테이블도 그대로 유지)
-        
+
         return petConverter.toDTO(updated);
     }
 
@@ -202,7 +202,7 @@ public class PetService {
 
         pet.softDelete();
         petRepository.save(pet);
-        
+
         // 펫 이미지 파일 삭제 (소프트 삭제이므로 파일은 유지하되 필요시 삭제 가능)
         // attachmentFileService.deleteAll(FileTargetType.PET, petIdx);
     }
@@ -231,7 +231,9 @@ public class PetService {
         return petConverter.toDTOList(pets);
     }
 
-    /** JWT subject(로그인 ID)와 펫 소유자 {@link Users#getId()} 일치 여부 */
+    /**
+     * JWT subject(로그인 ID)와 펫 소유자 {@link Users#getId()} 일치 여부
+     */
     private static void assertPetOwnedBy(Pet pet, String ownerUserId) {
         Users owner = pet.getUser();
         String ownerLoginId = owner != null ? owner.getId() : null;
@@ -240,4 +242,3 @@ public class PetService {
         }
     }
 }
-

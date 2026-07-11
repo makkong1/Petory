@@ -18,7 +18,9 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-/** 관리자용 첨부파일 목록 조회·삭제를 처리하는 퍼사드. */
+/**
+ * 관리자용 첨부파일 목록 조회·삭제를 처리하는 퍼사드.
+ */
 public class AdminFileFacade {
 
     private final AttachmentFileRepository fileRepository;
@@ -28,14 +30,14 @@ public class AdminFileFacade {
     public Page<FileDTO> getFiles(String targetType, String keyword, int page, int size) {
         return fileRepository.findAllForAdmin(targetType, keyword, PageRequest.of(page, size))
                 .map(f -> FileDTO.builder()
-                        .idx(f.getIdx())
-                        .targetType(f.getTargetType())
-                        .targetIdx(f.getTargetIdx())
-                        .filePath(f.getFilePath())
-                        .fileType(f.getFileType())
-                        .createdAt(f.getCreatedAt())
-                        .downloadUrl(attachmentFileService.buildDownloadUrl(f.getFilePath()))
-                        .build());
+                .idx(f.getIdx())
+                .targetType(f.getTargetType())
+                .targetIdx(f.getTargetIdx())
+                .filePath(f.getFilePath())
+                .fileType(f.getFileType())
+                .createdAt(f.getCreatedAt())
+                .downloadUrl(attachmentFileService.buildDownloadUrl(f.getFilePath()))
+                .build());
     }
 
     public List<FileDTO> getFilesByTarget(String targetType, Long targetIdx) {

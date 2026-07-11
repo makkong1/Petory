@@ -142,9 +142,8 @@ public class LocationServiceReviewService {
     }
 
     /**
-     * 특정 서비스의 리뷰 목록 projection 페이징 조회.
-     * user를 통째로 로딩하던 컬럼 오버페칭을 idx/username만 SELECT하도록 축소하고,
-     * 전건 반환 대신 DB 페이징으로 바꿨다(프론트는 '더보기'로 페이지 누적). 평균 평점·총 개수는
+     * 특정 서비스의 리뷰 목록 projection 페이징 조회. user를 통째로 로딩하던 컬럼 오버페칭을 idx/username만
+     * SELECT하도록 축소하고, 전건 반환 대신 DB 페이징으로 바꿨다(프론트는 '더보기'로 페이지 누적). 평균 평점·총 개수는
      * 페이지와 무관한 전체 집계가 필요하므로 별도 aggregate로 제공한다.
      */
     @Transactional(readOnly = true)
@@ -152,7 +151,9 @@ public class LocationServiceReviewService {
         return reviewRepository.findReviewListItems(serviceIdx, pageable);
     }
 
-    /** 특정 서비스의 평균 평점(리뷰 없으면 null). 페이징과 무관한 전체 집계. */
+    /**
+     * 특정 서비스의 평균 평점(리뷰 없으면 null). 페이징과 무관한 전체 집계.
+     */
     @Transactional(readOnly = true)
     public Double getAverageRatingByService(Long serviceIdx) {
         return reviewRepository.findAverageRatingByServiceIdx(serviceIdx).orElse(null);

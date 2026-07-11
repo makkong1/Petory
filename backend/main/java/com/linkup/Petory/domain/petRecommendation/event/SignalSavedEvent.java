@@ -5,4 +5,6 @@ public record SignalSavedEvent(
         Long signalId,
         String intentDomain,
         String urgency
-) {}
+        ) {
+
+}

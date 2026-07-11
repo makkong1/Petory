@@ -13,13 +13,12 @@ import com.linkup.Petory.domain.user.entity.Users;
 
 /**
  * Comment 도메인 Repository 인터페이스입니다.
- * 
- * 이 인터페이스는 도메인 레벨의 순수 인터페이스로, JPA나 다른 기술에 의존하지 않습니다.
- * 다양한 데이터베이스 구현체(JPA, MyBatis, NoSQL 등)로 교체 가능하도록 설계되었습니다.
- * 
- * 구현체:
- * - JpaCommentAdapter: JPA 기반 구현체
- * - 다른 DB로 변경 시 새로운 어댑터를 만들고 @Primary를 옮기면 됩니다.
+ *
+ * 이 인터페이스는 도메인 레벨의 순수 인터페이스로, JPA나 다른 기술에 의존하지 않습니다. 다양한 데이터베이스 구현체(JPA,
+ * MyBatis, NoSQL 등)로 교체 가능하도록 설계되었습니다.
+ *
+ * 구현체: - JpaCommentAdapter: JPA 기반 구현체 - 다른 DB로 변경 시 새로운 어댑터를 만들고 @Primary를 옮기면
+ * 됩니다.
  */
 public interface CommentRepository {
 
@@ -44,8 +43,8 @@ public interface CommentRepository {
     List<Comment> findByUserAndIsDeletedFalseOrderByCreatedAtDesc(Users user);
 
     /**
-     * 여러 게시글의 댓글 카운트를 한 번에 조회 (배치 조회) - 작성자도 활성 상태여야 함
-     * 반환값: List<Object[]> [boardId, count]
+     * 여러 게시글의 댓글 카운트를 한 번에 조회 (배치 조회) - 작성자도 활성 상태여야 함 반환값: List<Object[]>
+     * [boardId, count]
      */
     List<Object[]> countByBoardsAndIsDeletedFalse(List<Long> boardIds);
 

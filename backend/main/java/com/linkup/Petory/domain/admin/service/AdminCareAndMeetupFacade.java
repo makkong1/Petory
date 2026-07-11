@@ -1,5 +1,13 @@
 package com.linkup.Petory.domain.admin.service;
 
+import java.util.List;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.linkup.Petory.domain.care.converter.CareRequestConverter;
 import com.linkup.Petory.domain.care.dto.CareRequestDTO;
 import com.linkup.Petory.domain.care.exception.CareRequestNotFoundException;
@@ -8,19 +16,15 @@ import com.linkup.Petory.domain.care.service.CareRequestService;
 import com.linkup.Petory.domain.meetup.dto.MeetupDTO;
 import com.linkup.Petory.domain.meetup.dto.MeetupParticipantsDTO;
 import com.linkup.Petory.domain.meetup.service.MeetupService;
-import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
+import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-/** 관리자용 케어 요청·모임 조회·상태 변경·삭제를 처리하는 퍼사드. */
+/**
+ * 관리자용 케어 요청·모임 조회·상태 변경·삭제를 처리하는 퍼사드.
+ */
 public class AdminCareAndMeetupFacade {
 
     private final CareRequestRepository careRequestRepository;
@@ -30,9 +34,8 @@ public class AdminCareAndMeetupFacade {
     private final AdminAuditService auditService;
 
     // ── 케어 요청 ────────────────────────────────────────────────────────
-
     public Page<CareRequestDTO> getCareRequests(String status, Boolean deleted, String keyword,
-                                                 int page, int size) {
+            int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
         return careRequestRepository.findAllForAdmin(status, deleted, keyword, pageable)
                 .map(careRequestConverter::toDTO);
@@ -65,7 +68,6 @@ public class AdminCareAndMeetupFacade {
     }
 
     // ── 모임 ─────────────────────────────────────────────────────────────
-
     public Page<MeetupDTO> getMeetups(String status, String keyword, int page, int size) {
         return meetupService.getMeetupsForAdmin(status, keyword, PageRequest.of(page, size));
     }

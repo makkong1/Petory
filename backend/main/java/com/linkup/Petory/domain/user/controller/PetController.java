@@ -17,8 +17,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * 애완동물 관리 컨트롤러
- * - 모든 인증된 사용자가 자신의 펫을 관리할 수 있음
+ * 애완동물 관리 컨트롤러 - 모든 인증된 사용자가 자신의 펫을 관리할 수 있음
  */
 @Slf4j
 @RestController

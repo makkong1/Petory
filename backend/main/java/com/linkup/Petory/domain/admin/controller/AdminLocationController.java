@@ -25,9 +25,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * 지역서비스 관리 컨트롤러 (관리자용)
- * - MASTER만 접근 가능 (데이터 임포트)
- * - ADMIN과 MASTER 모두 접근 가능 (목록 조회)
+ * 지역서비스 관리 컨트롤러 (관리자용) - MASTER만 접근 가능 (데이터 임포트) - ADMIN과 MASTER 모두 접근 가능 (목록
+ * 조회)
  */
 @Slf4j
 @RestController

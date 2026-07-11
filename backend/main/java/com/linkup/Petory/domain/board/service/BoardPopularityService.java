@@ -158,20 +158,20 @@ public class BoardPopularityService {
             PeriodRange range,
             List<BoardScore> rankedBoards) {
 
-        final int[] rankCounter = { 1 };
+        final int[] rankCounter = {1};
 
         return rankedBoards.stream()
                 .map(score -> BoardPopularitySnapshot.builder()
-                        .board(score.board())
-                        .periodType(periodType)
-                        .periodStartDate(range.periodStart())
-                        .periodEndDate(range.periodEnd())
-                        .ranking(rankCounter[0]++)
-                        .popularityScore(score.score())
-                        .likeCount(score.likes())
-                        .commentCount(score.comments())
-                        .viewCount(score.views())
-                        .build())
+                .board(score.board())
+                .periodType(periodType)
+                .periodStartDate(range.periodStart())
+                .periodEndDate(range.periodEnd())
+                .ranking(rankCounter[0]++)
+                .popularityScore(score.score())
+                .likeCount(score.likes())
+                .commentCount(score.comments())
+                .viewCount(score.views())
+                .build())
                 .collect(Collectors.toList());
     }
 
@@ -186,8 +186,8 @@ public class BoardPopularityService {
      * [리팩토링] 3개 배치 조회를 병렬 실행 후 Map<Long, BoardCounts>로 통합
      *
      * <p>
-     * 동작: 좋아요/댓글/조회수 3개 쿼리를 supplyAsync로 동시(병렬) 실행 → allOf로 대기
-     * → 결과를 BoardCounts로 합침
+     * 동작: 좋아요/댓글/조회수 3개 쿼리를 supplyAsync로 동시(병렬) 실행 → allOf로 대기 → 결과를
+     * BoardCounts로 합침
      */
     private Map<Long, BoardCounts> fetchBoardCountsInParallel(List<Long> boardIds) {
         if (boardIds.isEmpty()) {
@@ -251,8 +251,8 @@ public class BoardPopularityService {
     }
 
     /**
-     * [리팩토링] 여러 게시글의 좋아요 카운트를 배치로 조회 (실시간 집계, LIKE만 DB 조회)
-     * IN 절 크기 제한을 위해 배치 단위로 나누어 조회
+     * [리팩토링] 여러 게시글의 좋아요 카운트를 배치로 조회 (실시간 집계, LIKE만 DB 조회) IN 절 크기 제한을 위해 배치
+     * 단위로 나누어 조회
      */
     private Map<Long, Integer> getLikeCountsBatch(List<Long> boardIds) {
         if (boardIds.isEmpty()) {
@@ -280,8 +280,7 @@ public class BoardPopularityService {
     }
 
     /**
-     * 여러 게시글의 댓글 카운트를 배치로 조회 (실시간 집계)
-     * IN 절 크기 제한을 위해 배치 단위로 나누어 조회
+     * 여러 게시글의 댓글 카운트를 배치로 조회 (실시간 집계) IN 절 크기 제한을 위해 배치 단위로 나누어 조회
      */
     private Map<Long, Integer> getCommentCountsBatch(List<Long> boardIds) {
         if (boardIds.isEmpty()) {
@@ -313,8 +312,7 @@ public class BoardPopularityService {
     }
 
     /**
-     * 여러 게시글의 조회수 카운트를 배치로 조회 (실시간 집계)
-     * IN 절 크기 제한을 위해 배치 단위로 나누어 조회
+     * 여러 게시글의 조회수 카운트를 배치로 조회 (실시간 집계) IN 절 크기 제한을 위해 배치 단위로 나누어 조회
      */
     private Map<Long, Integer> getViewCountsBatch(List<Long> boardIds) {
         if (boardIds.isEmpty()) {
@@ -349,38 +347,43 @@ public class BoardPopularityService {
         LocalDate today = LocalDate.now();
         LocalDate periodEnd = today;
         LocalDate periodStart = switch (periodType) {
-            case WEEKLY -> today.minusDays(6); // include today => 7 days
-            case MONTHLY -> today.minusDays(29); // include today => 30 days
+            case WEEKLY ->
+                today.minusDays(6); // include today => 7 days
+            case MONTHLY ->
+                today.minusDays(29); // include today => 30 days
         };
         return new PeriodRange(periodStart, periodEnd);
     }
 
     /**
      * 인기글 집계 기간 범위
-     * 
+     *
      * @param periodStart 집계 시작일 (포함)
-     * @param periodEnd   집계 종료일 (포함)
+     * @param periodEnd 집계 종료일 (포함)
      */
     private record PeriodRange(LocalDate periodStart, LocalDate periodEnd) {
+
     }
 
     /**
      * [리팩토링] 게시글별 좋아요/댓글/조회수 통합 DTO
      */
     private record BoardCounts(int likes, int comments, int views) {
+
         static final BoardCounts ZERO = new BoardCounts(0, 0, 0);
     }
 
     /**
      * 게시글 인기도 점수 및 구성 요소
      *
-     * @param board    게시글 엔티티
-     * @param score    종합 인기도 점수
-     * @param likes    좋아요 수
+     * @param board 게시글 엔티티
+     * @param score 종합 인기도 점수
+     * @param likes 좋아요 수
      * @param comments 댓글 수
-     * @param views    조회수
+     * @param views 조회수
      */
     private record BoardScore(Board board, int score, int likes, int comments, int views) {
+
     }
 
     private List<BoardPopularitySnapshotDTO> buildRecentBoardFallback(
@@ -391,20 +394,20 @@ public class BoardPopularityService {
         int[] rank = {1};
         return recent.stream()
                 .map(b -> new BoardPopularitySnapshotDTO(
-                        null,
-                        b.getIdx(),
-                        periodType,
-                        range.periodStart(),
-                        range.periodEnd(),
-                        rank[0]++,
-                        0,
-                        0,
-                        0,
-                        b.getViewCount() != null ? b.getViewCount() : 0,
-                        b.getTitle(),
-                        b.getCategory(),
-                        null,
-                        b.getCreatedAt()))
+                null,
+                b.getIdx(),
+                periodType,
+                range.periodStart(),
+                range.periodEnd(),
+                rank[0]++,
+                0,
+                0,
+                0,
+                b.getViewCount() != null ? b.getViewCount() : 0,
+                b.getTitle(),
+                b.getCategory(),
+                null,
+                b.getCreatedAt()))
                 .collect(Collectors.toList());
     }
 }

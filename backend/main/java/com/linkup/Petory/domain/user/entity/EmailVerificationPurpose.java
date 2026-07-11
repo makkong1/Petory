@@ -1,8 +1,7 @@
 package com.linkup.Petory.domain.user.entity;
 
 /**
- * 이메일 인증 용도
- * 단일 이메일 인증 시스템에서 용도만 분리하여 사용
+ * 이메일 인증 용도 단일 이메일 인증 시스템에서 용도만 분리하여 사용
  */
 public enum EmailVerificationPurpose {
     REGISTRATION, // 회원가입

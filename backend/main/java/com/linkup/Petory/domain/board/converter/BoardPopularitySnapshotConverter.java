@@ -1,23 +1,25 @@
 package com.linkup.Petory.domain.board.converter;
 
-import com.linkup.Petory.domain.board.dto.BoardPopularitySnapshotDTO;
-import com.linkup.Petory.domain.board.entity.BoardPopularitySnapshot;
-import com.linkup.Petory.domain.board.entity.Board;
-import com.linkup.Petory.domain.file.dto.FileDTO;
-import com.linkup.Petory.domain.file.entity.FileTargetType;
-import com.linkup.Petory.domain.file.service.AttachmentFileService;
-import org.springframework.stereotype.Component;
-
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
+import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
+
+import com.linkup.Petory.domain.board.dto.BoardPopularitySnapshotDTO;
+import com.linkup.Petory.domain.board.entity.Board;
+import com.linkup.Petory.domain.board.entity.BoardPopularitySnapshot;
+import com.linkup.Petory.domain.file.dto.FileDTO;
+import com.linkup.Petory.domain.file.entity.FileTargetType;
+import com.linkup.Petory.domain.file.service.AttachmentFileService;
 
 import lombok.RequiredArgsConstructor;
 
-/** BoardPopularitySnapshot 엔티티 → DTO 변환기. 목록 변환 시 첨부파일을 배치 선조회해 N+1을 방지한다. */
+/**
+ * BoardPopularitySnapshot 엔티티 → DTO 변환기. 목록 변환 시 첨부파일을 배치 선조회해 N+1을 방지한다.
+ */
 @Component
 @RequiredArgsConstructor
 public class BoardPopularitySnapshotConverter {
@@ -69,8 +71,8 @@ public class BoardPopularitySnapshotConverter {
                 .map(Board::getIdx)
                 .collect(Collectors.toList());
 
-        Map<Long, List<FileDTO>> attachmentsMap =
-                attachmentFileService.getAttachmentsBatch(FileTargetType.BOARD, boardIds);
+        Map<Long, List<FileDTO>> attachmentsMap
+                = attachmentFileService.getAttachmentsBatch(FileTargetType.BOARD, boardIds);
 
         return snapshots.stream()
                 .map(s -> toDTO(s, attachmentsMap))
@@ -78,7 +80,7 @@ public class BoardPopularitySnapshotConverter {
     }
 
     private BoardPopularitySnapshotDTO toDTO(BoardPopularitySnapshot snapshot,
-                                              Map<Long, List<FileDTO>> attachmentsMap) {
+            Map<Long, List<FileDTO>> attachmentsMap) {
         Board board = snapshot.getBoard();
         return new BoardPopularitySnapshotDTO(
                 snapshot.getSnapshotId(),
@@ -98,11 +100,17 @@ public class BoardPopularitySnapshotConverter {
     }
 
     private String resolvePrimaryFileUrl(Board board, Map<Long, List<FileDTO>> attachmentsMap) {
-        if (board == null) return null;
+        if (board == null) {
+            return null;
+        }
         List<FileDTO> attachments = attachmentsMap.getOrDefault(board.getIdx(), List.of());
-        if (attachments.isEmpty()) return null;
+        if (attachments.isEmpty()) {
+            return null;
+        }
         FileDTO primary = attachments.get(0);
-        if (StringUtils.hasText(primary.getDownloadUrl())) return primary.getDownloadUrl();
+        if (StringUtils.hasText(primary.getDownloadUrl())) {
+            return primary.getDownloadUrl();
+        }
         return attachmentFileService.buildDownloadUrl(primary.getFilePath());
     }
 }

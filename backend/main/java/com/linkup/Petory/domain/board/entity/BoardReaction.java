@@ -2,6 +2,7 @@ package com.linkup.Petory.domain.board.entity;
 
 import com.linkup.Petory.domain.common.BaseTimeEntity;
 import com.linkup.Petory.domain.user.entity.Users;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -20,10 +21,12 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/** 게시글 리액션(좋아요/싫어요) 엔티티. 사용자 1명이 게시글 1개에 1개의 리액션만 가질 수 있다. */
+/**
+ * 게시글 리액션(좋아요/싫어요) 엔티티. 사용자 1명이 게시글 1개에 1개의 리액션만 가질 수 있다.
+ */
 @Entity
 @Table(name = "board_reaction", uniqueConstraints = {
-        @UniqueConstraint(columnNames = { "board_idx", "user_idx" })
+    @UniqueConstraint(columnNames = {"board_idx", "user_idx"})
 })
 @Getter
 @Setter

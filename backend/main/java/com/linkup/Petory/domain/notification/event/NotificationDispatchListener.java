@@ -13,8 +13,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * 알림 부가 채널(Redis 캐시, SSE, FCM) 발송 리스너.
- * 도메인 트랜잭션 커밋 후 비동기로 실행되며, 채널별 실패를 서로 격리한다.
+ * 알림 부가 채널(Redis 캐시, SSE, FCM) 발송 리스너. 도메인 트랜잭션 커밋 후 비동기로 실행되며, 채널별 실패를 서로
+ * 격리한다.
  */
 @Component
 @RequiredArgsConstructor

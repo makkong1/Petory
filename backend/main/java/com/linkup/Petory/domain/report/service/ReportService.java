@@ -93,10 +93,11 @@ public class ReportService {
     /**
      * 신고 목록 조회 (관리자용) - AdminReportController에서 사용.
      *
-     * <p>기존엔 전건을 인메모리로 읽어 target별 신고횟수를 집계하고 그 횟수순으로 정렬했으나,
-     * 데이터가 쌓일수록 조회량이 비례해 커지는 구조였다. reporter/handledBy를 통째로 로딩하던 컬럼
-     * 오버페칭까지 겹쳐 있어, DB projection 페이징으로 전환한다(정렬은 최신순 {@code createdAt DESC}).
-     * 인메모리 집계하던 {@code reportCount}는 소비처가 없어 제거했다.
+     * <p>
+     * 기존엔 전건을 인메모리로 읽어 target별 신고횟수를 집계하고 그 횟수순으로 정렬했으나, 데이터가 쌓일수록 조회량이 비례해 커지는
+     * 구조였다. reporter/handledBy를 통째로 로딩하던 컬럼 오버페칭까지 겹쳐 있어, DB projection 페이징으로
+     * 전환한다(정렬은 최신순 {@code createdAt DESC}). 인메모리 집계하던 {@code reportCount}는 소비처가
+     * 없어 제거했다.
      */
     @Transactional(readOnly = true)
     public AdminReportPageResponseDTO getReports(ReportTargetType targetType, ReportStatus status, Pageable pageable) {
@@ -161,24 +162,29 @@ public class ReportService {
 
     private Long resolveSanctionUserId(Report report) {
         return switch (report.getTargetType()) {
-            case BOARD -> boardRepository.findById(report.getTargetIdx())
-                    .map(board -> board.getUser().getIdx())
-                    .orElseThrow(ReportTargetNotFoundException::board);
-            case COMMENT -> commentRepository.findById(report.getTargetIdx())
-                    .map(comment -> comment.getUser().getIdx())
-                    .or(() -> missingPetCommentRepository.findById(report.getTargetIdx())
-                            .map(comment -> comment.getUser().getIdx()))
-                    .orElseThrow(ReportTargetNotFoundException::comment);
-            case MISSING_PET -> missingPetBoardRepository.findById(report.getTargetIdx())
-                    .map(board -> board.getUser().getIdx())
-                    .orElseThrow(ReportTargetNotFoundException::missingPet);
-            case PET_CARE_PROVIDER -> usersRepository.findById(report.getTargetIdx())
-                    .filter(provider -> provider.getRole() == Role.SERVICE_PROVIDER)
-                    .map(Users::getIdx)
-                    .orElseThrow(ReportTargetNotFoundException::provider);
-            case CARE_REVIEW -> careReviewRepository.findById(report.getTargetIdx())
-                    .map(review -> review.getReviewer().getIdx())
-                    .orElseThrow(ReportTargetNotFoundException::careReview);
+            case BOARD ->
+                boardRepository.findById(report.getTargetIdx())
+                .map(board -> board.getUser().getIdx())
+                .orElseThrow(ReportTargetNotFoundException::board);
+            case COMMENT ->
+                commentRepository.findById(report.getTargetIdx())
+                .map(comment -> comment.getUser().getIdx())
+                .or(() -> missingPetCommentRepository.findById(report.getTargetIdx())
+                .map(comment -> comment.getUser().getIdx()))
+                .orElseThrow(ReportTargetNotFoundException::comment);
+            case MISSING_PET ->
+                missingPetBoardRepository.findById(report.getTargetIdx())
+                .map(board -> board.getUser().getIdx())
+                .orElseThrow(ReportTargetNotFoundException::missingPet);
+            case PET_CARE_PROVIDER ->
+                usersRepository.findById(report.getTargetIdx())
+                .filter(provider -> provider.getRole() == Role.SERVICE_PROVIDER)
+                .map(Users::getIdx)
+                .orElseThrow(ReportTargetNotFoundException::provider);
+            case CARE_REVIEW ->
+                careReviewRepository.findById(report.getTargetIdx())
+                .map(review -> review.getReviewer().getIdx())
+                .orElseThrow(ReportTargetNotFoundException::careReview);
         };
     }
 

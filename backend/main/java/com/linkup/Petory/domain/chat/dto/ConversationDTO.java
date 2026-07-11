@@ -3,17 +3,20 @@ package com.linkup.Petory.domain.chat.dto;
 import java.time.LocalDateTime;
 import java.util.List;
 
-import lombok.Data;
-import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-/** 대화방 응답 DTO. 참여자 목록·읽지 않은 메시지 수·마지막 메시지 미리보기를 포함한다. */
+/**
+ * 대화방 응답 DTO. 참여자 목록·읽지 않은 메시지 수·마지막 메시지 미리보기를 포함한다.
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class ConversationDTO {
+
     private Long idx;
     private String conversationType;  // DIRECT, GROUP, CARE_REQUEST, etc.
     private String title;
@@ -37,8 +40,9 @@ public class ConversationDTO {
     // 마지막 메시지 정보
     private ChatMessageDTO lastMessage;
 
-    /** 채팅방 참여자 중 제재 중인 사용자가 있을 때 true. 프론트엔드 안내 표시용. */
+    /**
+     * 채팅방 참여자 중 제재 중인 사용자가 있을 때 true. 프론트엔드 안내 표시용.
+     */
     @Builder.Default
     private boolean hasSanctionedParticipant = false;
 }
-

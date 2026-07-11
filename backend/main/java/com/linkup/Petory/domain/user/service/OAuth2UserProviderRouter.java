@@ -8,7 +8,10 @@ import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 
-/** OAuth2 제공자별 UserService 라우터. provider 이름에 따라 Google/Naver UserService를 선택해 위임한다. */
+/**
+ * OAuth2 제공자별 UserService 라우터. provider 이름에 따라 Google/Naver UserService를 선택해
+ * 위임한다.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -23,9 +26,12 @@ public class OAuth2UserProviderRouter extends DefaultOAuth2UserService {
         log.info("OAuth2 사용자 로드 요청: provider={}", provider);
 
         return switch (provider.toLowerCase()) {
-            case "google" -> googleOAuth2UserService.loadUser(userRequest);
-            case "naver" -> naverOAuth2UserService.loadUser(userRequest);
-            default -> throw new OAuth2AuthenticationException("지원하지 않는 소셜 로그인입니다: " + provider);
+            case "google" ->
+                googleOAuth2UserService.loadUser(userRequest);
+            case "naver" ->
+                naverOAuth2UserService.loadUser(userRequest);
+            default ->
+                throw new OAuth2AuthenticationException("지원하지 않는 소셜 로그인입니다: " + provider);
         };
     }
 }

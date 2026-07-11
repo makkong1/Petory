@@ -11,7 +11,9 @@ import com.linkup.Petory.domain.board.entity.Board;
 
 import lombok.RequiredArgsConstructor;
 
-/** Board 엔티티 → BoardDTO 변환기. Lazy Loading N+1 방지를 위해 commentCount 필드만 사용한다. */
+/**
+ * Board 엔티티 → BoardDTO 변환기. Lazy Loading N+1 방지를 위해 commentCount 필드만 사용한다.
+ */
 @Component
 @RequiredArgsConstructor
 public class BoardConverter {
@@ -42,8 +44,8 @@ public class BoardConverter {
     }
 
     /**
-     * 목록 projection(BoardListItemDTO) → BoardDTO 기본 매핑.
-     * 리액션/첨부파일은 서비스가 배치로 사후 주입하므로 여기서는 채우지 않는다(엔티티 toDTO와 동일 계약).
+     * 목록 projection(BoardListItemDTO) → BoardDTO 기본 매핑. 리액션/첨부파일은 서비스가 배치로 사후
+     * 주입하므로 여기서는 채우지 않는다(엔티티 toDTO와 동일 계약).
      */
     public BoardDTO toDTO(BoardListItemDTO item) {
         return BoardDTO.builder()

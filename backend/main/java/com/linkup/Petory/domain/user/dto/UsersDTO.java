@@ -3,17 +3,20 @@ package com.linkup.Petory.domain.user.dto;
 import java.time.LocalDateTime;
 import java.util.List;
 
-import lombok.Data;
-import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-/** 사용자 응답/요청 DTO. 응답 시 password는 포함하지 않으며, 제재·펫코인·이메일 인증 상태를 포함한다. */
+/**
+ * 사용자 응답/요청 DTO. 응답 시 password는 포함하지 않으며, 제재·펫코인·이메일 인증 상태를 포함한다.
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class UsersDTO {
+
     private Long idx;
     private String id;
     private String username;
@@ -26,18 +29,18 @@ public class UsersDTO {
     private String petInfo;
     private List<SocialUserDTO> socialUsers;
     private List<PetDTO> pets; // 등록한 애완동물 목록
-    
+
     // 제재 관련 필드
     private String status; // ACTIVE, SUSPENDED, BANNED
     private Integer warningCount;
     private LocalDateTime suspendedUntil;
-    
+
     // 펫코인 관련 필드
     private Integer petCoinBalance; // 펫코인 잔액
-    
+
     // 이메일 인증 관련 필드
     private Boolean emailVerified; // 이메일 인증 여부
-    
+
     // 소프트 삭제 관련 필드
     private Boolean isDeleted;
     private LocalDateTime deletedAt;

@@ -1,16 +1,29 @@
 package com.linkup.Petory.domain.board.entity;
 
+import java.time.LocalDate;
+
 import com.linkup.Petory.domain.common.BaseTimeEntity;
-import jakarta.persistence.*;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import java.time.LocalDate;
-
-/** 게시글 인기 스냅샷. 주간·월간 기간별 좋아요·댓글·조회 수와 랭킹을 기록한다. */
+/**
+ * 게시글 인기 스냅샷. 주간·월간 기간별 좋아요·댓글·조회 수와 랭킹을 기록한다.
+ */
 @Entity
 @Table(name = "board_popularity_snapshot")
 @Getter

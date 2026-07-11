@@ -17,8 +17,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-
-import com.linkup.Petory.global.security.CustomUserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,7 +41,7 @@ import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException;
 import com.linkup.Petory.domain.user.exception.UserNotFoundException;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
-import com.linkup.Petory.global.security.RoleConstants;
+import com.linkup.Petory.global.security.CustomUserDetails;
 
 import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
@@ -67,7 +65,9 @@ public class BoardService {
 
     private boolean isAdmin() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!(auth != null && auth.getPrincipal() instanceof CustomUserDetails ud)) return false;
+        if (!(auth != null && auth.getPrincipal() instanceof CustomUserDetails ud)) {
+            return false;
+        }
         return ud.isAdmin();
     }
 
@@ -405,8 +405,8 @@ public class BoardService {
     }
 
     /**
-     * [오버페칭 제거] 목록 projection(BoardListItemDTO) 기반 매핑.
-     * 작성자(Users) 전체 엔티티 로딩 없이 base DTO를 만든 뒤, 엔티티 경로와 동일한 배치 enrichment를 적용한다.
+     * [오버페칭 제거] 목록 projection(BoardListItemDTO) 기반 매핑. 작성자(Users) 전체 엔티티 로딩 없이
+     * base DTO를 만든 뒤, 엔티티 경로와 동일한 배치 enrichment를 적용한다.
      */
     private List<BoardDTO> mapBoardListItemsBatch(List<BoardListItemDTO> items) {
         if (items.isEmpty()) {
@@ -418,8 +418,9 @@ public class BoardService {
     }
 
     /**
-     * base BoardDTO 목록에 좋아요/싫어요 카운트·첨부파일을 배치로 사후 주입한다 (목록 N+1 방지).
-     * 엔티티 경로(mapBoardsWithReactionsBatch)와 projection 경로(mapBoardListItemsBatch)가 공유한다.
+     * base BoardDTO 목록에 좋아요/싫어요 카운트·첨부파일을 배치로 사후 주입한다 (목록 N+1 방지). 엔티티
+     * 경로(mapBoardsWithReactionsBatch)와 projection 경로(mapBoardListItemsBatch)가
+     * 공유한다.
      */
     private List<BoardDTO> enrichBoardDTOs(List<BoardDTO> dtos) {
         // 게시글 ID 목록 추출

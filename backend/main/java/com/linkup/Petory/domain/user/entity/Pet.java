@@ -12,9 +12,7 @@ import java.util.List;
 import com.linkup.Petory.domain.common.BaseTimeEntity;
 
 /**
- * 애완동물 엔티티
- * - 사용자가 등록한 반려동물 정보
- * - 펫케어 요청, 실종 제보 등에서 재사용
+ * 애완동물 엔티티 - 사용자가 등록한 반려동물 정보 - 펫케어 요청, 실종 제보 등에서 재사용
  */
 @Entity
 @Table(name = "pets")

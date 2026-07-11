@@ -5,8 +5,7 @@ import org.springframework.http.HttpStatus;
 import com.linkup.Petory.global.exception.ApiException;
 
 /**
- * 파일 저장소 IO/시스템 오류 시 발생하는 예외.
- * HTTP 500 Internal Server Error
+ * 파일 저장소 IO/시스템 오류 시 발생하는 예외. HTTP 500 Internal Server Error
  */
 public class FileStorageException extends ApiException {
 

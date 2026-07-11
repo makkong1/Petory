@@ -1,6 +1,5 @@
 package com.linkup.Petory.domain.board.service;
 
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -13,35 +12,32 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-
-import com.linkup.Petory.global.security.CustomUserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.linkup.Petory.domain.board.converter.CommentConverter;
-import com.linkup.Petory.domain.board.exception.BoardForbiddenException;
-import com.linkup.Petory.domain.board.exception.BoardNotFoundException;
-import com.linkup.Petory.domain.board.exception.CommentNotBelongToBoardException;
-import com.linkup.Petory.domain.board.exception.CommentNotFoundException;
-import com.linkup.Petory.global.security.RoleConstants;
-import com.linkup.Petory.domain.user.entity.Users;
-import com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException;
-import com.linkup.Petory.domain.user.exception.UserNotFoundException;
-import com.linkup.Petory.domain.user.repository.UsersRepository;
 import com.linkup.Petory.domain.board.dto.CommentDTO;
 import com.linkup.Petory.domain.board.dto.CommentPageResponseDTO;
 import com.linkup.Petory.domain.board.entity.Board;
 import com.linkup.Petory.domain.board.entity.Comment;
 import com.linkup.Petory.domain.board.entity.ReactionType;
+import com.linkup.Petory.domain.board.exception.BoardForbiddenException;
+import com.linkup.Petory.domain.board.exception.BoardNotFoundException;
+import com.linkup.Petory.domain.board.exception.CommentNotBelongToBoardException;
+import com.linkup.Petory.domain.board.exception.CommentNotFoundException;
 import com.linkup.Petory.domain.board.repository.BoardRepository;
 import com.linkup.Petory.domain.board.repository.CommentReactionRepository;
 import com.linkup.Petory.domain.board.repository.CommentRepository;
-import com.linkup.Petory.domain.common.ContentStatus;
 import com.linkup.Petory.domain.file.dto.FileDTO;
 import com.linkup.Petory.domain.file.entity.FileTargetType;
 import com.linkup.Petory.domain.file.service.AttachmentFileService;
 import com.linkup.Petory.domain.notification.entity.NotificationType;
 import com.linkup.Petory.domain.notification.service.NotificationService;
+import com.linkup.Petory.domain.user.entity.Users;
+import com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException;
+import com.linkup.Petory.domain.user.exception.UserNotFoundException;
+import com.linkup.Petory.domain.user.repository.UsersRepository;
+import com.linkup.Petory.global.security.CustomUserDetails;
 
 import lombok.RequiredArgsConstructor;
 
@@ -60,7 +56,9 @@ public class CommentService {
 
     private boolean isAdmin() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!(auth != null && auth.getPrincipal() instanceof CustomUserDetails ud)) return false;
+        if (!(auth != null && auth.getPrincipal() instanceof CustomUserDetails ud)) {
+            return false;
+        }
         return ud.isAdmin();
     }
 
@@ -75,12 +73,9 @@ public class CommentService {
     }
 
     /**
-     * 댓글 목록 조회 (페이징 지원)
-     * 엔드포인트: GET /api/boards/{boardId}/comments?page={page}&size={size}
-     * - 생성일 기준 오름차순 정렬
-     * - 삭제된 댓글 제외
-     * - 각 댓글의 파일 정보 포함
-     * - 댓글 파일 배치 조회 (N+1 문제 해결)
+     * 댓글 목록 조회 (페이징 지원) 엔드포인트: GET
+     * /api/boards/{boardId}/comments?page={page}&size={size} - 생성일 기준 오름차순 정렬 -
+     * 삭제된 댓글 제외 - 각 댓글의 파일 정보 포함 - 댓글 파일 배치 조회 (N+1 문제 해결)
      */
     public CommentPageResponseDTO getCommentsWithPaging(Long boardId, int page, int size) {
         // 게시글 존재 확인
@@ -131,11 +126,8 @@ public class CommentService {
     }
 
     /**
-     * 댓글 목록 조회 (페이징 없음 - 하위 호환성)
-     * 엔드포인트: GET /api/boards/{boardId}/comments
-     * - 생성일 기준 오름차순 정렬
-     * - 삭제된 댓글 제외
-     * - 각 댓글의 파일 정보 포함
+     * 댓글 목록 조회 (페이징 없음 - 하위 호환성) 엔드포인트: GET /api/boards/{boardId}/comments -
+     * 생성일 기준 오름차순 정렬 - 삭제된 댓글 제외 - 각 댓글의 파일 정보 포함
      */
     public List<CommentDTO> getComments(Long boardId) {
         Board board = boardRepository.findById(boardId)
@@ -153,9 +145,7 @@ public class CommentService {
     }
 
     /**
-     * 관리자용 댓글 조회
-     * - 작성자 상태 체크 없이 조회 (삭제된 사용자 댓글도 포함)
-     * - AdminBoardController에서 사용
+     * 관리자용 댓글 조회 - 작성자 상태 체크 없이 조회 (삭제된 사용자 댓글도 포함) - AdminBoardController에서 사용
      */
     public List<CommentDTO> getCommentsForAdmin(Long boardId) {
         Board board = boardRepository.findById(boardId)
@@ -203,7 +193,7 @@ public class CommentService {
                     "내 게시글에 새로운 댓글이 달렸습니다",
                     String.format("%s님이 댓글을 남겼습니다: %s", user.getUsername(),
                             dto.getContent().length() > 50 ? dto.getContent().substring(0, 50) + "..."
-                                    : dto.getContent()),
+                            : dto.getContent()),
                     board.getIdx(),
                     "BOARD");
         }
@@ -294,9 +284,8 @@ public class CommentService {
     }
 
     /**
-     * 여러 댓글의 반응(좋아요/싫어요) 카운트를 배치로 조회
-     * [리팩토링] countByCommentsGroupByReactionType - N개 댓글 시 2N 쿼리 → 1~2 쿼리
-     * 반환값: Map<CommentId, Map<ReactionType, Count>>
+     * 여러 댓글의 반응(좋아요/싫어요) 카운트를 배치로 조회 [리팩토링] countByCommentsGroupByReactionType
+     * - N개 댓글 시 2N 쿼리 → 1~2 쿼리 반환값: Map<CommentId, Map<ReactionType, Count>>
      */
     private Map<Long, Map<ReactionType, Long>> getReactionCountsBatch(List<Long> commentIds) {
         if (commentIds.isEmpty()) {
@@ -319,8 +308,8 @@ public class CommentService {
     }
 
     /**
-     * 댓글 목록을 DTO로 변환 (배치 조회된 반응/파일 정보 사용)
-     * [리팩토링] mapWithReactionCounts 3N 쿼리 → 배치 조회로 3~4 쿼리
+     * 댓글 목록을 DTO로 변환 (배치 조회된 반응/파일 정보 사용) [리팩토링] mapWithReactionCounts 3N 쿼리 →
+     * 배치 조회로 3~4 쿼리
      */
     private List<CommentDTO> mapCommentsWithReactionCountsBatch(
             List<Comment> comments,
@@ -342,8 +331,7 @@ public class CommentService {
     }
 
     /**
-     * 댓글 상태 변경 (관리자용)
-     * - AdminBoardController에서 사용
+     * 댓글 상태 변경 (관리자용) - AdminBoardController에서 사용
      */
     @CacheEvict(value = "boardDetail", key = "#p0")
     @Transactional
@@ -364,8 +352,7 @@ public class CommentService {
     }
 
     /**
-     * 댓글 복구 (관리자용)
-     * - AdminBoardController에서 사용
+     * 댓글 복구 (관리자용) - AdminBoardController에서 사용
      */
     @CacheEvict(value = "boardDetail", key = "#p0")
     @Transactional

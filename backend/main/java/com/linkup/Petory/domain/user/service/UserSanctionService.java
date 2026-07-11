@@ -33,8 +33,7 @@ public class UserSanctionService {
     private static final int AUTO_SUSPENSION_DAYS = 3; // 자동 이용제한 기간 (일)
 
     /**
-     * 경고 추가
-     * 경고 3회 도달 시 자동으로 이용제한 3일 적용
+     * 경고 추가 경고 3회 도달 시 자동으로 이용제한 3일 적용
      */
     @SuppressWarnings("null")
     @Transactional
@@ -184,7 +183,7 @@ public class UserSanctionService {
 
             boolean hasActiveSuspension = activeSanctions.stream()
                     .anyMatch(s -> s.getSanctionType() == UserSanction.SanctionType.SUSPENSION
-                            && s.getEndsAt() != null && s.getEndsAt().isAfter(LocalDateTime.now()));
+                    && s.getEndsAt() != null && s.getEndsAt().isAfter(LocalDateTime.now()));
 
             if (!hasActiveSuspension) {
                 user.activate();
@@ -210,8 +209,10 @@ public class UserSanctionService {
     public void applySanctionFromReport(Long userId, ReportActionType actionType, String reason, Long adminId,
             Long reportId) {
         switch (actionType) {
-            case WARN_USER -> addWarning(userId, reason, adminId, reportId);
-            case SUSPEND_USER -> addSuspension(userId, reason, adminId, reportId, AUTO_SUSPENSION_DAYS);
+            case WARN_USER ->
+                addWarning(userId, reason, adminId, reportId);
+            case SUSPEND_USER ->
+                addSuspension(userId, reason, adminId, reportId, AUTO_SUSPENSION_DAYS);
             default -> {
                 // NONE, DELETE_CONTENT, OTHER는 제재 없음
             }

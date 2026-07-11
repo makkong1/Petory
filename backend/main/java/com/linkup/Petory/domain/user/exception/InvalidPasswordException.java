@@ -5,8 +5,7 @@ import org.springframework.http.HttpStatus;
 import com.linkup.Petory.global.exception.ApiException;
 
 /**
- * 비밀번호 관련 오류 시 발생하는 예외.
- * HTTP 400 Bad Request
+ * 비밀번호 관련 오류 시 발생하는 예외. HTTP 400 Bad Request
  */
 public class InvalidPasswordException extends ApiException {
 

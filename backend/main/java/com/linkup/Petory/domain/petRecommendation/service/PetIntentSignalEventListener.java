@@ -22,25 +22,26 @@ import java.util.Optional;
 /**
  * 도메인 이벤트를 받아 비동기로 NLP 분석 signal 저장을 트리거한다.
  *
- * <p>커뮤니티/케어는 커밋 이후 처리하고, 위치 검색은 자연어+dedup 필터를 통과한 경우만 처리한다.
+ * <p>
+ * 커뮤니티/케어는 커밋 이후 처리하고, 위치 검색은 자연어+dedup 필터를 통과한 경우만 처리한다.
  */
 public class PetIntentSignalEventListener {
 
-    private final PetIntentClient            petIntentClient;
+    private final PetIntentClient petIntentClient;
     private final UserPetIntentSignalService signalService;
     private final RedisTemplate<String, String> redisTemplate;
 
-    private static final Duration LOC_DEDUP_TTL    = Duration.ofMinutes(10);
-    private static final int      MIN_NL_LENGTH    = 7;
-    private static final String   LOC_DEDUP_PREFIX = "nlp:loc-dedup:";
+    private static final Duration LOC_DEDUP_TTL = Duration.ofMinutes(10);
+    private static final int MIN_NL_LENGTH = 7;
+    private static final String LOC_DEDUP_PREFIX = "nlp:loc-dedup:";
 
     public PetIntentSignalEventListener(
             PetIntentClient petIntentClient,
             UserPetIntentSignalService signalService,
             @Qualifier("customStringRedisTemplate") RedisTemplate<String, String> redisTemplate) {
         this.petIntentClient = petIntentClient;
-        this.signalService   = signalService;
-        this.redisTemplate   = redisTemplate;
+        this.signalService = signalService;
+        this.redisTemplate = redisTemplate;
     }
 
     // T1: 트랜잭션 커밋 완료 후 실행 — rollback 시 dangling signal 방지
@@ -61,7 +62,9 @@ public class PetIntentSignalEventListener {
     @EventListener
     @Async("petIntentExecutor")
     public void handle(LocationSearchPerformedEvent event) {
-        if (event.getUserIdx() == null) return;
+        if (event.getUserIdx() == null) {
+            return;
+        }
 
         String keyword = event.getKeyword();
 
@@ -94,26 +97,34 @@ public class PetIntentSignalEventListener {
     }
 
     private void analyze(Long userIdx, String sourceType, Long sourceId,
-                         String text, String petType) {
+            String text, String petType) {
         try {
             Optional<PetIntentAnalyzeResponse> result = petIntentClient.analyze(text, petType);
-            result.ifPresent(analysis ->
-                    signalService.saveIfConfident(userIdx, sourceType, sourceId, analysis));
+            result.ifPresent(analysis
+                    -> signalService.saveIfConfident(userIdx, sourceType, sourceId, analysis));
         } catch (Exception e) {
             log.warn("[SignalListener] 분석 실패 — 원 액션에 영향 없음. sourceType={} error={}",
                     sourceType, e.getMessage());
         }
     }
 
-    /** 공백 collapse + trim + lowercase */
+    /**
+     * 공백 collapse + trim + lowercase
+     */
     static String normalize(String text) {
-        if (text == null) return "";
+        if (text == null) {
+            return "";
+        }
         return text.trim().toLowerCase().replaceAll("\\s+", " ");
     }
 
-    /** 자연어 판단: 정규화 후 7자 이상 + 공백 포함 */
+    /**
+     * 자연어 판단: 정규화 후 7자 이상 + 공백 포함
+     */
     static boolean isNaturalLanguage(String text) {
-        if (text == null) return false;
+        if (text == null) {
+            return false;
+        }
         String n = normalize(text);
         return n.length() >= MIN_NL_LENGTH && n.contains(" ");
     }

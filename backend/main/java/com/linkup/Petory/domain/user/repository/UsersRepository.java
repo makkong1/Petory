@@ -13,13 +13,12 @@ import com.linkup.Petory.domain.user.entity.Users;
 
 /**
  * Users 도메인 Repository 인터페이스입니다.
- * 
- * 이 인터페이스는 도메인 레벨의 순수 인터페이스로, JPA나 다른 기술에 의존하지 않습니다.
- * 다양한 데이터베이스 구현체(JPA, MyBatis, NoSQL 등)로 교체 가능하도록 설계되었습니다.
- * 
- * 구현체:
- * - JpaUsersAdapter: JPA 기반 구현체
- * - 다른 DB로 변경 시 새로운 어댑터를 만들고 @Primary를 옮기면 됩니다.
+ *
+ * 이 인터페이스는 도메인 레벨의 순수 인터페이스로, JPA나 다른 기술에 의존하지 않습니다. 다양한 데이터베이스 구현체(JPA,
+ * MyBatis, NoSQL 등)로 교체 가능하도록 설계되었습니다.
+ *
+ * 구현체: - JpaUsersAdapter: JPA 기반 구현체 - 다른 DB로 변경 시 새로운 어댑터를 만들고 @Primary를 옮기면
+ * 됩니다.
  */
 public interface UsersRepository {
 
@@ -49,9 +48,8 @@ public interface UsersRepository {
     Optional<Users> findByEmail(String email);
 
     /**
-     * 닉네임/사용자명/이메일 중복 검사 (1회 쿼리로 통합)
-     * [리팩토링] 3회 쿼리 → 1회
-     * 탈퇴하지 않은 사용자만 조회 (Soft Delete 필터링)
+     * 닉네임/사용자명/이메일 중복 검사 (1회 쿼리로 통합) [리팩토링] 3회 쿼리 → 1회 탈퇴하지 않은 사용자만 조회 (Soft
+     * Delete 필터링)
      */
     Optional<Users> findByNicknameOrUsernameOrEmail(String nickname, String username, String email);
 
@@ -92,20 +90,18 @@ public interface UsersRepository {
 
     /**
      * 경고 횟수 원자적 증가 (동시성 문제 해결)
-     * 
+     *
      * @return 업데이트된 행 수
      */
     int incrementWarningCount(Long userId);
 
     /**
-     * 비관적 락을 사용한 사용자 조회 (동시성 제어용)
-     * 코인 차감 시 Race Condition 방지를 위해 사용
+     * 비관적 락을 사용한 사용자 조회 (동시성 제어용) 코인 차감 시 Race Condition 방지를 위해 사용
      */
     Optional<Users> findByIdForUpdate(Long idx);
 
     /**
-     * 사용자 역할만 조회 (경량 조회용, 삭제 권한 검증 등)
-     * [리팩토링] getUser 대체 - role 프로젝션만
+     * 사용자 역할만 조회 (경량 조회용, 삭제 권한 검증 등) [리팩토링] getUser 대체 - role 프로젝션만
      */
     Optional<Role> findRoleByIdx(Long idx);
 

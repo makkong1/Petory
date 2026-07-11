@@ -32,24 +32,24 @@ public interface ChatMessageRepository {
      * 채팅방별 메시지 조회 (페이징, 최신순)
      */
     Page<ChatMessage> findByConversationIdxOrderByCreatedAtDesc(
-        Long conversationIdx,
-        Pageable pageable);
+            Long conversationIdx,
+            Pageable pageable);
 
     /**
      * 채팅방별 메시지 조회 (커서 기반 페이징, 최신순)
      */
     List<ChatMessage> findByConversationIdxAndCreatedAtBeforeOrderByCreatedAtDesc(
-        Long conversationIdx,
-        LocalDateTime beforeDate,
-        Pageable pageable);
+            Long conversationIdx,
+            LocalDateTime beforeDate,
+            Pageable pageable);
 
     /**
      * 채팅방별 메시지 조회 (특정 시점 이후, 페이징, 최신순) - 재참여 시 사용
      */
     Page<ChatMessage> findByConversationIdxAndCreatedAtAfterOrderByCreatedAtDesc(
-        Long conversationIdx,
-        LocalDateTime afterDate,
-        Pageable pageable);
+            Long conversationIdx,
+            LocalDateTime afterDate,
+            Pageable pageable);
 
     /**
      * 채팅방별 메시지 조회 (전체, 최신순)
@@ -70,8 +70,8 @@ public interface ChatMessageRepository {
      * 메시지 타입별 조회
      */
     List<ChatMessage> findByConversationAndMessageTypeAndIsDeletedFalse(
-        Conversation conversation,
-        MessageType messageType);
+            Conversation conversation,
+            MessageType messageType);
 
     /**
      * 채팅방별 읽지 않은 메시지 수 조회
@@ -87,7 +87,6 @@ public interface ChatMessageRepository {
      * 메시지 검색 (Full-Text Search)
      */
     List<ChatMessage> searchMessagesByKeyword(
-        Long conversationIdx,
-        String keyword);
+            Long conversationIdx,
+            String keyword);
 }
-

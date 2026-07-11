@@ -1,19 +1,28 @@
 package com.linkup.Petory.domain.admin.controller;
 
-import com.linkup.Petory.domain.admin.service.AdminSystemFacade;
-import com.linkup.Petory.global.security.AuthenticatedUserIdResolver;
-import lombok.RequiredArgsConstructor;
+import java.util.Map;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Map;
+import com.linkup.Petory.domain.admin.service.AdminSystemFacade;
+import com.linkup.Petory.global.security.AuthenticatedUserIdResolver;
+
+import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api/master/system")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('MASTER')")
-/** 시스템 설정(SystemConfig) 조회·변경 API. [MASTER] */
+/**
+ * 시스템 설정(SystemConfig) 조회·변경 API. [MASTER]
+ */
 public class AdminSystemController {
 
     private final AdminSystemFacade systemFacade;

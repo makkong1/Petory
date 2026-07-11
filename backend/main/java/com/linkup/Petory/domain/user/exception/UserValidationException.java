@@ -5,8 +5,7 @@ import org.springframework.http.HttpStatus;
 import com.linkup.Petory.global.exception.ApiException;
 
 /**
- * 사용자 입력 검증 실패 시 발생하는 예외.
- * HTTP 400 Bad Request
+ * 사용자 입력 검증 실패 시 발생하는 예외. HTTP 400 Bad Request
  */
 public class UserValidationException extends ApiException {
 

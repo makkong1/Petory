@@ -9,8 +9,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -36,10 +36,9 @@ import lombok.extern.slf4j.Slf4j;
 
 /**
  * 실종 제보 게시글 및 댓글 API 컨트롤러
- * 
- * 서비스 분리:
- * - MissingPetBoardService: 게시글 관련 로직 (CRUD)
- * - MissingPetCommentService: 댓글 관련 로직 (CRUD)
+ *
+ * 서비스 분리: - MissingPetBoardService: 게시글 관련 로직 (CRUD) -
+ * MissingPetCommentService: 댓글 관련 로직 (CRUD)
  */
 @Slf4j
 @RestController
@@ -57,11 +56,9 @@ public class MissingPetBoardController {
     }
 
     // ==================== 게시글 관련 API (MissingPetBoardService) ====================
-
     /**
-     * 실종 제보 목록 조회 (페이징 지원).
-     * 쿼리: status, page, size.
-     * 서비스: MissingPetBoardService.getBoardsWithPaging()
+     * 실종 제보 목록 조회 (페이징 지원). 쿼리: status, page, size. 서비스:
+     * MissingPetBoardService.getBoardsWithPaging()
      */
     @GetMapping("/home")
     public ResponseEntity<List<MissingPetBoardDTO>> getHomeMissing(
@@ -80,13 +77,10 @@ public class MissingPetBoardController {
     }
 
     /**
-     * 실종 제보 상세 조회 (댓글 페이징 지원).
-     * path: 게시글 id. 쿼리: commentPage, commentSize.
-     * 서비스: MissingPetBoardService.getBoard()
-     * - 댓글 페이징 처리 (commentPage, commentSize 파라미터)
-     * - 기본값: commentPage=0, commentSize=20 (첫 페이지, 20개씩)
-     * - 댓글 제외: commentSize=0
-     * - 댓글 전체: 댓글 목록 전용 엔드포인트(getComments) 사용
+     * 실종 제보 상세 조회 (댓글 페이징 지원). path: 게시글 id. 쿼리: commentPage, commentSize. 서비스:
+     * MissingPetBoardService.getBoard() - 댓글 페이징 처리 (commentPage, commentSize
+     * 파라미터) - 기본값: commentPage=0, commentSize=20 (첫 페이지, 20개씩) - 댓글 제외:
+     * commentSize=0 - 댓글 전체: 댓글 목록 전용 엔드포인트(getComments) 사용
      */
     @GetMapping("/{id}")
     public ResponseEntity<MissingPetBoardDTO> getBoard(
@@ -100,8 +94,7 @@ public class MissingPetBoardController {
     }
 
     /**
-     * 실종 제보 작성.
-     * 서비스: MissingPetBoardService.createBoard()
+     * 실종 제보 작성. 서비스: MissingPetBoardService.createBoard()
      */
     @PostMapping
     public ResponseEntity<MissingPetBoardDTO> createBoard(
@@ -112,9 +105,7 @@ public class MissingPetBoardController {
     }
 
     /**
-     * 실종 제보 수정.
-     * path: 게시글 id.
-     * 서비스: MissingPetBoardService.updateBoard()
+     * 실종 제보 수정. path: 게시글 id. 서비스: MissingPetBoardService.updateBoard()
      */
     @PutMapping("/{id}")
     public ResponseEntity<MissingPetBoardDTO> updateBoard(
@@ -125,9 +116,8 @@ public class MissingPetBoardController {
     }
 
     /**
-     * 실종 제보 상태 변경.
-     * path: 게시글 id 및 status 세그먼트.
-     * 서비스: MissingPetBoardService.updateStatus()
+     * 실종 제보 상태 변경. path: 게시글 id 및 status 세그먼트. 서비스:
+     * MissingPetBoardService.updateStatus()
      */
     @PatchMapping("/{id}/status")
     public ResponseEntity<MissingPetBoardDTO> updateStatus(
@@ -150,10 +140,9 @@ public class MissingPetBoardController {
     }
 
     /**
-     * 실종 제보 삭제 (소프트 삭제).
-     * path: 게시글 id.
-     * 서비스: MissingPetBoardService.deleteBoard()
-     * 참고: 관련 댓글도 함께 소프트 삭제됨 (MissingPetCommentService.deleteAllCommentsByBoard())
+     * 실종 제보 삭제 (소프트 삭제). path: 게시글 id. 서비스:
+     * MissingPetBoardService.deleteBoard() 참고: 관련 댓글도 함께 소프트 삭제됨
+     * (MissingPetCommentService.deleteAllCommentsByBoard())
      */
     @DeleteMapping("/{id}")
     public ResponseEntity<Map<String, Object>> deleteBoard(@PathVariable("id") Long id) {
@@ -164,11 +153,9 @@ public class MissingPetBoardController {
     }
 
     // ========== 댓글 관련 API (MissingPetCommentService) ==========
-
     /**
-     * 댓글 목록 조회 (페이징 지원).
-     * path: 게시글 id. 쿼리: page, size.
-     * 서비스: MissingPetCommentService.getCommentsWithPaging()
+     * 댓글 목록 조회 (페이징 지원). path: 게시글 id. 쿼리: page, size. 서비스:
+     * MissingPetCommentService.getCommentsWithPaging()
      */
     @GetMapping("/{id}/comments")
     public ResponseEntity<MissingPetCommentPageResponseDTO> getComments(
@@ -179,9 +166,7 @@ public class MissingPetBoardController {
     }
 
     /**
-     * 댓글 작성.
-     * path: 게시글 id.
-     * 서비스: MissingPetCommentService.addComment()
+     * 댓글 작성. path: 게시글 id. 서비스: MissingPetCommentService.addComment()
      */
     @PostMapping("/{id}/comments")
     public ResponseEntity<MissingPetCommentDTO> addComment(
@@ -193,9 +178,8 @@ public class MissingPetBoardController {
     }
 
     /**
-     * 댓글 삭제 (소프트 삭제).
-     * path: 게시글 id, 댓글 id.
-     * 서비스: MissingPetCommentService.deleteComment()
+     * 댓글 삭제 (소프트 삭제). path: 게시글 id, 댓글 id. 서비스:
+     * MissingPetCommentService.deleteComment()
      */
     @DeleteMapping("/{boardId}/comments/{commentId}")
     public ResponseEntity<Map<String, Object>> deleteComment(
@@ -208,10 +192,9 @@ public class MissingPetBoardController {
     }
 
     // ==================== 채팅 관련 API ====================
-
     /**
-     * 실종 제보 채팅 시작 (목격 제보).
-     * path 변수 boardIdx. 목격자는 JWT principal(로그인 사용자 idx)만 사용하며 witnessId 쿼리는 받지 않음.
+     * 실종 제보 채팅 시작 (목격 제보). path 변수 boardIdx. 목격자는 JWT principal(로그인 사용자 idx)만
+     * 사용하며 witnessId 쿼리는 받지 않음.
      *
      * @see MissingPetBoardService#getUserIdByBoardIdx
      * @see ConversationService#createMissingPetChat

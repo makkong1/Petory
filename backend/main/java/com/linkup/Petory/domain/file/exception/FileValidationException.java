@@ -5,8 +5,7 @@ import org.springframework.http.HttpStatus;
 import com.linkup.Petory.global.exception.ApiException;
 
 /**
- * 파일 도메인 일반 검증 실패 시 발생하는 예외.
- * HTTP 400 Bad Request
+ * 파일 도메인 일반 검증 실패 시 발생하는 예외. HTTP 400 Bad Request
  */
 public class FileValidationException extends ApiException {
 

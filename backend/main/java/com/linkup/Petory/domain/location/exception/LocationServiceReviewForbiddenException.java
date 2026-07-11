@@ -5,8 +5,7 @@ import org.springframework.http.HttpStatus;
 import com.linkup.Petory.global.exception.ApiException;
 
 /**
- * 위치 서비스 리뷰에 대한 권한이 없을 때 (타인 리뷰 수정/삭제 등).
- * HTTP 403 Forbidden
+ * 위치 서비스 리뷰에 대한 권한이 없을 때 (타인 리뷰 수정/삭제 등). HTTP 403 Forbidden
  */
 public class LocationServiceReviewForbiddenException extends ApiException {
 

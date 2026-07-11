@@ -5,8 +5,7 @@ import org.springframework.http.HttpStatus;
 import com.linkup.Petory.global.exception.ApiException;
 
 /**
- * 위치 서비스를 찾을 수 없을 때 발생하는 예외.
- * HTTP 404 Not Found
+ * 위치 서비스를 찾을 수 없을 때 발생하는 예외. HTTP 404 Not Found
  */
 public class LocationServiceNotFoundException extends ApiException {
 

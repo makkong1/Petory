@@ -15,8 +15,7 @@ import com.linkup.Petory.domain.board.entity.MissingPetComment;
 public class MissingPetConverter {
 
     /**
-     * 게시글 DTO 변환 (댓글 포함)
-     * 댓글이 이미 로드된 경우에만 사용 (N+1 문제 주의)
+     * 게시글 DTO 변환 (댓글 포함) 댓글이 이미 로드된 경우에만 사용 (N+1 문제 주의)
      */
     public MissingPetBoardDTO toBoardDTO(MissingPetBoard board) {
         List<MissingPetCommentDTO> commentDTOs = board.getComments() == null
@@ -25,12 +24,15 @@ public class MissingPetConverter {
                         .filter(comment -> !comment.getIsDeleted()) // 삭제된 댓글 제외
                         .sorted((c1, c2) -> {
                             // createdAt 기준 오름차순 정렬 (최신순)
-                            if (c1.getCreatedAt() == null && c2.getCreatedAt() == null)
+                            if (c1.getCreatedAt() == null && c2.getCreatedAt() == null) {
                                 return 0;
-                            if (c1.getCreatedAt() == null)
+                            }
+                            if (c1.getCreatedAt() == null) {
                                 return 1;
-                            if (c2.getCreatedAt() == null)
+                            }
+                            if (c2.getCreatedAt() == null) {
                                 return -1;
+                            }
                             return c1.getCreatedAt().compareTo(c2.getCreatedAt());
                         })
                         .map(this::toCommentDTO)
@@ -65,8 +67,8 @@ public class MissingPetConverter {
     }
 
     /**
-     * 게시글 DTO 변환 (댓글 제외, N+1 문제 방지)
-     * 목록 조회 시 사용 - 댓글을 접근하지 않아 lazy loading을 트리거하지 않음
+     * 게시글 DTO 변환 (댓글 제외, N+1 문제 방지) 목록 조회 시 사용 - 댓글을 접근하지 않아 lazy loading을
+     * 트리거하지 않음
      */
     public MissingPetBoardDTO toBoardDTOWithoutComments(MissingPetBoard board) {
         return MissingPetBoardDTO.builder()
@@ -98,11 +100,11 @@ public class MissingPetConverter {
     }
 
     /**
-     * 목록 조회 시 toBoardDTOList 대신 boards.stream().map(this::toBoardDTOWithoutComments).toList() 사용.
+     * 목록 조회 시 toBoardDTOList 대신
+     * boards.stream().map(this::toBoardDTOWithoutComments).toList() 사용.
      * toBoardDTO 사용 시 board.getComments() 호출로 Lazy Loading → N+1 쿼리 발생.
      */
     // toBoardDTOList 제거됨 (dead code, N+1 위험)
-
     public MissingPetCommentDTO toCommentDTO(MissingPetComment comment) {
         return MissingPetCommentDTO.builder()
                 .idx(comment.getIdx())

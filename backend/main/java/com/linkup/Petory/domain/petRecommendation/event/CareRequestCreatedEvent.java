@@ -16,7 +16,7 @@ public class CareRequestCreatedEvent extends ApplicationEvent {
     private final String petType;  // "DOG" | "CAT" | "BIRD" | "RABBIT" | "HAMSTER" | "ETC" | null
 
     public CareRequestCreatedEvent(Object source, Long userIdx, Long careRequestId,
-                                   String text, String petType) {
+            String text, String petType) {
         super(source);
         this.userIdx = userIdx;
         this.careRequestId = careRequestId;

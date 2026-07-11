@@ -34,8 +34,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * 일반 사용자용 프로필 관리 컨트롤러
- * - 모든 인증된 사용자(USER, SERVICE_PROVIDER, ADMIN, MASTER)가 자신의 프로필을 조회/수정 가능
+ * 일반 사용자용 프로필 관리 컨트롤러 - 모든 인증된 사용자(USER, SERVICE_PROVIDER, ADMIN, MASTER)가 자신의
+ * 프로필을 조회/수정 가능
  */
 @Slf4j
 @RestController
@@ -61,8 +61,8 @@ public class UserProfileController {
     }
 
     /**
-     * 자신의 프로필 조회 (리뷰 포함)
-     * [리팩토링] getReviewsByReviewee + getAverageRating 2회 → getReviewsWithAverage 1회
+     * 자신의 프로필 조회 (리뷰 포함) [리팩토링] getReviewsByReviewee + getAverageRating 2회 →
+     * getReviewsWithAverage 1회
      */
     @GetMapping("/me")
     public ResponseEntity<UserProfileWithReviewsDTO> getMyProfile(
@@ -96,9 +96,8 @@ public class UserProfileController {
     }
 
     /**
-     * 자신의 프로필 수정 (닉네임, 이메일, 전화번호, 위치, 펫 정보 등)
-     * - 당사자만 수정 가능 (권한 검증 포함)
-     * - 관리자(MASTER 포함)도 다른 사람의 프로필을 수정할 수 없음
+     * 자신의 프로필 수정 (닉네임, 이메일, 전화번호, 위치, 펫 정보 등) - 당사자만 수정 가능 (권한 검증 포함) -
+     * 관리자(MASTER 포함)도 다른 사람의 프로필을 수정할 수 없음
      */
     @PutMapping("/me")
     public ResponseEntity<UsersDTO> updateMyProfile(
@@ -279,21 +278,28 @@ public class UserProfileController {
      */
     private String getRedirectUrl(EmailVerificationPurpose purpose) {
         return switch (purpose) {
-            case REGISTRATION -> "/"; // 회원가입 완료 후 메인 페이지
-            case PASSWORD_RESET -> "/password-reset";
-            case PET_CARE -> "/care-requests";
-            case MEETUP -> "/meetups";
-            case LOCATION_REVIEW -> "/location-services";
-            case BOARD_EDIT -> "/boards";
-            case COMMENT_EDIT -> "/boards";
-            case MISSING_PET -> "/missing-pets";
+            case REGISTRATION ->
+                "/"; // 회원가입 완료 후 메인 페이지
+            case PASSWORD_RESET ->
+                "/password-reset";
+            case PET_CARE ->
+                "/care-requests";
+            case MEETUP ->
+                "/meetups";
+            case LOCATION_REVIEW ->
+                "/location-services";
+            case BOARD_EDIT ->
+                "/boards";
+            case COMMENT_EDIT ->
+                "/boards";
+            case MISSING_PET ->
+                "/missing-pets";
         };
     }
 
     /**
-     * 다른 사용자의 프로필 조회 (리뷰 포함)
-     * [리팩토링] getReviewsByReviewee + getAverageRating 2회 → getReviewsWithAverage 1회
-     * - 인증된 사용자는 다른 사용자의 프로필을 조회할 수 있음
+     * 다른 사용자의 프로필 조회 (리뷰 포함) [리팩토링] getReviewsByReviewee + getAverageRating 2회
+     * → getReviewsWithAverage 1회 - 인증된 사용자는 다른 사용자의 프로필을 조회할 수 있음
      */
     @GetMapping("/{userId}/profile")
     public ResponseEntity<UserProfileWithReviewsDTO> getUserProfile(@PathVariable("userId") Long userId) {

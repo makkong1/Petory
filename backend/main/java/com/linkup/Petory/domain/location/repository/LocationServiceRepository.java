@@ -12,6 +12,7 @@ import com.linkup.Petory.domain.location.entity.LocationService;
  * MyBatis, NoSQL 등)로 교체 가능하도록 설계되었습니다.
  *
  * 구현체: - JpaLocationServiceAdapter: JPA 기반 구현체 - 다른 DB로 변경 시 새로운 어댑터를 만들고
+ *
  * @Primary를 옮기면 됩니다.
  */
 public interface LocationServiceRepository {
@@ -61,7 +62,6 @@ public interface LocationServiceRepository {
     // 읍면동·도로명 검색 — 프론트 미사용으로 비활성화
     // List<LocationService> findByEupmyeondong(String eupmyeondong, String keyword, String category, int limit);
     // List<LocationService> findByRoadName(String roadName, String keyword, String category, int limit);
-
     /**
      * [FIX] 서비스 평점과 리뷰 수를 리뷰 집계 기준으로 원자적 갱신 (DB 단일 UPDATE)
      */

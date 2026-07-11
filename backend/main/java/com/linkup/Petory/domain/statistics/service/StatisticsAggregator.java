@@ -80,7 +80,9 @@ public class StatisticsAggregator {
     }
 
     private BigDecimal calcRate(long numerator, long denominator) {
-        if (denominator == 0) return BigDecimal.ZERO;
+        if (denominator == 0) {
+            return BigDecimal.ZERO;
+        }
         return BigDecimal.valueOf(numerator * 100.0 / denominator).setScale(2, RoundingMode.HALF_UP);
     }
 }

@@ -6,7 +6,14 @@ import java.util.stream.Collectors;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import com.linkup.Petory.domain.board.dto.MissingPetBoardDTO;
 import com.linkup.Petory.domain.board.dto.MissingPetBoardPageResponseDTO;
@@ -18,10 +25,8 @@ import com.linkup.Petory.domain.board.service.MissingPetCommentService;
 import lombok.RequiredArgsConstructor;
 
 /**
- * 실종/목격 관리 컨트롤러 (관리자용)
- * - ADMIN과 MASTER 모두 접근 가능
- * - 실종 제보 목록 조회, 상태 변경, 삭제/복구
- * - 댓글 관리
+ * 실종/목격 관리 컨트롤러 (관리자용) - ADMIN과 MASTER 모두 접근 가능 - 실종 제보 목록 조회, 상태 변경, 삭제/복구 -
+ * 댓글 관리
  */
 @RestController
 @RequestMapping("/api/admin/missing-pets")
@@ -33,10 +38,9 @@ public class AdminMissingPetController {
     private final MissingPetCommentService missingPetCommentService;
 
     /**
-     * [리팩토링] 실종 제보 목록 조회 - DB 레벨 필터링 + 페이징
-     * - 기존: getBoards() 전체 메모리 로드 후 stream 필터 → OOM 위험
-     * - 변경: getAdminBoardsWithPaging() Specification + DB 페이징
-     * - deleted=true 시 삭제된 게시글도 조회 가능 (기존 getBoards는 isDeleted=false만 조회하여 불가했음)
+     * [리팩토링] 실종 제보 목록 조회 - DB 레벨 필터링 + 페이징 - 기존: getBoards() 전체 메모리 로드 후 stream
+     * 필터 → OOM 위험 - 변경: getAdminBoardsWithPaging() Specification + DB 페이징 -
+     * deleted=true 시 삭제된 게시글도 조회 가능 (기존 getBoards는 isDeleted=false만 조회하여 불가했음)
      */
     @GetMapping("/paging")
     public ResponseEntity<MissingPetBoardPageResponseDTO> listMissingPetsWithPaging(
@@ -90,8 +94,7 @@ public class AdminMissingPetController {
     }
 
     /**
-     * 실종 제보 복구
-     * 서비스: MissingPetBoardService.restoreBoard()
+     * 실종 제보 복구 서비스: MissingPetBoardService.restoreBoard()
      */
     @PostMapping("/{id}/restore")
     public ResponseEntity<MissingPetBoardDTO> restoreMissingPet(@PathVariable("id") Long id) {
@@ -99,8 +102,7 @@ public class AdminMissingPetController {
     }
 
     /**
-     * 댓글 목록 조회
-     * 서비스: MissingPetCommentService.getComments()
+     * 댓글 목록 조회 서비스: MissingPetCommentService.getComments()
      */
     @GetMapping("/{boardId}/comments")
     public ResponseEntity<List<MissingPetCommentDTO>> listComments(
@@ -120,8 +122,7 @@ public class AdminMissingPetController {
     }
 
     /**
-     * 댓글 삭제
-     * 서비스: MissingPetCommentService.deleteComment()
+     * 댓글 삭제 서비스: MissingPetCommentService.deleteComment()
      */
     @PostMapping("/{boardId}/comments/{commentId}/delete")
     public ResponseEntity<Void> deleteComment(

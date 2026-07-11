@@ -5,8 +5,7 @@ import org.springframework.http.HttpStatus;
 import com.linkup.Petory.global.exception.ApiException;
 
 /**
- * 이미 해당 대상을 신고했을 때 발생하는 예외.
- * HTTP 409 Conflict
+ * 이미 해당 대상을 신고했을 때 발생하는 예외. HTTP 409 Conflict
  */
 public class ReportConflictException extends ApiException {
 

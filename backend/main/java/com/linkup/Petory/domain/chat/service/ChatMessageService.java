@@ -109,8 +109,7 @@ public class ChatMessageService {
     }
 
     /**
-     * 채팅방 메시지 조회 (페이징)
-     * 재참여한 경우 joinedAt 이후 메시지만 조회
+     * 채팅방 메시지 조회 (페이징) 재참여한 경우 joinedAt 이후 메시지만 조회
      */
     public Page<ChatMessageDTO> getMessages(Long conversationIdx, Long userId, int page, int size) {
         requireActiveParticipant(conversationIdx, userId);
@@ -180,7 +179,7 @@ public class ChatMessageService {
             }
         }
         participantRepository.save(participant);
-        
+
         // ⚠️ 제거됨: 불필요한 전체 메시지 조회 및 MessageReadStatus 기록 로직
         // - 전체 메시지 조회는 성능 문제를 일으킴 (수천~수만 건 조회)
         // - MessageReadStatus 기록 로직은 실제로 사용되지 않음
