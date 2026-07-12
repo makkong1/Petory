@@ -1,7 +1,5 @@
 ---
-
-## date: 2026-07-12
-
+date: 2026-07-12
 domains: [missingpet, file]
 type: performance-evidence
 problem: n-plus-one
@@ -10,6 +8,7 @@ metric: "worktree 실측(실제 커밋 코드): 267→4 queries (-98.5%), 762ms�
 before_commit: 9c7e0d68
 after_commit: 9dbf85ba
 related: [docs/troubleshooting/missing-pet/performance-measurement-results.md]
+---
 
 # MissingPet 목록 N+1 재검증 — 통합테스트 + EXPLAIN (2026-07-12)
 

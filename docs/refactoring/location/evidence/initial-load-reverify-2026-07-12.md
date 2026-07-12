@@ -1,7 +1,5 @@
 ---
-
-## date: 2026-07-12
-
+date: 2026-07-12
 domains: [location]
 type: performance-evidence
 problem: overfetching
@@ -10,6 +8,7 @@ metric: "worktree 실제 커밋: 22.4MB→100KB, 531.8ms→50.9ms. size=30000 �
 before_commit: 5ef571d9
 after_commit: 162ebc14
 related: [docs/troubleshooting/location/initial-load-performance.md]
+---
 
 # Location 초기 로드 재검증 — 실제 API 실측 + EXPLAIN (2026-07-12)
 
