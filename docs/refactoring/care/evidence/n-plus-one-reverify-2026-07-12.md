@@ -22,6 +22,7 @@ related: [docs/troubleshooting/care/care-request-n-plus-one-analysis.md, docs/tr
 - **Before**: JOIN FETCH 없는 EntityManager 쿼리로 CareRequest 조회 → `applications`/`pet.vaccinations` lazy 접근 + `attachmentFileService.getAttachments()`(단건) 호출로 문서가 기술한 "해결 전 코드"를 재현
 - **After**: 재현 코드가 아니라 **실제 서비스가 쓰는 코드 그대로** — `careRequestRepository.findAllActiveRequests()`(레포지토리 JOIN FETCH) + `careRequestConverter.toDTOList()`(Pet 배치 변환) 호출
 - 환경: 로컬 MySQL 8(`petory`), `@Transactional` 롤백으로 실데이터(care 1,014건) 비영향
+- **추가 검증(§1.5)**: `git worktree`로 `7aca5882`(before)를 실제 checkout해 그 시점 `CareRequestService.getAllCareRequests()`를 재구성 없이 직접 호출, dev(after)에서도 동일 메서드를 그대로 호출해 비교했다.
 
 ## 1. 통합테스트 실행 결과
 
@@ -32,7 +33,41 @@ related: [docs/troubleshooting/care/care-request-n-plus-one-analysis.md, docs/tr
 
 원 문서의 "~2,400개"보다 훨씬 적은 101개가 나온 이유는 **재검증 시점 기준으로 이미 3단계 최적화 중 2개(**`applications` \***\*`@BatchSize(50)`**,** `Pet.vaccinations` \*\***`@BatchSize(50)`**)가 코드에 존재하기 때문**이다. 아래 §2에서 이 부분을 세부 계측으로 확인했다.
 
-## 2. 세부 계측 — Before의 101개 쿼리는 정확히 무엇인가
+## 1.5. worktree 검증 — 실제 그 커밋의 코드는 어땠나 (그리고 측정 도구의 함정 발견)
+
+§1은 테스트 헬퍼로 옛 패턴을 재구성한 것이다. `git worktree`로 `7aca5882`(before, `@BatchSize` 최적화 이전)를 실제 checkout해서, 그 시점에 **실제로 존재하는** `CareRequestService.getAllCareRequests()`를 재구성 없이 그대로 호출했다.
+
+**결과(Hibernate Statistics API 기준)**:
+
+| | Before(`7aca5882`) | After(dev) |
+|---|---|---|
+| Statistics API 쿼리 수 | 51개 | 2개 |
+| 실행 시간 | 478ms | 210ms |
+
+**이 수치를 실제 SQL 로그와 대조하자 불일치가 드러났다.** Before의 로그를 `grep`으로 직접 세어보면:
+
+```
+select af1_0... from file            → 50회 (File 개별조회)
+select v1_0... from pet_vaccinations → 50회 (vaccinations lazy)
+select a1_0... from careapplication  → 50회 (applications lazy)
+select cr1_0... from carerequest     → 1회  (메인)
+```
+
+**실제 SQL은 151개인데 Statistics API는 51개라고 보고했다.** After도 마찬가지로 로그상 File 배치 1 + vaccinations 배치 1 + users 배치 1 + 메인 1 = 4개(우리 요청과 무관한 meetup 쿼리 1개가 로그에 섞여 있어 별도)인데 Statistics API는 2개라고 보고했다.
+
+**원인으로 추정되는 것**: Hibernate `Statistics.getQueryExecutionCount()`는 HQL/JPQL(`@Query` 애노테이션 쿼리) 실행만 카운트하고, Spring Data 파생 쿼리(메서드 이름 기반, 예: `findByTargetTypeAndTargetIdx`)나 컬렉션 lazy 초기화는 별도 통계 카테고리(`collectionFetchCount` 등)로 잡혀 `getQueryExecutionCount()`에 반영되지 않는 것으로 보인다. 오늘 다른 도메인(Board 등) 재검증에서는 이 값이 실제 SQL 카운트와 정확히 일치했는데, Care는 `AttachmentFileService`/`PetVaccination` 조회가 Spring Data 파생 쿼리 위주라 이 함정에 걸린 것으로 판단된다.
+
+**결론**: 이번 재검증부터는 **Hibernate Statistics API 값보다 실제 SQL 로그(`grep -c`) 카운트를 최종 수치로 채택**한다. 정정된 실측:
+
+| | Before(`7aca5882`, 실제 커밋 코드) | After(dev, 실제 프로덕션 코드) |
+|---|---|---|
+| **실제 SQL 카운트** | **151개** (메인1 + applications lazy 50 + file 개별 50 + vaccinations lazy 50) | **4개** (메인1 + file 배치1 + vaccinations 배치1 + users 배치1) |
+| 실행 시간 | 478ms | 210ms |
+| 결과 수 | 50건 | 50건 |
+
+151→4는 **-97.4%** — §1의 재구성 테스트(101→2, -98%)와 절대 수치는 다르지만(픽스처 규모·환경 차이) 방향과 크기는 일치한다. 재구성이 실제 역사를 정확히 반영했음을 다시 확인했다.
+
+## 2. 세부 계측 — Before의 101개 쿼리는 정확히 무엇인가 (§1 재구성 테스트 기준)
 
 Before 재현 코드는 게시글마다 3가지를 건드린다: `applications.size()`(lazy), `pet.getVaccinations().size()`(lazy), `attachmentFileService.getAttachments()`(명시적 단건 Repository 호출).
 
