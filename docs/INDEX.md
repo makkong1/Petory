@@ -9,7 +9,7 @@ frontmatter가 붙은 문서 21건. 각 문서 상단에 `date/domains/type/prob
 | --- | --- | --- | --- | --- | --- |
 | 2026-07-12 | [동시성/Race Condition 재검증 — 테스트 재실행 (2026-07-12)](concurrency/evidence/race-condition-reverify-2026-07-12.md) | meetup, payment, care | race-condition | Meetup 3명 제한 정확히 지켜짐(2성공+1실패), PetCoin 100→150 정확히 누적(Lost Update 없음), Care stuck state 없이 OPEN→IN_PROGRESS 정상 전이 | - |
 | 2026-07-12 | [Care 요청 목록 N+1 재검증 — 통합테스트 + EXPLAIN (2026-07-12)](refactoring/care/evidence/n-plus-one-reverify-2026-07-12.md) | care, file | n-plus-one | 101→2 queries (-98%), 511ms~617ms→133ms~137ms; file 테이블 인덱스 부재 추가 발견 | 전:[7aca5882](https://github.com/makkong1/Petory/commit/7aca5882) 후:[9c7e0d68](https://github.com/makkong1/Petory/commit/9c7e0d68) |
-| 2026-07-12 | [Chat 채팅방 목록 N+1 재검증 — 통합테스트 + EXPLAIN (2026-07-12)](refactoring/chat/evidence/n-plus-one-reverify-2026-07-12.md) | chat | n-plus-one | 21→4 queries (-80.95%), 130ms→44ms (-66.15%), 438KB→152KB (-65.22%) | 전:[496e121a](https://github.com/makkong1/Petory/commit/496e121a) 후:[30f7e078](https://github.com/makkong1/Petory/commit/30f7e078) |
+| 2026-07-12 | [Chat 채팅방 목록 N+1 재검증 — 통합테스트 + EXPLAIN (2026-07-12)](refactoring/chat/evidence/n-plus-one-reverify-2026-07-12.md) | chat | n-plus-one | worktree 실측(실제 커밋 코드): 41→4 queries (-90.2%), 167ms→70ms. 재구성 테스트: 21→4 (-80.95%), 130ms→44ms | 전:[496e121a](https://github.com/makkong1/Petory/commit/496e121a) 후:[30f7e078](https://github.com/makkong1/Petory/commit/30f7e078) |
 | 2026-07-12 | [Board 목록 N+1 재검증 — 통합테스트 + EXPLAIN (2026-07-12)](refactoring/board/evidence/n-plus-one-reverify-2026-07-12.md) | board | n-plus-one | 301→3 queries (-99%), 561ms→55ms (10.2x), 21MB→3MB | 전:[3a7a581d](https://github.com/makkong1/Petory/commit/3a7a581d) 후:[19b7c120](https://github.com/makkong1/Petory/commit/19b7c120) |
 | 2026-07-12 | [Location 초기 로드 재검증 — 실제 API 실측 + EXPLAIN (2026-07-12)](refactoring/location/evidence/initial-load-reverify-2026-07-12.md) | location | overfetching | 22.3MB→100KB (-99.6%), 602ms→49ms (-91.9%) HTTP 실측; DEFAULT_RADIUS_LIMIT=100 신규 발견 | 전:[5ef571d9](https://github.com/makkong1/Petory/commit/5ef571d9) 후:[162ebc14](https://github.com/makkong1/Petory/commit/162ebc14) |
 | 2026-07-12 | [MissingPet 목록 N+1 재검증 — 통합테스트 + EXPLAIN (2026-07-12)](refactoring/missing-pet/evidence/n-plus-one-reverify-2026-07-12.md) | missingpet, file | n-plus-one | 201→4 queries (-98%), 428ms→38ms (-91.1%) | 전:[9c7e0d68](https://github.com/makkong1/Petory/commit/9c7e0d68) 후:[9dbf85ba](https://github.com/makkong1/Petory/commit/9dbf85ba) |
@@ -53,7 +53,7 @@ frontmatter가 붙은 문서 21건. 각 문서 상단에 `date/domains/type/prob
 
 | 날짜 | 문서 | 문제 | 수치 |
 | --- | --- | --- | --- |
-| 2026-07-12 | [Chat 채팅방 목록 N+1 재검증 — 통합테스트 + EXPLAIN (2026-07-12)](refactoring/chat/evidence/n-plus-one-reverify-2026-07-12.md) | n-plus-one | 21→4 queries (-80.95%), 130ms→44ms (-66.15%), 438KB→152KB (-65.22%) |
+| 2026-07-12 | [Chat 채팅방 목록 N+1 재검증 — 통합테스트 + EXPLAIN (2026-07-12)](refactoring/chat/evidence/n-plus-one-reverify-2026-07-12.md) | n-plus-one | worktree 실측(실제 커밋 코드): 41→4 queries (-90.2%), 167ms→70ms. 재구성 테스트: 21→4 (-80.95%), 130ms→44ms |
 | 2026-05-07 | [채팅방 참여자 조회 N+1 쿼리 문제](troubleshooting/chat/n-plus-one-conversationparticipant.md) | n-plus-one | 케이스B(getMyConversations) 수정 완료, 케이스A(getConversation 단건조회 반복)는 해결 방향만 제시 |
 | 2025-12-20 | [채팅 메시지 읽음 처리 성능 문제](troubleshooting/chat/read-status-performance.md) | unnecessary-full-scan | 메시지 7,000건 기준 전체 조회 쿼리 1개 제거, 트랜잭션 범위 축소 |
 | 2025-12-10 | [로그인 시 N+1 문제 해결](troubleshooting/users/login-n-plus-one-issue.md) | n-plus-one | 21→4 queries (-80.95%), 305ms→55ms (-81.97%), 0.58MB→0.13MB |
@@ -129,7 +129,7 @@ frontmatter가 붙은 문서 21건. 각 문서 상단에 `date/domains/type/prob
 | 날짜 | 문서 | 도메인 | 수치 |
 | --- | --- | --- | --- |
 | 2026-07-12 | [Care 요청 목록 N+1 재검증 — 통합테스트 + EXPLAIN (2026-07-12)](refactoring/care/evidence/n-plus-one-reverify-2026-07-12.md) | care, file | 101→2 queries (-98%), 511ms~617ms→133ms~137ms; file 테이블 인덱스 부재 추가 발견 |
-| 2026-07-12 | [Chat 채팅방 목록 N+1 재검증 — 통합테스트 + EXPLAIN (2026-07-12)](refactoring/chat/evidence/n-plus-one-reverify-2026-07-12.md) | chat | 21→4 queries (-80.95%), 130ms→44ms (-66.15%), 438KB→152KB (-65.22%) |
+| 2026-07-12 | [Chat 채팅방 목록 N+1 재검증 — 통합테스트 + EXPLAIN (2026-07-12)](refactoring/chat/evidence/n-plus-one-reverify-2026-07-12.md) | chat | worktree 실측(실제 커밋 코드): 41→4 queries (-90.2%), 167ms→70ms. 재구성 테스트: 21→4 (-80.95%), 130ms→44ms |
 | 2026-07-12 | [Board 목록 N+1 재검증 — 통합테스트 + EXPLAIN (2026-07-12)](refactoring/board/evidence/n-plus-one-reverify-2026-07-12.md) | board | 301→3 queries (-99%), 561ms→55ms (10.2x), 21MB→3MB |
 | 2026-07-12 | [MissingPet 목록 N+1 재검증 — 통합테스트 + EXPLAIN (2026-07-12)](refactoring/missing-pet/evidence/n-plus-one-reverify-2026-07-12.md) | missingpet, file | 201→4 queries (-98%), 428ms→38ms (-91.1%) |
 | 2026-05-07 | [채팅방 참여자 조회 N+1 쿼리 문제](troubleshooting/chat/n-plus-one-conversationparticipant.md) | chat | 케이스B(getMyConversations) 수정 완료, 케이스A(getConversation 단건조회 반복)는 해결 방향만 제시 |
