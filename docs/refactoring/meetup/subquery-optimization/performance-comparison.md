@@ -1,3 +1,12 @@
+---
+date: 2026-02-08
+domains: [meetup]
+type: performance-evidence
+problem: query-optimization
+status: verified
+metric: "156ms→57ms (-63.5%), 메모리 19.07MB→2.00MB (-89.5%)"
+---
+
 # findAvailableMeetups() 성능 비교 - 리팩토링 전/후
 
 ## 📋 측정 개요

@@ -1,3 +1,12 @@
+---
+date: 2026-07-11
+domains: [user]
+type: sql-evidence
+problem: dynamic-query-antipattern
+status: verified
+metric: "':param IS NULL OR' 안티패턴 제거 확인(SQL 로그). 성능 개선은 modest — LIKE/CAST가 실행계획 지배"
+---
+
 # 관리자 유저 검색 QueryDSL 전환 — before/after SQL 증거
 
 > 작성일: 2026-07-11

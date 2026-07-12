@@ -1,3 +1,12 @@
+---
+date: 2025-12-10
+domains: [chat, user]
+type: performance-evidence
+problem: n-plus-one
+status: verified
+metric: "21→4 queries (-80.95%), 305ms→55ms (-81.97%), 0.58MB→0.13MB"
+---
+
 # 로그인 시 N+1 문제 해결
 
 ## 문제 상황

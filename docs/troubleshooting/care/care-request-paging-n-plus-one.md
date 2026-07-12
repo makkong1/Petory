@@ -1,3 +1,12 @@
+---
+date: 2026-02-28
+domains: [care]
+type: troubleshooting
+problem: n-plus-one
+status: partially-fixed
+metric: "페이징 경로 applications N+1 — @BatchSize(50) 적용 완료, JOIN FETCH 대안은 미적용"
+---
+
 # 펫케어 요청 목록 조회 (페이징) N+1 쿼리 문제
 
 ## 개요

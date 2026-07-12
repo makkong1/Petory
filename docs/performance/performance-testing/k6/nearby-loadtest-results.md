@@ -1,3 +1,12 @@
+---
+date: 2026-07-11
+domains: [meetup]
+type: performance-evidence
+problem: in-memory-filtering
+status: verified
+metric: "소규모 p95 78.0→37.4ms(-52%); 대용량 처리량 2.11→26.7req/s(~12.6x), p95 1.75s→57.5ms(~30x)"
+---
+
 # 모임 반경조회(nearby) k6 부하테스트 — before/after 실측 (소규모 + 대용량)
 
 > 측정일: 2026-07-11
