@@ -16,13 +16,14 @@ related: [docs/troubleshooting/board/performance-optimization.md]
 
 ## 0. 방법론
 
-- 실제 해결 커밋: [`19b7c120`](https://github.com/makkong1/Petory/commit/19b7c120) (2025-11-19, `게시글 목록 조회 n+1 문제해결`). 이 커밋 직전인 [`3a7a581d`](https://github.com/makkong1/Petory/commit/3a7a581d)에 실제 N+1 코드가 남아있다 — 아래 테스트는 그 시점 코드를 헬퍼 메서드로 패턴 재현한 것이지 커밋에서 그대로 복사한 건 아니므로, 정확한 원본이 필요하면 `git show 3a7a581d:backend/main/java/com/linkup/Petory/domain/board/service/BoardService.java`로 직접 대조할 수 있다.
+- 실제 해결 커밋: [`19b7c120`](https://github.com/makkong1/Petory/commit/19b7c120) (2025-11-19, `게시글 목록 조회 n+1 문제해결`). 직전 커밋은 [`3a7a581d`](https://github.com/makkong1/Petory/commit/3a7a581d).
 - 재현 대상: `backend/test/java/.../BoardPerformanceComparisonTest.java` (기존 테스트, 신규 작성 아님)
 - 실행: `./gradlew test --tests BoardPerformanceComparisonTest --rerun` — Hibernate Statistics로 쿼리 수·실행시간·메모리 측정
 - 환경: 로컬 MySQL 8(`petory`, `ddl-auto=none`), `@Transactional` 롤백이라 실데이터(board 10,264건) 비영향
 - EXPLAIN 대상: 테스트가 재현하는 두 쿼리 패턴(개별 COUNT 반복 vs IN절 배치)을 **실제 로컬 DB의 실제 board_idx 값**으로 별도 실행
+- **추가 검증(§1.5)**: §1의 결과는 테스트 헬퍼로 옛 패턴을 재구성한 것이었다. 이 재구성이 실제 역사와 같은지 `git worktree`로 직접 확인했다 — `3a7a581d`(before)를 실제로 checkout해서 그 커밋의 `BoardService.getAllBoards()`를 **재구성 없이 그대로 호출**하고, 같은 fixture로 dev(after) 코드도 동일하게 호출해 비교했다.
 
-## 1. 통합테스트 재실행 결과 (재현성 확인)
+## 1. 통합테스트 재실행 결과 (재현성 확인, 헬퍼로 재구성한 코드 기준)
 
 ### 테스트 3 — 전체 시나리오 (작성자 LAZY + 반응 개별 + 첨부파일 개별 → 배치 전환)
 
@@ -45,6 +46,27 @@ related: [docs/troubleshooting/board/performance-optimization.md]
 `entityManager.clear()` + 2차 캐시 evict를 해도 같은 `@Transactional` 트랜잭션 내에서는 Hibernate가 이미 로드한 `Users`를 재사용해 LAZY N+1이 실제로 재현되지 않는다(쿼리 1→1, 0% 감소). 이건 이 테스트 환경의 알려진 한계이며, 옛 문서에도 동일하게 기록돼 있다. 프로덕션에서는 요청마다 새 영속성 컨텍스트이므로 이 캐싱 효과가 없다.
 
 **해석**: 절대 시간(561ms vs 옛 문서 745ms)은 실행할 때마다 달라진다(로컬 머신 부하, JIT, 커넥션풀 워밍업 등) — 이건 예상된 변동이다. 재현성의 핵심은 **패턴이 고정된다는 것**: 쿼리 수는 정확히 301→3, 201→2로 100% 재현됐고, 시간은 매번 8~10배 이상 개선된다.
+
+## 1.5. worktree 검증 — 재구성이 아니라 실제 그 커밋의 코드를 실행
+
+§1은 테스트 헬퍼로 옛 패턴을 손으로 옮겨 적은 것이다. 이게 실제 역사와 같은지, `git worktree`로 완전히 격리된 공간을 만들어 확인했다.
+
+**방법**:
+1. `git worktree add`로 별도 디렉토리 생성 후 `git checkout 3a7a581d`(before, detached HEAD)
+2. 이 시점엔 `Users` 엔티티에 `nickname` 필드가 없고, `kakao.rest-api-key` 설정이 필요했다(지금은 `naver` 지도로 전환돼 있음) — **8개월치 스키마·설정 드리프트가 실제로 존재함을 그 자리에서 확인**했다. fixture를 이 시점 엔티티 구조에 맞게 조정하고, 더미 설정을 임시로 추가해 컨텍스트 로딩만 통과시켰다(비즈니스 로직 변경 없음)
+3. 재구성 없이 **이 커밋에 실제로 존재하는 `BoardService.getAllBoards(category)`를 직접 호출**하는 테스트 1개만 새로 작성 (fixture 100개, 카테고리로 격리)
+4. 같은 브랜치에서 `git checkout <dev 최신>`으로 되돌아와 **동일 테스트를 재실행** (재구성이 아니라 마찬가지로 `getAllBoards()`를 그대로 호출 — 다만 dev의 최신 구현은 내부적으로 배치 조회를 쓴다)
+
+**결과**:
+
+| | Before(`3a7a581d`, 실제 커밋 코드) | After(dev, 실제 프로덕션 코드) |
+|---|---|---|
+| 쿼리 수 | **301개** | **3개** |
+| 실행 시간 | 787ms | 38ms |
+| 메모리 | 3.1MB | (거의 0, GC 영향으로 음수 측정) |
+| 결과 수 | 100건 | 100건 |
+
+쿼리 수(301→3)가 §1의 재구성 테스트와 **정확히 일치**한다 — 재구성이 실제 역사를 정확히 반영했음이 이제 이중으로 확인됐다(소스 대조 + 실행 결과 대조). 시간(787ms)은 §1(561ms)보다 느린데, 워크트리가 이번 세션에서 처음 기동돼 JIT/커넥션풀 워밍업이 없었기 때문으로 보인다 — 시간의 절대값보다 **쿼리 수 301→3, 개선 배율(약 20배)**이 핵심 증거다.
 
 ## 2. EXPLAIN — 개별조회 vs 배치조회의 실행계획
 
