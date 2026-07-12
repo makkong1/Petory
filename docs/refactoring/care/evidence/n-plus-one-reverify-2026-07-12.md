@@ -132,7 +132,23 @@ FROM file WHERE target_type='PET' AND target_idx IN (100개);
 | Before(개별) | 100회     | 240행      | 24,000행 상당  |
 | After(배치)  | 1회       | 240행      | 240행          |
 
-배치 전환으로 "테이블을 몇 번 훑는가"는 100배 줄었지만, **한 번 훑을 때마다 인덱스 없이 전체 스캔한다는 근본 문제는 그대로**다. `file` 테이블이 지금 240행이라 안 보이지만, 파일이 수만 건으로 늘어나면 배치조회 1건조차 무거워진다. 이건 이번 재검증에서 새로 확인한 **별도의 개선 여지**(N+1 문제와는 다른 인덱스 누락 이슈)로, 이 문서에서는 발견 사실만 정직하게 남기고 인덱스 추가는 범위 밖으로 둔다.
+배치 전환으로 "테이블을 몇 번 훑는가"는 100배 줄었지만, **한 번 훑을 때마다 인덱스 없이 전체 스캔한다는 근본 문제는 그대로**다. `file` 테이블이 지금 240행이라 안 보이지만, 파일이 수만 건으로 늘어나면 배치조회 1건조차 무거워진다.
+
+**후속 조치(2026-07-12, 완료)**: `(target_type, target_idx)` 복합 인덱스를 추가했다.
+
+```sql
+CREATE INDEX idx_file_target ON file (target_type, target_idx);
+-- backend/main/resources/sql/migration/applied/file-target-index.sql
+```
+
+적용 후 EXPLAIN 재확인:
+
+| | 개별조회 | 배치조회(IN 100개) |
+|---|---|---|
+| 적용 전 | Table scan, 240행, 0.444ms | Table scan, 240행, 0.211ms |
+| 적용 후 | **Index lookup**, 1행, **0.0317ms** | **Index range scan**, **0.0423ms** |
+
+240행 기준으로도 약 5~14배 빨라졌고, 데이터가 커질수록 격차는 더 벌어진다. `.github/ci-schema.sql`도 `mysqldump`로 재생성해 CI 스키마에 반영했고, File 관련 통합테스트(`CareRequestNPlusOneReverifyTest`, `MissingPetNPlusOneReverifyTest`, `AdminFileFacadeTest`) 재실행으로 회귀 없음을 확인했다.
 
 ## 4. 재현 방법
 

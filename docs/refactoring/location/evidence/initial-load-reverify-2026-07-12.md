@@ -1,5 +1,7 @@
 ---
-date: 2026-07-12
+
+## date: 2026-07-12
+
 domains: [location]
 type: performance-evidence
 problem: overfetching
@@ -8,7 +10,6 @@ metric: "worktree 실제 커밋: 22.4MB→100KB, 531.8ms→50.9ms. size=30000 �
 before_commit: 5ef571d9
 after_commit: 162ebc14
 related: [docs/troubleshooting/location/initial-load-performance.md]
----
 
 # Location 초기 로드 재검증 — 실제 API 실측 + EXPLAIN (2026-07-12)
 
@@ -21,9 +22,9 @@ related: [docs/troubleshooting/location/initial-load-performance.md]
 - `searchLocationServicesByLocation()`(반경검색): `limit = maxResults ?? DEFAULT_RADIUS_LIMIT(100)` — 항상 상한이 걸린다
 - `searchLocationServicesByRegion()`(지역/기본검색, sido·sigungu 없을 때 `findByOrderByRatingDesc` 사용): `limit = maxResults ?? 50` — 이것도 기본 50건 제한
 
-**즉 "무제한 전체조회"라는 옛 시나리오 자체가 현재 코드에는 없다.** `size`(=maxResults)를 그대로 `LIMIT :limit`에 꽂는 구조라, 아주 큰 값(예: 30000)을 명시적으로 주지 않는 한 절대 전체 데이터를 반환하지 않는다. 이번 재검증은 **`size=30000`을 강제로 줘서 "사실상 무제한"이던 옛 동작을 재현**하고, 실제 반경조회(파라미터 기본값)와 비교했다.
+**즉 "무제한 전체조회"라는 옛 시나리오 자체가 현재 코드에는 없다.** `size`(=maxResults)를 그대로 `LIMIT :limit`에 꽂는 구조라, 아주 큰 값(예: 30000)을 명시적으로 주지 않는 한 절대 전체 데이터를 반환하지 않는다. 이번 재검증은 `size=30000`**을 강제로 줘서 "사실상 무제한"이던 옛 동작을 재현**하고, 실제 반경조회(파라미터 기본값)와 비교했다.
 
-실제 해결 커밋: [`162ebc14`](https://github.com/makkong1/Petory/commit/162ebc14) (2025-12-21, `주변서비스 로직 수정`). 직전 커밋 [`5ef571d9`](https://github.com/makkong1/Petory/commit/5ef571d9)에 파라미터 없는 `findByOrderByRatingDesc()`(무제한 전체조회) 호출이 실제로 있음을 확인.
+실제 해결 커밋: `[162ebc14](https://github.com/makkong1/Petory/commit/162ebc14)` (2025-12-21, `주변서비스 로직 수정`). 직전 커밋 `[5ef571d9](https://github.com/makkong1/Petory/commit/5ef571d9)`에 파라미터 없는 `findByOrderByRatingDesc()`(무제한 전체조회) 호출이 실제로 있음을 확인.
 
 ## 1. HTTP 레벨 실측 (실제 서버, 실제 API)
 
@@ -52,12 +53,12 @@ related: [docs/troubleshooting/location/initial-load-performance.md]
 
 **방법**: 워크트리를 포트 8082로 별도 기동 → `5ef571d9`(before) 그대로 무제한 조회 실측 → 서버 종료 → 같은 워크트리에서 dev(after)로 checkout해 재기동 → 반경조회 실측. 계정은 측정 후 즉시 삭제.
 
-| | Before(`5ef571d9`, 실제 커밋 코드, 파라미터 없음) | After(dev, 실제 반경조회) |
-|---|---|---|
-| 응답 바이트 | **22,379,448 B (≈22.4MB)** | **102,146 B (≈100KB)** |
-| 평균 응답시간(15회) | **531.8ms** | **50.9ms** |
+|                     | Before(`5ef571d9`, 실제 커밋 코드, 파라미터 없음) | After(dev, 실제 반경조회) |
+| ------------------- | ------------------------------------------------- | ------------------------- |
+| 응답 바이트         | **22,379,448 B (≈22.4MB)**                        | **102,146 B (≈100KB)**    |
+| 평균 응답시간(15회) | **531.8ms**                                       | **50.9ms**                |
 
-**Before 수치(22.4MB, 531.8ms)가 위 `size=30000` 트릭 결과(22.3MB, 602.2ms)와 거의 일치한다** — 바이트는 0.4% 차이, 응답시간은 트릭 쪽이 오히려 더 크게 나왔다(단일 측정 변동 범위 안). **트릭이 실제 역사적 동작을 정확히 재현했음이 확인됐다.** After 수치도 오늘 앞서 측정한 dev 결과(102,146B, 48.9ms)와 정확히 같은 바이트, 비슷한 시간으로 재현성도 확인됐다.
+**Before 수치(22.4MB, 531.8ms)가 위** `size=30000` **트릭 결과(22.3MB, 602.2ms)와 거의 일치한다** — 바이트는 0.4% 차이, 응답시간은 트릭 쪽이 오히려 더 크게 나왔다(단일 측정 변동 범위 안). **트릭이 실제 역사적 동작을 정확히 재현했음이 확인됐다.** After 수치도 오늘 앞서 측정한 dev 결과(102,146B, 48.9ms)와 정확히 같은 바이트, 비슷한 시간으로 재현성도 확인됐다.
 
 ## 2. EXPLAIN — 두 쿼리의 실행계획
 
@@ -129,6 +130,6 @@ mysql -uroot -p petory -e "DELETE FROM users WHERE id='loctest';"
 
 ## 4. 관련 문서
 
-- 원본(2025-12-21 측정, 아키텍처 이전 세대): [`troubleshooting/location/initial-load-performance.md`](../../../troubleshooting/location/initial-load-performance.md)
+- 원본(2025-12-21 측정, 아키텍처 이전 세대): `[troubleshooting/location/initial-load-performance.md](../../../troubleshooting/location/initial-load-performance.md)`
 - 공간 인덱스 세대 정보: `docs/analysis/리팩토링-순서-2026-07.md` §3
-- 대표 사례 선정: [`portfolio-refactoring-troubleshooting-selection.md`](../../portfolio-refactoring-troubleshooting-selection.md)
+- 대표 사례 선정: `[portfolio-refactoring-troubleshooting-selection.md](../../portfolio-refactoring-troubleshooting-selection.md)`
