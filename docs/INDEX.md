@@ -7,7 +7,7 @@ frontmatter가 붙은 문서 21건. 각 문서 상단에 `date/domains/type/prob
 
 | 날짜 | 문서 | 도메인 | 문제 | 수치 | 커밋 |
 | --- | --- | --- | --- | --- | --- |
-| 2026-07-12 | [동시성/Race Condition 재검증 — 테스트 재실행 (2026-07-12)](concurrency/evidence/race-condition-reverify-2026-07-12.md) | meetup, payment, care | race-condition | worktree 실제 커밋 검증: PetCoin before 100→110(Lost Update 3/3 재현)→after 100→150(3/3 해결). Meetup before(a5943b18)는 이미 Pessimistic Lock으로 안전했음(bf32d155는 전략 교체) 신규 발견. Care는 기존 재실행만(§4) | - |
+| 2026-07-12 | [동시성/Race Condition 재검증 — 테스트 재실행 (2026-07-12)](concurrency/evidence/race-condition-reverify-2026-07-12.md) | meetup, payment, care | race-condition | PetCoin before 100→110(Lost Update 3/3 재현)→after 100→150(3/3 해결). Meetup 진짜 최초버그(a549eb33) 재현 결과는 인원초과가 아니라 Deadlock으로 인한 요청 실패(성공1/실패2, 3/3 재현) — a5943b18은 이미 Pessimistic Lock 도입된 이후였음. Care는 기존 재실행만(§4) | - |
 | 2026-07-12 | [Care 요청 목록 N+1 재검증 — 통합테스트 + EXPLAIN (2026-07-12)](refactoring/care/evidence/n-plus-one-reverify-2026-07-12.md) | care, file | n-plus-one | 101→2 queries (-98%), 511ms~617ms→133ms~137ms; file 테이블 인덱스 부재 추가 발견 | 전:[7aca5882](https://github.com/makkong1/Petory/commit/7aca5882) 후:[9c7e0d68](https://github.com/makkong1/Petory/commit/9c7e0d68) |
 | 2026-07-12 | [Chat 채팅방 목록 N+1 재검증 — 통합테스트 + EXPLAIN (2026-07-12)](refactoring/chat/evidence/n-plus-one-reverify-2026-07-12.md) | chat | n-plus-one | worktree 실측(실제 커밋 코드): 41→4 queries (-90.2%), 167ms→70ms. 재구성 테스트: 21→4 (-80.95%), 130ms→44ms | 전:[496e121a](https://github.com/makkong1/Petory/commit/496e121a) 후:[30f7e078](https://github.com/makkong1/Petory/commit/30f7e078) |
 | 2026-07-12 | [Board 목록 N+1 재검증 — 통합테스트 + EXPLAIN (2026-07-12)](refactoring/board/evidence/n-plus-one-reverify-2026-07-12.md) | board | n-plus-one | 301→3 queries (-99%), 561ms→55ms (10.2x), 21MB→3MB | 전:[3a7a581d](https://github.com/makkong1/Petory/commit/3a7a581d) 후:[19b7c120](https://github.com/makkong1/Petory/commit/19b7c120) |
@@ -43,7 +43,7 @@ frontmatter가 붙은 문서 21건. 각 문서 상단에 `date/domains/type/prob
 
 | 날짜 | 문서 | 문제 | 수치 |
 | --- | --- | --- | --- |
-| 2026-07-12 | [동시성/Race Condition 재검증 — 테스트 재실행 (2026-07-12)](concurrency/evidence/race-condition-reverify-2026-07-12.md) | race-condition | worktree 실제 커밋 검증: PetCoin before 100→110(Lost Update 3/3 재현)→after 100→150(3/3 해결). Meetup before(a5943b18)는 이미 Pessimistic Lock으로 안전했음(bf32d155는 전략 교체) 신규 발견. Care는 기존 재실행만(§4) |
+| 2026-07-12 | [동시성/Race Condition 재검증 — 테스트 재실행 (2026-07-12)](concurrency/evidence/race-condition-reverify-2026-07-12.md) | race-condition | PetCoin before 100→110(Lost Update 3/3 재현)→after 100→150(3/3 해결). Meetup 진짜 최초버그(a549eb33) 재현 결과는 인원초과가 아니라 Deadlock으로 인한 요청 실패(성공1/실패2, 3/3 재현) — a5943b18은 이미 Pessimistic Lock 도입된 이후였음. Care는 기존 재실행만(§4) |
 | 2026-07-12 | [Care 요청 목록 N+1 재검증 — 통합테스트 + EXPLAIN (2026-07-12)](refactoring/care/evidence/n-plus-one-reverify-2026-07-12.md) | n-plus-one | 101→2 queries (-98%), 511ms~617ms→133ms~137ms; file 테이블 인덱스 부재 추가 발견 |
 | 2026-07-10 | [오버페칭 리팩토링 실측 근거 (2026-07-10)](refactoring/fetch-optimization/evidence/measurement-2026-07-10.md) | overfetching | Board 61.3→46.0ms(-25%, 바이트 불변); User 8647→5829B(-33%)/30.2→25.8ms(-15%); Care 17621→7421B(-58%)/38.3→9.9ms(-74%) |
 | 2026-02-28 | [펫케어 요청 목록 조회 (페이징) N+1 쿼리 문제](troubleshooting/care/care-request-paging-n-plus-one.md) | n-plus-one | 페이징 경로 applications N+1 — @BatchSize(50) 적용 완료, JOIN FETCH 대안은 미적용 |
@@ -76,7 +76,7 @@ frontmatter가 붙은 문서 21건. 각 문서 상단에 `date/domains/type/prob
 
 | 날짜 | 문서 | 문제 | 수치 |
 | --- | --- | --- | --- |
-| 2026-07-12 | [동시성/Race Condition 재검증 — 테스트 재실행 (2026-07-12)](concurrency/evidence/race-condition-reverify-2026-07-12.md) | race-condition | worktree 실제 커밋 검증: PetCoin before 100→110(Lost Update 3/3 재현)→after 100→150(3/3 해결). Meetup before(a5943b18)는 이미 Pessimistic Lock으로 안전했음(bf32d155는 전략 교체) 신규 발견. Care는 기존 재실행만(§4) |
+| 2026-07-12 | [동시성/Race Condition 재검증 — 테스트 재실행 (2026-07-12)](concurrency/evidence/race-condition-reverify-2026-07-12.md) | race-condition | PetCoin before 100→110(Lost Update 3/3 재현)→after 100→150(3/3 해결). Meetup 진짜 최초버그(a549eb33) 재현 결과는 인원초과가 아니라 Deadlock으로 인한 요청 실패(성공1/실패2, 3/3 재현) — a5943b18은 이미 Pessimistic Lock 도입된 이후였음. Care는 기존 재실행만(§4) |
 | 2026-07-11 | [모임 반경조회(nearby) k6 부하테스트 — before/after 실측 (소규모 + 대용량)](performance/performance-testing/k6/nearby-loadtest-results.md) | in-memory-filtering | 소규모 p95 78.0→37.4ms(-52%); 대용량 처리량 2.11→26.7req/s(~12.6x), p95 1.75s→57.5ms(~30x) |
 | 2026-02-08 | [findAvailableMeetups() 성능 비교 - 리팩토링 전/후](refactoring/meetup/subquery-optimization/performance-comparison.md) | query-optimization | 156ms→57ms (-63.5%), 메모리 19.07MB→2.00MB (-89.5%) |
 | 2026-02-07 | [getNearbyMeetups() 성능 비교 분석 (3단계 리팩토링)](refactoring/meetup/nearby-meetups/performance-comparison.md) | in-memory-filtering | 1~3단계(B-tree bounding box): 486ms→273ms (-43.8%), 스캔행 2958→117 (-96%). 현재는 4세대 공간인덱스로 재구현됨 |
@@ -99,7 +99,7 @@ frontmatter가 붙은 문서 21건. 각 문서 상단에 `date/domains/type/prob
 
 | 날짜 | 문서 | 문제 | 수치 |
 | --- | --- | --- | --- |
-| 2026-07-12 | [동시성/Race Condition 재검증 — 테스트 재실행 (2026-07-12)](concurrency/evidence/race-condition-reverify-2026-07-12.md) | race-condition | worktree 실제 커밋 검증: PetCoin before 100→110(Lost Update 3/3 재현)→after 100→150(3/3 해결). Meetup before(a5943b18)는 이미 Pessimistic Lock으로 안전했음(bf32d155는 전략 교체) 신규 발견. Care는 기존 재실행만(§4) |
+| 2026-07-12 | [동시성/Race Condition 재검증 — 테스트 재실행 (2026-07-12)](concurrency/evidence/race-condition-reverify-2026-07-12.md) | race-condition | PetCoin before 100→110(Lost Update 3/3 재현)→after 100→150(3/3 해결). Meetup 진짜 최초버그(a549eb33) 재현 결과는 인원초과가 아니라 Deadlock으로 인한 요청 실패(성공1/실패2, 3/3 재현) — a5943b18은 이미 Pessimistic Lock 도입된 이후였음. Care는 기존 재실행만(§4) |
 
 ### user
 
@@ -158,7 +158,7 @@ frontmatter가 붙은 문서 21건. 각 문서 상단에 `date/domains/type/prob
 
 | 날짜 | 문서 | 도메인 | 수치 |
 | --- | --- | --- | --- |
-| 2026-07-12 | [동시성/Race Condition 재검증 — 테스트 재실행 (2026-07-12)](concurrency/evidence/race-condition-reverify-2026-07-12.md) | meetup, payment, care | worktree 실제 커밋 검증: PetCoin before 100→110(Lost Update 3/3 재현)→after 100→150(3/3 해결). Meetup before(a5943b18)는 이미 Pessimistic Lock으로 안전했음(bf32d155는 전략 교체) 신규 발견. Care는 기존 재실행만(§4) |
+| 2026-07-12 | [동시성/Race Condition 재검증 — 테스트 재실행 (2026-07-12)](concurrency/evidence/race-condition-reverify-2026-07-12.md) | meetup, payment, care | PetCoin before 100→110(Lost Update 3/3 재현)→after 100→150(3/3 해결). Meetup 진짜 최초버그(a549eb33) 재현 결과는 인원초과가 아니라 Deadlock으로 인한 요청 실패(성공1/실패2, 3/3 재현) — a5943b18은 이미 Pessimistic Lock 도입된 이후였음. Care는 기존 재실행만(§4) |
 
 ### row-by-row-update
 

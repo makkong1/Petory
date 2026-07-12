@@ -4,7 +4,7 @@ domains: [meetup, payment, care]
 type: concurrency-evidence
 problem: race-condition
 status: verified
-metric: "worktree 실제 커밋 검증: PetCoin before 100→110(Lost Update 3/3 재현)→after 100→150(3/3 해결). Meetup before(a5943b18)는 이미 Pessimistic Lock으로 안전했음(bf32d155는 전략 교체) 신규 발견. Care는 기존 재실행만(§4)"
+metric: "PetCoin before 100→110(Lost Update 3/3 재현)→after 100→150(3/3 해결). Meetup 진짜 최초버그(a549eb33) 재현 결과는 인원초과가 아니라 Deadlock으로 인한 요청 실패(성공1/실패2, 3/3 재현) — a5943b18은 이미 Pessimistic Lock 도입된 이후였음. Care는 기존 재실행만(§4)"
 related: [docs/concurrency/concurrency-strategy-master.md]
 ---
 
@@ -66,7 +66,45 @@ related: [docs/concurrency/concurrency-strategy-master.md]
 
 dev(after, 원자적 조건부 UPDATE)로도 동일하게 3회 실행 — 결과는 성공2/실패1/초과없음으로 **완전히 동일**했다.
 
-**해석**: `bf32d155`는 "버그를 처음 고친 커밋"이 아니라, **이미 Pessimistic Lock으로 안전하게 막혀 있던 것을 원자적 UPDATE 방식으로 교체한 커밋**으로 보인다. `concurrency-strategy-master.md`와 포트폴리오 문서가 이 사례의 verification에 "Meetup은 **트랜잭션을 우회해** 레이스를 결정론적으로 재현했다"고 이미 적어 둔 것과 일치한다 — 즉 원래 이 버그는 `@Transactional`이 걸린 서비스 메서드를 정상 호출해서는 재현되지 않고, 테스트가 트랜잭션 경계를 의도적으로 우회해야만 드러나는 종류였다. 오늘 워크트리 재검증은 "정상적인 서비스 호출 경로"로 진행했기 때문에, Pessimistic Lock이 있던 시점에서는 재현되지 않은 것이다. 실제 원인 커밋(락 자체가 없던 최초 버그 시점)을 특정하려면 더 이전 커밋까지 거슬러 올라가야 하며, 이는 이번 재검증 범위 밖으로 남겨둔다.
+**해석**: `bf32d155`는 "버그를 처음 고친 커밋"이 아니라, **이미 Pessimistic Lock으로 안전하게 막혀 있던 것을 원자적 UPDATE 방식으로 교체한 커밋**으로 보인다. `concurrency-strategy-master.md`와 포트폴리오 문서가 이 사례의 verification에 "Meetup은 **트랜잭션을 우회해** 레이스를 결정론적으로 재현했다"고 이미 적어 둔 것과 일치한다 — 즉 원래 이 버그는 `@Transactional`이 걸린 서비스 메서드를 정상 호출해서는 재현되지 않고, 테스트가 트랜잭션 경계를 의도적으로 우회해야만 드러나는 종류였다. 오늘 워크트리 재검증은 "정상적인 서비스 호출 경로"로 진행했기 때문에, Pessimistic Lock이 있던 시점에서는 재현되지 않은 것이다.
+
+## 2.6. worktree 검증 — 진짜 최초 버그 커밋을 찾았다 (2026-07-12, 후속)
+
+`git log -- MeetupService.java`로 더 이전 이력을 훑어 진짜 최초 버그 커밋을 특정했다: [`a549eb33`](https://github.com/makkong1/Petory/commit/a549eb33) (2025-12-13, `feature: 이메일 인증 구현`). 이 커밋의 `joinMeetup()`을 열어보면 `meetupRepository.findById(meetupIdx)` — **정말로 락이 전혀 없다.**
+
+시간순 재정리:
+| 커밋 | 날짜 | 내용 |
+|---|---|---|
+| `a549eb33` | 2025-12-13 | `findById()` — 락 없음. **진짜 최초 버그 시점** |
+| (트러블슈팅 문서 작성) | 2025-12-19 | `race-condition-participants.md` |
+| `a5943b18` | 2025-12-19 | `findByIdWithLock()` 도입. 커밋 메시지 "트러블슈팅 파일 생성...해결방법 기반 실서비스 로직 수정"이 문서 작성일과 정확히 일치 |
+| `bf32d155` | 2025-12-20 | Pessimistic Lock → 원자적 조건부 UPDATE로 전략 교체 |
+
+`git worktree`로 `a549eb33`를 실제 checkout해서 동일한 동시 참가 시나리오(최대 3명, 기존 1명 + 신규 3명 동시 시도)를 3회 반복 실행했다.
+
+**예상과 또 다른 결과가 나왔다.** 3번 모두 동일하게:
+
+```
+성공: 1, 실패: 2
+최종 currentParticipants: 2
+인원 초과 발생: NO
+```
+
+인원초과(Lost Update)가 아니라 **정반대** — 남은 자리가 2개인데 1명만 성공하고 2명이 부당하게 실패했다. 실패 예외를 캡처하면:
+
+```
+CannotAcquireLockException: Deadlock found when trying to get lock; try restarting transaction
+[update meetup set ... where idx=?]
+```
+
+**해석**: `findById()`(SELECT) 자체는 락을 잡지 않지만, 이어지는 `meetupRepository.save(meetup)`이 발행하는 `UPDATE meetup SET ... WHERE idx=?`는 InnoDB가 자동으로 해당 행에 exclusive lock을 건다. 여러 스레드가 동시에 이 UPDATE를 시도하면 서로의 락을 기다리며 순환 대기가 발생하고, MySQL이 데드락을 감지해 한쪽 트랜잭션을 강제로 롤백시킨다. 즉 **"코드에 락이 없다" ≠ "자동으로 Lost Update가 조용히 발생한다"** — MySQL의 기본 트랜잭션 격리 수준과 InnoDB의 암묵적 행 잠금이 개입해서, 실제로는 Lost Update보다 먼저 Deadlock 예외로 요청이 실패하는 경향을 보였다. 이게 원 트러블슈팅 문서가 "트랜잭션을 우회해서 강제로 재현했다"고 명시한 이유로 보인다 — 정상적인 트랜잭션 경계 안에서 인원초과 자체를 재현하려면 이 Deadlock 방어선을 통과해야 하는데, 그러지 못하고 매번 여기서 막혔다.
+
+**정리**: Meetup의 동시성 결함은 세 단계로 존재했다.
+1. **`a549eb33`(락 없음)**: 사용자 경험 관점의 결함 — 정당한 참가 요청이 데드락으로 실패(인원초과는 아님)
+2. **`a5943b18`(Pessimistic Lock)**: 데드락도 인원초과도 없이 안전, 다만 락 대기로 인한 처리량 저하 가능성
+3. **`bf32d155`(원자적 UPDATE, 현재)**: 락 경합 없이 안전 + 처리량 유지
+
+"인원초과 버그"라는 표현은 트랜잭션을 우회한 별도 테스트에서만 확인 가능한 이론적 위험이었고, 실제 서비스 호출 경로에서 최초 버그가 일으킨 관찰 가능한 증상은 **부당한 요청 실패(Deadlock)** 였다는 게 이번 재검증의 핵심 발견이다.
 
 ## 3. PetCoin — 재검증 중 발견: "문제 상황" 테스트가 더 이상 문제를 재현하지 못한다
 
