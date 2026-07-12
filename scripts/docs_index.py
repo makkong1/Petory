@@ -9,6 +9,8 @@ frontmatter 스키마 (모든 필드 선택):
     problem: n-plus-one
     status: verified
     metric: "301->3 queries"
+    before_commit: 19b7c120   # 실제 before 코드가 존재하던 커밋. 재구성이면 'reconstructed'
+    after_commit: 19b7c120    # 해결이 반영된 커밋
     related: [docs/troubleshooting/board/performance-optimization.md]
     ---
 
@@ -28,6 +30,7 @@ except ImportError:
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DOCS_DIR = os.path.join(REPO_ROOT, "docs")
 OUTPUT_FILE = os.path.join(DOCS_DIR, "INDEX.md")
+GITHUB_REPO = "makkong1/Petory"
 
 FRONTMATTER_RE = re.compile(r"^---\n(.*?\n)---\n", re.DOTALL)
 
@@ -62,6 +65,8 @@ def scan_docs():
                 "problem": meta.get("problem", ""),
                 "status": meta.get("status", ""),
                 "metric": meta.get("metric", ""),
+                "before_commit": str(meta.get("before_commit", "")),
+                "after_commit": str(meta.get("after_commit", "")),
             })
     return entries
 
@@ -95,8 +100,30 @@ def render_table(entries, columns):
                 row.append(e["metric"] or "-")
             elif col == "상태":
                 row.append(e["status"] or "-")
+            elif col == "커밋":
+                row.append(format_commits(e["before_commit"], e["after_commit"]))
         lines.append("| " + " | ".join(row) + " |")
     return "\n".join(lines)
+
+
+def format_commits(before, after):
+    if not before and not after:
+        return "-"
+    if before == "reconstructed":
+        return "재구성(커밋 없음)"
+    if before and after and before == after:
+        return commit_link(before)
+    parts = []
+    if before:
+        parts.append(f"전:{commit_link(before)}")
+    if after:
+        parts.append(f"후:{commit_link(after)}")
+    return " ".join(parts)
+
+
+def commit_link(sha):
+    short = sha[:8]
+    return f"[{short}](https://github.com/{GITHUB_REPO}/commit/{sha})"
 
 
 def main():
@@ -125,7 +152,7 @@ def main():
 
     out.append("## 날짜순")
     out.append("")
-    out.append(render_table(entries, ["날짜", "문서", "도메인", "문제", "수치"]))
+    out.append(render_table(entries, ["날짜", "문서", "도메인", "문제", "수치", "커밋"]))
     out.append("")
 
     out.append("## 도메인별")

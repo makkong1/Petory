@@ -5,6 +5,8 @@ type: performance-evidence
 problem: n-plus-one
 status: verified
 metric: "201→4 queries (-98%), 428ms→38ms (-91.1%)"
+before_commit: 9c7e0d68
+after_commit: 9dbf85ba
 related: [docs/troubleshooting/missing-pet/performance-measurement-results.md]
 ---
 
@@ -14,6 +16,7 @@ related: [docs/troubleshooting/missing-pet/performance-measurement-results.md]
 
 ## 0. 방법론
 
+- 실제 해결 커밋: [`9dbf85ba`](https://github.com/makkong1/Petory/commit/9dbf85ba) (2025-12-31, `실종 도메인 n+1 트러블슈팅 해결`). 직전 커밋 [`9c7e0d68`](https://github.com/makkong1/Petory/commit/9c7e0d68)에 `attachmentFileService.getAttachments()` 단건 호출이 실제로 있음을 확인.
 - 신규 테스트: `backend/test/.../board/service/MissingPetNPlusOneReverifyTest.java`
 - Fixture: 작성자 1명, 게시글 100개, 게시글당 댓글 3개, 게시글당 첨부파일 1개
 - Before: JOIN FETCH 없는 EntityManager 쿼리로 게시글 조회 → `missingPetCommentService.getCommentCount()`(단건)/`attachmentFileService.getAttachments()`(단건)를 게시글마다 호출 — 원 문서가 기술한 "게시글 1 + 댓글 N + 파일 N" 패턴을 재현

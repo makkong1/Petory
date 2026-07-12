@@ -5,6 +5,8 @@ type: performance-evidence
 problem: n-plus-one
 status: verified
 metric: "301→3 queries (-99%), 561ms→55ms (10.2x), 21MB→3MB"
+before_commit: 3a7a581d
+after_commit: 19b7c120
 related: [docs/troubleshooting/board/performance-optimization.md]
 ---
 
@@ -14,6 +16,7 @@ related: [docs/troubleshooting/board/performance-optimization.md]
 
 ## 0. 방법론
 
+- 실제 해결 커밋: [`19b7c120`](https://github.com/makkong1/Petory/commit/19b7c120) (2025-11-19, `게시글 목록 조회 n+1 문제해결`). 이 커밋 직전인 [`3a7a581d`](https://github.com/makkong1/Petory/commit/3a7a581d)에 실제 N+1 코드가 남아있다 — 아래 테스트는 그 시점 코드를 헬퍼 메서드로 패턴 재현한 것이지 커밋에서 그대로 복사한 건 아니므로, 정확한 원본이 필요하면 `git show 3a7a581d:backend/main/java/com/linkup/Petory/domain/board/service/BoardService.java`로 직접 대조할 수 있다.
 - 재현 대상: `backend/test/java/.../BoardPerformanceComparisonTest.java` (기존 테스트, 신규 작성 아님)
 - 실행: `./gradlew test --tests BoardPerformanceComparisonTest --rerun` — Hibernate Statistics로 쿼리 수·실행시간·메모리 측정
 - 환경: 로컬 MySQL 8(`petory`, `ddl-auto=none`), `@Transactional` 롤백이라 실데이터(board 10,264건) 비영향

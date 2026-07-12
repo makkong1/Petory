@@ -5,7 +5,13 @@ type: performance-evidence
 problem: n-plus-one
 status: verified
 metric: "21→4 queries (-80.95%), 130ms→44ms (-66.15%), 438KB→152KB (-65.22%)"
-related: [docs/troubleshooting/users/login-n-plus-one-issue.md, docs/troubleshooting/chat/n-plus-one-conversationparticipant.md]
+before_commit: 496e121a
+after_commit: 30f7e078
+related:
+  [
+    docs/troubleshooting/users/login-n-plus-one-issue.md,
+    docs/troubleshooting/chat/n-plus-one-conversationparticipant.md,
+  ]
 ---
 
 # Chat 채팅방 목록 N+1 재검증 — 통합테스트 + EXPLAIN (2026-07-12)
@@ -14,6 +20,7 @@ related: [docs/troubleshooting/users/login-n-plus-one-issue.md, docs/troubleshoo
 
 ## 0. 방법론
 
+- 실제 해결 커밋: [`30f7e078`](https://github.com/makkong1/Petory/commit/30f7e078) (2025-12-10, `fix: 채팅방 목록 조회 N+1 문제 해결 및 성능 최적화`). 이 커밋이 `ConversationServicePerformanceTest.java`를 신규 추가했으므로, 아래 재실행 테스트는 재구성이 아니라 그 시점에 작성된 실제 재현 코드다. 직전 커밋 [`496e121a`](https://github.com/makkong1/Petory/commit/496e121a)에 `findByConversationIdxAndUserIdx`/`findByConversationIdxAndStatus` 개별 호출이 실제로 있음을 확인.
 - 재현 대상: 기존 테스트 `backend/test/.../chat/service/ConversationServicePerformanceTest.java` (신규 작성 아님, 그대로 재실행)
 - Fixture: 채팅방 10개 · 참여자 3명/채팅방 · 메시지 20개/채팅방
 - Before: `getMyConversationsBefore()` — 채팅방마다 `findByConversationIdxAndUserIdx`/`findByConversationIdxAndStatus` 개별 호출 + 전체 메시지 로드
@@ -22,11 +29,11 @@ related: [docs/troubleshooting/users/login-n-plus-one-issue.md, docs/troubleshoo
 
 ## 1. 통합테스트 재실행 결과
 
-| 항목 | Before | After | 원 문서(참고) |
-|---|---|---|---|
-| 쿼리 수 | 21개 | 4개 (**-80.95%**) | 21→4 (동일) |
-| 실행 시간 | 130ms | 44ms (**-66.15%**) | 305→55ms (-81.97%) |
-| 메모리 | 438,152B | 152,400B (**-65.22%**) | 607,968→138,384B (-77.24%) |
+| 항목      | Before   | After                  | 원 문서(참고)              |
+| --------- | -------- | ---------------------- | -------------------------- |
+| 쿼리 수   | 21개     | 4개 (**-80.95%**)      | 21→4 (동일)                |
+| 실행 시간 | 130ms    | 44ms (**-66.15%**)     | 305→55ms (-81.97%)         |
+| 메모리    | 438,152B | 152,400B (**-65.22%**) | 607,968→138,384B (-77.24%) |
 
 쿼리 수 감소율은 원 문서와 **정확히 일치**(21→4, 80.95%)한다. 절대 시간·메모리는 실행마다 달라지는 값이라 다르지만 개선 방향과 크기는 같은 대역이다.
 
@@ -60,6 +67,7 @@ conversationparticipant:
   INDEX(user_idx, status, unread_count)   ← 배치조회가 타는 인덱스
   INDEX(conversation_idx, status)
 ```
+
 Board/Care와 달리 필요한 인덱스가 이미 다 갖춰져 있다.
 
 ### Before — 개별조회 (`findByConversationIdxAndUserIdx`, 10번 반복됨)
@@ -89,10 +97,10 @@ EXPLAIN ANALYZE SELECT * FROM conversationparticipant WHERE conversation_idx IN 
 
 ### 해석 — 여기서 이득은 DB 실행시간이 아니라 순수하게 왕복 횟수
 
-| | 실행 횟수 | 1회당 DB 실행시간 | 왕복(라운드트립) |
-|---|---|---|---|
-| Before(개별) | 채팅방 수만큼(10회) | 0.0003ms | 10회 |
-| After(배치) | 1회 | 0.02ms | 1회 |
+|              | 실행 횟수           | 1회당 DB 실행시간 | 왕복(라운드트립) |
+| ------------ | ------------------- | ----------------- | ---------------- |
+| Before(개별) | 채팅방 수만큼(10회) | 0.0003ms          | 10회             |
+| After(배치)  | 1회                 | 0.02ms            | 1회              |
 
 Board/Care는 "인덱스 없음/전체스캔"이 겹쳐서 개선 효과가 컸다면, Chat은 **인덱스가 완벽한데도 왕복 횟수만으로 21→4쿼리, 130→44ms(66%) 개선**된다. 이건 N+1의 순수한 형태를 보여주는 케이스다 — DB가 아무리 빨라도 같은 트랜잭션 안에서 쿼리를 N번 왕복하면 그 자체가 비용이라는 것.
 

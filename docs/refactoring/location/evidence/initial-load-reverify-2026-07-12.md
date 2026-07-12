@@ -5,6 +5,8 @@ type: performance-evidence
 problem: overfetching
 status: verified
 metric: "22.3MB→100KB (-99.6%), 602ms→49ms (-91.9%) HTTP 실측; DEFAULT_RADIUS_LIMIT=100 신규 발견"
+before_commit: 5ef571d9
+after_commit: 162ebc14
 related: [docs/troubleshooting/location/initial-load-performance.md]
 ---
 
@@ -20,6 +22,8 @@ related: [docs/troubleshooting/location/initial-load-performance.md]
 - `searchLocationServicesByRegion()`(지역/기본검색, sido·sigungu 없을 때 `findByOrderByRatingDesc` 사용): `limit = maxResults ?? 50` — 이것도 기본 50건 제한
 
 **즉 "무제한 전체조회"라는 옛 시나리오 자체가 현재 코드에는 없다.** `size`(=maxResults)를 그대로 `LIMIT :limit`에 꽂는 구조라, 아주 큰 값(예: 30000)을 명시적으로 주지 않는 한 절대 전체 데이터를 반환하지 않는다. 이번 재검증은 **`size=30000`을 강제로 줘서 "사실상 무제한"이던 옛 동작을 재현**하고, 실제 반경조회(파라미터 기본값)와 비교했다.
+
+실제 해결 커밋: [`162ebc14`](https://github.com/makkong1/Petory/commit/162ebc14) (2025-12-21, `주변서비스 로직 수정`). 직전 커밋 [`5ef571d9`](https://github.com/makkong1/Petory/commit/5ef571d9)에 파라미터 없는 `findByOrderByRatingDesc()`(무제한 전체조회) 호출이 실제로 있음을 확인.
 
 ## 1. HTTP 레벨 실측 (실제 서버, 실제 API)
 

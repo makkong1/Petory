@@ -20,14 +20,23 @@ related: [docs/concurrency/concurrency-strategy-master.md]
   - `CareDealConcurrencyTest` (1 test)
 - 실행: `./gradlew test --tests ... --rerun --info`
 - 환경: 로컬 MySQL 8, ExecutorService 기반 멀티스레드 동시 실행(CountDownLatch/트랜잭션 경계는 테스트마다 다름)
+- 해결 커밋(`git log --oneline -- <경로>`로 확인, 문서 §5 참고): 사례마다 다른 시점에 해결됨
+
+| 사례 | 해결 커밋 | 날짜 | 그 직전 상태(before) |
+|---|---|---|---|
+| Meetup 인원 초과 | [`bf32d155`](https://github.com/makkong1/Petory/commit/bf32d155) | 2025-12-20 | [`a5943b18`](https://github.com/makkong1/Petory/commit/a5943b18) |
+| PetCoin Lost Update | [`c2bb32f9`](https://github.com/makkong1/Petory/commit/c2bb32f9) | 2026-02-18 | [`60455169`](https://github.com/makkong1/Petory/commit/60455169) |
+| Care 거래확정 stuck state | [`1b5df6f3`](https://github.com/makkong1/Petory/commit/1b5df6f3) | 2026-01-04 | [`e0eb851f`](https://github.com/makkong1/Petory/commit/e0eb851f) |
+
+각 해결 커밋에 해당 사례의 재현 테스트(`*RaceConditionTest.java`/`*ConcurrencyTest.java`)가 같이 신규 추가돼 있어(`git show --stat <커밋>`로 확인), 오늘 재실행한 테스트가 실제로 그 시점에 작성된 재현 코드라는 근거가 된다 — 재구성이 아니다.
 
 ## 1. 실행 결과 요약
 
-| 테스트 클래스 | 결과 |
-|---|---|
-| MeetupServiceRaceConditionTest | **6/6 통과** |
+| 테스트 클래스                   | 결과         |
+| ------------------------------- | ------------ |
+| MeetupServiceRaceConditionTest  | **6/6 통과** |
 | PetCoinServiceRaceConditionTest | **4/4 통과** |
-| CareDealConcurrencyTest | **1/1 통과** |
+| CareDealConcurrencyTest         | **1/1 통과** |
 
 총 11개 테스트 전부 통과. XML 결과(`build/test-results/test/TEST-*.xml`)의 `failures="0" errors="0"`으로 확인.
 
@@ -50,11 +59,13 @@ related: [docs/concurrency/concurrency-strategy-master.md]
 `❌ 문제 상황: chargeCoins 동시 충전 시 Lost Update 재현 (findById 사용)` 테스트를 재실행한 결과, **테스트 이름·주석과 실제 실행된 SQL이 어긋나 있었다.**
 
 테스트 로그:
+
 ```
 현재 chargeCoins는 findById 사용 → 락 없음 → Lost Update 가능
 ```
 
 하지만 실제 Hibernate 로그:
+
 ```sql
 select u1_0.idx, ... from users u1_0 where u1_0.idx=? for update
 ```

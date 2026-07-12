@@ -1,13 +1,14 @@
 ---
-
-## date: 2026-07-12
-
+date: 2026-07-12
 domains: [care, file]
 type: performance-evidence
 problem: n-plus-one
 status: verified
-metric: "101→2 queries (-98%), 511~~617ms→133~~137ms; file 테이블 인덱스 부재 추가 발견"
+metric: "101→2 queries (-98%), 511ms~617ms→133ms~137ms; file 테이블 인덱스 부재 추가 발견"
+before_commit: 7aca5882
+after_commit: 9c7e0d68
 related: [docs/troubleshooting/care/care-request-n-plus-one-analysis.md, docs/troubleshooting/care/care-request-paging-n-plus-one.md]
+---
 
 # Care 요청 목록 N+1 재검증 — 통합테스트 + EXPLAIN (2026-07-12)
 
@@ -15,6 +16,7 @@ related: [docs/troubleshooting/care/care-request-n-plus-one-analysis.md, docs/tr
 
 ## 0. 방법론
 
+- 실제 해결 커밋: [`9c7e0d68`](https://github.com/makkong1/Petory/commit/9c7e0d68) (2025-12-30, `펫케어 도메인 n+1 문제 해결`). 직전 커밋 [`7aca5882`](https://github.com/makkong1/Petory/commit/7aca5882)에 `request.getApplications()` lazy 접근 코드가 실제로 남아있음을 확인(`git show 7aca5882:...CareRequestConverter.java`).
 - 신규 테스트: `backend/test/.../care/service/CareRequestNPlusOneReverifyTest.java`
 - Fixture: 요청자 1명, 케어요청 100개, Pet 100마리(1:1), Pet당 예방접종 2건, Pet당 첨부파일 1건, 요청당 지원(CareApplication) 2건 — 문서의 "1004개 데이터" 규모를 100개로 축소 재현(로컬 실행 시간 단축, 패턴은 동일)
 - **Before**: JOIN FETCH 없는 EntityManager 쿼리로 CareRequest 조회 → `applications`/`pet.vaccinations` lazy 접근 + `attachmentFileService.getAttachments()`(단건) 호출로 문서가 기술한 "해결 전 코드"를 재현
