@@ -4,7 +4,7 @@ domains: [location]
 type: performance-evidence
 problem: overfetching
 status: verified
-metric: "22.3MB→100KB (-99.6%), 602ms→49ms (-91.9%) HTTP 실측; DEFAULT_RADIUS_LIMIT=100 신규 발견"
+metric: "worktree 실제 커밋: 22.4MB→100KB, 531.8ms→50.9ms. size=30000 트릭(검증됨, 오차<1%): 22.3MB→100KB (-99.6%), 602ms→49ms (-91.9%); DEFAULT_RADIUS_LIMIT=100 신규 발견"
 before_commit: 5ef571d9
 after_commit: 162ebc14
 related: [docs/troubleshooting/location/initial-load-performance.md]
@@ -43,6 +43,21 @@ related: [docs/troubleshooting/location/initial-load-performance.md]
 | 반환 건수           | 22,905건(전체)                                 | 100건(`DEFAULT_RADIUS_LIMIT`)                                                       |
 
 **응답 바이트 −99.6%, 응답시간 −91.9%.** 옛 문서(22MB→1MB, −95.5% / 1,484ms→700ms, −52.8%)보다 이번이 더 극적인데, 이유는 명확하다 — 반경조회 결과 자체를 100건으로 상한(`DEFAULT_RADIUS_LIMIT=100`)을 걸어놓은 게 지금 코드에 새로 추가돼 있어서다. 참고로 상한 없이 조회하면(`size=5000`) 반경 10km 내 실제 건수는 **2,499건**이다(§2 EXPLAIN의 필터 결과 행수와 일치). 옛 문서의 "1,026건"은 그 시점 데이터 분포·반경 계산 방식이 달라 직접 비교 대상은 아니다.
+
+## 1.5. worktree 검증 — `size=30000` 트릭이 실제 옛 코드와 같았는지 확인
+
+위 "Before 재현"은 **현재 코드**에 `size=30000`을 줘서 옛 동작을 흉내낸 것이다. 이게 실제로 그 시점 코드와 같은지, `git worktree`로 `5ef571d9`(before)를 실제 checkout해서 **파라미터 없이 자연스럽게 실행되는 진짜 무제한 조회**를 서버로 직접 띄워 측정했다.
+
+이 시점엔 위치 기반(반경) 검색 자체가 아직 없다 — `searchLocationServicesByRegion()`이 sido/sigungu/eupmyeondong/roadName/category가 전부 비어 있으면 무조건 `findByOrderByRatingDesc()`(파라미터 없는 전체조회)를 탄다. 즉 트릭 없이 그냥 `GET /api/location-services/search`(파라미터 없음)만 호출하면 된다.
+
+**방법**: 워크트리를 포트 8082로 별도 기동 → `5ef571d9`(before) 그대로 무제한 조회 실측 → 서버 종료 → 같은 워크트리에서 dev(after)로 checkout해 재기동 → 반경조회 실측. 계정은 측정 후 즉시 삭제.
+
+| | Before(`5ef571d9`, 실제 커밋 코드, 파라미터 없음) | After(dev, 실제 반경조회) |
+|---|---|---|
+| 응답 바이트 | **22,379,448 B (≈22.4MB)** | **102,146 B (≈100KB)** |
+| 평균 응답시간(15회) | **531.8ms** | **50.9ms** |
+
+**Before 수치(22.4MB, 531.8ms)가 위 `size=30000` 트릭 결과(22.3MB, 602.2ms)와 거의 일치한다** — 바이트는 0.4% 차이, 응답시간은 트릭 쪽이 오히려 더 크게 나왔다(단일 측정 변동 범위 안). **트릭이 실제 역사적 동작을 정확히 재현했음이 확인됐다.** After 수치도 오늘 앞서 측정한 dev 결과(102,146B, 48.9ms)와 정확히 같은 바이트, 비슷한 시간으로 재현성도 확인됐다.
 
 ## 2. EXPLAIN — 두 쿼리의 실행계획
 

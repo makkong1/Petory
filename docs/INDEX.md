@@ -11,7 +11,7 @@ frontmatter가 붙은 문서 21건. 각 문서 상단에 `date/domains/type/prob
 | 2026-07-12 | [Care 요청 목록 N+1 재검증 — 통합테스트 + EXPLAIN (2026-07-12)](refactoring/care/evidence/n-plus-one-reverify-2026-07-12.md) | care, file | n-plus-one | 101→2 queries (-98%), 511ms~617ms→133ms~137ms; file 테이블 인덱스 부재 추가 발견 | 전:[7aca5882](https://github.com/makkong1/Petory/commit/7aca5882) 후:[9c7e0d68](https://github.com/makkong1/Petory/commit/9c7e0d68) |
 | 2026-07-12 | [Chat 채팅방 목록 N+1 재검증 — 통합테스트 + EXPLAIN (2026-07-12)](refactoring/chat/evidence/n-plus-one-reverify-2026-07-12.md) | chat | n-plus-one | worktree 실측(실제 커밋 코드): 41→4 queries (-90.2%), 167ms→70ms. 재구성 테스트: 21→4 (-80.95%), 130ms→44ms | 전:[496e121a](https://github.com/makkong1/Petory/commit/496e121a) 후:[30f7e078](https://github.com/makkong1/Petory/commit/30f7e078) |
 | 2026-07-12 | [Board 목록 N+1 재검증 — 통합테스트 + EXPLAIN (2026-07-12)](refactoring/board/evidence/n-plus-one-reverify-2026-07-12.md) | board | n-plus-one | 301→3 queries (-99%), 561ms→55ms (10.2x), 21MB→3MB | 전:[3a7a581d](https://github.com/makkong1/Petory/commit/3a7a581d) 후:[19b7c120](https://github.com/makkong1/Petory/commit/19b7c120) |
-| 2026-07-12 | [Location 초기 로드 재검증 — 실제 API 실측 + EXPLAIN (2026-07-12)](refactoring/location/evidence/initial-load-reverify-2026-07-12.md) | location | overfetching | 22.3MB→100KB (-99.6%), 602ms→49ms (-91.9%) HTTP 실측; DEFAULT_RADIUS_LIMIT=100 신규 발견 | 전:[5ef571d9](https://github.com/makkong1/Petory/commit/5ef571d9) 후:[162ebc14](https://github.com/makkong1/Petory/commit/162ebc14) |
+| 2026-07-12 | [Location 초기 로드 재검증 — 실제 API 실측 + EXPLAIN (2026-07-12)](refactoring/location/evidence/initial-load-reverify-2026-07-12.md) | location | overfetching | worktree 실제 커밋: 22.4MB→100KB, 531.8ms→50.9ms. size=30000 트릭(검증됨, 오차<1%): 22.3MB→100KB (-99.6%), 602ms→49ms (-91.9%); DEFAULT_RADIUS_LIMIT=100 신규 발견 | 전:[5ef571d9](https://github.com/makkong1/Petory/commit/5ef571d9) 후:[162ebc14](https://github.com/makkong1/Petory/commit/162ebc14) |
 | 2026-07-12 | [MissingPet 목록 N+1 재검증 — 통합테스트 + EXPLAIN (2026-07-12)](refactoring/missing-pet/evidence/n-plus-one-reverify-2026-07-12.md) | missingpet, file | n-plus-one | worktree 실측(실제 커밋 코드): 267→4 queries (-98.5%), 762ms→88ms. 재구성 테스트: 201→4 (-98%), 428ms→38ms | 전:[9c7e0d68](https://github.com/makkong1/Petory/commit/9c7e0d68) 후:[9dbf85ba](https://github.com/makkong1/Petory/commit/9dbf85ba) |
 | 2026-07-11 | [관리자 유저 검색 QueryDSL 전환 — before/after SQL 증거](refactoring/querydsl/01-before-after-sql-evidence.md) | user | dynamic-query-antipattern | ':param IS NULL OR' 안티패턴 제거 확인(SQL 로그). 성능 개선은 modest — LIKE/CAST가 실행계획 지배 | - |
 | 2026-07-11 | [모임 반경조회(nearby) k6 부하테스트 — before/after 실측 (소규모 + 대용량)](performance/performance-testing/k6/nearby-loadtest-results.md) | meetup | in-memory-filtering | 소규모 p95 78.0→37.4ms(-52%); 대용량 처리량 2.11→26.7req/s(~12.6x), p95 1.75s→57.5ms(~30x) | - |
@@ -69,7 +69,7 @@ frontmatter가 붙은 문서 21건. 각 문서 상단에 `date/domains/type/prob
 
 | 날짜 | 문서 | 문제 | 수치 |
 | --- | --- | --- | --- |
-| 2026-07-12 | [Location 초기 로드 재검증 — 실제 API 실측 + EXPLAIN (2026-07-12)](refactoring/location/evidence/initial-load-reverify-2026-07-12.md) | overfetching | 22.3MB→100KB (-99.6%), 602ms→49ms (-91.9%) HTTP 실측; DEFAULT_RADIUS_LIMIT=100 신규 발견 |
+| 2026-07-12 | [Location 초기 로드 재검증 — 실제 API 실측 + EXPLAIN (2026-07-12)](refactoring/location/evidence/initial-load-reverify-2026-07-12.md) | overfetching | worktree 실제 커밋: 22.4MB→100KB, 531.8ms→50.9ms. size=30000 트릭(검증됨, 오차<1%): 22.3MB→100KB (-99.6%), 602ms→49ms (-91.9%); DEFAULT_RADIUS_LIMIT=100 신규 발견 |
 | 2025-12-21 | [Location 도메인 초기 로드 성능 문제](troubleshooting/location/initial-load-performance.md) | overfetching | 22,699→1,026건 (-95.5%), 1484ms→700ms (-52.8%), 22MB→1MB |
 
 ### meetup
@@ -144,7 +144,7 @@ frontmatter가 붙은 문서 21건. 각 문서 상단에 `date/domains/type/prob
 
 | 날짜 | 문서 | 도메인 | 수치 |
 | --- | --- | --- | --- |
-| 2026-07-12 | [Location 초기 로드 재검증 — 실제 API 실측 + EXPLAIN (2026-07-12)](refactoring/location/evidence/initial-load-reverify-2026-07-12.md) | location | 22.3MB→100KB (-99.6%), 602ms→49ms (-91.9%) HTTP 실측; DEFAULT_RADIUS_LIMIT=100 신규 발견 |
+| 2026-07-12 | [Location 초기 로드 재검증 — 실제 API 실측 + EXPLAIN (2026-07-12)](refactoring/location/evidence/initial-load-reverify-2026-07-12.md) | location | worktree 실제 커밋: 22.4MB→100KB, 531.8ms→50.9ms. size=30000 트릭(검증됨, 오차<1%): 22.3MB→100KB (-99.6%), 602ms→49ms (-91.9%); DEFAULT_RADIUS_LIMIT=100 신규 발견 |
 | 2026-07-10 | [오버페칭 리팩토링 실측 근거 (2026-07-10)](refactoring/fetch-optimization/evidence/measurement-2026-07-10.md) | board, user, care | Board 61.3→46.0ms(-25%, 바이트 불변); User 8647→5829B(-33%)/30.2→25.8ms(-15%); Care 17621→7421B(-58%)/38.3→9.9ms(-74%) |
 | 2025-12-21 | [Location 도메인 초기 로드 성능 문제](troubleshooting/location/initial-load-performance.md) | location | 22,699→1,026건 (-95.5%), 1484ms→700ms (-52.8%), 22MB→1MB |
 
