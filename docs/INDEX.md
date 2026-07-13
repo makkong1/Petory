@@ -1,5 +1,6 @@
-<!-- 자동 생성 파일 — 직접 수정하지 말 것. `python3 scripts/docs_index.py`로 재생성 -->
 # 문서 인덱스 (자동 생성)
+
+> ⚠️ **자동 생성 파일 — 직접 수정하지 말 것.** `python3 scripts/docs_index.py`로 재생성한다.
 
 frontmatter가 붙은 문서 23건. 각 문서 상단에 `date/domains/type/problem/status/metric` YAML을 붙이면 자동으로 여기 잡힌다.
 

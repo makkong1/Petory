@@ -143,8 +143,11 @@ def main():
         by_problem[e["problem"] or "(미지정)"].append(e)
 
     out = []
-    out.append("<!-- 자동 생성 파일 — 직접 수정하지 말 것. `python3 scripts/docs_index.py`로 재생성 -->")
+    # 헤딩을 첫 줄에 둔다. HTML 주석(<!--)으로 시작하면 내용을 스니핑하는 도구들이
+    # 이 파일을 마크다운이 아니라 SGML/HTML 문서로 오인해 렌더링하지 않는다.
     out.append("# 문서 인덱스 (자동 생성)")
+    out.append("")
+    out.append("> ⚠️ **자동 생성 파일 — 직접 수정하지 말 것.** `python3 scripts/docs_index.py`로 재생성한다.")
     out.append("")
     out.append(f"frontmatter가 붙은 문서 {len(entries)}건. "
                 "각 문서 상단에 `date/domains/type/problem/status/metric` YAML을 붙이면 자동으로 여기 잡힌다.")
