@@ -2,12 +2,13 @@
 
 > ⚠️ **자동 생성 파일 — 직접 수정하지 말 것.** `python3 scripts/docs_index.py`로 재생성한다.
 
-frontmatter가 붙은 문서 23건. 각 문서 상단에 `date/domains/type/problem/status/metric` YAML을 붙이면 자동으로 여기 잡힌다.
+frontmatter가 붙은 문서 24건. 각 문서 상단에 `date/domains/type/problem/status/metric` YAML을 붙이면 자동으로 여기 잡힌다.
 
 ## 날짜순
 
 | 날짜 | 문서 | 도메인 | 문제 | 수치 | 커밋 |
 | --- | --- | --- | --- | --- | --- |
+| 2026-07-14 | [쿼리 계획 감시의 일반화 — 설계 분석](analysis/query-plan-monitoring-design.md) | board, global | query-plan-monitoring-generalization | board 목록 쿼리는 이미 디스크 임시테이블 사용 중(tmp_table_size 16MB 초과). performance_schema digest 로 전체 쿼리 자동 스캔 가능성 확인 — 검사/반환 배율 2,082배 포착 | - |
 | 2026-07-13 | [반정규화 필드 정합성 실측 (2026-07-13)](analysis/entity-schema/evidence/denormalization-consistency-2026-07-13.md) | board, meetup, payment, location | denormalized-counter-drift | 반정규화 카운터 7종 실측 — 코드는 정합, 데이터(더미)가 오염. like_count 168/10264, comment_count 548/10264, current_participants 2791/3736 불일치 | - |
 | 2026-07-13 | [쿼리 성능 baseline (2026-07-13)](analysis/entity-schema/evidence/query-baseline-2026-07-13.md) | board, location, care, meetup | query-plan-baseline | board 목록 1페이지 0.09s (전 페이지 동일 — 매번 5만행 filesort). 공간인덱스는 정상(검사행 215 vs 22,737). carerequest 주변검색은 인덱스 없음 | - |
 | 2026-07-12 | [동시성/Race Condition 재검증 — 테스트 재실행 (2026-07-12)](concurrency/evidence/race-condition-reverify-2026-07-12.md) | meetup, payment, care | race-condition | PetCoin before 100→110(Lost Update 3/3 재현)→after 100→150(3/3 해결). Meetup 진짜 최초버그(a549eb33) 재현 결과는 인원초과가 아니라 Deadlock으로 인한 요청 실패(성공1/실패2, 3/3 재현) — a5943b18은 이미 Pessimistic Lock 도입된 이후였음. Care는 기존 재실행만(§4) | - |
@@ -38,6 +39,7 @@ frontmatter가 붙은 문서 23건. 각 문서 상단에 `date/domains/type/prob
 
 | 날짜 | 문서 | 문제 | 수치 |
 | --- | --- | --- | --- |
+| 2026-07-14 | [쿼리 계획 감시의 일반화 — 설계 분석](analysis/query-plan-monitoring-design.md) | query-plan-monitoring-generalization | board 목록 쿼리는 이미 디스크 임시테이블 사용 중(tmp_table_size 16MB 초과). performance_schema digest 로 전체 쿼리 자동 스캔 가능성 확인 — 검사/반환 배율 2,082배 포착 |
 | 2026-07-13 | [반정규화 필드 정합성 실측 (2026-07-13)](analysis/entity-schema/evidence/denormalization-consistency-2026-07-13.md) | denormalized-counter-drift | 반정규화 카운터 7종 실측 — 코드는 정합, 데이터(더미)가 오염. like_count 168/10264, comment_count 548/10264, current_participants 2791/3736 불일치 |
 | 2026-07-13 | [쿼리 성능 baseline (2026-07-13)](analysis/entity-schema/evidence/query-baseline-2026-07-13.md) | query-plan-baseline | board 목록 1페이지 0.09s (전 페이지 동일 — 매번 5만행 filesort). 공간인덱스는 정상(검사행 215 vs 22,737). carerequest 주변검색은 인덱스 없음 |
 | 2026-07-12 | [Board 목록 N+1 재검증 — 통합테스트 + EXPLAIN (2026-07-12)](refactoring/board/evidence/n-plus-one-reverify-2026-07-12.md) | n-plus-one | 301→3 queries (-99%), 561ms→55ms (10.2x), 21MB→3MB |
@@ -70,6 +72,12 @@ frontmatter가 붙은 문서 23건. 각 문서 상단에 `date/domains/type/prob
 | --- | --- | --- | --- |
 | 2026-07-12 | [Care 요청 목록 N+1 재검증 — 통합테스트 + EXPLAIN (2026-07-12)](refactoring/care/evidence/n-plus-one-reverify-2026-07-12.md) | n-plus-one | 101→2 queries (-98%), 511ms~617ms→133ms~137ms; file 테이블 인덱스 부재 추가 발견 |
 | 2026-07-12 | [MissingPet 목록 N+1 재검증 — 통합테스트 + EXPLAIN (2026-07-12)](refactoring/missing-pet/evidence/n-plus-one-reverify-2026-07-12.md) | n-plus-one | worktree 실측(실제 커밋 코드): 267→4 queries (-98.5%), 762ms→88ms. 재구성 테스트: 201→4 (-98%), 428ms→38ms |
+
+### global
+
+| 날짜 | 문서 | 문제 | 수치 |
+| --- | --- | --- | --- |
+| 2026-07-14 | [쿼리 계획 감시의 일반화 — 설계 분석](analysis/query-plan-monitoring-design.md) | query-plan-monitoring-generalization | board 목록 쿼리는 이미 디스크 임시테이블 사용 중(tmp_table_size 16MB 초과). performance_schema digest 로 전체 쿼리 자동 스캔 가능성 확인 — 검사/반환 배율 2,082배 포착 |
 
 ### location
 
@@ -176,6 +184,12 @@ frontmatter가 붙은 문서 23건. 각 문서 상단에 `date/domains/type/prob
 | 날짜 | 문서 | 도메인 | 수치 |
 | --- | --- | --- | --- |
 | 2026-07-13 | [쿼리 성능 baseline (2026-07-13)](analysis/entity-schema/evidence/query-baseline-2026-07-13.md) | board, location, care, meetup | board 목록 1페이지 0.09s (전 페이지 동일 — 매번 5만행 filesort). 공간인덱스는 정상(검사행 215 vs 22,737). carerequest 주변검색은 인덱스 없음 |
+
+### query-plan-monitoring-generalization
+
+| 날짜 | 문서 | 도메인 | 수치 |
+| --- | --- | --- | --- |
+| 2026-07-14 | [쿼리 계획 감시의 일반화 — 설계 분석](analysis/query-plan-monitoring-design.md) | board, global | board 목록 쿼리는 이미 디스크 임시테이블 사용 중(tmp_table_size 16MB 초과). performance_schema digest 로 전체 쿼리 자동 스캔 가능성 확인 — 검사/반환 배율 2,082배 포착 |
 
 ### race-condition
 
