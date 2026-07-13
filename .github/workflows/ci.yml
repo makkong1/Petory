@@ -3,7 +3,9 @@
 #
 # MySQL 8.0 + Redis 7 서비스 컨테이너를 띄우고,
 # 실제 시크릿이 없는 CI 전용 더미 설정(.github/ci/application-ci.properties)을 사용해,
-# 스키마 스냅샷(.github/ci-schema.sql)을 로드한 뒤 전체 테스트(./gradlew test)를 실행한다.
+# 전체 테스트(./gradlew test)를 실행한다.
+# 스키마는 빈 MySQL 에 Flyway(backend/main/resources/db/migration/V*.sql)가 만들고,
+# ddl-auto=validate 가 엔티티와 대조하므로, 스키마 드리프트는 여기서 빌드 실패로 잡힌다.
 # (설정 파일은 gitignore 되어 CI 체크아웃에 없으므로 런타임에 복사해 넣는다)
 name: CI
 
@@ -20,7 +22,7 @@ jobs:
 
     services:
       mysql:
-        image: mysql:8.0
+        image: mysql:8.4
         env:
           MYSQL_ROOT_PASSWORD: ci_root_pw
           MYSQL_DATABASE: petory
@@ -60,7 +62,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      - name: Wait for MySQL and load schema
+      - name: Wait for MySQL
         run: |
           for i in $(seq 1 30); do
             if mysqladmin ping -h 127.0.0.1 -P 3306 -uroot -pci_root_pw --silent 2>/dev/null; then
@@ -68,8 +70,6 @@ jobs:
             fi
             echo "waiting for MySQL... ($i/30)"; sleep 2
           done
-          mysql -h 127.0.0.1 -P 3306 -uroot -pci_root_pw petory < .github/ci-schema.sql
-          echo "loaded tables: $(mysql -h 127.0.0.1 -P 3306 -uroot -pci_root_pw -N -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='petory';")"
 
       - name: Prepare CI test config
         run: cp .github/ci/application-ci.properties backend/main/resources/application.properties

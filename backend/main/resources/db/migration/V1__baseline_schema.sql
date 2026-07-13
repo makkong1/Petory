@@ -1,3 +1,12 @@
+-- Petory 베이스라인 스키마 (Flyway V1)
+-- 엔티티와 일치함이 ddl-auto=validate 로 검증된 스키마에서 생성됨.
+-- 수정 금지: 스키마 변경은 새 V2__*.sql 파일로 추가할 것.
+
+-- MySQL dump 10.13  Distrib 9.6.0, for macos26.3 (arm64)
+--
+-- Host: 127.0.0.1    Database: petory
+-- ------------------------------------------------------
+-- Server version	9.6.0
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -9,7 +18,11 @@
 /*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
 /*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
-DROP TABLE IF EXISTS `admin_audit_log`;
+
+--
+-- Table structure for table `admin_audit_log`
+--
+
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `admin_audit_log` (
@@ -24,7 +37,11 @@ CREATE TABLE `admin_audit_log` (
   KEY `idx_audit_admin_created` (`admin_idx`,`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `board`;
+
+--
+-- Table structure for table `board`
+--
+
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `board` (
@@ -51,9 +68,13 @@ CREATE TABLE `board` (
   KEY `idx_board_created_at_desc` (`created_at` DESC),
   FULLTEXT KEY `idx_board_title_content` (`title`,`content`) /*!50100 WITH PARSER `ngram` */ ,
   CONSTRAINT `board_ibfk_1` FOREIGN KEY (`user_idx`) REFERENCES `users` (`idx`)
-) ENGINE=InnoDB AUTO_INCREMENT=34470 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `board_popularity_snapshot`;
+
+--
+-- Table structure for table `board_popularity_snapshot`
+--
+
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `board_popularity_snapshot` (
@@ -74,9 +95,13 @@ CREATE TABLE `board_popularity_snapshot` (
   KEY `idx_snapshot_range` (`period_type`,`period_start_date`,`period_end_date`),
   KEY `idx_snapshot_board_id` (`board_id`),
   CONSTRAINT `FKigqdyke28m9pvmo8jecehoh3d` FOREIGN KEY (`board_id`) REFERENCES `board` (`idx`)
-) ENGINE=InnoDB AUTO_INCREMENT=110 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `board_reaction`;
+
+--
+-- Table structure for table `board_reaction`
+--
+
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `board_reaction` (
@@ -91,9 +116,13 @@ CREATE TABLE `board_reaction` (
   KEY `FKag3ixpa53bjp1p5s79myoscpr` (`user_idx`),
   CONSTRAINT `FKag3ixpa53bjp1p5s79myoscpr` FOREIGN KEY (`user_idx`) REFERENCES `users` (`idx`),
   CONSTRAINT `FKgjhpjoxw7tt1kyfimlomv872y` FOREIGN KEY (`board_idx`) REFERENCES `board` (`idx`)
-) ENGINE=InnoDB AUTO_INCREMENT=123505 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `board_view_log`;
+
+--
+-- Table structure for table `board_view_log`
+--
+
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `board_view_log` (
@@ -106,9 +135,13 @@ CREATE TABLE `board_view_log` (
   KEY `FKemjj96yrflacv5mtek2nipy22` (`user_id`),
   CONSTRAINT `FKdlfgog8qjrr26l9qupeytyik0` FOREIGN KEY (`board_id`) REFERENCES `board` (`idx`),
   CONSTRAINT `FKemjj96yrflacv5mtek2nipy22` FOREIGN KEY (`user_id`) REFERENCES `users` (`idx`)
-) ENGINE=InnoDB AUTO_INCREMENT=35 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `careapplication`;
+
+--
+-- Table structure for table `careapplication`
+--
+
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `careapplication` (
@@ -124,9 +157,13 @@ CREATE TABLE `careapplication` (
   KEY `provider_idx` (`provider_idx`),
   CONSTRAINT `careapplication_ibfk_1` FOREIGN KEY (`care_request_idx`) REFERENCES `carerequest` (`idx`),
   CONSTRAINT `careapplication_ibfk_2` FOREIGN KEY (`provider_idx`) REFERENCES `users` (`idx`)
-) ENGINE=InnoDB AUTO_INCREMENT=858 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `carerequest`;
+
+--
+-- Table structure for table `carerequest`
+--
+
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `carerequest` (
@@ -153,9 +190,13 @@ CREATE TABLE `carerequest` (
   KEY `fk_carerequest_pet` (`pet_idx`),
   CONSTRAINT `carerequest_ibfk_1` FOREIGN KEY (`user_idx`) REFERENCES `users` (`idx`),
   CONSTRAINT `fk_carerequest_pet` FOREIGN KEY (`pet_idx`) REFERENCES `pets` (`idx`) ON DELETE SET NULL
-) ENGINE=InnoDB AUTO_INCREMENT=1504 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `carerequest_comment`;
+
+--
+-- Table structure for table `carerequest_comment`
+--
+
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `carerequest_comment` (
@@ -172,9 +213,13 @@ CREATE TABLE `carerequest_comment` (
   KEY `fk_care_request_comment_user` (`user_idx`),
   CONSTRAINT `fk_care_request_comment_request` FOREIGN KEY (`care_request_idx`) REFERENCES `carerequest` (`idx`) ON DELETE CASCADE,
   CONSTRAINT `fk_care_request_comment_user` FOREIGN KEY (`user_idx`) REFERENCES `users` (`idx`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `carereview`;
+
+--
+-- Table structure for table `carereview`
+--
+
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `carereview` (
@@ -193,9 +238,13 @@ CREATE TABLE `carereview` (
   CONSTRAINT `carereview_ibfk_1` FOREIGN KEY (`care_application_idx`) REFERENCES `careapplication` (`idx`),
   CONSTRAINT `carereview_ibfk_2` FOREIGN KEY (`reviewer_idx`) REFERENCES `users` (`idx`),
   CONSTRAINT `carereview_ibfk_3` FOREIGN KEY (`reviewee_idx`) REFERENCES `users` (`idx`)
-) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `chatmessage`;
+
+--
+-- Table structure for table `chatmessage`
+--
+
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `chatmessage` (
@@ -219,9 +268,13 @@ CREATE TABLE `chatmessage` (
   CONSTRAINT `chatmessage_ibfk_1` FOREIGN KEY (`conversation_idx`) REFERENCES `conversation` (`idx`) ON DELETE CASCADE,
   CONSTRAINT `chatmessage_ibfk_2` FOREIGN KEY (`sender_idx`) REFERENCES `users` (`idx`),
   CONSTRAINT `chatmessage_ibfk_3` FOREIGN KEY (`reply_to_message_idx`) REFERENCES `chatmessage` (`idx`) ON DELETE SET NULL
-) ENGINE=InnoDB AUTO_INCREMENT=627425 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `comment`;
+
+--
+-- Table structure for table `comment`
+--
+
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `comment` (
@@ -240,9 +293,13 @@ CREATE TABLE `comment` (
   KEY `idx_comment_status` (`status`),
   CONSTRAINT `comment_ibfk_1` FOREIGN KEY (`board_idx`) REFERENCES `board` (`idx`),
   CONSTRAINT `comment_ibfk_2` FOREIGN KEY (`user_idx`) REFERENCES `users` (`idx`)
-) ENGINE=InnoDB AUTO_INCREMENT=33754 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `comment_reaction`;
+
+--
+-- Table structure for table `comment_reaction`
+--
+
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `comment_reaction` (
@@ -257,9 +314,13 @@ CREATE TABLE `comment_reaction` (
   KEY `FK24cjwe1ksjmeujkgoa6f2pya` (`user_idx`),
   CONSTRAINT `FK24cjwe1ksjmeujkgoa6f2pya` FOREIGN KEY (`user_idx`) REFERENCES `users` (`idx`),
   CONSTRAINT `FKsdwdiwq8fqnux32g3tbns36tr` FOREIGN KEY (`comment_idx`) REFERENCES `comment` (`idx`)
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `conversation`;
+
+--
+-- Table structure for table `conversation`
+--
+
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `conversation` (
@@ -280,9 +341,13 @@ CREATE TABLE `conversation` (
   KEY `idx_conversation_related` (`related_type`,`related_idx`),
   KEY `idx_conversation_deleted` (`is_deleted`,`deleted_at`),
   CONSTRAINT `chk_related_fields` CHECK ((((`related_type` is null) and (`related_idx` is null)) or ((`related_type` is not null) and (`related_idx` is not null))))
-) ENGINE=InnoDB AUTO_INCREMENT=11115 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `conversationparticipant`;
+
+--
+-- Table structure for table `conversationparticipant`
+--
+
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `conversationparticipant` (
@@ -311,9 +376,13 @@ CREATE TABLE `conversationparticipant` (
   CONSTRAINT `conversationparticipant_ibfk_1` FOREIGN KEY (`conversation_idx`) REFERENCES `conversation` (`idx`) ON DELETE CASCADE,
   CONSTRAINT `conversationparticipant_ibfk_2` FOREIGN KEY (`user_idx`) REFERENCES `users` (`idx`),
   CONSTRAINT `conversationparticipant_ibfk_3` FOREIGN KEY (`last_read_message_idx`) REFERENCES `chatmessage` (`idx`) ON DELETE SET NULL
-) ENGINE=InnoDB AUTO_INCREMENT=12392 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `dailystatistics`;
+
+--
+-- Table structure for table `dailystatistics`
+--
+
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `dailystatistics` (
@@ -338,9 +407,13 @@ CREATE TABLE `dailystatistics` (
   `resolved_reports` bigint NOT NULL DEFAULT '0' COMMENT '신고 처리 수',
   PRIMARY KEY (`id`),
   UNIQUE KEY `stat_date` (`stat_date`)
-) ENGINE=InnoDB AUTO_INCREMENT=137 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `fcm_token`;
+
+--
+-- Table structure for table `fcm_token`
+--
+
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `fcm_token` (
@@ -355,7 +428,11 @@ CREATE TABLE `fcm_token` (
   CONSTRAINT `fk_fcm_token_user` FOREIGN KEY (`user_idx`) REFERENCES `users` (`idx`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `file`;
+
+--
+-- Table structure for table `file`
+--
+
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `file` (
@@ -368,9 +445,13 @@ CREATE TABLE `file` (
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'BaseTimeEntity (@LastModifiedDate)',
   PRIMARY KEY (`idx`),
   KEY `idx_file_target` (`target_type`,`target_idx`)
-) ENGINE=InnoDB AUTO_INCREMENT=928 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `locationservice`;
+
+--
+-- Table structure for table `locationservice`
+--
+
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `locationservice` (
@@ -383,7 +464,7 @@ CREATE TABLE `locationservice` (
   `rating` double DEFAULT '0',
   `description` varchar(255) DEFAULT NULL,
   `phone` varchar(255) DEFAULT NULL,
-  `website` varchar(255) DEFAULT NULL,
+  `website` varchar(500) DEFAULT NULL,
   `pet_friendly` tinyint(1) DEFAULT '0',
   `coordinates` point DEFAULT NULL,
   `category1` varchar(100) DEFAULT NULL,
@@ -421,7 +502,7 @@ CREATE TABLE `locationservice` (
   KEY `idx_road_name_deleted_rating` (`road_name`,`is_deleted`,`rating` DESC),
   SPATIAL KEY `idx_locationservice_location_spatial` (`location`),
   FULLTEXT KEY `ft_search` (`name`,`description`,`category1`,`category2`,`category3`)
-) ENGINE=InnoDB AUTO_INCREMENT=57460 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -461,7 +542,11 @@ DELIMITER ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
 /*!50003 SET character_set_results = @saved_cs_results */ ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
-DROP TABLE IF EXISTS `locationservicereview`;
+
+--
+-- Table structure for table `locationservicereview`
+--
+
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `locationservicereview` (
@@ -481,9 +566,13 @@ CREATE TABLE `locationservicereview` (
   KEY `idx_locationservicereview_user_deleted` (`user_idx`,`is_deleted`),
   CONSTRAINT `locationservicereview_ibfk_1` FOREIGN KEY (`service_idx`) REFERENCES `locationservice` (`idx`),
   CONSTRAINT `locationservicereview_ibfk_2` FOREIGN KEY (`user_idx`) REFERENCES `users` (`idx`)
-) ENGINE=InnoDB AUTO_INCREMENT=15 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `login_events`;
+
+--
+-- Table structure for table `login_events`
+--
+
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `login_events` (
@@ -495,9 +584,13 @@ CREATE TABLE `login_events` (
   KEY `idx_login_events_user_login_at` (`user_id`,`login_at`),
   KEY `idx_login_events_login_at` (`login_at`),
   CONSTRAINT `fk_login_events_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`idx`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=112 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `meetup`;
+
+--
+-- Table structure for table `meetup`
+--
+
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `meetup` (
@@ -527,7 +620,7 @@ CREATE TABLE `meetup` (
   FULLTEXT KEY `idx_meetup_title_description` (`title`,`description`) /*!50100 WITH PARSER `ngram` */ ,
   CONSTRAINT `meetup_ibfk_1` FOREIGN KEY (`organizer_idx`) REFERENCES `users` (`idx`),
   CONSTRAINT `chk_participants` CHECK ((`current_participants` <= `max_participants`))
-) ENGINE=InnoDB AUTO_INCREMENT=129715 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -567,7 +660,11 @@ DELIMITER ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
 /*!50003 SET character_set_results = @saved_cs_results */ ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
-DROP TABLE IF EXISTS `meetupparticipants`;
+
+--
+-- Table structure for table `meetupparticipants`
+--
+
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `meetupparticipants` (
@@ -582,7 +679,11 @@ CREATE TABLE `meetupparticipants` (
   CONSTRAINT `meetupparticipants_ibfk_2` FOREIGN KEY (`user_idx`) REFERENCES `users` (`idx`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `missing_pet_board`;
+
+--
+-- Table structure for table `missing_pet_board`
+--
+
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `missing_pet_board` (
@@ -611,9 +712,13 @@ CREATE TABLE `missing_pet_board` (
   KEY `idx_missing_pet_location` (`latitude`,`longitude`),
   KEY `idx_missing_pet_user` (`user_idx`,`is_deleted`,`created_at` DESC),
   CONSTRAINT `FKrid0u1qvm8e07etghggxnu1b1` FOREIGN KEY (`user_idx`) REFERENCES `users` (`idx`)
-) ENGINE=InnoDB AUTO_INCREMENT=842 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `missing_pet_comment`;
+
+--
+-- Table structure for table `missing_pet_comment`
+--
+
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `missing_pet_comment` (
@@ -634,9 +739,13 @@ CREATE TABLE `missing_pet_comment` (
   KEY `idx_missing_pet_comment_board_is_deleted` (`board_idx`,`is_deleted`),
   CONSTRAINT `FKe3sca61815j9cxi608oxmrfjt` FOREIGN KEY (`user_idx`) REFERENCES `users` (`idx`),
   CONSTRAINT `FKpodx5stuchr73mrjgffir72ii` FOREIGN KEY (`board_idx`) REFERENCES `missing_pet_board` (`idx`)
-) ENGINE=InnoDB AUTO_INCREMENT=4530 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `monthly_statistics`;
+
+--
+-- Table structure for table `monthly_statistics`
+--
+
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `monthly_statistics` (
@@ -666,7 +775,11 @@ CREATE TABLE `monthly_statistics` (
   UNIQUE KEY `uq_monthly_year_month` (`year`,`month`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='월간 통계 (무기한 보관)';
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `notifications`;
+
+--
+-- Table structure for table `notifications`
+--
+
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `notifications` (
@@ -683,9 +796,13 @@ CREATE TABLE `notifications` (
   PRIMARY KEY (`idx`),
   KEY `fk_notifications_user` (`user_idx`),
   CONSTRAINT `fk_notifications_user` FOREIGN KEY (`user_idx`) REFERENCES `users` (`idx`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=17 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `pet_coin_escrow`;
+
+--
+-- Table structure for table `pet_coin_escrow`
+--
+
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `pet_coin_escrow` (
@@ -715,7 +832,11 @@ CREATE TABLE `pet_coin_escrow` (
   CONSTRAINT `chk_escrow_amount_positive` CHECK ((`amount` > 0))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='펫코인 에스크로 (거래 확정 시 임시 보관)';
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `pet_coin_transaction`;
+
+--
+-- Table structure for table `pet_coin_transaction`
+--
+
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `pet_coin_transaction` (
@@ -740,9 +861,13 @@ CREATE TABLE `pet_coin_transaction` (
   CONSTRAINT `pet_coin_transaction_ibfk_1` FOREIGN KEY (`user_idx`) REFERENCES `users` (`idx`) ON DELETE CASCADE,
   CONSTRAINT `chk_amount_positive` CHECK ((`amount` > 0)),
   CONSTRAINT `chk_balance_after` CHECK ((`balance_after` >= 0))
-) ENGINE=InnoDB AUTO_INCREMENT=854 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='펫코인 거래 내역';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='펫코인 거래 내역';
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `pet_vaccinations`;
+
+--
+-- Table structure for table `pet_vaccinations`
+--
+
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `pet_vaccinations` (
@@ -759,9 +884,13 @@ CREATE TABLE `pet_vaccinations` (
   KEY `idx_pet_vaccine_pet_idx` (`pet_idx`),
   KEY `idx_pet_vaccine_deleted` (`is_deleted`),
   CONSTRAINT `fk_pet_vaccine_pet` FOREIGN KEY (`pet_idx`) REFERENCES `pets` (`idx`)
-) ENGINE=InnoDB AUTO_INCREMENT=701 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `pets`;
+
+--
+-- Table structure for table `pets`
+--
+
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `pets` (
@@ -789,9 +918,13 @@ CREATE TABLE `pets` (
   KEY `idx_pets_type` (`pet_type`),
   KEY `idx_pets_breed` (`breed`),
   CONSTRAINT `fk_pets_user` FOREIGN KEY (`user_idx`) REFERENCES `users` (`idx`)
-) ENGINE=InnoDB AUTO_INCREMENT=417 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `place_interaction_log`;
+
+--
+-- Table structure for table `place_interaction_log`
+--
+
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `place_interaction_log` (
@@ -805,7 +938,11 @@ CREATE TABLE `place_interaction_log` (
   KEY `idx_place_interaction` (`location_idx`,`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='장소 행동 로그 — popularity_score 계산용';
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `report`;
+
+--
+-- Table structure for table `report`
+--
+
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `report` (
@@ -827,9 +964,13 @@ CREATE TABLE `report` (
   KEY `handled_by` (`handled_by`),
   CONSTRAINT `report_ibfk_1` FOREIGN KEY (`reporter_idx`) REFERENCES `users` (`idx`),
   CONSTRAINT `report_ibfk_2` FOREIGN KEY (`handled_by`) REFERENCES `users` (`idx`)
-) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `signal_interaction_log`;
+
+--
+-- Table structure for table `signal_interaction_log`
+--
+
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `signal_interaction_log` (
@@ -847,7 +988,11 @@ CREATE TABLE `signal_interaction_log` (
   KEY `idx_signal_log_domain` (`intent_domain`,`interaction_type`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='추천 카드 상호작용 로그 — threshold 튜닝 및 카드 문구 개선 근거';
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `socialuser`;
+
+--
+-- Table structure for table `socialuser`
+--
+
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `socialuser` (
@@ -866,9 +1011,13 @@ CREATE TABLE `socialuser` (
   UNIQUE KEY `uk_socialuser_provider_providerid` (`provider`,`provider_id`),
   KEY `users_idx` (`users_idx`),
   CONSTRAINT `socialuser_ibfk_1` FOREIGN KEY (`users_idx`) REFERENCES `users` (`idx`)
-) ENGINE=InnoDB AUTO_INCREMENT=323 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `system_config`;
+
+--
+-- Table structure for table `system_config`
+--
+
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `system_config` (
@@ -882,7 +1031,11 @@ CREATE TABLE `system_config` (
   UNIQUE KEY `idx_system_config_key` (`config_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `user_pet_intent_signal`;
+
+--
+-- Table structure for table `user_pet_intent_signal`
+--
+
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `user_pet_intent_signal` (
@@ -902,9 +1055,13 @@ CREATE TABLE `user_pet_intent_signal` (
   PRIMARY KEY (`id`),
   KEY `idx_user_signal_active` (`user_idx`,`expires_at`,`created_at`),
   KEY `idx_signal_source` (`source_type`,`source_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='사용자 반려생활 의도 signal (원문 저장 없음, TTL 7일)';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='사용자 반려생활 의도 signal (원문 저장 없음, TTL 7일)';
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `user_sanctions`;
+
+--
+-- Table structure for table `user_sanctions`
+--
+
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `user_sanctions` (
@@ -925,9 +1082,13 @@ CREATE TABLE `user_sanctions` (
   KEY `idx_ends_at` (`ends_at`),
   CONSTRAINT `user_sanctions_ibfk_1` FOREIGN KEY (`user_idx`) REFERENCES `users` (`idx`),
   CONSTRAINT `user_sanctions_ibfk_2` FOREIGN KEY (`admin_idx`) REFERENCES `users` (`idx`)
-) ENGINE=InnoDB AUTO_INCREMENT=412 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `users`;
+
+--
+-- Table structure for table `users`
+--
+
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `users` (
@@ -964,9 +1125,13 @@ CREATE TABLE `users` (
   UNIQUE KEY `email` (`email`),
   UNIQUE KEY `uk_users_nickname` (`nickname`),
   CONSTRAINT `chk_pet_coin_balance` CHECK ((`pet_coin_balance` >= 0))
-) ENGINE=InnoDB AUTO_INCREMENT=24876 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `weekly_statistics`;
+
+--
+-- Table structure for table `weekly_statistics`
+--
+
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `weekly_statistics` (
@@ -995,8 +1160,16 @@ CREATE TABLE `weekly_statistics` (
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_weekly_year_week` (`year`,`week_number`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='주간 통계 (무기한 보관)';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='주간 통계 (무기한 보관)';
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping events for database 'petory'
+--
+
+--
+-- Dumping routines for database 'petory'
+--
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
@@ -1007,3 +1180,4 @@ CREATE TABLE `weekly_statistics` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
+-- Dump completed
