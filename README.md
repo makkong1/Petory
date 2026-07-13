@@ -35,7 +35,7 @@
 | **Frontend** | React 19, Styled-components, Axios, Recharts                     |
 | **Mobile**   | Capacitor 8 (Android / iOS), FCM                                 |
 | **NLP**      | Python, FastAPI, `petory-nlp-server` (한국어 반려생활 의도 분석) |
-| **Data**     | MySQL 8.0, Redis                                                 |
+| **Data**     | MySQL 8.4 LTS, Redis                                                 |
 | **Realtime** | WebSocket(STOMP), SSE, Firebase Admin SDK (FCM)                  |
 
 ### Redis 용도
@@ -152,7 +152,7 @@ Petory/
 
 | 서비스       | 기본                          | 비고                |
 | ------------ | ----------------------------- | ------------------- |
-| MySQL 8.0+   | `localhost:3306`, DB `petory` |                     |
+| MySQL 8.4 LTS | `localhost:3306`, DB `petory` |                     |
 | Redis        | `localhost:6379`              |                     |
 | Python 3.10+ | NLP 서버용                    | `petory-nlp-server` |
 
@@ -189,12 +189,18 @@ cd frontend && npm install && npm start
 cd frontend && npm run build && npm test
 ```
 
-### DB migration (추천 기능)
+### DB migration
+
+**손으로 SQL을 적용할 일은 없다.** 스키마는 앱이 뜰 때 **Flyway**가 `backend/main/resources/db/migration/V*.sql`을 자동 적용한다 (로컬·도커·CI 동일).
+
+스키마를 바꾸려면 새 버전 파일을 추가하고 앱을 재기동하면 된다:
 
 ```bash
-# user_pet_intent_signal 등
-mysql petory < backend/main/resources/sql/migration/user-pet-intent-signal-table.sql
+# 예: backend/main/resources/db/migration/V2__add_something.sql 생성 후
+./gradlew bootRun
 ```
+
+엔티티도 함께 고쳐야 한다 — `spring.jpa.hibernate.ddl-auto=validate`가 엔티티와 실제 스키마를 대조해서, 어긋나면 앱이 기동에 실패한다.
 
 ### 모바일 (Capacitor)
 

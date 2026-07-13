@@ -70,7 +70,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 | 서비스     | 기본값                          | 시작 명령                           |
 | ---------- | ------------------------------- | ----------------------------------- |
-| MySQL 8.0+ | `localhost:3306`, DB명 `petory` | `sudo mysqld --user=mysql &`        |
+| MySQL 8.4 LTS | `localhost:3306`, DB명 `petory` | `brew services start mysql@8.4`  |
 | Redis      | `localhost:6379`                | `sudo redis-server --daemonize yes` |
 
 ## 빌드 & 실행
@@ -104,6 +104,18 @@ npm test
 - OAuth2 클라이언트 등록 (더미값이라도 필수 — 없으면 `ClientRegistrationRepository` 빈 생성 실패)
 - Redis는 레거시 속성명 사용: `spring.redis.host` / `spring.redis.port` (`spring.data.redis.*` 아님)
 - `spring.profiles.active=dev` 설정 시 이메일 인증 스킵
+- **스키마 관련 (필수)** — 아래 두 줄이 없으면 기존 DB에서 Flyway가 기동에 실패한다:
+  - `spring.flyway.baseline-on-migrate=true`, `spring.flyway.baseline-version=1`
+  - `spring.jpa.hibernate.ddl-auto=validate`
+
+## 스키마 관리 (Flyway)
+
+**스키마의 유일한 정본은 `backend/main/resources/db/migration/V*.sql` 이다.** 앱이 기동할 때 Flyway가 로컬·도커·CI에 동일하게 적용한다.
+
+- **스키마를 바꾸려면** `db/migration/V2__무엇을_바꾸는지.sql` 처럼 새 버전 파일을 추가한다. **기존 V1을 수정하지 말 것.**
+- **엔티티도 같이 고쳐야 한다.** `ddl-auto=validate` 가 엔티티와 실제 스키마를 대조하므로, 어긋나면 앱이 기동에 실패한다(DDL은 실행하지 않으니 데이터는 안전).
+- `backend/main/resources/sql/migration/applied/` 는 Flyway 이전의 **이력 보관용**이며 실행되지 않는다. 여기에 새 파일을 넣지 말 것.
+- ⚠️ `ddl-auto=update` 를 절대 켜지 말 것 — 과거 `@Lob` 매핑 문제로 본문 컬럼이 `longtext → tinytext` 로 잘린 사고가 있었다.
 
 ## 소스 구조
 

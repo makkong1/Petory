@@ -46,7 +46,7 @@
          │                 │                 │
   ┌──────▼──────┐  ┌───────▼───────┐  ┌──────▼─────────────┐
   │ petory-mysql│  │ petory-redis  │  │ petory-nlp-server   │
-  │  MySQL 8.0  │  │  Redis 7      │  │ FastAPI, 의도 분석    │
+  │  MySQL 8.4  │  │  Redis 7      │  │ FastAPI, 의도 분석    │
   └─────────────┘  └───────────────┘  │  8000               │
                                        └──────────────────────┘
 ```
@@ -67,7 +67,7 @@
 - **실행 유저**: `petory`(non-root, `groupadd`/`useradd`로 생성)
 
 ### Infrastructure
-- **데이터베이스**: MySQL 8.0 — `docker-compose.yml`의 `mysql` 서비스. 최초 기동 시 `backend/main/resources/sql/migration/000-baseline-schema.sql`이 자동 실행되어 전체 스키마(테이블 40개)가 생성됨
+- **데이터베이스**: MySQL 8.4 LTS — `docker-compose.yml`의 `mysql` 서비스. 스키마는 앱 기동 시 **Flyway**가 `backend/main/resources/db/migration/V*.sql`을 적용해 생성한다(테이블 39개 + `flyway_schema_history`)
 - **캐시**: Redis 7 — `docker-compose.yml`의 `redis` 서비스
 - **NLP 서버**: `petory-nlp-server`(FastAPI, Python 3.9) — `docker-compose.yml`의 `nlp-server` 서비스. 반려생활 의도 분석(`POST /api/pet-intent/analyze`) 담당, `app`이 `PetIntentClient`로 호출 (`app.pet-intent.base-url=http://nlp-server:8000`)
 - **전체 스택 Compose**: 레포 루트 `docker-compose.yml`에 존재 (mysql·redis·nlp-server·app·nginx 5개 서비스)
