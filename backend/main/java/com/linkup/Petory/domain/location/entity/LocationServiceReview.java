@@ -10,7 +10,6 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
@@ -50,7 +49,7 @@ public class LocationServiceReview extends BaseTimeEntity {
     @Column(nullable = false)
     private Integer rating; // 평점 (1~5)
 
-    @Lob
+    @Column(columnDefinition = "LONGTEXT")
     private String comment; // 리뷰 내용
 
     // Soft Delete 필드

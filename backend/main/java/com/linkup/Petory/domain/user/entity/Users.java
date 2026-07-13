@@ -60,7 +60,7 @@ public class Users extends BaseTimeEntity {
 
     private String location;
 
-    @Lob
+    @Column(columnDefinition = "LONGTEXT")
     private String petInfo;
 
     /**

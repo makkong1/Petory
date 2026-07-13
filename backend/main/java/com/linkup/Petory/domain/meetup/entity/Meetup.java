@@ -18,7 +18,6 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.PrePersist;
@@ -46,7 +45,7 @@ public class Meetup extends BaseTimeEntity {
     @Column(nullable = false, length = 200)
     private String title; // 모임 제목
 
-    @Lob
+    @Column(columnDefinition = "LONGTEXT")
     private String description; // 모임 내용
 
     private String location; // 모임 장소 주소

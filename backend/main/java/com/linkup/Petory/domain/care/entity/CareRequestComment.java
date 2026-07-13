@@ -37,7 +37,7 @@ public class CareRequestComment extends BaseTimeEntity {
     private Users user;
 
     /** 댓글 내용 */
-    @Lob
+    @Column(columnDefinition = "LONGTEXT")
     private String content;
 
     @Column(name = "is_deleted")

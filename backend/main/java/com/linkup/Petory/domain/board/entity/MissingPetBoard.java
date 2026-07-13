@@ -19,7 +19,6 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.PrePersist;
@@ -53,7 +52,7 @@ public class MissingPetBoard extends BaseTimeEntity {
     @Column(length = 100, nullable = false)
     private String title;
 
-    @Lob
+    @Column(columnDefinition = "LONGTEXT")
     private String content;
 
     @Column(name = "pet_name", length = 50)
