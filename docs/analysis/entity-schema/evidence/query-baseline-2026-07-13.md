@@ -72,16 +72,67 @@ table: u   type: eq_ref  key: PRIMARY                     rows: 1
 `users` 에 `(is_deleted, status)` 인덱스가 없다. 옵티마이저는 `users` 필터를 적용하려면
 풀스캔이 필요하다고 보고, 그 비용을 근거로 `users` 를 드라이빙 테이블로 골랐다.
 
-### 아직 고치지 않았다
+### 해결: 히스토그램 (`BoardListQueryPlanMaintainer`)
 
-JPQL 은 `STRAIGHT_JOIN` 을 지원하지 않으므로 단순 힌트 추가로는 안 된다. 선택지:
+```sql
+ANALYZE TABLE users UPDATE HISTOGRAM ON status, is_deleted WITH 16 BUCKETS;
+```
 
-1. `users(is_deleted, status)` 인덱스 추가 → 풀스캔은 없어지지만 **filesort 는 남는다**
-2. 네이티브 쿼리로 조인 순서 고정 (`STRAIGHT_JOIN`)
-3. 쿼리 재구성 — 단, `u.status` 필터가 `LIMIT` **이전에** 적용되어야 하므로
-   단순 deferred join 으로는 의미가 바뀐다
+값 분포를 알려주면 옵티마이저가 `board` 를 먼저 읽고, `idx_board_deleted_created` 로 정렬 없이
+`LIMIT` 에서 조기 종료한다. **`Using temporary; Using filesort` 가 사라진다.**
 
-**어느 쪽이든 이 문서의 수치가 전후 비교 기준점이다.**
+```
+table: b   type: ref     key: idx_board_deleted_created   rows: 20   Extra: NULL
+table: u   type: eq_ref  key: PRIMARY                     rows: 1
+```
+
+| | 1페이지 |
+|---|---|
+| 히스토그램 없음 | **0.17s** |
+| 히스토그램 있음 | **0.00s** |
+
+인과는 A/B/A 로 확인했다 — 히스토그램 적용(0.00s) → 제거(0.17s) → 재적용(0.00s).
+
+#### ⚠️ `ANALYZE TABLE` 만으로는 고쳐지지 않는다 (검증함)
+
+| | 통계상 board 행 수 | 계획 | 시간 |
+|---|---|---|---|
+| ① 현재 (통계 낡음) | 10,872 | ❌ filesort | 0.17s |
+| ② `ANALYZE TABLE users, board` | 48,620 (정확해짐) | ❌ **여전히 filesort** | 0.18s |
+| ③ ② + 히스토그램 | 48,620 | ✅ 정상 | **0.00s** |
+
+**행 수 통계를 정확히 알려줘도 소용없다. 값 분포(히스토그램)가 있어야 한다.**
+
+> 부수 발견: 대량 INSERT/TRUNCATE 후 InnoDB 통계가 낡은 채로 남는다(board 를 10,872건으로 알고
+> 있었으나 실제 50,000건). 이 쿼리의 원인은 아니지만 별도 문제이므로 Maintainer 가 `ANALYZE TABLE` 도 함께 돈다.
+
+### 히스토그램의 약점과 보완
+
+히스토그램은 **자동 갱신되지 않고, 실패해도 앱은 정상 동작한다. 조용히 느려질 뿐이라 아무도 모른다.**
+(오늘 발견한 이 문제 자체가 그렇게 숨어 있었다.) 그래서 `BoardListQueryPlanMaintainer` 는
+**갱신만 하고 끝내지 않는다:**
+
+1. `ANALYZE TABLE users, board` — 행 수 통계
+2. `ANALYZE TABLE users UPDATE HISTOGRAM ON status, is_deleted` — 값 분포
+3. **`EXPLAIN FORMAT=JSON` 으로 실제 계획을 다시 뽑아 `using_filesort` / `using_temporary_table` 이 없는지 검증**
+4. 회귀했으면 `ERROR` 로그 + 메트릭 `petory.board.list_query_plan_healthy = 0` (Prometheus 알람)
+
+**성공 조건은 "ANALYZE 를 실행했다" 가 아니라 "계획에서 filesort 가 사라진 것을 확인했다" 이다.**
+
+실행 시점: **앱 기동 직후**(신규 배포·빈 DB 에 데이터가 쌓인 뒤 재기동하는 경우를 커버) + **매일 03:10**.
+게시글이 1,000건 미만이면 옵티마이저 선택이 무의미하므로 검증을 건너뛴다(빈 DB 오탐 방지).
+
+### CI 회귀 테스트 (`BoardListQueryPlanMaintainerTest`)
+
+**500명 / 2,500건이면 나쁜 계획이 재현된다**(실측 — 이보다 큰 데이터는 CI 시간만 늘린다).
+
+테스트는 2단계다:
+
+1. 히스토그램을 지우고 → **계획에 filesort 가 실제로 나타나는지 먼저 확인**
+2. `Maintainer.refresh()` 실행 → filesort 가 사라졌는지 확인
+
+**1번이 핵심이다.** 없으면, 테스트 데이터가 부족해 애초에 나쁜 계획이 안 나오는 경우에도 2번이 그냥 통과해
+**아무것도 검증하지 못한 채 초록불**이 켜진다.
 
 ---
 
