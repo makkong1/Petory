@@ -1,0 +1,104 @@
+package com.linkup.Petory.global.performance;
+
+import java.util.List;
+
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.transaction.annotation.Transactional;
+
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+/**
+ * ====================================================================================
+ * 인덱스가 "존재하는지" 가 아니라 "실제로 쓰이는지" 를 검증한다 (2026-07-14)
+ * ====================================================================================
+ *
+ * 인덱스 존재 여부만 확인하면 부족하다. 감사 도중 실제로 이런 일이 있었다:
+ *
+ *   · pets 에 (pet_type, is_deleted) 복합 인덱스를 만들었는데 옵티마이저가 안 골랐다.
+ *   · carerequest 에 (is_deleted, latitude, longitude) B-tree 를 만들었는데 소용이 없었다
+ *     — is_deleted 는 선택도가 0 이고, longitude 는 latitude 범위 뒤에서 범위 조건으로 못 쓰인다.
+ *     결국 SPATIAL 인덱스(geo_point)로 다시 갔다.
+ *
+ * 그래서 EXPLAIN 을 실행해 "그 인덱스 이름이 실행 계획에 등장하는지" 를 본다.
+ * 이러면 두 가지 회귀를 한꺼번에 잡는다:
+ *   (1) 마이그레이션이 되돌려져 인덱스가 사라진 경우
+ *   (2) 쿼리가 인덱스를 못 타는 형태로 다시 쓰인 경우 (예: ST_Within → BETWEEN 복귀)
+ *
+ * 근거: docs/analysis/query-audit/fixes-2026-07-14.md
+ * ====================================================================================
+ */
+@SpringBootTest
+@Transactional
+class IndexUsageRegressionTest {
+
+    @PersistenceContext
+    private EntityManager entityManager;
+
+    private String explain(String sql) {
+        @SuppressWarnings("unchecked")
+        List<Object> rows = entityManager.createNativeQuery("EXPLAIN FORMAT=TREE " + sql).getResultList();
+        StringBuilder sb = new StringBuilder();
+        rows.forEach(r -> sb.append(r).append('\n'));
+        return sb.toString();
+    }
+
+    /**
+     * SPATIAL 인덱스는 EXPLAIN 으로 검증하지 않는다.
+     *
+     * 실행 계획은 옵티마이저의 통계 추정에 따라 세션마다 달라진다 — 실제로 이 테스트를 처음 EXPLAIN
+     * 기반으로 짰더니, CLI 에서는 SPATIAL 인덱스를 타는데(rows=190) 테스트 세션에서는 통계 추정이
+     * rows=1 로 나와 B-tree 인덱스를 골랐다. 즉 EXPLAIN 단언은 흔들린다.
+     *
+     * 대신 스키마를 검증한다. 마이그레이션이 되돌려지는 것이 실제 회귀 위험이고, 그건 결정적으로 잡힌다.
+     * 인덱스가 실제로 쓰이는지는 A/B/A 로 확인해 문서에 남겼다
+     * (인덱스 제거 시 Table scan 3,000행 → 재적용 시 Index range scan 208행).
+     */
+    @Test
+    @DisplayName("care 주변검색: geo_point 에 SPATIAL 인덱스가 있어야 한다")
+    void nearbySearchHasSpatialIndex() {
+        @SuppressWarnings("unchecked")
+        List<String> columns = entityManager.createNativeQuery(
+                "SELECT COLUMN_NAME FROM information_schema.STATISTICS "
+                        + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'carerequest' "
+                        + "AND INDEX_TYPE = 'SPATIAL'")
+                .getResultList();
+
+        assertThat(columns)
+                .as("SPATIAL 인덱스가 없으면 주변검색이 carerequest 를 풀스캔한다 (3,000행 → 208행)")
+                .containsExactly("geo_point");
+    }
+
+    @Test
+    @DisplayName("care 목록: 정렬용 인덱스를 타고 filesort 가 없다")
+    void careListUsesSortIndex() {
+        String plan = explain(
+                "SELECT cr.idx FROM carerequest cr JOIN users u ON u.idx = cr.user_idx "
+                        + "WHERE cr.is_deleted = 0 AND u.is_deleted = 0 AND u.status = 'ACTIVE' "
+                        + "ORDER BY cr.created_at DESC LIMIT 20");
+
+        assertThat(plan)
+                .as("(is_deleted, created_at) 인덱스가 없으면 carerequest 전체를 읽고 전부 정렬한다.\n계획:\n%s", plan)
+                .contains("idx_carerequest_deleted_created");
+        assertThat(plan)
+                .as("정렬용 인덱스를 타면 filesort 가 필요 없다.\n계획:\n%s", plan)
+                .doesNotContain("Sort:");
+    }
+
+    @Test
+    @DisplayName("admin 사용자 목록: created_at 인덱스를 타고 filesort 가 없다")
+    void adminUserListUsesCreatedAtIndex() {
+        String plan = explain("SELECT u.idx FROM users u ORDER BY u.created_at DESC LIMIT 20");
+
+        assertThat(plan)
+                .as("users.created_at 인덱스가 없으면 1만 행을 전부 읽고 전부 정렬한다.\n계획:\n%s", plan)
+                .contains("idx_users_created_at");
+        assertThat(plan)
+                .as("정렬용 인덱스를 타면 filesort 가 필요 없다.\n계획:\n%s", plan)
+                .doesNotContain("Sort:");
+    }
+}
