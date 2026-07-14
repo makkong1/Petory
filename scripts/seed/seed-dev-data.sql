@@ -153,7 +153,7 @@ SELECT @U0 + (n - 1),
        ELT(1 + (n % 10), '초코','보리','coco','노랑이','까미','두부','흰둥이','밤톨','뭉치','호두'),
        IF(n % 3 = 0, 'CAT', 'DOG'),
        ELT(1 + (n % 6), '말티즈','푸들','골든리트리버','코리안숏헤어','시바','비숑'),
-       IF(n % 2 = 0, 'MALE', 'FEMALE'),
+       IF(n % 2 = 0, 'M', 'F'),   -- PetGender enum 은 M/F/UNKNOWN 이다 (MALE/FEMALE 아님)
        CONCAT(1 + (n % 15), '살'),
        ROUND(1 + (n % 30) * 0.7, 2),
        n % 2,
@@ -164,7 +164,7 @@ FROM seed_numbers WHERE n <= @USERS;
 INSERT INTO pets (user_idx, pet_name, pet_type, breed, gender, age, weight, is_neutered, created_at)
 SELECT @U0 + (n - 1), CONCAT('둘째', n % 100), IF(n % 2 = 0, 'CAT', 'DOG'),
        ELT(1 + (n % 4), '먼치킨','포메라니안','러시안블루','웰시코기'),
-       IF(n % 2 = 0, 'FEMALE', 'MALE'), CONCAT(1 + (n % 10), '살'),
+       IF(n % 2 = 0, 'F', 'M'), CONCAT(1 + (n % 10), '살'),   -- PetGender: M/F/UNKNOWN
        ROUND(1 + (n % 20) * 0.5, 2), n % 2,
        NOW() - INTERVAL (n % 500) DAY
 FROM seed_numbers WHERE n <= @USERS AND n % 5 = 0;
