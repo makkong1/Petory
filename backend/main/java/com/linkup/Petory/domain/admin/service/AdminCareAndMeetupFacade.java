@@ -3,6 +3,7 @@ package com.linkup.Petory.domain.admin.service;
 import java.util.List;
 
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -10,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.linkup.Petory.domain.care.converter.CareRequestConverter;
 import com.linkup.Petory.domain.care.dto.CareRequestDTO;
+import com.linkup.Petory.domain.care.entity.CareRequest;
 import com.linkup.Petory.domain.care.exception.CareRequestNotFoundException;
 import com.linkup.Petory.domain.care.repository.CareRequestRepository;
 import com.linkup.Petory.domain.care.service.CareRequestService;
@@ -37,8 +39,11 @@ public class AdminCareAndMeetupFacade {
     public Page<CareRequestDTO> getCareRequests(String status, Boolean deleted, String keyword,
             int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
-        return careRequestRepository.findAllForAdmin(status, deleted, keyword, pageable)
-                .map(careRequestConverter::toDTO);
+        Page<CareRequest> result = careRequestRepository.findAllForAdmin(status, deleted, keyword, pageable);
+        // Page.map(converter::toDTO) 를 쓰면 안 된다 — 단건 toDTO 는 행마다 첨부를 조회해 N+1 이 난다.
+        // toDTOList 는 첨부를 배치(IN)로 한 번에 가져온다.
+        return new PageImpl<>(careRequestConverter.toDTOList(result.getContent()), pageable,
+                result.getTotalElements());
     }
 
     public CareRequestDTO getCareRequest(Long id) {
