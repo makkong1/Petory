@@ -92,11 +92,12 @@ public class BoardController {
         return ResponseEntity.noContent().build();
     }
 
-    // 내 게시글 조회
+    // 내 게시글 조회 — 대상은 인증 주체다. 클라이언트가 보낸 userId 를 쓰면 남의 글이 조회된다.
     @GetMapping("/my-posts")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<List<BoardDTO>> getMyBoards(@RequestParam("userId") Long userId) {
-        return ResponseEntity.ok(boardService.getMyBoards(userId));
+    public ResponseEntity<List<BoardDTO>> getMyBoards(
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        return ResponseEntity.ok(boardService.getMyBoards(userDetails.getIdx()));
     }
 
     // 게시글 검색 (페이징 지원)
