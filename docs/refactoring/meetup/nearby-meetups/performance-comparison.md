@@ -1,3 +1,13 @@
+---
+date: 2026-02-07
+domains: [meetup]
+type: performance-evidence
+problem: in-memory-filtering
+status: superseded
+metric: "1~3단계(B-tree bounding box): 486ms→273ms (-43.8%), 스캔행 2958→117 (-96%). 현재는 4세대 공간인덱스로 재구현됨"
+related: [docs/performance/performance-testing/k6/nearby-loadtest-results.md]
+---
+
 # getNearbyMeetups() 성능 비교 분석 (3단계 리팩토링)
 
 ## 📋 비교 개요

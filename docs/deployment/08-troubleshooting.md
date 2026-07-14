@@ -57,6 +57,14 @@ docker network inspect petory_default
 **원인**: `sql/migration/`에 있던 파일들이 전부 기존 스키마 위에 컬럼을 추가하는 증분 ALTER 스크립트였고, 완전히 빈 DB에서 실행하면 중간에 깨짐 (`spring.jpa.hibernate.ddl-auto=none`이라 Hibernate 자동 생성도 안 됨)  
 **해결**: 로컬 DB 스키마를 `mysqldump --no-data`로 떠서 `sql/migration/000-baseline-schema.sql`로 고정, 기존 증분 파일은 `sql/migration/applied/`로 이동(MySQL이 하위 폴더는 스캔하지 않아 자동실행 대상에서 제외됨)
 
+> **⚠️ 2026-07-13 이후 이 문제는 발생하지 않는다.** 위 해결책은 스키마 정의 파일을 손으로 관리하는 방식이라 결국 사본이 갈라졌다(→ 다음 항목). 지금은 **Flyway**가 앱 기동 시 `db/migration/V*.sql`을 적용하므로, 빈 볼륨으로 띄워도 스키마가 자동 생성된다.
+
+### 스키마 사본이 갈라져 환경마다 다른 DB가 됨 (2026-07-13 해결)
+
+**문제**: 도커 DB에서 유저 조회가 `ERROR 1054 Unknown column 'is_dormant'`로 실패. 로컬에서는 멀쩡함
+**원인**: 스키마 사본이 4개(로컬 DB / 도커 DB / `000-baseline-schema.sql` / `.github/ci-schema.sql`)였고 전부 손으로 관리하다 보니 **넷이 서로 다른 지점에서 어긋남**. 마이그레이션을 한쪽에만 적용하는 일이 반복됨
+**해결**: **Flyway 도입.** 정본을 `db/migration/V1__baseline_schema.sql` 하나로 통합하고, 앱 기동 시 로컬·도커·CI에 동일하게 적용. 여기에 `spring.jpa.hibernate.ddl-auto=validate`를 걸어 엔티티와 스키마가 어긋나면 **앱이 아예 기동하지 않도록** 함 (드리프트가 조용히 쌓이지 못하게)
+
 ### 엔티티 `@Table(name)`과 실제 테이블명 대소문자 불일치 (리눅스에서만 발생)
 
 **문제**: 로컬 macOS에서는 멀쩡히 되던 기능이 도커(리눅스) 컨테이너에서 "Table 'AbcXyz' doesn't exist"로 실패  

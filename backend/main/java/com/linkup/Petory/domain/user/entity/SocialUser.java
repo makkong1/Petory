@@ -34,7 +34,6 @@ public class SocialUser extends BaseTimeEntity {
     private String providerId;
 
     // Provider별 상세 정보 필드
-    @Lob
     @Column(name = "provider_data", columnDefinition = "TEXT")
     private String providerData; // Provider별 원본 데이터 JSON (모든 OAuth2 응답 데이터 저장)
 

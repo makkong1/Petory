@@ -1,0 +1,19 @@
+-- file 테이블 (target_type, target_idx) 복합 인덱스 추가
+-- 배경: Care/MissingPet N+1 재검증(2026-07-12) 중 발견.
+--   AttachmentFileService.getAttachments()/getAttachmentsBatch()가 공통으로 쓰는
+--   WHERE target_type=? AND target_idx=?(또는 IN) 조건에 대응하는 인덱스가 없어서
+--   개별조회든 배치조회든 매번 file 테이블 전체를 스캔하고 있었다.
+--   (docs/refactoring/care/evidence/n-plus-one-reverify-2026-07-12.md §3 참고)
+--
+-- 적용 방법 (중요 - 이 폴더 전체가 자동 적용되지 않음):
+--   docker-compose.yml이 backend/main/resources/sql/migration 전체를
+--   MySQL 컨테이너의 /docker-entrypoint-initdb.d 에 마운트하지만, MySQL 공식
+--   이미지의 entrypoint는 그 아래 "파일"만 확장자별로 실행하고 하위 디렉토리는
+--   재귀적으로 안 들어간다(docker-entrypoint.sh의 docker_process_init_files가
+--   디렉토리를 만나면 "ignoring $f" 경고만 남기고 스킵). 즉:
+--   - migration/000-baseline-schema.sql 은 컨테이너 최초 초기화 시 자동 실행됨
+--   - migration/applied/*.sql (이 파일 포함) 은 컨테이너를 새로 만들어도 자동 적용 안 됨
+--   로컬 개발 DB, 도커 컨테이너 모두 CLI로 수동 실행해야 한다:
+--     mysql -uroot -p petory < backend/main/resources/sql/migration/applied/file-target-index.sql
+--     docker exec -i petory-mysql mysql -uroot -p petory < backend/main/resources/sql/migration/applied/file-target-index.sql
+CREATE INDEX idx_file_target ON file (target_type, target_idx);

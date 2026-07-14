@@ -1,3 +1,13 @@
+---
+date: 2025-12-21
+domains: [board]
+type: performance-evidence
+problem: n-plus-one
+status: superseded
+metric: "301→3 queries (-99%), 745ms→30ms (24.8x), 22.5MB→2MB"
+related: [docs/refactoring/board/evidence/n-plus-one-reverify-2026-07-12.md]
+---
+
 # Board 도메인 성능 최적화 - 해결 완료 항목
 
 ## 📋 개요

@@ -1,3 +1,13 @@
+---
+date: 2025-12-21
+domains: [location]
+type: performance-evidence
+problem: overfetching
+status: superseded
+metric: "22,699→1,026건 (-95.5%), 1484ms→700ms (-52.8%), 22MB→1MB"
+related: [docs/refactoring/location/evidence/initial-load-reverify-2026-07-12.md]
+---
+
 # Location 도메인 초기 로드 성능 문제
 
 ## 📋 개요

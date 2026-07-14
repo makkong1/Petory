@@ -3,6 +3,8 @@ package com.linkup.Petory.domain.user.repository;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Repository;
 
@@ -54,5 +56,10 @@ public class JpaPetAdapter implements PetRepository {
     @Override
     public List<Pet> findByPetTypeAndIsDeletedFalse(PetType petType) {
         return jpaRepository.findByPetTypeAndIsDeletedFalse(petType);
+    }
+
+    @Override
+    public Page<Pet> findByPetTypeAndIsDeletedFalse(PetType petType, Pageable pageable) {
+        return jpaRepository.findByPetTypeAndIsDeletedFalse(petType, pageable);
     }
 }

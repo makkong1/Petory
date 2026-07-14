@@ -1,3 +1,12 @@
+---
+date: 2026-05-07
+domains: [chat]
+type: troubleshooting
+problem: n-plus-one
+status: partially-fixed
+metric: "케이스B(getMyConversations) 수정 완료, 케이스A(getConversation 단건조회 반복)는 해결 방향만 제시"
+---
+
 # 채팅방 참여자 조회 N+1 쿼리 문제
 
 ## 📋 요약

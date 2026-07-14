@@ -511,9 +511,9 @@ public class MeetupService {
 
     // 키워드로 모임 검색
     @Timed("searchMeetupsByKeyword")
-    public List<MeetupDTO> searchMeetupsByKeyword(String keyword) {
-        List<Meetup> meetups = meetupRepository.findByKeyword(keyword);
-        return converter.toDTOList(meetups.size() > MAX_LIST_SIZE ? meetups.subList(0, MAX_LIST_SIZE) : meetups);
+    public List<MeetupDTO> searchMeetupsByKeyword(String keyword, Pageable pageable) {
+        // subList 제거: DB 에서 이미 LIMIT 으로 잘라 온다 (전량 500건을 읽고 메모리에서 자르던 것을 고침).
+        return converter.toDTOList(meetupRepository.findByKeyword(keyword, pageable));
     }
 
     /**

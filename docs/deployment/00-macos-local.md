@@ -17,7 +17,7 @@
 
 1. [Docker Desktop](https://www.docker.com/products/docker-desktop/) 설치 후 실행합니다.
 2. 메뉴 **Settings → Resources**에서 CPU/메모리 할당(예: 메모리 4GB 이상)을 여유 있게 두면 MySQL·Spring 컨테이너가 덜 불안정합니다.
-3. **Apple Silicon**: `mysql:8.0`, `redis:7-alpine`, `nginx:alpine`은 `linux/arm64`를 지원합니다. **주의**: `eclipse-temurin:17-{jdk,jre}-alpine`은 amd64 전용이라 M시리즈 맥에서 빌드가 아예 실패합니다(`no match for platform in manifest`) — 이 레포의 `Dockerfile`은 `-jammy`(Debian 기반) 태그를 씁니다. 다른 이미지를 새로 추가할 땐 `docker manifest inspect <image>`로 arm64 지원 여부를 먼저 확인하는 게 안전합니다.
+3. **Apple Silicon**: `mysql:8.4`, `redis:7-alpine`, `nginx:alpine`은 `linux/arm64`를 지원합니다. **주의**: `eclipse-temurin:17-{jdk,jre}-alpine`은 amd64 전용이라 M시리즈 맥에서 빌드가 아예 실패합니다(`no match for platform in manifest`) — 이 레포의 `Dockerfile`은 `-jammy`(Debian 기반) 태그를 씁니다. 다른 이미지를 새로 추가할 땐 `docker manifest inspect <image>`로 arm64 지원 여부를 먼저 확인하는 게 안전합니다.
 
 ### Compose 명령 (v2)
 

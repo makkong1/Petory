@@ -3,6 +3,9 @@ package com.linkup.Petory.domain.user.repository;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
 import com.linkup.Petory.domain.user.entity.Pet;
 import com.linkup.Petory.domain.user.entity.PetType;
 
@@ -36,4 +39,6 @@ public interface PetRepository {
      * 펫 타입으로 조회 (삭제되지 않은 것만)
      */
     List<Pet> findByPetTypeAndIsDeletedFalse(PetType petType);
+
+    Page<Pet> findByPetTypeAndIsDeletedFalse(PetType petType, Pageable pageable);
 }

@@ -1,3 +1,12 @@
+---
+date: 2026-07-10
+domains: [board, user, care]
+type: performance-evidence
+problem: overfetching
+status: verified
+metric: "Board 61.3→46.0ms(-25%, 바이트 불변); User 8647→5829B(-33%)/30.2→25.8ms(-15%); Care 17621→7421B(-58%)/38.3→9.9ms(-74%)"
+---
+
 # 오버페칭 리팩토링 실측 근거 (2026-07-10)
 
 목록/지도 조회 오버페칭 제거(projection) 리팩토링의 **전/후를 실제로 실행해 비교한 원자료**. 추정치가 아니라 실행 결과다.

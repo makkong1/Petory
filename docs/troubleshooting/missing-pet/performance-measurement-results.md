@@ -1,3 +1,12 @@
+---
+date: 2025-12-31
+domains: [missingpet]
+type: performance-evidence
+problem: n-plus-one
+status: verified
+metric: "207→3 queries (-98.5%), 571ms→79ms (-86%), 11MB→4MB (-64%)"
+---
+
 # Missing Pet 도메인 - 실제 성능 측정 결과
 
 ## 0. 현재 아키텍처 (최적화 후)

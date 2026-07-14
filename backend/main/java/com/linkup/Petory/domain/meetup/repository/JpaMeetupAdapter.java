@@ -43,8 +43,8 @@ public class JpaMeetupAdapter implements MeetupRepository {
     }
 
     @Override
-    public List<Meetup> findByKeyword(String keyword) {
-        return jpaRepository.findByKeyword(keyword);
+    public List<Meetup> findByKeyword(String keyword, Pageable pageable) {
+        return jpaRepository.findByKeyword(keyword, pageable);
     }
 
     @Override

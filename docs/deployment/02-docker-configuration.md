@@ -51,7 +51,7 @@ docker exec -it petory-redis redis-cli
 | `Dockerfile`(레포 루트)                      | **있음** — 멀티스테이지 빌드 (`eclipse-temurin:17-jdk-jammy` → `17-jre-jammy`), non-root 유저(`petory`)로 실행 |
 | `docker-compose.yml`(레포 루트)              | **있음** — `mysql`, `redis`, `nlp-server`, `app`, `nginx` 5개 서비스. `docker compose up --build -d`로 전체 스택 기동 검증 완료 |
 | `petory-nlp-server/Dockerfile`                | **있음** — Python 3.9-slim, FastAPI, non-root 유저. `app`은 `PetIntentClient`로 `http://nlp-server:8000` 호출 |
-| DB 스키마 초기화                              | `sql/migration/000-baseline-schema.sql`이 `docker-entrypoint-initdb.d`로 마운트되어 최초 기동 시 자동 실행됨 (전체 스키마 baseline dump) |
+| DB 스키마 초기화                              | **Flyway**가 앱 기동 시 `db/migration/V*.sql`을 적용 (2026-07-13~). `docker-entrypoint-initdb.d` 마운트는 제거됨 |
 | 로컬 Redis만 단독 실행                        | `docker run`으로 수동 실행 가능 (아래, 백엔드를 호스트에서 `bootRun`으로 돌릴 때)                                |
 | Spring Boot ↔ Redis                          | `application.properties`(또는 `.env`)의 **`spring.redis.*`** + `RedisConfig.java` — `spring.data.redis.*` 아님 주의 |
 
@@ -120,7 +120,7 @@ spring.redis.password=${REDIS_PASSWORD:실제비밀번호}
 
    - 서비스: `mysql`, `redis`, `nlp-server`(`petory-nlp-server/Dockerfile`로 빌드), `app`(빌드한 이미지), `nginx`
    - 컨테이너 간 통신은 `localhost`가 아니라 **서비스 이름**(`mysql`, `redis`, `nlp-server`, `app`) 사용
-   - `mysql` 서비스는 `sql/migration/000-baseline-schema.sql`을 `docker-entrypoint-initdb.d`로 마운트 — MySQL 데이터 볼륨이 비어있을 때(최초 기동) 자동으로 전체 스키마가 생성됨. `sql/migration/applied/`(하위 폴더)는 MySQL이 하위 디렉토리를 스캔하지 않아 자동실행 대상에서 제외됨
+   - `mysql` 서비스는 스키마를 스스로 만들지 않는다. **앱이 기동할 때 Flyway가 `backend/main/resources/db/migration/V*.sql`을 적용**해 스키마를 만든다(로컬·도커·CI 동일). 기존 DB에는 `spring.flyway.baseline-on-migrate=true`가 V1을 표시만 하고 넘어가므로 DDL이 재실행되지 않는다
    - `app`은 `depends_on`에 `nlp-server: condition: service_healthy`가 걸려 있어, nlp-server가 `/health` 응답을 시작한 뒤에야 기동됨
    - `nlp-server`는 임베딩 모델(`jhgan/ko-sroberta-multitask`)을 최초 기동 시 HuggingFace에서 다운로드하며, `nlp_model_cache` 볼륨에 캐시해 재기동 시 재다운로드하지 않음
    - 로컬 macOS에서 네이티브 MySQL(3306)/Redis(6379)를 이미 쓰고 있으면 호스트 포트가 충돌 — `ports`를 `3307:3306`, `6380:6379` 등으로 조정 (컨테이너 간 통신엔 영향 없음)

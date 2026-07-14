@@ -1,3 +1,13 @@
+---
+date: 2025-12-30
+domains: [care]
+type: performance-evidence
+problem: n-plus-one
+status: superseded
+metric: "~2,400→4~5 queries (-99.8%), 1084ms→66ms (-94%), 21MB→6MB"
+related: [docs/refactoring/care/evidence/n-plus-one-reverify-2026-07-12.md]
+---
+
 # 펫케어 요청 목록 조회 N+1 문제 분석
 
 > **참고**: 이 문서는 **비페이징** API (`findAllActiveRequests` 등)에 대한 분석입니다.  

@@ -1,6 +1,6 @@
 services:
   mysql:
-    image: mysql:8.0
+    image: mysql:8.4
     container_name: petory-mysql
     restart: unless-stopped
     environment:
@@ -14,11 +14,11 @@ services:
     volumes:
       # TODO: 로컬 볼륨 대신 관리형 클라우드 DB(RDS 등)로 이전 고려 (데이터를 로컬 디스크에 쌓아두지 않도록)
       - mysql_data:/var/lib/mysql
-      - ./backend/main/resources/sql/migration:/docker-entrypoint-initdb.d:ro
+      # 스키마는 app 기동 시 Flyway(db/migration/V*.sql)가 만든다. initdb 마운트는 사본을 만들 뿐이라 제거함.
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
-      - --default-authentication-plugin=mysql_native_password
+      # --default-authentication-plugin 은 MySQL 8.4 에서 제거됨. 인증은 기본값(caching_sha2_password)을 쓴다.
       - --max_connections=200
       - --innodb_buffer_pool_size=256M
     healthcheck:

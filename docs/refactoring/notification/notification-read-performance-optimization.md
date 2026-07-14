@@ -1,3 +1,12 @@
+---
+date: 2026-06-24
+domains: [notification]
+type: performance-evidence
+problem: row-by-row-update
+status: verified
+metric: "102→1 statement (-99%), row-by-row UPDATE → JPQL bulk UPDATE"
+---
+
 # Notification 읽음 처리 성능 리팩토링
 
 ## 1. 목적

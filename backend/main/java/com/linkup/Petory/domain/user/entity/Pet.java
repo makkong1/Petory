@@ -61,12 +61,10 @@ public class Pet extends BaseTimeEntity {
     @Column(name = "birth_date")
     private LocalDate birthDate; // 생년월일 (선택사항) - 있으면 나이 계산 가능
 
-    @Lob
-    @Column(name = "health_info")
+    @Column(name = "health_info", columnDefinition = "TEXT")
     private String healthInfo; // 건강 정보 (질병, 알레르기, 특이사항 등)
 
-    @Lob
-    @Column(name = "special_notes")
+    @Column(name = "special_notes", columnDefinition = "TEXT")
     private String specialNotes; // 특이사항 (성격, 주의사항 등)
 
     @Column(name = "profile_image_url", length = 500)

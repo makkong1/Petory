@@ -119,11 +119,19 @@ public interface SpringDataJpaCareRequestRepository extends JpaRepository<CareRe
                     "AND u.is_deleted = false " +
                     "AND cr.latitude IS NOT NULL " +
                     "AND cr.status IN ('OPEN', 'IN_PROGRESS') " +
-                    "AND cr.latitude BETWEEN (:lat - :radius / 111.0) AND (:lat + :radius / 111.0) " +
-                    "AND cr.longitude BETWEEN (:lng - :radius / (111.0 * cos(radians(:lat)))) AND (:lng + :radius / (111.0 * cos(radians(:lat)))) " +
-                    "AND (6371 * acos(cos(radians(:lat)) * cos(radians(cr.latitude)) * " +
-                    "    cos(radians(cr.longitude) - radians(:lng)) + " +
-                    "    sin(radians(:lat)) * sin(radians(cr.latitude)))) <= :radius " +
+                    // 이전에는 latitude/longitude 를 BETWEEN 으로 걸렀다. 인덱스를 타지 못해 풀스캔이었고,
+                    // 옵티마이저가 위도·경도를 독립 조건으로 곱해 선택도를 208배 오판했다(예상 3.77행 / 실제 783행).
+                    // meetup 과 동일하게 SPATIAL 인덱스(geo_point)를 타는 ST_Within 으로 바꾼다.
+                    // ST_Within 이 사각형으로 후보를 좁히고(인덱스), ST_Distance_Sphere 가 정확한 반경으로 거른다.
+                    "AND ST_Within(cr.geo_point, ST_GeomFromText(CONCAT('POLYGON((', " +
+                    ":lat - (:radius / 111.0), ' ', :lng - (:radius / (111.0 * COS(RADIANS(:lat)))), ', ', " +
+                    ":lat - (:radius / 111.0), ' ', :lng + (:radius / (111.0 * COS(RADIANS(:lat)))), ', ', " +
+                    ":lat + (:radius / 111.0), ' ', :lng + (:radius / (111.0 * COS(RADIANS(:lat)))), ', ', " +
+                    ":lat + (:radius / 111.0), ' ', :lng - (:radius / (111.0 * COS(RADIANS(:lat)))), ', ', " +
+                    ":lat - (:radius / 111.0), ' ', :lng - (:radius / (111.0 * COS(RADIANS(:lat)))), '))'), " +
+                    "4326)) " +
+                    "AND ST_Distance_Sphere(cr.geo_point, ST_GeomFromText(" +
+                    "CONCAT('POINT(', :lat, ' ', :lng, ')'), 4326)) <= (:radius * 1000) " +
                     "ORDER BY cr.created_at DESC " +
                     "LIMIT :limit", nativeQuery = true)
     List<CareRequestListView> findNearbyCareRequests(@Param("lat") Double lat,
@@ -152,11 +160,17 @@ public interface SpringDataJpaCareRequestRepository extends JpaRepository<CareRe
             nativeQuery = true)
     Page<CareRequest> searchWithPaging(@Param("keyword") String keyword, Pageable pageable);
 
+    // JOIN FETCH 가 없으면 목록 N건마다 user·pet 을 지연 로딩해 N+1 이 난다.
+    // 공개 API(findAllActiveRequestsWithPaging)는 이미 fetch join 을 쓰고 있었는데 관리자 경로만 빠져 있었다.
+    // Page<> + JOIN FETCH 는 countQuery 를 명시하지 않으면 Hibernate 가 fetch join 을 물고 COUNT 를 만든다.
     @RepositoryMethod("펫케어 요청: 관리자 필터 페이징 조회 (keyword 없을 때)")
-    @Query("SELECT r FROM CareRequest r WHERE " +
+    @Query(value = "SELECT r FROM CareRequest r JOIN FETCH r.user LEFT JOIN FETCH r.pet WHERE " +
            "(:status IS NULL OR CAST(r.status AS string) = :status) AND " +
            "(:deleted IS NULL OR r.isDeleted = :deleted) " +
-           "ORDER BY r.createdAt DESC")
+           "ORDER BY r.createdAt DESC",
+           countQuery = "SELECT COUNT(r) FROM CareRequest r WHERE " +
+           "(:status IS NULL OR CAST(r.status AS string) = :status) AND " +
+           "(:deleted IS NULL OR r.isDeleted = :deleted)")
     Page<CareRequest> findAllForAdmin(
             @Param("status") String status,
             @Param("deleted") Boolean deleted,

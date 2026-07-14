@@ -1,3 +1,12 @@
+---
+date: 2025-12-20
+domains: [chat]
+type: performance-evidence
+problem: unnecessary-full-scan
+status: verified
+metric: "메시지 7,000건 기준 전체 조회 쿼리 1개 제거, 트랜잭션 범위 축소"
+---
+
 # 채팅 메시지 읽음 처리 성능 문제
 
 ## 📋 요약

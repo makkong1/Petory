@@ -1,3 +1,12 @@
+---
+date: 2026-02-07
+domains: [meetup]
+type: performance-evidence
+problem: n-plus-one
+status: verified
+metric: "PrepareStatement 102→2 (-98%); 실행시간은 102ms→178ms로 증가(단일쿼리 복잡화 트레이드오프)"
+---
+
 # findByUserIdxOrderByJoinedAtDesc() 성능 비교 분석 (Before vs After)
 
 ## 📋 비교 개요

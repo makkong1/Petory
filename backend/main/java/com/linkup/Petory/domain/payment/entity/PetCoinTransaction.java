@@ -12,7 +12,6 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
@@ -61,7 +60,7 @@ public class PetCoinTransaction extends BaseTimeEntity {
     @Column(name = "related_idx")
     private Long relatedIdx; // 관련 엔티티 ID
 
-    @Lob
+    @Column(length = 500)
     private String description; // 거래 설명
 
     @Enumerated(EnumType.STRING)
