@@ -2,6 +2,8 @@ package com.linkup.Petory.domain.user.repository;
 
 import java.util.List;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -30,5 +32,8 @@ public interface SpringDataJpaPetRepository extends JpaRepository<Pet, Long> {
 
     @RepositoryMethod("펫: 타입별 조회")
     List<Pet> findByPetTypeAndIsDeletedFalse(PetType petType);
+
+    @RepositoryMethod("펫: 타입별 페이징 조회")
+    Page<Pet> findByPetTypeAndIsDeletedFalse(PetType petType, Pageable pageable);
 }
 

@@ -5,6 +5,8 @@ import java.util.Map;
 
 import jakarta.validation.Valid;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -74,9 +76,13 @@ public class PetController {
         return ResponseEntity.ok(restored);
     }
 
+    // 페이징 없이는 DOG 만 7,667건이 한 번에 나가고 백신 배치 쿼리가 154회 붙는다.
+    // 근거: docs/analysis/query-audit/etc-domains-2026-07-14.md §1
     @GetMapping("/type/{petType}")
-    public ResponseEntity<List<PetDTO>> getPetsByType(@PathVariable("petType") String petType) {
-        List<PetDTO> pets = petService.getPetsByType(petType);
-        return ResponseEntity.ok(pets);
+    public ResponseEntity<Page<PetDTO>> getPetsByType(
+            @PathVariable("petType") String petType,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "20") int size) {
+        return ResponseEntity.ok(petService.getPetsByType(petType, PageRequest.of(page, size)));
     }
 }

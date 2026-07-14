@@ -2,6 +2,9 @@ package com.linkup.Petory.domain.user.service;
 
 import java.util.List;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -229,6 +232,19 @@ public class PetService {
         PetType type = PetType.valueOf(petType);
         List<Pet> pets = petRepository.findByPetTypeAndIsDeletedFalse(type);
         return petConverter.toDTOList(pets);
+    }
+
+    /**
+     * 펫 타입으로 페이징 조회. 페이징 없는 위 메서드는 DOG 만 7,667건을 한 번에 반환해
+     * 백신 지연로딩 배치 쿼리가 154회 나갔다 (docs/analysis/query-audit/etc-domains-2026-07-14.md §1).
+     */
+    @Transactional(readOnly = true)
+    public Page<PetDTO> getPetsByType(String petType, Pageable pageable) {
+        PetType type = PetType.valueOf(petType);
+        Page<Pet> page = petRepository.findByPetTypeAndIsDeletedFalse(type, pageable);
+        // Page.map(petConverter::toDTO) 를 쓰면 안 된다 — 단건 toDTO 는 펫마다 첨부를 조회해 N+1 이 난다.
+        // toDTOList 는 첨부를 배치(IN)로 한 번에 가져온다.
+        return new PageImpl<>(petConverter.toDTOList(page.getContent()), pageable, page.getTotalElements());
     }
 
     /**
