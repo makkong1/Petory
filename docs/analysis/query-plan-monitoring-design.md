@@ -4,7 +4,7 @@ domains: [board, meetup, global]
 type: design-analysis
 problem: query-plan-monitoring-generalization
 status: analysis-only
-metric: "실제 API 호출로 재검증 — /api/boards 의 비용은 COUNT 쿼리(180,003행/141ms)가 지배. 히스토그램으로 고친 목록 SELECT 는 120행/4ms. digest 스캔 1회에 문제 쿼리 3건 즉시 포착"
+metric: "⚠️표본=API 1개(GET /api/boards). 그 하나에서 COUNT 쿼리 180,003행/141ms 발견(고친 목록 SELECT는 120행/4ms). 미확인: 컨트롤러 33개, Page<> COUNT 26개, 스케줄러 8개, 네이티브쿼리 20개"
 related: [docs/analysis/entity-schema/evidence/query-baseline-2026-07-13.md]
 ---
 
@@ -295,11 +295,80 @@ digest 스캔 1회에 문제 쿼리 3건이 나왔다. **셀 도구가 검증됐
 
 ---
 
-## 10. 아직 확인하지 않은 것
+## 10. ⚠️ 아직 확인하지 않은 것 — 대부분이다
 
-- **프로젝트 전체에 이런 쿼리가 몇 개인가** — 게시판 목록 API 하나만 호출했다.
-  care / meetup / chat / location 등 나머지 API 는 아직 안 돌려봤다
-- **`Page<>` COUNT 쿼리 문제는 board 만의 것이 아니다** — 페이징을 쓰는 모든 목록 API 가
-  같은 구조다. 전수 확인 필요
-- **`carerequest` 주변 검색에 공간 인덱스 없음** (별건, baseline 문서 §4)
-- **`file.idx_file_target`** 미측정 (시드가 file 테이블을 만들지 않음)
+**지금까지 실제로 호출해본 API 는 `GET /api/boards` **단 하나**다.**
+아래 수치는 전부 **미확인 위험**이며, 이 문서의 결론은 그 하나의 표본에서 나왔다.
+
+### 10.1 호출해보지 않은 API 표면
+
+| | 개수 | 상태 |
+|---|---|---|
+| 컨트롤러 | **34개** | `BoardController` **1개만** 호출해봄 |
+| 나머지 | 33개 | care / chat / meetup / location / payment / notification / report / file / admin(13개) 등 **전부 미확인** |
+
+### 10.2 🔴 `Page<>` COUNT 문제는 board 만의 것이 아니다
+
+§1 에서 발견한 COUNT 쿼리(180,003행 / 141ms)는 **`Page<>` 를 쓰면 자동으로 따라온다.**
+Spring Data 가 목록 SELECT 와 별개로 COUNT 쿼리를 날리기 때문이다.
+
+**`Page<>` 를 반환하는 리포지토리 메서드가 27개 있다:**
+
+| 도메인 | 메서드 수 | 예 |
+|---|---|---|
+| board | 13 | `findBoardListItems`, `searchByKeywordWithPaging`, `findByBoardIdAnd...` (댓글), MissingPet 4종 |
+| care | 5 | `findAllActiveRequestsWithPaging`, `findAllForAdmin`, `searchWithPaging` |
+| chat | 2 | `findByConversationIdxOrderByCreatedAtDesc` |
+| meetup | 3 | `findAllForAdmin`, `findAllNotDeleted` |
+| location | 1 | `findReviewListItems` |
+| payment | 1 | `findByUserOrderByCreatedAtDesc` |
+| report | 1 | `findReportListItems` |
+| file | 1 | `findAllForAdmin` |
+
+**27개 전부 COUNT 쿼리를 동반한다. 그중 1개만 확인했고, 그 1개가 141ms 였다.**
+→ **이것이 이 프로젝트에서 가장 넓게 퍼진 성능 위험일 가능성이 높다.** 전수 확인이 필요하다.
+
+### 10.3 스케줄러 — 사용자 요청 없이 도는 쿼리
+
+digest 스캔에서 `MeetupChatRoomRecoveryScheduler` 의 `findWithoutChatRoom()` 이
+**1만 행 검사 / 0행 반환 / 인덱스 미사용**으로 잡혔다.
+
+**스케줄러는 9개다** (`StatisticsScheduler`, `CareRequestScheduler`,
+`BoardPopularityScheduler`, `LocationServiceScoreScheduler`, `UserSanctionScheduler`,
+`UserDormantScheduler`, `MeetupChatRoomRecoveryScheduler`, `MeetupScheduler`,
+`BoardListQueryPlanMaintainer`).
+
+**그중 1개에서 문제가 나왔다. 나머지 8개는 확인하지 않았다.**
+스케줄러 쿼리는 사용자가 체감하지 못하므로 **더 오래 숨어 있을 수 있다.**
+
+### 10.4 네이티브 쿼리 20개
+
+`nativeQuery = true` 가 **20곳**에 있다 (board, boardReaction, boardViewLog,
+commentReaction, care, chat, location, meetup, dailyStatistics).
+
+JPQL 과 달리 **Hibernate 가 생성하지 않고 사람이 직접 쓴 SQL** 이므로,
+옵티마이저가 어떤 계획을 고르는지 **개별 확인이 필요하다.**
+(공간 검색 쿼리처럼 잘 짜인 것도 있지만 — baseline §2 — 전수 확인은 안 했다.)
+
+### 10.5 별건으로 이미 알려진 것
+
+- **`carerequest` 주변 검색에 공간 인덱스 없음** → 풀스캔 (baseline 문서 §4)
+- **`file.idx_file_target`** 미측정 (시드가 `file` 테이블을 만들지 않음)
+
+---
+
+## 11. 그래서 다음 세션에서 할 일 (구체적으로)
+
+```
+1. digest 스캐너 구현 (Layer 1) — 델타 처리(§5.1) 필수
+2. 앱을 띄우고 주요 API 를 한 바퀴 호출한다
+   - board / care / meetup / chat / location / payment / notification / report
+   - admin 계열 13개 (MASTER 계정 wowong123@naver.com 또는 시드 ADMIN 사용)
+   - 스케줄러는 cron 을 앞당기거나 수동 호출
+3. digest 를 스캔해 문제 쿼리 목록을 확보한다        ← 여기서 처음으로 N 이 나온다
+4. 27개 Page<> COUNT 를 전수 점검한다               ← 가장 넓게 퍼진 위험
+5. 그 결과를 보고 Layer 2 추상화를 설계한다
+```
+
+> **이 문서의 모든 결론은 API 1개(`GET /api/boards`)의 표본에서 나왔다.**
+> 2단계를 하기 전까지는 "프로젝트 전체에 문제가 몇 개인지" 아무도 모른다.
