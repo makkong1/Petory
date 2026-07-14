@@ -8,19 +8,18 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 import org.springframework.retry.annotation.EnableRetry;
 import org.springframework.scheduling.annotation.EnableAsync;
-import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.web.filter.HiddenHttpMethodFilter;
 
 import de.codecentric.boot.admin.server.config.EnableAdminServer;
 
 /**
- * 펫토리 애플리케이션 진입점. 스케줄링·비동기·캐시·감사·메서드 보안을 활성화한다.
+ * 펫토리 애플리케이션 진입점. 비동기·캐시·감사·메서드 보안을 활성화한다.
+ * 스케줄링은 끌 수 있어야 하므로 SchedulingConfig 로 분리했다.
  */
 @SpringBootApplication
 @ConfigurationProperties(prefix = "app")
 // @ServletComponentScan // 이 어노테이션을 추가하여 Servlet 리스너와 필터 자동 등록
-@EnableScheduling // 주기적 작업을 활성화+
 @EnableAsync
 @EnableRetry
 @EnableCaching
