@@ -39,7 +39,7 @@ public interface MeetupRepository {
     /**
      * 카테고리별 모임 조회 (제목이나 설명에 키워드 포함, 소프트 삭제 제외)
      */
-    List<Meetup> findByKeyword(String keyword);
+    List<Meetup> findByKeyword(String keyword, Pageable pageable);
 
     /**
      * 참여 가능한 모임 조회 (RECRUITING 상태 + 인원 미달, 소프트 삭제 제외).

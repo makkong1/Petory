@@ -41,13 +41,15 @@ public interface SpringDataJpaMeetupRepository extends JpaRepository<Meetup, Lon
             + "AND (m.status IS NULL OR m.status != 'CANCELLED') "
             + "AND MATCH(m.title, m.description) AGAINST(:keyword IN NATURAL LANGUAGE MODE) "
             + "ORDER BY m.date ASC", nativeQuery = true)
-    List<Long> findIdxByFulltextKeyword(@Param("keyword") String keyword);
+    List<Long> findIdxByFulltextKeyword(@Param("keyword") String keyword, Pageable pageable);
 
     //FULLTEXT 인덱스 활용 + JOIN FETCH N+1 방지를 동시에 달성하기 위한 패턴
     //컨트롤러 → 서비스 → 어댑터(도메인 인터페이스 구현체) → JPA 인터페이스 default 메서드 순
     @RepositoryMethod("모임: 키워드 검색 (FULLTEXT 2단계)")
-    default List<Meetup> findByKeyword(String keyword) {
-        List<Long> ids = findIdxByFulltextKeyword(keyword);
+    default List<Meetup> findByKeyword(String keyword, Pageable pageable) {
+        // 이전에는 전량 조회 후 서비스에서 subList 로 잘랐다 (DB 는 이미 500건을 다 읽은 뒤였다).
+        // 이제 DB LIMIT 으로 내린다. 근거: docs/analysis/query-audit/fixes-2026-07-14.md §4
+        List<Long> ids = findIdxByFulltextKeyword(keyword, pageable);
         if (ids.isEmpty()) {
             return List.of();
         }

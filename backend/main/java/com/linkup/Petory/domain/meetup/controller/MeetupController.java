@@ -133,8 +133,11 @@ public class MeetupController {
 
     // 키워드로 모임 검색
     @GetMapping("/search")
-    public ResponseEntity<Map<String, Object>> searchMeetupsByKeyword(@RequestParam(value = "keyword") String keyword) {
-        List<MeetupDTO> meetups = meetupService.searchMeetupsByKeyword(keyword);
+    public ResponseEntity<Map<String, Object>> searchMeetupsByKeyword(
+            @RequestParam(value = "keyword") String keyword,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "20") int size) {
+        List<MeetupDTO> meetups = meetupService.searchMeetupsByKeyword(keyword, PageRequest.of(page, size));
 
         Map<String, Object> response = new HashMap<>();
         response.put("meetups", meetups);
@@ -180,7 +183,7 @@ public class MeetupController {
             @RequestParam(value = "lat") Double lat,
             @RequestParam(value = "lng") Double lng,
             @RequestParam(value = "radius", defaultValue = "5.0") Double radius,
-            @RequestParam(value = "maxResults", defaultValue = "500") int maxResults) {
+            @RequestParam(value = "maxResults", defaultValue = "20") int maxResults) {
         List<MeetupDTO> meetups = meetupService.getNearbyMeetups(lat, lng, radius, maxResults);
 
         Map<String, Object> response = new HashMap<>();
