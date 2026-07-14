@@ -177,7 +177,12 @@ MATCH(cr.title, cr.description) AGAINST(:keyword IN NATURAL LANGUAGE MODE)
 - `latitude IS NOT NULL`인 요청만 포함한다.
 - `OPEN`, `IN_PROGRESS` 상태만 포함한다.
 - 요청자 `status=ACTIVE`, `isDeleted=false`인 요청만 포함한다.
-- 위도/경도 bounding box로 먼저 좁힌 뒤 Haversine 거리 조건을 적용한다.
+- `ST_Within`으로 사각형 범위를 먼저 좁힌 뒤 `ST_Distance_Sphere`로 정확한 반경을 적용한다.
+  - `geo_point`(POINT, SRID 4326)에 SPATIAL 인덱스를 걸었고, 값은 BEFORE INSERT/UPDATE 트리거가 위·경도에서 자동으로 채운다.
+    (`meetup`·`locationservice`와 동일한 패턴. 트리거로 채우므로 엔티티에 필드가 없고 `ddl-auto=validate`를 통과한다.)
+  - 예전에는 `latitude`/`longitude` BETWEEN + Haversine이었으나 **인덱스를 타지 못해 풀스캔**이었다.
+    B-tree는 범위 조건을 선두에서 하나만 쓸 수 있어 `longitude`가 걸러지지 않았고, 옵티마이저가 위·경도를
+    독립 조건으로 곱해 선택도를 208배 오판했다(예상 3.77행 / 실제 783행). → 3,000행 풀스캔에서 208행으로.
 
 ## 7. 수정과 삭제
 

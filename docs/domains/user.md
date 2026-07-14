@@ -347,7 +347,7 @@ OAuth2 로그인은 Spring Security OAuth2 성공 후 `OAuth2SuccessHandler`가 
 | `PUT /api/pets/{petIdx}`          | 펫 수정         |
 | `DELETE /api/pets/{petIdx}`       | 펫 soft delete  |
 | `POST /api/pets/{petIdx}/restore` | 펫 복구         |
-| `GET /api/pets/type/{petType}`    | 타입별 펫 조회  |
+| `GET /api/pets/type/{petType}?page&size` | 타입별 펫 조회 (페이징, 기본 size 20) |
 
 인증/소유권 정책:
 
@@ -453,7 +453,8 @@ OAuth2 로그인은 Spring Security OAuth2 성공 후 `OAuth2SuccessHandler`가 
 - 관리자 상태 변경 API는 상태 필드, refresh token 제거, 제재 이벤트 발행은 처리하지만, 아직 `UserSanctionService`를 경유하지 않아 `UserSanction` 이력을 항상 남기지는 않는다.
 - OAuth2 성공 핸들러는 token을 query parameter로 전달한다. 구현은 단순하지만 브라우저 history/log 노출 리스크가 있어 장기적으로 더 안전한 전달 방식을 검토할 수 있다.
 - OAuth2 경로의 제재 예외는 일반 로그인과 달리 `RuntimeException` 메시지를 redirect query의 `error`로 전달한다.
-- `GET /api/pets/type/{petType}`는 현재 사용자 소유 필터가 아니라 타입 기준 전체 조회다. 사용자용 API로 노출할 의도가 맞는지 검토 여지가 있다.
+- `GET /api/pets/type/{petType}`는 현재 사용자 소유 필터가 아니라 타입 기준 조회다. 사용자용 API로 노출할 의도가 맞는지 검토 여지가 있다.
+- 이 API는 원래 페이징이 없어 `DOG` 하나로 7,667마리를 전부 반환했다(백신 배치 쿼리 154회 / 331ms). 지금은 `Page<PetDTO>`로 페이징한다. 목록 DTO 변환은 `PetConverter.toDTOList()`(첨부 배치 조회)를 쓴다 — 단건 `toDTO()`는 펫마다 첨부를 조회하므로 `Page.map(toDTO)`를 쓰면 N+1이 난다.
 - `AuthController.validateToken()`은 일부 실패 응답을 컨트롤러에서 직접 조립한다.
 
 ## 13. 관련 문서
