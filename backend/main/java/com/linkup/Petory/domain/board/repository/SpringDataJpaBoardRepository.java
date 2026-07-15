@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
@@ -79,19 +80,43 @@ public interface SpringDataJpaBoardRepository extends JpaRepository<Board, Long>
             + "  u.idx, u.username, u.location) "
             + "FROM Board b JOIN b.user u ";
 
-    @RepositoryMethod("게시글: 전체 목록 페이징 (projection)")
-    @Query(BOARD_LIST_ITEM_SELECT
-            + "WHERE b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY b.createdAt DESC")
-    Page<BoardListItemDTO> findBoardListItems(Pageable pageable);
+    // 1단계: 커버링 인덱스로 깊은 skip. author_visible 로 걸러 users 조인이 필요없다.
+    @Query(value = "SELECT idx FROM board WHERE is_deleted = 0 AND author_visible = 1 "
+            + "ORDER BY created_at DESC LIMIT :size OFFSET :offset", nativeQuery = true)
+    List<Long> findVisibleBoardIds(@Param("offset") long offset, @Param("size") int size);
 
-    @RepositoryMethod("게시글: 카테고리별 목록 페이징 (projection)")
-    @Query(BOARD_LIST_ITEM_SELECT
-            + "WHERE b.category = :category AND b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY b.createdAt DESC")
-    Page<BoardListItemDTO> findBoardListItemsByCategory(@Param("category") String category, Pageable pageable);
+    @Query(value = "SELECT idx FROM board WHERE category = :category AND is_deleted = 0 AND author_visible = 1 "
+            + "ORDER BY created_at DESC LIMIT :size OFFSET :offset", nativeQuery = true)
+    List<Long> findVisibleBoardIdsByCategory(@Param("category") String category,
+            @Param("offset") long offset, @Param("size") int size);
+
+    // 2단계: 살아남은 idx 만 projection 조립(작성자 조인 20건). ORDER 로 1단계 순서 재현.
+    @Query(BOARD_LIST_ITEM_SELECT + "WHERE b.idx IN :ids ORDER BY b.createdAt DESC")
+    List<BoardListItemDTO> findBoardListItemsByIdIn(@Param("ids") List<Long> ids);
+
+    @Query("SELECT COUNT(b) FROM Board b WHERE b.isDeleted = false AND b.authorVisible = true")
+    long countVisible();
+
+    @Query("SELECT COUNT(b) FROM Board b WHERE b.category = :category AND b.isDeleted = false AND b.authorVisible = true")
+    long countVisibleByCategory(@Param("category") String category);
+
+    @RepositoryMethod("게시글: 전체 목록 페이징 (지연 조인)")
+    default Page<BoardListItemDTO> findBoardListItems(Pageable pageable) {
+        List<Long> ids = findVisibleBoardIds(pageable.getOffset(), pageable.getPageSize());
+        List<BoardListItemDTO> content = ids.isEmpty() ? List.of() : findBoardListItemsByIdIn(ids);
+        return new PageImpl<>(content, pageable, countVisible());
+    }
+
+    @RepositoryMethod("게시글: 카테고리별 목록 페이징 (지연 조인)")
+    default Page<BoardListItemDTO> findBoardListItemsByCategory(String category, Pageable pageable) {
+        List<Long> ids = findVisibleBoardIdsByCategory(category, pageable.getOffset(), pageable.getPageSize());
+        List<BoardListItemDTO> content = ids.isEmpty() ? List.of() : findBoardListItemsByIdIn(ids);
+        return new PageImpl<>(content, pageable, countVisibleByCategory(category));
+    }
 
     @RepositoryMethod("게시글: 작성자 닉네임 검색 페이징 (projection)")
     @Query(BOARD_LIST_ITEM_SELECT
-            + "WHERE u.nickname LIKE :nickname% AND b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY b.createdAt DESC")
+            + "WHERE u.nickname LIKE :nickname% AND b.isDeleted = false AND u.isDeleted = false AND b.authorVisible = true ORDER BY b.createdAt DESC")
     Page<BoardListItemDTO> searchBoardListItemsByNickname(@Param("nickname") String nickname, Pageable pageable);
 
     @RepositoryMethod("게시글: 카테고리+기간별 조회")
