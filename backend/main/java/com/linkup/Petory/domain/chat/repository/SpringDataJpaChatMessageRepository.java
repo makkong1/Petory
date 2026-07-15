@@ -22,13 +22,18 @@ import com.linkup.Petory.global.annotation.RepositoryMethod;
 public interface SpringDataJpaChatMessageRepository extends JpaRepository<ChatMessage, Long> {
 
     @RepositoryMethod("채팅 메시지: 채팅방별 페이징 조회")
-    @Query("SELECT m FROM ChatMessage m "
+    @Query(value = "SELECT m FROM ChatMessage m "
             + "JOIN FETCH m.sender s "
             + "LEFT JOIN FETCH m.replyToMessage "
             + "WHERE m.conversation.idx = :conversationIdx "
             + "  AND m.isDeleted = false "
             + "  AND s.isDeleted = false "
-            + "ORDER BY m.createdAt DESC")
+            + "ORDER BY m.createdAt DESC",
+            // countQuery 를 명시하지 않으면 Hibernate 가 본문의 fetch join(특히 replyToMessage
+            // self-join)까지 물고 COUNT 를 만든다. COUNT 에는 s.isDeleted 필터에 필요한 sender 만 남긴다.
+            countQuery = "SELECT COUNT(m) FROM ChatMessage m JOIN m.sender s "
+                    + "WHERE m.conversation.idx = :conversationIdx "
+                    + "  AND m.isDeleted = false AND s.isDeleted = false")
     Page<ChatMessage> findByConversationIdxOrderByCreatedAtDesc(
             @Param("conversationIdx") Long conversationIdx,
             Pageable pageable);
@@ -48,14 +53,18 @@ public interface SpringDataJpaChatMessageRepository extends JpaRepository<ChatMe
             Pageable pageable);
 
     @RepositoryMethod("채팅 메시지: 채팅방별 시점 이후 페이징 (재참여)")
-    @Query("SELECT m FROM ChatMessage m "
+    @Query(value = "SELECT m FROM ChatMessage m "
             + "JOIN FETCH m.sender s "
             + "LEFT JOIN FETCH m.replyToMessage "
             + "WHERE m.conversation.idx = :conversationIdx "
             + "  AND m.createdAt >= :afterDate "
             + "  AND m.isDeleted = false "
             + "  AND s.isDeleted = false "
-            + "ORDER BY m.createdAt DESC")
+            + "ORDER BY m.createdAt DESC",
+            countQuery = "SELECT COUNT(m) FROM ChatMessage m JOIN m.sender s "
+                    + "WHERE m.conversation.idx = :conversationIdx "
+                    + "  AND m.createdAt >= :afterDate "
+                    + "  AND m.isDeleted = false AND s.isDeleted = false")
     Page<ChatMessage> findByConversationIdxAndCreatedAtAfterOrderByCreatedAtDesc(
             @Param("conversationIdx") Long conversationIdx,
             @Param("afterDate") LocalDateTime afterDate,
