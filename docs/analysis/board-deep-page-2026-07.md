@@ -81,6 +81,27 @@ ORDER BY b.created_at DESC LIMIT 20 OFFSET 49980;
 
 **133ms** — board 인덱스를 훑는 매 행마다 `users` PK 단건 조회가 50,000번 딸려 붙는다. 기존 기록("구코드 깊은 페이지 147ms")과 같은 자릿수로 재현됐다.
 
+### OFFSET 비용 곡선 (수정 전, 실측)
+
+바로 위와 같은 "구코드 형태" 쿼리를 오프셋 여러 지점에서 실측해 O(offset) 곡선을 직접 확인했다. 목록 화면에 필요한 컬럼(`title`, `username`, `location`)을 실제로 select해 위 133ms 측정(`b.idx`만 select)보다 컬럼이 많다 — 그만큼 행 조회 비용이 더 들어가 있다:
+
+```sql
+SELECT b.idx, b.title, u.username, u.location
+FROM board b JOIN users u ON u.idx=b.user_idx
+WHERE b.is_deleted=0 AND u.is_deleted=0 AND u.status='ACTIVE'
+ORDER BY b.created_at DESC LIMIT 20 OFFSET <OFF>;
+```
+
+| OFFSET | 실행시간 (`actual time` 종료값, 2회 측정) |
+|---|---|
+| 0 (1페이지) | 0.4ms / 0.9ms |
+| 10,000 (500페이지) | 63.3ms / 65.3ms |
+| 25,000 (1,250페이지) | 71.6ms / 74.8ms |
+| 40,000 (2,000페이지) | 92.8ms / 94.0ms |
+| 49,980 (맨 뒤, 2,500페이지) | 107ms / 110ms |
+
+오프셋이 커질수록 `Nested loop inner join`이 훑어야 하는 board 행 수(offset+20)와 그에 딸린 `users` PK 단건 조회 횟수가 함께 늘어 선형으로 증가한다 — §0/§1의 O(offset) 주장을 이 곡선이 직접 뒷받침한다. 로컬 단일 실행 환경이라 버퍼풀 상태에 따라 흔들리므로(§6 참고) 2회씩 기록했다.
+
 ---
 
 ## 2. ② COUNT A/B
