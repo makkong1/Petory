@@ -157,7 +157,7 @@ default 메서드가 셋을 조립해 PageImpl 반환.
 ## 7. 범위 밖 (명시)
 
 - 키셋 페이징 전환(앱 전체 페이징 정체성 변경) — 하지 않음.
-- 죽은 엔티티 Page 오버로드 3개(`findAllByIsDeletedFalse...` 등, 서비스 호출 0) — 손대지 않음.
+- 엔티티 Page/List 오버로드(`findAllByIsDeletedFalse...` 등) — 죽은 코드가 아니라 실사용 중(`findByUserAndIsDeletedFalseOrderByCreatedAtDesc`→`BoardService.getMyBoards`, `findAllByIsDeletedFalseOrderByCreatedAtDesc`→`BoardPopularityService`). 지연 조인·비정규화 최적화 대상은 아니지만, 작성자 가시성 규칙은 `b.authorVisible = true`로 통일해 board 전체 목록 화면과 일관되게 SUSPENDED 작성자 글도 노출한다.
 - 단건 조회·관리자 board 쿼리 — 별도 규칙, 범위 밖.
 - 다른 도메인 지연 조인 적용 — 보류(§5).
 

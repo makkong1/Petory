@@ -29,28 +29,28 @@ import com.linkup.Petory.global.annotation.RepositoryMethod;
 public interface SpringDataJpaBoardRepository extends JpaRepository<Board, Long>, JpaSpecificationExecutor<Board> {
 
     @RepositoryMethod("게시글: 전체 목록 조회")
-    @Query("SELECT b FROM Board b JOIN FETCH b.user u WHERE b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY b.createdAt DESC")
+    @Query("SELECT b FROM Board b JOIN FETCH b.user u WHERE b.isDeleted = false AND u.isDeleted = false AND b.authorVisible = true ORDER BY b.createdAt DESC")
     List<Board> findAllByIsDeletedFalseOrderByCreatedAtDesc();
 
     @RepositoryMethod("게시글: 전체 목록 페이징")
-    @Query("SELECT b FROM Board b JOIN FETCH b.user u WHERE b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY b.createdAt DESC")
+    @Query("SELECT b FROM Board b JOIN FETCH b.user u WHERE b.isDeleted = false AND u.isDeleted = false AND b.authorVisible = true ORDER BY b.createdAt DESC")
     Page<Board> findAllByIsDeletedFalseOrderByCreatedAtDesc(Pageable pageable);
 
     @RepositoryMethod("게시글: 카테고리별 목록 조회")
-    @Query("SELECT b FROM Board b JOIN FETCH b.user u WHERE b.category = :category AND b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY b.createdAt DESC")
+    @Query("SELECT b FROM Board b JOIN FETCH b.user u WHERE b.category = :category AND b.isDeleted = false AND u.isDeleted = false AND b.authorVisible = true ORDER BY b.createdAt DESC")
     List<Board> findByCategoryAndIsDeletedFalseOrderByCreatedAtDesc(@Param("category") String category);
 
     @RepositoryMethod("게시글: 카테고리별 목록 페이징")
-    @Query("SELECT b FROM Board b JOIN FETCH b.user u WHERE b.category = :category AND b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY b.createdAt DESC")
+    @Query("SELECT b FROM Board b JOIN FETCH b.user u WHERE b.category = :category AND b.isDeleted = false AND u.isDeleted = false AND b.authorVisible = true ORDER BY b.createdAt DESC")
     Page<Board> findByCategoryAndIsDeletedFalseOrderByCreatedAtDesc(@Param("category") String category,
             Pageable pageable);
 
     @RepositoryMethod("게시글: 사용자별 목록 조회")
-    @Query("SELECT b FROM Board b JOIN FETCH b.user u WHERE b.user = :user AND b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY b.createdAt DESC")
+    @Query("SELECT b FROM Board b JOIN FETCH b.user u WHERE b.user = :user AND b.isDeleted = false AND u.isDeleted = false AND b.authorVisible = true ORDER BY b.createdAt DESC")
     List<Board> findByUserAndIsDeletedFalseOrderByCreatedAtDesc(@Param("user") Users user);
 
     @RepositoryMethod("게시글: 작성자 닉네임 검색 페이징")
-    @Query("SELECT b FROM Board b JOIN FETCH b.user u WHERE u.nickname LIKE :nickname% AND b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY b.createdAt DESC")
+    @Query("SELECT b FROM Board b JOIN FETCH b.user u WHERE u.nickname LIKE :nickname% AND b.isDeleted = false AND u.isDeleted = false AND b.authorVisible = true ORDER BY b.createdAt DESC")
     Page<Board> searchByNicknameWithPaging(@Param("nickname") String nickname, Pageable pageable);
 
     @RepositoryMethod("게시글: FULLTEXT 키워드 검색 페이징")
@@ -59,13 +59,13 @@ public interface SpringDataJpaBoardRepository extends JpaRepository<Board, Long>
             + "INNER JOIN users u ON b.user_idx = u.idx "
             + "WHERE b.is_deleted = false "
             + "AND u.is_deleted = false "
-            + "AND u.status = 'ACTIVE' "
+            + "AND b.author_visible = 1 "
             + "AND MATCH(b.title, b.content) AGAINST(:kw IN BOOLEAN MODE) "
             + "ORDER BY relevance DESC, b.created_at DESC", countQuery = "SELECT COUNT(*) FROM board b "
             + "INNER JOIN users u ON b.user_idx = u.idx "
             + "WHERE b.is_deleted = false "
             + "AND u.is_deleted = false "
-            + "AND u.status = 'ACTIVE' "
+            + "AND b.author_visible = 1 "
             + "AND MATCH(b.title, b.content) AGAINST(:kw IN BOOLEAN MODE)", nativeQuery = true)
     Page<Board> searchByKeywordWithPaging(@Param("kw") String keyword, Pageable pageable);
 
