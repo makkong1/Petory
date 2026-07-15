@@ -128,7 +128,8 @@ SELECT x FROM (
 -- §3. 유저 · 펫
 -- =============================================================================
 INSERT INTO users (id, username, nickname, email, phone, password, role, location,
-                   status, warning_count, pet_coin_balance, email_verified, created_at, last_login_at)
+                   status, warning_count, pet_coin_balance, email_verified, created_at, last_login_at,
+                   suspended_until, is_deleted)
 SELECT
   CONCAT('seed_user_', n),
   CONCAT('시드사용자', n),
@@ -141,9 +142,15 @@ SELECT
        ELSE 'USER' END,
   ELT(1 + (n % 8), '서울 강남구','서울 마포구','서울 송파구','경기 성남시',
                    '경기 고양시','부산 해운대구','대구 수성구','인천 연수구'),
-  'ACTIVE', 0, 0, 1,
+  -- 상태 분배: BANNED 2%(n%50=23) · SUSPENDED 4%(n%25=11) · 탈퇴 2%(n%50=7) · 나머지 ACTIVE
+  CASE WHEN n % 50 = 23 THEN 'BANNED'
+       WHEN n % 25 = 11 THEN 'SUSPENDED'
+       ELSE 'ACTIVE' END,
+  0, 0, 1,
   NOW() - INTERVAL (n % 730) DAY - INTERVAL (n % 1440) MINUTE,
-  NOW() - INTERVAL (n % 60) DAY
+  NOW() - INTERVAL (n % 60) DAY,
+  CASE WHEN n % 25 = 11 THEN NOW() + INTERVAL 7 DAY ELSE NULL END,  -- SUSPENDED 만 만료일
+  CASE WHEN n % 50 = 7 THEN 1 ELSE 0 END                            -- 탈퇴 2%
 FROM seed_numbers WHERE n <= @USERS;
 
 SET @U0 = (SELECT MIN(idx) FROM users WHERE email LIKE 'seed_user_%');
@@ -513,5 +520,10 @@ LEFT JOIN (
     ON m.user_idx = p.user_idx AND m.mx = p.idx
 ) t ON t.user_idx = u.idx
 SET u.pet_coin_balance = IFNULL(t.balance_after, 0);
+
+-- author_visible 정합: 시드는 board 를 INSERT 하고 users 를 INSERT(트리거 미발동)하므로
+-- 여기서 백필한다. V6 이 이미 컬럼을 만들었으므로 참조 가능하다.
+UPDATE board b JOIN users u ON u.idx = b.user_idx
+SET b.author_visible = IF(u.is_deleted = 0 AND u.status <> 'BANNED', 1, 0);
 
 DROP TABLE IF EXISTS seed_numbers;
