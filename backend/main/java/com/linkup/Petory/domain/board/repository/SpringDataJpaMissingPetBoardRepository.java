@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
@@ -69,33 +70,47 @@ public interface SpringDataJpaMissingPetBoardRepository extends JpaRepository<Mi
             @Param("status") MissingPetStatus status,
             Pageable pageable);
 
-    @RepositoryMethod("실종 제보: 홈 추천 바운딩 박스 후보 조회")
-    @Query(value = "SELECT b FROM MissingPetBoard b JOIN FETCH b.user u "
+    // 1단계: 바운딩 박스를 POLYGON 으로 만들어 SPATIAL 인덱스(geo_point)로 후보 idx 만 뽑는다.
+    // 이전에는 latitude/longitude BETWEEN 이었는데 B-tree 로는 경도가 걸러지지 않아 풀스캔이었다
+    // (carerequest V4 와 같은 병리). 좌표 순서는 POINT(위도 경도) — geo_point 저장 규약과 짝을 맞춘다.
+    @Query(value = "SELECT b.idx FROM missing_pet_board b JOIN users u ON u.idx = b.user_idx "
             + "WHERE b.status = :status "
-            + "AND b.isDeleted = false "
-            + "AND u.isDeleted = false "
+            + "AND b.is_deleted = false "
+            + "AND u.is_deleted = false "
             + "AND u.status = 'ACTIVE' "
-            + "AND b.latitude IS NOT NULL "
-            + "AND b.longitude IS NOT NULL "
-            + "AND b.latitude BETWEEN :minLat AND :maxLat "
-            + "AND b.longitude BETWEEN :minLng AND :maxLng "
-            + "ORDER BY b.lostDate DESC, b.createdAt DESC",
-            countQuery = "SELECT COUNT(b) FROM MissingPetBoard b JOIN b.user u "
-                    + "WHERE b.status = :status "
-                    + "AND b.isDeleted = false "
-                    + "AND u.isDeleted = false "
-                    + "AND u.status = 'ACTIVE' "
-                    + "AND b.latitude IS NOT NULL "
-                    + "AND b.longitude IS NOT NULL "
-                    + "AND b.latitude BETWEEN :minLat AND :maxLat "
-                    + "AND b.longitude BETWEEN :minLng AND :maxLng")
-    Page<MissingPetBoard> findHomeCandidatesInBoundingBox(
-            @Param("status") MissingPetStatus status,
+            + "AND ST_Within(b.geo_point, ST_GeomFromText(CONCAT('POLYGON((', "
+            + ":minLat, ' ', :minLng, ', ', "
+            + ":minLat, ' ', :maxLng, ', ', "
+            + ":maxLat, ' ', :maxLng, ', ', "
+            + ":maxLat, ' ', :minLng, ', ', "
+            + ":minLat, ' ', :minLng, '))'), 4326)) "
+            + "ORDER BY b.lost_date DESC, b.created_at DESC "
+            + "LIMIT :limit", nativeQuery = true)
+    List<Long> findHomeCandidateIdsInBoundingBox(
+            @Param("status") String status,
             @Param("minLat") BigDecimal minLat,
             @Param("maxLat") BigDecimal maxLat,
             @Param("minLng") BigDecimal minLng,
             @Param("maxLng") BigDecimal maxLng,
-            Pageable pageable);
+            @Param("limit") int limit);
+
+    // 2단계: 뽑힌 idx 를 JOIN FETCH 로 재조회(작성자 N+1 방지). 최종 정렬·점수는 서비스가 다시 한다.
+    @Query("SELECT b FROM MissingPetBoard b JOIN FETCH b.user u WHERE b.idx IN :ids")
+    List<MissingPetBoard> findByIdxInWithUser(@Param("ids") List<Long> ids);
+
+    @RepositoryMethod("실종 제보: 홈 추천 바운딩 박스 후보 조회 (SPATIAL 2단계)")
+    default Page<MissingPetBoard> findHomeCandidatesInBoundingBox(
+            MissingPetStatus status,
+            BigDecimal minLat,
+            BigDecimal maxLat,
+            BigDecimal minLng,
+            BigDecimal maxLng,
+            Pageable pageable) {
+        List<Long> ids = findHomeCandidateIdsInBoundingBox(
+                status.name(), minLat, maxLat, minLng, maxLng, pageable.getPageSize());
+        List<MissingPetBoard> content = ids.isEmpty() ? List.of() : findByIdxInWithUser(ids);
+        return new PageImpl<>(content, pageable, content.size());
+    }
 
     @RepositoryMethod("실종 제보: 작성자 ID 조회 (경량)")
     @Query("SELECT b.user.idx FROM MissingPetBoard b WHERE b.idx = :idx AND b.isDeleted = false")

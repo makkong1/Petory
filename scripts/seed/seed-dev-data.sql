@@ -44,6 +44,7 @@ SET @BOARDS   = 50000;   -- 게시글 (인덱스/딥페이징 측정이 유의�
 SET @COMMENTS = 150000;  -- 댓글
 SET @MEETUPS  = 5000;    -- 모임
 SET @CARE     = 3000;    -- 케어 요청
+SET @MISSING  = 3000;    -- 실종 제보 (care 와 같은 규모·같은 좌표 분포 → 지오 쿼리 비교가 사과 대 사과)
 SET @LREVIEWS = 20000;   -- 시설 리뷰
 SET @PW = '$2y$10$S7H2k5RJ1kTYDYSflTMdoeuoPtCaLBpPrXkpJgHRBlwwFTMYTH2Ni'; -- 평문: Seed1234!
 
@@ -214,6 +215,48 @@ SELECT @B0 + (b.n - 1),
 FROM seed_numbers b
 JOIN seed_numbers j ON j.n <= (b.n % 6)
 WHERE b.n <= @BOARDS;
+
+-- ── 실종 제보(missing_pet_board): 지오 검색이 걸리도록 carerequest 와 같은 좌표 분포로 채운다.
+--    좌표를 carerequest 와 동일하게 두면 두 도메인의 반경 검색 비용을 나란히 비교할 수 있다.
+INSERT INTO missing_pet_board (user_idx, title, content, species, breed, color, gender, age,
+                               pet_name, lost_date, lost_location, latitude, longitude,
+                               status, is_deleted, created_at, updated_at)
+SELECT @U0 + ((n * 2287) % @USERS),
+       CONCAT('강아지를 찾습니다 #', n),
+       CONCAT('시드 실종 제보 ', n, '. 목격하신 분은 연락 부탁드립니다.'),
+       ELT(1 + (n % 3), '개', '고양이', '기타'),
+       ELT(1 + (n % 5), '푸들', '말티즈', '포메라니안', '진돗개', '믹스'),
+       ELT(1 + (n % 4), '갈색', '흰색', '검정', '베이지'),
+       IF(n % 2 = 0, 'M', 'F'),
+       CONCAT(1 + (n % 15), '살'),
+       CONCAT('보리', n),
+       DATE(NOW() - INTERVAL (n % 200) DAY),
+       ELT(1 + (n % 4), '서울 강남구 역삼동', '서울 마포구 연남동', '경기 성남시 분당구', '서울 송파구 잠실동'),
+       37.45 + ((n % 90) * 0.004),
+       126.86 + ((n % 110) * 0.004),
+       CASE WHEN n % 10 < 6 THEN 'MISSING'
+            WHEN n % 10 < 9 THEN 'FOUND'
+            ELSE 'RESOLVED' END,
+       0,
+       NOW() - INTERVAL (n % 300) DAY,
+       NOW() - INTERVAL (n % 300) DAY
+FROM seed_numbers WHERE n <= @MISSING;
+
+SET @MP0 = (SELECT MIN(idx) FROM missing_pet_board);
+
+-- 목격 댓글: 제보마다 0~4건.
+INSERT INTO missing_pet_comment (board_idx, user_idx, content, latitude, longitude, is_deleted, created_at, updated_at)
+SELECT b.idx,
+       @U0 + ((b.idx * 4099 + j.n) % @USERS),
+       CONCAT('여기서 본 것 같아요! (목격 ', j.n, ')'),
+       37.45 + ((b.idx % 90) * 0.004),
+       126.86 + ((b.idx % 110) * 0.004),
+       0,
+       b.created_at + INTERVAL j.n HOUR,
+       b.created_at + INTERVAL j.n HOUR
+FROM missing_pet_board b
+JOIN seed_numbers j ON j.n <= (b.idx % 5)
+WHERE b.is_deleted = 0;
 
 -- =============================================================================
 -- §5. 모임 · 케어 · 채팅 · 코인
