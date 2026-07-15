@@ -36,14 +36,13 @@ export const boardApi = {
     });
   },
 
-  // 단일 게시글 조회 (옵션 viewerId)
-  getBoard: (id, viewerId) => {
+  // 단일 게시글 조회 — 조회자는 서버가 JWT에서 정한다 (viewerId를 보내지 않는다)
+  getBoard: (id) => {
     if (isDemoMode()) {
       const board = DEMO_BOARDS.find((b) => b.idx === Number(id));
       return mockResolve(board || DEMO_BOARDS[0]);
     }
-    const params = viewerId ? { viewerId } : {};
-    return api.get(`/${id}`, { params });
+    return api.get(`/${id}`);
   },
 
   // 인기 자랑 게시글 조회

@@ -471,15 +471,14 @@ public class BoardService {
         return countsMap;
     }
 
+    // viewerId 는 인증 주체(JWT)에서 온다. 컨트롤러가 클라이언트 파라미터를 받던 시절에는
+    // 여기서 식별 실패 시 true 를 반환했는데, 그러면 viewerId 를 빼고 반복 호출하는 것만으로
+    // 조회수가 무한히 올랐다. 조회자를 특정하지 못하면 중복 방지가 불가능하므로 세지 않는다.
     private boolean shouldIncrementView(Board board, Long viewerId) {
         if (viewerId == null) {
-            return true;
+            return false;
         }
-        Users viewer = usersRepository.findById(viewerId).orElse(null);
-        if (viewer == null) {
-            return true;
-        }
-        return boardViewLogRepository.insertIgnore(board.getIdx(), viewer.getIdx()) > 0;
+        return boardViewLogRepository.insertIgnore(board.getIdx(), viewerId) > 0;
     }
 
     /**
