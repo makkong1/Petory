@@ -94,7 +94,7 @@ Meetup 도메인은 사용자가 오프라인 모임을 만들고, 다른 사용
 | `DELETE /api/meetups/{meetupIdx}` | 모임 soft delete |
 | `GET /api/meetups?page&size` | 전체 모임 페이징 조회 |
 | `GET /api/meetups/{meetupIdx}` | 모임 상세 조회 |
-| `GET /api/meetups/search?keyword` | 키워드 검색 |
+| `GET /api/meetups/search?keyword&page&size` | 키워드 검색 (FULLTEXT, DB 페이징) |
 | `GET /api/meetups/available?page&size` | 참여 가능한 모임 Slice 조회 |
 | `GET /api/meetups/organizer/{organizerIdx}` | 주최자별 모임 조회 |
 | `GET /api/meetups/nearby?lat&lng&radius&maxResults` | 반경 기반 근처 모임 조회 |
@@ -211,11 +211,11 @@ Meetup 도메인은 사용자가 오프라인 모임을 만들고, 다른 사용
 - `lat`
 - `lng`
 - `radius`, 기본 5.0km
-- `maxResults`, 기본 500
+- `maxResults`, 기본 20
 
 서비스 정책:
 
-- maxResults는 1~1000으로 보정한다.
+- maxResults는 1~1000으로 보정한다. (기본값은 20 — 예전 기본값 500은 지도에 찍을 일이 없는데도 모임 500개를 반환해 요청 1건에 쿼리 21개가 나갔다.)
 - `date > now`
 - `status`가 `COMPLETED` 또는 `CANCELLED`가 아니거나 status null
 - soft delete 제외

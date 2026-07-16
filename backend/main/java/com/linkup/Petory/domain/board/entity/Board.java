@@ -88,6 +88,12 @@ public class Board extends BaseTimeEntity {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
+    // 작성자 보임 여부(미탈퇴 AND status<>BANNED). 트리거가 소유하므로 updatable=false —
+    // 글 수정 시 JPA 가 트리거의 값을 되돌리는 lost update 를 막는다.
+    @Builder.Default
+    @Column(name = "author_visible", updatable = false, nullable = false)
+    private Boolean authorVisible = true;
+
     public void softDelete() {
         this.status = ContentStatus.DELETED;
         this.isDeleted = true;

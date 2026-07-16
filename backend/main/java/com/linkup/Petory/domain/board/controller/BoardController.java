@@ -57,7 +57,10 @@ public class BoardController {
     @GetMapping("/{id}")
     public ResponseEntity<BoardDTO> getBoard(
             @PathVariable("id") Long id,
-            @RequestParam(value = "viewerId", required = false) Long viewerId) {
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        // 조회자는 인증 주체다. 클라이언트가 보낸 viewerId 를 쓰면 조회수 중복 방지를
+        // 우회하거나(파라미터를 빼면 매번 +1) 남에게 조회를 덮어씌울 수 있다.
+        Long viewerId = (userDetails != null) ? userDetails.getIdx() : null;
         return ResponseEntity.ok(boardService.getBoard(id, viewerId));
     }
 
@@ -92,11 +95,12 @@ public class BoardController {
         return ResponseEntity.noContent().build();
     }
 
-    // 내 게시글 조회
+    // 내 게시글 조회 — 대상은 인증 주체다. 클라이언트가 보낸 userId 를 쓰면 남의 글이 조회된다.
     @GetMapping("/my-posts")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<List<BoardDTO>> getMyBoards(@RequestParam("userId") Long userId) {
-        return ResponseEntity.ok(boardService.getMyBoards(userId));
+    public ResponseEntity<List<BoardDTO>> getMyBoards(
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        return ResponseEntity.ok(boardService.getMyBoards(userDetails.getIdx()));
     }
 
     // 게시글 검색 (페이징 지원)

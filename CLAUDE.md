@@ -112,7 +112,15 @@ npm test
 
 **스키마의 유일한 정본은 `backend/main/resources/db/migration/V*.sql` 이다.** 앱이 기동할 때 Flyway가 로컬·도커·CI에 동일하게 적용한다.
 
-- **스키마를 바꾸려면** `db/migration/V2__무엇을_바꾸는지.sql` 처럼 새 버전 파일을 추가한다. **기존 V1을 수정하지 말 것.**
+- **스키마를 바꾸려면** `db/migration/V5__무엇을_바꾸는지.sql` 처럼 **다음 번호로** 새 파일을 추가한다. **이미 적용된 파일(V1~V4)은 수정하지 말 것** — Flyway가 체크섬을 검사해 기동에 실패한다.
+- **현재 적용된 마이그레이션:**
+
+  | 버전 | 내용 |
+  |---|---|
+  | `V1` | baseline 스키마 (기존 DB를 Flyway로 편입) |
+  | `V2` | `carerequest` FULLTEXT (title, description) — 없어서 검색이 HTTP 500이었다 |
+  | `V3` | `pets` (pet_type, is_deleted) 복합 — COUNT가 인덱스 머지로 19,667행을 읽던 것 |
+  | `V4` | `users`(created_at) / `carerequest` 정렬·상태 인덱스 + `geo_point` POINT + SPATIAL + 트리거 |
 - **엔티티도 같이 고쳐야 한다.** `ddl-auto=validate` 가 엔티티와 실제 스키마를 대조하므로, 어긋나면 앱이 기동에 실패한다(DDL은 실행하지 않으니 데이터는 안전).
 - `backend/main/resources/sql/migration/applied/` 는 Flyway 이전의 **이력 보관용**이며 실행되지 않는다. 여기에 새 파일을 넣지 말 것.
 - ⚠️ `ddl-auto=update` 를 절대 켜지 말 것 — 과거 `@Lob` 매핑 문제로 본문 컬럼이 `longtext → tinytext` 로 잘린 사고가 있었다.
@@ -139,7 +147,8 @@ frontend/src/
 
 - **인증**: JWT Access Token(기본 15분, `jwt.access-token-expiration-ms`로 조정) + Refresh Token (1일, DB 저장). `JwtAuthenticationFilter` → `SecurityConfig`.
 - **권한**: `@PreAuthorize` 메서드 레벨 제어. Role 계층: USER < SERVICE_PROVIDER < ADMIN < MASTER.
-- **Redis 용도 3가지**: 알림 캐시 (최신 50개, TTL 24h) / 게시글 상세 캐시 (`@Cacheable`) / 이메일 인증 임시 저장 (TTL 24h).
+- **Redis 용도 3가지**: 알림 캐시 (최신 50개, TTL 24h) / 조회 캐시 (`@Cacheable` — 오늘의 통계 `todayStats`, 인기 위치서비스 `popularLocationServices`) / 이메일 인증 임시 저장 (TTL 24h).
+  - ⚠️ 게시글 상세 캐시는 **현재 비활성**이다 (`BoardService:156`에서 `@Cacheable` 제거 — 조회수 실시간 반영 때문).
 - **통계**: 실시간 쿼리 대신 매일 자정 배치로 `DailyStatistics` 테이블에 집계 (Daily Summary Pattern).
 - **동시성 제어**: 펫코인·에스크로는 비관적 락(`findByIdForUpdate`), 경고 횟수·모임 인원은 DB 레벨 원자적 증가 쿼리.
 - **채팅**: WebSocket(STOMP) 기반. 케어 요청 생성 시 1:1 채팅방, 모임 생성 시 그룹 채팅방 자동 생성.
@@ -148,6 +157,9 @@ frontend/src/
 ## 주의사항 (Gotchas)
 
 - Gradle toolchain이 시스템 Java가 21이어도 JDK 17을 자동 다운로드함 — 정상 동작.
+- **테스트는 개발 DB(`petory`)가 아니라 전용 DB(`petory_test`)를 쓴다** (`build.gradle`). 개발 DB에서 인덱스를 지우고 테스트해봐야 아무 영향이 없다.
+- **쿼리를 측정할 때는 스케줄러를 끈다** — `--petory.scheduling.enabled=false`. `MeetupChatRoomRecoveryScheduler`가 5분마다 meetup 1만 행을 검사해서 측정에 섞인다. 기본값은 `true`라 운영 동작은 그대로다.
+- **목록 DTO 변환에 `Page.map(converter::toDTO)`를 쓰지 말 것.** 컨버터들은 `toDTO`(단건, 첨부 개별 조회)와 `toDTOList`(배치)가 쌍으로 있다. `Page.map`은 단건 변환기를 행마다 호출해 N+1을 만든다.
 - `GET /api/boards`에 `@PreAuthorize("permitAll()")` 있어도 `SecurityConfig`의 `/api/**` catch-all 때문에 실제로는 인증 필요.
 - 회원가입 payload에 `"role":"USER"` 필드 필요.
 - OAuth2 소셜 로그인은 실제 credentials 없으면 동작 안 함 — 로컬 인증은 정상 동작.

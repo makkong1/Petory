@@ -125,7 +125,7 @@ const CommunityDetailPage = ({
     try {
       setLoadingBoard(true);
       setBoardError('');
-      const response = await boardApi.getBoard(boardId, viewerId);
+      const response = await boardApi.getBoard(boardId);
       const boardData = response.data || null;
       setBoard(boardData);
       if (boardData) {

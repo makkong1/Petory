@@ -44,6 +44,7 @@ SET @BOARDS   = 50000;   -- 게시글 (인덱스/딥페이징 측정이 유의�
 SET @COMMENTS = 150000;  -- 댓글
 SET @MEETUPS  = 5000;    -- 모임
 SET @CARE     = 3000;    -- 케어 요청
+SET @MISSING  = 3000;    -- 실종 제보 (care 와 같은 규모·같은 좌표 분포 → 지오 쿼리 비교가 사과 대 사과)
 SET @LREVIEWS = 20000;   -- 시설 리뷰
 SET @PW = '$2y$10$S7H2k5RJ1kTYDYSflTMdoeuoPtCaLBpPrXkpJgHRBlwwFTMYTH2Ni'; -- 평문: Seed1234!
 
@@ -127,7 +128,8 @@ SELECT x FROM (
 -- §3. 유저 · 펫
 -- =============================================================================
 INSERT INTO users (id, username, nickname, email, phone, password, role, location,
-                   status, warning_count, pet_coin_balance, email_verified, created_at, last_login_at)
+                   status, warning_count, pet_coin_balance, email_verified, created_at, last_login_at,
+                   suspended_until, is_deleted)
 SELECT
   CONCAT('seed_user_', n),
   CONCAT('시드사용자', n),
@@ -140,9 +142,15 @@ SELECT
        ELSE 'USER' END,
   ELT(1 + (n % 8), '서울 강남구','서울 마포구','서울 송파구','경기 성남시',
                    '경기 고양시','부산 해운대구','대구 수성구','인천 연수구'),
-  'ACTIVE', 0, 0, 1,
+  -- 상태 분배: BANNED 2%(n%50=23) · SUSPENDED 4%(n%25=11) · 탈퇴 2%(n%50=7) · 나머지 ACTIVE
+  CASE WHEN n % 50 = 23 THEN 'BANNED'
+       WHEN n % 25 = 11 THEN 'SUSPENDED'
+       ELSE 'ACTIVE' END,
+  0, 0, 1,
   NOW() - INTERVAL (n % 730) DAY - INTERVAL (n % 1440) MINUTE,
-  NOW() - INTERVAL (n % 60) DAY
+  NOW() - INTERVAL (n % 60) DAY,
+  CASE WHEN n % 25 = 11 THEN NOW() + INTERVAL 7 DAY ELSE NULL END,  -- SUSPENDED 만 만료일
+  CASE WHEN n % 50 = 7 THEN 1 ELSE 0 END                            -- 탈퇴 2%
 FROM seed_numbers WHERE n <= @USERS;
 
 SET @U0 = (SELECT MIN(idx) FROM users WHERE email LIKE 'seed_user_%');
@@ -214,6 +222,48 @@ SELECT @B0 + (b.n - 1),
 FROM seed_numbers b
 JOIN seed_numbers j ON j.n <= (b.n % 6)
 WHERE b.n <= @BOARDS;
+
+-- ── 실종 제보(missing_pet_board): 지오 검색이 걸리도록 carerequest 와 같은 좌표 분포로 채운다.
+--    좌표를 carerequest 와 동일하게 두면 두 도메인의 반경 검색 비용을 나란히 비교할 수 있다.
+INSERT INTO missing_pet_board (user_idx, title, content, species, breed, color, gender, age,
+                               pet_name, lost_date, lost_location, latitude, longitude,
+                               status, is_deleted, created_at, updated_at)
+SELECT @U0 + ((n * 2287) % @USERS),
+       CONCAT('강아지를 찾습니다 #', n),
+       CONCAT('시드 실종 제보 ', n, '. 목격하신 분은 연락 부탁드립니다.'),
+       ELT(1 + (n % 3), '개', '고양이', '기타'),
+       ELT(1 + (n % 5), '푸들', '말티즈', '포메라니안', '진돗개', '믹스'),
+       ELT(1 + (n % 4), '갈색', '흰색', '검정', '베이지'),
+       IF(n % 2 = 0, 'M', 'F'),
+       CONCAT(1 + (n % 15), '살'),
+       CONCAT('보리', n),
+       DATE(NOW() - INTERVAL (n % 200) DAY),
+       ELT(1 + (n % 4), '서울 강남구 역삼동', '서울 마포구 연남동', '경기 성남시 분당구', '서울 송파구 잠실동'),
+       37.45 + ((n % 90) * 0.004),
+       126.86 + ((n % 110) * 0.004),
+       CASE WHEN n % 10 < 6 THEN 'MISSING'
+            WHEN n % 10 < 9 THEN 'FOUND'
+            ELSE 'RESOLVED' END,
+       0,
+       NOW() - INTERVAL (n % 300) DAY,
+       NOW() - INTERVAL (n % 300) DAY
+FROM seed_numbers WHERE n <= @MISSING;
+
+SET @MP0 = (SELECT MIN(idx) FROM missing_pet_board);
+
+-- 목격 댓글: 제보마다 0~4건.
+INSERT INTO missing_pet_comment (board_idx, user_idx, content, latitude, longitude, is_deleted, created_at, updated_at)
+SELECT b.idx,
+       @U0 + ((b.idx * 4099 + j.n) % @USERS),
+       CONCAT('여기서 본 것 같아요! (목격 ', j.n, ')'),
+       37.45 + ((b.idx % 90) * 0.004),
+       126.86 + ((b.idx % 110) * 0.004),
+       0,
+       b.created_at + INTERVAL j.n HOUR,
+       b.created_at + INTERVAL j.n HOUR
+FROM missing_pet_board b
+JOIN seed_numbers j ON j.n <= (b.idx % 5)
+WHERE b.is_deleted = 0;
 
 -- =============================================================================
 -- §5. 모임 · 케어 · 채팅 · 코인
@@ -470,5 +520,10 @@ LEFT JOIN (
     ON m.user_idx = p.user_idx AND m.mx = p.idx
 ) t ON t.user_idx = u.idx
 SET u.pet_coin_balance = IFNULL(t.balance_after, 0);
+
+-- author_visible 정합: 시드는 board 를 INSERT 하고 users 를 INSERT(트리거 미발동)하므로
+-- 여기서 백필한다. V6 이 이미 컬럼을 만들었으므로 참조 가능하다.
+UPDATE board b JOIN users u ON u.idx = b.user_idx
+SET b.author_visible = IF(u.is_deleted = 0 AND u.status <> 'BANNED', 1, 0);
 
 DROP TABLE IF EXISTS seed_numbers;

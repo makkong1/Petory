@@ -8,8 +8,9 @@ const mockResolve = (data) => Promise.resolve({ data });
 
 export const activityApi = {
   // 내 활동 조회 (기존 API - 하위 호환성 유지)
-  getMyActivities: (userId) =>
-    isDemoMode() ? mockResolve(DEMO_ACTIVITIES) : api.get('/my', { params: { userId } }),
+  // 대상은 서버가 JWT에서 정한다 (userId를 보내지 않는다)
+  getMyActivities: () =>
+    isDemoMode() ? mockResolve(DEMO_ACTIVITIES) : api.get('/my'),
 
   // 내 활동 조회 (페이징 지원)
   getMyActivitiesWithPaging: (params = {}) => {
@@ -23,9 +24,9 @@ export const activityApi = {
         hasNext: start + activities.length < DEMO_ACTIVITIES.length,
       });
     }
-    const { userId, filter = 'ALL', page = 0, size = 20, ...otherParams } = params;
+    // userId는 보내지 않는다 — 대상은 서버가 JWT에서 정한다
+    const { userId: _ignoredUserId, filter = 'ALL', page = 0, size = 20, ...otherParams } = params;
     const requestParams = {
-      userId,
       filter,
       page,
       size,

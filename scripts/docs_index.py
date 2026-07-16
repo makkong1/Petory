@@ -142,6 +142,10 @@ def main():
     for e in entries:
         by_problem[e["problem"] or "(미지정)"].append(e)
 
+    by_type = defaultdict(list)
+    for e in entries:
+        by_type[e.get("type") or "(미지정)"].append(e)
+
     out = []
     # 헤딩을 첫 줄에 둔다. HTML 주석(<!--)으로 시작하면 내용을 스니핑하는 도구들이
     # 이 파일을 마크다운이 아니라 SGML/HTML 문서로 오인해 렌더링하지 않는다.
@@ -151,6 +155,25 @@ def main():
     out.append("")
     out.append(f"frontmatter가 붙은 문서 {len(entries)}건. "
                 "각 문서 상단에 `date/domains/type/problem/status/metric` YAML을 붙이면 자동으로 여기 잡힌다.")
+    out.append("")
+
+    # ── 층 구분 안내 ────────────────────────────────────────────────────────
+    # 이 인덱스는 "증거층"이다. 증거 문서는 흩어져 있는 게 정상이고, 그게 신뢰의 근거다
+    # ("이 숫자 어디서 났나"에 링크를 던질 수 있어야 한다).
+    # 이력서·포트폴리오·면접에서 말하는 "주장과 수치"의 정본은 핵심성과_분석.md 하나다.
+    # 이 구분이 없어서 같은 Chat N+1 수치가 세 군데에서 다르게 적혀 있던 적이 있다.
+    out.append("## 📌 이 문서를 어떻게 쓰나 — 층이 두 개다")
+    out.append("")
+    out.append("| 층 | 파일 | 역할 |")
+    out.append("| --- | --- | --- |")
+    out.append("| **주장 (정본)** | [핵심성과_분석.md](핵심성과_분석.md) | "
+               "이력서·포트폴리오·면접에서 말하는 **모든 수치는 여기서만 나온다.** 수치를 고칠 때는 여기부터 고친다 |")
+    out.append(f"| **증거** | 이 인덱스가 잡은 {len(entries)}건 | "
+               "측정·실험 기록. **통합하지 않는다** — 흩어져 있어야 \"이 숫자 어디서 났나\"에 링크를 던질 수 있다 |")
+    out.append("")
+    out.append("> 과거에 같은 Chat N+1 수치가 세 군데에서 다르게 적혀 있었다"
+               "(포트폴리오 `41→4`, 이 레포 `21→4`, 출처 불명 `305ms→55ms`). "
+               "**표현층이 주장층보다 최신인 상태**였다. 층을 나눈 이유가 이것이다.")
     out.append("")
 
     out.append("## 날짜순")
@@ -172,6 +195,16 @@ def main():
         out.append(f"### {problem}")
         out.append("")
         out.append(render_table(by_problem[problem], ["날짜", "문서", "도메인", "수치"]))
+        out.append("")
+
+    # 작업 성격별(type) 뷰. 디렉토리(refactoring/troubleshooting/analysis)는 경계가 모호해서
+    # — N+1 하나가 셋 다에 걸쳐 있다 — 디렉토리를 옮기는 대신 frontmatter의 type으로 갈라 본다.
+    out.append("## 작업 성격별 (type)")
+    out.append("")
+    for t in sorted(by_type):
+        out.append(f"### {t}")
+        out.append("")
+        out.append(render_table(by_type[t], ["날짜", "문서", "도메인", "수치"]))
         out.append("")
 
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
