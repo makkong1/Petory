@@ -4,7 +4,7 @@ domains: [board]
 type: query-fix-evidence
 problem: board-deep-page-lazy-join
 status: verified
-metric: "깊은 페이지(OFFSET 49980) 커버링 인덱스 스캔 24~32ms(비교군 66~84ms, 구코드 재현 133ms) · COUNT 단일 테이블 7~25ms(구코드 재현 22~32ms) · 너덜너덜 증명: 전체 2,500페이지 중 596페이지(23.8%)에 숨김 대상 글 유입 · k6 30s/20VU 15,555req 100% 200 · p95 63.91ms"
+metric: "깊은 페이지(OFFSET 49980) 커버링 인덱스 스캔 24~32ms(비교군 66~84ms, 구코드 재현 133ms) · COUNT 단일 테이블 7~25ms(구코드 재현 22~32ms) · 페이지 결손 검증: 전체 2,500페이지 중 596페이지(23.8%)에 숨김 대상 글 유입 · k6 30s/20VU 15,555req 100% 200 · p95 63.91ms"
 related: [docs/analysis/query-audit/fixes-2026-07-14.md, docs/superpowers/specs/2026-07-15-board-deep-page-pagination-design.md, docs/superpowers/plans/2026-07-15-board-deep-page-pagination.md]
 ---
 # board 깊은 페이지 — 2단계 지연 조인 + author_visible 비정규화, 전후 실측
@@ -23,7 +23,7 @@ related: [docs/analysis/query-audit/fixes-2026-07-14.md, docs/superpowers/specs/
 | ① | 깊은 페이지 스캔 (OFFSET 49980) | 인덱스 무시 시 **66~84ms** · 비커버링(행 조회 필요) | **24~32ms** · 커버링 인덱스 단독 | **~2.5배** |
 | ① | 〃 (구코드 형태: board JOIN users) | **133ms** · Nested loop 50,000회 PK 단건조회 | 〃 | **~4~5배** |
 | ② | COUNT | users 조인: **22~32ms** · 2테이블(users 10,001행 스캔 + board 46,000행) | 단일 테이블: **7~25ms** · board 48,000행만 | 조인 제거, 검사 대상 테이블 1개 |
-| ③ | 너덜너덜 증명 | `is_deleted`만으로 skip 시 — | 전체 2,500페이지 중 **596페이지(23.8%)**에 숨김 대상 글 유입(합 2,000건) | 비정규화 없인 페이지가 그만큼 샌다 |
+| ③ | 페이지 결손 검증 | `is_deleted`만으로 skip 시 — | 전체 2,500페이지 중 **596페이지(23.8%)**에 숨김 대상 글 유입(합 2,000건) | 비정규화 없인 그만큼 결손 페이지(size 미달) 발생 |
 | ④ | k6 (30s, 20VU, 페이지 0/1000/2000/2499 혼합) | — | **15,555 요청**, 100% 200, **p95 63.91ms**, avg 38.51ms | 페이지 깊이 무관하게 평탄 |
 
 **변경 파일(Task 4 기준):** Flyway `V6__board_author_visible.sql` + `Board` 엔티티 + Repository/Service(2단계 지연 조인) + 회귀 테스트.
@@ -150,7 +150,7 @@ WHERE b.is_deleted=0 AND u.is_deleted=0 AND u.status='ACTIVE';
 
 ---
 
-## 3. ③ 너덜너덜 증명 — 비정규화 없이 `is_deleted`만으로 skip하면
+## 3. ③ 페이지 결손 검증 — 비정규화 없이 `is_deleted`만으로 skip하면
 
 브리프 지정 쿼리(OFFSET 40000)와 다른 오프셋들로 표본을 떠봤다:
 

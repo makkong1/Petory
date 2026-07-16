@@ -17,7 +17,7 @@ frontmatter가 붙은 문서 33건. 각 문서 상단에 `date/domains/type/prob
 
 | 날짜 | 문서 | 도메인 | 문제 | 수치 | 커밋 |
 | --- | --- | --- | --- | --- | --- |
-| 2026-07-15 | [board 깊은 페이지 — 2단계 지연 조인 + author_visible 비정규화, 전후 실측](analysis/board-deep-page-2026-07.md) | board | board-deep-page-lazy-join | 깊은 페이지(OFFSET 49980) 커버링 인덱스 스캔 24~32ms(비교군 66~84ms, 구코드 재현 133ms) · COUNT 단일 테이블 7~25ms(구코드 재현 22~32ms) · 너덜너덜 증명: 전체 2,500페이지 중 596페이지(23.8%)에 숨김 대상 글 유입 · k6 30s/20VU 15,555req 100% 200 · p95 63.91ms | - |
+| 2026-07-15 | [board 깊은 페이지 — 2단계 지연 조인 + author_visible 비정규화, 전후 실측](analysis/board-deep-page-2026-07.md) | board | board-deep-page-lazy-join | 깊은 페이지(OFFSET 49980) 커버링 인덱스 스캔 24~32ms(비교군 66~84ms, 구코드 재현 133ms) · COUNT 단일 테이블 7~25ms(구코드 재현 22~32ms) · 페이지 결손 검증: 전체 2,500페이지 중 596페이지(23.8%)에 숨김 대상 글 유입 · k6 30s/20VU 15,555req 100% 200 · p95 63.91ms | - |
 | 2026-07-14 | [쿼리 계획 감시의 일반화 — 설계 분석 (v2)](analysis/query-plan-monitoring-design.md) | board, meetup, global | query-plan-monitoring-generalization | ⚠️표본=API 1개(GET /api/boards). 그 하나에서 COUNT 쿼리 180,003행/141ms 발견(고친 목록 SELECT는 120행/4ms). 미확인: 컨트롤러 33개, Page<> COUNT 26개, 스케줄러 8개, 네이티브쿼리 20개 | - |
 | 2026-07-14 | [care 도메인 쿼리 감사 — 실측 결과](analysis/query-audit/care-2026-07-14.md) | care | no-indexes-and-broken-fulltext-search | 검색 엔드포인트 HTTP 500 (FULLTEXT 인덱스 없음) · 목록/주변검색 전부 풀스캔+filesort (carerequest 인덱스 3개뿐, 전부 PK/FK) · 주변검색 선택도 208배 오판 · N+1 없음 | - |
 | 2026-07-14 | [meetup 도메인 쿼리 감사 — 실측 결과](analysis/query-audit/meetup-2026-07-14.md) | meetup | unbounded-result-size-no-paging | 검색 1회 = 쿼리 51개 / 247ms (500건 무제한 반환) · 주변 1회 = 쿼리 21개 / 98ms (maxResults 기본 500) · @BatchSize 는 정상 작동 → 고전적 N+1 아님 · 공간 인덱스 정상 | - |
@@ -65,7 +65,7 @@ frontmatter가 붙은 문서 33건. 각 문서 상단에 `date/domains/type/prob
 
 | 날짜 | 문서 | 문제 | 수치 |
 | --- | --- | --- | --- |
-| 2026-07-15 | [board 깊은 페이지 — 2단계 지연 조인 + author_visible 비정규화, 전후 실측](analysis/board-deep-page-2026-07.md) | board-deep-page-lazy-join | 깊은 페이지(OFFSET 49980) 커버링 인덱스 스캔 24~32ms(비교군 66~84ms, 구코드 재현 133ms) · COUNT 단일 테이블 7~25ms(구코드 재현 22~32ms) · 너덜너덜 증명: 전체 2,500페이지 중 596페이지(23.8%)에 숨김 대상 글 유입 · k6 30s/20VU 15,555req 100% 200 · p95 63.91ms |
+| 2026-07-15 | [board 깊은 페이지 — 2단계 지연 조인 + author_visible 비정규화, 전후 실측](analysis/board-deep-page-2026-07.md) | board-deep-page-lazy-join | 깊은 페이지(OFFSET 49980) 커버링 인덱스 스캔 24~32ms(비교군 66~84ms, 구코드 재현 133ms) · COUNT 단일 테이블 7~25ms(구코드 재현 22~32ms) · 페이지 결손 검증: 전체 2,500페이지 중 596페이지(23.8%)에 숨김 대상 글 유입 · k6 30s/20VU 15,555req 100% 200 · p95 63.91ms |
 | 2026-07-14 | [쿼리 계획 감시의 일반화 — 설계 분석 (v2)](analysis/query-plan-monitoring-design.md) | query-plan-monitoring-generalization | ⚠️표본=API 1개(GET /api/boards). 그 하나에서 COUNT 쿼리 180,003행/141ms 발견(고친 목록 SELECT는 120행/4ms). 미확인: 컨트롤러 33개, Page<> COUNT 26개, 스케줄러 8개, 네이티브쿼리 20개 |
 | 2026-07-14 | [전체 쿼리 감사 — 계획 및 방법론](analysis/query-audit/00-plan.md) | full-query-audit | 감사 대상 — 컨트롤러 34개 / 엔드포인트 189개 / Page<> COUNT 30개(그중 16개는 COUNT 자동생성) / 스케줄러 9개 / nativeQuery 21곳. 2026-07-14 전 도메인 감사 완료(엔드포인트 62개 실호출). 유일 잔여: 스케줄러 8개(cron) |
 | 2026-07-14 | [전체 쿼리 감사 — 종합](analysis/query-audit/99-summary.md) | full-query-audit-result | 전 도메인(12개) · 엔드포인트 62개 실호출 측정 완료. 처방 1~6 적용 + 회귀 테스트 8개. 치명 1건(care 검색 HTTP 500, 공개+admin 양쪽) · 진짜 N+1 1건(admin care, 20건→60쿼리) · 무제한 반환 3건 · 인덱스 부재 2곳(care, users.created_at) · statistics 는 가장 깨끗함 · 유일 잔여: 스케줄러 8개(cron) |
@@ -217,7 +217,7 @@ frontmatter가 붙은 문서 33건. 각 문서 상단에 `date/domains/type/prob
 
 | 날짜 | 문서 | 도메인 | 수치 |
 | --- | --- | --- | --- |
-| 2026-07-15 | [board 깊은 페이지 — 2단계 지연 조인 + author_visible 비정규화, 전후 실측](analysis/board-deep-page-2026-07.md) | board | 깊은 페이지(OFFSET 49980) 커버링 인덱스 스캔 24~32ms(비교군 66~84ms, 구코드 재현 133ms) · COUNT 단일 테이블 7~25ms(구코드 재현 22~32ms) · 너덜너덜 증명: 전체 2,500페이지 중 596페이지(23.8%)에 숨김 대상 글 유입 · k6 30s/20VU 15,555req 100% 200 · p95 63.91ms |
+| 2026-07-15 | [board 깊은 페이지 — 2단계 지연 조인 + author_visible 비정규화, 전후 실측](analysis/board-deep-page-2026-07.md) | board | 깊은 페이지(OFFSET 49980) 커버링 인덱스 스캔 24~32ms(비교군 66~84ms, 구코드 재현 133ms) · COUNT 단일 테이블 7~25ms(구코드 재현 22~32ms) · 페이지 결손 검증: 전체 2,500페이지 중 596페이지(23.8%)에 숨김 대상 글 유입 · k6 30s/20VU 15,555req 100% 200 · p95 63.91ms |
 
 ### denormalized-counter-drift
 
@@ -414,7 +414,7 @@ frontmatter가 붙은 문서 33건. 각 문서 상단에 `date/domains/type/prob
 
 | 날짜 | 문서 | 도메인 | 수치 |
 | --- | --- | --- | --- |
-| 2026-07-15 | [board 깊은 페이지 — 2단계 지연 조인 + author_visible 비정규화, 전후 실측](analysis/board-deep-page-2026-07.md) | board | 깊은 페이지(OFFSET 49980) 커버링 인덱스 스캔 24~32ms(비교군 66~84ms, 구코드 재현 133ms) · COUNT 단일 테이블 7~25ms(구코드 재현 22~32ms) · 너덜너덜 증명: 전체 2,500페이지 중 596페이지(23.8%)에 숨김 대상 글 유입 · k6 30s/20VU 15,555req 100% 200 · p95 63.91ms |
+| 2026-07-15 | [board 깊은 페이지 — 2단계 지연 조인 + author_visible 비정규화, 전후 실측](analysis/board-deep-page-2026-07.md) | board | 깊은 페이지(OFFSET 49980) 커버링 인덱스 스캔 24~32ms(비교군 66~84ms, 구코드 재현 133ms) · COUNT 단일 테이블 7~25ms(구코드 재현 22~32ms) · 페이지 결손 검증: 전체 2,500페이지 중 596페이지(23.8%)에 숨김 대상 글 유입 · k6 30s/20VU 15,555req 100% 200 · p95 63.91ms |
 | 2026-07-14 | [처방 6건 적용 + 회귀 테스트 — 결과](analysis/query-audit/fixes-2026-07-14.md) | care, user, meetup, admin | 처방 1~6 적용 · care 검색 HTTP 500→200 · admin care 66→7 쿼리 · pets 155→5 쿼리 · meetup 검색 583ms→43ms · care 목록 3,060→30행 · care 주변검색 3,000행 풀스캔→208행 SPATIAL · admin 사용자목록 10,021→20행. 회귀 테스트 8개(2단계 검증 완료) |
 
 ### sql-evidence
