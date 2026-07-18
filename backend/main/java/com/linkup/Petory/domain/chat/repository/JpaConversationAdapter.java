@@ -8,7 +8,6 @@ import org.springframework.stereotype.Repository;
 
 import com.linkup.Petory.domain.chat.entity.Conversation;
 import com.linkup.Petory.domain.chat.entity.ConversationStatus;
-import com.linkup.Petory.domain.chat.entity.ConversationType;
 import com.linkup.Petory.domain.chat.entity.RelatedType;
 
 import lombok.RequiredArgsConstructor;
@@ -63,13 +62,6 @@ public class JpaConversationAdapter implements ConversationRepository {
     }
 
     @Override
-    public List<Conversation> findByConversationTypeAndStatusAndIsDeletedFalse(
-            ConversationType conversationType,
-            ConversationStatus status) {
-        return jpaRepository.findByConversationTypeAndStatusAndIsDeletedFalse(conversationType, status);
-    }
-
-    @Override
     public Optional<Conversation> findByRelatedTypeAndRelatedIdxAndIsDeletedFalse(
             RelatedType relatedType,
             Long relatedIdx) {
@@ -88,11 +80,6 @@ public class JpaConversationAdapter implements ConversationRepository {
             Long user1Idx,
             Long user2Idx) {
         return jpaRepository.findDirectConversationBetweenUsers(user1Idx, user2Idx);
-    }
-
-    @Override
-    public List<Object[]> countParticipantsByConversationIdxs(List<Long> conversationIdxs) {
-        return jpaRepository.countParticipantsByConversationIdxs(conversationIdxs);
     }
 
     @Override

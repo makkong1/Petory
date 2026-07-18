@@ -53,11 +53,6 @@ public interface MeetupParticipantsRepository {
     Optional<MeetupParticipants> findByMeetupIdxAndUserIdxWithDetails(Long meetupIdx, Long userIdx);
 
     /**
-     * 특정 사용자가 참여한 모임 중 진행 예정인 모임들
-     */
-    List<MeetupParticipants> findUpcomingMeetupsByUser(Long userIdx);
-
-    /**
      * 제재 후속 처리용: 취소되지 않은 진행 예정 모임 참가 목록
      */
     List<MeetupParticipants> findActiveUpcomingMeetupsByUser(Long userIdx);

@@ -5,9 +5,7 @@ import java.util.List;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Repository;
 
-import com.linkup.Petory.domain.board.entity.Board;
 import com.linkup.Petory.domain.board.entity.BoardViewLog;
-import com.linkup.Petory.domain.user.entity.Users;
 
 import lombok.RequiredArgsConstructor;
 
@@ -25,11 +23,6 @@ public class JpaBoardViewLogAdapter implements BoardViewLogRepository {
     @Override
     public BoardViewLog save(BoardViewLog viewLog) {
         return jpaRepository.save(viewLog);
-    }
-
-    @Override
-    public boolean existsByBoardAndUser(Board board, Users user) {
-        return jpaRepository.existsByBoardAndUser(board, user);
     }
 
     @Override

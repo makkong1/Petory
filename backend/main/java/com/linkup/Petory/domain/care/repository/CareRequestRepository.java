@@ -81,12 +81,6 @@ public interface CareRequestRepository {
         long countByCreatedAtBetween(LocalDateTime start, LocalDateTime end);
 
         /**
-         * @deprecated 케어 예정일(date) 기준 집계 — 통계 오류. countByCompletedAtBetween 사용 권장
-         */
-        @Deprecated
-        long countByDateBetweenAndStatus(LocalDateTime start, LocalDateTime end, CareRequestStatus status);
-
-        /**
          * [FIX] 통계용: 특정 기간 동안 실제 완료된 케어 요청 수 (completedAt 기준)
          */
         long countByCompletedAtBetween(LocalDateTime start, LocalDateTime end);

@@ -8,9 +8,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 import com.linkup.Petory.domain.chat.entity.ChatMessage;
-import com.linkup.Petory.domain.chat.entity.Conversation;
-import com.linkup.Petory.domain.chat.entity.MessageType;
-import com.linkup.Petory.domain.user.entity.Users;
 
 /**
  * ChatMessage 도메인 Repository 인터페이스입니다.
@@ -55,28 +52,6 @@ public interface ChatMessageRepository {
      * 채팅방별 메시지 조회 (전체, 최신순)
      */
     List<ChatMessage> findByConversationIdxOrderByCreatedAtDesc(Long conversationIdx);
-
-    /**
-     * 채팅방의 가장 최신 메시지 조회
-     */
-    ChatMessage findTopByConversationIdxOrderByCreatedAtDesc(Long conversationIdx);
-
-    /**
-     * 사용자별 메시지 조회
-     */
-    List<ChatMessage> findBySenderAndIsDeletedFalseOrderByCreatedAtDesc(Users sender);
-
-    /**
-     * 메시지 타입별 조회
-     */
-    List<ChatMessage> findByConversationAndMessageTypeAndIsDeletedFalse(
-            Conversation conversation,
-            MessageType messageType);
-
-    /**
-     * 채팅방별 읽지 않은 메시지 수 조회
-     */
-    Long countUnreadMessages(Long conversationIdx, Long userId);
 
     /**
      * 여러 채팅방의 최신 메시지 조회 (배치) - Sender 포함

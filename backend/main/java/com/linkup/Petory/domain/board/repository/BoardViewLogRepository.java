@@ -2,9 +2,7 @@ package com.linkup.Petory.domain.board.repository;
 
 import java.util.List;
 
-import com.linkup.Petory.domain.board.entity.Board;
 import com.linkup.Petory.domain.board.entity.BoardViewLog;
-import com.linkup.Petory.domain.user.entity.Users;
 
 /**
  * BoardViewLog 도메인 Repository 인터페이스입니다.
@@ -12,8 +10,6 @@ import com.linkup.Petory.domain.user.entity.Users;
 public interface BoardViewLogRepository {
 
     BoardViewLog save(BoardViewLog viewLog);
-
-    boolean existsByBoardAndUser(Board board, Users user);
 
     int insertIgnore(Long boardId, Long userId);
 

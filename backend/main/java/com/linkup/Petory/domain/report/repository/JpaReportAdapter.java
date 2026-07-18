@@ -1,7 +1,6 @@
 package com.linkup.Petory.domain.report.repository;
 
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Optional;
 
 import org.springframework.context.annotation.Primary;
@@ -54,27 +53,6 @@ public class JpaReportAdapter implements ReportRepository {
     public boolean existsByTargetTypeAndTargetIdxAndReporterIdx(ReportTargetType targetType, Long targetIdx,
             Long reporterIdx) {
         return jpaRepository.existsByTargetTypeAndTargetIdxAndReporterIdx(targetType, targetIdx, reporterIdx);
-    }
-
-    @Override
-    public List<Report> findAllByOrderByCreatedAtDesc() {
-        return jpaRepository.findAllByOrderByCreatedAtDesc();
-    }
-
-    @Override
-    public List<Report> findByStatusOrderByCreatedAtDesc(ReportStatus status) {
-        return jpaRepository.findByStatusOrderByCreatedAtDesc(status);
-    }
-
-    @Override
-    public List<Report> findByTargetTypeOrderByCreatedAtDesc(ReportTargetType targetType) {
-        return jpaRepository.findByTargetTypeOrderByCreatedAtDesc(targetType);
-    }
-
-    @Override
-    public List<Report> findByTargetTypeAndStatusOrderByCreatedAtDesc(ReportTargetType targetType,
-            ReportStatus status) {
-        return jpaRepository.findByTargetTypeAndStatusOrderByCreatedAtDesc(targetType, status);
     }
 
     @Override

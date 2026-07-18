@@ -10,7 +10,6 @@ import org.springframework.data.repository.query.Param;
 
 import com.linkup.Petory.domain.chat.entity.Conversation;
 import com.linkup.Petory.domain.chat.entity.ConversationStatus;
-import com.linkup.Petory.domain.chat.entity.ConversationType;
 import com.linkup.Petory.domain.chat.entity.RelatedType;
 import com.linkup.Petory.global.annotation.RepositoryMethod;
 
@@ -39,11 +38,6 @@ public interface SpringDataJpaConversationRepository extends JpaRepository<Conve
             @Param("userId") Long userId,
             @Param("status") ConversationStatus status);
 
-    @RepositoryMethod("채팅방: 타입+상태별 조회")
-    List<Conversation> findByConversationTypeAndStatusAndIsDeletedFalse(
-            ConversationType conversationType,
-            ConversationStatus status);
-
     @RepositoryMethod("채팅방: 관련 엔티티로 조회")
     Optional<Conversation> findByRelatedTypeAndRelatedIdxAndIsDeletedFalse(
             RelatedType relatedType,
@@ -64,14 +58,6 @@ public interface SpringDataJpaConversationRepository extends JpaRepository<Conve
     Optional<Conversation> findDirectConversationBetweenUsers(
             @Param("user1Idx") Long user1Idx,
             @Param("user2Idx") Long user2Idx);
-
-    @RepositoryMethod("채팅방: 참여자 수 배치 조회")
-    @Query("SELECT c.idx, COUNT(p) FROM Conversation c "
-            + "LEFT JOIN c.participants p "
-            + "WHERE c.idx IN :conversationIdxs "
-            + "  AND (p IS NULL OR p.status = 'ACTIVE') "
-            + "GROUP BY c.idx")
-    List<Object[]> countParticipantsByConversationIdxs(@Param("conversationIdxs") List<Long> conversationIdxs);
 
     @RepositoryMethod("채팅방: 비관적 락 조회 (동시성 제어)")
     @Lock(LockModeType.PESSIMISTIC_WRITE)

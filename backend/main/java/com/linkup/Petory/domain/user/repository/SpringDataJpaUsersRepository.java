@@ -62,18 +62,12 @@ public interface SpringDataJpaUsersRepository extends JpaRepository<Users, Long>
     @Query("SELECT u.idx FROM Users u WHERE u.id = :id")
     Optional<Long> findIdxByIdString(@Param("id") String id);
 
-    @RepositoryMethod("사용자: RefreshToken으로 조회")
-    Optional<Users> findByRefreshToken(String refreshToken);
-
     @RepositoryMethod("사용자: RefreshToken으로 조회 (소프트 삭제 제외)")
     @Query("SELECT u FROM Users u WHERE u.refreshToken = :refreshToken AND (u.isDeleted = false OR u.isDeleted IS NULL)")
     Optional<Users> findActiveByRefreshToken(@Param("refreshToken") String refreshToken);
 
     @RepositoryMethod("사용자: 기간별 가입 수 통계")
     long countByCreatedAtBetween(LocalDateTime start, LocalDateTime end);
-
-    @RepositoryMethod("사용자: 기간별 로그인 수 통계")
-    long countByLastLoginAtBetween(LocalDateTime start, LocalDateTime end);
 
     /**
      * 경고 횟수 원자적 증가 (동시성 문제 해결)

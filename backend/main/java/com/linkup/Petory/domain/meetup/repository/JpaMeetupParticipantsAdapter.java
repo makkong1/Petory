@@ -77,11 +77,6 @@ public class JpaMeetupParticipantsAdapter implements MeetupParticipantsRepositor
     }
 
     @Override
-    public List<MeetupParticipants> findUpcomingMeetupsByUser(Long userIdx) {
-        return jpaRepository.findUpcomingMeetupsByUser(userIdx);
-    }
-
-    @Override
     public List<MeetupParticipants> findActiveUpcomingMeetupsByUser(Long userIdx) {
         return jpaRepository.findActiveUpcomingMeetupsByUser(userIdx);
     }

@@ -112,7 +112,7 @@ npm test
 
 **스키마의 유일한 정본은 `backend/main/resources/db/migration/V*.sql` 이다.** 앱이 기동할 때 Flyway가 로컬·도커·CI에 동일하게 적용한다.
 
-- **스키마를 바꾸려면** `db/migration/V5__무엇을_바꾸는지.sql` 처럼 **다음 번호로** 새 파일을 추가한다. **이미 적용된 파일(V1~V4)은 수정하지 말 것** — Flyway가 체크섬을 검사해 기동에 실패한다.
+- **스키마를 바꾸려면** `db/migration/V8__무엇을_바꾸는지.sql` 처럼 **다음 번호로** 새 파일을 추가한다. **이미 적용된 파일(V1~V7)은 수정하지 말 것** — Flyway가 체크섬을 검사해 기동에 실패한다.
 - **현재 적용된 마이그레이션:**
 
   | 버전 | 내용 |
@@ -121,6 +121,11 @@ npm test
   | `V2` | `carerequest` FULLTEXT (title, description) — 없어서 검색이 HTTP 500이었다 |
   | `V3` | `pets` (pet_type, is_deleted) 복합 — COUNT가 인덱스 머지로 19,667행을 읽던 것 |
   | `V4` | `users`(created_at) / `carerequest` 정렬·상태 인덱스 + `geo_point` POINT + SPATIAL + 트리거 |
+  | `V5` | `missing_pet_board` spatial 인덱스 |
+  | `V6` | `board.author_visible` 컬럼 + 커버링 인덱스 2종 + users 상태변경 동기화 트리거 |
+  | `V7` | 중복/죽은 인덱스 제거 — `pet_coin_escrow.uk_escrow_care_request`(uk_care_request와 완전 중복), `pets.idx_pets_type`/`idx_pets_deleted`(V3 복합 인덱스로 대체된 죽은 인덱스) |
+
+  ⚠️ 신규 docker 볼륨은 앱을 최소 한 번 부팅해야 Flyway가 V2~V7을 적용한다. `petory_app` 계정은 SUPER 권한이 없어 binlog가 켜진 상태에서 트리거 생성(V4, V6)이 `ERROR 1419`로 실패할 수 있다 — 그럴 땐 root로 `SET GLOBAL log_bin_trust_function_creators = 1;` 실행 후 재시도.
 - **엔티티도 같이 고쳐야 한다.** `ddl-auto=validate` 가 엔티티와 실제 스키마를 대조하므로, 어긋나면 앱이 기동에 실패한다(DDL은 실행하지 않으니 데이터는 안전).
 - `backend/main/resources/sql/migration/applied/` 는 Flyway 이전의 **이력 보관용**이며 실행되지 않는다. 여기에 새 파일을 넣지 말 것.
 - ⚠️ `ddl-auto=update` 를 절대 켜지 말 것 — 과거 `@Lob` 매핑 문제로 본문 컬럼이 `longtext → tinytext` 로 잘린 사고가 있었다.

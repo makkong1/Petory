@@ -37,10 +37,6 @@ public interface MissingPetBoardRepository {
 
     void deleteById(Long id);
 
-    List<MissingPetBoard> findAllByOrderByCreatedAtDesc();
-
-    List<MissingPetBoard> findByStatusOrderByCreatedAtDesc(MissingPetStatus status);
-
     Optional<MissingPetBoard> findByIdWithUser(Long id);
 
     /**

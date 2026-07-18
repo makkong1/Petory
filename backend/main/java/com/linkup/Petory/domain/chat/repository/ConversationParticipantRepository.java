@@ -3,10 +3,8 @@ package com.linkup.Petory.domain.chat.repository;
 import java.util.List;
 import java.util.Optional;
 
-import com.linkup.Petory.domain.chat.entity.Conversation;
 import com.linkup.Petory.domain.chat.entity.ConversationParticipant;
 import com.linkup.Petory.domain.chat.entity.ParticipantStatus;
-import com.linkup.Petory.domain.user.entity.Users;
 
 /**
  * ConversationParticipant 도메인 Repository 인터페이스입니다.
@@ -23,30 +21,11 @@ public interface ConversationParticipantRepository {
     void deleteById(Long id);
 
     /**
-     * 채팅방별 활성 참여자 조회
-     */
-    List<ConversationParticipant> findByConversationAndStatus(
-            Conversation conversation,
-            ParticipantStatus status);
-
-    /**
      * 채팅방 ID로 활성 참여자 조회
      */
     List<ConversationParticipant> findByConversationIdxAndStatus(
             Long conversationIdx,
             ParticipantStatus status);
-
-    /**
-     * 사용자별 활성 참여 채팅방 조회
-     */
-    List<ConversationParticipant> findActiveParticipationsByUser(Long userId);
-
-    /**
-     * 특정 채팅방의 특정 사용자 참여 정보 조회
-     */
-    Optional<ConversationParticipant> findByConversationAndUser(
-            Conversation conversation,
-            Users user);
 
     /**
      * 채팅방 ID와 사용자 ID로 조회
@@ -56,24 +35,9 @@ public interface ConversationParticipantRepository {
             Long userId);
 
     /**
-     * 읽지 않은 메시지가 있는 채팅방 조회
-     */
-    List<ConversationParticipant> findUnreadConversationsByUser(Long userId);
-
-    /**
-     * 읽지 않은 메시지 수 초기화
-     */
-    void markAsRead(Long conversationIdx, Long userId);
-
-    /**
      * 읽지 않은 메시지 수 증가
      */
     void incrementUnreadCount(Long conversationIdx, Long senderUserId);
-
-    /**
-     * 채팅방별 활성 참여자 수 조회 (배치) 반환값: List<Object[]> [conversationIdx, count]
-     */
-    List<Object[]> countActiveParticipantsByConversationIdxs(List<Long> conversationIdxs);
 
     /**
      * 특정 채팅방의 특정 상태 참여자 수 조회

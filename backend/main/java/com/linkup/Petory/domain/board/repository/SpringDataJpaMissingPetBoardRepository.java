@@ -28,14 +28,6 @@ import com.linkup.Petory.global.annotation.RepositoryMethod;
 // [리팩토링] Admin 페이징 DB 레벨 필터링을 위해 JpaSpecificationExecutor 추가
 public interface SpringDataJpaMissingPetBoardRepository extends JpaRepository<MissingPetBoard, Long>, JpaSpecificationExecutor<MissingPetBoard> {
 
-    @RepositoryMethod("실종 제보: 전체 목록 조회")
-    @Query("SELECT b FROM MissingPetBoard b JOIN FETCH b.user u WHERE b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY b.createdAt DESC")
-    List<MissingPetBoard> findAllByOrderByCreatedAtDesc();
-
-    @RepositoryMethod("실종 제보: 상태별 목록 조회")
-    @Query("SELECT b FROM MissingPetBoard b JOIN FETCH b.user u WHERE b.status = :status AND b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY b.createdAt DESC")
-    List<MissingPetBoard> findByStatusOrderByCreatedAtDesc(@Param("status") MissingPetStatus status);
-
     @RepositoryMethod("실종 제보: 단건 조회 (작성자 포함)")
     @Query("SELECT b FROM MissingPetBoard b JOIN FETCH b.user u WHERE b.idx = :id AND b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE'")
     Optional<MissingPetBoard> findByIdWithUser(@Param("id") Long id);

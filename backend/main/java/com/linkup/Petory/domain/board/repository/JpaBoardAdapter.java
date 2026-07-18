@@ -103,18 +103,8 @@ public class JpaBoardAdapter implements BoardRepository {
     }
 
     @Override
-    public Page<Board> findByCategoryAndIsDeletedFalseOrderByCreatedAtDesc(String category, Pageable pageable) {
-        return jpaRepository.findByCategoryAndIsDeletedFalseOrderByCreatedAtDesc(category, pageable);
-    }
-
-    @Override
     public List<Board> findByUserAndIsDeletedFalseOrderByCreatedAtDesc(Users user) {
         return jpaRepository.findByUserAndIsDeletedFalseOrderByCreatedAtDesc(user);
-    }
-
-    @Override
-    public Page<Board> searchByNicknameWithPaging(String nickname, Pageable pageable) {
-        return jpaRepository.searchByNicknameWithPaging(nickname, pageable);
     }
 
     @Override
