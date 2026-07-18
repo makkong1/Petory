@@ -17,6 +17,8 @@
 6. [배포 프로세스](./06-deployment-process.md)
 7. [모니터링 및 로깅](./07-monitoring-logging.md)
 8. [트러블슈팅](./08-troubleshooting.md)
+9. [모바일 (Capacitor)](./09-mobile-capacitor.md)
+10. [배포 전 보안 체크리스트 (Fly.io)](./10-predeploy-security-checklist.md) — 실코드 전수 확인 기준
 
 ---
 
