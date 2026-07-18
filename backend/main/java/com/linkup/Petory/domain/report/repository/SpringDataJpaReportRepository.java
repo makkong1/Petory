@@ -1,7 +1,6 @@
 package com.linkup.Petory.domain.report.repository;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -22,18 +21,6 @@ public interface SpringDataJpaReportRepository extends JpaRepository<Report, Lon
 
     @RepositoryMethod("신고: 중복 신고 여부 확인")
     boolean existsByTargetTypeAndTargetIdxAndReporterIdx(ReportTargetType targetType, Long targetIdx, Long reporterIdx);
-
-    @RepositoryMethod("신고: 전체 목록 조회")
-    List<Report> findAllByOrderByCreatedAtDesc();
-
-    @RepositoryMethod("신고: 상태별 목록 조회")
-    List<Report> findByStatusOrderByCreatedAtDesc(ReportStatus status);
-
-    @RepositoryMethod("신고: 대상 유형별 목록 조회")
-    List<Report> findByTargetTypeOrderByCreatedAtDesc(ReportTargetType targetType);
-
-    @RepositoryMethod("신고: 대상 유형+상태별 목록 조회")
-    List<Report> findByTargetTypeAndStatusOrderByCreatedAtDesc(ReportTargetType targetType, ReportStatus status);
 
     /**
      * 신고 목록 projection 페이징 조회 (관리자용). reporter/handledBy를 통째로 로딩하던 것을

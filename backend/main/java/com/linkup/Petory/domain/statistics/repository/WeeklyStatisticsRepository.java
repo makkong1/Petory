@@ -15,6 +15,4 @@ public interface WeeklyStatisticsRepository {
     Optional<WeeklyStatistics> findByYearAndWeekNumber(int year, int weekNumber);
 
     List<WeeklyStatistics> findByYearOrderByWeekNumberAsc(int year);
-
-    List<WeeklyStatistics> findByYearBetweenAndWeekNumberBetween(int startYear, int startWeek, int endYear, int endWeek);
 }

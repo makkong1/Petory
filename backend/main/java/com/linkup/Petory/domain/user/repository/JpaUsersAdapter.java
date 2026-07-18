@@ -106,11 +106,6 @@ public class JpaUsersAdapter implements UsersRepository {
     }
 
     @Override
-    public Optional<Users> findByRefreshToken(String refreshToken) {
-        return jpaRepository.findByRefreshToken(refreshToken);
-    }
-
-    @Override
     public Optional<Users> findActiveByRefreshToken(String refreshToken) {
         return jpaRepository.findActiveByRefreshToken(refreshToken);
     }
@@ -118,11 +113,6 @@ public class JpaUsersAdapter implements UsersRepository {
     @Override
     public long countByCreatedAtBetween(LocalDateTime start, LocalDateTime end) {
         return jpaRepository.countByCreatedAtBetween(start, end);
-    }
-
-    @Override
-    public long countByLastLoginAtBetween(LocalDateTime start, LocalDateTime end) {
-        return jpaRepository.countByLastLoginAtBetween(start, end);
     }
 
     @Override

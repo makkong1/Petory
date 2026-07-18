@@ -6,10 +6,8 @@ import java.util.Optional;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Repository;
 
-import com.linkup.Petory.domain.chat.entity.Conversation;
 import com.linkup.Petory.domain.chat.entity.ConversationParticipant;
 import com.linkup.Petory.domain.chat.entity.ParticipantStatus;
-import com.linkup.Petory.domain.user.entity.Users;
 
 import lombok.RequiredArgsConstructor;
 
@@ -48,29 +46,10 @@ public class JpaConversationParticipantAdapter implements ConversationParticipan
     }
 
     @Override
-    public List<ConversationParticipant> findByConversationAndStatus(
-            Conversation conversation,
-            ParticipantStatus status) {
-        return jpaRepository.findByConversationAndStatus(conversation, status);
-    }
-
-    @Override
     public List<ConversationParticipant> findByConversationIdxAndStatus(
             Long conversationIdx,
             ParticipantStatus status) {
         return jpaRepository.findByConversationIdxAndStatus(conversationIdx, status);
-    }
-
-    @Override
-    public List<ConversationParticipant> findActiveParticipationsByUser(Long userId) {
-        return jpaRepository.findActiveParticipationsByUser(userId);
-    }
-
-    @Override
-    public Optional<ConversationParticipant> findByConversationAndUser(
-            Conversation conversation,
-            Users user) {
-        return jpaRepository.findByConversationAndUser(conversation, user);
     }
 
     @Override
@@ -81,23 +60,8 @@ public class JpaConversationParticipantAdapter implements ConversationParticipan
     }
 
     @Override
-    public List<ConversationParticipant> findUnreadConversationsByUser(Long userId) {
-        return jpaRepository.findUnreadConversationsByUser(userId);
-    }
-
-    @Override
-    public void markAsRead(Long conversationIdx, Long userId) {
-        jpaRepository.markAsRead(conversationIdx, userId);
-    }
-
-    @Override
     public void incrementUnreadCount(Long conversationIdx, Long senderUserId) {
         jpaRepository.incrementUnreadCount(conversationIdx, senderUserId);
-    }
-
-    @Override
-    public List<Object[]> countActiveParticipantsByConversationIdxs(List<Long> conversationIdxs) {
-        return jpaRepository.countActiveParticipantsByConversationIdxs(conversationIdxs);
     }
 
     @Override

@@ -14,9 +14,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
 import com.linkup.Petory.domain.chat.entity.ChatMessage;
-import com.linkup.Petory.domain.chat.entity.Conversation;
-import com.linkup.Petory.domain.chat.entity.MessageType;
-import com.linkup.Petory.domain.user.entity.Users;
 
 import lombok.RequiredArgsConstructor;
 
@@ -88,28 +85,6 @@ public class JpaChatMessageAdapter implements ChatMessageRepository {
     @Override
     public List<ChatMessage> findByConversationIdxOrderByCreatedAtDesc(Long conversationIdx) {
         return jpaRepository.findByConversationIdxOrderByCreatedAtDesc(conversationIdx);
-    }
-
-    @Override
-    public ChatMessage findTopByConversationIdxOrderByCreatedAtDesc(Long conversationIdx) {
-        return jpaRepository.findTopByConversationIdxOrderByCreatedAtDesc(conversationIdx);
-    }
-
-    @Override
-    public List<ChatMessage> findBySenderAndIsDeletedFalseOrderByCreatedAtDesc(Users sender) {
-        return jpaRepository.findBySenderAndIsDeletedFalseOrderByCreatedAtDesc(sender);
-    }
-
-    @Override
-    public List<ChatMessage> findByConversationAndMessageTypeAndIsDeletedFalse(
-            Conversation conversation,
-            MessageType messageType) {
-        return jpaRepository.findByConversationAndMessageTypeAndIsDeletedFalse(conversation, messageType);
-    }
-
-    @Override
-    public Long countUnreadMessages(Long conversationIdx, Long userId) {
-        return jpaRepository.countUnreadMessages(conversationIdx, userId);
     }
 
     @Override

@@ -15,6 +15,4 @@ public interface SpringDataJpaMonthlyStatisticsRepository extends JpaRepository<
     Optional<MonthlyStatistics> findByYearAndMonth(int year, int month);
 
     List<MonthlyStatistics> findByYearOrderByMonthAsc(int year);
-
-    Optional<MonthlyStatistics> findTopByOrderByYearDescMonthDesc();
 }

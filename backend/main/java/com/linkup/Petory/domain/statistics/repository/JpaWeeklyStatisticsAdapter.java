@@ -35,10 +35,4 @@ public class JpaWeeklyStatisticsAdapter implements WeeklyStatisticsRepository {
     public List<WeeklyStatistics> findByYearOrderByWeekNumberAsc(int year) {
         return jpaRepository.findByYearOrderByWeekNumberAsc(year);
     }
-
-    @Override
-    public List<WeeklyStatistics> findByYearBetweenAndWeekNumberBetween(int startYear, int startWeek, int endYear,
-            int endWeek) {
-        return jpaRepository.findByYearBetweenAndWeekNumberBetween(startYear, startWeek, endYear, endWeek);
-    }
 }

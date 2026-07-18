@@ -5,7 +5,6 @@ import java.util.Optional;
 
 import com.linkup.Petory.domain.chat.entity.Conversation;
 import com.linkup.Petory.domain.chat.entity.ConversationStatus;
-import com.linkup.Petory.domain.chat.entity.ConversationType;
 import com.linkup.Petory.domain.chat.entity.RelatedType;
 
 /**
@@ -36,13 +35,6 @@ public interface ConversationRepository {
             ConversationStatus status);
 
     /**
-     * 채팅방 타입별 조회
-     */
-    List<Conversation> findByConversationTypeAndStatusAndIsDeletedFalse(
-            ConversationType conversationType,
-            ConversationStatus status);
-
-    /**
      * 관련 엔티티로 조회
      */
     Optional<Conversation> findByRelatedTypeAndRelatedIdxAndIsDeletedFalse(
@@ -62,11 +54,6 @@ public interface ConversationRepository {
     Optional<Conversation> findDirectConversationBetweenUsers(
             Long user1Idx,
             Long user2Idx);
-
-    /**
-     * 채팅방 참여자 수 조회 반환값: List<Object[]> [conversationIdx, count]
-     */
-    List<Object[]> countParticipantsByConversationIdxs(List<Long> conversationIdxs);
 
     /**
      * 비관적 락을 사용한 채팅방 조회 (동시성 제어용)

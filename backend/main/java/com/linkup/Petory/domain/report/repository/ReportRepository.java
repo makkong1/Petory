@@ -1,7 +1,6 @@
 package com.linkup.Petory.domain.report.repository;
 
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.domain.Page;
@@ -30,26 +29,6 @@ public interface ReportRepository {
      * 중복 신고 확인
      */
     boolean existsByTargetTypeAndTargetIdxAndReporterIdx(ReportTargetType targetType, Long targetIdx, Long reporterIdx);
-
-    /**
-     * 전체 신고 목록 조회 (최신순)
-     */
-    List<Report> findAllByOrderByCreatedAtDesc();
-
-    /**
-     * 상태별 신고 목록 조회
-     */
-    List<Report> findByStatusOrderByCreatedAtDesc(ReportStatus status);
-
-    /**
-     * 타겟 타입별 신고 목록 조회
-     */
-    List<Report> findByTargetTypeOrderByCreatedAtDesc(ReportTargetType targetType);
-
-    /**
-     * 타겟 타입과 상태별 신고 목록 조회
-     */
-    List<Report> findByTargetTypeAndStatusOrderByCreatedAtDesc(ReportTargetType targetType, ReportStatus status);
 
     /**
      * 필터 조건에 맞는 신고 목록 projection 페이징 조회 (관리자용)

@@ -11,9 +11,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.linkup.Petory.domain.chat.entity.ChatMessage;
-import com.linkup.Petory.domain.chat.entity.Conversation;
-import com.linkup.Petory.domain.chat.entity.MessageType;
-import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.global.annotation.RepositoryMethod;
 
 /**
@@ -79,30 +76,6 @@ public interface SpringDataJpaChatMessageRepository extends JpaRepository<ChatMe
             + "  AND s.isDeleted = false "
             + "ORDER BY m.createdAt DESC")
     List<ChatMessage> findByConversationIdxOrderByCreatedAtDesc(@Param("conversationIdx") Long conversationIdx);
-
-    @RepositoryMethod("채팅 메시지: 채팅방별 최신 메시지 조회")
-    @Query("SELECT m FROM ChatMessage m "
-            + "JOIN FETCH m.sender s "
-            + "WHERE m.conversation.idx = :conversationIdx "
-            + "  AND m.isDeleted = false "
-            + "  AND s.isDeleted = false "
-            + "ORDER BY m.createdAt DESC")
-    ChatMessage findTopByConversationIdxOrderByCreatedAtDesc(@Param("conversationIdx") Long conversationIdx);
-
-    @RepositoryMethod("채팅 메시지: 발신자별 조회")
-    List<ChatMessage> findBySenderAndIsDeletedFalseOrderByCreatedAtDesc(Users sender);
-
-    @RepositoryMethod("채팅 메시지: 채팅방+타입별 조회")
-    List<ChatMessage> findByConversationAndMessageTypeAndIsDeletedFalse(
-            Conversation conversation,
-            MessageType messageType);
-
-    @RepositoryMethod("채팅 메시지: 채팅방별 읽지 않은 메시지 수")
-    @Query("SELECT COUNT(m) FROM ChatMessage m "
-            + "WHERE m.conversation.idx = :conversationIdx "
-            + "  AND m.sender.idx != :userId "
-            + "  AND m.isDeleted = false")
-    Long countUnreadMessages(@Param("conversationIdx") Long conversationIdx, @Param("userId") Long userId);
 
     @RepositoryMethod("채팅 메시지: 채팅방별 최신 메시지 배치 조회")
     @Query("SELECT m FROM ChatMessage m "

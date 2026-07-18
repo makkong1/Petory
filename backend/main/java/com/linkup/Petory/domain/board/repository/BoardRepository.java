@@ -55,14 +55,8 @@ public interface BoardRepository {
     // 카테고리별 삭제되지 않은 게시글 조회 (최신순) - 작성자도 활성 상태여야 함
     List<Board> findByCategoryAndIsDeletedFalseOrderByCreatedAtDesc(String category);
 
-    // 카테고리별 삭제되지 않은 게시글 조회 (최신순) - 페이징 - 작성자도 활성 상태여야 함
-    Page<Board> findByCategoryAndIsDeletedFalseOrderByCreatedAtDesc(String category, Pageable pageable);
-
     // 사용자별 삭제되지 않은 게시글 조회 (최신순) - 작성자도 활성 상태여야 함
     List<Board> findByUserAndIsDeletedFalseOrderByCreatedAtDesc(Users user);
-
-    // 작성자 닉네임으로 검색 (페이징) - JOIN 쿼리로 최적화
-    Page<Board> searchByNicknameWithPaging(String nickname, Pageable pageable);
 
     // ── [오버페칭 제거] 목록 projection (작성자 3컬럼만) ──
     Page<BoardListItemDTO> findBoardListItems(Pageable pageable);

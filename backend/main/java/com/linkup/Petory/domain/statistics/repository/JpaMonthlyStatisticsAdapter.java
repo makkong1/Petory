@@ -35,9 +35,4 @@ public class JpaMonthlyStatisticsAdapter implements MonthlyStatisticsRepository 
     public List<MonthlyStatistics> findByYearOrderByMonthAsc(int year) {
         return jpaRepository.findByYearOrderByMonthAsc(year);
     }
-
-    @Override
-    public Optional<MonthlyStatistics> findTopByOrderByYearDescMonthDesc() {
-        return jpaRepository.findTopByOrderByYearDescMonthDesc();
-    }
 }
