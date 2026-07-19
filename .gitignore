@@ -23,6 +23,8 @@ bin/
 !**/backend/src/test/**/bin/
 docs/portfolio/
 docs/interview/
+docs/portfolio-source/
+docs/domain-page-drafts/
 
 ### IntelliJ IDEA ###
 .idea
