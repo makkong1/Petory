@@ -146,12 +146,14 @@ public class BoardController {
         return ResponseEntity.noContent().build();
     }
 
+    // 반응 대상 유저는 인증 주체다. 클라이언트가 보낸 userId 를 쓰면 남의 이름으로 반응을 조작할 수 있다.
     @PreAuthorize("isAuthenticated()")
     @PostMapping("/{boardId}/reactions")
     public ResponseEntity<ReactionSummaryDTO> reactToBoard(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable("boardId") Long boardId,
             @Valid @RequestBody ReactionRequest request) {
-        ReactionSummaryDTO summary = reactionService.reactToBoard(boardId, request.userId(),
+        ReactionSummaryDTO summary = reactionService.reactToBoard(boardId, userDetails.getIdx(),
                 request.reactionType());
         return ResponseEntity.ok(summary);
     }
@@ -159,10 +161,11 @@ public class BoardController {
     @PreAuthorize("isAuthenticated()")
     @PostMapping("/{boardId}/comments/{commentId}/reactions")
     public ResponseEntity<ReactionSummaryDTO> reactToComment(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable("boardId") Long boardId,
             @PathVariable("commentId") Long commentId,
             @Valid @RequestBody ReactionRequest request) {
-        ReactionSummaryDTO summary = reactionService.reactToComment(commentId, request.userId(),
+        ReactionSummaryDTO summary = reactionService.reactToComment(commentId, userDetails.getIdx(),
                 request.reactionType());
         return ResponseEntity.ok(summary);
     }

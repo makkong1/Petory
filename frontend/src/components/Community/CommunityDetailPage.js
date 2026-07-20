@@ -197,7 +197,6 @@ const CommunityDetailPage = ({
       try {
         setBoardError('');
         const response = await boardApi.reactToBoard(boardId, {
-          userId: user.idx,
           reactionType,
         });
         const summary = response.data;
@@ -389,7 +388,6 @@ const CommunityDetailPage = ({
       try {
         setCommentError('');
         const response = await boardApi.reactToComment(boardId, commentId, {
-          userId: user.idx,
           reactionType,
         });
         const summary = response.data;
