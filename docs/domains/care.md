@@ -256,6 +256,7 @@ Payment 상세는 [Payment 도메인](payment.md)과 [펫케어 코인 관련 �
 - `createEscrow()` 실패 시 현재 코드는 예외를 다시 던지지 않고 로그만 남긴다.
 - 따라서 코인 차감/에스크로 생성이 실패해도 채팅 거래 확정과 `IN_PROGRESS` 상태 전이는 유지될 수 있다.
 - 운영 정책상 결제 실패 시 매칭 자체를 롤백해야 한다면 이 지점은 개선 대상이다.
+- ⚠️ **5~10단계(CARE_REQUEST 분기)는 현재 운영 흐름에서 도달 불가능하다.** 채팅방을 만드는 유일한 경로인 `ConversationService.createCareRequestConversation()`은 항상 `relatedType = CARE_APPLICATION`으로 방을 생성하며, 코드 전체에서 `RelatedType.CARE_REQUEST`는 비교문에만 있고 값으로 대입되는 곳이 없다. 실제로 생성되는 `CARE_APPLICATION` 분기는 로그만 남기고 상태 전이·에스크로 생성을 하지 않는다. 자세한 내용은 [chat.md §6.1·§9](chat.md)를 본다.
 
 ## 10. 자동 완료 스케줄러
 
@@ -424,6 +425,7 @@ Statistics:
 ## 16. 한계와 개선
 
 - 별도 사용자-facing 케어 지원 신청/승인 API가 없다. 현재 매칭 전이는 채팅 거래 확정에 강하게 묶여 있다.
+- `confirmCareDeal()`의 `RelatedType.CARE_REQUEST` 분기(상태 전이·에스크로 생성)는 채팅방 생성 경로가 항상 `CARE_APPLICATION`만 만들기 때문에 현재 도달 불가능하다(§9 참고). `CARE_REQUEST`/`CARE_APPLICATION` 연결 정책을 정리해야 한다.
 - 채팅 거래 확정에서 에스크로 생성 실패를 롤백하지 않는다.
 - 케어 댓글 작성과 리뷰 작성은 요청 DTO의 사용자 ID를 사용하고, 인증 사용자와의 일치 검증이 약하다.
 - 리뷰는 완료 상태가 아니라 `CareApplication.ACCEPTED`만 요구한다.

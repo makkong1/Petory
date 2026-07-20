@@ -187,7 +187,9 @@ Board 도메인은 Petory 커뮤니티 게시글, 일반 댓글, 게시글/댓�
 
 정책:
 
-- `viewerId`가 없으면 조회수를 증가시킨다.
+- `viewerId`는 클라이언트 파라미터가 아니라 인증 주체(JWT, `CustomUserDetails`)에서 컨트롤러가 주입한다.
+- `viewerId`가 없으면(비로그인) 조회수를 증가시키지 **않는다** — 조회자를 특정 못 하면 중복 방지가 불가능하기 때문.
+  - ⚠️ 과거엔 컨트롤러가 클라이언트가 보낸 `viewerId` 파라미터를 그대로 썼고, 식별 실패 시 `true`를 반환해 `viewerId`를 빼고 반복 호출하는 것만으로 조회수가 무한 증가하는 취약점이 있었다. 지금은 고쳐졌다 (`BoardService.java:474` 주석 참고).
 - `viewerId`가 있으면 `BoardViewLog`에 `boardId + userId` 기록을 `insertIgnore`로 넣는다.
 - insert 성공 시에만 `board.viewCount`를 DB update로 증가시킨다.
 - 이미 조회한 사용자면 조회수를 증가시키지 않는다.
@@ -380,8 +382,8 @@ Admin/Report:
 ## 15. 한계와 개선
 
 - 사용자용 `BoardController`에는 댓글 수정 endpoint가 없다. 서비스에는 `updateComment()`가 구현되어 있다.
-- reaction 요청 body의 `userId`를 사용한다. 현재 로그인 사용자와 일치하는지 서비스에서 별도 검증하지 않는다.
-- 조회수 중복 방지는 `viewerId` 파라미터 기반이다. 인증 컨텍스트 기반 자동 추출이 아니므로 클라이언트가 값을 넘기지 않으면 비로그인 조회처럼 증가한다.
+- (해결됨) reaction(`POST /{boardId}/reactions`, `POST /{boardId}/comments/{commentId}/reactions`)도 조회수와 같은 문제였다 — body의 `userId`를 그대로 서비스에 넘겨 남의 ID로 반응을 조작할 수 있었다. 대상 유저를 `@AuthenticationPrincipal CustomUserDetails`(JWT)에서 주입하도록 고쳤고, `ReactionRequest`에서 `userId` 필드를 제거했다.
+- (해결됨) 조회수 중복 방지는 인증 컨텍스트(JWT)에서 `viewerId`를 주입하도록 고쳐졌다 — 비로그인은 조회수를 아예 증가시키지 않는다(§7 참고). 과거 클라이언트 파라미터 기반 시절엔 이 값을 생략하는 것만으로 조회수를 무한 증가시킬 수 있었다.
 - 컨트롤러의 `permitAll()`과 보안 설정의 `/api/**` 인증 정책이 어긋날 수 있다.
 - 게시글 상세 캐시는 현재 실시간 조회수 반영을 위해 제거되어 있다. 캐시 재도입 시 조회수/반응/댓글 count 무효화 전략이 필요하다.
 - 인기글 병렬 집계는 기본 `ForkJoinPool`을 사용한다. 부하가 커지면 전용 executor 검토가 필요하다.

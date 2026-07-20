@@ -567,7 +567,6 @@ const CommunityBoard = () => {
 
     try {
       const response = await boardApi.reactToBoard(boardId, {
-        userId: user.idx,
         reactionType,
       });
       const summary = response.data;
