@@ -70,7 +70,7 @@ public class PublicDataApiClient {
 
     private final RestClient restClient;
 
-    @Value("${app.public-data.base-url}")
+    @Value("${app.public-data.base-url:https://api.odcloud.kr/api/15111389/v1/uddi:41944402-8249-4e45-9e9d-a52d0a7db1cc}")
     private String baseUrl;
 
     @Value("${app.public-data.service-key:}")
