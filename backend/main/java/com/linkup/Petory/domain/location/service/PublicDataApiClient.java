@@ -1,6 +1,8 @@
 package com.linkup.Petory.domain.location.service;
 
 import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -113,12 +115,15 @@ public class PublicDataApiClient {
      * 단일 페이지 조회 (실패 시 최대 {@link #MAX_RETRIES}회 재시도).
      */
     public PublicDataApiPage fetchPage(int page) {
+        // 디코딩 서비스키에는 '+','/','=' 가 들어있다. '+'는 쿼리에서 공백으로 해석되므로
+        // 반드시 퍼센트 인코딩(+→%2B)한 뒤 build(true)로 재인코딩을 막는다.
+        String encodedKey = URLEncoder.encode(serviceKey, StandardCharsets.UTF_8);
         URI uri = UriComponentsBuilder.fromUriString(baseUrl)
                 .queryParam("page", page)
                 .queryParam("perPage", pageSize)
                 .queryParam("returnType", "JSON")
-                .queryParam("serviceKey", serviceKey)
-                .build()
+                .queryParam("serviceKey", encodedKey)
+                .build(true)
                 .toUri();
 
         RestClientException last = null;
