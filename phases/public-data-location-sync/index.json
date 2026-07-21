@@ -1,0 +1,27 @@
+{
+  "task": "public-data-location-sync",
+  "description": "공공데이터포털(한국문화정보원 반려동물 동반가능 문화시설, data 15111389) odcloud 오픈API를 주기적으로 호출해 location_service 테이블에 멱등 upsert 하는 데이터 파이프라인. 스케줄러 자동 실행 + 관리자 수동 트리거 + 실행이력(location_sync_log) 추적.",
+  "spec": "docs/superpowers/specs/2026-07-21-public-data-location-sync-design.md",
+  "steps": [
+    {
+      "step": 1,
+      "name": "DB 레이어: V8 마이그레이션 + LocationSyncLog 엔티티/리포지토리",
+      "status": "pending"
+    },
+    {
+      "step": 2,
+      "name": "PublicDataApiClient: odcloud 오픈API 페이징 호출 + 한글 키 → PublicDataLocationDTO 매핑",
+      "status": "pending"
+    },
+    {
+      "step": 3,
+      "name": "PublicDataSyncService + BatchWriter upsert 확장: 신규 INSERT / 변경 UPDATE / 무변경 skip + 실행이력 기록",
+      "status": "pending"
+    },
+    {
+      "step": 4,
+      "name": "PublicDataSyncScheduler(@Scheduled) + AdminLocationController 수동 트리거 엔드포인트",
+      "status": "pending"
+    }
+  ]
+}

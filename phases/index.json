@@ -1,68 +1,72 @@
 {
-  "phases": [
-    {
-      "dir": "mock-task",
-      "status": "pending"
-    },
-    {
-      "dir": "meetup-backend-refactor",
-      "status": "completed"
-    },
-    {
-      "dir": "map-layout-redesign",
-      "status": "pending"
-    },
-    {
-      "dir": "meetup-db-fixes",
-      "status": "pending"
-    },
-    {
-      "dir": "homepage-live-data",
-      "status": "pending"
-    },
-    {
-      "dir": "homepage-ranking-algorithm",
-      "status": "pending"
-    },
-    {
-      "dir": "facility-sync-petory",
-      "status": "pending"
-    },
-    {
-      "dir": "pet-recommend-nlp",
-      "status": "completed"
-    },
-    {
-      "dir": "place-tag-batch",
-      "status": "pending"
-    },
-    {
-      "dir": "nlp-traffic-policy",
-      "status": "pending"
-    },
-    {
-      "dir": "intent-routing-phase0",
-      "status": "pending"
-    },
-    {
-      "dir": "pet-health-alert-mvp",
-      "status": "pending"
-    },
-    {
-      "dir": "statistics-bug-fix",
-      "status": "completed"
-    },
-    {
-      "dir": "statistics-login-events",
-      "status": "completed"
-    },
-    {
-      "dir": "sanction-domain-enforcement",
-      "status": "pending"
-    },
-    {
-      "dir": "review-critical-fixes",
-      "status": "completed"
-    }
-  ]
+    "phases": [
+        {
+            "dir": "mock-task",
+            "status": "pending"
+        },
+        {
+            "dir": "meetup-backend-refactor",
+            "status": "completed"
+        },
+        {
+            "dir": "map-layout-redesign",
+            "status": "pending"
+        },
+        {
+            "dir": "meetup-db-fixes",
+            "status": "pending"
+        },
+        {
+            "dir": "homepage-live-data",
+            "status": "pending"
+        },
+        {
+            "dir": "homepage-ranking-algorithm",
+            "status": "pending"
+        },
+        {
+            "dir": "facility-sync-petory",
+            "status": "pending"
+        },
+        {
+            "dir": "pet-recommend-nlp",
+            "status": "completed"
+        },
+        {
+            "dir": "place-tag-batch",
+            "status": "pending"
+        },
+        {
+            "dir": "nlp-traffic-policy",
+            "status": "pending"
+        },
+        {
+            "dir": "intent-routing-phase0",
+            "status": "pending"
+        },
+        {
+            "dir": "pet-health-alert-mvp",
+            "status": "pending"
+        },
+        {
+            "dir": "statistics-bug-fix",
+            "status": "completed"
+        },
+        {
+            "dir": "statistics-login-events",
+            "status": "completed"
+        },
+        {
+            "dir": "sanction-domain-enforcement",
+            "status": "pending"
+        },
+        {
+            "dir": "review-critical-fixes",
+            "status": "completed"
+        },
+        {
+            "dir": "public-data-location-sync",
+            "status": "pending"
+        }
+    ]
 }
