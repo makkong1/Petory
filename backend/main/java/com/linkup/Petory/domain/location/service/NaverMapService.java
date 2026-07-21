@@ -1,5 +1,6 @@
 package com.linkup.Petory.domain.location.service;
 
+import java.net.URI;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -168,11 +169,13 @@ public class NaverMapService {
 
             // 네이버맵 Geocoding API URL (지오코딩) - 공식 문서에 따름
             // 공식 엔드포인트: https://maps.apigw.ntruss.com/map-geocode/v2/geocode
-            String url = UriComponentsBuilder
+            // URI 객체로 넘겨야 함 — 문자열로 넘기면 RestClient가 이미 인코딩된 값을 다시 인코딩해 한글 쿼리가 깨짐
+            URI url = UriComponentsBuilder
                     .fromUriString("https://maps.apigw.ntruss.com/map-geocode/v2/geocode")
                     .queryParam("query", cleanedAddress)
                     .encode() // URL 인코딩 자동 처리
-                    .toUriString();
+                    .build()
+                    .toUri();
 
             log.info("📡 [NaverMapService] API 호출 시작...");
             Map<String, Object> responseBody = restClient.get()
@@ -272,11 +275,12 @@ public class NaverMapService {
         try {
             String cleanedQuery = query.replace("+", " ").replaceAll("\\s+", " ").trim();
 
-            String url = UriComponentsBuilder
+            URI url = UriComponentsBuilder
                     .fromUriString("https://maps.apigw.ntruss.com/map-geocode/v2/geocode")
                     .queryParam("query", cleanedQuery)
                     .encode()
-                    .toUriString();
+                    .build()
+                    .toUri();
 
             Map<String, Object> responseBody = restClient.get()
                     .uri(url)

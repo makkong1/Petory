@@ -16,10 +16,12 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.linkup.Petory.domain.location.dto.LocationServiceDTO;
 import com.linkup.Petory.domain.location.dto.LocationServiceLoadResponse;
+import com.linkup.Petory.domain.location.entity.LocationSyncLog;
 import com.linkup.Petory.domain.location.service.LocationServiceAdminService;
 import com.linkup.Petory.domain.location.service.LocationServiceService;
 import com.linkup.Petory.domain.location.service.PublicDataLocationService;
 import com.linkup.Petory.domain.location.service.PublicDataLocationService.BatchImportResult;
+import com.linkup.Petory.domain.location.service.PublicDataSyncService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -43,6 +45,7 @@ public class AdminLocationController {
     private final LocationServiceAdminService locationServiceAdminService;
     private final LocationServiceService locationServiceService;
     private final PublicDataLocationService publicDataLocationService;
+    private final PublicDataSyncService publicDataSyncService;
 
     /**
      * 지역서비스 목록 조회 (관리자용)
@@ -183,5 +186,28 @@ public class AdminLocationController {
                             .error(1)
                             .build());
         }
+    }
+
+    /**
+     * 공공데이터 오픈API를 즉시 호출해 시설 데이터를 upsert 한다. [MASTER]
+     * 실행 결과 요약(상태·신규·갱신·스킵·실패 건수)을 반환한다.
+     */
+    @PostMapping("/sync-public-data")
+    @PreAuthorize("hasRole('MASTER')")
+    public ResponseEntity<Map<String, Object>> syncPublicData() {
+        LocationSyncLog result = publicDataSyncService.syncFromApi(LocationSyncLog.SyncTriggerType.MANUAL);
+        Map<String, Object> body = new HashMap<>();
+        body.put("status", result.getStatus().name());
+        body.put("totalFetched", result.getTotalFetched());
+        body.put("inserted", result.getInserted());
+        body.put("updated", result.getUpdated());
+        body.put("skipped", result.getSkipped());
+        body.put("failed", result.getFailed());
+        body.put("startedAt", result.getStartedAt());
+        body.put("finishedAt", result.getFinishedAt());
+        if (result.getErrorMessage() != null) {
+            body.put("errorMessage", result.getErrorMessage());
+        }
+        return ResponseEntity.ok(body);
     }
 }
