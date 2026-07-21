@@ -1,0 +1,14 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  # Spring Boot Actuator (JVM, HTTP 요청, DB 커넥션풀 등)
+  - job_name: petory-app
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["app:8080"]
+
+  # MySQL 지표 (쿼리 수, 커넥션, 슬로우 쿼리, InnoDB 버퍼풀 등)
+  - job_name: mysql
+    static_configs:
+      - targets: ["mysqld-exporter:9104"]

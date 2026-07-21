@@ -90,6 +90,54 @@ services:
       retries: 3
       start_period: 60s
 
+  # ── 모니터링 (로컬 전용, 배포 인프라 아님) ──
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: petory-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      - app
+
+  mysqld-exporter:
+    image: prom/mysqld-exporter:latest
+    container_name: petory-mysqld-exporter
+    restart: unless-stopped
+    environment:
+      DB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+    entrypoint: ["/bin/sh", "-c"]
+    # 0.15+부터 DATA_SOURCE_NAME 환경변수 지원이 빠져서 .my.cnf 파일 방식으로 인증
+    command:
+      - |
+        cat > /tmp/.my.cnf <<EOF
+        [client]
+        user=root
+        password=$$DB_ROOT_PASSWORD
+        host=mysql
+        port=3306
+        EOF
+        exec mysqld_exporter --config.my-cnf=/tmp/.my.cnf
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: petory-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+
   nginx:
     image: nginx:alpine
     container_name: petory-nginx
@@ -116,3 +164,4 @@ volumes:
   uploads:
   nginx_logs:
   nlp_model_cache:
+  grafana_data:
