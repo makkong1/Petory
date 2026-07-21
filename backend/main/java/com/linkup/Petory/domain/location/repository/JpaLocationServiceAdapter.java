@@ -59,6 +59,11 @@ public class JpaLocationServiceAdapter implements LocationServiceRepository {
     }
 
     @Override
+    public Optional<LocationService> findFirstByNameAndAddress(String name, String address) {
+        return jpaRepository.findByNameAndAddress(name, address).stream().findFirst();
+    }
+
+    @Override
     public List<LocationService> findByRadius(Double latitude, Double longitude, Double radiusInMeters,
             String keyword, String category, String sort, int limit) {
         return jpaRepository.findByRadius(latitude, longitude, radiusInMeters, keyword, category, sort, limit);
