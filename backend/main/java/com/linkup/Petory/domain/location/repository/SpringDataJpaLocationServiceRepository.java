@@ -64,6 +64,12 @@ public interface SpringDataJpaLocationServiceRepository extends JpaRepository<Lo
             + "ls.isDeleted = false")
     boolean existsByNameAndAddress(@Param("name") String name, @Param("address") String address);
 
+    @RepositoryMethod("장소 서비스: 이름+주소로 조회(업서트용)")
+    @Query("SELECT ls FROM LocationService ls WHERE "
+            + "ls.name = :name AND ls.address = :address AND "
+            + "ls.isDeleted = false")
+    List<LocationService> findByNameAndAddress(@Param("name") String name, @Param("address") String address);
+
     // spatial index를 실제로 잘 타고 있음
     // ST_Within + ST_Distance_Sphere 조합이 망하지 않음
     // LIKE '%??%'가 인덱스를 못 타더라도, 이미 반경 후보가 줄어든 뒤라 피해가 제한적임

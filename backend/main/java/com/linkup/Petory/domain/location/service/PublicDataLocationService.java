@@ -387,7 +387,7 @@ public class PublicDataLocationService {
     /**
      * DTO 유효성 검증
      */
-    private boolean isValid(PublicDataLocationDTO dto) {
+    boolean isValid(PublicDataLocationDTO dto) {
         // 최소한 시설명과 주소 중 하나는 있어야 함
         if (!StringUtils.hasText(dto.getFacilityName())) {
             return false;
@@ -398,7 +398,7 @@ public class PublicDataLocationService {
     /**
      * 중복 체크용 키 생성
      */
-    private String buildDedupKey(PublicDataLocationDTO dto) {
+    String buildDedupKey(PublicDataLocationDTO dto) {
         String name = dto.getFacilityName() != null ? dto.getFacilityName() : "";
         String address = dto.getRoadAddress() != null ? dto.getRoadAddress()
                 : (dto.getJibunAddress() != null ? dto.getJibunAddress() : "");
@@ -422,7 +422,7 @@ public class PublicDataLocationService {
      * DTO를 엔티티로 변환 구조: 1) 모든 값 검증 및 파싱 먼저 수행, 2) 마지막에 엔티티 생성 이렇게 하면 파싱 실패 시 영속성
      * 컨텍스트에 엔티티가 들어가지 않음
      */
-    private LocationService convertToEntity(PublicDataLocationDTO dto) {
+    LocationService convertToEntity(PublicDataLocationDTO dto) {
         // ============================================
         // 1단계: 모든 값 검증 및 파싱 (엔티티 생성 전)
         // ============================================

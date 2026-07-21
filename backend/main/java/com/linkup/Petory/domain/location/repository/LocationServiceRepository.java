@@ -44,6 +44,11 @@ public interface LocationServiceRepository {
     boolean existsByNameAndAddress(String name, String address);
 
     /**
+     * 이름과 주소로 첫 번째 미삭제 서비스 조회 (업서트용)
+     */
+    Optional<LocationService> findFirstByNameAndAddress(String name, String address);
+
+    /**
      * 반경 검색 (ST_Distance_Sphere 사용, keyword·category 필터 포함)
      */
     List<LocationService> findByRadius(Double latitude, Double longitude, Double radiusInMeters,
