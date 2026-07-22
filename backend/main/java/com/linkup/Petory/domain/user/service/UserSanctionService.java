@@ -43,7 +43,14 @@ public class UserSanctionService {
 
         Users admin = adminId != null ? usersRepository.findById(adminId).orElse(null) : null;
 
-        // 경고 추가
+        // 경고 횟수 원자적 증가 (동시성 문제 해결)
+        // ⚠️ FK INSERT(아래 sanction 저장)보다 먼저 실행한다. sanction INSERT는 FK 때문에
+        //    users 행에 S락을 잡고, 이 UPDATE는 같은 행에 X락이 필요하다. 순서가 반대면
+        //    동시 요청들이 모두 S락을 쥔 채 X락 승격을 노려 데드락이 난다. UPDATE를 먼저 실행해
+        //    X락을 선점하면 요청들이 순차 처리되어 데드락이 사라진다. (같은 트랜잭션이라 순서만 바꿔도 안전)
+        usersRepository.incrementWarningCount(userId);
+
+        // 경고 기록 추가
         UserSanction warning = UserSanction.builder()
                 .user(user)
                 .sanctionType(UserSanction.SanctionType.WARNING)
@@ -56,9 +63,6 @@ public class UserSanctionService {
                 .build();
 
         sanctionRepository.save(warning);
-
-        // 경고 횟수 원자적 증가 (동시성 문제 해결)
-        usersRepository.incrementWarningCount(userId);
 
         // 업데이트된 사용자 정보 다시 조회
         user = usersRepository.findById(userId)

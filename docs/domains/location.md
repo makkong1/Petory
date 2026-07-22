@@ -20,6 +20,7 @@ Location 도메인은 반려동물 관련 장소 데이터를 검색하고, 지�
 - 리뷰 평균 평점과 리뷰 수 캐시 갱신
 - 주소 검색, 주소-좌표 변환, 좌표-주소 변환, 길찾기
 - 관리자용 위치 서비스 목록 조회와 공공데이터 CSV 임포트
+- 공공데이터 오픈API(data.go.kr odcloud) 기반 시설 데이터 주기 동기화(스케줄러 + 관리자 수동 트리거, 멱등 upsert)
 
 비범위:
 
@@ -42,7 +43,12 @@ Location 도메인은 반려동물 관련 장소 데이터를 검색하고, 지�
 | 지오코딩 컨트롤러          | `backend/main/java/com/linkup/Petory/domain/location/controller/GeocodingController.java`                    |
 | Naver Maps 연동            | `backend/main/java/com/linkup/Petory/domain/location/service/NaverMapService.java`                           |
 | 관리자 Location API        | `backend/main/java/com/linkup/Petory/domain/admin/controller/AdminLocationController.java`                   |
-| 공공데이터 적재            | `backend/main/java/com/linkup/Petory/domain/location/service/PublicDataLocationService.java`                 |
+| 공공데이터 CSV 적재        | `backend/main/java/com/linkup/Petory/domain/location/service/PublicDataLocationService.java`                 |
+| 공공데이터 오픈API 클라이언트 | `backend/main/java/com/linkup/Petory/domain/location/service/PublicDataApiClient.java`                       |
+| 공공데이터 동기화 서비스   | `backend/main/java/com/linkup/Petory/domain/location/service/PublicDataSyncService.java`                     |
+| 공공데이터 동기화 스케줄러 | `backend/main/java/com/linkup/Petory/domain/location/service/PublicDataSyncScheduler.java`                   |
+| 배치 저장 writer           | `backend/main/java/com/linkup/Petory/domain/location/service/LocationServiceBatchWriter.java`                |
+| 동기화 실행이력 엔티티     | `backend/main/java/com/linkup/Petory/domain/location/entity/LocationSyncLog.java`                            |
 
 ## 3. 검색 API
 
@@ -271,14 +277,25 @@ WHERE idx = :serviceIdx
 
 관리자 API는 `/api/admin/location-services` 아래에 있다.
 
-| API                                                         | 권한              | 설명                   |
-| ----------------------------------------------------------- | ----------------- | ---------------------- |
-| `GET /api/admin/location-services`                          | `ADMIN`, `MASTER` | 위치 서비스 목록 조회  |
-| `POST /api/admin/location-services/load-data`               | `MASTER`          | 초기 데이터 로드       |
-| `POST /api/admin/location-services/import-public-data`      | `MASTER`          | CSV 파일 업로드 임포트 |
-| `POST /api/admin/location-services/import-public-data-path` | `MASTER`          | CSV 파일 경로 임포트   |
+| API                                                         | 권한              | 설명                        |
+| ----------------------------------------------------------- | ----------------- | --------------------------- |
+| `GET /api/admin/location-services`                          | `ADMIN`, `MASTER` | 위치 서비스 목록 조회       |
+| `POST /api/admin/location-services/load-data`               | `MASTER`          | 초기 데이터 로드            |
+| `POST /api/admin/location-services/import-public-data`      | `MASTER`          | CSV 파일 업로드 임포트      |
+| `POST /api/admin/location-services/import-public-data-path` | `MASTER`          | CSV 파일 경로 임포트        |
+| `POST /api/admin/location-services/sync-public-data`        | `MASTER`          | 공공데이터 오픈API 동기화(수동 트리거) |
 
-CSV 업로드는 확장자, Content-Type, 최대 크기 200MB를 검증한다. 공공데이터 적재는 `PublicDataLocationService`가 처리하고, 배치 저장은 별도 writer를 통해 트랜잭션을 분리한다.
+CSV 업로드는 확장자, Content-Type, 최대 크기 200MB를 검증한다. CSV 적재는 `PublicDataLocationService`가 처리하고, 배치 저장은 별도 writer(`LocationServiceBatchWriter`, `@Transactional(REQUIRES_NEW)`)를 통해 트랜잭션을 분리한다.
+
+### 공공데이터 오픈API 동기화 파이프라인
+
+CSV 수동 업로드와 별개로, data.go.kr odcloud 오픈API(한국문화정보원 반려동물 동반가능 문화시설, 7만여 건)를 주기적으로 받아 `location_service`에 **멱등 upsert** 하는 자동 파이프라인이 있다.
+
+- **트리거 2종**: `PublicDataSyncScheduler`가 매일 03:00 자동 실행(`@Scheduled`, `SchedulingConfig`의 `petory.scheduling.enabled`가 중앙 게이팅) + 위 `POST .../sync-public-data`로 관리자 수동 실행.
+- **수집**: `PublicDataApiClient.fetchAll()`이 `page`/`perPage`로 전체 페이지를 순회한다. 응답의 한글 컬럼키(공백·괄호 포함 31개)를 정규화(`normalizeKey`)해 `PublicDataLocationDTO`로 매핑한다. 페이지 호출 실패 시 최대 2회 재시도한다. 서비스키의 `+`는 URL 인코딩(`URLEncoder` + `build(true)`)으로 공백 오해석을 막는다.
+- **upsert**: `PublicDataSyncService`가 시설명+주소(`findFirstByNameAndAddress`)로 기존 행을 조회해 없으면 INSERT, 내용이 바뀌었으면 UPDATE, 동일하면 skip 한다. UPDATE는 신규 엔티티로 덮어쓰지 않고 **공공데이터 필드만 복사**(`copyPublicFields`)해, 앱 관리 필드(`rating`, `reviewCount`, `isDeleted`, `geo_point`, `createdAt`)를 보존한다.
+- **실행이력**: run 당 1행을 `location_sync_log`(V8 마이그레이션)에 기록한다 — 시작/종료 시각, 상태(`SUCCESS`/`PARTIAL`/`FAILED`), 조회/신규/갱신/스킵/실패 건수, 트리거 종류. API 전체 실패는 `FAILED`, 일부 배치 실패는 `PARTIAL`이다.
+- **설정**: `app.public-data.base-url`(기본값 = 고정 odcloud 엔드포인트), `app.public-data.service-key`(비우면 동기화만 실패하고 앱은 정상 기동), `app.public-data.page-size`. 서비스키는 gitignore된 로컬 설정/`.env`에만 둔다.
 
 ## 13. 추천 도메인 연동
 
@@ -309,6 +326,8 @@ Location 검색어는 `LocationSearchPerformedEvent`로 추천 도메인에 전�
 ## 15. 관련 문서
 
 - [위치 기반 서비스 아키텍처](<../architecture/location/위치 기반 서비스 아키텍처.md>)
+- [위치서비스 공공데이터 CSV 배치 임포트 구현](<../architecture/location/위치서비스_공공데이터_CSV_배치_임포트_구현.md>)
+- [위치서비스 공공데이터 오픈API 동기화 파이프라인](<../architecture/location/위치서비스_공공데이터_오픈API_동기화_파이프라인.md>)
 - [Location 지도 결과 안정성 리팩토링](../refactoring/location/지도-결과-안정성-리팩토링.md)
 - [Location 프론트 검색 워크플로우 정리](../refactoring/location/지도-검색-워크플로우-정리.md)
 - [주변서비스 현행 vs 설계안 비교](../refactoring/location/주변서비스-현행vs설계안-비교.md)
