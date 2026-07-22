@@ -166,6 +166,7 @@ class UserSanctionServiceConcurrencyTest {
         CountDownLatch latch = new CountDownLatch(adminCount);
 
         List<Integer> warningCounts = new ArrayList<>();
+        AtomicInteger successCount = new AtomicInteger(0);
         List<Long> adminIds = List.of(admin1.getIdx(), admin2.getIdx(), admin3.getIdx(),
                 admin1.getIdx(), admin2.getIdx());
 
@@ -182,6 +183,7 @@ class UserSanctionServiceConcurrencyTest {
                             "Lost Update 테스트 " + adminIndex,
                             adminIds.get(adminIndex),
                             null);
+                    successCount.incrementAndGet();
 
                     // 경고 부여 후 즉시 경고 횟수 확인
                     Users user = usersRepository.findById(testUser.getIdx()).orElse(null);
@@ -207,12 +209,20 @@ class UserSanctionServiceConcurrencyTest {
 
         long actualWarningCount = userSanctionRepository.countWarningsByUserId(testUser.getIdx());
 
+        System.out.println("성공한 경고 부여 수: " + successCount.get());
         System.out.println("최종 경고 횟수 (DB): " + finalUser.getWarningCount());
         System.out.println("실제 경고 기록 수: " + actualWarningCount);
         System.out.println("중간 경고 횟수들: " + warningCounts);
 
+        // 정합성: 경고 카운트 == 실제 WARNING 기록 수 (같은 트랜잭션이라 항상 성립)
         assertEquals((long) actualWarningCount, (long) finalUser.getWarningCount(),
-                "동시 요청 시 경고 횟수가 누락될 수 있습니다.");
+                "경고 횟수와 실제 경고 기록 수가 일치해야 함");
+        // [강화] 락 순서 수정 전에는 5개 중 4개가 데드락으로 실패했다.
+        //        수정 후에는 데드락 없이 5개 요청이 모두 반영돼야 한다.
+        assertEquals(adminCount, successCount.get(),
+                "동시 경고 요청이 데드락 없이 모두 성공해야 함");
+        assertEquals((long) adminCount, (long) finalUser.getWarningCount(),
+                "최종 경고 횟수가 요청 수와 같아야 함 (누락·데드락 없음)");
     }
 
     @Test
