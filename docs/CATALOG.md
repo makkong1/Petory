@@ -472,7 +472,7 @@
 > `domain-page-drafts/`(포트폴리오 V2 페이지 문구 점검)와 `interview/concepts/`(개념 횡단 정리) 둘 다 채우지 않는 자리 — 포트폴리오 흐름도 페이지(`/domains/flows`) 시퀀스 하나하나를 [코드 근거] + [포트폴리오 대응 위치·딥링크] + [예상질문·답변] 3단으로 도메인별 1파일씩 정리.
 
 - `interview/flows/README.md` — 폴더 목적, 기존 문서와의 역할 구분, 도메인별 진행 현황표.
-- `interview/flows/care.md` — Care 거래 확정 흐름(`confirmCareDeal` 비관적 락 → `CareApplication` 승인 → 에스크로 생성). 6개 설계 변천사(원인→해결→결과 형식) 포함 — Stuck State, 스케줄러 트랜잭션 경계, `updateStatus` 이중 락 회귀, 문서-코드 불일치 발견, 에스크로 크로스-유저 락 데드락(3-6, 프로브로 재현: 29/60→60/60)까지.
+- `interview/flows/care.md` — Care 거래 확정 흐름(`confirmCareDeal` 비관적 락 → `CareApplication` 승인 → 에스크로 생성). 5개 설계 변천사(원인→해결→결과 형식) 포함 — Stuck State, 스케줄러 트랜잭션 경계, `updateStatus` 이중 락 회귀, 문서-코드 불일치 발견까지.
 - `interview/flows/board.md` — Board 목록/상세/댓글/인기글 흐름. 3개 설계 변천사(N+1 301→3쿼리, 상세 캐시가 조회수 버그를 만든 사례, "인덱스 있는데도 안 쓰인" 옵티마이저 히스토그램 사건) + 반응 API의 userId 신뢰 문제 등 알려진 한계 포함.
 - `interview/flows/chat.md` — Chat(Care/MissingPet/Meetup 연계) 채팅방 생성·메시지·읽음 흐름. 4개 설계 변천사(IDOR 수정, self-invocation으로 REQUIRES_NEW 무시되던 버그, 읽음 처리가 죽은 코드였던 사례, N+1 41→4쿼리 + 측정도구 자체의 버그 발견) 포함.
 - `interview/flows/missing-pet.md` — Missing Pet 제보·목격 댓글·채팅 연결 흐름. N+1(267→4쿼리) + `orphanRemoval=true`가 소프트 삭제 정책과 충돌하던 사례 + Pageable 정렬이 하드코딩된 JPQL에 조용히 무시되는 한계 포함.
