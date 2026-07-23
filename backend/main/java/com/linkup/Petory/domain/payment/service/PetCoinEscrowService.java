@@ -16,6 +16,8 @@ import com.linkup.Petory.domain.payment.exception.PetCoinEscrowNotFoundException
 import com.linkup.Petory.domain.payment.event.PaymentRecordedEvent;
 import com.linkup.Petory.domain.payment.repository.PetCoinEscrowRepository;
 import com.linkup.Petory.domain.user.entity.Users;
+import com.linkup.Petory.domain.user.exception.UserNotFoundException;
+import com.linkup.Petory.domain.user.repository.UsersRepository;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,6 +33,7 @@ public class PetCoinEscrowService {
     private final PetCoinEscrowRepository escrowRepository;
     private final PetCoinService petCoinService;
     private final ApplicationEventPublisher eventPublisher;
+    private final UsersRepository usersRepository;
 
     /**
      * 에스크로 생성 (거래 확정 시)
@@ -54,6 +57,13 @@ public class PetCoinEscrowService {
                 .ifPresent(existing -> {
                     throw PaymentConflictException.escrowAlreadyExists();
                 });
+
+        // ⚠️ 크로스-유저 데드락 방지: requester/provider 두 행을 idx 오름차순으로 먼저 선점한다.
+        //    createEscrow는 deductCoins(requester)로 요청자 행에 X락을, escrow INSERT로 제공자 행에
+        //    FK 공유락을 잡는다. 서로 역할이 뒤바뀐 두 거래(A→B, B→A)가 동시에 실행되면 락 순서가
+        //    엇갈려 순환 대기(MySQL 1213 Deadlock)가 발생한다. 항상 낮은 idx부터 잠가 전역 락 순서를
+        //    통일하면 모든 거래가 같은 순서로 대기해 데드락이 사라진다.
+        lockUsersInOrder(requester, provider);
 
         // 요청자 코인 차감
         petCoinService.deductCoins(
@@ -163,5 +173,19 @@ public class PetCoinEscrowService {
     public PetCoinEscrow findByCareRequestForUpdate(CareRequest careRequest) {
         return escrowRepository.findByCareRequestForUpdate(careRequest)
                 .orElse(null);
+    }
+
+    /**
+     * 두 사용자 행을 idx 오름차순으로 비관적 락(X) 선점한다. 전역 락 순서를 통일해 크로스-유저 데드락을 방지한다.
+     */
+    private void lockUsersInOrder(Users first, Users second) {
+        long a = first.getIdx();
+        long b = second.getIdx();
+        long lo = Math.min(a, b);
+        long hi = Math.max(a, b);
+        usersRepository.findByIdForUpdate(lo).orElseThrow(UserNotFoundException::new);
+        if (hi != lo) {
+            usersRepository.findByIdForUpdate(hi).orElseThrow(UserNotFoundException::new);
+        }
     }
 }
