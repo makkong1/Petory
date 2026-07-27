@@ -184,6 +184,7 @@ frontend/src/
 | 테스트 | `.claude/skills/test.md` | 변경 코드 기반 테스트 자동 생성 (정상/예외/경계값 3종 필수, 동시성 테스트 포함) |
 | **순서(파이프라인)** | `.claude/skills/workflow.md` | review 이후 fix·refactor 분기 → test → commit → docs (분기·예외 규칙) |
 | DB 리뷰 | `.claude/skills/db-review.md` | N+1·인덱스 누락·트랜잭션 범위·동시성 제어 점검 (JPA/Repository 변경 시) |
+| DB 진단 | `.claude/skills/db-diagnose.md` | 측정으로 DB 문제 능동 진단: 증상→의심→계측→교차검증→해결(원인분석>검증>해결 루프). 측정 함정(조인이 카운트 축소·Statistics 과소보고·행락 미포착) 전제 |
 
 ## 개발 워크플로우 파이프라인
 
