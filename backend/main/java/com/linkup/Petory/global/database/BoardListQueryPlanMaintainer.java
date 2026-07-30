@@ -19,14 +19,16 @@ import lombok.extern.slf4j.Slf4j;
  * <p>
  * <b>문제</b>: {@code SpringDataJpaBoardRepository.findBoardListItems} 는 작성자가 탈퇴/정지된
  * 게시글을 숨기려고 {@code users} 를 조인한다. 그런데 {@code users.status} 에 값 분포 통계가 없으면
- * 옵티마이저는 {@code status = 'ACTIVE'} 가 1% 정도만 통과시킬 거라고 기본 추측한다. 실제로는 거의 100% 가
- * 통과하므로, 이 오판 하나 때문에 {@code users} 를 드라이빙 테이블로 골라 <b>매 페이지마다 전체 게시글을 임시테이블에
- * 쌓고 filesort 로 정렬</b>한다. (50,000행 기준 1페이지 0.17s)
+ * 옵티마이저는 {@code status = 'ACTIVE'} 가 1% 정도만 통과시킬 거라고 기본 추측한다(등호 술어당 10% 고정
+ * 상수 × 2개). 실제로는 92% 가 통과하므로, 이 93배 오판 하나 때문에 {@code users} 를 드라이빙 테이블로 골라
+ * <b>매 페이지마다 조인 결과 전체를 임시테이블에 쌓고 filesort 로 정렬</b>한다.
  *
  * <p>
  * <b>해결</b>: {@code users.status / is_deleted} 에 히스토그램을 만들어 실제 분포를 알려주면, 옵티마이저가
  * {@code board} 를 먼저 읽고 {@code idx_board_deleted_created} 로 정렬 없이 LIMIT 에서 조기 종료한다.
- * (0.17s → 0.00s)
+ * 실측(board 50,000 / users 10,001, {@code EXPLAIN ANALYZE}): 히스토그램 제거 시 <b>291ms</b> ↔
+ * 적용 시 <b>0.16~0.71ms</b>. (예전 기록의 "0.17s → 0.00s" 는 MySQL 이 소수 둘째 자리로 반올림해 찍은
+ * 값이라 0.00s 를 시간으로 인용하면 안 된다.)
  *
  * <p>
  * 행 수 통계만 갱신하는 일반 {@code ANALYZE TABLE} 로는 고쳐지지 않는다 — 값 분포(히스토그램)가 있어야 한다.
@@ -75,8 +77,8 @@ public class BoardListQueryPlanMaintainer {
         refresh();
     }
 
-    /** 매일 03:10. 데이터가 변하면 히스토그램도 낡으므로 주기적으로 다시 만든다. */
-    @Scheduled(cron = "${board.query-plan.refresh-cron:0 10 3 * * *}")
+    /** 매일 17:10. 데이터가 변하면 히스토그램도 낡으므로 주기적으로 다시 만든다. */
+    @Scheduled(cron = "${board.query-plan.refresh-cron:0 10 17 * * *}")
     public void refreshOnSchedule() {
         refresh();
     }
@@ -85,6 +87,8 @@ public class BoardListQueryPlanMaintainer {
      * 통계·히스토그램을 갱신하고, 실행 계획이 실제로 좋아졌는지 검증한다.
      */
     public void refresh() {
+        long startedAt = System.currentTimeMillis();
+        log.info("게시글 목록 쿼리 계획 갱신 시작 — ANALYZE + users.status/is_deleted 히스토그램");
         try {
             // 행 수 통계. 이 쿼리를 직접 고치진 못하지만, 대량 INSERT/TRUNCATE 후 낡은 채로 남는다.
             jdbcTemplate.execute("ANALYZE TABLE users, board");
@@ -94,9 +98,12 @@ public class BoardListQueryPlanMaintainer {
                     "ANALYZE TABLE users UPDATE HISTOGRAM ON status, is_deleted WITH 16 BUCKETS");
 
             verify();
+            log.info("게시글 목록 쿼리 계획 갱신 완료 — plan_healthy={}, {}ms 소요",
+                    planHealthy.get(), System.currentTimeMillis() - startedAt);
         } catch (Exception e) {
             planHealthy.set(0);
-            log.error("게시글 목록 쿼리 계획 갱신 실패 — 목록 조회가 느려질 수 있다", e);
+            log.error("게시글 목록 쿼리 계획 갱신 실패 ({}ms) — 목록 조회가 느려질 수 있다",
+                    System.currentTimeMillis() - startedAt, e);
         }
     }
 
