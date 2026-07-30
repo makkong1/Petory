@@ -387,13 +387,13 @@ class ConversationServicePerformanceTest {
                 long startTimeBefore = System.currentTimeMillis();
 
                 // 쿼리 수 측정 시작
-                long queryCountBefore = statistics.getQueryExecutionCount();
+                long queryCountBefore = statistics.getPrepareStatementCount();
 
                 List<ConversationDTO> resultBefore = getMyConversationsBefore(userId);
 
                 // 측정 종료
                 long endTimeBefore = System.currentTimeMillis();
-                long queryCountAfterBefore = statistics.getQueryExecutionCount();
+                long queryCountAfterBefore = statistics.getPrepareStatementCount();
                 System.gc();
                 long memoryAfterBefore = runtime.totalMemory() - runtime.freeMemory();
 
@@ -428,13 +428,13 @@ class ConversationServicePerformanceTest {
                 long startTimeAfter = System.currentTimeMillis();
 
                 // 쿼리 수 측정 시작
-                long queryCountStartAfter = statistics.getQueryExecutionCount();
+                long queryCountStartAfter = statistics.getPrepareStatementCount();
 
                 List<ConversationDTO> resultAfter = getMyConversationsAfter(userId);
 
                 // 측정 종료
                 long endTimeAfter = System.currentTimeMillis();
-                long queryCountEndAfter = statistics.getQueryExecutionCount();
+                long queryCountEndAfter = statistics.getPrepareStatementCount();
                 System.gc();
                 long memoryAfterAfter = runtime.totalMemory() - runtime.freeMemory();
 

@@ -200,7 +200,7 @@ class BoardPerformanceComparisonTest {
         long afterMemory = getUsedMemory();
         long beforeElapsed = afterTime - beforeTime;
         long beforeMemoryUsed = afterMemory - beforeMemory;
-        long beforeQueryCount = stats.getQueryExecutionCount();
+        long beforeQueryCount = stats.getPrepareStatementCount();
 
         System.out.println("📊 결과:");
         System.out.println("  ⏱️  실행 시간: " + beforeElapsed + " ms");
@@ -235,7 +235,7 @@ class BoardPerformanceComparisonTest {
         afterMemory = getUsedMemory();
         long afterElapsed = afterTime - beforeTime;
         long afterMemoryUsed = afterMemory - beforeMemory;
-        long afterQueryCount = stats.getQueryExecutionCount();
+        long afterQueryCount = stats.getPrepareStatementCount();
 
         System.out.println("📊 결과:");
         System.out.println("  ⏱️  실행 시간: " + afterElapsed + " ms");
@@ -339,7 +339,7 @@ class BoardPerformanceComparisonTest {
 
         long afterTime = System.currentTimeMillis();
         long beforeElapsed = afterTime - beforeTime;
-        long beforeQueryCount = stats.getQueryExecutionCount();
+        long beforeQueryCount = stats.getPrepareStatementCount();
 
         System.out.println("📊 결과:");
         System.out.println("  ⏱️  실행 시간: " + beforeElapsed + " ms");
@@ -375,7 +375,7 @@ class BoardPerformanceComparisonTest {
 
         afterTime = System.currentTimeMillis();
         long afterElapsed = afterTime - beforeTime;
-        long afterQueryCount = stats.getQueryExecutionCount();
+        long afterQueryCount = stats.getPrepareStatementCount();
 
         System.out.println("📊 결과:");
         System.out.println("  ⏱️  실행 시간: " + afterElapsed + " ms");
@@ -467,7 +467,7 @@ class BoardPerformanceComparisonTest {
         long afterMemory = getUsedMemory();
         long beforeElapsed = afterTime - beforeTime;
         long beforeMemoryUsed = afterMemory - beforeMemory;
-        long beforeQueryCount = stats.getQueryExecutionCount();
+        long beforeQueryCount = stats.getPrepareStatementCount();
 
         System.out.println("📊 결과:");
         System.out.println("  ⏱️  실행 시간: " + beforeElapsed + " ms");
@@ -502,7 +502,7 @@ class BoardPerformanceComparisonTest {
         afterMemory = getUsedMemory();
         long afterElapsed = afterTime - beforeTime;
         long afterMemoryUsed = afterMemory - beforeMemory;
-        long afterQueryCount = stats.getQueryExecutionCount();
+        long afterQueryCount = stats.getPrepareStatementCount();
 
         System.out.println("📊 결과:");
         System.out.println("  ⏱️  실행 시간: " + afterElapsed + " ms");

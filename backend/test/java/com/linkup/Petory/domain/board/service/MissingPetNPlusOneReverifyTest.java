@@ -133,7 +133,10 @@ class MissingPetNPlusOneReverifyTest {
         long beforeStart = System.currentTimeMillis();
         List<MissingPetBoardDTO> beforeResult = getBoardsWithIndividualQueries();
         long beforeElapsed = System.currentTimeMillis() - beforeStart;
-        long beforeQueryCount = stats.getQueryExecutionCount();
+        // 지표: getQueryExecutionCount() 가 아니라 getPrepareStatementCount().
+        // 전자는 JPQL/네이티브만 세고 지연로딩 단건 조회를 빼먹어 실제의 일부만 보고한다
+        // (Care before 101 vs 실제 303, Chat before 21 vs 실제 31 — 같은 실행에서 확인).
+        long beforeQueryCount = stats.getPrepareStatementCount();
 
         System.out.println("\n[Before] JOIN FETCH 없음 + 댓글수/파일 개별 조회");
         System.out.println("  쿼리 수: " + beforeQueryCount);
@@ -149,7 +152,7 @@ class MissingPetNPlusOneReverifyTest {
         MissingPetBoardPageResponseDTO afterResult = missingPetBoardService
                 .getBoardsWithPaging(null, 0, BOARD_COUNT);
         long afterElapsed = System.currentTimeMillis() - afterStart;
-        long afterQueryCount = stats.getQueryExecutionCount();
+        long afterQueryCount = stats.getPrepareStatementCount();
 
         System.out.println("\n[After] 실제 프로덕션 경로 (getBoardsWithPaging)");
         System.out.println("  쿼리 수: " + afterQueryCount);
