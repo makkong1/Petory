@@ -89,6 +89,35 @@ class IndexUsageRegressionTest {
                 .doesNotContain("Sort:");
     }
 
+    /**
+     * 실제로 이 테스트가 없어서 회귀를 놓쳤다.
+     *
+     * <p>
+     * 정렬 동점 처리로 {@code ORDER BY created_at DESC, idx DESC} 를 붙였더니, 세컨더리 인덱스는
+     * {@code (키…, PK)} 로 저장돼 {@code created_at DESC} 인덱스 안의 PK 는 ASC 순인데 DESC 를
+     * 요구해서 <b>인덱스 순서로 정렬을 만족시키지 못하고 filesort 가 붙었다.</b> 1페이지가 20행을
+     * 받으려고 48,000행을 전부 읽고 정렬해 15.8ms(원래 0.02ms)가 됐다.
+     *
+     * <p>
+     * 보조 키를 {@code idx ASC} 로 바꾸면 인덱스 스캔 순서 그대로라 정렬이 사라진다. 이 테스트는
+     * "동점 처리를 붙이되 인덱스 순서를 깨지 않는다" 는 계약을 고정한다.
+     */
+    @Test
+    @DisplayName("게시글 목록 1단계: 커버링 인덱스를 타고 filesort 가 없다 (동점 처리 방향 포함)")
+    void boardListStage1UsesCoveringIndexWithoutSort() {
+        String plan = explain(
+                "SELECT idx FROM board WHERE is_deleted = 0 AND author_visible = 1 "
+                        + "ORDER BY created_at DESC, idx ASC LIMIT 20 OFFSET 0");
+
+        assertThat(plan)
+                .as("커버링 인덱스를 못 타면 깊은 페이지 skip 이 무의미해진다.\n계획:\n%s", plan)
+                .contains("idx_board_visible_created");
+        assertThat(plan)
+                .as("정렬 노드가 생기면 LIMIT 20 인데도 전체를 읽고 정렬한다. "
+                        + "보조 정렬키 방향이 인덱스와 어긋났는지 확인할 것.\n계획:\n%s", plan)
+                .doesNotContain("Sort:");
+    }
+
     @Test
     @DisplayName("admin 사용자 목록: created_at 인덱스를 타고 filesort 가 없다")
     void adminUserListUsesCreatedAtIndex() {
