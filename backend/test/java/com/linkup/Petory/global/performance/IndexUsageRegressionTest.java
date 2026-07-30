@@ -73,6 +73,41 @@ class IndexUsageRegressionTest {
                 .containsExactly("geo_point");
     }
 
+    /**
+     * 첨부 조회 인덱스는 EXPLAIN 이 아니라 스키마로 검증한다.
+     *
+     * <p>
+     * {@code file} 테이블은 현재 더미 시드에 데이터가 없어(board 5만·care 3천·pets 1.2만은 있는데
+     * 첨부만 0행) EXPLAIN 을 떠도 의미 있는 계획이 안 나온다. 그런데 <b>인덱스가 사라지는 것 자체가
+     * 실제 회귀 위험</b>이고 그건 스키마로 결정적으로 잡힌다.
+     *
+     * <p>
+     * 배경: {@code AttachmentFileService} 의 개별·배치 조회가 공통으로
+     * {@code WHERE target_type = ? AND target_idx IN (…)} 을 쓰는데 이 인덱스가 없어 <b>개별이든
+     * 배치든 매번 테이블 전체를 스캔</b>하고 있었다(2026-07-12 발견, 커밋 {@code 631d2d15}).
+     * 당시 측정은 개별조회 0.444→0.032ms, 배치조회 0.211→0.042ms 로 절대값이 작았지만, 풀스캔은
+     * <b>테이블 크기에 비례</b>하므로 첨부가 쌓이면 그대로 벌어진다. 고친 근거는 속도가 아니라 그 구조다.
+     *
+     * <p>
+     * N+1(왕복 횟수)과 인덱스 부재(각 쿼리의 실행계획)는 서로 다른 축이라, 배치 조회로 N+1 을 없앤
+     * 뒤에도 이 문제가 따로 남아 있었다.
+     */
+    @Test
+    @DisplayName("첨부 조회: file(target_type, target_idx) 복합 인덱스가 있어야 한다")
+    void attachmentLookupHasCompositeIndex() {
+        @SuppressWarnings("unchecked")
+        List<String> columns = entityManager.createNativeQuery(
+                "SELECT COLUMN_NAME FROM information_schema.STATISTICS "
+                        + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'file' "
+                        + "AND INDEX_NAME = 'idx_file_target' ORDER BY SEQ_IN_INDEX")
+                .getResultList();
+
+        assertThat(columns)
+                .as("idx_file_target 이 사라지면 첨부 조회(개별·배치 공통)가 file 전체를 스캔한다. "
+                        + "지금은 file 이 0행이라 체감이 없지만, 첨부가 쌓이는 만큼 선형으로 나빠진다.")
+                .containsExactly("target_type", "target_idx");
+    }
+
     @Test
     @DisplayName("care 목록: 정렬용 인덱스를 타고 filesort 가 없다")
     void careListUsesSortIndex() {
