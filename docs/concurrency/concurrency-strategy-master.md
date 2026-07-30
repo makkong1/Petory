@@ -107,7 +107,10 @@
 - **왜 이 전략**: 카운터 증가 자체는 검증 불필요 → 원자적 UPDATE로 충분. 단 **락 획득 순서**가 데드락을 좌우하므로 X락 선점이 핵심(원자적 UPDATE만으론 데드락이 안 풀렸음).
 - ✅ **`1f989b9f` diff로 확인된 사실**: 이 커밋 **이전에도 `incrementWarningCount`(원자적 UPDATE)는 이미 있었다** — 단지 `sanctionRepository.save()` **뒤**에 있었다. 커밋이 한 일은 그 한 줄을 INSERT 앞으로 옮긴 것뿐이다. 즉 "원자적 UPDATE로도 데드락이 남았다"는 서술이 diff로 입증된다(값을 바꾼 게 아니라 **순서만** 바꿔 해결). 테스트 diff도 항진명제 assert 1개에서 `successCount == adminCount` + `warningCount == adminCount` 2개 추가로 강화된 것이 확인된다.
 - 🔗 **§3.2 Meetup과 동일 메커니즘**: `INSERT(FK S락) → UPDATE(X락)` 순서가 양쪽의 공통 원인이다. 경고는 순서를 직접 뒤집어, 모임은 진입점에서 X락을 선점(`findByIdWithLock`)해 각각 해결했다.
-- **실측 재확인(2026-07-30)**: 성공 5/5, 최종 warningCount 5, 기록 5건, **중간값 `[1,2,3,4,5]`** — 요청이 순차 처리된 직접 증거.
+- **실측 재확인(2026-07-30) — before/after 양방향 실행**:
+  - **Before**: `git worktree`로 fix 직전 커밋 `e937b823`을 checkout 후 **강화된 테스트를 그 코드에 얹어** 실행 → **4/5 Deadlock, 성공 1/5**, warningCount 1, 중간값 `[1]`, 테스트 `expected: <5> but was: <1>` 실패. 실패 SQL = `update users u1_0 set warning_count=(u1_0.warning_count+1) where u1_0.idx=?` → **원자적 UPDATE 문장에서 데드락**이 확인됨(S락 보유 중 X락 승격의 직접 증거).
+  - **After**: 성공 5/5, warningCount 5, 기록 5건, **중간값 `[1,2,3,4,5]`**(순차 처리 증거), Deadlock 0.
+  - → "4/5 실패 → 5/5 성공"은 **커밋 메시지 인용이 아니라 재실행으로 입증된 수치**다.
 - **검증**: `UserSanctionServiceConcurrencyTest` — 항진명제(경고수==기록수)에서 **'성공 콜 수 == 최종 경고수'로 강화**해 실제 결함을 검출. 데드락 수정 후 **4/5 실패 → 5/5 성공, warningCount 1→5, Deadlock 0** (`petory_test`, git `1f989b9f`).
 
 ### 3.5 닉네임/가입 중복 — DB Unique 제약
