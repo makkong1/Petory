@@ -15,7 +15,7 @@ const LocationControls = ({
   intentSignals = [],
   /** 마지막으로 선택한 중분류 브랜치 (소분류가 여러 중복일 때 필수) */
   activeGroupId = null,
-  sort = 'stable',
+  sort = 'distance',
   hasPendingAreaChange = false,
   radius,
   onSearch,

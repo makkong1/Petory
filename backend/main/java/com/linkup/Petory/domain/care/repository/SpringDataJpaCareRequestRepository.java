@@ -129,7 +129,16 @@ public interface SpringDataJpaCareRequestRepository extends JpaRepository<CareRe
                     "4326)) " +
                     "AND ST_Distance_Sphere(cr.geo_point, ST_GeomFromText(" +
                     "CONCAT('POINT(', :lat, ' ', :lng, ')'), 4326)) <= (:radius * 1000) " +
-                    "ORDER BY cr.created_at DESC " +
+                    // [지도 반경검색 통일] 정렬을 created_at DESC → 거리 ASC 로 바꿨다.
+                    // created_at 은 idx_carerequest_deleted_created 로 정렬이 가능해서, 반경이 넓어져
+                    // 매치가 LIMIT 을 채우면 옵티마이저가 "정렬 인덱스를 역주행하다 멈추는" 계획을 고르고
+                    // 공간 인덱스를 아예 안 쓴다(실측: 5km 는 SPATIAL 208행, 10km 부터는 created_at 인덱스).
+                    // 네 도메인 중 care 만 이 탈출구가 있어 계획이 혼자 다르게 뒤집혔다.
+                    // 거리순으로 통일하면 정렬용 인덱스가 없어져 계획이 예측 가능해지고(선택도 교차점까지
+                    // 항상 공간 인덱스), 지도에서는 "가까운 순"이 의미상으로도 맞다.
+                    // idx ASC 는 거리 동점 시 순서를 고정해 지도를 옮겨도 결과가 흔들리지 않게 한다.
+                    "ORDER BY ST_Distance_Sphere(cr.geo_point, ST_GeomFromText(" +
+                    "CONCAT('POINT(', :lat, ' ', :lng, ')'), 4326)) ASC, cr.idx ASC " +
                     "LIMIT :limit", nativeQuery = true)
     List<CareRequestListView> findNearbyCareRequests(@Param("lat") Double lat,
                     @Param("lng") Double lng,

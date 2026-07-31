@@ -61,25 +61,17 @@ const toMapItem = (type, raw) => {
   };
 };
 
-// location은 결과 안정성을 위해 고정 제한을 사용하고, meetup/care만 줌 레벨 제한을 적용한다.
-const LOCATION_RESULT_LIMIT = 300;
-
-const ZOOM_LIMIT_TABLE = {
-  meetup:   { 4: 30, 5: 50, 6: 100, 7: 200, 8: 350, 9: 500, default: 800 },
-  care:     { 4: 20, 5: 30, 6: 50,  7: 80,  8: 150, 9: 250, default: 400 },
-};
-
-const getLimitForLevel = (type, level) => {
-  const table = ZOOM_LIMIT_TABLE[type];
-  const key = level <= 4 ? 4 : level >= 10 ? 'default' : level;
-  return table[key] ?? table['default'];
-};
-
 /**
  * 활성 탭 1개의 데이터만 조회해 공통 mapItem 배열로 반환
- * @param {number} mapLevel - meetup/care용 카카오맵 기준 줌 레벨 (1=최대확대, 14=전국). 기본값 7
+ *
+ * [지도 반경검색 통일] 결과 상한은 더 이상 프론트가 정하지 않는다.
+ * 예전엔 여기 ZOOM_LIMIT_TABLE(줌 레벨 → meetup 30~800 / care 20~400)과
+ * LOCATION_RESULT_LIMIT=300 이 따로 있었는데, 쿼리가 읽을 행 수를 결정하는 건
+ * 줌 레벨이 아니라 반경이다. 둘은 따로 움직여서(반경 5km 로 두고 지도만 축소하면
+ * 레벨 12 → 상한 400) 상한이 쿼리와 무관한 값을 따라다녔다.
+ * 이제 백엔드 NearbySearchPolicy 가 반경으로 상한을 정한다. 프론트는 반경만 보낸다.
  */
-export const fetchActiveMapItems = async ({ type, lat, lng, radius, keyword, category, sort, mapLevel = 7 }) => {
+export const fetchActiveMapItems = async ({ type, lat, lng, radius, keyword, category, sort }) => {
   if (type === 'location') {
     const radiusKm = typeof radius === 'number' && Number.isFinite(radius) ? radius : 5;
     const res = await locationServiceApi.searchPlaces({
@@ -89,21 +81,20 @@ export const fetchActiveMapItems = async ({ type, lat, lng, radius, keyword, cat
       ...(keyword && { keyword }),
       ...(category && { category }),
       ...(sort && { sort }),
-      size: LOCATION_RESULT_LIMIT,
     });
     const services = res?.data?.services ?? [];
     return services.map(r => toMapItem('location', r));
   }
 
   if (type === 'meetup') {
-    const res = await meetupApi.getNearbyMeetups(lat, lng, radius, getLimitForLevel('meetup', mapLevel));
+    const res = await meetupApi.getNearbyMeetups(lat, lng, radius);
     const meetups = res?.data?.meetups ?? res?.data ?? [];
     return meetups.map(r => toMapItem('meetup', r));
   }
 
   if (type === 'care') {
     if (isDemoMode()) return [];
-    const res = await careRequestApi.getNearby({ lat, lng, radius, limit: getLimitForLevel('care', mapLevel) });
+    const res = await careRequestApi.getNearby({ lat, lng, radius });
     const careRequests = res?.data ?? [];
     return careRequests.map(r => toMapItem('care', r));
   }

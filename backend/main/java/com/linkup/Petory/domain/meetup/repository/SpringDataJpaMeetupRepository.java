@@ -95,8 +95,12 @@ public interface SpringDataJpaMeetupRepository extends JpaRepository<Meetup, Lon
             + "4326)) "
             + "AND ST_Distance_Sphere(m.geo_point, ST_GeomFromText("
             + "CONCAT('POINT(', :lat, ' ', :lng, ')'), 4326)) <= (:radius * 1000) "
+            // [지도 반경검색 통일] 보조 정렬키를 m.date ASC → m.idx ASC 로 맞췄다.
+            // 거리 동점일 때 date 가 같은 모임이 또 있으면 순서가 비결정적이라, 지도를 옮기며
+            // 재조회할 때 마커 순서가 흔들릴 수 있었다. PK 를 마지막 키로 두면 항상 고정된다.
+            // (같은 규칙을 care·location 에도 적용했다)
             + "ORDER BY ST_Distance_Sphere(m.geo_point, ST_GeomFromText("
-            + "CONCAT('POINT(', :lat, ' ', :lng, ')'), 4326)) ASC, m.date ASC "
+            + "CONCAT('POINT(', :lat, ' ', :lng, ')'), 4326)) ASC, m.idx ASC "
             + "LIMIT :limit", nativeQuery = true)
     List<Long> findNearbyMeetupIds(@Param("lat") Double lat,
             @Param("lng") Double lng,

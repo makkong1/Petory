@@ -1,5 +1,6 @@
 package com.linkup.Petory.domain.meetup.controller;
 
+import com.linkup.Petory.global.config.NearbySearchPolicy;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -177,14 +178,17 @@ public class MeetupController {
         return ResponseEntity.ok(response);
     }
 
-    // 반경 기반 모임 조회 (마커 표시용, maxResults 상한 기본 500)
+    // 반경 기반 모임 조회 (마커 표시용). 상한은 NearbySearchPolicy 가 반경으로 정한다.
+    // [지도 반경검색 통일] 주석엔 "기본 500"이라 적혀 있었는데 코드 기본값은 20이었다.
+    // 실제로는 프론트 ZOOM_LIMIT_TABLE 이 30~800 을 보내고 있어서 세 값이 전부 달랐다.
     @GetMapping("/nearby")
     public ResponseEntity<Map<String, Object>> getNearbyMeetups(
             @RequestParam(value = "lat") Double lat,
             @RequestParam(value = "lng") Double lng,
             @RequestParam(value = "radius", defaultValue = "5.0") Double radius,
-            @RequestParam(value = "maxResults", defaultValue = "20") int maxResults) {
-        List<MeetupDTO> meetups = meetupService.getNearbyMeetups(lat, lng, radius, maxResults);
+            @RequestParam(value = "maxResults", required = false) Integer maxResults) {
+        List<MeetupDTO> meetups = meetupService.getNearbyMeetups(
+                lat, lng, radius, NearbySearchPolicy.clampResultLimit(maxResults, radius));
 
         Map<String, Object> response = new HashMap<>();
         response.put("meetups", meetups);

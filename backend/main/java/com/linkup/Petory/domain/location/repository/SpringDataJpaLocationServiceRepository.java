@@ -143,15 +143,6 @@ public interface SpringDataJpaLocationServiceRepository extends JpaRepository<Lo
             @Param("category") String category,
             @Param("limit") int limit);
 
-    // 읍면동·도로명 검색 — 프론트 미사용으로 비활성화
-    // @RepositoryMethod("장소 서비스: 읍면동별 조회 (keyword·category 필터)")
-    // @Query(value = "SELECT * FROM locationservice USE INDEX (idx_locationservice_eupmyeondong_deleted_rating) ...")
-    // List<LocationService> findByEupmyeondong(@Param("eupmyeondong") String eupmyeondong,
-    //         @Param("keyword") String keyword, @Param("category") String category, @Param("limit") int limit);
-    // @RepositoryMethod("장소 서비스: 도로명별 조회 (keyword·category 필터)")
-    // @Query(value = "SELECT * FROM locationservice USE INDEX (idx_road_name_deleted_rating) ...")
-    // List<LocationService> findByRoadName(@Param("roadName") String roadName,
-    //         @Param("keyword") String keyword, @Param("category") String category, @Param("limit") int limit);
     // [FIX] 리뷰 평균을 DB에서 직접 계산해 rating 컬럼을 한 번의 UPDATE로 갱신.
     // 기존 read → AVG계산 → write 패턴은 동시 리뷰 시 Lost Update 위험이 있었음.
     // 인라인 뷰로 감싸 MySQL 버전 무관하게 호환성 확보.

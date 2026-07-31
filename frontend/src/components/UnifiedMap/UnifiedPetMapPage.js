@@ -98,7 +98,9 @@ const UnifiedPetMapPage = () => {
   const [locationCategory, setLocationCategory] = useState("");
   /** 소분류(카페·미술관 등)가 여러 중분류에 있을 때 선택한 중분류 id */
   const [locationCategoryGroupId, setLocationCategoryGroupId] = useState(null);
-  const [locationSort, setLocationSort] = useState("stable");
+  // [지도 반경검색 통일] 기본 정렬을 거리순으로 맞췄다 (care·meetup 과 동일).
+  // 백엔드 DEFAULT_RADIUS_SORT 는 원래 distance 였는데 프론트만 stable 을 보내고 있었다.
+  const [locationSort, setLocationSort] = useState("distance");
   const [hasPendingAreaChange, setHasPendingAreaChange] = useState(false);
   const [searchMode, setSearchMode] = useState("initial");
   const [petIntentSignals, setPetIntentSignals] = useState([]);
@@ -179,11 +181,14 @@ const UnifiedPetMapPage = () => {
 
   // 데이터 조회 (디바운스 300ms)
   const fetchItems = useCallback(
-    (type, center, r, keyword, category, sort, level = 7) => {
+    // [지도 반경검색 통일] 줌 레벨(level)은 더 이상 조회 파라미터가 아니다.
+    // 결과 상한을 백엔드가 반경으로 정하므로, 같은 중심·반경이면 줌을 바꿔도 결과가 같다.
+    // 그래서 캐시 키에서도 뺐다 — 예전엔 줌만 바꿔도 캐시가 빗나가 재조회했다.
+    (type, center, r, keyword, category, sort) => {
       if (!hasValidCenter(center)) return;
       clearTimeout(fetchTimerRef.current);
       fetchTimerRef.current = setTimeout(async () => {
-        const cacheKeyParts = [
+        const cacheKey = [
           type,
           center.lat.toFixed(4),
           center.lng.toFixed(4),
@@ -191,11 +196,7 @@ const UnifiedPetMapPage = () => {
           keyword,
           category,
           sort,
-        ];
-        if (type !== "location") {
-          cacheKeyParts.push(level);
-        }
-        const cacheKey = cacheKeyParts.join("-");
+        ].join("-");
         if (cacheRef.current[cacheKey]) {
           setItems(cacheRef.current[cacheKey]);
           return;
@@ -212,7 +213,6 @@ const UnifiedPetMapPage = () => {
             keyword: type === "location" ? keyword : undefined,
             category: type === "location" ? category : undefined,
             sort: type === "location" ? sort : undefined,
-            mapLevel: level,
           });
           cacheRef.current[cacheKey] = result;
           setItems(result);
@@ -230,7 +230,6 @@ const UnifiedPetMapPage = () => {
 
   const effectiveFetchCenter =
     activeLayer === "location" ? searchCenter : mapViewportCenter;
-  const effectiveMapLevel = activeLayer === "location" ? null : mapLevel;
 
   useEffect(() => {
     if (effectiveFetchCenter) {
@@ -240,8 +239,7 @@ const UnifiedPetMapPage = () => {
         radius,
         locationKeyword,
         locationCategory,
-        locationSort,
-        effectiveMapLevel
+        locationSort
       );
     }
   }, [
@@ -251,7 +249,6 @@ const UnifiedPetMapPage = () => {
     locationKeyword,
     locationCategory,
     locationSort,
-    effectiveMapLevel,
     fetchItems,
   ]);
 
@@ -390,21 +387,13 @@ const UnifiedPetMapPage = () => {
   // 모임 생성 성공 시 목록 갱신
   const handleMeetupCreated = () => {
     cacheRef.current = {};
-    fetchItems(
-      "meetup",
-      mapViewportCenter,
-      radius,
-      "",
-      "",
-      undefined,
-      mapLevel
-    );
+    fetchItems("meetup", mapViewportCenter, radius, "", "", undefined);
   };
 
   // 케어 요청 생성 성공 시 목록 갱신
   const handleCareCreated = () => {
     cacheRef.current = {};
-    fetchItems("care", mapViewportCenter, radius, "", "", undefined, mapLevel);
+    fetchItems("care", mapViewportCenter, radius, "", "", undefined);
   };
 
   const displayItems = items;

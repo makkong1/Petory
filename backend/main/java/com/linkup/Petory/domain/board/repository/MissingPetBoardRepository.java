@@ -68,6 +68,9 @@ public interface MissingPetBoardRepository {
             BigDecimal maxLat,
             BigDecimal minLng,
             BigDecimal maxLng,
+            double centerLat,
+            double centerLng,
+            double radiusMeters,
             Pageable pageable);
 
     /**

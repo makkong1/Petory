@@ -76,6 +76,14 @@ public interface SpringDataJpaMissingPetBoardRepository extends JpaRepository<Mi
             + ":maxLat, ' ', :maxLng, ', ', "
             + ":maxLat, ' ', :minLng, ', ', "
             + ":minLat, ' ', :minLng, '))'), 4326)) "
+            // [지도 반경검색 통일] 2차 정밀 반경 필터를 Java 에서 DB 로 내렸다.
+            // 예전엔 DB 가 사각형 후보만 주고 서비스가 haversineKm 으로 원형 필터를 했는데,
+            // 그러면 후보 :limit 건 중 사각형 모서리에 걸린 것들이 Java 에서 버려져
+            // 실제 점수 계산 대상이 :limit 보다 적어졌다. 이제 DB 가 원형까지 걸러서
+            // :limit 건이 전부 반경 안이고, 나머지 세 도메인과 필터 위치가 같아진다.
+            // (점수 계산 0.6×최신성+0.4×근접도 와 최종 정렬은 그대로 서비스가 한다)
+            + "AND ST_Distance_Sphere(b.geo_point, ST_GeomFromText("
+            + "CONCAT('POINT(', :centerLat, ' ', :centerLng, ')'), 4326)) <= :radiusMeters "
             + "ORDER BY b.lost_date DESC, b.created_at DESC "
             + "LIMIT :limit", nativeQuery = true)
     List<Long> findHomeCandidateIdsInBoundingBox(
@@ -84,6 +92,9 @@ public interface SpringDataJpaMissingPetBoardRepository extends JpaRepository<Mi
             @Param("maxLat") BigDecimal maxLat,
             @Param("minLng") BigDecimal minLng,
             @Param("maxLng") BigDecimal maxLng,
+            @Param("centerLat") double centerLat,
+            @Param("centerLng") double centerLng,
+            @Param("radiusMeters") double radiusMeters,
             @Param("limit") int limit);
 
     // 2단계: 뽑힌 idx 를 JOIN FETCH 로 재조회(작성자 N+1 방지). 최종 정렬·점수는 서비스가 다시 한다.
@@ -97,9 +108,13 @@ public interface SpringDataJpaMissingPetBoardRepository extends JpaRepository<Mi
             BigDecimal maxLat,
             BigDecimal minLng,
             BigDecimal maxLng,
+            double centerLat,
+            double centerLng,
+            double radiusMeters,
             Pageable pageable) {
         List<Long> ids = findHomeCandidateIdsInBoundingBox(
-                status.name(), minLat, maxLat, minLng, maxLng, pageable.getPageSize());
+                status.name(), minLat, maxLat, minLng, maxLng,
+                centerLat, centerLng, radiusMeters, pageable.getPageSize());
         List<MissingPetBoard> content = ids.isEmpty() ? List.of() : findByIdxInWithUser(ids);
         return new PageImpl<>(content, pageable, content.size());
     }
