@@ -16,6 +16,9 @@ import com.linkup.Petory.domain.user.exception.UserNotFoundException;
 import com.linkup.Petory.domain.user.repository.UserSanctionRepository;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -28,6 +31,9 @@ public class UserSanctionService {
     private final UserSanctionRepository sanctionRepository;
     private final UsersRepository usersRepository;
     private final ApplicationEventPublisher eventPublisher;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     private static final int WARNING_THRESHOLD = 3; // 경고 3회 시 자동 이용제한
     private static final int AUTO_SUSPENSION_DAYS = 3; // 자동 이용제한 기간 (일)
@@ -64,9 +70,13 @@ public class UserSanctionService {
 
         sanctionRepository.save(warning);
 
-        // 업데이트된 사용자 정보 다시 조회
-        user = usersRepository.findById(userId)
-                .orElseThrow(UserNotFoundException::new);
+        // ⚠️ incrementWarningCount 는 JPQL bulk UPDATE 라 영속성 컨텍스트를 우회한다.
+        //    DB 의 warning_count 는 늘었지만 1차 캐시의 user 는 증가 이전 값을 그대로 들고 있고,
+        //    같은 트랜잭션에서 findById 로 다시 읽어도 캐시가 히트해 낡은 값이 돌아온다.
+        //    그대로 두면 아래 임계값 검사가 성립하지 않아 자동 이용제한이 발동하지 않는다.
+        //    이 엔티티만 DB 에서 다시 읽어 동기화한다.
+        //    (MeetupService.joinMeetup 도 원자적 UPDATE 뒤 같은 이유로 refresh 를 쓴다)
+        entityManager.refresh(user);
 
         // 경고 3회 이상이면 자동 이용제한
         if (user.getWarningCount() >= WARNING_THRESHOLD) {

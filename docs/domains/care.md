@@ -165,18 +165,30 @@ location 검색은 `LIKE '값%'` 형태라 B-tree 인덱스 활용을 고려한 
 MATCH(cr.title, cr.description) AGAINST(:keyword IN NATURAL LANGUAGE MODE)
 ```
 
+FULLTEXT 인덱스(`idx_carerequest_title_desc`)는 `ngram` 파서를 쓴다(V9). 기본 InnoDB 파서는 `innodb_ft_min_token_size=3`이라 `산책`·`병원` 같은 2글자 한글 단어를 색인하지 못하고, 공백 기준 토큰화라 `강아지산책` 안의 `산책`을 부분 매칭하지 못한다. ngram은 2글자 단위로 분해해 이 갭을 메운다(board·meetup과 동일). V2에서 검색 500(인덱스 부재)을 먼저 막고, ngram 전환은 V9로 분리했다.
+
 검색도 삭제되지 않은 요청과 활성 작성자만 포함한다. `JpaCareRequestAdapter`는 검색 결과 idx를 기준으로 연관 엔티티를 다시 fetch하여 DTO 변환 시 N+1을 줄인다.
 
 ### 지도 근처 조회
 
-`GET /api/care-requests/nearby`는 `lat`, `lng`, `radius`, `limit`을 받는다.
+`GET /api/care-requests/nearby`는 `lat`, `lng`, `radius`(기본 5.0km), `limit`(선택)을 받는다.
 
 정책:
 
-- limit은 1~500 사이로 보정한다.
+- **결과 상한은 `NearbySearchPolicy`가 반경으로 정한다** (2km까지 100 / 5km 200 / 10km 350 / 20km 500 / 그 외 800).
+  `limit` 파라미터를 주면 그 값과 정책값 중 **작은 쪽**을 쓴다. 안 주면 정책값이다.
+  예전에는 프론트 `ZOOM_LIMIT_TABLE`이 **줌 레벨** 기준으로 20~400을 보냈는데, 쿼리가 읽을 행 수를
+  정하는 건 줌이 아니라 반경이라 둘이 어긋났다(반경 5km로 두고 지도만 축소하면 상한이 400으로 뜀).
 - `latitude IS NOT NULL`인 요청만 포함한다.
 - `OPEN`, `IN_PROGRESS` 상태만 포함한다.
 - 요청자 `status=ACTIVE`, `isDeleted=false`인 요청만 포함한다.
+- **정렬은 거리 오름차순 + `idx` 오름차순이다** (2026-07-31 지도 반경검색 통일).
+  예전에는 `created_at DESC`였다. `created_at`에는 정렬용 인덱스(`idx_carerequest_deleted_created`)가
+  있어서, 매치가 `LIMIT`을 채우면 옵티마이저가 "정렬 인덱스를 역주행하다 멈추는" 계획을 골라
+  **공간 인덱스를 아예 쓰지 않았다**(실측: 반경 5km는 SPATIAL 208행, 10km부터 created_at 인덱스 1,622행).
+  지도 네 도메인 중 care만 이 탈출구가 있어 계획이 혼자 다르게 뒤집혔다. 거리순으로 통일하면
+  정렬용 인덱스가 없어져 계획이 예측 가능해지고, 지도에서는 "가까운 순"이 의미상으로도 맞다.
+  `idx ASC`는 거리 동점 시 순서를 고정해 지도를 옮겨도 결과가 흔들리지 않게 한다.
 - `ST_Within`으로 사각형 범위를 먼저 좁힌 뒤 `ST_Distance_Sphere`로 정확한 반경을 적용한다.
   - `geo_point`(POINT, SRID 4326)에 SPATIAL 인덱스를 걸었고, 값은 BEFORE INSERT/UPDATE 트리거가 위·경도에서 자동으로 채운다.
     (`meetup`·`locationservice`와 동일한 패턴. 트리거로 채우므로 엔티티에 필드가 없고 `ddl-auto=validate`를 통과한다.)

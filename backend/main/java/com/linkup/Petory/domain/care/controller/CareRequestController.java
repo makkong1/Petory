@@ -1,5 +1,6 @@
 package com.linkup.Petory.domain.care.controller;
 
+import com.linkup.Petory.global.config.NearbySearchPolicy;
 import java.util.List;
 
 import org.springframework.http.ResponseEntity;
@@ -47,8 +48,12 @@ public class CareRequestController {
             @RequestParam(value = "lat") double lat,
             @RequestParam(value = "lng") double lng,
             @RequestParam(value = "radius", defaultValue = "5.0") double radius,
-            @RequestParam(value = "limit", defaultValue = "200") int limit) {
-        return ResponseEntity.ok(careRequestService.getNearby(lat, lng, radius, limit));
+            @RequestParam(value = "limit", required = false) Integer limit) {
+        // [지도 반경검색 통일] 상한을 NearbySearchPolicy 한 곳에서 정한다.
+        // 예전엔 프론트 ZOOM_LIMIT_TABLE(줌 레벨 기준)이 limit 을 보냈는데,
+        // 쿼리가 읽을 행 수를 정하는 건 줌이 아니라 반경이라 둘이 어긋났다.
+        return ResponseEntity.ok(careRequestService.getNearby(
+                lat, lng, radius, NearbySearchPolicy.clampResultLimit(limit, radius)));
     }
 
     // 전체 케어 요청 조회 (페이징 지원)

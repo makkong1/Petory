@@ -140,8 +140,11 @@ latitude + longitude 있음
 - 프론트 UI의 반경은 km이다.
 - 백엔드 API의 `radius`는 m이다.
 - `unifiedMapApi`가 `radius * 1000`으로 단위를 변환한다.
-- Location 결과는 줌 레벨과 무관하게 `size=300`으로 고정한다.
-- Meetup/Care만 줌 레벨 기반 limit을 유지한다.
+- **결과 상한은 프론트가 정하지 않는다.** 백엔드 `NearbySearchPolicy`가 반경으로 정한다
+  (2km까지 100 / 5km 200 / 10km 350 / 20km 500 / 그 외 800). 프론트는 반경만 보낸다.
+  2026-07-31 지도 반경검색 통일 전에는 Location이 `LOCATION_RESULT_LIMIT=300` 고정,
+  Meetup/Care가 `ZOOM_LIMIT_TABLE`(줌 레벨 기준), 백엔드 기본값이 또 100이라 상한 출처가 넷이었다.
+  줌 레벨은 쿼리가 읽을 행 수와 무관한 값이라 키를 반경으로 바꿨다.
 
 ## 5. 검색창 fallback
 
@@ -187,7 +190,12 @@ latitude + longitude 있음
 | `reviews`  | 리뷰순. 리뷰 수 → 거리 → 평점 → idx                        |
 | `score`    | score 내림차순                                             |
 
-프론트 기본값은 `stable`이고 UI 라벨은 “추천순”이다. 거리순은 중심 좌표가 조금만 바뀌어도 결과 경계가 흔들릴 수 있으므로 기본 검색에는 안정적인 정렬을 사용한다.
+**프론트·백엔드 기본값 모두 `distance`(거리순)다.** 2026-07-31 지도 반경검색 통일로 맞췄다.
+
+그전에는 백엔드 `DEFAULT_RADIUS_SORT`가 `distance`인데 **프론트만 `stable`을 명시적으로 보내고 있어**
+같은 API의 기본값이 두 개였다. care·meetup이 거리순으로 통일되면서 location도 같은 기준으로 맞췄다.
+`stable`(추천순)은 UI 정렬 옵션으로 그대로 남아 있다 — 사용자가 선택할 수 있고, 중심 좌표가 조금만
+바뀌어도 결과 경계가 흔들리는 게 싫을 때 쓴다.
 
 ## 8. 지역 검색
 
@@ -315,11 +323,16 @@ Location 검색어는 `LocationSearchPerformedEvent`로 추천 도메인에 전�
 ## 14. 한계와 개선
 
 - 메인 지도 기본 경로는 반경 검색 중심이다. 지역 계층 검색은 백엔드에 남아 있지만 현재 주 사용자 경로에서 적극적으로 쓰이지 않는다.
-- `eupmyeondong`, `roadName` 직접 검색 쿼리는 현재 비활성화되어 있다.
+- `eupmyeondong`, `roadName` 직접 검색은 **제거됐다**(2026-07-31). 오래 주석 처리돼 있었고
+  `SpringDataJpaLocationServiceRepository` / `LocationServiceRepository` / `JpaLocationServiceAdapter`
+  3계층에 주석 코드가 흩어져 있었다. 전용 인덱스 2개(`idx_locationservice_eupmyeondong_deleted_rating`,
+  `idx_road_name_deleted_rating`)도 읽기 0회라 `V11`에서 같이 지웠다. 다시 열려면 마이그레이션 주석에
+  복구 DDL이 적혀 있다.
 - 위치/지역 검색의 keyword는 `name LIKE '%keyword%'`라 FULLTEXT 단독 검색과 검색 범위가 다르다.
 - `LIKE '%keyword%'`는 인덱스 효율이 낮지만, 반경/지역 후보를 먼저 줄인 뒤 적용하는 구조다.
-- 통합 지도 Location 결과는 `size=300`으로 고정되어 밀집 지역에서는 이후 후보가 잘릴 수 있다.
-- `stable` 정렬은 안정성 중심이며, 거리 가까움을 최우선으로 보장하지 않는다.
+- 통합 지도 Location 결과 상한은 반경에 따라 100~800이라(`NearbySearchPolicy`), 밀집 지역에서는
+  여전히 후보가 잘릴 수 있다.
+- `stable` 정렬은 안정성 중심이며, 거리 가까움을 최우선으로 보장하지 않는다(현재 기본값은 `distance`).
 - `LocationServiceController`, `LocationServiceReviewController`, `GeocodingController`에는 아직 수동 try-catch 응답 조립이 남아 있어 전역 예외 처리로 더 정리할 수 있다.
 - 뷰포트 바운딩 박스 검색은 현재 API 구조 변경 폭이 커서 장기 개선안으로 남아 있다.
 

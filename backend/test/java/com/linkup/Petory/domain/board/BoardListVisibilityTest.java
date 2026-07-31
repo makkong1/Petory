@@ -32,8 +32,8 @@ import com.linkup.Petory.domain.user.entity.Users;
  * 작성자 글이 목록에 포함된다"이며, 지연조인 전환 전 코드에서는 반드시 실패해야 한다(TDD RED).
  *
  * <p>
- * petory_test 는 board 시드 데이터가 없으므로(더미 데이터는 dev DB petory 전용), 각 테스트마다 전용
- * user+board 행을 직접 만든다 — {@link AuthorVisibleTriggerTest} 와 동일한 패턴. board.created_at
+ * 각 테스트마다 전용 user+board 행을 직접 만든다 — {@link AuthorVisibleTriggerTest} 와 동일한 패턴.
+ * (petory_test 에도 더미 시드가 들어와 있으므로 전체 건수를 절대값으로 단언하지 않는다.) board.created_at
  * 컬럼은 초 단위(datetime, 밀리초 없음)라 JPA auditing 이 부여한 값만으로는 순서를 결정적으로 만들 수 없어,
  * 네이티브 UPDATE 로 명시적으로 벌린다(1단계 native 쿼리가 실제 DB 값을 읽으므로 flush 필수).
  */
@@ -136,9 +136,15 @@ class BoardListVisibilityTest {
                 .as("created_at DESC 순서")
                 .isSortedAccordingTo((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()));
 
+        // petory_test 에도 더미 시드(board 5만)가 들어와 절대값으로 고정할 수 없다.
+        // 검증 의도는 "COUNT 가 users 조인 없이 author_visible 만으로 세어진다"이므로 그 정의와 대조한다.
+        long visibleInDb = ((Number) em.createNativeQuery(
+                "SELECT COUNT(*) FROM board WHERE is_deleted = 0 AND author_visible = 1")
+                .getSingleResult()).longValue();
+
         assertThat(page.getTotalElements())
                 .as("단일 테이블 COUNT: 보이는(author_visible=true) 글 수와 일치")
-                .isEqualTo(2L);
+                .isEqualTo(visibleInDb);
     }
 
     @Test

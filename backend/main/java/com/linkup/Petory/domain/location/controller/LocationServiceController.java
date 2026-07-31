@@ -1,5 +1,6 @@
 package com.linkup.Petory.domain.location.controller;
 
+import com.linkup.Petory.global.config.NearbySearchPolicy;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -58,8 +59,12 @@ public class LocationServiceController {
             if (latitude != null && longitude != null) {
                 // ① 반경 검색: 지도 초기 로드, "이 지역 검색" 버튼
                 int radiusM = (radius != null && radius > 0) ? radius : 10_000;
+                // [지도 반경검색 통일] 반경 경로의 상한은 NearbySearchPolicy 가 반경으로 정한다.
+                // 예전엔 프론트가 LOCATION_RESULT_LIMIT=300 고정을 보내고 백엔드 기본은 100이라
+                // 같은 화면에서 두 값이 섞여 있었다. care·meetup 과 같은 표를 쓴다.
                 services = locationServiceService.searchLocationServicesByLocation(
-                        latitude, longitude, radiusM, keyword, category, sort, effectiveSize);
+                        latitude, longitude, radiusM, keyword, category, sort,
+                        NearbySearchPolicy.clampResultLimit(effectiveSize, radiusM / 1000.0));
 
             } else if (StringUtils.hasText(sigungu) || StringUtils.hasText(sido)) {
                 // ② 지역 검색: 강남구·서울특별시 등 지역명 직접 검색

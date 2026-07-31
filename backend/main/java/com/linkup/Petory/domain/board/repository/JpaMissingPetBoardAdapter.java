@@ -108,9 +108,13 @@ public class JpaMissingPetBoardAdapter implements MissingPetBoardRepository {
             BigDecimal maxLat,
             BigDecimal minLng,
             BigDecimal maxLng,
+            double centerLat,
+            double centerLng,
+            double radiusMeters,
             Pageable pageable) {
         return jpaRepository.findHomeCandidatesInBoundingBox(
-                status, minLat, maxLat, minLng, maxLng, pageable);
+                status, minLat, maxLat, minLng, maxLng,
+                centerLat, centerLng, radiusMeters, pageable);
     }
 
     // [리팩토링] Admin 페이징 - Specification 기반 DB 레벨 필터링

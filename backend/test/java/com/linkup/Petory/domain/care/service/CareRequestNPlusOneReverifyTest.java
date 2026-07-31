@@ -189,7 +189,10 @@ class CareRequestNPlusOneReverifyTest {
         long beforeStart = System.currentTimeMillis();
         List<CareRequestDTO> beforeResult = getRequestsWithIndividualQueries();
         long beforeElapsed = System.currentTimeMillis() - beforeStart;
-        long beforeQueryCount = stats.getQueryExecutionCount();
+        // 지표: getQueryExecutionCount() 가 아니라 getPrepareStatementCount().
+        // 전자는 JPQL/네이티브만 세고 지연로딩 단건 조회를 빼먹어 실제의 일부만 보고한다
+        // (Care before 101 vs 실제 303, Chat before 21 vs 실제 31 — 같은 실행에서 확인).
+        long beforeQueryCount = stats.getPrepareStatementCount();
 
         System.out.println("\n[Before] JOIN FETCH 없음 + lazy 개별 접근");
         System.out.println("  쿼리 수: " + beforeQueryCount);
@@ -207,7 +210,7 @@ class CareRequestNPlusOneReverifyTest {
                 .collect(Collectors.toList());
         List<CareRequestDTO> afterResult = careRequestConverter.toDTOList(requests);
         long afterElapsed = System.currentTimeMillis() - afterStart;
-        long afterQueryCount = stats.getQueryExecutionCount();
+        long afterQueryCount = stats.getPrepareStatementCount();
 
         System.out.println("\n[After] 실제 프로덕션 경로 (findAllActiveRequests + toDTOList)");
         System.out.println("  쿼리 수: " + afterQueryCount);
@@ -235,7 +238,7 @@ class CareRequestNPlusOneReverifyTest {
                 CareRequest.class);
         query.setParameter("userId", requester.getIdx());
         List<CareRequest> requests = query.getResultList();
-        long afterMain = stats.getQueryExecutionCount();
+        long afterMain = stats.getPrepareStatementCount();
 
         List<CareRequestDTO> results = new ArrayList<>();
         for (CareRequest request : requests) {
@@ -263,7 +266,7 @@ class CareRequestNPlusOneReverifyTest {
                 throw new IllegalStateException("unreachable");
             }
         }
-        long afterLoop = stats.getQueryExecutionCount();
+        long afterLoop = stats.getPrepareStatementCount();
         System.out.println("  [세부] 메인쿼리 이후: " + afterMain + ", 루프(applications+file+vaccinations) 이후: "
                 + afterLoop + " (루프에서 발생: " + (afterLoop - afterMain) + "개)");
         return results;

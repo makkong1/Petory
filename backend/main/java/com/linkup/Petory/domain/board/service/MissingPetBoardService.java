@@ -475,6 +475,7 @@ public class MissingPetBoardService {
                         BigDecimal.valueOf(bounds[1]),
                         BigDecimal.valueOf(bounds[2]),
                         BigDecimal.valueOf(bounds[3]),
+                        lat, lng, HOME_MISSING_RADIUS_KM * 1000,
                         candidatePage)
                 .getContent();
 
@@ -500,7 +501,8 @@ public class MissingPetBoardService {
                     double score = 0.6 * recencyScore + 0.4 * distScore;
                     return new ScoredMissingPet(board, distKm, score);
                 })
-                .filter(scored -> scored.distanceKm() <= HOME_MISSING_RADIUS_KM)
+                // [지도 반경검색 통일] 반경 필터는 이제 DB(ST_Distance_Sphere)가 한다.
+                // 여기서 haversineKm 을 다시 쓰는 건 점수(근접도)를 매기기 위해서지 거르기 위해서가 아니다.
                 .sorted(java.util.Comparator.comparingDouble(ScoredMissingPet::score).reversed())
                 .limit(limit)
                 .forEach(scored -> {

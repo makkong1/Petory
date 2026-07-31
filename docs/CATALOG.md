@@ -180,7 +180,7 @@
 
 ## 6. concurrency/ — 동시성 제어
 
-- `concurrency/concurrency-strategy-master.md` — 2026-07-07, 동시성 8개 시나리오를 4전략(비관적 락/원자적 UPDATE/DB Unique/트랜잭션 경계)으로 분류한 마스터 문서. Meetup 실측(비관적 락 2.4ms vs 원자적 UPDATE 8.4ms) 포함.
+- `concurrency/concurrency-strategy-master.md` — 2026-07-07, 동시성 8개 시나리오를 4전략(비관적 락/원자적 UPDATE/DB Unique/트랜잭션 경계)으로 분류한 마스터 문서. Meetup 속도 벤치마크(비관적 락 2.4ms vs 원자적 UPDATE 8.4ms)는 §부록에 **인용 금지 사유와 함께** 참고 기록으로만 보존.
 - `concurrency/evidence/race-condition-reverify-2026-07-12.md` — Meetup/PetCoin/Care 동시성 테스트 재실행+worktree 재현. PetCoin Lost Update 재현·해결 확인, Meetup 최초버그(a549eb33)는 인원초과가 아니라 Deadlock이었음을 새로 발견.
 - `concurrency/transaction-concurrency-cases.md` — 트랜잭션 관리(cascade delete, 댓글수 동기화, readOnly)와 동시성 제어(조회수·반응 중복방지, 원자적 증가) 실제 코드 사례 모음.
 

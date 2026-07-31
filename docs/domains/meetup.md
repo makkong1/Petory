@@ -226,7 +226,13 @@ Meetup 도메인은 사용자가 오프라인 모임을 만들고, 다른 사용
 - `geo_point` 공간 컬럼
 - `ST_Within` bounding polygon
 - `ST_Distance_Sphere` 반경 검증
-- 거리 오름차순, 날짜 오름차순 정렬
+- **거리 오름차순 + `idx` 오름차순 정렬** — 2026-07-31 지도 반경검색 통일로 보조 정렬키를
+  `date ASC`에서 `idx ASC`로 바꿨다. 거리와 날짜가 동시에 같은 모임이 있으면 순서가 비결정적이라
+  지도를 옮기며 재조회할 때 마커 순서가 흔들릴 수 있었다. PK를 마지막 키로 두면 항상 고정된다.
+  (같은 규칙을 care·location에도 적용했다)
+- **결과 상한은 `NearbySearchPolicy`가 반경으로 정한다.** `maxResults`를 주면 정책값과 비교해
+  작은 쪽을 쓴다. 예전에는 컨트롤러 기본값 20, 주석 설명 500, 프론트 `ZOOM_LIMIT_TABLE` 30~800이
+  전부 달랐다.
 - id만 조회한 뒤 `findByIdxInWithOrganizer(ids)`로 주최자 fetch
 - id 순서를 유지해 DTO 변환
 

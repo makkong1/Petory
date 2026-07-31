@@ -8,7 +8,8 @@ const mockResolve = (data) => Promise.resolve({ data });
 
 export const meetupApi = {
   // 반경 기반 모임 조회 (마커 표시용)
-  getNearbyMeetups: (lat, lng, radius = 5, maxResults = 200) => {
+  // [지도 반경검색 통일] maxResults 를 안 보내면 백엔드 NearbySearchPolicy 가 반경으로 정한다.
+  getNearbyMeetups: (lat, lng, radius = 5, maxResults) => {
     if (isDemoMode()) {
       return mockResolve(DEMO_MEETUPS);
     }

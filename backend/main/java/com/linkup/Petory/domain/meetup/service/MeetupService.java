@@ -289,8 +289,8 @@ public class MeetupService {
                 .map(meetup -> {
                     MeetupDTO dto = converter.toDTO(meetup);
                     if (meetup.getLatitude() != null && meetup.getLongitude() != null) {
-                        dto.setDistance(calculateDistanceMeters(
-                                lat, lng, meetup.getLatitude(), meetup.getLongitude()));
+                        dto.setDistance(haversineKm(
+                                lat, lng, meetup.getLatitude(), meetup.getLongitude()) * 1000);
                     }
                     return dto;
                 })
@@ -306,15 +306,26 @@ public class MeetupService {
         return result;
     }
 
-    private double calculateDistanceMeters(Double lat1, Double lng1, Double lat2, Double lng2) {
-        final int earthRadiusMeters = 6371000;
+    /**
+     * 두 좌표 사이의 구면 거리(km). Haversine 공식.
+     *
+     * <p>
+     * [지도 반경검색 통일] 예전엔 이 클래스에 {@code calculateDistanceMeters}(반환 m)와
+     * {@code haversineKm}(반환 km)이 <b>수식은 같고 단위만 다른 채로</b> 둘 다 있었다.
+     * 하나로 합치고, 미터가 필요한 쪽에서 {@code * 1000} 한다.
+     *
+     * <p>
+     * 반경 필터·정렬은 DB의 {@code ST_Distance_Sphere} 가 하고, 이 메서드는 이미 조회된
+     * 결과의 거리 표시(DTO {@code distance})와 홈 추천 점수 계산에만 쓴다.
+     */
+    private double haversineKm(double lat1, double lng1, double lat2, double lng2) {
+        final int earthRadiusKm = 6371;
         double dLat = Math.toRadians(lat2 - lat1);
         double dLng = Math.toRadians(lng2 - lng1);
         double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
                 + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
-                * Math.sin(dLng / 2) * Math.sin(dLng / 2);
-        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return earthRadiusMeters * c;
+                        * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+        return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
 
     // 특정 모임의 참가자 목록 조회 (존재·삭제 여부 먼저 확인)
@@ -590,16 +601,6 @@ public class MeetupService {
                 .collect(Collectors.toList());
 
         return scored.isEmpty() ? getAvailableMeetups(fallbackPage).getContent() : scored;
-    }
-
-    private double haversineKm(double lat1, double lng1, double lat2, double lng2) {
-        final int R = 6371;
-        double dLat = Math.toRadians(lat2 - lat1);
-        double dLng = Math.toRadians(lng2 - lng1);
-        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
-                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
-                * Math.sin(dLng / 2) * Math.sin(dLng / 2);
-        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
 
     // 주최자별 모임 조회
