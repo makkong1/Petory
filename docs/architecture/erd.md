@@ -456,12 +456,29 @@ CREATE INDEX idx_meetup_status_date
 ON meetup(status, date DESC);
 
 -- 위치 기반 검색 (Spatial Index)
-CREATE SPATIAL INDEX idx_missing_pet_location 
-ON missing_pet_board(latitude, longitude);
-
-CREATE SPATIAL INDEX idx_location_service_coords 
-ON location_service(latitude, longitude);
+-- 네 도메인 모두 POINT(SRID 4326) 컬럼에 SPATIAL 인덱스를 건다.
+-- 값은 BEFORE INSERT/UPDATE 트리거가 latitude/longitude 에서 자동으로 채우므로
+-- 엔티티에는 POINT 를 매핑하지 않는다(ddl-auto=validate 통과).
+CREATE SPATIAL INDEX idx_carerequest_geo_point_spatial   ON carerequest(geo_point);        -- V4
+CREATE SPATIAL INDEX idx_meetup_geo_point_spatial        ON meetup(geo_point);             -- V1
+CREATE SPATIAL INDEX idx_missing_pet_geo_point_spatial   ON missing_pet_board(geo_point);  -- V5
+CREATE SPATIAL INDEX idx_locationservice_location_spatial ON locationservice(location);    -- V1
 ```
+
+> **정정(2026-07-31)**: 예전 판은 `missing_pet_board(latitude, longitude)`와
+> `location_service(latitude, longitude)`를 SPATIAL 인덱스로 적었는데 **둘 다 사실과 달랐다.**
+> `(latitude, longitude)`는 SPATIAL이 될 수 없다 — SPATIAL 인덱스는 geometry 컬럼에만 걸린다.
+> 실제로 존재했던 건 같은 이름의 **B-tree** 인덱스였고, 공간 인덱스로 대체된 뒤 읽기 0회로 남아 있다가
+> `V10`에서 제거됐다. `location_service`라는 테이블도 없다(실제 이름은 `locationservice`).
+
+**공간 인덱스로 대체돼 제거된 인덱스** (`V10`·`V11`):
+
+| 인덱스 | 테이블 | 제거 근거 |
+|---|---|---|
+| `idx_meetup_location (latitude, longitude)` | meetup | SPATIAL 로 대체. 읽기 0회 |
+| `idx_missing_pet_location (latitude, longitude)` | missing_pet_board | SPATIAL 로 대체(V5). 읽기 0회 |
+| `idx_locationservice_eupmyeondong_deleted_rating` | locationservice | 호출부가 주석 처리돼 있었음. 읽기 0회 |
+| `idx_road_name_deleted_rating` | locationservice | 위와 같음 |
 
 #### Full-Text 인덱스
 ```sql
