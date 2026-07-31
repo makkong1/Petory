@@ -11,6 +11,7 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * ====================================================================================
@@ -45,6 +46,34 @@ class IndexUsageRegressionTest {
         StringBuilder sb = new StringBuilder();
         rows.forEach(r -> sb.append(r).append('\n'));
         return sb.toString();
+    }
+
+    private long rowCountOf(String table) {
+        Object count = entityManager.createNativeQuery("SELECT COUNT(*) FROM " + table).getSingleResult();
+        return ((Number) count).longValue();
+    }
+
+    /**
+     * 실행계획 단언은 <b>데이터가 충분할 때만</b> 의미가 있다.
+     *
+     * <p>
+     * 옵티마이저는 행 수와 통계로 계획을 고르므로, 빈 테이블에서는 인덱스를 안 타거나 다른 인덱스를
+     * 골라도 그게 정상이다. 실제로 CI 가 이것 때문에 깨졌다 — CI 는 빈 MySQL 에 Flyway 로 스키마만
+     * 만들고 더미 데이터를 넣지 않는데, 로컬(board 5만 행)에서 통과하던 계획 단언이 CI(0행)에서
+     * 실패했다.
+     *
+     * <p>
+     * 그래서 행 수가 기준 미만이면 <b>실패가 아니라 skip</b> 한다. 이 가드가 지키려는 회귀
+     * (인덱스를 못 타는 형태로 쿼리가 다시 쓰이는 것)는 어차피 데이터가 있는 환경에서만 드러난다.
+     * 데이터와 무관하게 결정적인 것 — 인덱스가 존재하는지 — 은 아래 스키마 검증 테스트들이 맡는다.
+     */
+    private void requireRowsFor(String table, long minimumRows) {
+        long actual = rowCountOf(table);
+        assumeTrue(actual >= minimumRows,
+                () -> String.format(
+                        "%s 가 %d행뿐이라 실행계획 단언을 건너뛴다(필요: %d행 이상). "
+                                + "빈 DB(CI)에서는 옵티마이저가 다른 계획을 골라도 정상이다.",
+                        table, actual, minimumRows));
     }
 
     /**
@@ -168,6 +197,7 @@ class IndexUsageRegressionTest {
     @Test
     @DisplayName("care 목록: 정렬용 인덱스를 타고 filesort 가 없다")
     void careListUsesSortIndex() {
+        requireRowsFor("carerequest", 500);
         String plan = explain(
                 "SELECT cr.idx FROM carerequest cr JOIN users u ON u.idx = cr.user_idx "
                         + "WHERE cr.is_deleted = 0 AND u.is_deleted = 0 AND u.status = 'ACTIVE' "
@@ -197,6 +227,7 @@ class IndexUsageRegressionTest {
     @Test
     @DisplayName("게시글 목록 1단계: 커버링 인덱스를 타고 filesort 가 없다 (동점 처리 방향 포함)")
     void boardListStage1UsesCoveringIndexWithoutSort() {
+        requireRowsFor("board", 1000);
         String plan = explain(
                 "SELECT idx FROM board WHERE is_deleted = 0 AND author_visible = 1 "
                         + "ORDER BY created_at DESC, idx ASC LIMIT 20 OFFSET 0");
@@ -257,6 +288,7 @@ class IndexUsageRegressionTest {
     @Test
     @DisplayName("admin 사용자 목록: created_at 인덱스를 타고 filesort 가 없다")
     void adminUserListUsesCreatedAtIndex() {
+        requireRowsFor("users", 500);
         String plan = explain("SELECT u.idx FROM users u ORDER BY u.created_at DESC LIMIT 20");
 
         assertThat(plan)

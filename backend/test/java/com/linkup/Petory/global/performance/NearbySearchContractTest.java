@@ -1,16 +1,25 @@
 package com.linkup.Petory.global.performance;
 
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.data.jpa.repository.Query;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.linkup.Petory.domain.care.dto.CareRequestListView;
+import com.linkup.Petory.domain.care.entity.CareRequest;
+import com.linkup.Petory.domain.care.entity.CareRequestStatus;
+import com.linkup.Petory.domain.care.entity.CareScheduleMode;
+import com.linkup.Petory.domain.care.repository.CareRequestRepository;
 import com.linkup.Petory.domain.care.repository.SpringDataJpaCareRequestRepository;
+import com.linkup.Petory.domain.user.entity.Role;
+import com.linkup.Petory.domain.user.entity.Users;
+import com.linkup.Petory.domain.user.repository.UsersRepository;
 import com.linkup.Petory.global.config.NearbySearchPolicy;
 
 import jakarta.persistence.EntityManager;
@@ -31,18 +40,21 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <li>care — {@code created_at DESC}. 이 컬럼엔 정렬용 인덱스가 있어서, 매치가 LIMIT 을
  * 채우면 옵티마이저가 "정렬 인덱스를 역주행하다 멈추는" 계획을 골라 <b>공간 인덱스를 아예
  * 안 썼다</b>(5km 는 SPATIAL 208행, 10km 부터 created_at 인덱스 1,622행).</li>
- * <li>meetup — {@code ST_Distance_Sphere(...) ASC}. 함수식이라 정렬 인덱스가 없고 조기종료가
- * 불가능해서, 순수 선택도 손익분기점에서만 뒤집혔다(박스가 테이블의 약 25%, 12km 부터 Table scan).</li>
- * <li>locationservice — {@code CASE(sort)..., rating DESC, idx ASC}. 넓어지면
+ * <li>meetup — {@code ST_Distance_Sphere(...) ASC}. 함수식이라 조기종료가 불가능해서
+ * 순수 선택도 손익분기점에서만 뒤집혔다(박스가 테이블의 약 25%, 12km 부터 Table scan).</li>
+ * <li>locationservice — {@code CASE(sort)..., rating DESC}. 넓어지면
  * {@code idx_locationservice_deleted_rating} 으로 갈아탔다.</li>
  * </ul>
  *
  * <p>
- * 거리순으로 통일하면 네 도메인 모두 정렬용 인덱스가 없어져 <b>계획이 예측 가능</b>해진다 —
- * 선택도 교차점까지는 공간 인덱스, 그 뒤엔 다른 경로. 지도에서 "가까운 순"이 의미상으로도 맞다.
+ * <b>이 테스트는 계획이 아니라 "계약" 만 검증한다.</b> 처음엔 실행계획을 단언했다가 CI 에서
+ * 깨졌다 — CI 는 빈 MySQL 에 Flyway 로 스키마만 만들고 더미 데이터를 넣지 않는데, 실행계획은
+ * 행 수와 통계에 따라 달라지기 때문이다. 로컬(더미 5만 행)에서 통과하던 것이 CI(0행)에서
+ * 실패했다. 그래서 <b>어떤 인덱스를 타는지는 테스트가 아니라 측정·문서의 영역</b>으로 넘기고,
+ * 여기서는 데이터를 직접 만들어 <b>정렬 순서와 반경 경계</b>만 본다. 이건 행 수와 무관하게
+ * 결정적이다.
  *
  * <p>
- * 이 테스트는 그 계약을 고정한다. 누군가 {@code ORDER BY} 를 다시 도메인별로 바꾸면 깨진다.
  * 근거: docs/interview/concepts/02_공간쿼리_Haversine.md
  * ====================================================================================
  */
@@ -50,55 +62,75 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Transactional
 class NearbySearchContractTest {
 
-    /** 서울 시청 근처 — 더미 데이터가 수도권에 몰려 있어 후보가 잡힌다. */
+    /** 서울 시청. 테스트가 심는 좌표의 기준점. */
     private static final double LAT = 37.5665;
     private static final double LNG = 126.978;
+
+    /** 위도 1도 ≈ 111km. 거리를 km 단위로 의도한 만큼 벌리는 데 쓴다. */
+    private static final double KM_PER_LAT_DEGREE = 111.0;
 
     @PersistenceContext
     private EntityManager entityManager;
 
     @Autowired
-    private SpringDataJpaCareRequestRepository careRequestRepository;
+    private SpringDataJpaCareRequestRepository careRequestJpaRepository;
+    @Autowired
+    private CareRequestRepository careRequestRepository;
+    @Autowired
+    private UsersRepository usersRepository;
 
-    private String plan(String sql) {
-        @SuppressWarnings("unchecked")
-        List<Object> rows = entityManager.createNativeQuery("EXPLAIN FORMAT=TREE " + sql).getResultList();
-        StringBuilder sb = new StringBuilder();
-        rows.forEach(r -> sb.append(r).append('\n'));
-        return sb.toString();
-    }
+    private String tag;
 
     /**
-     * 네 도메인의 반경검색 쿼리가 모두 {@code ST_Distance_Sphere} 로 정밀 반경을 거르는지 본다.
+     * 중심에서 북쪽으로 정확히 {@code km} 만큼 떨어진 케어 요청을 만든다.
      *
      * <p>
-     * missing_pet_board 은 예전에 이 필터가 <b>Java 에 있었다</b> — DB 는 사각형 후보만 주고
-     * 서비스가 {@code haversineKm} 로 원형을 걸렀다. 그러면 후보 상한(200건) 중 사각형 모서리에
-     * 걸린 것들이 Java 에서 버려져 실제 점수 계산 대상이 200보다 적어졌다. DB 로 내려서
-     * 나머지 세 도메인과 필터 위치를 맞췄다.
+     * {@code geo_point} 는 엔티티에 매핑돼 있지 않고 {@code BEFORE INSERT} 트리거가
+     * 위·경도에서 채우므로, 위·경도만 넣으면 공간 쿼리가 그대로 동작한다.
      */
-    @Test
-    @DisplayName("4도메인 모두 2단계(ST_Within → ST_Distance_Sphere)로 반경을 거른다")
-    void allDomainsFilterRadiusInDatabase() {
-        String careSql = "SELECT COUNT(*) FROM carerequest cr WHERE cr.is_deleted = 0 "
-                + "AND ST_Distance_Sphere(cr.geo_point, ST_GeomFromText('POINT(37.5665 126.978)', 4326)) <= 5000";
-        String meetupSql = "SELECT COUNT(*) FROM meetup m WHERE (m.is_deleted = false OR m.is_deleted IS NULL) "
-                + "AND ST_Distance_Sphere(m.geo_point, ST_GeomFromText('POINT(37.5665 126.978)', 4326)) <= 5000";
-        String missingSql = "SELECT COUNT(*) FROM missing_pet_board b WHERE b.is_deleted = 0 "
-                + "AND ST_Distance_Sphere(b.geo_point, ST_GeomFromText('POINT(37.5665 126.978)', 4326)) <= 5000";
-        String locationSql = "SELECT COUNT(*) FROM locationservice ls WHERE ls.is_deleted = 0 "
-                + "AND ST_Distance_Sphere(ls.location, ST_GeomFromText('POINT(37.5665 126.978)', 4326)) <= 5000";
-
-        // 네 쿼리가 예외 없이 실행되면 geo_point/location 컬럼과 SRID 규약이 살아 있다는 뜻이다.
-        for (String sql : List.of(careSql, meetupSql, missingSql, locationSql)) {
-            Object count = entityManager.createNativeQuery(sql).getSingleResult();
-            assertThat(((Number) count).longValue())
-                    .as("반경 필터가 실행되지 않는다. geo_point 컬럼·SRID 규약을 확인할 것:\n%s", sql)
-                    .isGreaterThanOrEqualTo(0L);
-        }
+    private CareRequest careAtDistance(Users writer, double km) {
+        return careRequestRepository.save(CareRequest.builder()
+                .user(writer)
+                .title(tag + " " + km + "km")
+                .description("반경검색 계약 테스트")
+                .date(LocalDateTime.now().plusDays(1))
+                .scheduleMode(CareScheduleMode.FIXED)
+                .estimatedDurationMinutes(30)
+                .offeredCoins(100)
+                .status(CareRequestStatus.OPEN)
+                .isDeleted(false)
+                .latitude(LAT + km / KM_PER_LAT_DEGREE)
+                .longitude(LNG)
+                .build());
     }
 
-    /** 두 좌표 사이 거리(m). ST_Distance_Sphere 와 같은 구면 근사를 쓴다. */
+    @BeforeEach
+    void setUp() {
+        tag = "nb" + UUID.randomUUID().toString().substring(0, 8);
+
+        Users writer = usersRepository.save(Users.builder()
+                .id(tag + "-writer")
+                .username(tag + "-writer")
+                .email(tag + "-writer@test.com")
+                .nickname(tag + "-작성자")
+                .password("password")
+                .role(Role.USER)
+                .location("서울시 중구")
+                .build());
+
+        // 일부러 거리 순서와 삽입 순서를 어긋나게 심는다.
+        // 삽입 순서(= 사실상 created_at 순서)대로 나오면 정렬이 안 걸린 것이므로 테스트가 잡는다.
+        careAtDistance(writer, 3.0);
+        careAtDistance(writer, 0.5);
+        careAtDistance(writer, 7.0);
+        careAtDistance(writer, 1.5);
+        careAtDistance(writer, 30.0); // 반경 밖 — 걸러져야 한다
+
+        // native 쿼리는 자동 flush 대상이 아닐 수 있으므로 명시적으로 반영시킨다.
+        entityManager.flush();
+    }
+
+    /** 두 좌표 사이 거리(m). ST_Distance_Sphere 와 같은 구면 근사. */
     private static double distanceMeters(double lat1, double lng1, double lat2, double lng2) {
         double dLat = Math.toRadians(lat2 - lat1);
         double dLng = Math.toRadians(lng2 - lng1);
@@ -124,68 +156,66 @@ class NearbySearchContractTest {
     @Test
     @DisplayName("care 반경검색: 리포지토리 결과가 거리 오름차순이고 반경을 벗어나지 않는다")
     void careNearbyIsSortedByDistance() {
-        double radiusKm = 5.0;
-        List<CareRequestListView> views = careRequestRepository.findNearbyCareRequests(
+        double radiusKm = 10.0;
+        List<CareRequestListView> views = careRequestJpaRepository.findNearbyCareRequests(
                 LAT, LNG, radiusKm, NearbySearchPolicy.resultLimitFor(radiusKm));
 
-        assertThat(views)
-                .as("후보가 0건이면 정렬 계약을 검증할 수 없다. 더미 데이터의 좌표 분포를 확인할 것.")
-                .isNotEmpty();
+        List<CareRequestListView> mine = views.stream()
+                .filter(v -> v.getTitle() != null && v.getTitle().startsWith(tag))
+                .toList();
+
+        assertThat(mine)
+                .as("이 테스트가 심은 반경 안 요청 4건이 조회돼야 한다 (30km 짜리는 제외)")
+                .hasSize(4);
 
         double previous = -1;
-        for (CareRequestListView v : views) {
+        for (CareRequestListView v : mine) {
             double distance = distanceMeters(LAT, LNG, v.getLatitude(), v.getLongitude());
 
             assertThat(distance)
-                    .as("반경 %skm 밖의 행이 섞였다(idx=%s) — 2차 ST_Distance_Sphere 필터를 확인할 것",
-                            radiusKm, v.getIdx())
+                    .as("반경 %skm 밖의 행이 섞였다(%s) — 2차 ST_Distance_Sphere 필터를 확인할 것",
+                            radiusKm, v.getTitle())
                     .isLessThanOrEqualTo(radiusKm * 1000 + 1.0);
             assertThat(distance)
-                    .as("거리 오름차순이 깨졌다(idx=%s, %.1fm 뒤에 %.1fm). "
+                    .as("거리 오름차순이 깨졌다(%s: %.1fm 앞에 %.1fm). "
                             + "ORDER BY 가 created_at 등으로 되돌아갔는지 확인할 것",
-                            v.getIdx(), previous, distance)
+                            v.getTitle(), previous, distance)
                     .isGreaterThanOrEqualTo(previous - 1.0);
             previous = distance;
         }
     }
 
     /**
-     * 정렬 통일이 실제로 계획을 바꿨는지 — {@code created_at} 정렬 인덱스로 새지 않는다.
+     * 네 도메인의 반경검색이 모두 {@code ST_Distance_Sphere} 로 정밀 반경을 거르는지 본다.
      *
      * <p>
-     * 이게 이 작업의 핵심 효과다. 예전엔 반경이 조금만 넓어져도
-     * {@code Index scan on cr using idx_carerequest_deleted_created (reverse)} 로 새면서
-     * 공간 인덱스를 버렸다. 거리순으로 바꾸면 그 탈출구가 없어진다.
+     * missing_pet_board 은 예전에 이 필터가 <b>Java 에 있었다</b> — DB 는 사각형 후보만 주고
+     * 서비스가 {@code haversineKm} 로 원형을 걸렀다. 그러면 후보 상한(200건) 중 사각형 모서리에
+     * 걸린 것들이 Java 에서 버려져 실제 점수 계산 대상이 200보다 적어졌다. DB 로 내려서
+     * 나머지 세 도메인과 필터 위치를 맞췄다.
      *
      * <p>
-     * 계획은 <b>실제 프로덕션 쿼리 문자열</b>로 떠야 의미가 있다. 그래서 리포지토리에 박힌
-     * 쿼리를 {@code @Query} 어노테이션에서 읽어와 EXPLAIN 한다.
+     * 데이터가 없어도 성립한다 — 쿼리가 실행된다는 것 자체가 {@code geo_point}/{@code location}
+     * 컬럼과 SRID 규약이 살아 있다는 뜻이다.
      */
     @Test
-    @DisplayName("care 반경검색: 프로덕션 쿼리가 created_at 정렬 인덱스로 새지 않는다")
-    void careNearbyNoLongerEscapesToCreatedAtIndex() throws Exception {
-        String sql = productionNearbyQuery()
-                .replace(":lat", String.valueOf(LAT))
-                .replace(":lng", String.valueOf(LNG))
-                .replace(":radius", "20.0")
-                .replace(":limit", "500");
+    @DisplayName("4도메인 모두 2단계(ST_Within → ST_Distance_Sphere)로 반경을 거른다")
+    void allDomainsFilterRadiusInDatabase() {
+        String careSql = "SELECT COUNT(*) FROM carerequest cr WHERE cr.is_deleted = 0 "
+                + "AND ST_Distance_Sphere(cr.geo_point, ST_GeomFromText('POINT(37.5665 126.978)', 4326)) <= 5000";
+        String meetupSql = "SELECT COUNT(*) FROM meetup m WHERE (m.is_deleted = false OR m.is_deleted IS NULL) "
+                + "AND ST_Distance_Sphere(m.geo_point, ST_GeomFromText('POINT(37.5665 126.978)', 4326)) <= 5000";
+        String missingSql = "SELECT COUNT(*) FROM missing_pet_board b WHERE b.is_deleted = 0 "
+                + "AND ST_Distance_Sphere(b.geo_point, ST_GeomFromText('POINT(37.5665 126.978)', 4326)) <= 5000";
+        String locationSql = "SELECT COUNT(*) FROM locationservice ls WHERE ls.is_deleted = 0 "
+                + "AND ST_Distance_Sphere(ls.location, ST_GeomFromText('POINT(37.5665 126.978)', 4326)) <= 5000";
 
-        String plan = plan(sql);
-        assertThat(plan)
-                .as("정렬 기준이 거리인데 created_at 인덱스를 탄다는 건 ORDER BY 가 되돌아갔다는 뜻이다.\n계획:\n%s",
-                        plan)
-                .doesNotContain("idx_carerequest_deleted_created");
-    }
-
-    /** 리포지토리에 실제로 박혀 있는 반경검색 쿼리 문자열을 꺼낸다(테스트가 SQL 을 새로 쓰지 않도록). */
-    private String productionNearbyQuery() throws NoSuchMethodException {
-        Query query = SpringDataJpaCareRequestRepository.class
-                .getMethod("findNearbyCareRequests", Double.class, Double.class, Double.class, int.class)
-                .getAnnotation(Query.class);
-        assertThat(query)
-                .as("findNearbyCareRequests 에 @Query 가 없다 — 시그니처가 바뀌었는지 확인할 것")
-                .isNotNull();
-        return query.value();
+        for (String sql : List.of(careSql, meetupSql, missingSql, locationSql)) {
+            Object count = entityManager.createNativeQuery(sql).getSingleResult();
+            assertThat(((Number) count).longValue())
+                    .as("반경 필터가 실행되지 않는다. geo_point 컬럼·SRID 규약을 확인할 것:\n%s", sql)
+                    .isGreaterThanOrEqualTo(0L);
+        }
     }
 
     /** 결과 상한 정책이 반경에 따라 단조 증가하고 절대 상한을 넘지 않는지. */
