@@ -467,6 +467,20 @@
 - `interview/ds-algorithm-checklist.md` — 도메인별 실사용 자료구조·알고리즘 우선순위표. petRecommendation만 분석완료, 나머지는 미분석.
 - `interview/petory-backend-면접-코테-정리.md` — 실제 면접 질문 12개와 답변+정답 가이드.
 
+### interview/flows/
+
+> `domain-page-drafts/`(포트폴리오 V2 페이지 문구 점검)와 `interview/concepts/`(개념 횡단 정리) 둘 다 채우지 않는 자리 — 포트폴리오 흐름도 페이지(`/domains/flows`) 시퀀스 하나하나를 [코드 근거] + [포트폴리오 대응 위치·딥링크] + [예상질문·답변] 3단으로 도메인별 1파일씩 정리.
+
+- `interview/flows/README.md` — 폴더 목적, 기존 문서와의 역할 구분, 도메인별 진행 현황표.
+- `interview/flows/care.md` — Care 거래 확정 흐름(`confirmCareDeal` 비관적 락 → `CareApplication` 승인 → 에스크로 생성). 5개 설계 변천사(원인→해결→결과 형식) 포함 — Stuck State, 스케줄러 트랜잭션 경계, `updateStatus` 이중 락 회귀, 문서-코드 불일치 발견까지.
+- `interview/flows/board.md` — Board 목록/상세/댓글/인기글 흐름. 3개 설계 변천사(N+1 301→3쿼리, 상세 캐시가 조회수 버그를 만든 사례, "인덱스 있는데도 안 쓰인" 옵티마이저 히스토그램 사건) + 반응 API의 userId 신뢰 문제 등 알려진 한계 포함.
+- `interview/flows/chat.md` — Chat(Care/MissingPet/Meetup 연계) 채팅방 생성·메시지·읽음 흐름. 4개 설계 변천사(IDOR 수정, self-invocation으로 REQUIRES_NEW 무시되던 버그, 읽음 처리가 죽은 코드였던 사례, N+1 41→4쿼리 + 측정도구 자체의 버그 발견) 포함.
+- `interview/flows/missing-pet.md` — Missing Pet 제보·목격 댓글·채팅 연결 흐름. N+1(267→4쿼리) + `orphanRemoval=true`가 소프트 삭제 정책과 충돌하던 사례 + Pageable 정렬이 하드코딩된 JPQL에 조용히 무시되는 한계 포함.
+- `interview/flows/meetup.md` — Meetup 모임 생성·참가·채팅방 흐름. 3개 설계 변천사(참가 정원 동시성 — 진단이 두 번 뒤집힌 사례: 정원초과 예상→실제론 데드락→3중 방어로 정착, 참가취소 Lost Update, 채팅방 생성 3단계 안전망) 포함.
+- `interview/flows/location.md` — Location 주변서비스 검색·리뷰·평점 흐름. 4개 설계 변천사(무제한 전체조회→반경조회, DB시간보다 HTTP시간 격차가 컸던 이유, 카테고리 필터 Java메모리→SQL 통합, 메서드명-실제동작 불일치, saveBatch self-invocation — Chat과 동일 패턴) 포함.
+- `interview/flows/recommendation.md` — Recommendation Signal 수집·NLP 분석·추천 카드 흐름. 2개 설계 변천사(이벤트 리스너가 트랜잭션 커밋 전에 실행되던 문제, petType 422 무음 드롭 — 장애격리 원칙 자체가 만든 침묵 버그) 포함.
+- `interview/flows/user.md` — User JWT 인증·프로필·제재 흐름. 2개 설계 변천사(제재된 사용자가 기존 토큰으로 계속 접근 가능했던 취약점 A1~A6 + SUSPENDED 신고 예외 정책, 로그인/refresh 중복 조회 제거) 포함. 도메인 8개 전체 완료.
+
 ### interview/concepts/
 
 - `interview/concepts/_진행상태.md` — 문서 전수 점검 체크리스트. 01~14 점검 완료, 2차 점검(2026-06-18), 15·16 신규 추가.

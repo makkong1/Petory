@@ -36,9 +36,9 @@
 | #   | 시나리오                             | 문제 유형                            | 선택 전략                                                     | 상태                                 | 근거 (테스트 / 문서)                                                                                         |
 | --- | ------------------------------------ | ------------------------------------ | ------------------------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
 | 1   | **PetCoin 잔액** 차감/충전/지급/환불 | Lost Update                          | 비관적 락 `findByIdForUpdate`                                 | ✅ 해결                              | `PetCoinServiceRaceConditionTest` / [payment 문서](../refactoring/payment/petcoin-service-race-condition.md) |
-| 2   | **Meetup 참가 인원**                 | Lost Update + 최대 인원 초과         | 원자적 조건부 UPDATE + CHECK 제약                             | ✅ 해결 (+벤치마크)                  | `MeetupServiceRaceConditionTest` / [meetup 문서](../troubleshooting/meetup/race-condition-participants.md)   |
+| 2   | **Meetup 참가 인원**                 | **락 승격 데드락**(정상 경로) + 초과·Lost Update(트랜잭션 우회 시) | 비관적 락 `findByIdWithLock` + 조건부 원자 UPDATE + 복합 PK + CHECK **4겹**(§3.2) | ✅ 해결 (`58467b4e`에서 현재 형태 완성) | `MeetupServiceRaceConditionTest` / [meetup 문서](../troubleshooting/meetup/race-condition-participants.md)   |
 | 3   | **Care 거래 확정**                   | Stuck State (격리수준으로 로직 skip) | 비관적 락 (Conversation)                                      | ✅ 해결                              | `CareDealConcurrencyTest` / [care 문서](../troubleshooting/care/care-deal-confirmation-race-condition.md)    |
-| 4   | **경고 횟수 증가**                   | Lost Update + **락 승격 데드락**     | 원자적 UPDATE `warning_count+1` + **UPDATE를 FK INSERT보다 먼저**(X락 선점) | ✅ 해결                              | `UserSanctionServiceConcurrencyTest`                                                                         |
+| 4   | **경고 횟수 증가**                   | Lost Update + **락 승격 데드락** + bulk update 후 1차 캐시 stale | 원자적 UPDATE `warning_count+1` + **UPDATE를 FK INSERT보다 먼저**(X락 선점) + `entityManager.refresh(user)` | ✅ 해결 (결함 2건, `1f989b9f`·`294ea235`) | `UserSanctionServiceConcurrencyTest` · `UserSanctionAutoSuspensionTest`                                       |
 | 5   | **닉네임/가입 중복**                 | 중복 생성                            | DB Unique 제약 (+예외처리)                                    | ✅ 무결성 보장 / 예외처리 개선 여지  | `UsersServiceConcurrencyTest`                                                                                |
 | 6   | **소셜 로그인 중복 계정**            | 중복 생성                            | DB Unique 제약 `uk_socialuser_provider_providerid` (backstop) | 🟡 부분 (무결성 O, 패자 예외 미처리) | `OAuth2ServiceConcurrencyTest`                                                                               |
 | 7   | **Refresh Token 동시 갱신**          | 토큰 회전 경합                       | (미확립)                                                      | 🔴 탐색/미해결                       | `AuthServiceConcurrencyTest`                                                                                 |
@@ -107,6 +107,12 @@
 - **왜 이 전략**: 카운터 증가 자체는 검증 불필요 → 원자적 UPDATE로 충분. 단 **락 획득 순서**가 데드락을 좌우하므로 X락 선점이 핵심(원자적 UPDATE만으론 데드락이 안 풀렸음).
 - ✅ **`1f989b9f` diff로 확인된 사실**: 이 커밋 **이전에도 `incrementWarningCount`(원자적 UPDATE)는 이미 있었다** — 단지 `sanctionRepository.save()` **뒤**에 있었다. 커밋이 한 일은 그 한 줄을 INSERT 앞으로 옮긴 것뿐이다. 즉 "원자적 UPDATE로도 데드락이 남았다"는 서술이 diff로 입증된다(값을 바꾼 게 아니라 **순서만** 바꿔 해결). 테스트 diff도 항진명제 assert 1개에서 `successCount == adminCount` + `warningCount == adminCount` 2개 추가로 강화된 것이 확인된다.
 - 🔗 **§3.2 Meetup과 동일 메커니즘**: `INSERT(FK S락) → UPDATE(X락)` 순서가 양쪽의 공통 원인이다. 경고는 순서를 직접 뒤집어, 모임은 진입점에서 X락을 선점(`findByIdWithLock`)해 각각 해결했다.
+- 🟠 **같은 메서드의 두 번째 결함 — 자동 이용제한이 발동하지 않았다 (2026-07-30 발견 → `294ea235`로 해결)**: `addWarning`의 임계 검사가 **증가 전 값**을 읽고 있었다. `incrementWarningCount`는 `@Modifying` JPQL bulk update인데 `clearAutomatically`가 없어 영속성 컨텍스트를 비우지 않고, 앞서 `findById`로 적재된 `Users`가 그대로 남아 있어서 이후 `findById` 재조회가 **1차 캐시에 히트**했다(해당 구간에 재조회 SQL이 나가지 않는 것으로 확인). 그래서 `warningCount >= 3` 검사가 낡은 값과 비교됐다.
+  - **실측 (수정 전, `294ea235^`)**: 경고 2회 사용자에게 동시 3회 부여 → UPDATE 3건 모두 실행됐으나 **최종 상태 `ACTIVE`, 이용제한 0회**, `log.info("경고 N회 도달…")` 미출력.
+  - **테스트가 못 잡은 이유**: `testConcurrentWarningAutoSuspension`의 단언이 `if (status == SUSPENDED) { assertNotNull(...) }` **조건부**라 제재가 아예 안 걸리면 통과했다. §3.1 PetCoin false-green, 경고 항진명제와 같은 계열.
+  - **해결 (`294ea235`, 2026-07-30)**: Meetup이 동일 함정을 이미 `entityManager.refresh()`로 막고 있었으므로(§3.2) 같은 방식으로 맞췄다 — `sanctionRepository.save(warning)` 직후 `entityManager.refresh(user)`. `@Modifying(clearAutomatically = true)`는 컨텍스트를 통째로 비워 앞서 로드한 `user`·`admin`이 detach 되므로 채택하지 않았다.
+  - **회귀 방지**: 조건부가 아니라 **무조건 단언**하는 `UserSanctionAutoSuspensionTest` 신설(3회 도달 시 `SUSPENDED` + 경계값 2회는 `ACTIVE` 유지, 2건). TDD RED(`expected SUSPENDED but was ACTIVE`) → GREEN 확인. 2026-07-31 재실행에서도 2건 통과.
+  - ⚠️ **이 항목은 "미해결"로 적혀 있었다.** 그 서술을 쓴 **같은 날 저녁에 수정이 들어갔는데** 문서가 안 따라왔다. 결함 상태도 수치와 마찬가지로 **커밋 시점을 붙여야 한다.**
 - **실측 재확인(2026-07-30) — before/after 양방향 실행**:
   - **Before**: `git worktree`로 fix 직전 커밋 `e937b823`을 checkout 후 **강화된 테스트를 그 코드에 얹어** 실행 → **4/5 Deadlock, 성공 1/5**, warningCount 1, 중간값 `[1]`, 테스트 `expected: <5> but was: <1>` 실패. 실패 SQL = `update users u1_0 set warning_count=(u1_0.warning_count+1) where u1_0.idx=?` → **원자적 UPDATE 문장에서 데드락**이 확인됨(S락 보유 중 X락 승격의 직접 증거).
   - **After**: 성공 5/5, warningCount 5, 기록 5건, **중간값 `[1,2,3,4,5]`**(순차 처리 증거), Deadlock 0.
@@ -193,8 +199,8 @@
 ## 7. 면접 1분 스크립트
 
 > "동시성을 8개 시나리오에서 재현했고, **'현재 값 검증이 필요한가'** 기준으로 전략을 갈랐습니다.
-> 잔액처럼 값을 읽고 검증해야 하면 **비관적 락**(PetCoin), 인원처럼 단순 조건부 증가면 **원자적 조건부 UPDATE**(Meetup), 유일성이면 **DB Unique 제약**(닉네임·소셜), 부분 실패 롤백이면 **트랜잭션 경계**를 썼습니다.
-> Meetup은 비관적 락과 원자적 UPDATE를 **같은 조건에서 실측 비교**까지 했고, Care 거래 확정은 중복 실행이 아니라 **격리수준 때문에 로직이 skip되는 stuck state**라는 걸 파악해 상위 엔티티 락으로 풀었습니다.
+> 잔액처럼 값을 읽고 검증해야 하면 **비관적 락**(PetCoin), 유일성이면 **DB Unique 제약**(닉네임·소셜), 부분 실패 롤백이면 **트랜잭션 경계**를 썼습니다. 인원은 단순 조건부 증가라 **원자적 조건부 UPDATE**가 중심이지만, Meetup은 초과가 치명적이라 **비관적 락 + 조건부 UPDATE + 복합 PK + CHECK로 계층 방어**를 뒀습니다.
+> 여기에 축이 하나 더 있는데, **카운터 UPDATE 앞에 같은 행을 참조하는 FK INSERT가 있으면 락 획득 순서까지 봐야 한다**는 것입니다 — 경고와 Meetup 둘 다 예상은 Lost Update였는데 실제 증상은 락 승격 데드락이었습니다. Care 거래 확정은 중복 실행이 아니라 **격리수준 때문에 로직이 skip되는 stuck state**라는 걸 파악해 상위 엔티티 락으로 풀었습니다.
 > 리프레시 토큰 회전과 삭제-댓글 경합은 문제를 재현·식별한 단계까지 갔고, 해결은 설계 결정이 필요해 분리해 뒀습니다."
 
 ---
