@@ -3,7 +3,6 @@ package com.linkup.Petory.domain.board.service;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,7 +35,6 @@ public class ReactionService {
     private final CommentRepository commentRepository;
     private final UsersRepository usersRepository;
 
-    @CacheEvict(value = "boardDetail", key = "#p0")
     public ReactionSummaryDTO reactToBoard(Long boardId, Long userId, ReactionType reactionType) {
         Board board = boardRepository.findById(boardId)
                 .orElseThrow(() -> new BoardNotFoundException());
