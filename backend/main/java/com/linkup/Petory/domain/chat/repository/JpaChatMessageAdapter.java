@@ -95,12 +95,13 @@ public class JpaChatMessageAdapter implements ChatMessageRepository {
     @Override
     public List<ChatMessage> searchMessagesByKeyword(
             Long conversationIdx,
-            String keyword) {
+            String keyword,
+            LocalDateTime readFrom) {
         if (keyword == null || keyword.isBlank()) {
             return List.of();
         }
         String trimmed = keyword.trim();
-        List<Long> ids = jpaRepository.findIdxByFulltextContent(conversationIdx, trimmed);
+        List<Long> ids = jpaRepository.findIdxByFulltextContent(conversationIdx, trimmed, readFrom);
         if (ids.isEmpty()) {
             return List.of();
         }

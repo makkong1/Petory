@@ -97,11 +97,14 @@ public interface SpringDataJpaChatMessageRepository extends JpaRepository<ChatMe
             + "AND (m.is_deleted IS NULL OR m.is_deleted = 0) "
             + "AND (s.is_deleted IS NULL OR s.is_deleted = 0) "
             + "AND MATCH(m.content) AGAINST(:keyword IN NATURAL LANGUAGE MODE) "
+            // 신규·재참여자는 참여 이전 대화를 검색으로도 못 본다 (목록 조회와 같은 규칙)
+            + "AND (:readFrom IS NULL OR m.created_at > :readFrom) "
             + "ORDER BY m.created_at DESC",
             nativeQuery = true)
     List<Long> findIdxByFulltextContent(
             @Param("conversationIdx") Long conversationIdx,
-            @Param("keyword") String keyword);
+            @Param("keyword") String keyword,
+            @Param("readFrom") LocalDateTime readFrom);
 
     @RepositoryMethod("채팅 메시지: idx 목록으로 발신자 FETCH 조회")
     @Query("SELECT DISTINCT m FROM ChatMessage m JOIN FETCH m.sender s LEFT JOIN FETCH m.replyToMessage "
