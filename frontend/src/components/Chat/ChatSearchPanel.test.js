@@ -1,6 +1,6 @@
 // frontend/src/components/Chat/ChatSearchPanel.test.js
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { ThemeProvider } from 'styled-components';
 import { lightTheme } from '../../styles/theme';
 import ChatSearchPanel from './ChatSearchPanel';
@@ -49,13 +49,12 @@ test('검색에 성공하면 건수와 결과를 보여주고 키워드를 mark�
   wrap({});
   submit('산책');
 
-  await waitFor(() => expect(screen.getByText('1건')).toBeInTheDocument());
+  expect(await screen.findByText('1건')).toBeInTheDocument();
   expect(searchMessages).toHaveBeenCalledWith(1, '산책');
   expect(screen.getByText('김철수')).toBeInTheDocument();
 
-  const mark = document.querySelector('mark');
-  expect(mark).not.toBeNull();
-  expect(mark.textContent).toBe('산책');
+  const mark = screen.getByText('산책');
+  expect(mark.tagName).toBe('MARK');
 });
 
 test('결과가 없으면 안내 문구를 보여준다', async () => {
@@ -63,7 +62,5 @@ test('결과가 없으면 안내 문구를 보여준다', async () => {
   wrap({});
   submit('산책');
 
-  await waitFor(() =>
-    expect(screen.getByText('검색 결과가 없습니다.')).toBeInTheDocument()
-  );
+  expect(await screen.findByText('검색 결과가 없습니다.')).toBeInTheDocument();
 });
