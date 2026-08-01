@@ -1,6 +1,6 @@
 // frontend/src/components/Chat/ChatSearchPanel.test.js
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { ThemeProvider } from 'styled-components';
 import { lightTheme } from '../../styles/theme';
 import ChatSearchPanel from './ChatSearchPanel';
@@ -63,4 +63,36 @@ test('결과가 없으면 안내 문구를 보여준다', async () => {
   submit('산책');
 
   expect(await screen.findByText('검색 결과가 없습니다.')).toBeInTheDocument();
+});
+
+test('연타해도 늦게 온 이전 응답이 최신 결과를 덮지 않는다', async () => {
+  const result = (idx, content) => ({
+    idx,
+    senderIdx: 2,
+    senderUsername: '김철수',
+    content,
+    createdAt: '2026-07-28T14:03:00',
+    messageType: 'TEXT',
+  });
+
+  // 첫 검색의 응답을 붙잡아 두고, 두 번째 검색이 먼저 끝나게 만든다.
+  let resolveFirst;
+  searchMessages
+    .mockImplementationOnce(() => new Promise((resolve) => { resolveFirst = resolve; }))
+    .mockResolvedValueOnce([result(20, '두번째 산책')]);
+
+  wrap({});
+  submit('산책');
+  submit('산책');
+
+  expect(await screen.findByText(/두번째/)).toBeInTheDocument();
+
+  // 이제 첫 요청이 뒤늦게 응답한다 — 반영되면 안 된다.
+  await act(async () => {
+    resolveFirst([result(10, '첫번째 산책'), result(11, '첫번째 또 산책')]);
+  });
+
+  expect(screen.queryByText(/첫번째/)).not.toBeInTheDocument();
+  expect(screen.getByText(/두번째/)).toBeInTheDocument();
+  expect(screen.getByText('1건')).toBeInTheDocument();
 });

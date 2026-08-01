@@ -1,5 +1,5 @@
 // frontend/src/components/Chat/ChatSearchPanel.js
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
 import { searchMessages } from '../../api/chatApi';
 
@@ -45,6 +45,16 @@ const ChatSearchPanel = ({ conversationIdx, onClose }) => {
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState('');
 
+  // 연타하면 응답이 보낸 순서대로 오지 않는다. 마지막 요청의 응답만 반영한다.
+  // (없으면 먼저 보낸 검색의 늦은 응답이 나중 검색 결과를 덮어쓰고,
+  //  하이라이트용 searchedKeyword 가 표시된 행과 어긋난다.)
+  const latestRequestRef = useRef(0);
+
+  // 언마운트 뒤 setState 하지 않기 위한 것이기도 하다.
+  useEffect(() => () => {
+    latestRequestRef.current += 1;
+  }, []);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     const trimmed = keyword.trim();
@@ -56,17 +66,23 @@ const ChatSearchPanel = ({ conversationIdx, onClose }) => {
       return;
     }
 
+    const requestId = latestRequestRef.current + 1;
+    latestRequestRef.current = requestId;
+
     setNotice('');
     setLoading(true);
     try {
       const data = await searchMessages(conversationIdx, trimmed);
+      if (latestRequestRef.current !== requestId) return;
       setResults(Array.isArray(data) ? data : []);
       setSearchedKeyword(trimmed);
     } catch (error) {
+      if (latestRequestRef.current !== requestId) return;
+      console.error('메시지 검색 실패:', error);
       setResults(null);
       setNotice('검색에 실패했습니다. 다시 시도해주세요.');
     } finally {
-      setLoading(false);
+      if (latestRequestRef.current === requestId) setLoading(false);
     }
   };
 
