@@ -208,6 +208,16 @@ REST 전송과 WebSocket 전송 모두 최종적으로 `ChatMessageService.sendM
 
 DB에 `chatmessage(content)` FULLTEXT 인덱스가 없으면 검색 쿼리가 실패할 수 있다.
 
+**프론트 진입점** — 채팅방 헤더 🔍 버튼 → `ChatSearchPanel`
+(`frontend/src/components/Chat/ChatSearchPanel.js`). 결과는 목록으로만 보여주고
+해당 메시지로 이동하지 않는다. 메시지 목록이 최신 100건만 로드하는 구조라
+(`ChatRoom.js:108`) 이동하려면 특정 메시지 앞뒤 구간을 불러오는 API가 따로 필요하다.
+
+**2글자 검색 전제** — `chatmessage` FULLTEXT 는 `V12` 에서 ngram 파서로 전환됐다.
+그 전(기본 파서)에는 `innodb_ft_min_token_size=3` 이라 2글자 한글이 색인되지 않아
+검색이 항상 0건이었다. 클라이언트는 1글자 요청을 보내지 않는다 —
+`ngram_token_size=2` 라 서버가 무조건 0건을 돌려주기 때문이다.
+
 ---
 
 ## 6. 도메인 연동
