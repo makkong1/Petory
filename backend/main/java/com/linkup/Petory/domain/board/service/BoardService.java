@@ -7,8 +7,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Caching;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -172,7 +170,6 @@ public class BoardService {
     }
 
     // 게시글 생성
-    @CacheEvict(value = "boardList", allEntries = true) // 전체 리스트 캐시 무효화 (전체/카테고리 모두)
     @Transactional
     public BoardDTO createBoard(BoardDTO dto, String currentUserLoginId) {
         Users user = usersRepository.findActiveByIdString(currentUserLoginId)
@@ -197,10 +194,6 @@ public class BoardService {
     }
 
     // 게시글 수정
-    @Caching(evict = {
-        @CacheEvict(value = "boardDetail", key = "#p0"),
-        @CacheEvict(value = "boardList", allEntries = true) // 카테고리 변경 가능하므로 안전하게 전체 무효화
-    })
     @Transactional
     public BoardDTO updateBoard(long idx, BoardDTO dto) {
         Board board = boardRepository.findByIdWithUser(idx)
@@ -235,10 +228,6 @@ public class BoardService {
     }
 
     // 게시글 삭제
-    @Caching(evict = {
-        @CacheEvict(value = "boardDetail", key = "#p0"),
-        @CacheEvict(value = "boardList", allEntries = true) // 해당 카테고리 캐시 무효화를 위해 전체 무효화
-    })
     @Transactional
     public void deleteBoard(long idx) {
         Board board = boardRepository.findByIdWithUser(idx)
@@ -484,10 +473,6 @@ public class BoardService {
     /**
      * 게시글 상태 변경 (관리자용) - AdminBoardController에서 사용
      */
-    @Caching(evict = {
-        @CacheEvict(value = "boardDetail", key = "#p0"),
-        @CacheEvict(value = "boardList", allEntries = true)
-    })
     @Transactional
     public BoardDTO updateBoardStatus(long id, ContentStatus status) {
         Board board = boardRepository.findByIdWithUser(id).orElseThrow(() -> new BoardNotFoundException());
@@ -499,10 +484,6 @@ public class BoardService {
     /**
      * 게시글 복구 (관리자용) - AdminBoardController에서 사용
      */
-    @Caching(evict = {
-        @CacheEvict(value = "boardDetail", key = "#p0"),
-        @CacheEvict(value = "boardList", allEntries = true)
-    })
     @Transactional
     public BoardDTO restoreBoard(long id) {
         Board board = boardRepository.findByIdWithUser(id).orElseThrow(() -> new BoardNotFoundException());

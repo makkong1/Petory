@@ -6,7 +6,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -161,7 +160,6 @@ public class CommentService {
         return mapCommentsWithReactionCountsBatch(comments, reactionCountsMap, filesByCommentId);
     }
 
-    @CacheEvict(value = "boardDetail", key = "#p0")
     @Transactional
     public CommentDTO addComment(Long boardId, CommentDTO dto, String currentUserLoginId) {
         Board board = boardRepository.findById(boardId)
@@ -201,7 +199,6 @@ public class CommentService {
         return mapWithReactionCounts(saved);
     }
 
-    @CacheEvict(value = "boardDetail", key = "#p0")
     @Transactional
     public CommentDTO updateComment(Long boardId, Long commentId, CommentDTO dto) {
         Board board = boardRepository.findById(boardId)
@@ -240,7 +237,6 @@ public class CommentService {
         return mapWithReactionCounts(saved);
     }
 
-    @CacheEvict(value = "boardDetail", key = "#p0")
     @Transactional
     public void deleteComment(Long boardId, Long commentId) {
         Board board = boardRepository.findById(boardId)
@@ -333,7 +329,6 @@ public class CommentService {
     /**
      * 댓글 상태 변경 (관리자용) - AdminBoardController에서 사용
      */
-    @CacheEvict(value = "boardDetail", key = "#p0")
     @Transactional
     public CommentDTO updateCommentStatus(Long boardId, Long commentId,
             com.linkup.Petory.domain.common.ContentStatus status) {
@@ -354,7 +349,6 @@ public class CommentService {
     /**
      * 댓글 복구 (관리자용) - AdminBoardController에서 사용
      */
-    @CacheEvict(value = "boardDetail", key = "#p0")
     @Transactional
     public CommentDTO restoreComment(Long boardId, Long commentId) {
         Board board = boardRepository.findById(boardId)

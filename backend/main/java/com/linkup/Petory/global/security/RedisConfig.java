@@ -167,6 +167,11 @@ public class RedisConfig {
                                 .disableCachingNullValues(); // null 값 캐싱 방지
 
                 // 게시글 목록 캐시: 10분
+                // ⚠️ 현재 미사용 — 이 캐시를 채우는 @Cacheable 이 없다.
+                //    boardDetail 은 조회수 실시간 반영 때문에 의도적으로 뺐고(BoardService),
+                //    boardList 는 "개발 중 데이터 동기화 문제"로 주석 처리된 상태다.
+                //    비우기만 하던 @CacheEvict 15곳은 아무도 채우지 않는 캐시를 매 쓰기마다
+                //    비우고 있어서 제거했다. 되살리려면 @Cacheable 과 @CacheEvict 를 짝으로 함께 넣을 것.
                 RedisCacheConfiguration boardListConfig = RedisCacheConfiguration.defaultCacheConfig()
                                 .entryTtl(Duration.ofMinutes(10))
                                 .serializeKeysWith(
