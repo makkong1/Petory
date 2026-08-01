@@ -8,6 +8,7 @@ import { careRequestApi } from '../../api/careRequestApi';
 import { careReviewApi } from '../../api/careReviewApi';
 import { uploadApi } from '../../api/uploadApi';
 import { geocodingApi } from '../../api/geocodingApi';
+import ChatSearchPanel from './ChatSearchPanel';
 
 const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
   const { user } = useAuth();
@@ -20,6 +21,7 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
   const [showMenu, setShowMenu] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
   const [dealConfirmed, setDealConfirmed] = useState(false);
   const [confirmingDeal, setConfirmingDeal] = useState(false);
   const [careRequestStatus, setCareRequestStatus] = useState(null);
@@ -668,6 +670,7 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
           </HeaderSubtitle>
         </HeaderInfo>
         <HeaderActions>
+          <MenuButton onClick={() => setShowSearch(true)} aria-label="메시지 검색">🔍</MenuButton>
           <MenuButton onClick={() => setShowMenu(!showMenu)}>⋮</MenuButton>
           {showMenu && (
             <MenuDropdown ref={menuRef}>
@@ -680,6 +683,13 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
           )}
         </HeaderActions>
       </Header>
+
+      {showSearch && (
+        <ChatSearchPanel
+          conversationIdx={conversationIdx}
+          onClose={() => setShowSearch(false)}
+        />
+      )}
 
       <MiddleColumn>
         <MessagesContainer ref={messagesContainerRef}>
