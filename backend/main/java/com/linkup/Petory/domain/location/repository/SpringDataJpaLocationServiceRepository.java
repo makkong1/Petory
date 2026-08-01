@@ -73,8 +73,20 @@ public interface SpringDataJpaLocationServiceRepository extends JpaRepository<Lo
     // spatial index를 실제로 잘 타고 있음
     // ST_Within + ST_Distance_Sphere 조합이 망하지 않음
     // LIKE '%??%'가 인덱스를 못 타더라도, 이미 반경 후보가 줄어든 뒤라 피해가 제한적임
+    //
+    // [IGNORE INDEX 이유] is_deleted 는 이 테이블에서 사실상 한 값뿐이라(카디널리티 1)
+    // idx_locationservice_deleted_rating 은 반경 검색에서 단 한 행도 걸러내지 못한다.
+    // 그런데 옵티마이저는 이걸 "싼 진입점"으로 오판해(cost 808 vs 공간 인덱스 2100)
+    // 반경이 넓어지면 공간 인덱스 대신 이 인덱스로 전건 24,130 행을 읽었다.
+    // 실측 (2026-08-02, 서울시청 중심, NearbySearchPolicy 상한, EXPLAIN ANALYZE 3회):
+    //    5km / 10km  계획 동일 — 원래도 공간 인덱스라 변화 없음
+    //   20km         24,130행 159ms → 공간 인덱스 6,826행 80ms   (2.0배)
+    //   50km         24,130행 197ms → Table scan 24,130행 178ms  (사각형이 49%라 전건이 옳다)
+    // FORCE INDEX(공간) 가 아니라 IGNORE 인 이유: "이 인덱스를 써라"는 데이터 분포가 바뀌면
+    // 틀리지만, "아무것도 못 거르는 인덱스를 후보에서 빼라"는 분포와 무관하게 성립한다.
+    // 인덱스 자체는 ORDER BY rating DESC 쿼리들이 쓰므로(COUNT_FETCH 530,860) 제거하지 않는다.
     @RepositoryMethod("장소 서비스: 반경 검색 (keyword·category 필터)")
-    @Query(value = "SELECT * FROM locationservice ls WHERE "
+    @Query(value = "SELECT * FROM locationservice ls IGNORE INDEX (idx_locationservice_deleted_rating) WHERE "
             + "ST_Within(ls.location, ST_GeomFromText("
             + "CONCAT('POLYGON((', "
             + ":latitude - (:radiusInMeters / 111000.0), ' ', :longitude - (:radiusInMeters / (111000.0 * COS(RADIANS(:latitude)))), ', ', "
