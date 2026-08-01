@@ -208,6 +208,13 @@ REST 전송과 WebSocket 전송 모두 최종적으로 `ChatMessageService.sendM
 
 DB에 `chatmessage(content)` FULLTEXT 인덱스가 없으면 검색 쿼리가 실패할 수 있다.
 
+**참여 이전 대화는 검색에도 안 걸린다.** `resolveReadFrom()`이 목록 조회와 같은
+규칙(`lastReadMessage`가 null이고 `joinedAt`이 있으면 재참여로 간주)으로 시작 시각을
+정하고, 네이티브 쿼리가 `(:readFrom IS NULL OR m.created_at > :readFrom)`로 거른다.
+예전엔 이 조건이 목록 조회에만 있어서, 모임 재참여자가 검색으로는 참여 이전 대화를
+키워드로 볼 수 있었다 — 호출부가 없어 드러나지 않다가 검색 UI를 붙이면서 발견했다.
+§5.4의 `/before` 커서 API는 아직 이 제한을 적용하지 않는다(추가 보완 지점).
+
 **프론트 진입점** — 채팅방 헤더 🔍 버튼 → `ChatSearchPanel`
 (`frontend/src/components/Chat/ChatSearchPanel.js`). 결과는 목록으로만 보여주고
 해당 메시지로 이동하지 않는다. 메시지 목록이 최신 100건만 로드하는 구조라
