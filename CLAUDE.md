@@ -124,6 +124,11 @@ npm test
   | `V5` | `missing_pet_board` spatial 인덱스 |
   | `V6` | `board.author_visible` 컬럼 + 커버링 인덱스 2종 + users 상태변경 동기화 트리거 |
   | `V7` | 중복/죽은 인덱스 제거 — `pet_coin_escrow.uk_escrow_care_request`(uk_care_request와 완전 중복), `pets.idx_pets_type`/`idx_pets_deleted`(V3 복합 인덱스로 대체된 죽은 인덱스) |
+  | `V8` | `location_sync_log` 테이블 — 공공데이터 위치 동기화 실행 이력 |
+  | `V9` | `carerequest` FULLTEXT를 ngram 파서로 전환 (V2 핫픽스가 남긴 기본 파서 → 2글자 한글 미색인) |
+  | `V10` | 공간 인덱스로 대체된 `meetup`·`missing_pet_board`의 lat/lng B-tree 인덱스 제거 |
+  | `V11` | 읽는 쿼리가 없는 `locationservice` 읍면동·도로명 인덱스 제거 (3계층 모두 주석 처리된 메서드용) |
+  | `V12` | `chatmessage`·`locationservice` FULLTEXT를 ngram으로 전환 — **이로써 FULLTEXT 5개 전부 ngram** |
 
   ⚠️ 신규 docker 볼륨은 앱을 최소 한 번 부팅해야 Flyway가 V2~V7을 적용한다. `petory_app` 계정은 SUPER 권한이 없어 binlog가 켜진 상태에서 트리거 생성(V4, V6)이 `ERROR 1419`로 실패할 수 있다 — 그럴 땐 root로 `SET GLOBAL log_bin_trust_function_creators = 1;` 실행 후 재시도.
 - **엔티티도 같이 고쳐야 한다.** `ddl-auto=validate` 가 엔티티와 실제 스키마를 대조하므로, 어긋나면 앱이 기동에 실패한다(DDL은 실행하지 않으니 데이터는 안전).

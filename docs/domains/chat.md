@@ -208,6 +208,23 @@ REST 전송과 WebSocket 전송 모두 최종적으로 `ChatMessageService.sendM
 
 DB에 `chatmessage(content)` FULLTEXT 인덱스가 없으면 검색 쿼리가 실패할 수 있다.
 
+**참여 이전 대화는 검색에도 안 걸린다.** `resolveReadFrom()`이 목록 조회와 같은
+규칙(`lastReadMessage`가 null이고 `joinedAt`이 있으면 재참여로 간주)으로 시작 시각을
+정하고, 네이티브 쿼리가 `(:readFrom IS NULL OR m.created_at > :readFrom)`로 거른다.
+예전엔 이 조건이 목록 조회에만 있어서, 모임 재참여자가 검색으로는 참여 이전 대화를
+키워드로 볼 수 있었다 — 호출부가 없어 드러나지 않다가 검색 UI를 붙이면서 발견했다.
+§5.4의 `/before` 커서 API는 아직 이 제한을 적용하지 않는다(추가 보완 지점).
+
+**프론트 진입점** — 채팅방 헤더 🔍 버튼 → `ChatSearchPanel`
+(`frontend/src/components/Chat/ChatSearchPanel.js`). 결과는 목록으로만 보여주고
+해당 메시지로 이동하지 않는다. 메시지 목록이 최신 100건만 로드하는 구조라
+(`ChatRoom.js:110` 의 `fetchMessages`) 이동하려면 특정 메시지 앞뒤 구간을 불러오는 API가 따로 필요하다.
+
+**2글자 검색 전제** — `chatmessage` FULLTEXT 는 `V12` 에서 ngram 파서로 전환됐다.
+그 전(기본 파서)에는 `innodb_ft_min_token_size=3` 이라 2글자 한글이 색인되지 않아
+검색이 항상 0건이었다. 클라이언트는 1글자 요청을 보내지 않는다 —
+`ngram_token_size=2` 라 서버가 무조건 0건을 돌려주기 때문이다.
+
 ---
 
 ## 6. 도메인 연동

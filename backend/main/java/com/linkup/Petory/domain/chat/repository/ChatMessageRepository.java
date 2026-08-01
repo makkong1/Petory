@@ -60,8 +60,12 @@ public interface ChatMessageRepository {
 
     /**
      * 메시지 검색 (Full-Text Search)
+     *
+     * @param readFrom 이 시각 이후 메시지만 검색. null 이면 제한 없음.
+     *                 신규·재참여자가 참여 이전 대화를 키워드로 들여다보지 못하게 한다.
      */
     List<ChatMessage> searchMessagesByKeyword(
             Long conversationIdx,
-            String keyword);
+            String keyword,
+            LocalDateTime readFrom);
 }

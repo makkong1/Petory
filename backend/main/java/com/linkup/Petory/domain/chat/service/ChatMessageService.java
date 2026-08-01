@@ -109,20 +109,35 @@ public class ChatMessageService {
     }
 
     /**
+     * 이 참여자가 볼 수 있는 메시지의 시작 시각. null 이면 제한 없음(전체 조회 가능).
+     *
+     * <p>
+     * lastReadMessage 가 null 이고 joinedAt 이 있으면 신규·재참여로 보고 참여 시점 이후만 보여준다.
+     * 모임 채팅 재참여 시 이전 대화를 못 보게 하려고 ConversationService 가 lastReadMessage 를
+     * 비워두는 것과 짝이다.
+     *
+     * <p>
+     * 목록 조회와 검색이 같은 규칙을 쓰도록 여기 한 곳에 둔다 — 예전엔 목록에만 있어서
+     * 검색으로는 참여 이전 대화가 키워드로 노출됐다.
+     */
+    private LocalDateTime resolveReadFrom(Long conversationIdx, Long userId) {
+        ConversationParticipant participant = participantRepository
+                .findByConversationIdxAndUserIdx(conversationIdx, userId)
+                .orElseThrow(ChatForbiddenException::notParticipant);
+
+        if (participant.getLastReadMessage() == null && participant.getJoinedAt() != null) {
+            return participant.getJoinedAt();
+        }
+        return null;
+    }
+
+    /**
      * 채팅방 메시지 조회 (페이징) 재참여한 경우 joinedAt 이후 메시지만 조회
      */
     public Page<ChatMessageDTO> getMessages(Long conversationIdx, Long userId, int page, int size) {
         requireActiveParticipant(conversationIdx, userId);
 
-        ConversationParticipant participant = participantRepository
-                .findByConversationIdxAndUserIdx(conversationIdx, userId)
-                .orElseThrow(ChatForbiddenException::notParticipant);
-
-        LocalDateTime readFrom = null;
-        if (participant.getLastReadMessage() == null && participant.getJoinedAt() != null) {
-            // 재참여한 경우: lastReadMessage가 null이고 joinedAt이 있으면 재참여로 간주
-            readFrom = participant.getJoinedAt();
-        }
+        LocalDateTime readFrom = resolveReadFrom(conversationIdx, userId);
 
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
 
@@ -212,7 +227,7 @@ public class ChatMessageService {
         requireActiveParticipant(conversationIdx, userId);
 
         List<ChatMessage> messages = chatMessageRepository
-                .searchMessagesByKeyword(conversationIdx, keyword);
+                .searchMessagesByKeyword(conversationIdx, keyword, resolveReadFrom(conversationIdx, userId));
 
         return messages.stream()
                 .map(messageConverter::toDTO)

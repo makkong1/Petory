@@ -116,7 +116,8 @@ class ChatMessageServiceTest {
                 .thenReturn(Optional.of(participant(ParticipantStatus.ACTIVE, false)));
 
         ChatMessage msg = ChatMessage.builder().build();
-        when(chatMessageRepository.searchMessagesByKeyword(CONV, "lost"))
+        // joinedAt 이 없는 기존 참여자 → 시각 제한 없음(null)
+        when(chatMessageRepository.searchMessagesByKeyword(CONV, "lost", null))
                 .thenReturn(List.of(msg));
         when(messageConverter.toDTO(msg)).thenReturn(ChatMessageDTO.builder().idx(1L).build());
 
@@ -124,6 +125,26 @@ class ChatMessageServiceTest {
                 .hasSize(1)
                 .extracting(ChatMessageDTO::getIdx)
                 .containsExactly(1L);
+    }
+
+    @Test
+    @DisplayName("검색도 참여 이전 대화를 막는다 — joinedAt 이 readFrom 으로 넘어간다")
+    void 정상_searchMessages_재참여자는_joinedAt_이후만() {
+        // 재참여 판정 조건: lastReadMessage 가 null 이고 joinedAt 이 있다
+        // (ConversationService 가 모임 재참여 시 lastReadMessage 를 비워둔다)
+        LocalDateTime joinedAt = LocalDateTime.now().minusDays(3);
+        ConversationParticipant rejoined = participant(ParticipantStatus.ACTIVE, false);
+        rejoined.setJoinedAt(joinedAt);
+
+        when(participantRepository.findByConversationIdxAndUserIdx(CONV, USER))
+                .thenReturn(Optional.of(rejoined));
+        when(chatMessageRepository.searchMessagesByKeyword(CONV, "lost", joinedAt))
+                .thenReturn(List.of());
+
+        chatMessageService.searchMessages(CONV, USER, "lost");
+
+        // joinedAt 이 아니라 null 로 넘어가면 참여 이전 대화가 키워드로 노출된다
+        verify(chatMessageRepository).searchMessagesByKeyword(CONV, "lost", joinedAt);
     }
 
     @Test
