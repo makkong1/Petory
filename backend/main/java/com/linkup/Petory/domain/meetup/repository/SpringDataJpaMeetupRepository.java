@@ -26,9 +26,11 @@ import jakarta.persistence.LockModeType;
 public interface SpringDataJpaMeetupRepository extends JpaRepository<Meetup, Long> {
 
     @RepositoryMethod("모임: 주최자별 목록 조회")
-    @Query("SELECT m FROM Meetup m JOIN FETCH m.organizer WHERE m.organizer.idx = :organizerIdx "
+    @Query("SELECT m FROM Meetup m JOIN FETCH m.organizer o WHERE o.idx = :organizerIdx "
             + "AND (m.status IS NULL OR m.status <> com.linkup.Petory.domain.meetup.entity.MeetupStatus.CANCELLED) "
-            + "AND (m.isDeleted = false OR m.isDeleted IS NULL) ORDER BY m.createdAt DESC")
+            + "AND (m.isDeleted = false OR m.isDeleted IS NULL) "
+            + "AND o.isDeleted = false AND o.status <> com.linkup.Petory.domain.user.entity.UserStatus.BANNED "
+            + "ORDER BY m.createdAt DESC")
     List<Meetup> findByOrganizerIdxOrderByCreatedAtDesc(@Param("organizerIdx") Long organizerIdx);
 
     @RepositoryMethod("모임: 이벤트 리스너용 주최자의 RECRUITING 모임 조회")
@@ -36,9 +38,12 @@ public interface SpringDataJpaMeetupRepository extends JpaRepository<Meetup, Lon
     List<Meetup> findRecruitingByOrganizerIdx(@Param("organizerIdx") Long organizerIdx, @Param("status") MeetupStatus status);
 
     @RepositoryMethod("모임: 키워드 FULLTEXT 검색 — idx 목록 반환 (N+1 방지용 1단계)")
+    // 주최자 필터는 1단계(idx 목록)에 걸어야 LIMIT/페이징 건수가 맞는다.
     @Query(value = "SELECT m.idx FROM meetup m "
+            + "INNER JOIN users u ON u.idx = m.organizer_idx "
             + "WHERE (m.is_deleted = false OR m.is_deleted IS NULL) "
             + "AND (m.status IS NULL OR m.status != 'CANCELLED') "
+            + "AND u.is_deleted = 0 AND u.status <> 'BANNED' "
             + "AND MATCH(m.title, m.description) AGAINST(:keyword IN NATURAL LANGUAGE MODE) "
             + "ORDER BY m.date ASC", nativeQuery = true)
     List<Long> findIdxByFulltextKeyword(@Param("keyword") String keyword, Pageable pageable);
@@ -61,11 +66,12 @@ public interface SpringDataJpaMeetupRepository extends JpaRepository<Meetup, Lon
      * {@link Pageable#unpaged()}이면 전체, 아니면 DB LIMIT/OFFSET 적용.
      */
     @RepositoryMethod("모임: 참여 가능 목록 (페이징 가능, RECRUITING 상태만)")
-    @Query("SELECT m FROM Meetup m JOIN FETCH m.organizer "
+    @Query("SELECT m FROM Meetup m JOIN FETCH m.organizer o "
             + "WHERE m.date > :currentDate "
             + "AND m.currentParticipants < m.maxParticipants "
             + "AND m.status = :recruiting "
             + "AND (m.isDeleted = false OR m.isDeleted IS NULL) "
+            + "AND o.isDeleted = false AND o.status <> com.linkup.Petory.domain.user.entity.UserStatus.BANNED "
             + "ORDER BY m.date ASC")
     List<Meetup> findAvailableMeetups(
             @Param("currentDate") LocalDateTime currentDate,
@@ -79,10 +85,13 @@ public interface SpringDataJpaMeetupRepository extends JpaRepository<Meetup, Lon
     Optional<Meetup> findByIdWithOrganizer(@Param("idx") Long idx);
 
     @RepositoryMethod("모임: 반경 기반 근처 모임 ID 목록 (공간 인덱스 정렬·LIMIT)")
+    // 주최자 필터는 1단계(idx 목록)에 걸어야 LIMIT 건수가 맞는다.
     @Query(value = "SELECT m.idx FROM meetup m "
+            + "INNER JOIN users u ON u.idx = m.organizer_idx "
             + "WHERE m.date > :currentDate "
             + "AND (m.status IS NULL OR m.status NOT IN ('COMPLETED', 'CANCELLED')) "
             + "AND (m.is_deleted = false OR m.is_deleted IS NULL) "
+            + "AND u.is_deleted = 0 AND u.status <> 'BANNED' "
             + "AND m.latitude IS NOT NULL "
             + "AND m.longitude IS NOT NULL "
             + "AND ST_Within(m.geo_point, ST_GeomFromText("
@@ -139,18 +148,24 @@ public interface SpringDataJpaMeetupRepository extends JpaRepository<Meetup, Lon
     int decrementParticipantsIfPositive(@Param("meetupIdx") Long meetupIdx);
 
     @RepositoryMethod("모임: 전체 목록 조회 (삭제 제외)")
-    @Query("SELECT m FROM Meetup m JOIN FETCH m.organizer "
+    @Query("SELECT m FROM Meetup m JOIN FETCH m.organizer o "
             + "WHERE (m.status IS NULL OR m.status <> com.linkup.Petory.domain.meetup.entity.MeetupStatus.CANCELLED) "
-            + "AND (m.isDeleted = false OR m.isDeleted IS NULL)")
+            + "AND (m.isDeleted = false OR m.isDeleted IS NULL) "
+            + "AND o.isDeleted = false AND o.status <> com.linkup.Petory.domain.user.entity.UserStatus.BANNED")
     List<Meetup> findAllNotDeleted();
 
     /**
      * 전체 목록 페이징 (JOIN FETCH 대신 EntityGraph — Pageable과 호환).
      */
     @EntityGraph(attributePaths = {"organizer"})
-    @Query("SELECT m FROM Meetup m "
+    @Query(value = "SELECT m FROM Meetup m JOIN m.organizer o "
             + "WHERE (m.status IS NULL OR m.status <> com.linkup.Petory.domain.meetup.entity.MeetupStatus.CANCELLED) "
-            + "AND (m.isDeleted = false OR m.isDeleted IS NULL)")
+            + "AND (m.isDeleted = false OR m.isDeleted IS NULL) "
+            + "AND o.isDeleted = false AND o.status <> com.linkup.Petory.domain.user.entity.UserStatus.BANNED",
+           countQuery = "SELECT COUNT(m) FROM Meetup m JOIN m.organizer o "
+            + "WHERE (m.status IS NULL OR m.status <> com.linkup.Petory.domain.meetup.entity.MeetupStatus.CANCELLED) "
+            + "AND (m.isDeleted = false OR m.isDeleted IS NULL) "
+            + "AND o.isDeleted = false AND o.status <> com.linkup.Petory.domain.user.entity.UserStatus.BANNED")
     Page<Meetup> findAllNotDeleted(Pageable pageable);
 
     @EntityGraph(attributePaths = {"organizer"})
@@ -186,12 +201,13 @@ public interface SpringDataJpaMeetupRepository extends JpaRepository<Meetup, Lon
 
     @RepositoryMethod("모임: 단건 상세 조회 (참여자 포함)")
     @Query("SELECT DISTINCT m FROM Meetup m "
-            + "LEFT JOIN FETCH m.organizer "
+            + "LEFT JOIN FETCH m.organizer o "
             + "LEFT JOIN FETCH m.participants p "
             + "LEFT JOIN FETCH p.user "
             + "WHERE m.idx = :idx "
             + "AND (m.status IS NULL OR m.status <> com.linkup.Petory.domain.meetup.entity.MeetupStatus.CANCELLED) "
-            + "AND (m.isDeleted = false OR m.isDeleted IS NULL)")
+            + "AND (m.isDeleted = false OR m.isDeleted IS NULL) "
+            + "AND o.isDeleted = false AND o.status <> com.linkup.Petory.domain.user.entity.UserStatus.BANNED")
     Optional<Meetup> findByIdWithDetails(@Param("idx") Long idx);
 
     @Modifying(clearAutomatically = true)

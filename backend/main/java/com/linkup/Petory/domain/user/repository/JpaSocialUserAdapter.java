@@ -50,4 +50,9 @@ public class JpaSocialUserAdapter implements SocialUserRepository {
     public Optional<SocialUser> findByProviderAndProviderId(Provider provider, String providerId) {
         return jpaRepository.findByProviderAndProviderId(provider, providerId);
     }
+
+    @Override
+    public void deleteByUserIdx(Long userIdx) {
+        jpaRepository.deleteByUserIdx(userIdx);
+    }
 }

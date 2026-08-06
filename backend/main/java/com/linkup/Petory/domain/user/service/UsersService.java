@@ -32,6 +32,7 @@ import com.linkup.Petory.domain.user.exception.InvalidPasswordException;
 import com.linkup.Petory.domain.user.exception.UserForbiddenException;
 import com.linkup.Petory.domain.user.exception.UserNotFoundException;
 import com.linkup.Petory.domain.user.exception.UserValidationException;
+import com.linkup.Petory.domain.user.repository.SocialUserRepository;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -44,6 +45,7 @@ import lombok.extern.slf4j.Slf4j;
 public class UsersService {
 
     private final UsersRepository usersRepository;
+    private final SocialUserRepository socialUserRepository;
     private final UsersConverter usersConverter;
     private final PetConverter petConverter;
     private final PasswordEncoder passwordEncoder;
@@ -258,6 +260,9 @@ public class UsersService {
         user.setRefreshToken(null);
         user.setRefreshExpiration(null);
         usersRepository.save(user);
+        // 소셜 연동 해제 - 남겨두면 OAuth2 로그인이 탈퇴 계정에 다시 도달한다
+        // (Users.socialUsers는 orphanRemoval이 없어 컬렉션 clear로는 행이 지워지지 않는다)
+        socialUserRepository.deleteByUserIdx(idx);
     }
 
     /**

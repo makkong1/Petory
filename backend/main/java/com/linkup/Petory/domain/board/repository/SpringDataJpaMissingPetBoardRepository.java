@@ -29,21 +29,21 @@ import com.linkup.Petory.global.annotation.RepositoryMethod;
 public interface SpringDataJpaMissingPetBoardRepository extends JpaRepository<MissingPetBoard, Long>, JpaSpecificationExecutor<MissingPetBoard> {
 
     @RepositoryMethod("실종 제보: 단건 조회 (작성자 포함)")
-    @Query("SELECT b FROM MissingPetBoard b JOIN FETCH b.user u WHERE b.idx = :id AND b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE'")
+    @Query("SELECT b FROM MissingPetBoard b JOIN FETCH b.user u WHERE b.idx = :id AND b.isDeleted = false AND u.isDeleted = false AND u.status <> com.linkup.Petory.domain.user.entity.UserStatus.BANNED")
     Optional<MissingPetBoard> findByIdWithUser(@Param("id") Long id);
 
     @RepositoryMethod("실종 제보: 사용자별 목록 조회")
-    @Query("SELECT b FROM MissingPetBoard b JOIN FETCH b.user u WHERE b.user = :user AND b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY b.createdAt DESC")
+    @Query("SELECT b FROM MissingPetBoard b JOIN FETCH b.user u WHERE b.user = :user AND b.isDeleted = false AND u.isDeleted = false AND u.status <> com.linkup.Petory.domain.user.entity.UserStatus.BANNED ORDER BY b.createdAt DESC")
     List<MissingPetBoard> findByUserAndIsDeletedFalseOrderByCreatedAtDesc(@Param("user") Users user);
 
     @RepositoryMethod("실종 제보: 전체 페이징")
-    @Query(value = "SELECT b FROM MissingPetBoard b JOIN FETCH b.user u WHERE b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY b.createdAt DESC",
-           countQuery = "SELECT COUNT(b) FROM MissingPetBoard b JOIN b.user u WHERE b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE'")
+    @Query(value = "SELECT b FROM MissingPetBoard b JOIN FETCH b.user u WHERE b.isDeleted = false AND u.isDeleted = false AND u.status <> com.linkup.Petory.domain.user.entity.UserStatus.BANNED ORDER BY b.createdAt DESC",
+           countQuery = "SELECT COUNT(b) FROM MissingPetBoard b JOIN b.user u WHERE b.isDeleted = false AND u.isDeleted = false AND u.status <> com.linkup.Petory.domain.user.entity.UserStatus.BANNED")
     Page<MissingPetBoard> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
     @RepositoryMethod("실종 제보: 상태별 페이징")
-    @Query(value = "SELECT b FROM MissingPetBoard b JOIN FETCH b.user u WHERE b.status = :status AND b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY b.createdAt DESC",
-           countQuery = "SELECT COUNT(b) FROM MissingPetBoard b JOIN b.user u WHERE b.status = :status AND b.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE'")
+    @Query(value = "SELECT b FROM MissingPetBoard b JOIN FETCH b.user u WHERE b.status = :status AND b.isDeleted = false AND u.isDeleted = false AND u.status <> com.linkup.Petory.domain.user.entity.UserStatus.BANNED ORDER BY b.createdAt DESC",
+           countQuery = "SELECT COUNT(b) FROM MissingPetBoard b JOIN b.user u WHERE b.status = :status AND b.isDeleted = false AND u.isDeleted = false AND u.status <> com.linkup.Petory.domain.user.entity.UserStatus.BANNED")
     Page<MissingPetBoard> findByStatusOrderByCreatedAtDesc(@Param("status") MissingPetStatus status, Pageable pageable);
 
     @RepositoryMethod("실종 제보: 홈 추천 후보 조회 (실종일 최신순)")
@@ -51,13 +51,13 @@ public interface SpringDataJpaMissingPetBoardRepository extends JpaRepository<Mi
             + "WHERE b.status = :status "
             + "AND b.isDeleted = false "
             + "AND u.isDeleted = false "
-            + "AND u.status = 'ACTIVE' "
+            + "AND u.status <> com.linkup.Petory.domain.user.entity.UserStatus.BANNED "
             + "ORDER BY b.lostDate DESC, b.createdAt DESC",
             countQuery = "SELECT COUNT(b) FROM MissingPetBoard b JOIN b.user u "
                     + "WHERE b.status = :status "
                     + "AND b.isDeleted = false "
                     + "AND u.isDeleted = false "
-                    + "AND u.status = 'ACTIVE'")
+                    + "AND u.status <> com.linkup.Petory.domain.user.entity.UserStatus.BANNED")
     Page<MissingPetBoard> findHomeCandidatesByStatusOrderByLostDateDesc(
             @Param("status") MissingPetStatus status,
             Pageable pageable);
@@ -69,7 +69,7 @@ public interface SpringDataJpaMissingPetBoardRepository extends JpaRepository<Mi
             + "WHERE b.status = :status "
             + "AND b.is_deleted = false "
             + "AND u.is_deleted = false "
-            + "AND u.status = 'ACTIVE' "
+            + "AND u.status <> 'BANNED' "
             + "AND ST_Within(b.geo_point, ST_GeomFromText(CONCAT('POLYGON((', "
             + ":minLat, ' ', :minLng, ', ', "
             + ":minLat, ' ', :maxLng, ', ', "

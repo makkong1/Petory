@@ -18,6 +18,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import com.linkup.Petory.domain.user.converter.PetConverter;
@@ -28,6 +29,7 @@ import com.linkup.Petory.domain.user.entity.UserStatus;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.event.UserSanctionAppliedEvent;
 import com.linkup.Petory.domain.user.exception.UserValidationException;
+import com.linkup.Petory.domain.user.repository.SocialUserRepository;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -38,6 +40,8 @@ class UsersServiceDeleteTest {
 
     @Mock
     private UsersRepository usersRepository;
+    @Mock
+    private SocialUserRepository socialUserRepository;
     @Mock
     private UsersConverter usersConverter;
     @Mock
@@ -97,6 +101,51 @@ class UsersServiceDeleteTest {
         assertThat(user.getUsername()).isNotEqualTo("user-1");
         assertThat(user.getNickname()).isNotEqualTo("닉네임1");
         assertThat(user.getEmail()).isNotEqualTo("user-1@test.local");
+    }
+
+    @Test
+    @DisplayName("정상: 탈퇴 시 나머지 개인정보도 비우고 비밀번호는 매칭 불가 값으로 대체한다")
+    void 정상_탈퇴시_개인정보_익명화() {
+        Users user = Users.builder()
+                .idx(1L)
+                .id("user-1")
+                .username("user-1")
+                .email("user-1@test.local")
+                .password(new BCryptPasswordEncoder().encode("plain-password"))
+                .phone("010-1234-5678")
+                .birthDate("1990-01-01")
+                .gender("M")
+                .location("서울시 강남구")
+                .petInfo("말티즈 2살")
+                .profileImage("https://example.com/me.jpg")
+                .role(Role.USER)
+                .status(UserStatus.ACTIVE)
+                .isDeleted(false)
+                .build();
+        when(usersRepository.findById(1L)).thenReturn(Optional.of(user));
+
+        usersService.deleteUser(1L);
+
+        assertThat(user.getPhone()).isNull();
+        assertThat(user.getBirthDate()).isNull();
+        assertThat(user.getGender()).isNull();
+        assertThat(user.getLocation()).isNull();
+        assertThat(user.getPetInfo()).isNull();
+        assertThat(user.getProfileImage()).isNull();
+        // password는 NOT NULL 컬럼이라 null이 될 수 없고, 대신 어떤 평문과도 매칭되지 않아야 한다
+        assertThat(user.getPassword()).isNotNull();
+        assertThat(new BCryptPasswordEncoder().matches("plain-password", user.getPassword())).isFalse();
+    }
+
+    @Test
+    @DisplayName("정상: 탈퇴 시 소셜 연동 정보를 삭제해 OAuth2 재로그인 경로를 끊는다")
+    void 정상_탈퇴시_소셜연동_삭제() {
+        Users user = baseUser();
+        when(usersRepository.findById(1L)).thenReturn(Optional.of(user));
+
+        usersService.deleteUser(1L);
+
+        verify(socialUserRepository).deleteByUserIdx(1L);
     }
 
     @Test

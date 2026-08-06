@@ -19,4 +19,7 @@ public interface SpringDataJpaSocialUserRepository extends JpaRepository<SocialU
 
     @RepositoryMethod("소셜 사용자: Provider+ProviderId로 조회")
     Optional<SocialUser> findByProviderAndProviderId(Provider provider, String providerId);
+
+    @RepositoryMethod("소셜 사용자: 사용자 idx로 연동 정보 삭제")
+    void deleteByUserIdx(Long userIdx);
 }

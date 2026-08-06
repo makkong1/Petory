@@ -200,7 +200,7 @@ class IndexUsageRegressionTest {
         requireRowsFor("carerequest", 500);
         String plan = explain(
                 "SELECT cr.idx FROM carerequest cr JOIN users u ON u.idx = cr.user_idx "
-                        + "WHERE cr.is_deleted = 0 AND u.is_deleted = 0 AND u.status = 'ACTIVE' "
+                        + "WHERE cr.is_deleted = 0 AND u.is_deleted = 0 AND u.status <> 'BANNED' "
                         + "ORDER BY cr.created_at DESC LIMIT 20");
 
         assertThat(plan)

@@ -1,6 +1,10 @@
 package com.linkup.Petory.domain.user.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.LocalDateTime;
@@ -89,5 +93,33 @@ class OAuth2ServiceTest {
 
         assertThat(user.getIsDormant()).isFalse();
         assertThat(user.getDormantAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("예외: 탈퇴한 계정의 소셜 연동이 남아 있어도 OAuth2 로그인은 차단된다")
+    void 예외_탈퇴계정_OAuth2로그인_차단() {
+        Users user = Users.builder()
+                .id("withdrawn_1")
+                .role(Role.USER)
+                .status(UserStatus.ACTIVE)
+                .isDeleted(true)
+                .deletedAt(LocalDateTime.now().minusDays(1))
+                .build();
+        SocialUser socialUser = SocialUser.builder()
+                .user(user)
+                .provider(Provider.GOOGLE)
+                .providerId("google-provider-id")
+                .build();
+
+        when(socialUserRepository.findByProviderAndProviderId(Provider.GOOGLE, "google-provider-id"))
+                .thenReturn(Optional.of(socialUser));
+
+        OAuth2User oauth2User = createMockOAuth2User("google-provider-id", "withdrawn@example.com", "Withdrawn User");
+
+        assertThatThrownBy(() -> oAuth2Service.processOAuth2Login(oauth2User, Provider.GOOGLE))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("탈퇴한 계정");
+
+        verify(usersRepository, never()).save(any(Users.class));
     }
 }
