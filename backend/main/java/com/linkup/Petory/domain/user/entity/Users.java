@@ -117,8 +117,14 @@ public class Users extends BaseTimeEntity {
     private List<Pet> pets; // 등록한 애완동물 목록
 
     /**
+     * 탈퇴 계정의 비밀번호 자리표시자. bcrypt 해시 형식이 아니므로 어떤 평문으로도 matches()가 false다.
+     */
+    private static final String WITHDRAWN_PASSWORD = "(withdrawn)";
+
+    /**
      * 회원 탈퇴. 복구 불가 - id/username/nickname/email은 UNIQUE 제약이 걸려있어 값을 유지하면 다른
-     * 사용자가 영구히 재사용할 수 없으므로 즉시 익명화한다.
+     * 사용자가 영구히 재사용할 수 없으므로 즉시 익명화하고, 나머지 개인정보(연락처/생년월일/성별/지역/펫정보/프로필
+     * 이미지)는 비운다. password는 NOT NULL이라 null 대신 어떤 평문과도 매칭되지 않는 상수로 대체한다.
      */
     public void softDelete() {
         this.isDeleted = true;
@@ -127,6 +133,13 @@ public class Users extends BaseTimeEntity {
         this.username = "withdrawn_" + this.idx;
         this.nickname = "탈퇴한사용자_" + this.idx;
         this.email = "withdrawn_" + this.idx + "@deleted.petory";
+        this.password = WITHDRAWN_PASSWORD;
+        this.phone = null;
+        this.birthDate = null;
+        this.gender = null;
+        this.location = null;
+        this.petInfo = null;
+        this.profileImage = null;
     }
 
     public void suspend(LocalDateTime until) {

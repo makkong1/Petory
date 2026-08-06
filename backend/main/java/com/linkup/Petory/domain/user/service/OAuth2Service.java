@@ -85,6 +85,11 @@ public class OAuth2Service {
             log.info("신규 소셜 로그인 사용자 생성: userId={}", user.getId());
         }
 
+        // 탈퇴 계정 확인 (SocialUser → Users 직행 경로는 일반 로그인의 소프트 삭제 필터를 거치지 않는다)
+        if (Boolean.TRUE.equals(user.getIsDeleted())) {
+            throw new RuntimeException("탈퇴한 계정입니다. 다시 이용하시려면 새로 가입해주세요.");
+        }
+
         // 제재 상태 확인
         if (user.getStatus() == UserStatus.BANNED) {
             throw new RuntimeException("영구 차단된 계정입니다. 웹사이트 이용이 불가능합니다.");

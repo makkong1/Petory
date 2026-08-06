@@ -27,4 +27,9 @@ public interface SocialUserRepository {
      * Provider와 ProviderId로 소셜 사용자 조회
      */
     Optional<SocialUser> findByProviderAndProviderId(Provider provider, String providerId);
+
+    /**
+     * 특정 사용자의 소셜 연동 정보 전체 삭제 (탈퇴 시 연동 해제)
+     */
+    void deleteByUserIdx(Long userIdx);
 }
