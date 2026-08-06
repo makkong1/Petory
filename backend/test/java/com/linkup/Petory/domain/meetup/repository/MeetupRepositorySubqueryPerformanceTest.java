@@ -185,10 +185,13 @@ class MeetupRepositorySubqueryPerformanceTest {
         // DB 쿼리 실행 — findAvailableMeetups와 동일 도메인 조건(참여 가능 정의 일치)
         long dbStartTime = System.currentTimeMillis();
         List<Meetup> meetupsBefore = entityManager.createQuery(
-                "SELECT m FROM Meetup m WHERE m.date > :currentDate "
+                "SELECT m FROM Meetup m JOIN m.organizer o WHERE m.date > :currentDate "
                         + "AND m.currentParticipants < m.maxParticipants "
                         + "AND m.status = :recruiting "
                         + "AND (m.isDeleted = false OR m.isDeleted IS NULL) "
+                        // 주최자 필터(탈퇴·영구정지 제외)는 리포지토리 쪽에도 있다. 여기에 없으면
+                        // 이 테스트가 비교하려는 대상(JOIN FETCH 유무)이 아니라 필터 차이를 재는 셈이 된다.
+                        + "AND o.isDeleted = false AND o.status <> com.linkup.Petory.domain.user.entity.UserStatus.BANNED "
                         + "ORDER BY m.date ASC",
                 Meetup.class)
                 .setParameter("currentDate", currentDate)

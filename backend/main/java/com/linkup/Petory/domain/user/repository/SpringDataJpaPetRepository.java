@@ -30,10 +30,18 @@ public interface SpringDataJpaPetRepository extends JpaRepository<Pet, Long> {
     @Query("SELECT p FROM Pet p WHERE p.user.idx = :userIdx AND p.isDeleted = false")
     List<Pet> findByUserIdxAndNotDeleted(@Param("userIdx") Long userIdx);
 
+    // 파생 쿼리(메서드명)로는 주인 상태를 볼 수 없어 @Query 로 전환했다.
+    // 공개 목록(/api/pets/type/{type})이므로 탈퇴·영구정지 회원의 펫은 제외한다(정지는 보임).
     @RepositoryMethod("펫: 타입별 조회")
-    List<Pet> findByPetTypeAndIsDeletedFalse(PetType petType);
+    @Query("SELECT p FROM Pet p JOIN p.user u WHERE p.petType = :petType AND p.isDeleted = false "
+            + "AND u.isDeleted = false AND u.status <> com.linkup.Petory.domain.user.entity.UserStatus.BANNED")
+    List<Pet> findByPetTypeAndIsDeletedFalse(@Param("petType") PetType petType);
 
     @RepositoryMethod("펫: 타입별 페이징 조회")
-    Page<Pet> findByPetTypeAndIsDeletedFalse(PetType petType, Pageable pageable);
+    @Query(value = "SELECT p FROM Pet p JOIN p.user u WHERE p.petType = :petType AND p.isDeleted = false "
+            + "AND u.isDeleted = false AND u.status <> com.linkup.Petory.domain.user.entity.UserStatus.BANNED",
+           countQuery = "SELECT COUNT(p) FROM Pet p JOIN p.user u WHERE p.petType = :petType AND p.isDeleted = false "
+            + "AND u.isDeleted = false AND u.status <> com.linkup.Petory.domain.user.entity.UserStatus.BANNED")
+    Page<Pet> findByPetTypeAndIsDeletedFalse(@Param("petType") PetType petType, Pageable pageable);
 }
 

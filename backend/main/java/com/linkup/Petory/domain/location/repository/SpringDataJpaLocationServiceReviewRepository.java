@@ -29,13 +29,15 @@ public interface SpringDataJpaLocationServiceReviewRepository extends JpaReposit
             + "  r.rating, r.comment, r.createdAt, r.updatedAt, r.isDeleted, r.deletedAt) "
             + "FROM LocationServiceReview r JOIN r.user u "
             + "WHERE r.service.idx = :serviceIdx AND r.isDeleted = false "
+            + "AND u.isDeleted = false AND u.status <> com.linkup.Petory.domain.user.entity.UserStatus.BANNED "
             + "ORDER BY r.createdAt DESC")
     Page<LocationServiceReviewDTO> findReviewListItems(@Param("serviceIdx") Long serviceIdx, Pageable pageable);
 
     @RepositoryMethod("장소 리뷰: 사용자별 목록 조회")
-    @Query("SELECT r FROM LocationServiceReview r JOIN FETCH r.service JOIN FETCH r.user WHERE "
+    @Query("SELECT r FROM LocationServiceReview r JOIN FETCH r.service JOIN FETCH r.user u WHERE "
             + "r.user.idx = :userIdx AND "
-            + "r.isDeleted = false "
+            + "r.isDeleted = false AND "
+            + "u.isDeleted = false AND u.status <> com.linkup.Petory.domain.user.entity.UserStatus.BANNED "
             + "ORDER BY r.createdAt DESC")
     List<LocationServiceReview> findByUserIdxOrderByCreatedAtDesc(@Param("userIdx") Long userIdx);
 
@@ -44,9 +46,10 @@ public interface SpringDataJpaLocationServiceReviewRepository extends JpaReposit
     Optional<LocationServiceReview> findByIdWithUserAndService(@Param("idx") Long idx);
 
     @RepositoryMethod("장소 리뷰: 서비스별 평균 평점")
-    @Query("SELECT AVG(r.rating) FROM LocationServiceReview r WHERE "
+    @Query("SELECT AVG(r.rating) FROM LocationServiceReview r JOIN r.user u WHERE "
             + "r.service.idx = :serviceIdx AND "
-            + "r.isDeleted = false")
+            + "r.isDeleted = false AND "
+            + "u.isDeleted = false AND u.status <> com.linkup.Petory.domain.user.entity.UserStatus.BANNED")
     Optional<Double> findAverageRatingByServiceIdx(@Param("serviceIdx") Long serviceIdx);
 
     @RepositoryMethod("장소 리뷰: 서비스+사용자 리뷰 작성 여부")

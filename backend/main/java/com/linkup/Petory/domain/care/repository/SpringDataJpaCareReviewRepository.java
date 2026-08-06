@@ -17,18 +17,20 @@ public interface SpringDataJpaCareReviewRepository extends JpaRepository<CareRev
     @RepositoryMethod("펫케어 리뷰: 피리뷰어별 목록 조회")
     @Query("SELECT r FROM CareReview r " +
             "JOIN FETCH r.careApplication " +
-            "JOIN FETCH r.reviewer " +
+            "JOIN FETCH r.reviewer rv " +
             "JOIN FETCH r.reviewee " +
             "WHERE r.reviewee.idx = :revieweeIdx " +
+            "AND rv.isDeleted = false AND rv.status <> com.linkup.Petory.domain.user.entity.UserStatus.BANNED " +
             "ORDER BY r.createdAt DESC")
     List<CareReview> findByRevieweeIdxOrderByCreatedAtDesc(@Param("revieweeIdx") Long revieweeIdx);
 
     @RepositoryMethod("펫케어 리뷰: 리뷰어별 목록 조회")
     @Query("SELECT r FROM CareReview r " +
             "JOIN FETCH r.careApplication " +
-            "JOIN FETCH r.reviewer " +
+            "JOIN FETCH r.reviewer rv " +
             "JOIN FETCH r.reviewee " +
             "WHERE r.reviewer.idx = :reviewerIdx " +
+            "AND rv.isDeleted = false AND rv.status <> com.linkup.Petory.domain.user.entity.UserStatus.BANNED " +
             "ORDER BY r.createdAt DESC")
     List<CareReview> findByReviewerIdxOrderByCreatedAtDesc(@Param("reviewerIdx") Long reviewerIdx);
 
