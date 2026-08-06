@@ -27,17 +27,17 @@ import com.linkup.Petory.global.annotation.RepositoryMethod;
 public interface SpringDataJpaCommentRepository extends JpaRepository<Comment, Long> {
 
     @RepositoryMethod("댓글: 게시글별 목록 조회 (삭제 제외)")
-    @Query("SELECT c FROM Comment c JOIN FETCH c.user u WHERE c.board = :board AND c.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY c.createdAt ASC")
+    @Query("SELECT c FROM Comment c JOIN FETCH c.user u WHERE c.board = :board AND c.isDeleted = false AND u.isDeleted = false AND u.status <> com.linkup.Petory.domain.user.entity.UserStatus.BANNED ORDER BY c.createdAt ASC")
     List<Comment> findByBoardAndIsDeletedFalseOrderByCreatedAtAsc(@Param("board") Board board);
 
     @RepositoryMethod("댓글: 사용자별 목록 조회")
-    @Query("SELECT c FROM Comment c JOIN FETCH c.board b JOIN FETCH b.user bu JOIN FETCH c.user u WHERE c.user = :user AND c.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY c.createdAt DESC")
+    @Query("SELECT c FROM Comment c JOIN FETCH c.board b JOIN FETCH b.user bu JOIN FETCH c.user u WHERE c.user = :user AND c.isDeleted = false AND u.isDeleted = false AND u.status <> com.linkup.Petory.domain.user.entity.UserStatus.BANNED ORDER BY c.createdAt DESC")
     List<Comment> findByUserAndIsDeletedFalseOrderByCreatedAtDesc(@Param("user") Users user);
 
     @RepositoryMethod("댓글: 게시글별 댓글 수 배치 조회")
     @Query("SELECT c.board.idx as boardId, COUNT(c) as count " +
            "FROM Comment c JOIN c.user u " +
-           "WHERE c.board.idx IN :boardIds AND c.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' " +
+           "WHERE c.board.idx IN :boardIds AND c.isDeleted = false AND u.isDeleted = false AND u.status <> com.linkup.Petory.domain.user.entity.UserStatus.BANNED " +
            "GROUP BY c.board.idx")
     List<Object[]> countByBoardsAndIsDeletedFalse(@Param("boardIds") List<Long> boardIds);
 
@@ -46,8 +46,8 @@ public interface SpringDataJpaCommentRepository extends JpaRepository<Comment, L
     List<Comment> findByBoardAndIsDeletedFalseForAdmin(@Param("board") Board board);
 
     @RepositoryMethod("댓글: 게시글별 페이징 조회")
-    @Query(value = "SELECT c FROM Comment c JOIN FETCH c.user u WHERE c.board.idx = :boardId AND c.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE' ORDER BY c.createdAt ASC",
-           countQuery = "SELECT COUNT(c) FROM Comment c JOIN c.user u WHERE c.board.idx = :boardId AND c.isDeleted = false AND u.isDeleted = false AND u.status = 'ACTIVE'")
+    @Query(value = "SELECT c FROM Comment c JOIN FETCH c.user u WHERE c.board.idx = :boardId AND c.isDeleted = false AND u.isDeleted = false AND u.status <> com.linkup.Petory.domain.user.entity.UserStatus.BANNED ORDER BY c.createdAt ASC",
+           countQuery = "SELECT COUNT(c) FROM Comment c JOIN c.user u WHERE c.board.idx = :boardId AND c.isDeleted = false AND u.isDeleted = false AND u.status <> com.linkup.Petory.domain.user.entity.UserStatus.BANNED")
     Page<Comment> findByBoardIdAndIsDeletedFalseOrderByCreatedAtAsc(@Param("boardId") Long boardId, Pageable pageable);
 
     @Transactional
