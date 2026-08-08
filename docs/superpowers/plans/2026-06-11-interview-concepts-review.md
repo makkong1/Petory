@@ -50,7 +50,7 @@ Phase 5 (마무리):     10 (도메인별 공부법) + 새 도메인 신규 파�
 - [ ] **Step 1: 현재 문서 전체 읽기**
 
   ```bash
-  cat docs/interview/concepts/03_동시성_제어.md
+  cat docs/interview/concepts/면접/03_동시성_제어.md
   ```
 
 - [ ] **Step 2: 실제 비관적 락 코드 확인**
@@ -97,7 +97,7 @@ Phase 5 (마무리):     10 (도메인별 공부법) + 새 도메인 신규 파�
 - [ ] **Step 1: 현재 문서 전체 읽기**
 
   ```bash
-  cat docs/interview/concepts/02_공간쿼리_Haversine.md
+  cat docs/interview/concepts/면접/02_공간쿼리_Haversine.md
   ```
 
 - [ ] **Step 2: 실제 공간 쿼리 확인**
@@ -134,7 +134,7 @@ Phase 5 (마무리):     10 (도메인별 공부법) + 새 도메인 신규 파�
 - [ ] **Step 1: 현재 문서 전체 읽기**
 
   ```bash
-  cat docs/interview/concepts/04_JPA_N+1.md
+  cat docs/interview/concepts/면접/04_JPA_N+1.md
   ```
 
 - [ ] **Step 2: Fetch Join / EntityGraph 실제 사용 확인**
@@ -183,7 +183,7 @@ Phase 5 (마무리):     10 (도메인별 공부법) + 새 도메인 신규 파�
 - [ ] **Step 1: 현재 문서 읽기**
 
   ```bash
-  cat docs/interview/concepts/07_이벤트_트랜잭션_배치.md
+  cat docs/interview/concepts/면접/07_이벤트_트랜잭션_배치.md
   ```
 
 - [ ] **Step 2: afterCommit() 이벤트 리스너 확인**
@@ -229,7 +229,7 @@ Phase 5 (마무리):     10 (도메인별 공부법) + 새 도메인 신규 파�
 - [ ] **Step 1: 현재 문서 읽기**
 
   ```bash
-  cat docs/interview/concepts/05_알고리즘_점수설계.md
+  cat docs/interview/concepts/배경/05_알고리즘_점수설계.md
   ```
 
 - [ ] **Step 2: 최신 petRecommendation 점수 로직 확인**
@@ -274,7 +274,7 @@ Phase 5 (마무리):     10 (도메인별 공부법) + 새 도메인 신규 파�
 - [ ] **Step 1: 현재 문서 읽기**
 
   ```bash
-  cat docs/interview/concepts/06_실시간통신_SSE_WebSocket.md
+  cat docs/interview/concepts/면접/06_실시간통신_SSE_WebSocket.md
   ```
 
 - [ ] **Step 2: SSE 구현 방식 확인**
@@ -320,7 +320,7 @@ Phase 5 (마무리):     10 (도메인별 공부법) + 새 도메인 신규 파�
 - [ ] **Step 1: 현재 문서 읽기**
 
   ```bash
-  cat docs/interview/concepts/01_DB_인덱스.md
+  cat docs/interview/concepts/면접/01_DB_인덱스.md
   ```
 
 - [ ] **Step 2: 실제 인덱스 어노테이션 확인**
@@ -354,7 +354,7 @@ Phase 5 (마무리):     10 (도메인별 공부법) + 새 도메인 신규 파�
 - [ ] **Step 1: 현재 문서 읽기**
 
   ```bash
-  cat docs/interview/concepts/08_Redis_캐시.md
+  cat docs/interview/concepts/면접/08_Redis_캐시.md
   ```
 
 - [ ] **Step 2: Redis 3가지 용도 실제 코드 확인**
@@ -389,7 +389,7 @@ Phase 5 (마무리):     10 (도메인별 공부법) + 새 도메인 신규 파�
 - [ ] **Step 1: 현재 문서 읽기**
 
   ```bash
-  cat docs/interview/concepts/09_보안_JWT_인증.md
+  cat docs/interview/concepts/배경/09_보안_JWT_인증.md
   ```
 
 - [ ] **Step 2: JWT 필터 체인 순서 확인**

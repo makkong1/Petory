@@ -103,6 +103,11 @@ CANCELLED   → (없음)
 
 현재 사용자-facing Care API에는 별도 지원 신청 endpoint가 없고, 채팅 거래 확정 흐름에서 `CareApplication`을 생성하거나 `ACCEPTED`로 변경한다.
 
+`PENDING → ACCEPTED / REJECTED`. 거래가 확정되면 그 지원은 `ACCEPTED`가 되고,
+**같은 요청의 나머지 `PENDING` 지원은 `REJECTED`로 정리된다**(선정되지 않음).
+2026-08-08 이전에는 `reject()`를 호출하는 곳이 없어 `REJECTED`가 되는 경로 자체가 없었고,
+탈락한 지원자는 계속 대기 중인 상태로 남았다.
+
 ### CareRequestComment
 
 케어 요청 댓글이다. `SERVICE_PROVIDER` 역할 사용자만 작성할 수 있다. 삭제는 soft delete다.
@@ -297,21 +302,24 @@ Payment 상세는 [Payment 도메인](payment.md)과 [펫케어 코인 관련 �
 
 케어 매칭의 실제 확정은 Chat 도메인의 `ConversationService.confirmCareDeal()`에서 일어난다.
 
+**케어 채팅방은 지원(CareApplication) 단위다.** 한 요청에는 제공자가 여러 명 지원할 수 있어,
+요청 단위로 방을 만들면 지원자 전원이 한 방에 들어가게 된다. 그래서 방은 `RelatedType.CARE_APPLICATION`이고
+`relatedIdx`는 `careApplicationIdx`다(`createCareRequestConversation`).
+
 흐름:
 
 1. `Conversation`을 비관적 락으로 조회
-2. `RelatedType`이 `CARE_REQUEST` 또는 `CARE_APPLICATION`인지 확인
-3. 현재 사용자의 `ConversationParticipant.dealConfirmed=true` 저장
-4. 활성 참여자 2명이 모두 확정했는지 확인
-5. `RelatedType.CARE_REQUEST`이고 요청 상태가 `OPEN`이면 처리
-6. 채팅 참여자 중 요청자가 아닌 사용자를 provider로 판단
-7. 기존 `CareApplication`이 있으면 `ACCEPTED`로 변경
-8. 없으면 새 `CareApplication(status=ACCEPTED)` 생성
-9. `CareRequest`를 `IN_PROGRESS`로 변경
-10. `PetCoinEscrowService.assignProvider()`로 **이미 보관 중인 에스크로에 지급 대상을 배정**
+2. `relatedIdx`로 `CareApplication`을 찾고, 거기서 `CareRequest`와 `provider`를 얻는다
+3. 금액 대조 + 낡은 확정 무효화 (아래 표)
+4. 현재 사용자의 `ConversationParticipant.dealConfirmed=true` + `confirmedOfferedCoins` 저장
+5. 활성 참여자 2명이 모두 확정했는지 확인
+6. 요청이 `OPEN`이 아니면 **이유를 알려주고 거절**한다("이미 다른 제공자와 거래가 확정된 요청입니다")
+7. 해당 지원을 `ACCEPTED`로, **같은 요청의 나머지 `PENDING` 지원을 `REJECTED`로**
+8. `CareRequest`를 `IN_PROGRESS`로 변경
+9. `PetCoinEscrowService.assignProvider()`로 **이미 보관 중인 에스크로에 지급 대상을 배정**
 
-3단계 앞에 금액 합의 검사가 있다. 확정은 양쪽이 따로 누르고 금액은 `OPEN` 동안 바뀔 수 있어,
-아무 장치가 없으면 제공자는 5,000에 동의하고 요청자는 1,000에 동의한 채 계약이 성립한다.
+금액 합의 — 확정은 양쪽이 따로 누르고 금액은 `OPEN` 동안 바뀔 수 있어, 아무 장치가 없으면
+제공자는 5,000에 동의하고 요청자는 1,000에 동의한 채 계약이 성립한다.
 
 | 장치 | 막는 것 |
 | --- | --- |
@@ -327,9 +335,15 @@ Payment 상세는 [Payment 도메인](payment.md)과 [펫케어 코인 관련 �
   여기서 잔액 부족으로 깨지는 일이 없다. (§5 참고)
 - `assignProvider()` 실패 시 예외를 그대로 전파한다. 이전에는 `try/catch`로 삼키고 "확정은 진행한다"고
   주석까지 달아뒀지만, `REQUIRED`로 같은 트랜잭션에 합류하므로 실패가 rollback-only를 남겨
-  **그 동작은 애초에 불가능했다** — 삼켜도 바깥 커밋에서 `UnexpectedRollbackException`이 날 뿐이었다.
-  전파로 바꾼 실효는 롤백을 만드는 게 아니라 원인을 남기는 것이다(HTTP 500 → 원인 명시).
-- ⚠️ **5~10단계(CARE_REQUEST 분기)는 현재 운영 흐름에서 도달 불가능하다.** 채팅방을 만드는 유일한 경로인 `ConversationService.createCareRequestConversation()`은 항상 `relatedType = CARE_APPLICATION`으로 방을 생성하며, 코드 전체에서 `RelatedType.CARE_REQUEST`는 비교문에만 있고 값으로 대입되는 곳이 없다. 실제로 생성되는 `CARE_APPLICATION` 분기는 로그만 남기고 상태 전이·에스크로 생성을 하지 않는다. 자세한 내용은 [chat.md §6.1·§9](chat.md)를 본다.
+  **그 동작은 애초에 불가능했다** — 전파로 바꾼 실효는 원인을 남기는 것이다(HTTP 500 → 원인 명시).
+- 선정되지 않은 지원의 채팅방은 그대로 남는다. 대화는 계속 가능하지만 확정은 6번에서 막힌다.
+
+> **2026-08-08 이전에는 이 흐름 전체가 실행되지 않았다.** 확정 로직이 `RelatedType.CARE_REQUEST`를
+> 전제로 쓰여 있었는데(방 참여자에서 제공자를 역추론하고 지원이 없으면 새로 만드는 구조), 실제로
+> 생성되는 방은 전부 `CARE_APPLICATION`이라 그 분기에 도달하지 않았다. `CARE_APPLICATION` 분기는
+> 로그 한 줄이 전부였다. **확정 버튼을 눌러도 참여자 플래그만 켜지고 요청·지원·에스크로는 그대로였다** —
+> 화면만 진행되고 도메인은 멈춰 있었다.
+> → `docs/refactoring/care/care-settlement-integrity-2026-08-08.md`
 
 ## 10. 만료 요청 정리 스케줄러
 

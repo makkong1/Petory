@@ -347,4 +347,4 @@ backend/main/resources/sql/migration/notifications-add-updated-at-column.sql
 - `docs/domains/notification.md`
 - `docs/architecture/notification/알림 시스템 아키텍처.md`
 - `docs/architecture/user/알림 시스템 아키텍처.md`
-- `docs/interview/concepts/04_JPA_N+1.md`
+- `docs/interview/concepts/면접/04_JPA_N+1.md`

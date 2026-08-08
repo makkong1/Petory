@@ -485,28 +485,28 @@
 
 - `interview/concepts/_진행상태.md` — 문서 전수 점검 체크리스트. 01~14 점검 완료, 2차 점검(2026-06-18), 15·16 신규 추가.
 - `interview/concepts/00_목차.md` — concepts/ 전체 목차 및 우선순위(★~★★★) 분류.
-- `interview/concepts/01_DB_인덱스.md` — B-Tree/FULLTEXT/Spatial/Unique 인덱스 정리.
-- `interview/concepts/02_공간쿼리_Haversine.md` — Location/Meetup 2단계 공간인덱스 전략과 MissingPet 바운딩박스 비교.
-- `interview/concepts/03_동시성_제어.md` — 원자적 UPDATE/비관적 락/DB 제약 3계층 전략, worktree 실측 사례.
-- `interview/concepts/04_JPA_N+1.md` — Fetch Join/@EntityGraph/@BatchSize/2-Query패턴/JPQL Bulk UPDATE 정리.
-- `interview/concepts/05_알고리즘_점수설계.md` — 추천/모임/실종신고/게시판 인기도 가중합 점수 설계.
-- `interview/concepts/06_실시간통신_SSE_WebSocket.md` — SSE(알림) vs WebSocket/STOMP(채팅) 선택 이유와 구조.
-- `interview/concepts/07_이벤트_트랜잭션_배치.md` — afterCommit() 패턴, petRecommendation 이벤트 체인, 통계 배치, 커스텀 AOP.
-- `interview/concepts/08_Redis_캐시.md` — Redis 4가지 실사용 용도와 RedisTemplate 구성, boardDetail 캐시 제거 배경.
-- `interview/concepts/09_보안_JWT_인증.md` — Access/Refresh JWT 구조, JwtAuthenticationFilter DB 재조회 흐름.
-- `interview/concepts/10_PG결제_PetCoin_Escrow.md` — PG 미연동 현황과 PetCoin 에스크로 패턴, 비관적 락 지점.
-- `interview/concepts/11_주변서비스_CareRequest.md` — CareRequest 상태전이와 에스크로 연동, FULLTEXT 2-Query 패턴.
-- `interview/concepts/12_모임_Meetup.md` — 모임 참가 3중 동시성 방어, afterCommit() 채팅방 생성+복구.
-- `interview/concepts/13_NLP_서버_FastAPI.md` — FastAPI NLP 서버 분리 이유, Kiwi+ko-sroberta 하이브리드 규칙기반.
-- `interview/concepts/14_CS_기본기.md` — HTTP/TCP/WebSocket vs SSE/CORS/데드락 등을 프로젝트 코드와 연결.
-- `interview/concepts/15_Spring_Java.md` — IoC/DI, AOP, self-invocation, GC 등을 프로젝트 코드와 연결.
-- `interview/concepts/16_추가질문_일반개념.md` — N+1/동시성/캐시 후속질문 + 프로젝트에 없는 일반개념(CAP, CQRS 등) 비교.
+- `interview/concepts/면접/01_DB_인덱스.md` — B-Tree/FULLTEXT/Spatial/Unique 인덱스 정리.
+- `interview/concepts/면접/02_공간쿼리_Haversine.md` — Location/Meetup 2단계 공간인덱스 전략과 MissingPet 바운딩박스 비교.
+- `interview/concepts/면접/03_동시성_제어.md` — 원자적 UPDATE/비관적 락/DB 제약 3계층 전략, worktree 실측 사례.
+- `interview/concepts/면접/04_JPA_N+1.md` — Fetch Join/@EntityGraph/@BatchSize/2-Query패턴/JPQL Bulk UPDATE 정리.
+- `interview/concepts/배경/05_알고리즘_점수설계.md` — 추천/모임/실종신고/게시판 인기도 가중합 점수 설계.
+- `interview/concepts/면접/06_실시간통신_SSE_WebSocket.md` — SSE(알림) vs WebSocket/STOMP(채팅) 선택 이유와 구조.
+- `interview/concepts/면접/07_이벤트_트랜잭션_배치.md` — afterCommit() 패턴, petRecommendation 이벤트 체인, 통계 배치, 커스텀 AOP.
+- `interview/concepts/면접/08_Redis_캐시.md` — Redis 4가지 실사용 용도와 RedisTemplate 구성, boardDetail 캐시 제거 배경.
+- `interview/concepts/배경/09_보안_JWT_인증.md` — Access/Refresh JWT 구조, JwtAuthenticationFilter DB 재조회 흐름.
+- `interview/concepts/배경/10_PG결제_PetCoin_Escrow.md` — PG 미연동 현황과 PetCoin 에스크로 패턴, 비관적 락 지점.
+- `interview/concepts/배경/11_주변서비스_CareRequest.md` — CareRequest 상태전이와 에스크로 연동, FULLTEXT 2-Query 패턴.
+- `interview/concepts/배경/12_모임_Meetup.md` — 모임 참가 3중 동시성 방어, afterCommit() 채팅방 생성+복구.
+- `interview/concepts/배경/13_NLP_서버_FastAPI.md` — FastAPI NLP 서버 분리 이유, Kiwi+ko-sroberta 하이브리드 규칙기반.
+- `interview/concepts/배경/14_CS_기본기.md` — HTTP/TCP/WebSocket vs SSE/CORS/데드락 등을 프로젝트 코드와 연결.
+- `interview/concepts/배경/15_Spring_Java.md` — IoC/DI, AOP, self-invocation, GC 등을 프로젝트 코드와 연결.
+- `interview/concepts/배경/16_추가질문_일반개념.md` — N+1/동시성/캐시 후속질문 + 프로젝트에 없는 일반개념(CAP, CQRS 등) 비교.
 - `interview/concepts/17_도메인별_공부법.md` — 8개 그룹 우선순위별 면접 공부 순서와 도메인 연관 지도.
-- `interview/concepts/18_자료구조.md` — Array/Stack/HashMap/Tree/Heap/Graph/Trie를 프로젝트 코드와 연결.
-- `interview/concepts/19_프로젝트_자료구조_선택.md` — List/Page/Map/Set/Enum 등 실제 선택 근거.
-- `interview/concepts/20_백엔드_면접_학습로드맵.md` — 선행개념 의존관계 기준 학습순서와 2~3주 스퍼트 플랜.
+- `interview/concepts/배경/18_자료구조.md` — Array/Stack/HashMap/Tree/Heap/Graph/Trie를 프로젝트 코드와 연결.
+- `interview/concepts/배경/19_프로젝트_자료구조_선택.md` — List/Page/Map/Set/Enum 등 실제 선택 근거.
+- `interview/concepts/배경/20_백엔드_면접_학습로드맵.md` — 선행개념 의존관계 기준 학습순서와 2~3주 스퍼트 플랜.
 - `interview/concepts/21_백엔드_취업_기본기_체크리스트.md` — 4단계 기준 프로젝트 코드 근거 유무 판정.
-- `interview/concepts/23_쿼리_옵티마이저_통계와_실행계획.md` — 게시판 목록 쿼리 "인덱스 있는데도 안 쓰인" 사건 분석, A/B/A 인과증명.
+- `interview/concepts/면접/23_쿼리_옵티마이저_통계와_실행계획.md` — 게시판 목록 쿼리 "인덱스 있는데도 안 쓰인" 사건 분석, A/B/A 인과증명.
 
 ### interview/concepts/db-infra/
 
