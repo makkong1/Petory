@@ -115,9 +115,11 @@ public class CareReviewService {
 
     /**
      * 리뷰 작성 (요청자가 제공자에게 리뷰 작성)
+     *
+     * @param currentUserId 인증 주체의 사용자 ID. dto.reviewerId 는 클라이언트가 보낸 값이라 믿지 않는다.
      */
     @Transactional
-    public CareReviewDTO createReview(CareReviewDTO dto) {
+    public CareReviewDTO createReview(CareReviewDTO dto, Long currentUserId) {
         if (dto.getCareApplicationId() == null) {
             throw CareValidationException.careApplicationIdRequired();
         }
@@ -133,7 +135,7 @@ public class CareReviewService {
 
         // 이미 리뷰를 작성했는지 확인
         boolean alreadyReviewed = reviewRepository.existsByCareApplicationIdxAndReviewerIdx(
-                dto.getCareApplicationId(), dto.getReviewerId());
+                dto.getCareApplicationId(), currentUserId);
         if (alreadyReviewed) {
             throw CareConflictException.alreadyReviewed();
         }
@@ -142,7 +144,7 @@ public class CareReviewService {
         Long requesterId = careApplication.getCareRequest().getUser().getIdx();
         Long providerId = careApplication.getProvider().getIdx();
 
-        if (!dto.getReviewerId().equals(requesterId)) {
+        if (!currentUserId.equals(requesterId)) {
             throw CareForbiddenException.requesterOnly();
         }
 
@@ -151,7 +153,7 @@ public class CareReviewService {
         }
 
         // 사용자 조회
-        Users reviewer = usersRepository.findById(dto.getReviewerId())
+        Users reviewer = usersRepository.findById(currentUserId)
                 .orElseThrow(() -> new UserNotFoundException("리뷰 작성자를 찾을 수 없습니다."));
         Users reviewee = usersRepository.findById(dto.getRevieweeId())
                 .orElseThrow(() -> new UserNotFoundException("리뷰 대상자를 찾을 수 없습니다."));

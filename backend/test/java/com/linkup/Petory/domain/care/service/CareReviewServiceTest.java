@@ -11,6 +11,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import static org.mockito.ArgumentMatchers.any;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -95,7 +96,7 @@ class CareReviewServiceTest {
                 when(reviewConverter.toDTO(any(CareReview.class)))
                                 .thenReturn(CareReviewDTO.builder().idx(1L).rating(5).build());
 
-                CareReviewDTO result = careReviewService.createReview(dto);
+                CareReviewDTO result = careReviewService.createReview(dto, 1L);
 
                 assertThat(result).isNotNull();
                 assertThat(result.getRating()).isEqualTo(5);
@@ -114,7 +115,7 @@ class CareReviewServiceTest {
                 when(careApplicationRepository.findById(10L)).thenReturn(Optional.of(app));
                 when(reviewRepository.existsByCareApplicationIdxAndReviewerIdx(10L, 1L)).thenReturn(true);
 
-                assertThatThrownBy(() -> careReviewService.createReview(dto))
+                assertThatThrownBy(() -> careReviewService.createReview(dto, 1L))
                                 .isInstanceOf(CareConflictException.class);
         }
 
@@ -133,7 +134,7 @@ class CareReviewServiceTest {
                 when(reviewRepository.save(any(CareReview.class)))
                                 .thenThrow(new DataIntegrityViolationException("Duplicate entry"));
 
-                assertThatThrownBy(() -> careReviewService.createReview(dto))
+                assertThatThrownBy(() -> careReviewService.createReview(dto, 1L))
                                 .isInstanceOf(CareConflictException.class);
         }
 
@@ -157,7 +158,7 @@ class CareReviewServiceTest {
 
                 when(careApplicationRepository.findById(10L)).thenReturn(Optional.of(pendingApp));
 
-                assertThatThrownBy(() -> careReviewService.createReview(dto))
+                assertThatThrownBy(() -> careReviewService.createReview(dto, 1L))
                                 .isInstanceOf(IllegalStateException.class)
                                 .hasMessageContaining("승인된");
         }
@@ -169,7 +170,7 @@ class CareReviewServiceTest {
 
                 when(careApplicationRepository.findById(999L)).thenReturn(Optional.empty());
 
-                assertThatThrownBy(() -> careReviewService.createReview(dto))
+                assertThatThrownBy(() -> careReviewService.createReview(dto, 1L))
                                 .isInstanceOf(CareApplicationNotFoundException.class);
         }
 
@@ -185,7 +186,34 @@ class CareReviewServiceTest {
                 when(careApplicationRepository.findById(10L)).thenReturn(Optional.of(app));
                 when(reviewRepository.existsByCareApplicationIdxAndReviewerIdx(10L, 3L)).thenReturn(false);
 
-                assertThatThrownBy(() -> careReviewService.createReview(dto))
+                assertThatThrownBy(() -> careReviewService.createReview(dto, 3L))
+                                .isInstanceOf(CareForbiddenException.class);
+        }
+
+        @Test
+        @DisplayName("보안: 본문의 reviewerId 를 요청자로 위조해도 인증 주체가 기준이 된다")
+        void 보안_reviewerId_위조() {
+                Users requester = createUser(1L);
+                Users provider = createUser(2L);
+                CareApplication app = createAcceptedApplication(10L, requester, provider);
+
+                // 제3자(3번)가 요청자(1번)인 척 본문을 꾸며 보낸다.
+                CareReviewDTO forged = createReviewDTO(10L, 1L, 2L);
+
+                when(careApplicationRepository.findById(10L)).thenReturn(Optional.of(app));
+                when(reviewRepository.existsByCareApplicationIdxAndReviewerIdx(10L, 3L)).thenReturn(false);
+
+                // 아래 셋은 "본문을 믿던 옛 코드"만 도달하는 경로다. 지금 코드는 그 전에 막히므로
+                // lenient() 로 둔다 — 이 스텁이 있어야 옛 코드에서 저장까지 성공해, 이 테스트가
+                // "예외가 안 났다"는 이유로 정확히 실패한다(엉뚱한 예외로 실패하는 게 아니라).
+                lenient().when(usersRepository.findById(1L)).thenReturn(Optional.of(requester));
+                lenient().when(usersRepository.findById(2L)).thenReturn(Optional.of(provider));
+                lenient().when(reviewRepository.save(any(CareReview.class))).thenReturn(
+                                CareReview.builder().careApplication(app).reviewer(requester)
+                                                .reviewee(provider).rating(5).build());
+
+                assertThatThrownBy(() -> careReviewService.createReview(forged, 3L))
+                                .as("본문 reviewerId 가 아니라 인증 주체로 판정해야 한다")
                                 .isInstanceOf(CareForbiddenException.class);
         }
 
@@ -201,7 +229,7 @@ class CareReviewServiceTest {
                                 .rating(5)
                                 .build();
 
-                assertThatThrownBy(() -> careReviewService.createReview(dto))
+                assertThatThrownBy(() -> careReviewService.createReview(dto, 1L))
                                 .isInstanceOf(RuntimeException.class);
         }
 

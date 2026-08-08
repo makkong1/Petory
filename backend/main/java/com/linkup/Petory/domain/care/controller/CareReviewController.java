@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.linkup.Petory.domain.care.dto.CareReviewDTO;
 import com.linkup.Petory.domain.care.service.CareReviewService;
+import com.linkup.Petory.global.security.AuthenticatedUserIdResolver;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -23,14 +24,19 @@ import lombok.RequiredArgsConstructor;
 public class CareReviewController {
 
     private final CareReviewService careReviewService;
+    private final AuthenticatedUserIdResolver authenticatedUserIdResolver;
 
     /**
      * 리뷰 작성
+     *
+     * 작성자는 요청 본문이 아니라 인증 주체에서 가져온다. 본문의 reviewerId 를 믿으면
+     * 인증만 된 사용자가 남의 이름으로 리뷰를 쓸 수 있다(평점·프로필에 반영되므로 실질 피해).
      */
     @PostMapping
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<CareReviewDTO> createReview(@Valid @RequestBody CareReviewDTO dto) {
-        return ResponseEntity.ok(careReviewService.createReview(dto));
+        Long currentUserId = authenticatedUserIdResolver.requireCurrentUserIdx();
+        return ResponseEntity.ok(careReviewService.createReview(dto, currentUserId));
     }
 
     /**
