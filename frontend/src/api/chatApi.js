@@ -75,9 +75,14 @@ export const updateConversationStatus = async (conversationIdx, status) => {
 
 /**
  * 펫케어 거래 확정
+ *
+ * expectedAmount = 사용자가 화면에서 보고 동의한 제시 금액. 그 사이 요청자가 금액을 바꿨으면
+ * 서버가 409 로 거절한다 — 화면에 뜬 숫자와 실제로 성립하는 계약이 달라지지 않게 하기 위해서다.
  */
-export const confirmCareDeal = async (conversationIdx) => {
-  await api.post(`/conversations/${conversationIdx}/confirm-deal`);
+export const confirmCareDeal = async (conversationIdx, expectedAmount) => {
+  await api.post(`/conversations/${conversationIdx}/confirm-deal`, null, {
+    params: expectedAmount != null ? { expectedAmount } : undefined,
+  });
 };
 
 // ==================== Chat Message API ====================

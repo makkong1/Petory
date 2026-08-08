@@ -110,6 +110,17 @@ public class CareRequestController {
         return ResponseEntity.ok(careRequestService.updateStatus(id, status, currentUserId));
     }
 
+    /**
+     * 이행 완료 확인. 요청자와 제공자가 각자 호출하고, 양쪽이 모두 확인해야 COMPLETED 로 넘어가며 정산된다.
+     * 한쪽만 확인한 상태에서는 상대 확인을 기다린다(응답의 상태는 여전히 IN_PROGRESS).
+     */
+    @PostMapping("/{id}/complete")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<CareRequestDTO> confirmCompletion(@PathVariable("id") Long id) {
+        Long currentUserId = getCurrentUserId();
+        return ResponseEntity.ok(careRequestService.confirmCompletion(id, currentUserId));
+    }
+
     // 케어 요청 검색 (페이징 지원)
     @GetMapping("/search")
     public ResponseEntity<CareRequestPageResponseDTO> searchCareRequests(

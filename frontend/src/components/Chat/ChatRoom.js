@@ -472,47 +472,68 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
   const handleConfirmDeal = async () => {
     if (!conversationIdx || !user?.idx || dealConfirmed) return;
 
-    if (!window.confirm('거래를 확정하시겠습니까? 양쪽 모두 확정하면 펫케어 서비스가 시작됩니다.')) {
+    // 지금 화면에 떠 있는 금액을 그대로 서버에 실어 보낸다. 그 사이 요청자가 금액을 바꿨으면
+    // 서버가 409 로 거절하므로, 사용자가 본 숫자와 실제로 성립하는 계약이 어긋나지 않는다.
+    const expectedAmount = careRequestData?.offeredCoins;
+
+    const amountText = expectedAmount != null ? `${expectedAmount.toLocaleString()} 코인으로 ` : '';
+    if (!window.confirm(`${amountText}거래를 확정하시겠습니까?\n양쪽 모두 확정하면 펫케어 서비스가 시작됩니다.`)) {
       return;
     }
 
     setConfirmingDeal(true);
     try {
-      await confirmCareDeal(conversationIdx);
+      await confirmCareDeal(conversationIdx, expectedAmount);
       setDealConfirmed(true);
       // 채팅방 정보 다시 조회
       await fetchConversation();
       showToast('거래 확정이 완료되었습니다. 상대방도 확정하면 서비스가 시작됩니다.', 'success');
     } catch (error) {
       console.error('거래 확정 실패:', error);
+      // 409 = 제시 금액이 바뀐 경우. 최신 금액을 다시 받아 보여준다.
+      if (error.response?.status === 409) {
+        await fetchConversation();
+      }
       showToast(error.response?.data?.error || '거래 확정에 실패했습니다.');
     } finally {
       setConfirmingDeal(false);
     }
   };
 
-  // 펫케어 서비스 완료
+  // 펫케어 서비스 이행 완료 확인
+  // 요청자·제공자가 각자 눌러야 하고, 양쪽이 다 확인해야 COMPLETED 가 되며 코인이 정산된다.
   const handleCompleteCare = async () => {
     if (!conversation?.relatedIdx || !user?.idx || completingCare) return;
 
-    if (!window.confirm('펫케어 서비스를 완료 처리하시겠습니까?')) {
+    if (!window.confirm('이행이 끝났음을 확인하시겠습니까?\n양쪽 모두 확인해야 코인이 정산됩니다.')) {
       return;
     }
 
     setCompletingCare(true);
     try {
-      await careRequestApi.updateStatus(conversation.relatedIdx, 'COMPLETED');
-      setCareRequestStatus('COMPLETED');
+      const response = await careRequestApi.confirmCompletion(conversation.relatedIdx);
+      const updated = response?.data;
+      setCareRequestStatus(updated?.status || 'IN_PROGRESS');
       // 펫케어 요청 정보 다시 조회
       await fetchConversation();
-      showToast('펫케어 서비스가 완료되었습니다.', 'success');
+      showToast(
+        updated?.status === 'COMPLETED'
+          ? '양쪽 확인이 끝나 펫케어 서비스가 완료되었습니다.'
+          : '완료 확인했습니다. 상대방 확인을 기다리는 중입니다.',
+        'success'
+      );
     } catch (error) {
-      console.error('서비스 완료 실패:', error);
-      showToast(error.response?.data?.error || '서비스 완료 처리에 실패했습니다.');
+      console.error('완료 확인 실패:', error);
+      showToast(error.response?.data?.error || '완료 확인에 실패했습니다.');
     } finally {
       setCompletingCare(false);
     }
   };
+
+  // 내가 이미 이행 완료를 확인했는지 (확인했으면 상대를 기다리는 상태)
+  const myCompletionConfirmed = isRequester
+    ? Boolean(careRequestData?.requesterCompletedAt)
+    : Boolean(careRequestData?.providerCompletedAt);
 
   // 리뷰 작성 모달 열기
   const handleOpenReviewModal = () => {
@@ -750,11 +771,19 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
           </DealConfirmedBanner>
         )}
 
-        {/* 서비스 완료 버튼 (IN_PROGRESS 상태이고 제공자일 때만 표시) */}
-        {isCareRequestChat && careRequestStatus === 'IN_PROGRESS' && isProvider && (
+        {/* 이행 완료 확인 버튼 — 요청자·제공자 양쪽에 표시된다.
+            예전에는 제공자에게만 보였고, 그 한 번의 클릭으로 바로 정산됐다. */}
+        {isCareRequestChat && careRequestStatus === 'IN_PROGRESS' && (isProvider || isRequester) && (
           <CompleteCareSection>
-            <CompleteCareButton onClick={handleCompleteCare} disabled={completingCare}>
-              {completingCare ? '완료 처리 중...' : '✅ 서비스 완료'}
+            <CompleteCareButton
+              onClick={handleCompleteCare}
+              disabled={completingCare || myCompletionConfirmed}
+            >
+              {myCompletionConfirmed
+                ? '⏳ 상대방 확인 대기 중'
+                : completingCare
+                  ? '확인 중...'
+                  : '✅ 이행 완료 확인'}
             </CompleteCareButton>
           </CompleteCareSection>
         )}

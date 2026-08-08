@@ -73,25 +73,32 @@ Payment 도메인은 Petory 내부 결제 단위인 펫코인의 잔액 변경�
 
 ### PetCoinEscrow
 
-케어 거래 확정 시 요청자 코인을 임시 보관하는 엔티티다.
+**케어 요청 등록 시** 요청자 코인을 임시 보관하는 엔티티다. 거래 조건이 충족될 때까지 어느 쪽 잔액에도
+속하지 않는 구간을 만든다 — 선불이면 요청자가, 후불이면 제공자가 떼일 위험이 있어 시스템이 중간에서 든다.
 
 | 필드 | 의미 |
 |---|---|
 | `careRequest` | 연결된 케어 요청, unique |
-| `careApplication` | 확정된 케어 매칭 |
+| `careApplication` | 확정된 케어 매칭. 등록 시점에는 `NULL` |
 | `requester` | 코인을 지불한 요청자 |
-| `provider` | 지급받을 제공자 |
+| `provider` | 지급받을 제공자. **등록 시점에는 `NULL`**(아직 상대 미정) |
 | `amount` | 에스크로 금액 |
 | `status` | `HOLD`, `RELEASED`, `REFUNDED` |
 | `releasedAt` | 지급 시각 |
 | `refundedAt` | 환불 시각 |
 
-에스크로 상태 변경:
+`provider IS NULL`은 "아직 상대가 정해지지 않은 보관"이라는 뜻이고, **확정 여부를 판별하는 신호로도 쓴다**
+(컬럼 하나가 두 몫). 금액 수정이 가능한 구간도 이 상태다.
 
-- `release()`: `HOLD -> RELEASED`
+에스크로 상태 변경(전이 가드는 엔티티 안에 있다 — 서비스가 늘어도 우회할 수 없다):
+
+- `assignProvider()`: 지급 대상 배정. `HOLD`이고 아직 미배정일 때만
+- `changeAmount()`: 보관 금액 변경. `HOLD`이고 아직 미배정일 때만
+- `release()`: `HOLD -> RELEASED`. **지급 대상이 배정돼 있어야 한다**
 - `refund()`: `HOLD -> REFUNDED`
 
-`care_request_idx`는 unique라 하나의 케어 요청에는 하나의 에스크로만 연결된다.
+`care_request_idx`는 unique라 하나의 케어 요청에는 하나의 에스크로만 연결된다. 앱의 "저장 전 조회로
+중복 확인"은 TOCTOU라 막지 못하고, 유일성의 최종 보증은 이 DB 제약에 있다.
 
 ## 4. 사용자 Payment API
 
@@ -176,26 +183,51 @@ Payment 도메인은 Petory 내부 결제 단위인 펫코인의 잔액 변경�
 
 ## 7. 에스크로 서비스
 
-### createEscrow
+### holdForRequest
 
-`ConversationService.confirmCareDeal()`에서 양쪽 거래 확정 후 호출된다.
+`CareRequestService.createCareRequest()`에서 **요청 등록과 같은 트랜잭션으로** 호출된다.
 
 흐름:
 
 1. amount가 0 이하이면 거절
 2. 같은 CareRequest에 이미 에스크로가 있으면 `PaymentConflictException`
-3. `deductCoins(requester, amount, "CARE_REQUEST", careRequest.idx, ...)` 호출
-4. `PetCoinEscrow(status=HOLD)` 생성
+3. `deductCoins(requester, amount, "CARE_REQUEST", careRequest.idx, ...)` 호출 — 비관적 락 안에서 잔액 검사
+4. `PetCoinEscrow(status=HOLD, provider=NULL)` 생성
 
-중요:
+> **왜 확정이 아니라 등록에서 잡나.** `createCareRequest`에는 원래 잔액 "확인"만 있었다. 등록 시점에
+> 지급 능력을 보겠다는 의도는 있었는데 잡지는 않아 TOCTOU였다 — 확인과 실제 차감(거래 확정) 사이에
+> 잔액을 다른 데 쓰면 확정 순간에 깨졌고, 제공자는 신청하고 채팅까지 마친 뒤에야 알았다.
+> 등록에서 잡아야 **"올라와 있는 요청은 지급이 보증된다"**가 성립한다.
+>
+> 충전형 코인이라 가능한 선택이다. 등록 시 차감은 새로 결제를 받는 게 아니라 플랫폼 안에서
+> 잔액 → 에스크로로 옮기는 것뿐이다.
 
-- 이 메서드 자체는 `@Transactional`이다.
-- 하지만 호출자인 `ConversationService.confirmCareDeal()`은 이 호출을 try/catch로 감싸고 예외를 다시 던지지 않는다.
-- 그래서 에스크로 생성 실패 시에도 Care 매칭 상태 전이가 커밋될 수 있다.
+잔액이 모자라면 같은 트랜잭션이라 **케어 요청 자체가 등록되지 않는다.**
+
+### assignProvider
+
+`ConversationService.confirmCareDeal()`에서 양쪽 거래 확정 후 호출된다.
+
+흐름:
+
+1. `findByCareRequestForUpdate()` 비관적 락 조회
+2. `expectedAmount`(확정하는 쪽이 화면에서 본 금액)가 실제와 다르면 `PaymentConflictException`(409)
+3. `escrow.assignProvider(provider, careApplication)` — 이미 배정됐으면 거절
+
+**이 시점에 차감은 일어나지 않는다.** 등록 때 이미 잡혀 있다.
+
+### changeAmount
+
+`CareRequestService.updateCareRequest()`에서 제시 금액이 바뀔 때 호출된다.
+
+목표 금액을 받아 차액만 정산한다(증액=`deductCoins`, 감액=`refundCoins`). 증분이 아니라 목표값이라
+같은 요청이 두 번 도착해도 두 번째는 차액이 0이 되어 **멱등키 없이 재시도 안전**하다.
+상대가 정해진 뒤(`provider != NULL`)에는 계약 조건이므로 거절한다.
 
 ### releaseToProvider
 
-`CareRequestService.updateStatus(..., COMPLETED, ...)`에서 호출된다.
+`CareRequestService.confirmCompletion()`에서 **양쪽이 이행 완료를 확인했을 때** 호출된다.
+(관리자 분쟁 조정 경로인 `updateStatus(..., COMPLETED, ...)`에서도 호출된다.)
 
 흐름:
 
@@ -209,7 +241,9 @@ Payment 도메인은 Petory 내부 결제 단위인 펫코인의 잔액 변경�
 
 ### refundToRequester
 
-`CareRequestService.updateStatus(..., CANCELLED, ...)`에서 호출된다.
+`CareRequestService.updateStatus(..., CANCELLED, ...)`와 `deleteCareRequest()`에서 호출된다.
+취소·만료·삭제 세 경로가 모두 이 환불을 탄다 — 내부 코인은 플랫폼이 돌려주지 않으면 회수 수단이 없어,
+경로 하나를 빠뜨리면 그대로 묶인다.
 
 흐름:
 

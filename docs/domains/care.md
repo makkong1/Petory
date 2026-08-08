@@ -68,8 +68,25 @@ Care 도메인은 보호자가 펫케어 요청을 등록하고, 서비스 제�
 | `latitude`, `longitude`, `address` | 지도 표출/반경 검색용 위치                      |
 | `isDeleted`, `deletedAt`           | soft delete 상태                                |
 | `completedAt`                      | 완료 시각, 통계 집계용                          |
+| `requesterCompletedAt`             | 요청자가 이행 완료를 확인한 시각 (`NULL` = 미확인) |
+| `providerCompletedAt`              | 제공자가 이행 완료를 확인한 시각 (`NULL` = 미확인) |
+| `offeredCoinsUpdatedAt`            | 제시 금액이 마지막으로 바뀐 시각. 표시용        |
 
 상태를 `COMPLETED`로 변경할 때 `transitionTo()`가 `completedAt`을 기록한다.
+
+`transitionTo()`는 허용된 전이만 통과시킨다. `COMPLETED`/`CANCELLED`는 종착이라 어디로도 가지 않는다.
+같은 상태로의 재요청은 예외 없이 무시된다(재시도 안전).
+
+```
+OPEN        → IN_PROGRESS | CANCELLED
+IN_PROGRESS → COMPLETED   | CANCELLED
+COMPLETED   → (없음)
+CANCELLED   → (없음)
+```
+
+> 가드가 없던 시절 `COMPLETED → CANCELLED`가 통했고, 그때 에스크로는 이미 `RELEASED`라 환불이
+> 스킵되어 "상태는 취소인데 돈은 제공자에게" 남는 불일치가 생겼다.
+> → `docs/refactoring/care/care-settlement-integrity-2026-08-08.md`
 
 ### CareApplication
 
@@ -85,6 +102,11 @@ Care 도메인은 보호자가 펫케어 요청을 등록하고, 서비스 제�
 `care_request_idx + provider_idx` unique 제약이 있다.
 
 현재 사용자-facing Care API에는 별도 지원 신청 endpoint가 없고, 채팅 거래 확정 흐름에서 `CareApplication`을 생성하거나 `ACCEPTED`로 변경한다.
+
+`PENDING → ACCEPTED / REJECTED`. 거래가 확정되면 그 지원은 `ACCEPTED`가 되고,
+**같은 요청의 나머지 `PENDING` 지원은 `REJECTED`로 정리된다**(선정되지 않음).
+2026-08-08 이전에는 `reject()`를 호출하는 곳이 없어 `REJECTED`가 되는 경로 자체가 없었고,
+탈락한 지원자는 계속 대기 중인 상태로 남았다.
 
 ### CareRequestComment
 
@@ -107,7 +129,8 @@ Care 도메인은 보호자가 펫케어 요청을 등록하고, 서비스 제�
 | `PUT /api/care-requests/{id}`                           | 인증 필요           | 케어 요청 수정             |
 | `DELETE /api/care-requests/{id}`                        | 인증 필요           | 케어 요청 soft delete      |
 | `GET /api/care-requests/my-requests`                    | 인증 필요           | 내 케어 요청 목록          |
-| `PATCH /api/care-requests/{id}/status?status=COMPLETED` | 인증 필요           | 케어 요청 상태 변경        |
+| `PATCH /api/care-requests/{id}/status?status=...`       | 인증 필요           | 케어 요청 상태 변경. `COMPLETED`는 관리자만 |
+| `POST /api/care-requests/{id}/complete`                 | 인증 필요           | 이행 완료 확인. 양쪽이 확인해야 정산 |
 | `GET /api/care-requests/search?keyword&page&size`       | 보안 설정 확인 필요 | 케어 요청 검색             |
 
 생성 시 컨트롤러가 `AuthenticatedUserIdResolver`로 현재 로그인 사용자 PK를 구해 `dto.userId`에 넣는다. 즉, 요청 생성은 클라이언트가 보낸 userId를 신뢰하지 않는다.
@@ -118,12 +141,14 @@ Care 도메인은 보호자가 펫케어 요청을 등록하고, 서비스 제�
 
 1. 현재 로그인 사용자 조회
 2. 이메일 인증 확인
-3. 요청자 펫코인 잔액이 `offeredCoins` 이상인지 확인
-4. `scheduleMode`가 없으면 `FIXED` 사용
-5. 제목, 설명, 일정, 예상 시간, 코인, 주소, 좌표 저장
-6. `petIdx`가 있으면 펫 존재와 소유자 확인
-7. `status=OPEN`으로 저장
+3. `scheduleMode`가 없으면 `FIXED` 사용
+4. 제목, 설명, 일정, 예상 시간, 코인, 주소, 좌표 저장
+5. `petIdx`가 있으면 펫 존재와 소유자 확인
+6. `status=OPEN`으로 저장
+7. **`offeredCoins`를 에스크로에 잡는다**(`holdForRequest`) — 비관적 락 안에서 잔액을 검사하고 차감한다
 8. `CareRequestCreatedEvent` 발행
+
+7번이 실패하면 같은 트랜잭션이라 **글도 남지 않는다.** 잔액이 모자라면 요청 자체가 등록되지 않는다.
 
 이메일 인증 purpose:
 
@@ -131,7 +156,8 @@ Care 도메인은 보호자가 펫케어 요청을 등록하고, 서비스 제�
 
 주의:
 
-- 서버는 `offeredCoins >= 1` DTO validation과 잔액 확인을 수행한다.
+- 서버는 `offeredCoins >= 100` DTO validation을 수행하고, 잔액은 에스크로 차감 시 비관적 락 안에서 검사한다.
+  (이전에는 잔액을 "확인"만 하고 잡지 않아, 확인과 실제 차감 사이에 잔액을 쓰면 거래 확정 순간에 깨지는 TOCTOU 였다.)
 - 시간당 최소 코인, 펫 크기별 가중치 같은 가격 가이드 공식은 현재 백엔드에 없다.
 - 펫 연결은 선택이다.
 
@@ -201,14 +227,21 @@ FULLTEXT 인덱스(`idx_carerequest_title_desc`)는 `ngram` 파서를 쓴다(V9)
 수정:
 
 - 작성자 또는 `ADMIN`/`MASTER`만 가능하다.
+- **`OPEN` 상태에서만 가능하다. 관리자도 예외가 아니다** — 관리자가 우회할 수 있으면 가드가 아니다.
+  (이전에는 상태 가드가 없어 이미 `COMPLETED`된 케어의 날짜·장소·펫을 사후에 바꿀 수 있었다.)
 - 제목, 설명, 날짜, 일정 모드, 예상 시간, 주소, 좌표를 부분 수정한다.
+- **`offeredCoins`도 수정한다.** 목표 금액을 받아 에스크로와의 차액만 정산한다(증액=추가 차감, 감액=환불).
+  증분이 아니라 목표값이라 같은 요청이 두 번 와도 두 번째는 차액이 0이 되어 **멱등키 없이 재시도 안전**하다.
+  변경 시각(`offeredCoinsUpdatedAt`)을 함께 남긴다.
 - `petIdx`가 있으면 해당 펫이 요청자 소유인지 확인하고 연결한다.
 - `petIdx == null`이고 기존 펫이 있으면 펫 연결을 해제한다.
 
 삭제:
 
 - 작성자 또는 `ADMIN`/`MASTER`만 가능하다.
-- hard delete가 아니라 `softDelete()`로 `isDeleted=true`, `deletedAt=now` 처리한다.
+- **`OPEN` 상태에서만 가능하다.** 상대가 있는 계약을 한쪽이 지우면 보관 코인의 귀속이 사라진다.
+- **보관 중인 에스크로를 요청자에게 환불한 뒤** `softDelete()`로 `isDeleted=true`, `deletedAt=now` 처리한다.
+  내부 코인은 플랫폼이 돌려주지 않으면 회수 수단이 없어, 환불 경로를 빠뜨리면 그대로 묶인다.
 
 주의:
 
@@ -230,8 +263,27 @@ OPEN/IN_PROGRESS -> CANCELLED
 - 일반 사용자는 요청자 또는 `ACCEPTED` 상태의 제공자만 가능하다.
 - 스케줄러는 `currentUserId=null`로 호출하므로 권한 검증을 생략한다.
 - 일반 사용자가 `COMPLETED` 또는 `CANCELLED`로 전환할 때 요청자나 `ACCEPTED` 제공자 중 제재 사용자가 있으면 거절한다.
+- **`COMPLETED`로의 전환은 관리자만 가능하다.** 일반 사용자의 완료는 아래 양방향 확인 경로로만 이뤄진다.
+  두 경로가 모두 열려 있으면 양방향 확인 가드가 그대로 우회되기 때문이다.
+  관리자를 남긴 것은 당사자 합의가 불가능한 분쟁 조정을 위해서다.
 
-`COMPLETED` 처리:
+### 이행 완료 확인 (`POST /api/care-requests/{id}/complete`)
+
+요청자와 제공자가 각자 호출하고, **양쪽이 모두 확인해야** `COMPLETED`가 되며 그때 정산한다.
+
+1. `CareRequest`를 **비관적 락**으로 조회 (`findByIdForUpdate`)
+2. `IN_PROGRESS`인지 확인
+3. 호출자가 요청자인지 `ACCEPTED` 제공자인지 판별 (아니면 403)
+4. 자기 쪽 확인 시각 기록. 이미 확인했으면 덮어쓰지 않는다(재시도 안전)
+5. 양쪽 다 확인됐으면 `transitionTo(COMPLETED)` + `releaseToProvider()`
+
+> **왜 비관적 락인가.** 양쪽이 동시에 누르면 둘 다 "상대도 확인했나"를 읽고 각자 정산으로 넘어갈 수 있다.
+> 읽고 판단해서 쓰는 구간이라 원자적 UPDATE로 대체되지 않는다.
+>
+> **왜 필요했나.** 이전에는 `updateStatus`를 요청자 **또는** 제공자 아무나 호출할 수 있었고
+> `COMPLETED`가 되는 순간 정산돼, **제공자가 혼자 눌러 요청자 동의 없이 돈을 가져갈 수 있었다.**
+
+`COMPLETED` 처리(관리자 경로):
 
 1. `transitionTo(COMPLETED)`로 상태 변경 및 `completedAt` 기록
 2. 해당 CareRequest의 에스크로 조회
@@ -250,34 +302,66 @@ Payment 상세는 [Payment 도메인](payment.md)과 [펫케어 코인 관련 �
 
 케어 매칭의 실제 확정은 Chat 도메인의 `ConversationService.confirmCareDeal()`에서 일어난다.
 
+**케어 채팅방은 지원(CareApplication) 단위다.** 한 요청에는 제공자가 여러 명 지원할 수 있어,
+요청 단위로 방을 만들면 지원자 전원이 한 방에 들어가게 된다. 그래서 방은 `RelatedType.CARE_APPLICATION`이고
+`relatedIdx`는 `careApplicationIdx`다(`createCareRequestConversation`).
+
 흐름:
 
 1. `Conversation`을 비관적 락으로 조회
-2. `RelatedType`이 `CARE_REQUEST` 또는 `CARE_APPLICATION`인지 확인
-3. 현재 사용자의 `ConversationParticipant.dealConfirmed=true` 저장
-4. 활성 참여자 2명이 모두 확정했는지 확인
-5. `RelatedType.CARE_REQUEST`이고 요청 상태가 `OPEN`이면 처리
-6. 채팅 참여자 중 요청자가 아닌 사용자를 provider로 판단
-7. 기존 `CareApplication`이 있으면 `ACCEPTED`로 변경
-8. 없으면 새 `CareApplication(status=ACCEPTED)` 생성
-9. `CareRequest`를 `IN_PROGRESS`로 변경
-10. `PetCoinEscrowService.createEscrow()`로 요청자 코인을 차감하고 에스크로 생성
+2. `relatedIdx`로 `CareApplication`을 찾고, 거기서 `CareRequest`와 `provider`를 얻는다
+3. 금액 대조 + 낡은 확정 무효화 (아래 표)
+4. 현재 사용자의 `ConversationParticipant.dealConfirmed=true` + `confirmedOfferedCoins` 저장
+5. 활성 참여자 2명이 모두 확정했는지 확인
+6. 요청이 `OPEN`이 아니면 **이유를 알려주고 거절**한다("이미 다른 제공자와 거래가 확정된 요청입니다")
+7. 해당 지원을 `ACCEPTED`로, **같은 요청의 나머지 `PENDING` 지원을 `REJECTED`로**
+8. `CareRequest`를 `IN_PROGRESS`로 변경
+9. `PetCoinEscrowService.assignProvider()`로 **이미 보관 중인 에스크로에 지급 대상을 배정**
+
+금액 합의 — 확정은 양쪽이 따로 누르고 금액은 `OPEN` 동안 바뀔 수 있어, 아무 장치가 없으면
+제공자는 5,000에 동의하고 요청자는 1,000에 동의한 채 계약이 성립한다.
+
+| 장치 | 막는 것 |
+| --- | --- |
+| `expectedAmount` (확정 요청 파라미터) | **지금 내가** 화면에서 보고 동의하는 값이 실제와 같은가 → 다르면 409 |
+| `ConversationParticipant.confirmedOfferedCoins` | **이미 있는 동의**가 현재 금액과 같은 금액에 대한 것인가 → 다르면 무효화하고 다시 받는다 |
+
+무효화를 chat 쪽에서 하는 이유는 도메인 참조 방향이다. `dealConfirmed`는 chat에 있고 현재 참조는
+`chat → care` 단방향이라, care가 participant를 건드리면 순환이 된다. care는 금액만 노출한다.
 
 중요한 현재 동작:
 
-- `createEscrow()` 실패 시 현재 코드는 예외를 다시 던지지 않고 로그만 남긴다.
-- 따라서 코인 차감/에스크로 생성이 실패해도 채팅 거래 확정과 `IN_PROGRESS` 상태 전이는 유지될 수 있다.
-- 운영 정책상 결제 실패 시 매칭 자체를 롤백해야 한다면 이 지점은 개선 대상이다.
-- ⚠️ **5~10단계(CARE_REQUEST 분기)는 현재 운영 흐름에서 도달 불가능하다.** 채팅방을 만드는 유일한 경로인 `ConversationService.createCareRequestConversation()`은 항상 `relatedType = CARE_APPLICATION`으로 방을 생성하며, 코드 전체에서 `RelatedType.CARE_REQUEST`는 비교문에만 있고 값으로 대입되는 곳이 없다. 실제로 생성되는 `CARE_APPLICATION` 분기는 로그만 남기고 상태 전이·에스크로 생성을 하지 않는다. 자세한 내용은 [chat.md §6.1·§9](chat.md)를 본다.
+- **코인 차감은 이 시점이 아니라 요청 등록 시점에 이미 일어났다.** 확정에서 하는 일은 지급 대상 배정뿐이라
+  여기서 잔액 부족으로 깨지는 일이 없다. (§5 참고)
+- `assignProvider()` 실패 시 예외를 그대로 전파한다. 이전에는 `try/catch`로 삼키고 "확정은 진행한다"고
+  주석까지 달아뒀지만, `REQUIRED`로 같은 트랜잭션에 합류하므로 실패가 rollback-only를 남겨
+  **그 동작은 애초에 불가능했다** — 전파로 바꾼 실효는 원인을 남기는 것이다(HTTP 500 → 원인 명시).
+- 선정되지 않은 지원의 채팅방은 그대로 남는다. 대화는 계속 가능하지만 확정은 6번에서 막힌다.
 
-## 10. 자동 완료 스케줄러
+> **2026-08-08 이전에는 이 흐름 전체가 실행되지 않았다.** 확정 로직이 `RelatedType.CARE_REQUEST`를
+> 전제로 쓰여 있었는데(방 참여자에서 제공자를 역추론하고 지원이 없으면 새로 만드는 구조), 실제로
+> 생성되는 방은 전부 `CARE_APPLICATION`이라 그 분기에 도달하지 않았다. `CARE_APPLICATION` 분기는
+> 로그 한 줄이 전부였다. **확정 버튼을 눌러도 참여자 플래그만 켜지고 요청·지원·에스크로는 그대로였다** —
+> 화면만 진행되고 도메인은 멈춰 있었다.
+> → `docs/refactoring/care/care-settlement-integrity-2026-08-08.md`
 
-`CareRequestScheduler`가 만료 요청을 자동 완료한다.
+## 10. 만료 요청 정리 스케줄러
+
+`CareRequestScheduler`가 예정일이 지난 요청을 정리한다.
+
+| 상태 | 처리 |
+| --- | --- |
+| `OPEN` | `CANCELLED`로 전환. 성사되지 않은 요청이므로 보관 코인은 환불된다 |
+| `IN_PROGRESS` | **건드리지 않는다.** 경고 로그만 남긴다 |
+
+> **왜 `IN_PROGRESS`를 두는가.** 이전에는 이것도 `COMPLETED`로 바꿨고, `updateStatus`가 `COMPLETED`에서
+> 에스크로를 제공자에게 지급한다. 즉 **아무도 완료를 누르지 않아도 예정일만 지나면 매시간 돈이 넘어갔다.**
+> 실제 이행 여부는 당사자만 알 수 있으므로 자동 정산하지 않는다.
 
 스케줄:
 
 - 매 시간 정각
-- 매일 자정
+- 매일 자정 (시간별 메서드를 그대로 호출한다)
 
 대상:
 
@@ -288,10 +372,11 @@ Payment 상세는 [Payment 도메인](payment.md)과 [펫케어 코인 관련 �
 
 - 스케줄러 자체에는 큰 트랜잭션을 걸지 않는다.
 - 조회 시 요청자와 지원 제공자를 함께 fetch한다.
-- 요청자 또는 `ACCEPTED` 제공자가 `isSanctioned()` 상태이면 자동 완료하지 않고 로그만 남긴다.
-- 각 요청마다 `careRequestService.updateStatus(idx, "COMPLETED", null)`을 호출한다.
+- 요청자 또는 `ACCEPTED` 제공자가 `isSanctioned()` 상태이면 자동 처리하지 않고 로그만 남긴다.
+- `IN_PROGRESS`는 스킵하고 경고 로그를 남긴다.
+- `OPEN`은 `careRequestService.updateStatus(idx, "CANCELLED", null)`을 호출한다.
 - 개별 요청 실패는 로그로 남기고 다음 요청을 계속 처리한다.
-- 완료 처리도 일반 상태 변경과 같은 Payment 지급 경로를 탄다.
+- 취소 처리도 일반 상태 변경과 같은 Payment 환불 경로를 탄다.
 
 ## 11. 케어 댓글 API
 

@@ -16,10 +16,13 @@ import lombok.extern.slf4j.Slf4j;
 
 /**
  * 펫케어 요청의 상태를 자동으로 업데이트하는 스케줄러
- * 날짜가 지난 요청은 자동으로 COMPLETED 상태로 변경
- * 
+ * 예정일이 지났는데 모집 중(OPEN)인 요청 = 성사되지 않은 것 → CANCELLED
+ * 진행 중(IN_PROGRESS)인 요청은 손대지 않는다 (자동 정산 금지)
+ *
  * 변경 이력:
  * - 2026-01-28: CareRequestService.updateStatus()를 호출하여 에스크로 처리 포함
+ * - 2026-08-08: 자동 COMPLETED 제거. updateStatus 가 COMPLETED 에서 에스크로를 제공자에게
+ *   지급하므로, 예정일만 지나면 이행 여부와 무관하게 돈이 넘어가고 있었다.
  */
 @Slf4j
 @Service
@@ -63,21 +66,31 @@ public class CareRequestScheduler {
 
         for (CareRequest request : expiredRequests) {
             try {
-                // 제재된 당사자가 있는 케어는 자동 완료하지 않음 (해제/관리자 검토 대상)
+                // 제재된 당사자가 있는 케어는 자동 처리하지 않음 (해제/관리자 검토 대상)
                 if (hasSanctionedParty(request)) {
-                    log.warn("자동 완료 스킵 (케어 당사자 제재 중): careId={}, requesterId={}",
+                    log.warn("자동 처리 스킵 (케어 당사자 제재 중): careId={}, requesterId={}",
                             request.getIdx(), request.getUser().getIdx());
                     continue;
                 }
 
-                // 서비스 메서드를 통해 상태 변경 (에스크로 처리 포함)
+                // 진행 중인 케어는 스케줄러가 손대지 않는다.
+                // 예전에는 이것도 COMPLETED 로 바꿨고, updateStatus 가 에스크로를 제공자에게
+                // 지급하므로 "아무도 완료를 누르지 않아도 예정일만 지나면 돈이 넘어가는" 상태였다.
+                // 이행 여부는 당사자만 알 수 있으므로 자동 정산하지 않고 그대로 둔다.
+                if (request.getStatus() == CareRequestStatus.IN_PROGRESS) {
+                    log.warn("진행 중인 케어가 예정일을 지남 — 자동 정산하지 않음: careId={}, date={}",
+                            request.getIdx(), request.getDate());
+                    continue;
+                }
+
+                // 모집 중인 채로 예정일이 지난 요청은 성사되지 않은 것이므로 취소 처리한다.
                 // 스케줄러는 시스템 작업이므로 currentUserId는 null
                 careRequestService.updateStatus(
                         request.getIdx(),
-                        "COMPLETED",
+                        "CANCELLED",
                         null);
                 successCount++;
-                log.debug("펫케어 요청 상태 변경 완료: id={}, title={}, date={}, status=OPEN/IN_PROGRESS -> COMPLETED",
+                log.debug("펫케어 요청 상태 변경 완료: id={}, title={}, date={}, status=OPEN -> CANCELLED",
                         request.getIdx(), request.getTitle(), request.getDate());
             } catch (Exception e) {
                 failureCount++;

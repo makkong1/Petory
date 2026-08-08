@@ -41,13 +41,22 @@ public class CareRequestDTO {
     @Max(1440)
     private Integer estimatedDurationMinutes;
 
+    // 최소 금액을 둔다. 1 코인짜리 요청은 사실상 무료라, 사람을 모아놓고 금액을 바닥까지
+    // 내리는 경로가 열린다(금액 수정은 OPEN 인 동안 가능하다).
     @NotNull
-    @Min(1)
+    @Min(100)
     private Integer offeredCoins;
     private String status; // OPEN, IN_PROGRESS, COMPLETED, CANCELLED
     private LocalDateTime createdAt;
     private Boolean deleted;
     private LocalDateTime deletedAt;
+
+    /** 이행 완료 확인 시각. 어느 쪽이 아직 안 눌렀는지 화면이 알아야 "상대 확인 대기"를 보여줄 수 있다. */
+    private LocalDateTime requesterCompletedAt;
+    private LocalDateTime providerCompletedAt;
+
+    /** 제시 금액이 마지막으로 바뀐 시각. 화면이 "요청자가 금액을 변경했습니다"를 보여줄 근거. */
+    private LocalDateTime offeredCoinsUpdatedAt;
 
     // 위치 정보
     private Double latitude;

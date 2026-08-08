@@ -57,6 +57,10 @@ export const careRequestApi = {
       ? mockResolve({})
       : api.patch(`/${id}/status`, null, { params: { status } }),
 
+  // 이행 완료 확인 (요청자·제공자가 각자 호출, 양쪽이 확인해야 정산된다)
+  confirmCompletion: (id) =>
+    isDemoMode() ? mockResolve({}) : api.post(`/${id}/complete`),
+
   // 댓글 관련
   getComments: (careRequestId) =>
     isDemoMode()

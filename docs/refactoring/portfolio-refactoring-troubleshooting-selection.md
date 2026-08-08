@@ -108,7 +108,7 @@ Hibernate Statistics와 성능 로그로 쿼리 수, 실행 시간, 메모리 �
 - [Meetup 참가 Race Condition](../troubleshooting/meetup/race-condition-participants.md)
 - [Care 거래 확정 Race Condition](../troubleshooting/care/care-deal-confirmation-race-condition.md)
 - [PetCoinService Race Condition](./payment/petcoin-service-race-condition.md)
-- [동시성 개념 정리](../interview/concepts/03_동시성_제어.md)
+- [동시성 개념 정리](../interview/concepts/면접/03_동시성_제어.md)
 
 ### 대표 수치·상황
 
@@ -184,7 +184,7 @@ Chat은 메시지 조회·검색·상태 변경 경로에서 활성 참여자 �
 - [Care & Payment 리팩토링 기록](./care/care-payment-refactoring-2026-04-14.md)
 - [Chat 보안·트랜잭션 정리](./chat/chat-backend-security-transaction-2026-04-14.md)
 - [인증 주체 조회 리팩터링 점검](./authentication-principal-refactoring.md)
-- [보안 & JWT 개념 정리](../interview/concepts/09_보안_JWT_인증.md)
+- [보안 & JWT 개념 정리](../interview/concepts/배경/09_보안_JWT_인증.md)
 
 ---
 
@@ -200,7 +200,7 @@ Java와 Python FastAPI 서버 사이의 `petType` enum 계약이 달라 특정 �
 
 - [petType 422 silent drop](../troubleshooting/petRecommendation/pettype-422-silent-drop-2026-06-10.md)
 - [NLP 서버 품질 & 계약 이슈](../troubleshooting/petRecommendation/nlp-server-issues-2026-06-09.md)
-- [NLP 서버 개념 정리](../interview/concepts/13_NLP_서버_FastAPI.md)
+- [NLP 서버 개념 정리](../interview/concepts/배경/13_NLP_서버_FastAPI.md)
 
 ---
 

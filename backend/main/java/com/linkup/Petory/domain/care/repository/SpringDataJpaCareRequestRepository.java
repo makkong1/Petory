@@ -8,8 +8,11 @@ import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+
+import jakarta.persistence.LockModeType;
 
 import com.linkup.Petory.domain.care.dto.CareRequestListView;
 import com.linkup.Petory.domain.care.entity.CareRequest;
@@ -80,6 +83,16 @@ public interface SpringDataJpaCareRequestRepository extends JpaRepository<CareRe
     @RepositoryMethod("펫케어 요청: 단건 조회 (지원 목록 포함)")
     @Query("SELECT cr FROM CareRequest cr LEFT JOIN FETCH cr.pet LEFT JOIN FETCH cr.user LEFT JOIN FETCH cr.applications a LEFT JOIN FETCH a.provider WHERE cr.idx = :idx")
     Optional<CareRequest> findByIdWithApplications(@Param("idx") Long idx);
+
+    /**
+     * 비관적 락 단건 조회 (동시성 제어용).
+     * 양쪽이 동시에 이행 완료를 확인할 때, 둘 다 "상대도 확인했나"를 읽고 각자 정산으로
+     * 넘어가는 것을 막기 위해 확인 경로 전체를 이 행 락으로 직렬화한다.
+     */
+    @RepositoryMethod("펫케어 요청: ID 비관적 락 조회")
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT cr FROM CareRequest cr WHERE cr.idx = :idx")
+    Optional<CareRequest> findByIdForUpdate(@Param("idx") Long idx);
 
     // 통계용
     long countByCreatedAtBetween(LocalDateTime start, LocalDateTime end);
