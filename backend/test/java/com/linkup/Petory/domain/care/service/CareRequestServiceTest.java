@@ -101,10 +101,14 @@ class CareRequestServiceTest {
     // ===== updateStatus 테스트 =====
 
     @Test
-    @DisplayName("정상: OPEN → COMPLETED 상태 변경 시 completedAt 기록")
+    @DisplayName("정상: IN_PROGRESS → COMPLETED 상태 변경 시 completedAt 기록")
     void 정상_상태변경_COMPLETED() {
         Users user = createUser(1L);
         CareRequest request = createOpenRequest(1L, user);
+        // 2026-08-08: 이 테스트는 원래 OPEN 에서 바로 COMPLETED 로 갔다. 상태 전이 가드를 넣으면서
+        // 그 경로를 막았으므로(확정을 거치지 않은 요청이 '완료'일 수는 없다) 시작 상태를 바꾼다.
+        // 검증 대상은 여전히 completedAt 기록이다.
+        request.setStatus(CareRequestStatus.IN_PROGRESS);
 
         setSecurityContext(1L);
 

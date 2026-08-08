@@ -105,7 +105,15 @@ public class CareRequest extends BaseTimeEntity {
     private LocalDateTime completedAt;
 
     public void transitionTo(CareRequestStatus newStatus) {
-        if (newStatus == CareRequestStatus.COMPLETED && this.status != CareRequestStatus.COMPLETED) {
+        // 같은 상태로의 재요청은 무해한 no-op — 재시도가 에러가 되지 않게 둔다.
+        if (newStatus == this.status) {
+            return;
+        }
+        if (!this.status.canTransitionTo(newStatus)) {
+            throw new IllegalStateException(
+                    "허용되지 않는 상태 전이입니다: " + this.status + " -> " + newStatus);
+        }
+        if (newStatus == CareRequestStatus.COMPLETED) {
             this.completedAt = LocalDateTime.now();
         }
         this.status = newStatus;
