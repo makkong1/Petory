@@ -26,6 +26,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import com.linkup.Petory.global.security.CustomUserDetails;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 
@@ -98,19 +99,30 @@ class CareRequestServiceTest {
         SecurityContextHolder.getContext().setAuthentication(auth);
     }
 
+    /** isAdmin() 은 principal 이 CustomUserDetails 일 때만 true 가 될 수 있다. */
+    private void setAdminSecurityContext() {
+        CustomUserDetails adminDetails = org.mockito.Mockito.mock(CustomUserDetails.class);
+        when(adminDetails.isAdmin()).thenReturn(true);
+        var auth = new UsernamePasswordAuthenticationToken(
+                adminDetails, null, List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
+        SecurityContextHolder.getContext().setAuthentication(auth);
+    }
+
     // ===== updateStatus 테스트 =====
 
     @Test
-    @DisplayName("정상: IN_PROGRESS → COMPLETED 상태 변경 시 completedAt 기록")
+    @DisplayName("관리자는 분쟁 조정으로 IN_PROGRESS → COMPLETED 강제 전이할 수 있고 completedAt 이 기록된다")
     void 정상_상태변경_COMPLETED() {
         Users user = createUser(1L);
         CareRequest request = createOpenRequest(1L, user);
-        // 2026-08-08: 이 테스트는 원래 OPEN 에서 바로 COMPLETED 로 갔다. 상태 전이 가드를 넣으면서
-        // 그 경로를 막았으므로(확정을 거치지 않은 요청이 '완료'일 수는 없다) 시작 상태를 바꾼다.
-        // 검증 대상은 여전히 completedAt 기록이다.
+        // 2026-08-08: 이 테스트는 원래 일반 사용자가 OPEN 에서 바로 COMPLETED 로 가는 경로였다.
+        //   (1) 상태 전이 가드로 OPEN -> COMPLETED 를 막아 시작 상태를 IN_PROGRESS 로 바꿨고,
+        //   (2) 완료는 양쪽 확인(confirmCompletion)으로만 성립하게 하면서 updateStatus 의 COMPLETED 는
+        //       관리자 전용으로 남겼다 — 당사자 합의가 불가능한 분쟁 조정용이다.
+        // 그래서 이 테스트는 "관리자 예외가 살아 있다"를 문서화하는 자리가 됐다. 검증 대상은 여전히 completedAt.
         request.setStatus(CareRequestStatus.IN_PROGRESS);
 
-        setSecurityContext(1L);
+        setAdminSecurityContext();
 
         when(careRequestRepository.findByIdWithApplications(1L)).thenReturn(Optional.of(request));
         when(careRequestRepository.save(any(CareRequest.class))).thenAnswer(inv -> inv.getArgument(0));

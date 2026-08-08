@@ -49,6 +49,10 @@ public class CareRequestDTO {
     private Boolean deleted;
     private LocalDateTime deletedAt;
 
+    /** 이행 완료 확인 시각. 어느 쪽이 아직 안 눌렀는지 화면이 알아야 "상대 확인 대기"를 보여줄 수 있다. */
+    private LocalDateTime requesterCompletedAt;
+    private LocalDateTime providerCompletedAt;
+
     // 위치 정보
     private Double latitude;
     private Double longitude;

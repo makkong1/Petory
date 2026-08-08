@@ -104,6 +104,40 @@ public class CareRequest extends BaseTimeEntity {
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
 
+    /** 요청자가 이행 완료를 확인한 시각. NULL 이면 미확인. */
+    @Column(name = "requester_completed_at")
+    private LocalDateTime requesterCompletedAt;
+
+    /** 제공자가 이행 완료를 확인한 시각. NULL 이면 미확인. */
+    @Column(name = "provider_completed_at")
+    private LocalDateTime providerCompletedAt;
+
+    /**
+     * 한쪽의 이행 완료 확인을 기록한다. 이미 확인했다면 시각을 덮어쓰지 않는다
+     * (재시도로 같은 요청이 두 번 와도 결과가 같아야 하므로).
+     *
+     * @return 이번 호출로 새로 기록됐으면 true, 이미 확인 상태였으면 false
+     */
+    public boolean confirmCompletionBy(boolean isRequester) {
+        if (isRequester) {
+            if (this.requesterCompletedAt != null) {
+                return false;
+            }
+            this.requesterCompletedAt = LocalDateTime.now();
+        } else {
+            if (this.providerCompletedAt != null) {
+                return false;
+            }
+            this.providerCompletedAt = LocalDateTime.now();
+        }
+        return true;
+    }
+
+    /** 양쪽이 모두 이행 완료를 확인했는가. 정산은 이 조건에서만 일어난다. */
+    public boolean isBothCompletionConfirmed() {
+        return this.requesterCompletedAt != null && this.providerCompletedAt != null;
+    }
+
     public void transitionTo(CareRequestStatus newStatus) {
         // 같은 상태로의 재요청은 무해한 no-op — 재시도가 에러가 되지 않게 둔다.
         if (newStatus == this.status) {

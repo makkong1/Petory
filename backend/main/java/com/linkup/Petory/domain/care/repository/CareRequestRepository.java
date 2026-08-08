@@ -76,6 +76,11 @@ public interface CareRequestRepository {
         Optional<CareRequest> findByIdWithApplications(Long idx);
 
         /**
+         * 비관적 락 단건 조회 (동시성 제어용). 이행 완료 확인처럼 "읽고 판단해서 쓰는" 경로를 직렬화한다.
+         */
+        Optional<CareRequest> findByIdForUpdate(Long idx);
+
+        /**
          * 통계용: 특정 기간 동안 생성된 케어 요청 수
          */
         long countByCreatedAtBetween(LocalDateTime start, LocalDateTime end);

@@ -491,28 +491,40 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
     }
   };
 
-  // 펫케어 서비스 완료
+  // 펫케어 서비스 이행 완료 확인
+  // 요청자·제공자가 각자 눌러야 하고, 양쪽이 다 확인해야 COMPLETED 가 되며 코인이 정산된다.
   const handleCompleteCare = async () => {
     if (!conversation?.relatedIdx || !user?.idx || completingCare) return;
 
-    if (!window.confirm('펫케어 서비스를 완료 처리하시겠습니까?')) {
+    if (!window.confirm('이행이 끝났음을 확인하시겠습니까?\n양쪽 모두 확인해야 코인이 정산됩니다.')) {
       return;
     }
 
     setCompletingCare(true);
     try {
-      await careRequestApi.updateStatus(conversation.relatedIdx, 'COMPLETED');
-      setCareRequestStatus('COMPLETED');
+      const response = await careRequestApi.confirmCompletion(conversation.relatedIdx);
+      const updated = response?.data;
+      setCareRequestStatus(updated?.status || 'IN_PROGRESS');
       // 펫케어 요청 정보 다시 조회
       await fetchConversation();
-      showToast('펫케어 서비스가 완료되었습니다.', 'success');
+      showToast(
+        updated?.status === 'COMPLETED'
+          ? '양쪽 확인이 끝나 펫케어 서비스가 완료되었습니다.'
+          : '완료 확인했습니다. 상대방 확인을 기다리는 중입니다.',
+        'success'
+      );
     } catch (error) {
-      console.error('서비스 완료 실패:', error);
-      showToast(error.response?.data?.error || '서비스 완료 처리에 실패했습니다.');
+      console.error('완료 확인 실패:', error);
+      showToast(error.response?.data?.error || '완료 확인에 실패했습니다.');
     } finally {
       setCompletingCare(false);
     }
   };
+
+  // 내가 이미 이행 완료를 확인했는지 (확인했으면 상대를 기다리는 상태)
+  const myCompletionConfirmed = isRequester
+    ? Boolean(careRequestData?.requesterCompletedAt)
+    : Boolean(careRequestData?.providerCompletedAt);
 
   // 리뷰 작성 모달 열기
   const handleOpenReviewModal = () => {
@@ -750,11 +762,19 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
           </DealConfirmedBanner>
         )}
 
-        {/* 서비스 완료 버튼 (IN_PROGRESS 상태이고 제공자일 때만 표시) */}
-        {isCareRequestChat && careRequestStatus === 'IN_PROGRESS' && isProvider && (
+        {/* 이행 완료 확인 버튼 — 요청자·제공자 양쪽에 표시된다.
+            예전에는 제공자에게만 보였고, 그 한 번의 클릭으로 바로 정산됐다. */}
+        {isCareRequestChat && careRequestStatus === 'IN_PROGRESS' && (isProvider || isRequester) && (
           <CompleteCareSection>
-            <CompleteCareButton onClick={handleCompleteCare} disabled={completingCare}>
-              {completingCare ? '완료 처리 중...' : '✅ 서비스 완료'}
+            <CompleteCareButton
+              onClick={handleCompleteCare}
+              disabled={completingCare || myCompletionConfirmed}
+            >
+              {myCompletionConfirmed
+                ? '⏳ 상대방 확인 대기 중'
+                : completingCare
+                  ? '확인 중...'
+                  : '✅ 이행 완료 확인'}
             </CompleteCareButton>
           </CompleteCareSection>
         )}

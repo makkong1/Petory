@@ -341,6 +341,13 @@ public class CareRequestService {
         CareRequestStatus oldStatus = request.getStatus();
         CareRequestStatus newStatus = CareRequestStatus.valueOf(status);
 
+        // 완료는 양쪽이 이행을 확인해야 성립한다(confirmCompletion). 이 경로로 들어오는 COMPLETED 는
+        // 한쪽 의사만으로 정산을 일으키므로 막는다 — 예전에는 제공자가 혼자 눌러 돈을 가져갈 수 있었다.
+        // 관리자만 남겨두는 이유는 분쟁 조정처럼 당사자 합의가 불가능한 경우가 있기 때문이다.
+        if (newStatus == CareRequestStatus.COMPLETED && !isAdmin()) {
+            throw CareForbiddenException.ownerOrApprovedProvider();
+        }
+
         if (!isAdmin() && isSettlementStatus(newStatus) && hasSanctionedCareParty(request)) {
             throw CareForbiddenException.sanctioned();
         }
@@ -376,6 +383,65 @@ public class CareRequestService {
         }
 
         return careRequestConverter.toDTO(updated);
+    }
+
+    /**
+     * 이행 완료 확인. 요청자와 제공자가 각자 한 번씩 누르고, 양쪽이 모두 확인해야 정산된다.
+     *
+     * 왜 한쪽으로는 안 되는가: 예전에는 updateStatus 를 요청자 "또는" 승인된 제공자 아무나
+     * 호출할 수 있었고 COMPLETED 가 되는 순간 에스크로가 지급됐다. 제공자가 혼자 완료를 눌러
+     * 요청자 동의 없이 돈을 가져갈 수 있는 구조였다.
+     *
+     * 왜 비관적 락인가: 양쪽이 동시에 누르면 둘 다 "상대도 확인했나"를 읽고 각자 정산으로 넘어갈
+     * 수 있다. 읽고 판단해서 쓰는 구간이라 원자적 UPDATE 로는 대체되지 않아 행 락으로 직렬화한다.
+     */
+    @Transactional
+    public CareRequestDTO confirmCompletion(Long idx, Long currentUserId) {
+        CareRequest request = careRequestRepository.findByIdForUpdate(idx)
+                .orElseThrow(() -> new CareRequestNotFoundException());
+
+        if (Boolean.TRUE.equals(request.getIsDeleted())) {
+            throw new CareRequestNotFoundException();
+        }
+
+        if (request.getStatus() != CareRequestStatus.IN_PROGRESS) {
+            throw new IllegalStateException(
+                    "진행 중(IN_PROGRESS)인 케어만 완료 확인할 수 있습니다. 현재 상태: " + request.getStatus());
+        }
+
+        boolean isRequester = request.getUser().getIdx().equals(currentUserId);
+        boolean isAcceptedProvider = request.getApplications() != null
+                && request.getApplications().stream()
+                        .anyMatch(app -> app.getStatus() == CareApplicationStatus.ACCEPTED
+                                && app.getProvider().getIdx().equals(currentUserId));
+
+        if (!isRequester && !isAcceptedProvider) {
+            throw CareForbiddenException.ownerOrApprovedProvider();
+        }
+
+        if (hasSanctionedCareParty(request)) {
+            throw CareForbiddenException.sanctioned();
+        }
+
+        // 이미 확인한 쪽이 다시 눌러도 시각을 덮어쓰지 않는다(재시도 안전).
+        request.confirmCompletionBy(isRequester);
+
+        if (request.isBothCompletionConfirmed()) {
+            request.transitionTo(CareRequestStatus.COMPLETED);
+            PetCoinEscrow escrow = petCoinEscrowService.findByCareRequest(request);
+            if (escrow != null && escrow.getStatus() == EscrowStatus.HOLD) {
+                petCoinEscrowService.releaseToProvider(escrow);
+                log.info("양쪽 확인 완료 — 제공자에게 코인 지급: careRequestIdx={}, escrowIdx={}, amount={}",
+                        request.getIdx(), escrow.getIdx(), escrow.getAmount());
+            } else {
+                log.warn("양쪽 확인 완료되었으나 지급할 에스크로가 없음: careRequestIdx={}", request.getIdx());
+            }
+        } else {
+            log.info("한쪽 이행 완료 확인 — 상대 확인 대기: careRequestIdx={}, byRequester={}",
+                    request.getIdx(), isRequester);
+        }
+
+        return careRequestConverter.toDTO(careRequestRepository.save(request));
     }
 
     private boolean isSanctionedPreMatchRequest(CareRequest request) {

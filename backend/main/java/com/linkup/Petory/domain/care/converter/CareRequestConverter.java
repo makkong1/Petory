@@ -46,6 +46,8 @@ public class CareRequestConverter {
                 .createdAt(request.getCreatedAt())
                 .deleted(request.getIsDeleted())
                 .deletedAt(request.getDeletedAt())
+                .requesterCompletedAt(request.getRequesterCompletedAt())
+                .providerCompletedAt(request.getProviderCompletedAt())
                 .latitude(request.getLatitude())
                 .longitude(request.getLongitude())
                 .address(request.getAddress())
