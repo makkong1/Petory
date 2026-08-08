@@ -605,25 +605,23 @@ public class ConversationService {
                                 provider.getIdx());
 
                         if (offeredCoins != null && offeredCoins > 0) {
-                            try {
-                                petCoinEscrowService.createEscrow(
-                                        careRequest,
-                                        finalApplication,
-                                        requester,
-                                        provider,
-                                        offeredCoins);
-                                log.info("펫코인 차감 및 에스크로 생성 완료: careRequestIdx={}, amount={}, escrowIdx={}",
-                                        relatedIdx, offeredCoins, "확인 필요");
-                            } catch (Exception e) {
-                                log.error("펫코인 차감 및 에스크로 생성 실패: careRequestIdx={}, amount={}, requesterId={}, providerId={}, error={}, stackTrace={}",
-                                        relatedIdx, offeredCoins,
-                                        requester.getIdx(), provider.getIdx(),
-                                        e.getMessage(),
-                                        java.util.Arrays.toString(
-                                                e.getStackTrace()));
-                                // 코인 차감 실패 시 거래 확정은 진행하되, 로그만 남김
-                                // 실제 운영 환경에서는 예외를 다시 던져서 거래 확정을 롤백할 수도 있음
-                            }
+                            // 차감이 실패하면 확정도 롤백된다 — 이건 예전부터 그랬다.
+                            // 이전 코드는 예외를 try/catch 로 삼키고 "확정은 진행"한다는 주석을 달아뒀지만,
+                            // createEscrow 가 REQUIRED 로 이 트랜잭션에 합류하므로 실패가 rollback-only 를
+                            // 남긴다. 삼켜도 바깥 커밋에서 UnexpectedRollbackException 이 날 뿐이라,
+                            // 주석이 말하던 "차감 없는 확정"은 애초에 만들어질 수 없었다.
+                            // 그래서 전파로 바꾼 이유는 롤백을 만들기 위해서가 아니라 원인을 남기기 위해서다.
+                            // 옛 코드: 원인을 알 수 없는 UnexpectedRollbackException → HTTP 500
+                            // 지금:   InsufficientBalanceException → HTTP 400 INSUFFICIENT_BALANCE
+                            // 고정: CareDealEscrowFailureTest (옛 코드에서 실패하는 것을 확인하고 등록)
+                            petCoinEscrowService.createEscrow(
+                                    careRequest,
+                                    finalApplication,
+                                    requester,
+                                    provider,
+                                    offeredCoins);
+                            log.info("펫코인 차감 및 에스크로 생성 완료: careRequestIdx={}, amount={}",
+                                    relatedIdx, offeredCoins);
                         } else {
                             log.warn("펫코인 가격이 설정되지 않음: careRequestIdx={}, offeredCoins={}",
                                     relatedIdx, offeredCoins);
