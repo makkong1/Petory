@@ -160,7 +160,7 @@ class CareDealConcurrencyTest {
         // Requester의 확정 시도
         executorService.submit(() -> {
             try {
-                conversationService.confirmCareDeal(conversation.getIdx(), requester.getIdx());
+                conversationService.confirmCareDeal(conversation.getIdx(), requester.getIdx(), null);
             } catch (Exception e) {
                 e.printStackTrace();
             } finally {
@@ -171,7 +171,7 @@ class CareDealConcurrencyTest {
         // Provider의 확정 시도
         executorService.submit(() -> {
             try {
-                conversationService.confirmCareDeal(conversation.getIdx(), provider.getIdx());
+                conversationService.confirmCareDeal(conversation.getIdx(), provider.getIdx(), null);
             } catch (Exception e) {
                 e.printStackTrace();
             } finally {

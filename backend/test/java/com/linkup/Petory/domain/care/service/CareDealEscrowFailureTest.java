@@ -25,19 +25,24 @@ import com.linkup.Petory.domain.chat.entity.RelatedType;
 import com.linkup.Petory.domain.chat.repository.ConversationParticipantRepository;
 import com.linkup.Petory.domain.chat.repository.ConversationRepository;
 import com.linkup.Petory.domain.chat.service.ConversationService;
-import com.linkup.Petory.domain.payment.exception.InsufficientBalanceException;
+import com.linkup.Petory.domain.payment.exception.PetCoinEscrowNotFoundException;
 import com.linkup.Petory.domain.user.entity.Role;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 
 /**
- * 거래 확정 시 펫코인 차감이 실패하는 경로를 고정한다.
+ * 거래 확정 시 에스크로 처리가 실패하면 원인이 삼켜지지 않고 호출자까지 전파되는지 고정한다.
  *
- * 왜 상태가 아니라 예외를 단언하는가: 예전 코드는 createEscrow 실패를 try/catch 로 삼키고 "확정은 진행한다"고 주석까지
- * 달아 두었지만, createEscrow 가 REQUIRED 로 같은 트랜잭션에 합류하므로 실패가 rollback-only 를 남긴다. 삼켜도
- * 바깥 커밋에서 터져 전부 롤백됐다 — 즉 "차감 없는 확정"은 애초에 만들어질 수 없었고, DB 상태는 수정 전후가 동일하다.
- * 상태만 단언하면 옛 코드에서도 통과하는 눈먼 테스트가 된다. 실제로 달라진 것은 호출자가 받는 예외이고(옛: 원인을 알 수 없는
- * UnexpectedRollbackException / 지금: InsufficientBalanceException = HTTP 400), 그래서 그걸 단언한다.
+ * 왜 상태가 아니라 예외를 단언하는가: 예전 코드는 실패를 try/catch 로 삼키고 "확정은 진행한다"고 주석까지
+ * 달아 두었지만, 에스크로 처리가 REQUIRED 로 같은 트랜잭션에 합류하므로 실패가 rollback-only 를 남긴다.
+ * 삼켜도 바깥 커밋에서 터져 전부 롤백됐다 — 즉 "정산 없는 확정"은 애초에 만들어질 수 없었고, DB 상태는
+ * 수정 전후가 동일하다. 상태만 단언하면 옛 코드에서도 통과하는 눈먼 테스트가 된다. 실제로 달라진 것은
+ * 호출자가 받는 예외다(옛: 원인을 알 수 없는 UnexpectedRollbackException).
+ *
+ * 재현하는 실패: 에스크로가 없는 요청의 확정.
+ * 차감 시점을 등록으로 옮긴 뒤로 확정에서 잔액 부족이 날 수는 없지만, 이행 전 데이터로 만들어진
+ * 요청(등록 시 에스크로를 잡지 않던 시절)은 에스크로 없이 남아 있고 그대로 두기로 했다.
+ * 그 요청이 확정되면 배정할 보관이 없다 — 조용히 넘어가지 않고 드러나야 한다.
  */
 @SpringBootTest
 class CareDealEscrowFailureTest {
@@ -69,7 +74,7 @@ class CareDealEscrowFailureTest {
     void setup() {
         long uniqueId = System.currentTimeMillis();
 
-        // 요청자 잔액은 기본값 0 — OFFERED_COINS 를 감당할 수 없다(차감 실패를 만드는 조건).
+        // 요청을 서비스가 아니라 리포지토리로 직접 만든다 = 등록 시 에스크로를 잡지 않던 시절의 데이터.
         requester = usersRepository.save(Users.builder()
                 .id("escrowfail_req_" + uniqueId)
                 .username("EscrowFailRequester_" + uniqueId)
@@ -144,18 +149,18 @@ class CareDealEscrowFailureTest {
     }
 
     @Test
-    @DisplayName("잔액이 모자라 차감이 실패하면, 원인 예외가 호출자까지 그대로 전파된다")
-    void confirmCareDeal_whenBalanceInsufficient_propagatesCause() {
+    @DisplayName("보관된 에스크로가 없으면, 원인 예외가 호출자까지 그대로 전파된다")
+    void confirmCareDeal_whenEscrowMissing_propagatesCause() {
         // Given: 요청자가 먼저 확정 — 아직 한쪽이라 에스크로 분기로 가지 않는다
-        conversationService.confirmCareDeal(conversation.getIdx(), requester.getIdx());
+        conversationService.confirmCareDeal(conversation.getIdx(), requester.getIdx(), null);
 
-        // When: 제공자까지 확정하면 양쪽 완료 → 차감 + 에스크로 생성 시도 → 잔액 부족
+        // When: 제공자까지 확정하면 양쪽 완료 → 지급 대상 배정 시도 → 배정할 보관이 없음
         // Then: 삼켜지지 않고 원인 그대로 올라와야 한다.
         //       옛 코드에서는 catch 가 삼킨 뒤 커밋 시점에 UnexpectedRollbackException 이 나므로 여기서 실패한다.
         assertThatThrownBy(
-                () -> conversationService.confirmCareDeal(conversation.getIdx(), provider.getIdx()))
-                        .as("잔액 부족이 원인인데 다른 예외가 나오면 호출자는 이유를 알 수 없다 (HTTP 400 이 아니라 500 이 나간다)")
-                        .isInstanceOf(InsufficientBalanceException.class);
+                () -> conversationService.confirmCareDeal(conversation.getIdx(), provider.getIdx(), null))
+                        .as("원인이 다른 예외로 덮이면 호출자는 이유를 알 수 없다 (HTTP 500 이 나간다)")
+                        .isInstanceOf(PetCoinEscrowNotFoundException.class);
 
         // 보조 단언: 확정이 롤백돼 OPEN 으로 남는다.
         // 이 단언만으로는 수정 여부를 가리지 못한다(옛 코드도 롤백됐다) — 계약을 고정하는 용도다.

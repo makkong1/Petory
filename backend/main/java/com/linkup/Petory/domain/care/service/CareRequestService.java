@@ -186,10 +186,9 @@ public class CareRequestService {
                     EmailVerificationPurpose.PET_CARE);
         }
 
-        // 사용자 잔액 확인
-        if (user.getPetCoinBalance() < dto.getOfferedCoins()) {
-            throw CareValidationException.insufficientBalance();
-        }
+        // 잔액은 아래 holdForRequest 에서 비관적 락 안에서 검사·차감한다.
+        // 여기서 미리 보던 확인은 잡지 않는 확인이라 TOCTOU 였다 — 확인과 차감 사이에 잔액을
+        // 다른 데 쓰면 확정 순간에 깨졌고, 제공자는 신청·채팅을 마친 뒤에야 그 사실을 알았다.
 
         CareScheduleMode mode = dto.getScheduleMode() != null ? dto.getScheduleMode() : CareScheduleMode.FIXED;
 
@@ -219,6 +218,11 @@ public class CareRequestService {
         }
 
         CareRequest saved = careRequestRepository.save(builder.build());
+
+        // 등록과 동시에 제시 금액을 에스크로에 잡는다. 잔액이 모자라면 여기서 실패하고 글도 남지 않는다
+        // (같은 트랜잭션). "올라와 있는 요청은 지급이 보증된다"가 이걸로 성립한다.
+        petCoinEscrowService.holdForRequest(saved, user, saved.getOfferedCoins());
+
         String petType = saved.getPet() != null ? saved.getPet().getPetType().name() : null;
         eventPublisher.publishEvent(new CareRequestCreatedEvent(
                 this, user.getIdx(), saved.getIdx(),
@@ -242,6 +246,16 @@ public class CareRequestService {
         if (request.getStatus() != CareRequestStatus.OPEN) {
             throw new IllegalStateException(
                     "모집 중(OPEN)인 요청만 수정할 수 있습니다. 현재 상태: " + request.getStatus());
+        }
+
+        // 제시 금액 수정 — 목표 금액을 받아 차액만큼 추가 차감하거나 환불한다.
+        // 증분(+3000)이 아니라 목표값(8000)이라, 같은 요청이 두 번 도착해도 두 번째는 차액이 0 이
+        // 되어 아무 일도 일어나지 않는다. 멱등키 없이 재시도 안전한 이유가 이 표현 방식에 있다.
+        if (dto.getOfferedCoins() != null
+                && !dto.getOfferedCoins().equals(request.getOfferedCoins())) {
+            petCoinEscrowService.changeAmount(request, request.getUser(), dto.getOfferedCoins());
+            // 변경 시각을 남겨, 이 시각 이전에 이뤄진 거래 확정을 낡은 동의로 판별할 수 있게 한다.
+            request.changeOfferedCoins(dto.getOfferedCoins());
         }
 
         if (dto.getTitle() != null) {
@@ -296,6 +310,21 @@ public class CareRequestService {
         // 작성자 확인 (관리자는 우회)
         if (!isAdmin() && !request.getUser().getIdx().equals(currentUserId)) {
             throw CareForbiddenException.ownRequestOnly();
+        }
+
+        // 진행 중이거나 끝난 거래는 지울 수 없다. 상대가 있는 계약이고, 보관 중인 코인의
+        // 귀속이 삭제로 사라지면 안 된다. 관리자도 예외가 아니다.
+        if (request.getStatus() != CareRequestStatus.OPEN) {
+            throw new IllegalStateException(
+                    "모집 중(OPEN)인 요청만 삭제할 수 있습니다. 현재 상태: " + request.getStatus());
+        }
+
+        // 등록 시 잡아둔 코인을 돌려준다. 내부 코인은 플랫폼이 돌려주지 않으면 회수 수단이 없다.
+        PetCoinEscrow escrow = petCoinEscrowService.findByCareRequest(request);
+        if (escrow != null && escrow.getStatus() == EscrowStatus.HOLD) {
+            petCoinEscrowService.refundToRequester(escrow);
+            log.info("요청 삭제로 보관 코인 환불: careRequestIdx={}, escrowIdx={}, amount={}",
+                    request.getIdx(), escrow.getIdx(), escrow.getAmount());
         }
 
         request.softDelete();

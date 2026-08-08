@@ -81,6 +81,14 @@ public class ConversationParticipant extends BaseTimeEntity {
     @Column(name = "deal_confirmed_at")
     private LocalDateTime dealConfirmedAt;
 
+    /**
+     * 확정 당시 동의한 제시 금액. 현재 금액과 다르면 낡은 동의다.
+     * 시각 비교(확정 시각 vs 금액 변경 시각)는 datetime 초 정밀도에서 같은 초를 구분하지 못해 새는데,
+     * 금액을 직접 들고 있으면 시계와 무관하게 판정된다.
+     */
+    @Column(name = "confirmed_offered_coins")
+    private Integer confirmedOfferedCoins;
+
     @Column(name = "is_deleted")
     @Builder.Default
     private Boolean isDeleted = false;

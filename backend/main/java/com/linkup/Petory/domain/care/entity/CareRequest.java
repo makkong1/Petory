@@ -113,6 +113,22 @@ public class CareRequest extends BaseTimeEntity {
     private LocalDateTime providerCompletedAt;
 
     /**
+     * 제시 금액이 마지막으로 바뀐 시각. NULL 이면 등록 이후 변경 없음.
+     *
+     * 낡은 거래 확정을 가려내는 판정에는 쓰지 않는다 — 처음엔 이 시각과 확정 시각을 비교했는데,
+     * 둘 다 `datetime`(초 단위)이라 같은 초에 일어난 변경·확정을 구분하지 못했다(V15 참고).
+     * 지금은 참여자가 동의한 금액을 직접 들고 비교한다. 이 컬럼은 표시용으로 남긴다.
+     */
+    @Column(name = "offered_coins_updated_at")
+    private LocalDateTime offeredCoinsUpdatedAt;
+
+    /** 제시 금액을 바꾸고 변경 시각을 남긴다. */
+    public void changeOfferedCoins(int newAmount) {
+        this.offeredCoins = newAmount;
+        this.offeredCoinsUpdatedAt = LocalDateTime.now();
+    }
+
+    /**
      * 한쪽의 이행 완료 확인을 기록한다. 이미 확인했다면 시각을 덮어쓰지 않는다
      * (재시도로 같은 요청이 두 번 와도 결과가 같아야 하므로).
      *

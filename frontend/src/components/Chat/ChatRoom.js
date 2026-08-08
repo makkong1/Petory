@@ -472,19 +472,28 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
   const handleConfirmDeal = async () => {
     if (!conversationIdx || !user?.idx || dealConfirmed) return;
 
-    if (!window.confirm('거래를 확정하시겠습니까? 양쪽 모두 확정하면 펫케어 서비스가 시작됩니다.')) {
+    // 지금 화면에 떠 있는 금액을 그대로 서버에 실어 보낸다. 그 사이 요청자가 금액을 바꿨으면
+    // 서버가 409 로 거절하므로, 사용자가 본 숫자와 실제로 성립하는 계약이 어긋나지 않는다.
+    const expectedAmount = careRequestData?.offeredCoins;
+
+    const amountText = expectedAmount != null ? `${expectedAmount.toLocaleString()} 코인으로 ` : '';
+    if (!window.confirm(`${amountText}거래를 확정하시겠습니까?\n양쪽 모두 확정하면 펫케어 서비스가 시작됩니다.`)) {
       return;
     }
 
     setConfirmingDeal(true);
     try {
-      await confirmCareDeal(conversationIdx);
+      await confirmCareDeal(conversationIdx, expectedAmount);
       setDealConfirmed(true);
       // 채팅방 정보 다시 조회
       await fetchConversation();
       showToast('거래 확정이 완료되었습니다. 상대방도 확정하면 서비스가 시작됩니다.', 'success');
     } catch (error) {
       console.error('거래 확정 실패:', error);
+      // 409 = 제시 금액이 바뀐 경우. 최신 금액을 다시 받아 보여준다.
+      if (error.response?.status === 409) {
+        await fetchConversation();
+      }
       showToast(error.response?.data?.error || '거래 확정에 실패했습니다.');
     } finally {
       setConfirmingDeal(false);

@@ -42,6 +42,101 @@ public class PetCoinEscrowService {
      * @param amount 에스크로 금액 (코인 단위)
      * @return 생성된 에스크로
      */
+    /**
+     * 요청 등록 시 에스크로 생성. 이 시점에는 제공자가 없으므로 지급 대상 없이 금액만 보관한다.
+     *
+     * 왜 확정이 아니라 등록에서 잡는가: 확정 시 차감이면 제공자가 신청하고 채팅까지 마친 뒤에야
+     * 요청자의 잔액 부족이 드러난다. 등록에서 잡아야 "올라와 있는 요청은 지급이 보증된다"가 성립한다.
+     */
+    @Transactional
+    public PetCoinEscrow holdForRequest(CareRequest careRequest, Users requester, Integer amount) {
+        if (amount == null || amount <= 0) {
+            throw PaymentValidationException.escrowAmountInvalid();
+        }
+
+        escrowRepository.findByCareRequest(careRequest)
+                .ifPresent(existing -> {
+                    throw PaymentConflictException.escrowAlreadyExists();
+                });
+
+        petCoinService.deductCoins(
+                requester,
+                amount,
+                "CARE_REQUEST",
+                careRequest.getIdx(),
+                String.format("펫케어 요청 등록 - 요청 ID: %d", careRequest.getIdx()));
+
+        PetCoinEscrow saved = escrowRepository.save(PetCoinEscrow.builder()
+                .careRequest(careRequest)
+                .requester(requester)
+                .amount(amount)
+                .status(EscrowStatus.HOLD)
+                .build());
+
+        log.info("에스크로 보관 시작(상대 미정): escrowIdx={}, careRequestIdx={}, amount={}, requesterId={}",
+                saved.getIdx(), careRequest.getIdx(), amount, requester.getIdx());
+
+        return saved;
+    }
+
+    /**
+     * 거래 확정 시 지급 대상 배정. 금액은 이 시점에 바뀌지 않는다 — 확정하는 쪽이 화면에서 본
+     * 금액(expectedAmount)과 보관 금액이 다르면 거절한다.
+     */
+    @Transactional
+    public PetCoinEscrow assignProvider(CareRequest careRequest, Users provider,
+            CareApplication careApplication, Integer expectedAmount) {
+        PetCoinEscrow escrow = escrowRepository.findByCareRequestForUpdate(careRequest)
+                .orElseThrow(() -> new PetCoinEscrowNotFoundException());
+
+        if (expectedAmount != null && !expectedAmount.equals(escrow.getAmount())) {
+            throw PaymentConflictException.escrowAmountChanged(escrow.getAmount());
+        }
+
+        escrow.assignProvider(provider, careApplication);
+        PetCoinEscrow saved = escrowRepository.save(escrow);
+
+        log.info("에스크로 지급 대상 배정: escrowIdx={}, careRequestIdx={}, providerId={}, amount={}",
+                saved.getIdx(), careRequest.getIdx(), provider.getIdx(), saved.getAmount());
+
+        return saved;
+    }
+
+    /**
+     * 보관 금액을 목표 금액으로 맞춘다. 차액만큼 추가 차감하거나 환불한다.
+     *
+     * 증분이 아니라 목표 금액을 받기 때문에 같은 요청이 두 번 도착해도 두 번째는 차액이 0 이 되어
+     * 아무 일도 일어나지 않는다 — 별도 멱등키 없이 재시도 안전하다.
+     */
+    @Transactional
+    public PetCoinEscrow changeAmount(CareRequest careRequest, Users requester, int newAmount) {
+        if (newAmount <= 0) {
+            throw PaymentValidationException.escrowAmountInvalid();
+        }
+
+        PetCoinEscrow escrow = escrowRepository.findByCareRequestForUpdate(careRequest)
+                .orElseThrow(() -> new PetCoinEscrowNotFoundException());
+
+        int diff = newAmount - escrow.getAmount();
+        if (diff == 0) {
+            return escrow;
+        }
+
+        if (diff > 0) {
+            petCoinService.deductCoins(requester, diff, "CARE_REQUEST", careRequest.getIdx(),
+                    String.format("펫케어 제시 금액 인상 정산 - 요청 ID: %d", careRequest.getIdx()));
+        } else {
+            petCoinService.refundCoins(requester, -diff, "CARE_REQUEST", careRequest.getIdx(),
+                    String.format("펫케어 제시 금액 인하 정산 - 요청 ID: %d", careRequest.getIdx()));
+        }
+
+        escrow.changeAmount(newAmount);
+        log.info("에스크로 금액 변경: escrowIdx={}, careRequestIdx={}, {} -> {}",
+                escrow.getIdx(), careRequest.getIdx(), escrow.getAmount() - diff, newAmount);
+
+        return escrowRepository.save(escrow);
+    }
+
     @Transactional
     public PetCoinEscrow createEscrow(CareRequest careRequest, CareApplication careApplication,
             Users requester, Users provider, Integer amount) {

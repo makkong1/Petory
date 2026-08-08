@@ -154,11 +154,15 @@ public class ConversationController {
 
     /**
      * 펫케어 거래 확정
+     *
+     * @param expectedAmount 확정하는 쪽이 화면에서 본 제시 금액. 실제와 다르면 409 로 거절하고
+     *                       다시 확인시킨다. 생략하면 대조하지 않는다(구버전 클라이언트 호환).
      */
     @PostMapping("/{conversationIdx}/confirm-deal")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Void> confirmCareDeal(@PathVariable("conversationIdx") Long conversationIdx) {
-        conversationService.confirmCareDeal(conversationIdx, getCurrentUserId());
+    public ResponseEntity<Void> confirmCareDeal(@PathVariable("conversationIdx") Long conversationIdx,
+            @RequestParam(value = "expectedAmount", required = false) Integer expectedAmount) {
+        conversationService.confirmCareDeal(conversationIdx, getCurrentUserId(), expectedAmount);
         return ResponseEntity.noContent().build();
     }
 }

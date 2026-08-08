@@ -18,6 +18,7 @@ import com.linkup.Petory.domain.care.entity.CareRequest;
 import com.linkup.Petory.domain.care.entity.CareRequestStatus;
 import com.linkup.Petory.domain.care.exception.CareApplicationNotFoundException;
 import com.linkup.Petory.domain.care.exception.CareRequestNotFoundException;
+import com.linkup.Petory.domain.payment.exception.PaymentConflictException;
 import com.linkup.Petory.domain.care.repository.CareApplicationRepository;
 import com.linkup.Petory.domain.care.repository.CareRequestRepository;
 import com.linkup.Petory.domain.chat.converter.ChatMessageConverter;
@@ -490,7 +491,7 @@ public class ConversationService {
      * 펫케어 거래 확정 (양쪽 모두 확인 시 지원 승인 및 상태 변경)
      */
     @Transactional
-    public void confirmCareDeal(Long conversationIdx, Long userId) {
+    public void confirmCareDeal(Long conversationIdx, Long userId, Integer expectedAmount) {
         // 비관적 락으로 채팅방 조회 (동시성 제어)
         Conversation conversation = conversationRepository.findByIdWithLock(conversationIdx)
                 .orElseThrow(() -> new IllegalArgumentException("채팅방을 찾을 수 없습니다."));
@@ -517,6 +518,39 @@ public class ConversationService {
             throw ChatForbiddenException.sanctionedPartyCannotConfirmDeal();
         }
 
+        // 금액 대조 + 낡은 확정 무효화.
+        // 확정은 양쪽이 따로 누르므로, 한쪽이 5,000 에 동의한 뒤 금액이 1,000 으로 바뀌고 다른 쪽이
+        // 1,000 에 동의하면 서로 다른 금액에 동의한 채 계약이 성립한다. 두 가지가 각각 다른 걸 막는다.
+        //   - expectedAmount        : 지금 내가 화면에서 보고 동의하는 값이 실제와 같은가
+        //   - confirmedOfferedCoins : 이미 있는 동의가 현재 금액과 같은 금액에 대한 것인가
+        // 지키려는 불변식은 "성립한 계약의 모든 동의는 같은 금액에 대한 것"이다.
+        // 낡은 동의는 무효화하고 새 금액으로 다시 받는다. care 의 확정 플래그를 care 쪽에서 건드리면
+        // 도메인 참조가 순환하므로(지금은 chat -> care 단방향), 무효화는 여기(chat)서 한다.
+        Integer currentOfferedCoins = null;
+        if (conversation.getRelatedType() == RelatedType.CARE_REQUEST
+                && conversation.getRelatedIdx() != null) {
+            CareRequest target = careRequestRepository.findById(conversation.getRelatedIdx())
+                    .orElseThrow(CareRequestNotFoundException::new);
+            currentOfferedCoins = target.getOfferedCoins();
+
+            if (expectedAmount != null && !expectedAmount.equals(currentOfferedCoins)) {
+                throw PaymentConflictException.escrowAmountChanged(currentOfferedCoins);
+            }
+
+            for (ConversationParticipant p : allParticipants) {
+                if (Boolean.TRUE.equals(p.getDealConfirmed())
+                        && !java.util.Objects.equals(p.getConfirmedOfferedCoins(), currentOfferedCoins)) {
+                    p.setDealConfirmed(false);
+                    p.setDealConfirmedAt(null);
+                    p.setConfirmedOfferedCoins(null);
+                    participantRepository.save(p);
+                    log.info("금액 변경으로 거래 확정 무효화: conversationIdx={}, userId={}, 동의금액={}, 현재금액={}",
+                            conversationIdx, p.getUser().getIdx(), p.getConfirmedOfferedCoins(),
+                            currentOfferedCoins);
+                }
+            }
+        }
+
         // 이미 거래 확정했는지 확인
         if (Boolean.TRUE.equals(participant.getDealConfirmed())) {
             throw new IllegalStateException("이미 거래 확정을 완료했습니다.");
@@ -525,6 +559,7 @@ public class ConversationService {
         // 거래 확정 처리
         participant.setDealConfirmed(true);
         participant.setDealConfirmedAt(LocalDateTime.now());
+        participant.setConfirmedOfferedCoins(currentOfferedCoins);
         participantRepository.save(participant);
 
         // 양쪽 모두 거래 확정했는지 확인
@@ -605,22 +640,17 @@ public class ConversationService {
                                 provider.getIdx());
 
                         if (offeredCoins != null && offeredCoins > 0) {
-                            // 차감이 실패하면 확정도 롤백된다 — 이건 예전부터 그랬다.
-                            // 이전 코드는 예외를 try/catch 로 삼키고 "확정은 진행"한다는 주석을 달아뒀지만,
-                            // createEscrow 가 REQUIRED 로 이 트랜잭션에 합류하므로 실패가 rollback-only 를
-                            // 남긴다. 삼켜도 바깥 커밋에서 UnexpectedRollbackException 이 날 뿐이라,
-                            // 주석이 말하던 "차감 없는 확정"은 애초에 만들어질 수 없었다.
-                            // 그래서 전파로 바꾼 이유는 롤백을 만들기 위해서가 아니라 원인을 남기기 위해서다.
-                            // 옛 코드: 원인을 알 수 없는 UnexpectedRollbackException → HTTP 500
-                            // 지금:   InsufficientBalanceException → HTTP 400 INSUFFICIENT_BALANCE
-                            // 고정: CareDealEscrowFailureTest (옛 코드에서 실패하는 것을 확인하고 등록)
-                            petCoinEscrowService.createEscrow(
+                            // 코인은 요청 등록 시 이미 에스크로에 잡혀 있다. 확정에서 하는 일은
+                            // 지급 대상을 배정하는 것뿐이고, 여기서 잔액이 모자라 깨지는 일은 없다.
+                            // (그 TOCTOU 를 없애려고 차감을 등록 시점으로 옮겼다.)
+                            // 실패해도 예외는 그대로 전파한다 — 배정 없이 확정만 남으면 지급 대상이 사라진다.
+                            // 고정: CareDealEscrowFailureTest
+                            petCoinEscrowService.assignProvider(
                                     careRequest,
-                                    finalApplication,
-                                    requester,
                                     provider,
-                                    offeredCoins);
-                            log.info("펫코인 차감 및 에스크로 생성 완료: careRequestIdx={}, amount={}",
+                                    finalApplication,
+                                    expectedAmount);
+                            log.info("에스크로 지급 대상 배정 완료: careRequestIdx={}, amount={}",
                                     relatedIdx, offeredCoins);
                         } else {
                             log.warn("펫코인 가격이 설정되지 않음: careRequestIdx={}, offeredCoins={}",
