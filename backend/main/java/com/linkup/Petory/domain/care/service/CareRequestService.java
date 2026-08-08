@@ -237,6 +237,13 @@ public class CareRequestService {
             throw CareForbiddenException.ownRequestOnly();
         }
 
+        // 모집 중일 때만 수정 가능. 관리자도 예외가 아니다 — 관리자가 우회할 수 있으면 가드가 아니다.
+        // 이전에는 상태 가드가 없어서 이미 완료된 케어의 날짜·장소·펫을 사후에 바꿀 수 있었다.
+        if (request.getStatus() != CareRequestStatus.OPEN) {
+            throw new IllegalStateException(
+                    "모집 중(OPEN)인 요청만 수정할 수 있습니다. 현재 상태: " + request.getStatus());
+        }
+
         if (dto.getTitle() != null) {
             request.setTitle(dto.getTitle());
         }
