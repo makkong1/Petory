@@ -12,8 +12,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
+import com.linkup.Petory.domain.care.entity.CareApplication;
+import com.linkup.Petory.domain.care.entity.CareApplicationStatus;
 import com.linkup.Petory.domain.care.entity.CareRequest;
 import com.linkup.Petory.domain.care.entity.CareRequestStatus;
+import com.linkup.Petory.domain.care.repository.CareApplicationRepository;
 import com.linkup.Petory.domain.care.repository.CareRequestRepository;
 import com.linkup.Petory.domain.chat.entity.Conversation;
 import com.linkup.Petory.domain.chat.entity.ConversationParticipant;
@@ -64,6 +67,9 @@ class CareDealEscrowFailureTest {
     @Autowired
     private ConversationParticipantRepository participantRepository;
 
+    @Autowired
+    private CareApplicationRepository careApplicationRepository;
+
     private Users requester;
     private Users provider;
     private CareRequest careRequest;
@@ -103,10 +109,18 @@ class CareDealEscrowFailureTest {
                 .build();
         careRequestRepository.save(careRequest);
 
+        // 케어 채팅방은 지원 단위다 — relatedIdx 는 careApplicationIdx.
+        // 에스크로는 일부러 만들지 않는다(이행 전 데이터 재현).
+        CareApplication application = careApplicationRepository.saveAndFlush(CareApplication.builder()
+                .careRequest(careRequest)
+                .provider(provider)
+                .status(CareApplicationStatus.PENDING)
+                .build());
+
         conversation = Conversation.builder()
                 .conversationType(ConversationType.CARE_REQUEST)
-                .relatedType(RelatedType.CARE_REQUEST)
-                .relatedIdx(careRequest.getIdx())
+                .relatedType(RelatedType.CARE_APPLICATION)
+                .relatedIdx(application.getIdx())
                 .status(ConversationStatus.ACTIVE)
                 .build();
         conversationRepository.save(conversation);

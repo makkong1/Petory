@@ -17,7 +17,6 @@ import com.linkup.Petory.domain.care.entity.CareApplicationStatus;
 import com.linkup.Petory.domain.care.entity.CareRequest;
 import com.linkup.Petory.domain.care.entity.CareRequestStatus;
 import com.linkup.Petory.domain.care.exception.CareApplicationNotFoundException;
-import com.linkup.Petory.domain.care.exception.CareRequestNotFoundException;
 import com.linkup.Petory.domain.payment.exception.PaymentConflictException;
 import com.linkup.Petory.domain.care.repository.CareApplicationRepository;
 import com.linkup.Petory.domain.care.repository.CareRequestRepository;
@@ -496,11 +495,24 @@ public class ConversationService {
         Conversation conversation = conversationRepository.findByIdWithLock(conversationIdx)
                 .orElseThrow(() -> new IllegalArgumentException("채팅방을 찾을 수 없습니다."));
 
-        // 펫케어 관련 채팅방인지 확인
-        if (conversation.getRelatedType() != RelatedType.CARE_REQUEST
-                && conversation.getRelatedType() != RelatedType.CARE_APPLICATION) {
-            throw new IllegalArgumentException("펫케어 관련 채팅방이 아닙니다.");
+        // 케어 채팅방은 지원(CareApplication) 단위로 만들어진다.
+        // 한 요청(CareRequest)에는 제공자가 여러 명 지원할 수 있어, 요청 단위로 방을 만들면
+        // 지원자 전원이 한 방에 들어가게 된다. 그래서 1:1 방은 지원 단위이고 relatedIdx 는
+        // careApplicationIdx 다(createCareRequestConversation 참고).
+        //
+        // 이전에는 이 메서드가 RelatedType.CARE_REQUEST 를 전제로 쓰여 있었다. 방에 있는 참여자로
+        // 제공자를 역추론하고 지원이 없으면 새로 만드는 로직이었는데, 실제로 생성되는 방은 전부
+        // CARE_APPLICATION 이라 그 분기는 한 번도 실행되지 않았다 — 확정 버튼을 눌러도 참여자
+        // 플래그만 켜지고 요청 상태·지원 상태·에스크로는 그대로였다. 지원 단위로 정리하면
+        // 역추론이 통째로 없어진다.
+        if (conversation.getRelatedType() != RelatedType.CARE_APPLICATION
+                || conversation.getRelatedIdx() == null) {
+            throw new IllegalArgumentException("펫케어 지원 채팅방이 아닙니다.");
         }
+
+        CareApplication application = careApplicationRepository.findById(conversation.getRelatedIdx())
+                .orElseThrow(CareApplicationNotFoundException::new);
+        CareRequest careRequest = application.getCareRequest();
 
         // 사용자의 참여자 정보 조회
         ConversationParticipant participant = participantRepository
@@ -526,28 +538,22 @@ public class ConversationService {
         // 지키려는 불변식은 "성립한 계약의 모든 동의는 같은 금액에 대한 것"이다.
         // 낡은 동의는 무효화하고 새 금액으로 다시 받는다. care 의 확정 플래그를 care 쪽에서 건드리면
         // 도메인 참조가 순환하므로(지금은 chat -> care 단방향), 무효화는 여기(chat)서 한다.
-        Integer currentOfferedCoins = null;
-        if (conversation.getRelatedType() == RelatedType.CARE_REQUEST
-                && conversation.getRelatedIdx() != null) {
-            CareRequest target = careRequestRepository.findById(conversation.getRelatedIdx())
-                    .orElseThrow(CareRequestNotFoundException::new);
-            currentOfferedCoins = target.getOfferedCoins();
+        Integer currentOfferedCoins = careRequest.getOfferedCoins();
 
-            if (expectedAmount != null && !expectedAmount.equals(currentOfferedCoins)) {
-                throw PaymentConflictException.escrowAmountChanged(currentOfferedCoins);
-            }
+        if (expectedAmount != null && !expectedAmount.equals(currentOfferedCoins)) {
+            throw PaymentConflictException.escrowAmountChanged(currentOfferedCoins);
+        }
 
-            for (ConversationParticipant p : allParticipants) {
-                if (Boolean.TRUE.equals(p.getDealConfirmed())
-                        && !java.util.Objects.equals(p.getConfirmedOfferedCoins(), currentOfferedCoins)) {
-                    p.setDealConfirmed(false);
-                    p.setDealConfirmedAt(null);
-                    p.setConfirmedOfferedCoins(null);
-                    participantRepository.save(p);
-                    log.info("금액 변경으로 거래 확정 무효화: conversationIdx={}, userId={}, 동의금액={}, 현재금액={}",
-                            conversationIdx, p.getUser().getIdx(), p.getConfirmedOfferedCoins(),
-                            currentOfferedCoins);
-                }
+        for (ConversationParticipant p : allParticipants) {
+            if (Boolean.TRUE.equals(p.getDealConfirmed())
+                    && !java.util.Objects.equals(p.getConfirmedOfferedCoins(), currentOfferedCoins)) {
+                log.info("금액 변경으로 거래 확정 무효화: conversationIdx={}, userId={}, 동의금액={}, 현재금액={}",
+                        conversationIdx, p.getUser().getIdx(), p.getConfirmedOfferedCoins(),
+                        currentOfferedCoins);
+                p.setDealConfirmed(false);
+                p.setDealConfirmedAt(null);
+                p.setConfirmedOfferedCoins(null);
+                participantRepository.save(p);
             }
         }
 
@@ -566,110 +572,48 @@ public class ConversationService {
         boolean allConfirmed = allParticipants.stream()
                 .allMatch(p -> Boolean.TRUE.equals(p.getDealConfirmed()));
 
-        // 양쪽 모두 확정했으면 CareRequest 상태 변경 및 지원 승인 처리
+        // 양쪽 모두 확정했으면 지원 승인 + 요청 상태 전이 + 에스크로 지급 대상 배정
         if (allConfirmed && allParticipants.size() == 2) {
-            Long relatedIdx = conversation.getRelatedIdx();
-            if (relatedIdx != null) {
-                // CARE_REQUEST 타입인 경우
-                if (conversation.getRelatedType() == RelatedType.CARE_REQUEST) {
-                    CareRequest careRequest = careRequestRepository.findById(relatedIdx)
-                            .orElseThrow(CareRequestNotFoundException::new);
+            // 다른 방에서 이미 확정된 요청이면 여기서 멈춘다. 조용히 넘어가면 사용자는
+            // 확정이 된 줄 알고 기다리게 된다 — 이유를 알려준다.
+            if (careRequest.getStatus() != CareRequestStatus.OPEN) {
+                throw new IllegalStateException(
+                        "이미 다른 제공자와 거래가 확정된 요청입니다. 현재 상태: " + careRequest.getStatus());
+            }
 
-                    // 요청 상태가 OPEN인 경우에만 처리
-                    if (careRequest.getStatus() == CareRequestStatus.OPEN) {
-                        // 채팅방 참여자 중 요청자가 아닌 사람을 제공자로 간주
-                        List<Long> participantIds = allParticipants.stream()
-                                .map(p -> p.getUser().getIdx())
-                                .collect(Collectors.toList());
+            Users requester = careRequest.getUser();
+            Users provider = application.getProvider();
+            if (requester.isSanctioned() || provider.isSanctioned()) {
+                throw ChatForbiddenException.sanctionedPartyCannotConfirmDeal();
+            }
 
-                        Long requesterId = careRequest.getUser().getIdx();
-                        Long providerId = participantIds.stream()
-                                .filter(id -> !id.equals(requesterId))
-                                .findFirst()
-                                .orElseThrow(UserNotFoundException::new);
+            application.accept();
 
-                        // CareApplication 찾기 (이미 지원한 경우)
-                        CareApplication existingApplication = careRequest
-                                .getApplications() != null
-                                        ? careRequest.getApplications().stream()
-                                                .filter(app -> app
-                                                .getProvider()
-                                                .getIdx()
-                                                .equals(providerId))
-                                                .findFirst()
-                                                .orElse(null)
-                                        : null;
-
-                        // 요청자와 제공자 정보 가져오기
-                        Users requester = careRequest.getUser();
-                        Users provider = usersRepository.findById(providerId)
-                                .orElseThrow(UserNotFoundException::new);
-                        if (requester.isSanctioned() || provider.isSanctioned()) {
-                            throw ChatForbiddenException.sanctionedPartyCannotConfirmDeal();
-                        }
-
-                        CareApplication finalApplication;
-                        if (existingApplication == null) {
-                            // TransientObjectException 해결을 위한 확실한 영속 객체 참조 (Proxy) 가져오기
-                            CareRequest careRequestRef = careRequestRepository
-                                    .getReferenceById(relatedIdx);
-
-                            // CareApplication이 없으면 생성
-                            CareApplication newApplication = CareApplication.builder()
-                                    .careRequest(careRequestRef) // Proxy 객체 사용
-                                    .provider(provider)
-                                    .status(CareApplicationStatus.ACCEPTED)
-                                    .build();
-
-                            // 명시적으로 저장 및 플러시
-                            finalApplication = careApplicationRepository
-                                    .saveAndFlush(newApplication);
-                        } else {
-                            // 이미 있으면 승인 상태로 변경
-                            existingApplication.accept();
-                            finalApplication = existingApplication;
-                        }
-
-                        careRequest.transitionTo(CareRequestStatus.IN_PROGRESS);
-                        careRequestRepository.save(careRequest);
-
-                        // 펫코인 차감 및 에스크로 생성
-                        Integer offeredCoins = careRequest.getOfferedCoins();
-                        log.info("거래 확정 시 펫코인 처리 시작: careRequestIdx={}, offeredCoins={}, requesterId={}, providerId={}",
-                                relatedIdx, offeredCoins, requester.getIdx(),
-                                provider.getIdx());
-
-                        if (offeredCoins != null && offeredCoins > 0) {
-                            // 코인은 요청 등록 시 이미 에스크로에 잡혀 있다. 확정에서 하는 일은
-                            // 지급 대상을 배정하는 것뿐이고, 여기서 잔액이 모자라 깨지는 일은 없다.
-                            // (그 TOCTOU 를 없애려고 차감을 등록 시점으로 옮겼다.)
-                            // 실패해도 예외는 그대로 전파한다 — 배정 없이 확정만 남으면 지급 대상이 사라진다.
-                            // 고정: CareDealEscrowFailureTest
-                            petCoinEscrowService.assignProvider(
-                                    careRequest,
-                                    provider,
-                                    finalApplication,
-                                    expectedAmount);
-                            log.info("에스크로 지급 대상 배정 완료: careRequestIdx={}, amount={}",
-                                    relatedIdx, offeredCoins);
-                        } else {
-                            log.warn("펫코인 가격이 설정되지 않음: careRequestIdx={}, offeredCoins={}",
-                                    relatedIdx, offeredCoins);
-                        }
-
-                        log.info("거래 확정 완료: conversationIdx={}, careRequestIdx={}, providerId={}, 상태 변경: OPEN -> IN_PROGRESS",
-                                conversationIdx, relatedIdx, providerId);
+            // 같은 요청의 나머지 지원은 선정되지 않았다. PENDING 으로 두면 그 지원자들은
+            // 계속 대기 중인 줄 알게 된다.
+            if (careRequest.getApplications() != null) {
+                for (CareApplication other : careRequest.getApplications()) {
+                    if (!other.getIdx().equals(application.getIdx())
+                            && other.getStatus() == CareApplicationStatus.PENDING) {
+                        other.reject();
+                        careApplicationRepository.saveAndFlush(other);
                     }
-                } // CARE_APPLICATION 타입인 경우 (이미 지원이 있는 경우)
-                else if (conversation.getRelatedType() == RelatedType.CARE_APPLICATION) {
-                    // CareApplication을 찾아서 승인 처리
-                    // relatedIdx가 CareApplication의 idx인 경우
-                    // 이 경우는 CareApplicationRepository가 필요하지만,
-                    // 일단 CareRequest를 통해 접근
-                    log.info("거래 확정 완료: conversationIdx={}, careApplicationIdx={}", conversationIdx,
-                            relatedIdx);
                 }
             }
+
+            careRequest.transitionTo(CareRequestStatus.IN_PROGRESS);
+            careRequestRepository.save(careRequest);
+
+            // 코인은 요청 등록 시 이미 에스크로에 잡혀 있다. 확정에서 하는 일은 지급 대상을
+            // 배정하는 것뿐이고, 여기서 잔액이 모자라 깨지는 일은 없다.
+            // (그 TOCTOU 를 없애려고 차감을 등록 시점으로 옮겼다.)
+            // 실패해도 예외는 그대로 전파한다 — 배정 없이 확정만 남으면 지급 대상이 사라진다.
+            // 고정: CareDealEscrowFailureTest
+            petCoinEscrowService.assignProvider(careRequest, provider, application, expectedAmount);
+
+            log.info("거래 확정 완료: conversationIdx={}, careApplicationIdx={}, careRequestIdx={}, providerId={}, amount={}",
+                    conversationIdx, application.getIdx(), careRequest.getIdx(),
+                    provider.getIdx(), currentOfferedCoins);
         }
     }
 }

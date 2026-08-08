@@ -14,9 +14,15 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
+import com.linkup.Petory.domain.care.entity.CareApplication;
+import com.linkup.Petory.domain.care.entity.CareApplicationStatus;
 import com.linkup.Petory.domain.care.entity.CareRequest;
 import com.linkup.Petory.domain.care.entity.CareRequestStatus;
+import com.linkup.Petory.domain.care.repository.CareApplicationRepository;
 import com.linkup.Petory.domain.care.repository.CareRequestRepository;
+import com.linkup.Petory.domain.payment.entity.EscrowStatus;
+import com.linkup.Petory.domain.payment.entity.PetCoinEscrow;
+import com.linkup.Petory.domain.payment.repository.PetCoinEscrowRepository;
 import com.linkup.Petory.domain.chat.entity.Conversation;
 import com.linkup.Petory.domain.chat.entity.ConversationParticipant;
 import com.linkup.Petory.domain.chat.entity.ConversationStatus;
@@ -48,6 +54,12 @@ class CareDealConcurrencyTest {
 
     @Autowired
     private ConversationParticipantRepository participantRepository;
+
+    @Autowired
+    private CareApplicationRepository careApplicationRepository;
+
+    @Autowired
+    private PetCoinEscrowRepository escrowRepository;
 
     private Users requester;
     private Users provider;
@@ -86,14 +98,30 @@ class CareDealConcurrencyTest {
                 .description("Test Content")
                 .date(LocalDateTime.now().plusDays(1))
                 .status(CareRequestStatus.OPEN)
+                .offeredCoins(1_000)
                 .build();
         careRequestRepository.save(careRequest);
+
+        // 케어 채팅방은 지원 단위로 만들어진다 — relatedIdx 는 careApplicationIdx 다.
+        CareApplication application = careApplicationRepository.saveAndFlush(CareApplication.builder()
+                .careRequest(careRequest)
+                .provider(provider)
+                .status(CareApplicationStatus.PENDING)
+                .build());
+
+        // 코인은 요청 등록 시 잡힌다. 여기서는 리포지토리로 직접 만들므로 보관도 직접 만들어 준다.
+        escrowRepository.save(PetCoinEscrow.builder()
+                .careRequest(careRequest)
+                .requester(requester)
+                .amount(1_000)
+                .status(EscrowStatus.HOLD)
+                .build());
 
         // 3. 채팅방 생성
         conversation = Conversation.builder()
                 .conversationType(ConversationType.CARE_REQUEST)
-                .relatedType(RelatedType.CARE_REQUEST)
-                .relatedIdx(careRequest.getIdx())
+                .relatedType(RelatedType.CARE_APPLICATION)
+                .relatedIdx(application.getIdx())
                 .status(ConversationStatus.ACTIVE)
                 .build();
         conversationRepository.save(conversation);

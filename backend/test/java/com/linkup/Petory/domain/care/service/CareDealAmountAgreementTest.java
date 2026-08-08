@@ -13,6 +13,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import com.linkup.Petory.domain.care.dto.CareRequestDTO;
+import com.linkup.Petory.domain.care.entity.CareApplication;
+import com.linkup.Petory.domain.care.entity.CareApplicationStatus;
+import com.linkup.Petory.domain.care.repository.CareApplicationRepository;
 import com.linkup.Petory.domain.care.repository.CareRequestRepository;
 import com.linkup.Petory.domain.chat.entity.Conversation;
 import com.linkup.Petory.domain.chat.entity.ConversationParticipant;
@@ -41,9 +44,13 @@ import com.linkup.Petory.domain.user.repository.UsersRepository;
  *             ㄴ 제공자의 동의는 5,000 에 대한 것이었다
  *
  * 두 장치가 각각 다른 것을 막는다.
- *   - expectedAmount : 지금 내가 화면에서 보고 동의하는 값이 실제와 같은가
- *   - 변경 시각 비교  : 이미 있는 동의가 마지막 금액 변경보다 이전인가(= 낡았는가)
+ *   - expectedAmount        : 지금 내가 화면에서 보고 동의하는 값이 실제와 같은가
+ *   - confirmedOfferedCoins : 이미 있는 동의가 현재 금액과 같은 금액에 대한 것인가
  * 하나만으로는 위 시나리오가 막히지 않는다.
+ *
+ * 처음에는 시각 비교(금액 변경 시각 vs 확정 시각)로 만들었는데, 두 컬럼 모두 datetime(초 단위)이라
+ * 같은 초에 일어난 변경·확정을 구분하지 못해 이 클래스의 두 번째 테스트가 실패했다. 그래서 동의한
+ * 금액을 직접 기록하는 방식으로 바꿨다(V15). 시계와 무관하게 성립한다.
  */
 @SpringBootTest
 class CareDealAmountAgreementTest {
@@ -68,6 +75,9 @@ class CareDealAmountAgreementTest {
 
     @Autowired
     private ConversationParticipantRepository participantRepository;
+
+    @Autowired
+    private CareApplicationRepository careApplicationRepository;
 
     private Users requester;
     private Users provider;
@@ -98,10 +108,17 @@ class CareDealAmountAgreementTest {
                 .latitude(37.5).longitude(127.0).address("서울시 어딘가")
                 .build()).getIdx();
 
+        CareApplication application = careApplicationRepository.saveAndFlush(CareApplication.builder()
+                .careRequest(careRequestRepository.findById(careRequestIdx).orElseThrow())
+                .provider(provider)
+                .status(CareApplicationStatus.PENDING)
+                .build());
+
+        // 케어 채팅방은 지원 단위다 — relatedIdx 는 careApplicationIdx.
         conversation = conversationRepository.save(Conversation.builder()
                 .conversationType(ConversationType.CARE_REQUEST)
-                .relatedType(RelatedType.CARE_REQUEST)
-                .relatedIdx(careRequestIdx)
+                .relatedType(RelatedType.CARE_APPLICATION)
+                .relatedIdx(application.getIdx())
                 .status(ConversationStatus.ACTIVE)
                 .build());
 
