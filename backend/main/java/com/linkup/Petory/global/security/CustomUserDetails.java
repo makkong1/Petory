@@ -12,6 +12,7 @@ import com.linkup.Petory.domain.user.entity.Role;
 import com.linkup.Petory.domain.user.entity.UserStatus;
 import com.linkup.Petory.domain.user.entity.Users;
 
+
 public class CustomUserDetails implements UserDetails {
 
     private final Long idx;
