@@ -20,8 +20,8 @@ public class PublicDataSyncScheduler {
 
     private final PublicDataSyncService publicDataSyncService;
 
-    /** 매일 03:00 실행. */
-    @Scheduled(cron = "0 0 3 * * *")
+    /** 매일 18:10 실행. 스케줄러 스레드가 1개뿐이라 자정(4개)·정각(2개)·17:10·18:30 슬롯을 피한다. */
+    @Scheduled(cron = "0 10 18 * * *")
     public void runDailySync() {
         try {
             LocationSyncLog result = publicDataSyncService.syncFromApi(SyncTriggerType.SCHEDULED);

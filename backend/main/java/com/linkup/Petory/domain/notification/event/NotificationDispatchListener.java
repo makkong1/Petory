@@ -25,7 +25,7 @@ public class NotificationDispatchListener {
     private final NotificationSseService sseService;
     private final FcmService fcmService;
 
-    @Async
+    @Async("notificationExecutor")
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onNotificationCreated(NotificationCreatedEvent event) {
         // 채널별 예외 격리 — 한 채널 장애가 다른 채널 발송을 막지 않는다
