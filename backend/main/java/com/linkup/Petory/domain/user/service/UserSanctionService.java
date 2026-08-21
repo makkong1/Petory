@@ -227,6 +227,8 @@ public class UserSanctionService {
                 addWarning(userId, reason, adminId, reportId);
             case SUSPEND_USER ->
                 addSuspension(userId, reason, adminId, reportId, AUTO_SUSPENSION_DAYS);
+            case BAN_USER ->
+                addBan(userId, reason, adminId, reportId);
             default -> {
                 // NONE, DELETE_CONTENT, OTHER는 제재 없음
             }

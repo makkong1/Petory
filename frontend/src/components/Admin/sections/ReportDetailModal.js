@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import styled from 'styled-components';
 import { reportApi } from '../../../api/reportApi';
 import { communityAdminApi } from '../../../api/communityAdminApi';
+import { missingPetAdminApi } from '../../../api/missingPetAdminApi';
 import { StatusPill } from '../ui/AdminUI';
 
 // 신고 상태 → pill tone/라벨
@@ -51,7 +52,7 @@ const ReportDetailModal = ({ reportId, onClose, onHandled }) => {
           setAdminNote(data.report.adminNote || '');
         }
         
-        // 게시글 상태 확인 (BOARD 타입일 때만)
+        // 대상 삭제 상태 확인 (BOARD/MISSING_PET 타입일 때만 - 조치 버튼 노출 여부에 씀)
         if (data?.report?.targetType === 'BOARD' && data?.target?.id) {
           try {
             const boardRes = await communityAdminApi.getBoard(data.target.id);
@@ -62,6 +63,17 @@ const ReportDetailModal = ({ reportId, onClose, onHandled }) => {
             }
           } catch (e) {
             console.error('게시글 상태 확인 실패:', e);
+          }
+        } else if (data?.report?.targetType === 'MISSING_PET' && data?.target?.id) {
+          try {
+            const mpRes = await missingPetAdminApi.getMissingPet(data.target.id);
+            const missingPet = mpRes.data;
+            if (missingPet) {
+              setTargetStatus(missingPet.status);
+              setTargetDeleted(missingPet.deleted || false);
+            }
+          } catch (e) {
+            console.error('실종 제보 상태 확인 실패:', e);
           }
         }
       } catch (e) {
@@ -122,12 +134,18 @@ const ReportDetailModal = ({ reportId, onClose, onHandled }) => {
     }
   };
 
+  const isTargetActionable = detail?.report?.targetType === 'BOARD' || detail?.report?.targetType === 'MISSING_PET';
+
   const handleDelete = async () => {
-    if (!detail?.target?.id || detail?.report?.targetType !== 'BOARD') return;
-    if (!window.confirm('이 게시글을 삭제(소프트 삭제)하시겠습니까?')) return;
+    if (!detail?.target?.id || !isTargetActionable) return;
+    if (!window.confirm('이 콘텐츠를 삭제(소프트 삭제)하시겠습니까?')) return;
     try {
       setActionLoading(true);
-      await communityAdminApi.deleteBoard(detail.target.id);
+      if (detail.report.targetType === 'BOARD') {
+        await communityAdminApi.deleteBoard(detail.target.id);
+      } else {
+        await missingPetAdminApi.deleteMissingPet(detail.target.id);
+      }
       setTargetDeleted(true);
       alert('삭제되었습니다.');
       // 상세 정보 새로고침
@@ -141,11 +159,15 @@ const ReportDetailModal = ({ reportId, onClose, onHandled }) => {
   };
 
   const handleRestore = async () => {
-    if (!detail?.target?.id || detail?.report?.targetType !== 'BOARD') return;
-    if (!window.confirm('이 게시글을 복구하시겠습니까?')) return;
+    if (!detail?.target?.id || !isTargetActionable) return;
+    if (!window.confirm('이 콘텐츠를 복구하시겠습니까?')) return;
     try {
       setActionLoading(true);
-      await communityAdminApi.restoreBoard(detail.target.id);
+      if (detail.report.targetType === 'BOARD') {
+        await communityAdminApi.restoreBoard(detail.target.id);
+      } else {
+        await missingPetAdminApi.restoreMissingPet(detail.target.id);
+      }
       setTargetDeleted(false);
       alert('복구되었습니다.');
       // 상세 정보 새로고침
@@ -214,16 +236,16 @@ const ReportDetailModal = ({ reportId, onClose, onHandled }) => {
                   ) : null;
                 })()}
               </PreviewCard>
-              {detail?.report?.targetType === 'BOARD' && detail?.target?.id && (
+              {isTargetActionable && detail?.target?.id && (
                 <BoardActions>
-                  <ActionLabel>게시글 조치</ActionLabel>
+                  <ActionLabel>콘텐츠 조치</ActionLabel>
                   <ActionButtons>
-                    {targetStatus !== 'BLINDED' && !targetDeleted && (
+                    {detail?.report?.targetType === 'BOARD' && targetStatus !== 'BLINDED' && !targetDeleted && (
                       <ActionButton onClick={handleBlind} disabled={actionLoading}>
                         블라인드
                       </ActionButton>
                     )}
-                    {targetStatus === 'BLINDED' && !targetDeleted && (
+                    {detail?.report?.targetType === 'BOARD' && targetStatus === 'BLINDED' && !targetDeleted && (
                       <ActionButton onClick={handleUnblind} disabled={actionLoading}>
                         블라인드 해제
                       </ActionButton>
@@ -257,6 +279,7 @@ const ReportDetailModal = ({ reportId, onClose, onHandled }) => {
                   <option value="DELETE_CONTENT">콘텐츠 삭제</option>
                   <option value="SUSPEND_USER">유저 정지</option>
                   <option value="WARN_USER">유저 경고</option>
+                  <option value="BAN_USER">유저 영구 차단</option>
                   <option value="OTHER">기타 조치</option>
                 </Select>
               </FormRow>
