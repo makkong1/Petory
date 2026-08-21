@@ -148,6 +148,37 @@ class ReportServiceTest {
                 11L);
     }
 
+    @Test
+    @DisplayName("신고 처리: BAN_USER 조치도 SUSPEND_USER/WARN_USER처럼 제재가 실제로 적용된다")
+    void 실종제보신고_영구차단_제재적용() {
+        Users admin = user(1L, Role.ADMIN);
+        Users author = user(55L, Role.USER);
+        Report report = Report.builder()
+                .idx(12L)
+                .targetType(ReportTargetType.MISSING_PET)
+                .targetIdx(789L)
+                .reason("fake missing pet")
+                .build();
+        com.linkup.Petory.domain.board.entity.MissingPetBoard missingPetBoard =
+                com.linkup.Petory.domain.board.entity.MissingPetBoard.builder().idx(789L).user(author).build();
+        ReportHandleRequest request = new ReportHandleRequest();
+        request.setStatus(ReportStatus.RESOLVED);
+        request.setActionTaken(ReportActionType.BAN_USER);
+        when(reportRepository.findById(12L)).thenReturn(Optional.of(report));
+        when(usersRepository.findById(1L)).thenReturn(Optional.of(admin));
+        when(missingPetBoardRepository.findById(789L)).thenReturn(Optional.of(missingPetBoard));
+        when(reportConverter.toDTO(any(Report.class))).thenReturn(ReportDTO.builder().idx(12L).build());
+
+        reportService.handleReport(12L, 1L, request);
+
+        verify(userSanctionService).applySanctionFromReport(
+                eq(55L),
+                eq(ReportActionType.BAN_USER),
+                any(String.class),
+                eq(1L),
+                eq(12L));
+    }
+
     private Users user(Long idx, Role role) {
         return Users.builder()
                 .idx(idx)

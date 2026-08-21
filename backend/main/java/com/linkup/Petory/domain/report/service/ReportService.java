@@ -146,7 +146,8 @@ public class ReportService {
         // 제재 조치가 있으면 자동 적용
         if (req.getActionTaken() != null
                 && (req.getActionTaken() == ReportActionType.WARN_USER
-                || req.getActionTaken() == ReportActionType.SUSPEND_USER)) {
+                || req.getActionTaken() == ReportActionType.SUSPEND_USER
+                || req.getActionTaken() == ReportActionType.BAN_USER)) {
             String sanctionReason = String.format("신고 #%d 처리: %s", reportId,
                     req.getAdminNote() != null ? req.getAdminNote() : report.getReason());
             userSanctionService.applySanctionFromReport(

@@ -15,6 +15,6 @@ import lombok.Setter;
 public class ReportHandleRequest {
 
     private ReportStatus status;           // RESOLVED or REJECTED
-    private ReportActionType actionTaken;  // NONE/DELETE_CONTENT/SUSPEND_USER/WARN_USER/OTHER
+    private ReportActionType actionTaken;  // NONE/DELETE_CONTENT/SUSPEND_USER/WARN_USER/BAN_USER/OTHER
     private String adminNote;
 }
