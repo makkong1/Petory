@@ -72,6 +72,12 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/**").permitAll()   // 모니터링 엔드포인트 (로컬 전용)
                         .requestMatchers("/admin-ui/**").permitAll()   // Spring Boot Admin UI (로컬 전용)
                         .requestMatchers("/ws/**", "/chat/**").permitAll() // WebSocket 엔드포인트 (인증은 인터셉터에서 처리)
+                        // 게시글 조회는 비로그인(이용제한 포함)도 가능해야 한다.
+                        // 컨트롤러 메서드의 @PreAuthorize("permitAll()")만으로는 부족하다 — 아래 /api/** catch-all이
+                        // 필터 체인 단계에서 먼저 막아버려 메서드 보안까지 도달하지 못한다.
+                        .requestMatchers(HttpMethod.GET, "/api/boards/my-posts").authenticated() // 아래 permitAll보다 먼저 와야 함(더 구체적인 규칙 우선)
+                        .requestMatchers(HttpMethod.GET, "/api/boards", "/api/boards/popular", "/api/boards/search",
+                                "/api/boards/*", "/api/boards/*/comments").permitAll()
                         // MASTER 전용 API - 최상위 권한만 접근 가능
                         .requestMatchers("/api/master/**").hasRole("MASTER")
                         // 관리자 전용 API - ADMIN 또는 MASTER 권한 필요

@@ -21,6 +21,8 @@ import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.global.security.CustomUserDetails;
 import com.linkup.Petory.util.JwtUtil;
 
+import jakarta.servlet.http.HttpServletResponse;
+
 @ExtendWith(MockitoExtension.class)
 class JwtAuthenticationFilterTest {
 
@@ -83,6 +85,64 @@ class JwtAuthenticationFilterTest {
         when(jwtUtil.isTokenExpired("access-token")).thenReturn(false);
         when(jwtUtil.getIdFromToken("access-token")).thenReturn("active-user");
         when(userDetailsService.loadUserByUsername("active-user")).thenReturn(CustomUserDetails.from(user));
+
+        filter.doFilter(request, response, chain);
+
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("정상: 이용제한(SUSPENDED) 사용자는 신고 경로가 아니면 비로그인처럼 인증이 등록되지 않는다(차단 아님)")
+    void 정상_이용제한사용자_일반경로_비로그인취급() throws Exception {
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(jwtUtil, userDetailsService);
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/boards/1");
+        request.addHeader("Authorization", "Bearer access-token");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+        Users user = Users.builder()
+                .idx(1L)
+                .id("suspended-user")
+                .password("encoded")
+                .role(Role.USER)
+                .status(UserStatus.SUSPENDED)
+                .suspendedUntil(java.time.LocalDateTime.now().plusDays(1))
+                .build();
+
+        when(jwtUtil.extractTokenFromHeader("Bearer access-token")).thenReturn("access-token");
+        when(jwtUtil.validateToken("access-token")).thenReturn(true);
+        when(jwtUtil.isTokenExpired("access-token")).thenReturn(false);
+        when(jwtUtil.getIdFromToken("access-token")).thenReturn("suspended-user");
+        when(userDetailsService.loadUserByUsername("suspended-user")).thenReturn(CustomUserDetails.from(user));
+
+        filter.doFilter(request, response, chain);
+
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+        assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_OK); // 403으로 끊지 않고 흘려보냄
+    }
+
+    @Test
+    @DisplayName("정상: 이용제한(SUSPENDED) 사용자는 신고 등록 경로에서는 본인 신원으로 인증된다")
+    void 정상_이용제한사용자_신고경로_인증등록() throws Exception {
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(jwtUtil, userDetailsService);
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/reports");
+        request.setServletPath("/api/reports"); // isSuspendedReportException()이 getServletPath()로 판별함
+        request.addHeader("Authorization", "Bearer access-token");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+        Users user = Users.builder()
+                .idx(1L)
+                .id("suspended-user")
+                .password("encoded")
+                .role(Role.USER)
+                .status(UserStatus.SUSPENDED)
+                .suspendedUntil(java.time.LocalDateTime.now().plusDays(1))
+                .build();
+
+        when(jwtUtil.extractTokenFromHeader("Bearer access-token")).thenReturn("access-token");
+        when(jwtUtil.validateToken("access-token")).thenReturn(true);
+        when(jwtUtil.isTokenExpired("access-token")).thenReturn(false);
+        when(jwtUtil.getIdFromToken("access-token")).thenReturn("suspended-user");
+        when(userDetailsService.loadUserByUsername("suspended-user")).thenReturn(CustomUserDetails.from(user));
 
         filter.doFilter(request, response, chain);
 

@@ -56,22 +56,28 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
                 if (id != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                     UserDetails userDetails = userDetailsService.loadUserByUsername(id);
-                    if (!isUsableAccount(userDetails, request)) {
-                        log.warn("JWT 인증 거부: 제재 또는 비활성 계정 userId={}", id);
+                    AccountAccess access = resolveAccess(userDetails, request);
+
+                    if (access == AccountAccess.DENY) {
+                        log.warn("JWT 인증 거부: 영구 차단 계정 userId={}", id);
                         SecurityContextHolder.clearContext();
                         writeForbidden(response);
                         return;
                     }
 
-                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                            userDetails,
-                            null,
-                            userDetails.getAuthorities());
+                    if (access == AccountAccess.ALLOW) {
+                        UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                                userDetails,
+                                null,
+                                userDetails.getAuthorities());
 
-                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                        authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                        SecurityContextHolder.getContext().setAuthentication(authToken);
 
-                    log.debug("JWT 인증 성공: {}", id);
+                        log.debug("JWT 인증 성공: {}", id);
+                    }
+                    // ANONYMOUS: SecurityContext를 설정하지 않고 흘려보낸다 — 이후 permitAll 경로는 통과,
+                    // 인증이 필요한 경로는 비로그인과 동일하게 401을 받는다(이용제한 = 비로그인 취급).
                 }
             }
         } catch (Exception e) {
@@ -82,18 +88,22 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
-    private boolean isUsableAccount(UserDetails userDetails, HttpServletRequest request) {
+    private enum AccountAccess {
+        ALLOW, ANONYMOUS, DENY
+    }
+
+    private AccountAccess resolveAccess(UserDetails userDetails, HttpServletRequest request) {
         if (userDetails instanceof CustomUserDetails cud) {
-            if (!cud.isAccountNonLocked()) return false;  // BANNED: 항상 거부
-            if (cud.isEnabled()) return true;             // ACTIVE: 항상 허용
-            if (cud.isSuspensionExpired()) return true;    // 만료된 SUSPENDED: 조회 시점 기준 허용
-            // SUSPENDED인 경우: POST /api/reports만 예외 허용
+            if (!cud.isAccountNonLocked()) return AccountAccess.DENY;      // BANNED: 항상 거부(비로그인보다도 강하게 차단)
+            if (cud.isEnabled()) return AccountAccess.ALLOW;               // ACTIVE: 항상 허용
+            if (cud.isSuspensionExpired()) return AccountAccess.ALLOW;     // 만료된 SUSPENDED: 조회 시점 기준 허용
             if (cud.isCurrentlySuspended()) {
-                return isSuspendedReportException(request);
+                // 신고만 본인 신원을 유지한 채 예외 허용, 그 외엔 비로그인처럼 취급
+                return isSuspendedReportException(request) ? AccountAccess.ALLOW : AccountAccess.ANONYMOUS;
             }
-            return false;
+            return AccountAccess.ANONYMOUS;
         }
-        return userDetails.isEnabled() && userDetails.isAccountNonLocked();
+        return (userDetails.isEnabled() && userDetails.isAccountNonLocked()) ? AccountAccess.ALLOW : AccountAccess.DENY;
     }
 
     // POST /api/reports 예외: SUSPENDED 사용자가 신고를 생성할 수 있는 유일한 경로
