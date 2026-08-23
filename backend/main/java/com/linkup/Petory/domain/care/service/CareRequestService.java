@@ -39,6 +39,7 @@ import com.linkup.Petory.domain.user.exception.PetNotFoundException;
 import com.linkup.Petory.domain.user.exception.UserNotFoundException;
 import com.linkup.Petory.domain.user.repository.PetRepository;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
+import com.linkup.Petory.domain.user.util.SanctionGuard;
 import com.linkup.Petory.global.security.RoleConstants;
 
 import lombok.RequiredArgsConstructor;
@@ -173,10 +174,7 @@ public class CareRequestService {
         Users user = usersRepository.findById(dto.getUserId())
                 .orElseThrow(() -> new UserNotFoundException());
 
-        // 제재 상태 확인
-        if (user.isSanctioned()) {
-            throw CareForbiddenException.sanctioned();
-        }
+        SanctionGuard.check(user, CareForbiddenException::sanctioned);
 
         // 이메일 인증 확인
         if (!Boolean.TRUE.equals(user.getEmailVerified())) {
