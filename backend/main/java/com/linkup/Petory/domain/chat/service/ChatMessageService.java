@@ -27,6 +27,7 @@ import com.linkup.Petory.domain.chat.repository.ConversationRepository;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.exception.UserNotFoundException;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
+import com.linkup.Petory.domain.user.util.SanctionGuard;
 
 import lombok.RequiredArgsConstructor;
 
@@ -67,9 +68,7 @@ public class ChatMessageService {
         }
 
         // 제재 가드: WebSocket 기존 세션 포함, 메시지 전송 시점에 최신 DB 상태 확인
-        if (sender.isSanctioned()) {
-            throw ChatForbiddenException.sanctionedUserCannotSend();
-        }
+        SanctionGuard.check(sender, ChatForbiddenException::sanctionedUserCannotSend);
 
         // 2. 채팅방 확인
         Conversation conversation = conversationRepository.findById(conversationIdx)

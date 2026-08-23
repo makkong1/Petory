@@ -18,6 +18,7 @@ import com.linkup.Petory.domain.care.repository.CareRequestCommentRepository;
 import com.linkup.Petory.domain.care.repository.CareRequestRepository;
 import com.linkup.Petory.domain.user.entity.Role;
 import com.linkup.Petory.domain.user.entity.Users;
+import com.linkup.Petory.domain.user.util.SanctionGuard;
 import com.linkup.Petory.domain.file.dto.FileDTO;
 import com.linkup.Petory.domain.user.exception.UserNotFoundException;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
@@ -57,16 +58,13 @@ public class CareRequestCommentService {
         }
 
         @Transactional
-        public CareRequestCommentDTO addComment(Long careRequestId, CareRequestCommentDTO dto) {
+        public CareRequestCommentDTO addComment(Long careRequestId, CareRequestCommentDTO dto, Long userId) {
                 CareRequest careRequest = careRequestRepository.findById(careRequestId)
                                 .orElseThrow(() -> new CareRequestNotFoundException());
-                Users user = usersRepository.findById(dto.getUserId())
+                Users user = usersRepository.findById(userId)
                                 .orElseThrow(() -> new UserNotFoundException());
 
-                // 제재 상태 확인
-                if (user.isSanctioned()) {
-                        throw CareForbiddenException.sanctioned();
-                }
+                SanctionGuard.check(user, CareForbiddenException::sanctioned);
 
                 // SERVICE_PROVIDER만 댓글 작성 가능
                 if (user.getRole() != Role.SERVICE_PROVIDER) {
@@ -110,7 +108,7 @@ public class CareRequestCommentService {
         }
 
         @Transactional
-        public void deleteComment(Long careRequestId, Long commentId, String userId) {
+        public void deleteComment(Long careRequestId, Long commentId, Long userId) {
                 CareRequest careRequest = careRequestRepository.findById(careRequestId)
                                 .orElseThrow(() -> new CareRequestNotFoundException());
                 CareRequestComment comment = commentRepository.findById(commentId)
@@ -120,7 +118,7 @@ public class CareRequestCommentService {
                         throw new CareCommentNotBelongException();
                 }
 
-                Users requestingUser = usersRepository.findByUsername(userId)
+                Users requestingUser = usersRepository.findById(userId)
                                 .orElseThrow(() -> new UserNotFoundException());
 
                 boolean isOwner = comment.getUser().getIdx().equals(requestingUser.getIdx());

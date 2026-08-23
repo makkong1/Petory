@@ -41,6 +41,7 @@ import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.exception.EmailVerificationRequiredException;
 import com.linkup.Petory.domain.user.exception.UserNotFoundException;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
+import com.linkup.Petory.domain.user.util.SanctionGuard;
 import com.linkup.Petory.global.exception.ApiException;
 
 import jakarta.persistence.EntityManager;
@@ -82,10 +83,7 @@ public class MeetupService {
         Users organizer = usersRepository.findByIdString(userId)
                 .orElseThrow(UserNotFoundException::new);
 
-        // 제재 상태 확인
-        if (organizer.isSanctioned()) {
-            throw MeetupForbiddenException.sanctioned();
-        }
+        SanctionGuard.check(organizer, MeetupForbiddenException::sanctioned);
 
         // 이메일 인증 확인
         if (organizer.getEmailVerified() == null || !organizer.getEmailVerified()) {
@@ -347,10 +345,7 @@ public class MeetupService {
         Users user = usersRepository.findByIdString(userId)
                 .orElseThrow(UserNotFoundException::new);
 
-        // 제재 상태 확인
-        if (user.isSanctioned()) {
-            throw MeetupForbiddenException.sanctioned();
-        }
+        SanctionGuard.check(user, MeetupForbiddenException::sanctioned);
 
         // 이메일 인증 확인
         if (user.getEmailVerified() == null || !user.getEmailVerified()) {
