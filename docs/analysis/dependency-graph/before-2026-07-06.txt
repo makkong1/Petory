@@ -1,62 +1,93 @@
-activity -> board
-activity -> care
-activity -> user
-admin -> board
-admin -> care
-admin -> common
-admin -> file
-admin -> location
-admin -> meetup
-admin -> report
-admin -> statistics
-admin -> user
-board -> chat
-board -> common
-board -> file
-board -> notification
-board -> petRecommendation
-board -> user
-care -> common
-care -> file
-care -> notification
-care -> payment
-care -> petRecommendation
-care -> user
-chat -> care
-chat -> common
-chat -> file
-chat -> meetup
-chat -> payment
-chat -> user
-file -> common
-location -> common
-location -> petRecommendation
-location -> user
-meetup -> chat
-meetup -> common
-meetup -> user
-notification -> common
-notification -> user
-payment -> care
-payment -> common
-payment -> statistics
-payment -> user
-petRecommendation -> common
-petRecommendation -> location
-petRecommendation -> notification
-report -> board
-report -> care
-report -> common
-report -> user
-statistics -> board
-statistics -> care
-statistics -> common
-statistics -> meetup
-statistics -> report
-statistics -> user
-user -> care
-user -> common
-user -> file
-user -> location
-user -> meetup
-user -> report
+============================================================
+ BEFORE
+============================================================
+
+[activity]
+├──→ board
+├──→ care
+└──→ user
+
+[admin]
+├──→ board
+├──→ care
+├──→ common
+├──→ file
+├──→ location
+├──→ meetup
+├──→ report
+├──→ statistics
+└──→ user
+
+[board]
+├──→ chat
+├──→ common
+├──→ file
+├──→ notification
+├──→ petRecommendation
+└──→ user
+
+[care]
+├──→ common
+├──→ file
+├──→ notification
+├──→ payment
+├──→ petRecommendation
+└──→ user
+
+[chat]
+├──→ care
+├──→ common
+├──→ file
+├──→ meetup
+├──→ payment
+└──→ user
+
+[file]
+└──→ common
+
+[location]
+├──→ common
+├──→ petRecommendation
+└──→ user
+
+[meetup]
+├──→ chat
+├──→ common
+└──→ user
+
+[notification]
+├──→ common
+└──→ user
+
+[payment]
+├──→ care
+├──→ common
+├──→ statistics
+└──→ user
+
+[petRecommendation]
+├──→ common
+├──→ location
+└──→ notification
+
+[report]
+├──→ board
+├──→ care
+├──→ common
+└──→ user
+
+[statistics]
+├──→ board
+├──→ care
+├──→ common
+├──→ meetup
+├──→ report
+└──→ user
+
+[user]
+├──→ care
+├──→ common
+├──→ file
+├──→ location
+├──→ meetup
+└──→ report

@@ -99,7 +99,7 @@ class UserSanctionServiceConcurrencyTest {
     }
 
     @Test
-    @DisplayName("경고 횟수 동시 증가 문제 - 여러 관리자가 동시에 경고 부여")
+    @DisplayName("경고 횟수 동시 증가 문제 - 여러 관리자가 동시에 경고 부여(이 테스트가 동시성 잘못된 케이스)")
     void testConcurrentWarningIncrement() throws InterruptedException {
         int adminCount = 3;
         ExecutorService executor = Executors.newFixedThreadPool(adminCount);
@@ -118,6 +118,7 @@ class UserSanctionServiceConcurrencyTest {
                     latch.countDown();
                     latch.await(); // 모든 스레드가 준비될 때까지 대기
 
+                    // 경고 부여
                     Users admin = admins.get(adminIndex);
                     userSanctionService.addWarning(
                             testUser.getIdx(),
@@ -151,8 +152,11 @@ class UserSanctionServiceConcurrencyTest {
         System.out.println("최종 경고 횟수: " + finalUser.getWarningCount());
         System.out.println("경고 기록 개수: " + userSanctionRepository.countWarningsByUserId(testUser.getIdx()));
 
-        // 경고 횟수가 정확한지 확인
-        // 이상적으로는 경고 횟수 = 경고 기록 개수여야 함
+        // ⚠️ [반전1 — 실제로는 방어하지 못했던 단언] 경고 횟수와 경고 기록 개수는
+        //    addWarning() 안에서 같은 트랜잭션으로 함께 INSERT/UPDATE된다. 그래서 5번 중 4번이
+        //    데드락으로 롤백돼도 둘은 "함께 죽어서" 이 등식은 항상 참으로 남는다.
+        //    이 단언은 "트랜잭션이 원자적인가"만 검사한 것이지, "몇 번이 성공했는가"는 전혀 못 본다.
+        //    실제로 이 테스트만으로는 데드락으로 4/5가 실패해도 초록불이었다(아래 testConcurrentWarningLostUpdate가 그걸 잡아냄).
         long actualWarningCount = userSanctionRepository.countWarningsByUserId(testUser.getIdx());
         assertEquals((long) actualWarningCount, (long) finalUser.getWarningCount(),
                 "경고 횟수와 실제 경고 기록 수가 일치해야 함");
@@ -217,7 +221,9 @@ class UserSanctionServiceConcurrencyTest {
         // 정합성: 경고 카운트 == 실제 WARNING 기록 수 (같은 트랜잭션이라 항상 성립)
         assertEquals((long) actualWarningCount, (long) finalUser.getWarningCount(),
                 "경고 횟수와 실제 경고 기록 수가 일치해야 함");
-        // [강화] 락 순서 수정 전에는 5개 중 4개가 데드락으로 실패했다.
+        // ✅ [반전1 — 실제로 잡아낸 단언] adminCount(상수)와 successCount(AtomicInteger)는
+        //    DB 트랜잭션 밖에 있어서 롤백의 영향을 안 받는다 — 그래서 롤백이 나면 이 등식이 깨진다.
+        //    [강화] 락 순서 수정 전에는 5개 중 4개가 데드락으로 실패했다.
         //        수정 후에는 데드락 없이 5개 요청이 모두 반영돼야 한다.
         assertEquals(adminCount, successCount.get(),
                 "동시 경고 요청이 데드락 없이 모두 성공해야 함");
@@ -278,6 +284,10 @@ class UserSanctionServiceConcurrencyTest {
         System.out.println("최종 상태: " + finalUser.getStatus());
         System.out.println("이용제한 적용 횟수: " + suspensionCount.get());
 
+        // ⚠️ [반전3 — 조건부 단언이라 실제로는 방어하지 못했던 자리] status가 SUSPENDED일 때만
+        //    안쪽 검사를 하고, SUSPENDED가 "아니면" 아무것도 assert하지 않고 그냥 테스트가 통과해버린다.
+        //    bulk UPDATE가 영속성 컨텍스트를 우회해 자동 이용제한이 발동 안 했던 실제 버그 상황에서도
+        //    이 if가 거짓이 되어 조용히 초록불이었다 — refresh() 수정 전엔 이 테스트가 그 결함을 못 잡았다.
         // 이용제한이 한 번만 적용되어야 함
         if (finalUser.getStatus() == UserStatus.SUSPENDED) {
             assertNotNull(finalUser.getSuspendedUntil(), "이용제한 종료일이 설정되어야 함");
