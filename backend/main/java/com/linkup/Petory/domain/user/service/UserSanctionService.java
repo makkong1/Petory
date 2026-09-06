@@ -79,7 +79,11 @@ public class UserSanctionService {
         entityManager.refresh(user);
 
         // 경고 3회 이상이면 자동 이용제한
-        if (user.getWarningCount() >= WARNING_THRESHOLD) {
+        // ⚠️ status == ACTIVE 가드 없이 매번 addSuspension 을 호출하면, 경고 여러 건이 몰려서
+        //    warningCount 가 임계값을 여러 번(3,4,5...) 넘나들 때마다 매번 새 이용제한이 중복
+        //    적용된다(SUSPENSION 레코드 중복, 이벤트 중복 발행). 이미 SUSPENDED/BANNED 면
+        //    이번 경고로 새로 이용제한을 걸 필요가 없으므로 ACTIVE 일 때만 발동한다.
+        if (user.getWarningCount() >= WARNING_THRESHOLD && user.getStatus() == UserStatus.ACTIVE) {
             log.info("유저 {} 경고 {}회 도달, 자동 이용제한 {}일 적용", userId, user.getWarningCount(), AUTO_SUSPENSION_DAYS);
             addSuspension(userId,
                     String.format("경고 %d회 누적으로 인한 자동 이용제한", user.getWarningCount()),
