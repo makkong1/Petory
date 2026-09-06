@@ -292,5 +292,15 @@ class UserSanctionServiceConcurrencyTest {
         if (finalUser.getStatus() == UserStatus.SUSPENDED) {
             assertNotNull(finalUser.getSuspendedUntil(), "이용제한 종료일이 설정되어야 함");
         }
+
+        // 진짜 "중복 적용 방지" 검증 — 위 if는 status만 보고 몇 번 발동됐는지는 안 본다.
+        // 초기 경고 2회 + 동시 요청 3개 = 3,4,5회 전부 WARNING_THRESHOLD(3) 이상이라,
+        // addWarning 이 매번 addSuspension 을 호출하면 SUSPENSION 레코드가 3개 쌓일 수 있다.
+        long suspensionRecordCount = userSanctionRepository.findAll().stream()
+                .filter(s -> s.getUser().getIdx().equals(testUser.getIdx()))
+                .filter(s -> s.getSanctionType() == com.linkup.Petory.domain.user.entity.UserSanction.SanctionType.SUSPENSION)
+                .count();
+        assertEquals(1, suspensionRecordCount,
+                "경고 3회 도달 버스트 하나당 이용제한은 정확히 1번만 적용돼야 함 (실제: " + suspensionRecordCount + "번)");
     }
 }
