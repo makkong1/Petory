@@ -35,6 +35,23 @@ function isAuthRefreshRequest(config) {
   return url.includes('/auth/refresh') || full.includes('/auth/refresh');
 }
 
+/**
+ * 백엔드 에러 응답이 'message'/'error' 둘 중 하나만 채워 보내는 경우가 있다
+ * (GlobalExceptionHandler 핸들러마다 다름). 프론트 호출부는 둘 중 아무 키나 읽으므로,
+ * 어느 쪽을 읽든 실제 메시지가 나오도록 여기서 한 번에 상호 보완한다.
+ */
+export function normalizeErrorData(error) {
+  const data = error.response?.data;
+  if (data && typeof data === 'object') {
+    if (data.message == null && data.error != null) {
+      data.message = data.error;
+    } else if (data.error == null && data.message != null) {
+      data.error = data.message;
+    }
+  }
+  return error;
+}
+
 function handle403Branch(error) {
   if (error.response?.status === 403) {
     const data = error.response?.data;
@@ -80,6 +97,7 @@ export function attachAuthInterceptors(instance) {
   instance.interceptors.response.use(
     (response) => response,
     async (error) => {
+      normalizeErrorData(error);
       const originalRequest = error.config;
 
       if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
