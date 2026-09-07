@@ -65,7 +65,18 @@ public interface SpringDataJpaMissingPetBoardRepository extends JpaRepository<Mi
     // 1단계: 바운딩 박스를 POLYGON 으로 만들어 SPATIAL 인덱스(geo_point)로 후보 idx 만 뽑는다.
     // 이전에는 latitude/longitude BETWEEN 이었는데 B-tree 로는 경도가 걸러지지 않아 풀스캔이었다
     // (carerequest V4 와 같은 병리). 좌표 순서는 POINT(위도 경도) — geo_point 저장 규약과 짝을 맞춘다.
-    @Query(value = "SELECT b.idx FROM missing_pet_board b JOIN users u ON u.idx = b.user_idx "
+    //
+    // [IGNORE INDEX 이유] UI 반경 옵션 상한(RadiusFilter.js RADIUS_OPTIONS=[1,3,5,10]) 안에서도
+    // 10km 부터 옵티마이저가 idx_missing_pet_status 로 갈아탄다(cost 438 vs 공간 인덱스 416,
+    // 거의 붙어 있어 오판하기 쉬움). 실측(3회 반복, EXPLAIN ANALYZE): 5km 는 원래도 공간 인덱스라
+    // 변화 없음, 10km 13.6~32.2ms → 공간 인덱스 4.5~5.9ms(최대 6배), 20km 20.5~35.9ms →
+    // 14.8~17.7ms. status 인덱스가 "아무것도 못 거르는" 건 아니지만(카디널리티 1이 아님,
+    // MISSING 이 63%) 이 반경 구간에서 공간 인덱스보다 항상 더 비싸서 후보에서 뺀다.
+    // location(SpringDataJpaLocationServiceRepository) 과 같은 이유로 FORCE 가 아니라 IGNORE —
+    // "이 인덱스만 써라"가 아니라 "이 구간에서 오판을 유도하는 인덱스를 빼라"는 데이터 분포가
+    // 바뀌어도 방향이 틀릴 여지가 적다.
+    @Query(value = "SELECT b.idx FROM missing_pet_board b IGNORE INDEX (idx_missing_pet_status) "
+            + "JOIN users u ON u.idx = b.user_idx "
             + "WHERE b.status = :status "
             + "AND b.is_deleted = false "
             + "AND u.is_deleted = false "
