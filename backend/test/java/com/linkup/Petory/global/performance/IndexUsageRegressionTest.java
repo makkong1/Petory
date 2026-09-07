@@ -298,4 +298,33 @@ class IndexUsageRegressionTest {
                 .as("정렬용 인덱스를 타면 filesort 가 필요 없다.\n계획:\n%s", plan)
                 .doesNotContain("Sort:");
     }
+
+    /**
+     * missing-pet 주변검색: idx_missing_pet_status 를 후보에서 빼는 IGNORE INDEX 힌트가
+     * 쿼리에서 사라지지 않아야 한다.
+     *
+     * <p>
+     * 위 SPATIAL 인덱스 테스트와 같은 이유로 EXPLAIN 단언 대신 쿼리 텍스트를 검증한다 — 이 힌트가
+     * 막는 오판은 통계 추정에 따라 재현이 안 될 수도 있다(테스트 세션 vs CLI 차이는 위 주석 참고).
+     * 힌트 자체는 데이터와 무관하게 항상 텍스트에 있어야 하므로 이건 결정적으로 잡을 수 있다.
+     *
+     * <p>
+     * 실측(2026-09-07, 서울시청 중심, EXPLAIN ANALYZE 3회 반복): UI 반경 상한(10km, RadiusFilter.js)
+     * 에서 옵티마이저가 idx_missing_pet_status 로 갈아타 13.6~32.2ms, 힌트로 공간 인덱스를 유지하면
+     * 4.5~5.9ms(최대 6배).
+     */
+    @Test
+    @DisplayName("missing-pet 주변검색: idx_missing_pet_status 를 배제하는 IGNORE INDEX 힌트가 있어야 한다")
+    void missingPetNearbyQueryIgnoresStatusIndex() throws NoSuchMethodException {
+        org.springframework.data.jpa.repository.Query query = com.linkup.Petory.domain.board.repository.SpringDataJpaMissingPetBoardRepository.class
+                .getMethod("findHomeCandidateIdsInBoundingBox",
+                        String.class, java.math.BigDecimal.class, java.math.BigDecimal.class,
+                        java.math.BigDecimal.class, java.math.BigDecimal.class,
+                        double.class, double.class, double.class, int.class)
+                .getAnnotation(org.springframework.data.jpa.repository.Query.class);
+
+        assertThat(query.value())
+                .as("이 힌트가 없으면 10km 반경부터 idx_missing_pet_status 로 오판해 3~6배 느려진다")
+                .contains("IGNORE INDEX (idx_missing_pet_status)");
+    }
 }
