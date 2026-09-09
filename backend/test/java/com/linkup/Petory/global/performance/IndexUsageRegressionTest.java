@@ -391,13 +391,24 @@ class IndexUsageRegressionTest {
                 .getSingleResult();
         assumeTrue(boardRows.longValue() > 0, "board 데이터가 없으면 검증할 수 없다");
 
-        Number visibleButDeletedAuthor = (Number) entityManager.createNativeQuery(
+        // V6 정의를 그대로 뒤집어 본다: author_visible = (is_deleted = 0 AND status <> 'BANNED').
+        // 양방향을 다 본다 — 한쪽만 보면 "숨겨야 할 글이 보이는" 결함만 잡히고
+        // "보여야 할 글이 숨는" 반대 방향 드리프트를 놓친다(목록·검색 양쪽에서 글이 사라진다).
+        Number visibleButHiddenAuthor = (Number) entityManager.createNativeQuery(
                 "SELECT COUNT(*) FROM board b JOIN users u ON b.user_idx = u.idx "
-                        + "WHERE b.author_visible = 1 AND u.is_deleted <> 0")
+                        + "WHERE b.author_visible = 1 AND (u.is_deleted <> 0 OR u.status = 'BANNED')")
                 .getSingleResult();
-        assertThat(visibleButDeletedAuthor.longValue())
-                .as("author_visible = 1 인데 작성자가 탈퇴면 u.is_deleted 조건이 잉여가 아니게 된다. "
+        assertThat(visibleButHiddenAuthor.longValue())
+                .as("author_visible = 1 인데 작성자가 탈퇴·밴이면 u.is_deleted 조건이 잉여가 아니게 된다. "
                         + "이 값이 0이 아니면 trg_board_author_visible 동기화를 먼저 확인할 것")
+                .isZero();
+
+        Number hiddenButVisibleAuthor = (Number) entityManager.createNativeQuery(
+                "SELECT COUNT(*) FROM board b JOIN users u ON b.user_idx = u.idx "
+                        + "WHERE b.author_visible = 0 AND u.is_deleted = 0 AND u.status <> 'BANNED'")
+                .getSingleResult();
+        assertThat(hiddenButVisibleAuthor.longValue())
+                .as("멀쩡한 작성자인데 author_visible = 0 이면 그 글은 목록·검색 양쪽에서 사라진다")
                 .isZero();
 
         Number orphanBoards = (Number) entityManager.createNativeQuery(

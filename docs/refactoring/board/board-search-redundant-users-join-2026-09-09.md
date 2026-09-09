@@ -236,7 +236,58 @@ WHERE u.nickname LIKE :nickname% AND b.isDeleted = false
 
 ---
 
+---
+
+## 후속 검증 — 조인을 뺐으니 `author_visible`을 전적으로 믿게 됐다
+
+조인이 없어지면 트리거(`trg_board_author_visible`)가 유일한 동기화 경로가 된다. **다만 이건 이번에 새로 생긴 위험이 아니라 원래 있던 위험이 드러난 것이다** — 목록 경로엔 처음부터 조인이 없어서, 트리거가 깨지면 탈퇴·밴 회원 글이 **목록에는 이미 노출된다.** 검색만 막아봐야 사용자는 목록에서 그 글을 본다.
+
+### `V6` 주석이 깔고 있던 전제를 코드로 확인했다
+
+> `-- 새 글은 항상 보임: 밴/탈퇴 회원은 글 생성 경로에서 차단되므로 DEFAULT 1 이 정확하다.`
+
+트리거는 `AFTER UPDATE ON users`라 **board INSERT 시점엔 안 돈다.** 밴/탈퇴 회원이 글을 쓰면 `author_visible`이 `DEFAULT 1`로 박히고 아무도 고쳐주지 않는다. 그래서 이 전제가 성립해야 불변식이 유지된다.
+
+| 차단 지점 | 탈퇴(`is_deleted`) | 밴(`status = BANNED`) |
+|---|---|---|
+| `JwtAuthenticationFilter:85~96` `isUsableAccount` | ✅ | ✅ `isAccountNonLocked()` = `status != BANNED` → 403 |
+| `BoardService:175` `findActiveByIdString` | ✅ | ❌ **안 봄** |
+
+`SpringDataJpaUsersRepository:57~59`:
+```sql
+SELECT u FROM Users u WHERE u.id = :id AND (u.isDeleted = false OR u.isDeleted IS NULL)
+```
+
+→ **전제는 성립한다. 다만 밴 차단은 방어가 한 겹뿐이다.** 탈퇴는 필터+서비스 두 겹인데 밴은 필터만이다. 필터를 우회하는 경로(`permitAll` + 수동 인증 등)가 새로 생기면 밴 회원이 `author_visible = 1`인 글을 만들 수 있다. 지금은 **모든 요청이 필터를 거치고 매 요청 DB로 상태를 재조회**하므로 실제 구멍은 아니다.
+
+### 실측 (2026-09-09, 개발 DB)
+
+| 검사 | 결과 |
+|---|---|
+| `author_visible=1` 인데 작성자 탈퇴 | **0** |
+| `author_visible=1` 인데 작성자 BANNED | **0** |
+| `author_visible=0` 인데 작성자 정상 (반대 방향 드리프트) | **0** |
+| `trg_board_author_visible` 존재 | ✅ |
+
+users 분포: ACTIVE 9,402(탈퇴 200) · SUSPENDED 400 · **BANNED 200** — 밴·탈퇴가 실제로 존재하므로 공허한 통과가 아니다.
+
+### 테스트 보강
+
+`authorVisibleSubsumesUserDeletedFilter` 가 처음엔 `is_deleted`만 봤는데, 불변식 정의(`is_deleted = 0 AND status <> 'BANNED'`)를 **양방향으로** 검사하도록 고쳤다.
+
+- `author_visible = 1` 인데 탈퇴·밴 → 0 (숨겨야 할 글이 보이는 결함)
+- `author_visible = 0` 인데 정상 작성자 → 0 (**보여야 할 글이 목록·검색 양쪽에서 사라지는 결함**)
+
+한쪽만 보면 반대 방향 드리프트를 놓친다.
+
+### 남은 리스크와 선택지 (미적용)
+
+- ⚠️ `CLAUDE.md` 기재: `petory_app` 계정은 SUPER 권한이 없어 binlog 가 켜진 상태에서 **트리거 생성이 `ERROR 1419`로 실패할 수 있다.** 즉 트리거가 아예 없는 환경이 생길 수 있다.
+- 후보: ① 기동 시 트리거 존재 검증 ② 정합성 점검 배치(스케줄러 12개 인프라 재사용) ③ `BoardService` 에도 밴 가드 추가(방어 2겹). **셋 다 이번 범위 밖.**
+
+---
+
 ## 상태
 
 - **개선 완료** (2026-09-09)
-- 브랜치 `perf/board-search-drop-redundant-join` → `dev` 머지 → `main` PR
+- 브랜치 `perf/board-search-drop-redundant-join` → `dev` 머지 → `main` PR #270
