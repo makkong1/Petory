@@ -2,14 +2,14 @@
 
 > ⚠️ **자동 생성 파일 — 직접 수정하지 말 것.** `python3 scripts/docs_index.py`로 재생성한다.
 
-frontmatter가 붙은 문서 33건. 각 문서 상단에 `date/domains/type/problem/status/metric` YAML을 붙이면 자동으로 여기 잡힌다.
+frontmatter가 붙은 문서 34건. 각 문서 상단에 `date/domains/type/problem/status/metric` YAML을 붙이면 자동으로 여기 잡힌다.
 
 ## 📌 이 문서를 어떻게 쓰나 — 층이 두 개다
 
 | 층 | 파일 | 역할 |
 | --- | --- | --- |
 | **주장 (정본)** | [핵심성과_분석.md](핵심성과_분석.md) | 이력서·포트폴리오·면접에서 말하는 **모든 수치는 여기서만 나온다.** 수치를 고칠 때는 여기부터 고친다 |
-| **증거** | 이 인덱스가 잡은 33건 | 측정·실험 기록. **통합하지 않는다** — 흩어져 있어야 "이 숫자 어디서 났나"에 링크를 던질 수 있다 |
+| **증거** | 이 인덱스가 잡은 34건 | 측정·실험 기록. **통합하지 않는다** — 흩어져 있어야 "이 숫자 어디서 났나"에 링크를 던질 수 있다 |
 
 > 과거에 같은 Chat N+1 수치가 세 군데에서 다르게 적혀 있었다(포트폴리오 `41→4`, 이 레포 `21→4`, 출처 불명 `305ms→55ms`). **표현층이 주장층보다 최신인 상태**였다. 층을 나눈 이유가 이것이다.
 
@@ -17,6 +17,7 @@ frontmatter가 붙은 문서 33건. 각 문서 상단에 `date/domains/type/prob
 
 | 날짜 | 문서 | 도메인 | 문제 | 수치 | 커밋 |
 | --- | --- | --- | --- | --- | --- |
+| 2026-09-09 | [게시글 검색 쿼리의 중복 `users` 조인](refactoring/board/board-search-redundant-users-join-2026-09-09.md) | board | redundant-users-join-in-fulltext-search | 검색 쿼리 users 조인 제거 — 결과 동일(3키워드 7,666/7,667/7,667), A/B/A 교대 6회 중앙값 19.9ms→18.6ms. 이득은 작고 근거는 경로 간 일관성 | 전:[dfbeac61](https://github.com/makkong1/Petory/commit/dfbeac61) |
 | 2026-07-15 | [board 깊은 페이지 — 2단계 지연 조인 + author_visible 비정규화, 전후 실측](analysis/board-deep-page-2026-07.md) | board | board-deep-page-lazy-join | 깊은 페이지(OFFSET 49980) 커버링 인덱스 스캔 24~32ms(비교군 66~84ms, 구코드 재현 133ms) · COUNT 단일 테이블 7~25ms(구코드 재현 22~32ms) · 페이지 결손 검증: 전체 2,500페이지 중 596페이지(23.8%)에 숨김 대상 글 유입 · k6 30s/20VU 15,555req 100% 200 · p95 63.91ms | - |
 | 2026-07-14 | [쿼리 계획 감시의 일반화 — 설계 분석 (v2)](analysis/query-plan-monitoring-design.md) | board, meetup, global | query-plan-monitoring-generalization | ⚠️표본=API 1개(GET /api/boards). 그 하나에서 COUNT 쿼리 180,003행/141ms 발견(고친 목록 SELECT는 120행/4ms). 미확인: 컨트롤러 33개, Page<> COUNT 26개, 스케줄러 8개, 네이티브쿼리 20개 | - |
 | 2026-07-14 | [care 도메인 쿼리 감사 — 실측 결과](analysis/query-audit/care-2026-07-14.md) | care | no-indexes-and-broken-fulltext-search | 검색 엔드포인트 HTTP 500 (FULLTEXT 인덱스 없음) · 목록/주변검색 전부 풀스캔+filesort (carerequest 인덱스 3개뿐, 전부 PK/FK) · 주변검색 선택도 208배 오판 · N+1 없음 | - |
@@ -65,6 +66,7 @@ frontmatter가 붙은 문서 33건. 각 문서 상단에 `date/domains/type/prob
 
 | 날짜 | 문서 | 문제 | 수치 |
 | --- | --- | --- | --- |
+| 2026-09-09 | [게시글 검색 쿼리의 중복 `users` 조인](refactoring/board/board-search-redundant-users-join-2026-09-09.md) | redundant-users-join-in-fulltext-search | 검색 쿼리 users 조인 제거 — 결과 동일(3키워드 7,666/7,667/7,667), A/B/A 교대 6회 중앙값 19.9ms→18.6ms. 이득은 작고 근거는 경로 간 일관성 |
 | 2026-07-15 | [board 깊은 페이지 — 2단계 지연 조인 + author_visible 비정규화, 전후 실측](analysis/board-deep-page-2026-07.md) | board-deep-page-lazy-join | 깊은 페이지(OFFSET 49980) 커버링 인덱스 스캔 24~32ms(비교군 66~84ms, 구코드 재현 133ms) · COUNT 단일 테이블 7~25ms(구코드 재현 22~32ms) · 페이지 결손 검증: 전체 2,500페이지 중 596페이지(23.8%)에 숨김 대상 글 유입 · k6 30s/20VU 15,555req 100% 200 · p95 63.91ms |
 | 2026-07-14 | [쿼리 계획 감시의 일반화 — 설계 분석 (v2)](analysis/query-plan-monitoring-design.md) | query-plan-monitoring-generalization | ⚠️표본=API 1개(GET /api/boards). 그 하나에서 COUNT 쿼리 180,003행/141ms 발견(고친 목록 SELECT는 120행/4ms). 미확인: 컨트롤러 33개, Page<> COUNT 26개, 스케줄러 8개, 네이티브쿼리 20개 |
 | 2026-07-14 | [전체 쿼리 감사 — 계획 및 방법론](analysis/query-audit/00-plan.md) | full-query-audit | 감사 대상 — 컨트롤러 34개 / 엔드포인트 189개 / Page<> COUNT 30개(그중 16개는 COUNT 자동생성) / 스케줄러 9개 / nativeQuery 21곳. 2026-07-14 전 도메인 감사 완료(엔드포인트 62개 실호출). 유일 잔여: 스케줄러 8개(cron) |
@@ -310,6 +312,12 @@ frontmatter가 붙은 문서 33건. 각 문서 상단에 `date/domains/type/prob
 | --- | --- | --- | --- |
 | 2026-07-12 | [동시성/Race Condition 재검증 — 테스트 재실행 (2026-07-12)](concurrency/evidence/race-condition-reverify-2026-07-12.md) | meetup, payment, care | PetCoin before 100→110(Lost Update 3/3 재현)→after 100→150(3/3 해결). Meetup 진짜 최초버그(a549eb33) 재현 결과는 인원초과가 아니라 Deadlock으로 인한 요청 실패(성공1/실패2, 3/3 재현) — a5943b18은 이미 Pessimistic Lock 도입된 이후였음. Care는 기존 재실행만(§4) |
 
+### redundant-users-join-in-fulltext-search
+
+| 날짜 | 문서 | 도메인 | 수치 |
+| --- | --- | --- | --- |
+| 2026-09-09 | [게시글 검색 쿼리의 중복 `users` 조인](refactoring/board/board-search-redundant-users-join-2026-09-09.md) | board | 검색 쿼리 users 조인 제거 — 결과 동일(3키워드 7,666/7,667/7,667), A/B/A 교대 6회 중앙값 19.9ms→18.6ms. 이득은 작고 근거는 경로 간 일관성 |
+
 ### row-by-row-update
 
 | 날짜 | 문서 | 도메인 | 수치 |
@@ -416,6 +424,12 @@ frontmatter가 붙은 문서 33건. 각 문서 상단에 `date/domains/type/prob
 | --- | --- | --- | --- |
 | 2026-07-15 | [board 깊은 페이지 — 2단계 지연 조인 + author_visible 비정규화, 전후 실측](analysis/board-deep-page-2026-07.md) | board | 깊은 페이지(OFFSET 49980) 커버링 인덱스 스캔 24~32ms(비교군 66~84ms, 구코드 재현 133ms) · COUNT 단일 테이블 7~25ms(구코드 재현 22~32ms) · 페이지 결손 검증: 전체 2,500페이지 중 596페이지(23.8%)에 숨김 대상 글 유입 · k6 30s/20VU 15,555req 100% 200 · p95 63.91ms |
 | 2026-07-14 | [처방 6건 적용 + 회귀 테스트 — 결과](analysis/query-audit/fixes-2026-07-14.md) | care, user, meetup, admin | 처방 1~6 적용 · care 검색 HTTP 500→200 · admin care 66→7 쿼리 · pets 155→5 쿼리 · meetup 검색 583ms→43ms · care 목록 3,060→30행 · care 주변검색 3,000행 풀스캔→208행 SPATIAL · admin 사용자목록 10,021→20행. 회귀 테스트 8개(2단계 검증 완료) |
+
+### refactoring
+
+| 날짜 | 문서 | 도메인 | 수치 |
+| --- | --- | --- | --- |
+| 2026-09-09 | [게시글 검색 쿼리의 중복 `users` 조인](refactoring/board/board-search-redundant-users-join-2026-09-09.md) | board | 검색 쿼리 users 조인 제거 — 결과 동일(3키워드 7,666/7,667/7,667), A/B/A 교대 6회 중앙값 19.9ms→18.6ms. 이득은 작고 근거는 경로 간 일관성 |
 
 ### sql-evidence
 

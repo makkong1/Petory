@@ -327,4 +327,85 @@ class IndexUsageRegressionTest {
                 .as("이 힌트가 없으면 10km 반경부터 idx_missing_pet_status 로 오판해 3~6배 느려진다")
                 .contains("IGNORE INDEX (idx_missing_pet_status)");
     }
+
+    /**
+     * 게시글 FULLTEXT 검색: author_visible 이 이미 담고 있는 users 조인이 되살아나지 않아야 한다.
+     *
+     * <p>
+     * V6 정의상 author_visible = (작성자 미탈퇴 AND status &lt;&gt; BANNED) 다. 따라서 검색 쿼리의
+     * "INNER JOIN users u ... AND u.is_deleted = false" 는 아무 행도 더 거르지 못했고, SELECT 절도
+     * users 컬럼을 쓰지 않아 조인이 그 중복 조건 하나 때문에만 붙어 있었다.
+     *
+     * <p>
+     * 목록 경로(findVisibleBoardIds / countVisible)는 처음부터 조인이 없다. 같은 컬럼을 경로마다
+     * 다른 신뢰 수준으로 쓰지 않기 위해 검색도 board 단일 테이블로 맞췄다. 이 테스트는 그 형태가
+     * 되돌아가는 것을 막는다.
+     *
+     * <p>
+     * 실측(2026-09-09, 개발 DB board 50,000행, A/B/A 교대 6회): 중앙값 19.9ms → 18.6ms.
+     * 이득은 작다 — 이 변경의 근거는 성능이 아니라 경로 간 일관성이다.
+     */
+    @Test
+    @DisplayName("게시글 검색: author_visible 이 포섭하는 users 조인이 되살아나지 않아야 한다")
+    void boardSearchQueryHasNoRedundantUsersJoin() throws NoSuchMethodException {
+        org.springframework.data.jpa.repository.Query query = com.linkup.Petory.domain.board.repository.SpringDataJpaBoardRepository.class
+                .getMethod("searchByKeywordWithPaging", String.class,
+                        org.springframework.data.domain.Pageable.class)
+                .getAnnotation(org.springframework.data.jpa.repository.Query.class);
+
+        assertThat(query.value())
+                .as("본문 쿼리: author_visible 이 u.is_deleted 를 포섭하므로 users 조인은 불필요하다")
+                .doesNotContain("JOIN users");
+        assertThat(query.countQuery())
+                .as("countQuery 도 같은 이유로 조인이 없어야 한다")
+                .doesNotContain("JOIN users");
+        assertThat(query.value())
+                .as("조인을 뺀 대신 author_visible 필터는 반드시 남아야 한다")
+                .contains("author_visible = 1");
+        assertThat(query.countQuery())
+                .as("countQuery 의 author_visible 필터가 빠지면 총건수가 부풀려진다")
+                .contains("author_visible = 1");
+    }
+
+    /**
+     * 위 조인 제거가 안전한 근거인 불변식 두 가지를 데이터로 확인한다.
+     *
+     * <p>
+     * 키워드 표본을 비교하는 대신 불변식 자체를 본다. 표본 비교는 그 키워드에 대해서만 참이지만,
+     * 아래 두 가지가 성립하면 조인 제거는 어떤 키워드에서도 결과를 바꾸지 않는다.
+     *
+     * <ol>
+     * <li>author_visible = 1 인데 작성자가 탈퇴 상태인 행이 없다 → u.is_deleted 조건이 잉여</li>
+     * <li>작성자가 없는 board 행이 없다(FK board_ibfk_1) → INNER JOIN 이 행을 떨구지 않는다</li>
+     * </ol>
+     *
+     * <p>
+     * (1)이 깨지면 트리거 trg_board_author_visible 의 동기화가 실패한 것이고, 그때는 조인을 되살릴
+     * 게 아니라 트리거를 고쳐야 한다 — 목록 경로엔 이미 조인이 없어 어차피 목록에 노출되기 때문이다.
+     */
+    @Test
+    @DisplayName("게시글 검색: 조인 제거의 전제(author_visible 포섭 · FK 무결성)가 실제 데이터에서 성립한다")
+    void authorVisibleSubsumesUserDeletedFilter() {
+        Number boardRows = (Number) entityManager
+                .createNativeQuery("SELECT COUNT(*) FROM board")
+                .getSingleResult();
+        assumeTrue(boardRows.longValue() > 0, "board 데이터가 없으면 검증할 수 없다");
+
+        Number visibleButDeletedAuthor = (Number) entityManager.createNativeQuery(
+                "SELECT COUNT(*) FROM board b JOIN users u ON b.user_idx = u.idx "
+                        + "WHERE b.author_visible = 1 AND u.is_deleted <> 0")
+                .getSingleResult();
+        assertThat(visibleButDeletedAuthor.longValue())
+                .as("author_visible = 1 인데 작성자가 탈퇴면 u.is_deleted 조건이 잉여가 아니게 된다. "
+                        + "이 값이 0이 아니면 trg_board_author_visible 동기화를 먼저 확인할 것")
+                .isZero();
+
+        Number orphanBoards = (Number) entityManager.createNativeQuery(
+                "SELECT COUNT(*) FROM board b LEFT JOIN users u ON b.user_idx = u.idx "
+                        + "WHERE u.idx IS NULL")
+                .getSingleResult();
+        assertThat(orphanBoards.longValue())
+                .as("작성자 없는 board 가 있으면 INNER JOIN 제거가 결과 건수를 늘린다")
+                .isZero();
+    }
 }
