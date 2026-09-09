@@ -45,17 +45,17 @@ public interface SpringDataJpaBoardRepository extends JpaRepository<Board, Long>
     List<Board> findByUserAndIsDeletedFalseOrderByCreatedAtDesc(@Param("user") Users user);
 
     @RepositoryMethod("게시글: FULLTEXT 키워드 검색 페이징")
+    // author_visible = (작성자 미탈퇴 AND status <> BANNED) 이므로(V6) u.is_deleted 조건은
+    // 아무 행도 더 거르지 못한다. SELECT 절도 users 컬럼을 쓰지 않아 조인이 그 중복 조건
+    // 하나 때문에만 붙어 있었다 → 조인째 제거해 목록 경로(findVisibleBoardIds/countVisible)와
+    // 같은 형태로 맞춘다. 같은 author_visible 을 경로마다 다른 신뢰 수준으로 쓰지 않는다.
     @Query(value = "SELECT b.*, MATCH(b.title, b.content) AGAINST(:kw IN BOOLEAN MODE) AS relevance "
             + "FROM board b "
-            + "INNER JOIN users u ON b.user_idx = u.idx "
             + "WHERE b.is_deleted = false "
-            + "AND u.is_deleted = false "
             + "AND b.author_visible = 1 "
             + "AND MATCH(b.title, b.content) AGAINST(:kw IN BOOLEAN MODE) "
             + "ORDER BY relevance DESC, b.created_at DESC", countQuery = "SELECT COUNT(*) FROM board b "
-            + "INNER JOIN users u ON b.user_idx = u.idx "
             + "WHERE b.is_deleted = false "
-            + "AND u.is_deleted = false "
             + "AND b.author_visible = 1 "
             + "AND MATCH(b.title, b.content) AGAINST(:kw IN BOOLEAN MODE)", nativeQuery = true)
     Page<Board> searchByKeywordWithPaging(@Param("kw") String keyword, Pageable pageable);
@@ -112,8 +112,9 @@ public interface SpringDataJpaBoardRepository extends JpaRepository<Board, Long>
     }
 
     @RepositoryMethod("게시글: 작성자 닉네임 검색 페이징 (projection)")
+    // 조인은 닉네임 검색·projection 에 필요해 남긴다. u.isDeleted 조건만 authorVisible 과 중복이라 뺀다.
     @Query(BOARD_LIST_ITEM_SELECT
-            + "WHERE u.nickname LIKE :nickname% AND b.isDeleted = false AND u.isDeleted = false AND b.authorVisible = true ORDER BY b.createdAt DESC, b.idx ASC")
+            + "WHERE u.nickname LIKE :nickname% AND b.isDeleted = false AND b.authorVisible = true ORDER BY b.createdAt DESC, b.idx ASC")
     Page<BoardListItemDTO> searchBoardListItemsByNickname(@Param("nickname") String nickname, Pageable pageable);
 
     @RepositoryMethod("게시글: 카테고리+기간별 조회")
