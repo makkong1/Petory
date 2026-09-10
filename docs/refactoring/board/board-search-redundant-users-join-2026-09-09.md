@@ -8,7 +8,6 @@ metric: "검색 쿼리 users 조인 제거 — 결과 동일(3키워드 7,666/7,
 before_commit: dfbeac61
 related: [docs/refactoring/board/board-backend-performance-optimization.md]
 ---
-
 # 게시글 검색 쿼리의 중복 `users` 조인
 
 > 2026-09-09 작성. **상태: 미적용(판단 대기).** 아직 코드를 고치지 않았다.
@@ -18,14 +17,16 @@ related: [docs/refactoring/board/board-backend-performance-optimization.md]
 
 ## 발생 위치
 
-| 역할 | 클래스 | 위치 |
-|---|---|---|
+
+| 역할        | 클래스                            | 위치                                                        |
+| --------- | ------------------------------ | --------------------------------------------------------- |
 | **문제 쿼리** | `SpringDataJpaBoardRepository` | `:48~61` `searchByKeywordWithPaging` (본문 + countQuery 양쪽) |
-| 포트 인터페이스 | `BoardRepository` | `:69` |
-| 어댑터 | `JpaBoardAdapter` | `:126~127` |
-| 호출부 | `BoardService` | `:306` |
-| 엔드포인트 | `BoardController` | `:107~109` `GET /api/boards/search` |
-| 컬럼 정의 | `V6__board_author_visible.sql` | `author_visible` 컬럼 + `trg_board_author_visible` 트리거 |
+| 포트 인터페이스  | `BoardRepository`              | `:69`                                                     |
+| 어댑터       | `JpaBoardAdapter`              | `:126~127`                                                |
+| 호출부       | `BoardService`                 | `:306`                                                    |
+| 엔드포인트     | `BoardController`              | `:107~109` `GET /api/boards/search`                       |
+| 컬럼 정의     | `V6__board_author_visible.sql` | `author_visible` 컬럼 + `trg_board_author_visible` 트리거      |
+
 
 경로: `backend/main/java/com/linkup/Petory/domain/board/`
 
@@ -33,7 +34,7 @@ related: [docs/refactoring/board/board-backend-performance-optimization.md]
 
 ## 문제
 
-`author_visible`은 **`users` 조인을 없애려고 만든 비정규화 컬럼**인데, 검색 쿼리만 그 컬럼을 쓰면서 조인도 그대로 하고 있다.
+`author_visible`은 `**users` 조인을 없애려고 만든 비정규화 컬럼**인데, 검색 쿼리만 그 컬럼을 쓰면서 조인도 그대로 하고 있다.
 
 ### 현재 쿼리 (`SpringDataJpaBoardRepository:48~60`)
 
@@ -58,7 +59,7 @@ UPDATE board b JOIN users u ON u.idx = b.user_idx
 SET b.author_visible = IF(u.is_deleted = 0 AND u.status <> 'BANNED', 1, 0);
 ```
 
-`author_visible = 1` ⟹ `u.is_deleted = 0`. **`AND u.is_deleted = false`는 논리적으로 아무 행도 더 거르지 못한다.**
+`author_visible = 1` ⟹ `u.is_deleted = 0`. `**AND u.is_deleted = false`는 논리적으로 아무 행도 더 거르지 못한다.**
 
 그리고 `SELECT` 절이 `b.*`와 relevance뿐이라 **조인이 오직 그 중복 조건 하나 때문에 붙어 있다.**
 
@@ -74,13 +75,15 @@ List<Long> findVisibleBoardIds(...)
 
 **목록 경로는 이미 조인을 뺐다.** 대조:
 
-| 경로 | 메서드 | `users` 조인 |
-|---|---|---|
-| 목록 1단계 | `findVisibleBoardIds` `:75` | **없음** |
-| 목록 COUNT | `countVisible` `:94` | **없음** |
-| 카테고리 COUNT | `countVisibleByCategory` `:97` | **없음** |
-| **검색 본문** | `searchByKeywordWithPaging` `:48` | **있음** 🔴 |
-| **검색 COUNT** | 같은 메서드 `countQuery` `:55` | **있음** 🔴 |
+
+| 경로           | 메서드                               | `users` 조인 |
+| ------------ | --------------------------------- | ---------- |
+| 목록 1단계       | `findVisibleBoardIds` `:75`       | **없음**     |
+| 목록 COUNT     | `countVisible` `:94`              | **없음**     |
+| 카테고리 COUNT   | `countVisibleByCategory` `:97`    | **없음**     |
+| **검색 본문**    | `searchByKeywordWithPaging` `:48` | **있음** 🔴  |
+| **검색 COUNT** | 같은 메서드 `countQuery` `:55`         | **있음** 🔴  |
+
 
 → **같은 `author_visible`을 두고 경로마다 신뢰 수준이 다르다.** 목록은 컬럼만 믿고, 검색은 조인으로 한 번 더 확인한다. §1(깊은 페이지 페이징)에서 "컬럼을 믿는다"로 이미 결정했는데 검색 경로가 안 따라간 것이다.
 
@@ -102,29 +105,35 @@ WHERE u.nickname LIKE :nickname% AND b.isDeleted = false
 
 ### ① 조인이 행을 떨구지 않는가
 
-| 항목 | 결과 |
-|---|---|
-| FK `board_ibfk_1` (board.user_idx → users.idx) | 존재 |
-| orphan board (`LEFT JOIN` 후 `u.idx IS NULL`) | **0건** |
+
+| 항목                                             | 결과     |
+| ---------------------------------------------- | ------ |
+| FK `board_ibfk_1` (board.user_idx → users.idx) | 존재     |
+| orphan board (`LEFT JOIN` 후 `u.idx IS NULL`)   | **0건** |
+
 
 → `INNER JOIN`이 `LEFT JOIN`과 동일하게 동작한다. 조인 제거가 행을 늘리지 않는다.
 
 ### ② 결과 동일성
 
-| 키워드 | 조인 있음 | 조인 없음 |
-|---|---|---|
-| 산책 | 7,666 | **7,666** |
-| 미용 | 7,667 | **7,667** |
+
+| 키워드  | 조인 있음 | 조인 없음     |
+| ---- | ----- | --------- |
+| 산책   | 7,666 | **7,666** |
+| 미용   | 7,667 | **7,667** |
 | 예방접종 | 7,667 | **7,667** |
+
 
 ---
 
 ## 측정 (A/B/A 교대 6회, 버퍼풀 워밍 후, `SHOW PROFILES`)
 
-| | 평균 | 중앙 | 최소 |
-|---|---|---|---|
-| A 조인 있음 | 22.8ms | 19.9ms | 19.3ms |
+
+|         | 평균     | 중앙         | 최소         |
+| ------- | ------ | ---------- | ---------- |
+| A 조인 있음 | 22.8ms | 19.9ms     | 19.3ms     |
 | B 조인 없음 | 18.8ms | **18.6ms** | **17.6ms** |
+
 
 **이득은 작다 — 중앙값 1.3ms, 약 6%.**
 
@@ -157,16 +166,18 @@ WHERE u.nickname LIKE :nickname% AND b.isDeleted = false
 
 **타입을 Performance가 아니라 Structure로 잡은 이유가 여기 있다.**
 
-조인을 빼면 **`author_visible`을 전적으로 믿게 된다.** 지금은 트리거(`trg_board_author_visible`)가 실패하거나 데이터가 드리프트하면 조인이 마지막 안전망 역할을 한다.
+조인을 빼면 `**author_visible`을 전적으로 믿게 된다.** 지금은 트리거(`trg_board_author_visible`)가 실패하거나 데이터가 드리프트하면 조인이 마지막 안전망 역할을 한다.
 
 다만 **그 안전망이 이미 일관되지 않다** — 목록 경로엔 조인이 없어서, 트리거가 깨지면 탈퇴·밴 회원 글이 **목록에는 이미 노출된다.** 검색만 막아봐야 반쪽이다.
 
 그래서 선택지는 둘이다:
 
-| 안 | 내용 | 평가 |
-|---|---|---|
+
+| 안                   | 내용                            | 평가                   |
+| ------------------- | ----------------------------- | -------------------- |
 | **(a) 검색에서도 조인 제거** | 목록과 동일하게 `author_visible`만 신뢰 | §1이 이미 정한 방향. 일관성 확보 |
-| (b) 목록에 조인 복원 | 안전망 우선 | §1의 성능 개선을 되돌리게 됨 |
+| (b) 목록에 조인 복원       | 안전망 우선                        | §1의 성능 개선을 되돌리게 됨    |
+
 
 **(a)를 제안한다.** 다만 이건 "빨라지니까"가 아니라 **"같은 컬럼에 대한 신뢰 수준을 경로마다 다르게 두지 않는다"**가 이유다. 성능 이득(1.3ms)은 근거로 쓰기엔 약하다.
 
@@ -209,15 +220,17 @@ WHERE u.nickname LIKE :nickname% AND b.isDeleted = false
 
 ## 검증 결과 (2026-09-09)
 
-| 테스트 | 결과 |
-|---|---|
-| `IndexUsageRegressionTest` | **10/10** (신규 2개 포함) |
-| `AuthorVisibleTriggerTest` | 3/3 |
-| `FulltextParserRegressionTest` | 3/3 |
-| `BoardListVisibilityTest` | 2/2 |
-| `BoardServiceListProjectionTest` | 3/3 |
-| `BoardListTieBreakTest` | 3/3 |
-| `QueryCountScalingRegressionTest` | 3/3 |
+
+| 테스트                               | 결과                   |
+| --------------------------------- | -------------------- |
+| `IndexUsageRegressionTest`        | **10/10** (신규 2개 포함) |
+| `AuthorVisibleTriggerTest`        | 3/3                  |
+| `FulltextParserRegressionTest`    | 3/3                  |
+| `BoardListVisibilityTest`         | 2/2                  |
+| `BoardServiceListProjectionTest`  | 3/3                  |
+| `BoardListTieBreakTest`           | 3/3                  |
+| `QueryCountScalingRegressionTest` | 3/3                  |
+
 
 `./gradlew compileJava compileTestJava` 통과. 실패·에러 0.
 
@@ -227,10 +240,12 @@ WHERE u.nickname LIKE :nickname% AND b.isDeleted = false
 
 같은 클래스에 **조건만 중복**인 곳이 두 군데 더 있다. 조인은 `JOIN FETCH`로 작성자 엔티티를 실제로 로딩하므로 **필요하고**, `u.isDeleted = false` 조건만 잉여다.
 
-| 메서드 | 위치 |
-|---|---|
+
+| 메서드                                                   | 위치    |
+| ----------------------------------------------------- | ----- |
 | `findByCategoryAndIsDeletedFalseOrderByCreatedAtDesc` | `:40` |
-| `findByUserAndIsDeletedFalseOrderByCreatedAtDesc` | `:44` |
+| `findByUserAndIsDeletedFalseOrderByCreatedAtDesc`     | `:44` |
+
 
 이번 PR 범위 밖이라 손대지 않았다(승인받은 계획은 2건). 성능 영향은 없고 순수 가독성 항목이다.
 
@@ -248,12 +263,15 @@ WHERE u.nickname LIKE :nickname% AND b.isDeleted = false
 
 트리거는 `AFTER UPDATE ON users`라 **board INSERT 시점엔 안 돈다.** 밴/탈퇴 회원이 글을 쓰면 `author_visible`이 `DEFAULT 1`로 박히고 아무도 고쳐주지 않는다. 그래서 이 전제가 성립해야 불변식이 유지된다.
 
-| 차단 지점 | 탈퇴(`is_deleted`) | 밴(`status = BANNED`) |
-|---|---|---|
-| `JwtAuthenticationFilter:85~96` `isUsableAccount` | ✅ | ✅ `isAccountNonLocked()` = `status != BANNED` → 403 |
-| `BoardService:175` `findActiveByIdString` | ✅ | ❌ **안 봄** |
+
+| 차단 지점                                             | 탈퇴(`is_deleted`) | 밴(`status = BANNED`)                                |
+| ------------------------------------------------- | ---------------- | --------------------------------------------------- |
+| `JwtAuthenticationFilter:85~96` `isUsableAccount` | ✅                | ✅ `isAccountNonLocked()` = `status != BANNED` → 403 |
+| `BoardService:175` `findActiveByIdString`         | ✅                | ❌ **안 봄**                                           |
+
 
 `SpringDataJpaUsersRepository:57~59`:
+
 ```sql
 SELECT u FROM Users u WHERE u.id = :id AND (u.isDeleted = false OR u.isDeleted IS NULL)
 ```
@@ -262,12 +280,14 @@ SELECT u FROM Users u WHERE u.id = :id AND (u.isDeleted = false OR u.isDeleted I
 
 ### 실측 (2026-09-09, 개발 DB)
 
-| 검사 | 결과 |
-|---|---|
-| `author_visible=1` 인데 작성자 탈퇴 | **0** |
-| `author_visible=1` 인데 작성자 BANNED | **0** |
+
+| 검사                                        | 결과    |
+| ----------------------------------------- | ----- |
+| `author_visible=1` 인데 작성자 탈퇴              | **0** |
+| `author_visible=1` 인데 작성자 BANNED          | **0** |
 | `author_visible=0` 인데 작성자 정상 (반대 방향 드리프트) | **0** |
-| `trg_board_author_visible` 존재 | ✅ |
+| `trg_board_author_visible` 존재             | ✅     |
+
 
 users 분포: ACTIVE 9,402(탈퇴 200) · SUSPENDED 400 · **BANNED 200** — 밴·탈퇴가 실제로 존재하므로 공허한 통과가 아니다.
 
@@ -291,3 +311,4 @@ users 분포: ACTIVE 9,402(탈퇴 200) · SUSPENDED 400 · **BANNED 200** — �
 
 - **개선 완료** (2026-09-09)
 - 브랜치 `perf/board-search-drop-redundant-join` → `dev` 머지 → `main` PR #270
+
