@@ -94,12 +94,12 @@ public class PetCoinEscrowService {
         }
 
         escrow.assignProvider(provider, careApplication);
-        PetCoinEscrow saved = escrowRepository.save(escrow);
 
+        // save() 를 부르지 않는다: escrow 는 영속 상태라 변경이 더티 체킹으로 반영된다.
         log.info("에스크로 지급 대상 배정: escrowIdx={}, careRequestIdx={}, providerId={}, amount={}",
-                saved.getIdx(), careRequest.getIdx(), provider.getIdx(), saved.getAmount());
+                escrow.getIdx(), careRequest.getIdx(), provider.getIdx(), escrow.getAmount());
 
-        return saved;
+        return escrow;
     }
 
     /**
@@ -134,7 +134,8 @@ public class PetCoinEscrowService {
         log.info("에스크로 금액 변경: escrowIdx={}, careRequestIdx={}, {} -> {}",
                 escrow.getIdx(), careRequest.getIdx(), escrow.getAmount() - diff, newAmount);
 
-        return escrowRepository.save(escrow);
+        // save() 를 부르지 않는다: escrow 는 영속 상태라 변경이 더티 체킹으로 반영된다.
+        return escrow;
     }
 
     @Transactional
@@ -184,30 +185,31 @@ public class PetCoinEscrowService {
      */
     @Transactional
     public PetCoinEscrow releaseToProvider(PetCoinEscrow escrow) {
-        // 비관적 락으로 에스크로 조회 (Race Condition 방지)
-        escrow = escrowRepository.findByIdForUpdate(escrow.getIdx())
+        // 파라미터는 호출자가 락 없이 읽은 엔티티라 상태가 이미 낡았을 수 있다. 여기서 잠그고 다시
+        // 읽어야 아래 release() 의 상태 가드가 의미를 갖는다 — 락 없이 검사하면 두 트랜잭션이 동시에
+        // HOLD 를 읽고 둘 다 통과한다(check-then-act). 파라미터는 식별자를 넘겨받는 용도로만 쓴다.
+        PetCoinEscrow locked = escrowRepository.findByIdForUpdate(escrow.getIdx())
                 .orElseThrow(() -> new PetCoinEscrowNotFoundException());
 
-        escrow.release();
+        locked.release();
 
         // 제공자에게 코인 지급
         petCoinService.payoutCoins(
-                escrow.getProvider(),
-                escrow.getAmount(),
+                locked.getProvider(),
+                locked.getAmount(),
                 "CARE_REQUEST",
-                escrow.getCareRequest().getIdx(),
-                String.format("펫케어 거래 완료 - 요청 ID: %d", escrow.getCareRequest().getIdx()));
+                locked.getCareRequest().getIdx(),
+                String.format("펫케어 거래 완료 - 요청 ID: %d", locked.getCareRequest().getIdx()));
 
         // 통계 집계는 결제 트랜잭션 커밋 후 비동기 처리 (실패해도 코인 지급은 롤백되지 않음)
-        eventPublisher.publishEvent(new PaymentRecordedEvent(BigDecimal.valueOf(escrow.getAmount())));
+        eventPublisher.publishEvent(new PaymentRecordedEvent(BigDecimal.valueOf(locked.getAmount())));
 
-        PetCoinEscrow saved = escrowRepository.save(escrow);
-
+        // save() 를 부르지 않는다: locked 는 영속 상태라 변경이 더티 체킹으로 반영된다.
         log.info("에스크로 지급 완료: escrowIdx={}, careRequestIdx={}, amount={}, providerId={}",
-                saved.getIdx(), escrow.getCareRequest().getIdx(), escrow.getAmount(),
-                escrow.getProvider().getIdx());
+                locked.getIdx(), locked.getCareRequest().getIdx(), locked.getAmount(),
+                locked.getProvider().getIdx());
 
-        return saved;
+        return locked;
     }
 
     /**
@@ -218,27 +220,26 @@ public class PetCoinEscrowService {
      */
     @Transactional
     public PetCoinEscrow refundToRequester(PetCoinEscrow escrow) {
-        // 비관적 락으로 에스크로 조회 (Race Condition 방지)
-        escrow = escrowRepository.findByIdForUpdate(escrow.getIdx())
+        // releaseToProvider 와 같은 이유로 잠그고 다시 읽는다(위 주석 참고).
+        PetCoinEscrow locked = escrowRepository.findByIdForUpdate(escrow.getIdx())
                 .orElseThrow(() -> new PetCoinEscrowNotFoundException());
 
-        escrow.refund();
+        locked.refund();
 
         // 요청자에게 코인 환불
         petCoinService.refundCoins(
-                escrow.getRequester(),
-                escrow.getAmount(),
+                locked.getRequester(),
+                locked.getAmount(),
                 "CARE_REQUEST",
-                escrow.getCareRequest().getIdx(),
-                String.format("펫케어 거래 취소 - 요청 ID: %d", escrow.getCareRequest().getIdx()));
+                locked.getCareRequest().getIdx(),
+                String.format("펫케어 거래 취소 - 요청 ID: %d", locked.getCareRequest().getIdx()));
 
-        PetCoinEscrow saved = escrowRepository.save(escrow);
-
+        // save() 를 부르지 않는다: locked 는 영속 상태라 변경이 더티 체킹으로 반영된다.
         log.info("에스크로 환불 완료: escrowIdx={}, careRequestIdx={}, amount={}, requesterId={}",
-                saved.getIdx(), escrow.getCareRequest().getIdx(), escrow.getAmount(),
-                escrow.getRequester().getIdx());
+                locked.getIdx(), locked.getCareRequest().getIdx(), locked.getAmount(),
+                locked.getRequester().getIdx());
 
-        return saved;
+        return locked;
     }
 
     /**
