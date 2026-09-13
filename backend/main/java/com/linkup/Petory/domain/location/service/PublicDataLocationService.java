@@ -37,6 +37,7 @@ import lombok.extern.slf4j.Slf4j;
 public class PublicDataLocationService {
 
     private final LocationServiceRepository locationServiceRepository;
+    // 별도 빈으로 주입 — 자기 호출이면 프록시를 안 거쳐 REQUIRES_NEW가 무시된다
     private final LocationServiceBatchWriter batchWriter;
 
     @PersistenceContext
