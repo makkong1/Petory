@@ -290,7 +290,6 @@ WHERE idx = :serviceIdx
 | `GET /api/admin/location-services`                          | `ADMIN`, `MASTER` | 위치 서비스 목록 조회       |
 | `POST /api/admin/location-services/load-data`               | `MASTER`          | 초기 데이터 로드            |
 | `POST /api/admin/location-services/import-public-data`      | `MASTER`          | CSV 파일 업로드 임포트      |
-| `POST /api/admin/location-services/import-public-data-path` | `MASTER`          | CSV 파일 경로 임포트        |
 | `POST /api/admin/location-services/sync-public-data`        | `MASTER`          | 공공데이터 오픈API 동기화(수동 트리거) |
 
 CSV 업로드는 확장자, Content-Type, 최대 크기 200MB를 검증한다. CSV 적재는 `PublicDataLocationService`가 처리하고, 배치 저장은 별도 writer(`LocationServiceBatchWriter`, `@Transactional(REQUIRES_NEW)`)를 통해 트랜잭션을 분리한다.

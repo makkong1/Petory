@@ -45,13 +45,11 @@
 - **역할**: REST API 엔드포인트 제공
 - **엔드포인트**: 
   - `POST /api/admin/location-services/import-public-data` (파일 업로드)
-  - `POST /api/admin/location-services/import-public-data-path` (파일 경로)
 
 #### 2. PublicDataLocationService
 - **역할**: CSV 파일 파싱 및 배치 저장 로직
 - **주요 메서드**:
   - `importFromCsv(MultipartFile file)`: 파일 업로드 방식
-  - `importFromCsv(String csvFilePath)`: 파일 경로 방식
   - `saveBatch(List<LocationService> batch)`: 배치 저장 (별도 트랜잭션)
 
 #### 3. PublicDataLocationDTO
