@@ -290,7 +290,6 @@ bulk upsert는 key별로 `upsertConfig()`를 호출하므로 감사 로그도 ke
 | GET | `/api/admin/location-services` | `ADMIN`, `MASTER` | 장소 목록. `sido`, `sigungu`, `category`, `size`, `q` |
 | POST | `/api/admin/location-services/load-data` | `MASTER` | 초기 데이터 로드 |
 | POST | `/api/admin/location-services/import-public-data` | `MASTER` | CSV 업로드 임포트. multipart `file` |
-| POST | `/api/admin/location-services/import-public-data-path` | `MASTER` | 서버 경로 기반 CSV 임포트 |
 
 CSV 업로드 제한:
 
