@@ -161,34 +161,6 @@ public class AdminLocationController {
     }
 
     /**
-     * 공공데이터 CSV 파일 경로로 임포트 (기존 방식 - 하위 호환성)
-     *
-     * @param csvFilePath CSV 파일의 절대 경로 또는 상대 경로
-     * @return 배치 임포트 결과
-     */
-    /**
-     * 공공데이터 CSV 파일 경로 임포트 (MASTER만)
-     */
-    @PostMapping("/import-public-data-path")
-    @PreAuthorize("hasRole('MASTER')")
-    public ResponseEntity<BatchImportResult> importPublicDataByPath(
-            @RequestParam("csvFilePath") String csvFilePath) {
-
-        log.info("공공데이터 CSV 경로 임포트 요청: {}", csvFilePath);
-
-        try {
-            BatchImportResult result = publicDataLocationService.importFromCsv(csvFilePath);
-            return ResponseEntity.ok(result);
-        } catch (Exception e) {
-            log.error("공공데이터 CSV 임포트 실패: {}", e.getMessage(), e);
-            return ResponseEntity.internalServerError()
-                    .body(BatchImportResult.builder()
-                            .error(1)
-                            .build());
-        }
-    }
-
-    /**
      * 공공데이터 오픈API를 즉시 호출해 시설 데이터를 upsert 한다. [MASTER]
      * 실행 결과 요약(상태·신규·갱신·스킵·실패 건수)을 반환한다.
      */

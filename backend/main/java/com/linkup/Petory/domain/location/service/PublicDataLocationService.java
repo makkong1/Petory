@@ -4,8 +4,6 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
@@ -158,130 +156,6 @@ public class PublicDataLocationService {
 
         } catch (IOException e) {
             log.error("CSV 파일 읽기 실패: {}", file.getOriginalFilename(), e);
-            throw new RuntimeException("CSV 파일 읽기 실패: " + e.getMessage(), e);
-        }
-
-        log.info("공공데이터 임포트 완료 - 총 읽음: {}, 저장: {}, 중복: {}, 스킵: {}, 에러: {}",
-                totalRead, saved, duplicate, skipped, error);
-
-        return BatchImportResult.builder()
-                .totalRead(totalRead)
-                .saved(saved)
-                .duplicate(duplicate)
-                .skipped(skipped)
-                .error(error)
-                .build();
-    }
-
-    /**
-     * CSV 파일 경로를 받아서 데이터를 파싱하고 배치로 저장 각 배치는 별도 트랜잭션으로 처리되므로 메인 메서드는 트랜잭션 불필요
-     *
-     * @param csvFilePath CSV 파일 경로
-     * @return 저장 결과 통계
-     */
-    public BatchImportResult importFromCsv(String csvFilePath) {
-        log.info("공공데이터 CSV 파일 임포트 시작: {}", csvFilePath);
-
-        int totalRead = 0;
-        int saved = 0;
-        int skipped = 0;
-        int duplicate = 0;
-        int error = 0;
-
-        Set<String> deduplicationKeys = new HashSet<>();
-        List<LocationService> batch = new ArrayList<>();
-
-        try (BufferedReader reader = Files.newBufferedReader(Path.of(csvFilePath))) {
-            // 헤더 라인 읽기
-            String headerLine = reader.readLine();
-            if (headerLine == null) {
-                log.warn("CSV 파일이 비어있습니다.");
-                return BatchImportResult.empty();
-            }
-
-            String line;
-            while ((line = reader.readLine()) != null) {
-                totalRead++;
-
-                try {
-                    PublicDataLocationDTO dto = parseCsvLine(line);
-                    if (dto == null || !isValid(dto)) {
-                        skipped++;
-                        continue;
-                    }
-
-                    // 중복 체크
-                    String dedupKey = buildDedupKey(dto);
-                    if (deduplicationKeys.contains(dedupKey)) {
-                        duplicate++;
-                        continue;
-                    }
-
-                    // DB 중복 체크
-                    if (isDuplicateInDb(dto)) {
-                        duplicate++;
-                        continue;
-                    }
-
-                    // 엔티티 변환 (예외 발생 시 스킵 및 세션 정리)
-                    LocationService entity;
-                    try {
-                        entity = convertToEntity(dto);
-                        if (entity == null) {
-                            skipped++;
-                            continue;
-                        }
-                        // 엔티티 유효성 검증 (idx는 null이어야 함 - 새 엔티티)
-                        if (entity.getIdx() != null) {
-                            log.warn("라인 {} 엔티티에 이미 ID가 설정됨: {}", totalRead, entity.getIdx());
-                            skipped++;
-                            continue;
-                        }
-                    } catch (Exception e) {
-                        error++;
-                        log.warn("라인 {} 엔티티 변환 실패: {}", totalRead, e.getMessage());
-                        // 세션 정리 (오염 방지)
-                        entityManager.clear();
-                        continue;
-                    }
-
-                    batch.add(entity);
-                    deduplicationKeys.add(dedupKey);
-
-                    // 배치 사이즈에 도달하면 저장
-                    if (batch.size() >= batchSize) {
-                        int batchSaved = batchWriter.saveBatch(batch);
-                        saved += batchSaved;
-                        if (batchSaved < batch.size()) {
-                            error += (batch.size() - batchSaved);
-                        }
-                        log.info("배치 저장 완료: {}개 (총 저장: {}개)", batchSaved, saved);
-                        batch.clear();
-                        // 세션 정리 (메모리 관리 및 오염 방지)
-                        entityManager.clear();
-                    }
-
-                } catch (Exception e) {
-                    error++;
-                    log.warn("라인 {} 파싱 실패: {}", totalRead, e.getMessage());
-                    // 예외 발생 시 세션 정리
-                    entityManager.clear();
-                }
-            }
-
-            // 남은 배치 저장
-            if (!batch.isEmpty()) {
-                int batchSaved = batchWriter.saveBatch(batch);
-                saved += batchSaved;
-                if (batchSaved < batch.size()) {
-                    error += (batch.size() - batchSaved);
-                }
-                log.info("최종 배치 저장 완료: {}개 (총 저장: {}개)", batchSaved, saved);
-                entityManager.clear();
-            }
-
-        } catch (IOException e) {
-            log.error("CSV 파일 읽기 실패: {}", csvFilePath, e);
             throw new RuntimeException("CSV 파일 읽기 실패: " + e.getMessage(), e);
         }
 
