@@ -15,6 +15,10 @@ import com.linkup.Petory.global.annotation.RepositoryMethod;
  */
 public interface SpringDataJpaLocationServiceRepository extends JpaRepository<LocationService, Long> {
 
+    /** score = 0.5 x rating x log10(reviewCount+1) + 0.2 x petFriendly */
+    String SCORE_FORMULA = "0.5 * COALESCE(rating, 0) * LOG10(COALESCE(review_count, 0) + 1) "
+            + "+ 0.2 * IF(pet_friendly = 1, 1.0, 0.0)";
+
     @RepositoryMethod("장소 서비스: 평점순 전체 조회 (keyword·category 필터)")
     @Query(value = "SELECT * FROM locationservice WHERE "
             + "is_deleted = 0 "
@@ -179,4 +183,16 @@ public interface SpringDataJpaLocationServiceRepository extends JpaRepository<Lo
             + ") "
             + "WHERE idx = :serviceIdx", nativeQuery = true)
     void updateReviewStats(@Param("serviceIdx") Long serviceIdx);
+
+    // [PERF] score 재계산을 UPDATE 한 번으로 처리. 기존엔 findAll() 로 24,130행을
+    // 영속성 컨텍스트에 올린 뒤 자바에서 계산했다(정상 상태 678ms / 전 행 변경 시 3,923ms).
+    // WHERE 절이 핵심이다 - 이게 없으면 매일 전 행을 무조건 다시 써서, 더티 체킹이
+    // 공짜로 해주던 "안 바뀐 행은 안 쓰기"를 잃는다(binlog·redo 증가).
+    // 측정(83e72f9f, petory_test 24,130행): 정상 상태 29ms / 전 행 변경 시 341ms.
+    @RepositoryMethod("장소 서비스: score 일괄 재계산 (변경된 행만)")
+    @Modifying
+    @Query(value = "UPDATE locationservice SET score = "
+            + SCORE_FORMULA
+            + " WHERE score IS NULL OR score <> (" + SCORE_FORMULA + ")", nativeQuery = true)
+    int recalculateScores();
 }

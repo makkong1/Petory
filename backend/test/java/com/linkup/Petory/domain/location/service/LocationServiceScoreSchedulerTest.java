@@ -17,7 +17,11 @@ import jakarta.persistence.PersistenceContext;
 @SpringBootTest
 class LocationServiceScoreSchedulerTest {
 
-    /** {@code LocationServiceScoreScheduler#computeScore} 와 같은 공식. */
+    /**
+     * 프로덕션({@code SpringDataJpaLocationServiceRepository.SCORE_FORMULA})과 같은 공식을
+     * <b>일부러 복제해</b> 둔다. 상수를 그대로 참조하면 공식이 바뀌어도 테스트가 따라 바뀌어
+     * 아무것도 못 잡는다(동어반복).
+     */
     private static final String SCORE_FORMULA =
             "0.5 * COALESCE(rating, 0) * LOG10(COALESCE(review_count, 0) + 1) "
                     + "+ 0.2 * IF(pet_friendly = 1, 1.0, 0.0)";
