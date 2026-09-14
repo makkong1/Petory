@@ -71,11 +71,12 @@ git diff
 
 - **`feature/*`** (또는 `fix/*`, `perf/*`, `refactor/*`) — 실제 작업. 여기서 커밋한다.
 - **`dev`** — 개발 통합 브랜치. feature를 **PR로** 받는다. 리뷰·CI가 붙는 지점은 여기다(코드가 새로 생기는 곳).
-- **`main`** — 배포 브랜치. `dev`에서 **fast-forward로만** 전진시킨다.
+- **`main`** — 확정된 상태를 가리키는 브랜치. `dev`에서 **fast-forward로만** 전진시킨다.
+  ⚠️ **Petory는 아직 배포가 없다**(로컬 `bootRun` 뿐). `main`은 "배포된 것"이 아니라 "dev에서 확인이 끝난 지점"이다. 배포가 생기면 그때 의미를 올리면 된다.
 
 > ⚠️ **`main`에 `dev`가 모르는 커밋이 생기면 두 브랜치가 어긋난다.** PR 머지커밋이 바로 그 커밋이다.
 > 실제로 이 저장소는 `dev → main` PR을 37번 하는 동안 그만큼 쌓여 **dev가 41커밋 뒤처진 적이 있다**(2026-09-14 `--ff-only`로 정리).
-> 그래서 **`dev → main`에는 PR을 쓰지 않는다.** 아래 「dev → main 배포」 절 참고.
+> 그래서 **`dev → main`에는 PR을 쓰지 않는다.** 아래 「dev → main 반영」 절 참고.
 
 ```bash
 git branch --show-current
@@ -85,7 +86,7 @@ git branch --show-current
 |---|---|
 | `feature/*` 등 작업 브랜치 | 통과 — 바로 다음 단계 |
 | `dev` | **작업 브랜치를 딸지 묻는다.** 코드 변경이면 기본값은 브랜치 생성(`git checkout -b <type>/<주제>`). 문서·설정 등 사소한 변경만 dev 직접 커밋을 허용한다. |
-| `main`/`master` | **커밋하지 않는다.** 알리고 작업 브랜치로 전환한다. `main`은 배포 지점을 가리킬 뿐 직접 커밋하는 곳이 아니다. 사용자가 명시적으로 지시한 hotfix만 예외. |
+| `main`/`master` | **커밋하지 않는다.** 알리고 작업 브랜치로 전환한다. `main`은 확정 지점을 가리킬 뿐 직접 커밋하는 곳이 아니다. 사용자가 명시적으로 지시한 hotfix만 예외. |
 
 ### 2단계: 파일 필터링 (안전장치)
 
@@ -195,9 +196,9 @@ gh run watch <run-id> --exit-status
 - 🔄 CD (Build & Push Docker Images): ✅ 성공 (run 28734294862)
 ```
 
-## dev → main 배포 (fast-forward)
+## dev → main 반영 (fast-forward)
 
-`dev`에 쌓인 것을 배포할 때는 **PR을 만들지 않는다.** 로컬에서 fast-forward로 `main`을 전진시킨다.
+`dev`에서 확인이 끝난 지점을 `main`에 반영할 때는 **PR을 만들지 않는다.** 로컬 `main` 포인터를 fast-forward로 전진시키고 원격에 올릴 뿐이다 — 빌드도 서버도 관여하지 않는다.
 
 ```bash
 git checkout main
@@ -208,10 +209,10 @@ git checkout dev
 
 - **`--ff-only`가 안전장치다.** `main`에 `dev`가 모르는 커밋이 있으면 조용히 머지하지 않고 **실패한다.** 그때는 덮지 말고 왜 갈라졌는지부터 확인한다(`git log --oneline dev..origin/main`).
 - push 후에는 **5-1단계(CI/CD 트리거 확인)**를 그대로 수행한다.
-- 배포 시점 기록은 PR 번호 대신 **태그**로 남긴다:
+- 구분점을 남기고 싶으면 PR 번호 대신 **태그**를 쓴다(선택):
 
 ```bash
-git tag -a v0.3.0 -m "<무엇을 배포하는지>"
+git tag -a v0.3.0 -m "<무엇이 들어갔는지>"
 git push origin v0.3.0
 ```
 
