@@ -31,7 +31,8 @@ public class LocationServiceScoreScheduler {
         for (LocationService ls : all) {
             ls.setScore(computeScore(ls));
         }
-        locationServiceRepository.saveAll(all);
+        // saveAll() 을 부르지 않는다: findAll() 로 가져온 엔티티는 영속 상태라
+        // 변경이 더티 체킹으로 반영된다.
         log.info("[ScoreScheduler] score 재계산 완료: {}건", all.size());
     }
 
