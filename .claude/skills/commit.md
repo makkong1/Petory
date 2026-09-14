@@ -65,17 +65,27 @@ git diff
 - staged + unstaged 변경사항을 모두 파악한다.
 - 비밀 파일(.env, credentials, application.properties 등)이 포함되면 **경고하고 제외**한다.
 
-### 1-1단계: 브랜치 확인 (main 직접 커밋 방지)
+### 1-1단계: 브랜치 확인 (작업은 feature 브랜치에서)
 
-이 저장소는 `dev` 브랜치에서 작업 → PR → `main` 병합 컨벤션을 쓴다(`git log`의 `Merge pull request #NNN from makkong1/dev` 이력 참고).
+이 저장소의 흐름은 **`feature/*` → PR → `dev` → fast-forward → `main`** 이다.
+
+- **`feature/*`** (또는 `fix/*`, `perf/*`, `refactor/*`) — 실제 작업. 여기서 커밋한다.
+- **`dev`** — 개발 통합 브랜치. feature를 **PR로** 받는다. 리뷰·CI가 붙는 지점은 여기다(코드가 새로 생기는 곳).
+- **`main`** — 배포 브랜치. `dev`에서 **fast-forward로만** 전진시킨다.
+
+> ⚠️ **`main`에 `dev`가 모르는 커밋이 생기면 두 브랜치가 어긋난다.** PR 머지커밋이 바로 그 커밋이다.
+> 실제로 이 저장소는 `dev → main` PR을 37번 하는 동안 그만큼 쌓여 **dev가 41커밋 뒤처진 적이 있다**(2026-09-14 `--ff-only`로 정리).
+> 그래서 **`dev → main`에는 PR을 쓰지 않는다.** 아래 「dev → main 배포」 절 참고.
 
 ```bash
 git branch --show-current
 ```
 
-- 현재 브랜치가 `main`/`master`이면, 커밋 전에 반드시 사용자에게 알린다: "지금 main 브랜치입니다. dev로 전환해서 작업할까요, 아니면 이번만 main에 직접 커밋할까요?"
-- 사용자가 브랜치를 특정하지 않고 그냥 "커밋해/푸시해"라고만 했다면 **기본값은 dev로 전환**(`git checkout dev && git pull`) 후 커밋한다. main 직접 커밋은 사용자가 명시적으로 지시했을 때만(예: 문서 전용 변경, 긴급 hotfix) 예외로 허용한다.
-- 이미 `dev`나 `feature/*` 등 main이 아닌 브랜치에 있다면 이 단계는 통과, 바로 다음 단계로 진행한다.
+| 현재 브랜치 | 동작 |
+|---|---|
+| `feature/*` 등 작업 브랜치 | 통과 — 바로 다음 단계 |
+| `dev` | **작업 브랜치를 딸지 묻는다.** 코드 변경이면 기본값은 브랜치 생성(`git checkout -b <type>/<주제>`). 문서·설정 등 사소한 변경만 dev 직접 커밋을 허용한다. |
+| `main`/`master` | **커밋하지 않는다.** 알리고 작업 브랜치로 전환한다. `main`은 배포 지점을 가리킬 뿐 직접 커밋하는 곳이 아니다. 사용자가 명시적으로 지시한 hotfix만 예외. |
 
 ### 2단계: 파일 필터링 (안전장치)
 
@@ -185,6 +195,29 @@ gh run watch <run-id> --exit-status
 - 🔄 CD (Build & Push Docker Images): ✅ 성공 (run 28734294862)
 ```
 
+## dev → main 배포 (fast-forward)
+
+`dev`에 쌓인 것을 배포할 때는 **PR을 만들지 않는다.** 로컬에서 fast-forward로 `main`을 전진시킨다.
+
+```bash
+git checkout main
+git merge --ff-only dev     # 머지커밋을 만들지 않는다. 어긋나 있으면 거부하고 멈춘다
+git push origin main
+git checkout dev
+```
+
+- **`--ff-only`가 안전장치다.** `main`에 `dev`가 모르는 커밋이 있으면 조용히 머지하지 않고 **실패한다.** 그때는 덮지 말고 왜 갈라졌는지부터 확인한다(`git log --oneline dev..origin/main`).
+- push 후에는 **5-1단계(CI/CD 트리거 확인)**를 그대로 수행한다.
+- 배포 시점 기록은 PR 번호 대신 **태그**로 남긴다:
+
+```bash
+git tag -a v0.3.0 -m "<무엇을 배포하는지>"
+git push origin v0.3.0
+```
+
+> ⚠️ 나중에 `main`에 브랜치 보호를 걸면 직접 push가 막혀 이 방식이 깨진다. 그땐 릴리스 PR로 바꾸되, **머지 직후 dev를 되받는 것**을 규칙으로 붙인다:
+> `git checkout dev && git pull --ff-only origin main && git push origin dev`
+
 ## 빠른 모드
 
 사용자가 "바로 커밋해", "커밋 푸시해" 등 빠른 실행을 요청하면:
@@ -198,6 +231,9 @@ gh run watch <run-id> --exit-status
 
 ## 제약
 
+- **`dev → main`은 항상 `--ff-only`.** `main`에 머지커밋을 만들지 않는다.
+- **`feature → dev`는 PR로 받는다.** 로컬 머지로 dev에 직접 밀지 않는다(리뷰·CI 지점을 잃는다).
+- ⚠️ `docs/` 하위 `.md`를 커밋하면 pre-commit 훅이 `docs/INDEX.md`를 재생성한다(`scripts/docs_index.py`, **PyYAML 필요**). PyYAML이 없으면 커밋이 막힌다 — `--no-verify`로 넘기기 전에 **해당 문서가 frontmatter를 갖는지 / `docs/INDEX.md`에 등재돼 있는지** 확인하고, 인덱스에 영향이 없을 때만 넘긴다.
 - `--force`, `--amend`는 사용자가 명시적으로 요청할 때만 사용한다.
 - main/master 브랜치에 force push는 경고 후 사용자 재확인을 받는다.
 - 민감 파일은 자동 제외하되, 제외 사실을 반드시 알린다.
