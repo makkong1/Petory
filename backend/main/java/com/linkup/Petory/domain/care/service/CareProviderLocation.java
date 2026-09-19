@@ -50,6 +50,33 @@ final class CareProviderLocation {
         return keys;
     }
 
+    /**
+     * 시·도 이름. 표기가 흔들려도 같은 값이 나오도록 접미사를 떼어 정규화한다
+     * ({@code "서울특별시" -> "서울"}, {@code "경기도" -> "경기"}).
+     *
+     * <p>구 단위로 맞추면 후보가 0인 경우가 흔해서(제공자가 그 구에 없을 뿐, 옆 구엔 있다)
+     * 한 단계 넓혀 찾을 때 쓴다.
+     */
+    static String wideAreaOf(String address) {
+        if (address == null || address.isBlank()) {
+            return null;
+        }
+        String head = address.trim().split("\\s+")[0];
+        for (String suffix : new String[] { "특별자치시", "특별자치도", "특별시", "광역시", "도" }) {
+            if (head.length() > suffix.length() && head.endsWith(suffix)) {
+                return head.substring(0, head.length() - suffix.length());
+            }
+        }
+        return head;
+    }
+
+    /** 두 주소가 같은 시·도인가. 구가 달라도 같은 광역이면 참. */
+    static boolean sameWideArea(String addressA, String addressB) {
+        String a = wideAreaOf(addressA);
+        String b = wideAreaOf(addressB);
+        return a != null && a.equals(b);
+    }
+
     /** 두 주소가 같은 시/군/구를 하나라도 공유하는가. */
     static boolean sameArea(String addressA, String addressB) {
         Set<String> a = keysOf(addressA);

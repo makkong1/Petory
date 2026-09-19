@@ -33,6 +33,7 @@ const CareLayer = ({ selectedItem, onClose }) => {
   const [chatLoading, setChatLoading] = useState(false);
   const [chatError, setChatError] = useState(null);
   const [candidates, setCandidates] = useState([]);
+  const [candidateScope, setCandidateScope] = useState(null); // { scope, areaLabel, total }
   const [candidatesLoading, setCandidatesLoading] = useState(false);
   const [candidatesError, setCandidatesError] = useState(null);
   const [offeringTo, setOfferingTo] = useState(null);
@@ -161,7 +162,14 @@ const CareLayer = ({ selectedItem, onClose }) => {
       setCandidatesError(null);
       try {
         const { data } = await careOfferApi.candidates(r.idx);
-        if (!cancelled) setCandidates(Array.isArray(data) ? data : []);
+        if (!cancelled) {
+          setCandidates(data?.providers || []);
+          setCandidateScope({
+            scope: data?.scope,
+            areaLabel: data?.areaLabel,
+            total: data?.total ?? 0,
+          });
+        }
       } catch (err) {
         if (!cancelled) setCandidatesError('제공자 목록을 불러오지 못했습니다.');
       } finally {
@@ -362,15 +370,34 @@ const CareLayer = ({ selectedItem, onClose }) => {
       {isOwner && r.status === 'OPEN' && (
         <CandidateSection>
           <SectionHeader>
-            <SectionTitle>이 지역 제공자</SectionTitle>
-            <SectionMeta>{candidates.length}명</SectionMeta>
+            <SectionTitle>
+              {candidateScope?.scope === 'WIDE'
+                ? `${candidateScope.areaLabel} 제공자`
+                : candidateScope?.areaLabel
+                  ? `${candidateScope.areaLabel} 제공자`
+                  : '이 지역 제공자'}
+            </SectionTitle>
+            <SectionMeta>
+              {candidateScope?.total > candidates.length
+                ? `${candidates.length} / ${candidateScope.total}명`
+                : `${candidates.length}명`}
+            </SectionMeta>
           </SectionHeader>
+          {candidateScope?.scope === 'WIDE' && candidates.length > 0 && (
+            <ScopeNote>
+              가까운 구에 활동 중인 제공자가 없어 {candidateScope.areaLabel} 전체에서 찾았습니다.
+            </ScopeNote>
+          )}
           {candidatesLoading ? (
             <EmptyState>불러오는 중...</EmptyState>
           ) : candidatesError ? (
             <EmptyState>{candidatesError}</EmptyState>
           ) : candidates.length === 0 ? (
-            <EmptyState>이 지역에서 활동하는 제공자가 아직 없습니다.</EmptyState>
+            <EmptyState>
+              {candidateScope?.areaLabel
+                ? `${candidateScope.areaLabel} 주변에 활동 중인 제공자가 아직 없습니다.`
+                : '활동 중인 제공자가 아직 없습니다.'}
+            </EmptyState>
           ) : (
             <CandidateList>
               {candidates.map((c) => (
@@ -626,6 +653,12 @@ const PrimaryButton = styled.button`
   }
 `;
 
+const ScopeNote = styled.div`
+  font-size: 11px;
+  color: ${({ theme }) => theme.colors.textSecondary};
+  padding: 2px 0;
+`;
+
 const CandidateSection = styled.div`
   margin-top: 12px;
   display: flex;
@@ -637,6 +670,8 @@ const CandidateList = styled.div`
   display: flex;
   flex-direction: column;
   gap: 6px;
+  max-height: 240px;
+  overflow-y: auto;
 `;
 
 const CandidateCard = styled.div`

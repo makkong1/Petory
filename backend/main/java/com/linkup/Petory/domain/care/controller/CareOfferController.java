@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.linkup.Petory.domain.care.dto.CareApplicationDTO;
-import com.linkup.Petory.domain.care.dto.CareProviderDTO;
+import com.linkup.Petory.domain.care.dto.CareProviderSearchDTO;
 import com.linkup.Petory.domain.care.service.CareOfferService;
 import com.linkup.Petory.global.security.AuthenticatedUserIdResolver;
 
@@ -79,7 +79,7 @@ public class CareOfferController {
      */
     @GetMapping("/candidates")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<List<CareProviderDTO>> candidates(
+    public ResponseEntity<CareProviderSearchDTO> candidates(
             @RequestParam("careRequestIdx") Long careRequestIdx) {
         return ResponseEntity.ok(
                 careOfferService.findCandidates(careRequestIdx, getCurrentUserId()));

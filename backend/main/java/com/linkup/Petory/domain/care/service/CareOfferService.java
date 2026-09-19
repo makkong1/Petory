@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.linkup.Petory.domain.care.converter.CareApplicationConverter;
 import com.linkup.Petory.domain.care.dto.CareApplicationDTO;
 import com.linkup.Petory.domain.care.dto.CareProviderDTO;
+import com.linkup.Petory.domain.care.dto.CareProviderSearchDTO;
 import com.linkup.Petory.domain.care.repository.CareReviewRepository;
 import com.linkup.Petory.domain.care.entity.CareApplication;
 import com.linkup.Petory.domain.care.entity.CareApplicationStatus;
@@ -285,8 +286,22 @@ public class CareOfferService {
      * <p>집계는 배치로 한 번씩만 돈다(평점 1문 + 완료건수 1문). 1인당 한 번씩 부르면 목록
      * 길이만큼 N+1 이 된다.
      */
+    /**
+     * 이 요청에 제안할 수 있는 제공자. 요청자가 먼저 움직이는 유일한 경로다.
+     *
+     * <p>그전에는 <b>제공자가 먼저 문의해 와야만</b> 요청자가 제안할 수 있었다.
+     *
+     * <p>지역만 맞추고 <b>정렬하지 않는다.</b> 평점·완료건수로 줄 세우면 리뷰가 없는 신규
+     * 제공자가 영영 안 뽑혀 상위 몇 명에게만 일이 몰린다 — 두 수치는 표시만 한다.
+     *
+     * <p>집계는 배치로 한 번씩만 돈다(평점 1문 + 완료건수 1문). 1인당 한 번씩 부르면 목록
+     * 길이만큼 N+1 이 된다.
+     */
+    /** 한 화면에 내려보낼 후보 수 상한. 넘으면 잘라 보내고 전체 수만 알린다. */
+    private static final int CANDIDATE_LIMIT = 30;
+
     @Transactional(readOnly = true)
-    public List<CareProviderDTO> findCandidates(Long careRequestIdx, Long currentUserId) {
+    public CareProviderSearchDTO findCandidates(Long careRequestIdx, Long currentUserId) {
         CareRequest request = careRequestRepository.findByIdWithApplications(careRequestIdx)
                 .orElseThrow(CareRequestNotFoundException::new);
         if (Boolean.TRUE.equals(request.getIsDeleted())) {
@@ -298,16 +313,32 @@ public class CareOfferService {
 
         // 지역 기준은 요청자의 프로필이 아니라 케어가 실제로 일어나는 곳(요청 주소)이다.
         String area = request.getAddress();
+        List<Users> all = usersRepository.findActiveServiceProviders(currentUserId);
 
-        List<Users> candidates = usersRepository.findActiveServiceProviders(currentUserId).stream()
+        // 같은 구를 먼저 본다. 구 단위로만 맞추면 후보가 0인 경우가 흔해서 — 그 구에 없을 뿐
+        // 옆 구엔 있다 — 비면 같은 시·도로 한 단계 넓힌다. 넓혔다는 사실은 화면에 알린다.
+        String scope = "DISTRICT";
+        List<Users> matched = all.stream()
                 .filter(u -> CareProviderLocation.sameArea(area, u.getLocation()))
                 .toList();
-
-        if (candidates.isEmpty()) {
-            return List.of();
+        if (matched.isEmpty()) {
+            scope = "WIDE";
+            matched = all.stream()
+                    .filter(u -> CareProviderLocation.sameWideArea(area, u.getLocation()))
+                    .toList();
+        }
+        if (matched.isEmpty()) {
+            return CareProviderSearchDTO.builder()
+                    .scope("NONE").areaLabel(CareProviderLocation.wideAreaOf(area))
+                    .total(0).providers(List.of()).build();
         }
 
-        List<Long> ids = candidates.stream().map(Users::getIdx).toList();
+        int total = matched.size();
+        List<Users> page = matched.size() > CANDIDATE_LIMIT
+                ? matched.subList(0, CANDIDATE_LIMIT)
+                : matched;
+
+        List<Long> ids = page.stream().map(Users::getIdx).toList();
 
         Map<Long, double[]> ratingByProvider = new HashMap<>();
         for (Object[] row : careReviewRepository.aggregateByRevieweeIdxs(ids)) {
@@ -326,7 +357,7 @@ public class CareOfferService {
                         .map(app -> app.getProvider().getIdx())
                         .collect(Collectors.toSet());
 
-        return candidates.stream()
+        List<CareProviderDTO> providers = page.stream()
                 .map(u -> {
                     double[] rating = ratingByProvider.get(u.getIdx());
                     return CareProviderDTO.builder()
@@ -341,6 +372,13 @@ public class CareOfferService {
                             .build();
                 })
                 .toList();
+
+        String label = "DISTRICT".equals(scope)
+                ? CareProviderLocation.keysOf(area).stream().findFirst().orElse(null)
+                : CareProviderLocation.wideAreaOf(area);
+
+        return CareProviderSearchDTO.builder()
+                .scope(scope).areaLabel(label).total(total).providers(providers).build();
     }
 
     private boolean isLive(CareApplication offer) {

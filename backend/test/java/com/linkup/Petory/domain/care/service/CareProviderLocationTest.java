@@ -54,4 +54,23 @@ class CareProviderLocationTest {
         assertThat(CareProviderLocation.sameArea("서울 강남구", null)).isFalse();
         assertThat(CareProviderLocation.sameArea("   ", "서울 강남구")).isFalse();
     }
+
+    @Test
+    @DisplayName("시·도 표기가 흔들려도 같은 광역이면 맞는다 — 구가 비었을 때 넓히는 기준")
+    void 광역_정규화() {
+        assertThat(CareProviderLocation.wideAreaOf("서울특별시 중랑구 묵동")).isEqualTo("서울");
+        assertThat(CareProviderLocation.wideAreaOf("서울 강남구")).isEqualTo("서울");
+        assertThat(CareProviderLocation.wideAreaOf("경기도 고양시")).isEqualTo("경기");
+        assertThat(CareProviderLocation.wideAreaOf("경기 고양시")).isEqualTo("경기");
+
+        // 사용자가 실제로 겪은 조합: 중랑구 요청인데 제공자는 강남구뿐이었다.
+        assertThat(CareProviderLocation.sameArea("서울특별시 중랑구 묵동", "서울 강남구")).isFalse();
+        assertThat(CareProviderLocation.sameWideArea("서울특별시 중랑구 묵동", "서울 강남구")).isTrue();
+    }
+
+    @Test
+    @DisplayName("시·도가 다르면 넓혀도 안 맞는다")
+    void 다른_광역은_불일치() {
+        assertThat(CareProviderLocation.sameWideArea("서울특별시 중랑구", "경기 고양시")).isFalse();
+    }
 }
