@@ -19,6 +19,7 @@ import com.linkup.Petory.domain.care.converter.CareRequestConverter;
 import com.linkup.Petory.domain.care.dto.CareRequestDTO;
 import com.linkup.Petory.domain.care.dto.CareRequestListView;
 import com.linkup.Petory.domain.care.dto.CareRequestPageResponseDTO;
+import com.linkup.Petory.domain.care.entity.CareApplication;
 import com.linkup.Petory.domain.care.entity.CareApplicationStatus;
 import com.linkup.Petory.domain.care.entity.CareRequest;
 import com.linkup.Petory.domain.care.entity.CareRequestStatus;
@@ -30,6 +31,8 @@ import com.linkup.Petory.domain.care.repository.CareRequestRepository;
 import com.linkup.Petory.domain.payment.entity.EscrowStatus;
 import com.linkup.Petory.domain.payment.entity.PetCoinEscrow;
 import com.linkup.Petory.domain.payment.service.PetCoinEscrowService;
+import com.linkup.Petory.domain.notification.entity.NotificationType;
+import com.linkup.Petory.domain.notification.service.NotificationService;
 import com.linkup.Petory.domain.petRecommendation.event.CareRequestCreatedEvent;
 import com.linkup.Petory.domain.user.entity.EmailVerificationPurpose;
 import com.linkup.Petory.domain.user.entity.Pet;
@@ -56,6 +59,7 @@ public class CareRequestService {
     private final CareRequestConverter careRequestConverter;
     private final PetCoinEscrowService petCoinEscrowService;
     private final ApplicationEventPublisher eventPublisher;
+    private final NotificationService notificationService;
 
     /**
      * 현재 사용자가 관리자(ADMIN 또는 MASTER)인지 확인
@@ -254,6 +258,12 @@ public class CareRequestService {
             petCoinEscrowService.changeAmount(request, request.getUser(), dto.getOfferedCoins());
             // 변경 시각을 남겨, 이 시각 이전에 이뤄진 거래 확정을 낡은 동의로 판별할 수 있게 한다.
             request.changeOfferedCoins(dto.getOfferedCoins());
+
+            // 나가 있는 제안은 바뀌기 전 금액을 들고 있다. 그대로 두면 제공자 화면엔 옛 금액이
+            // 계속 보이고, 수락을 누르는 순간에야 금액이 다르다며 거절당한다.
+            // 지금 내려두고 요청자가 새 금액으로 다시 제안하게 한다 — 제안 금액을 조용히
+            // 덮어쓰지 않는 이유는, 화면을 띄워둔 제공자가 바뀐 줄 모르고 수락할 수 있어서다.
+            withdrawPendingOffers(request, "제시 금액이 변경되어");
         }
 
         if (dto.getTitle() != null) {
@@ -302,7 +312,8 @@ public class CareRequestService {
     // 케어 요청 삭제
     @Transactional
     public void deleteCareRequest(Long idx, Long currentUserId) {
-        CareRequest request = careRequestRepository.findByIdWithUser(idx)
+        // 제안을 같이 내려야 하므로 applications 까지 읽는다.
+        CareRequest request = careRequestRepository.findByIdWithApplications(idx)
                 .orElseThrow(() -> new CareRequestNotFoundException());
 
         // 작성자 확인 (관리자는 우회)
@@ -324,6 +335,8 @@ public class CareRequestService {
             log.info("요청 삭제로 보관 코인 환불: careRequestIdx={}, escrowIdx={}, amount={}",
                     request.getIdx(), escrow.getIdx(), escrow.getAmount());
         }
+
+        withdrawPendingOffers(request, "요청이 삭제되어");
 
         request.softDelete();
         careRequestRepository.save(request);
@@ -407,6 +420,12 @@ public class CareRequestService {
             }
         }
 
+        // 취소되면 나가 있던 제안도 같이 내린다. 안 내리면 제공자 화면에서 제안이 조용히
+        // 사라지고(조회가 취소된 요청을 걸러낸다), 거절당한 건지 취소된 건지 알 수 없다.
+        if (newStatus == CareRequestStatus.CANCELLED) {
+            withdrawPendingOffers(request, "요청이 취소되어");
+        }
+
         // 상태가 CANCELLED로 변경될 때 에스크로에서 요청자에게 코인 환불
         if (newStatus == CareRequestStatus.CANCELLED) {
             PetCoinEscrow escrow = petCoinEscrowService.findByCareRequest(request);
@@ -479,6 +498,34 @@ public class CareRequestService {
         }
 
         return careRequestConverter.toDTO(careRequestRepository.save(request));
+    }
+
+    /**
+     * 나가 있는(대기 중) 제안을 전부 내리고 제공자에게 이유를 알린다.
+     *
+     * 제공자가 거절한 것과 구분하려고 {@code WITHDRAWN} 을 쓴다 — 제공자는 아무것도 하지 않았는데
+     * 화면에 "거절하셨습니다"로 남으면 상태가 거짓말을 하는 것이다(V20 참고).
+     */
+    private void withdrawPendingOffers(CareRequest request, String reason) {
+        if (request.getApplications() == null) {
+            return;
+        }
+        for (CareApplication offer : request.getApplications()) {
+            if (offer.getStatus() != CareApplicationStatus.PENDING) {
+                continue;
+            }
+            offer.withdraw();
+            notificationService.createNotification(
+                    offer.getProvider().getIdx(),
+                    NotificationType.CARE_OFFER_WITHDRAWN,
+                    "케어 제안이 내려갔습니다",
+                    String.format("%s \"%s\" 케어 제안이 더 이상 유효하지 않습니다.",
+                            reason, request.getTitle()),
+                    request.getIdx(),
+                    "CARE_REQUEST");
+            log.info("케어 제안 철회: careRequestIdx={}, applicationIdx={}, 사유={}",
+                    request.getIdx(), offer.getIdx(), reason);
+        }
     }
 
     private boolean isSanctionedPreMatchRequest(CareRequest request) {

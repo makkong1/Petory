@@ -87,4 +87,21 @@ public class CareApplication extends BaseTimeEntity {
     public void reject() {
         this.status = CareApplicationStatus.REJECTED;
     }
+
+    /** 요청자 사정으로 제안을 내린다(금액 변경·요청 취소·요청 삭제). 제공자의 거절과 구분한다. */
+    public void withdraw() {
+        this.status = CareApplicationStatus.WITHDRAWN;
+    }
+
+    /**
+     * 끝난 제안을 새 금액으로 다시 보낸다.
+     *
+     * 새 행을 만들지 않는 이유는 {@code UNIQUE(care_request_idx, provider_idx)} 다 — 같은
+     * 사람에게 두 번 제안하는 건 두 건이 아니라 같은 한 건을 다시 보내는 것이다. 이 메서드가
+     * 없으면 거절·철회당한 제안이 영영 되살아나지 못해 재제안 경로가 막힌다.
+     */
+    public void reopen(Integer amount) {
+        this.status = CareApplicationStatus.PENDING;
+        this.offeredCoins = amount;
+    }
 }

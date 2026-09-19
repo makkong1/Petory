@@ -17,6 +17,8 @@ import com.linkup.Petory.domain.care.exception.CareForbiddenException;
 import com.linkup.Petory.domain.care.exception.CareRequestNotFoundException;
 import com.linkup.Petory.domain.care.repository.CareApplicationRepository;
 import com.linkup.Petory.domain.care.repository.CareRequestRepository;
+import com.linkup.Petory.domain.notification.entity.NotificationType;
+import com.linkup.Petory.domain.notification.service.NotificationService;
 import com.linkup.Petory.domain.payment.service.PetCoinEscrowService;
 import com.linkup.Petory.domain.user.entity.Role;
 import com.linkup.Petory.domain.user.entity.Users;
@@ -54,6 +56,7 @@ public class CareOfferService {
     private final UsersRepository usersRepository;
     private final CareApplicationConverter careApplicationConverter;
     private final PetCoinEscrowService petCoinEscrowService;
+    private final NotificationService notificationService;
 
     /**
      * 요청자가 제공자 한 명에게 케어를 제안한다.
@@ -91,20 +94,41 @@ public class CareOfferService {
         }
         SanctionGuard.check(provider, CareForbiddenException::sanctioned);
 
-        CareApplication existing = findOfferTo(request, providerId);
-        if (existing != null) {
-            return careApplicationConverter.toDTO(existing);
+        CareApplication offer = findOfferTo(request, providerId);
+        if (offer != null && isLive(offer)) {
+            // 살아 있는 제안이 이미 있으면 그대로 돌려준다(재시도 안전).
+            return careApplicationConverter.toDTO(offer);
         }
 
-        CareApplication offer = careApplicationRepository.saveAndFlush(CareApplication.builder()
-                .careRequest(request)
-                .provider(provider)
-                .status(CareApplicationStatus.PENDING)
-                .offeredCoins(request.getOfferedCoins())
-                .build());
+        if (offer != null) {
+            // 거절·철회로 끝난 제안이 남아 있다. UNIQUE(care_request_idx, provider_idx) 때문에
+            // 새 행을 만들 수 없으므로 그 행을 새 금액으로 되살린다.
+            // 이 분기가 없으면 한 번 거절당한 제공자에게는 영영 다시 제안할 수 없는데,
+            // 화면에는 "제안을 보냈습니다"가 떠서 보낸 줄로 착각하게 된다.
+            offer.reopen(request.getOfferedCoins());
+            careApplicationRepository.saveAndFlush(offer);
+            log.info("케어 제안 재전송: careRequestIdx={}, providerId={}, amount={}",
+                    request.getIdx(), providerId, request.getOfferedCoins());
+        } else {
+            offer = careApplicationRepository.saveAndFlush(CareApplication.builder()
+                    .careRequest(request)
+                    .provider(provider)
+                    .status(CareApplicationStatus.PENDING)
+                    .offeredCoins(request.getOfferedCoins())
+                    .build());
+            log.info("케어 제안 생성: careRequestIdx={}, providerId={}, amount={}",
+                    request.getIdx(), providerId, request.getOfferedCoins());
+        }
 
-        log.info("케어 제안 생성: careRequestIdx={}, providerId={}, amount={}",
-                request.getIdx(), providerId, request.getOfferedCoins());
+        notificationService.createNotification(
+                providerId,
+                NotificationType.CARE_OFFER_RECEIVED,
+                "케어 제안이 도착했습니다",
+                String.format("%s님이 \"%s\" 케어를 %,d 코인에 맡기고 싶어 합니다.",
+                        request.getUser().getUsername(), request.getTitle(),
+                        request.getOfferedCoins() == null ? 0 : request.getOfferedCoins()),
+                request.getIdx(),
+                "CARE_REQUEST");
 
         return careApplicationConverter.toDTO(offer);
     }
@@ -184,6 +208,15 @@ public class CareOfferService {
         log.info("케어 제안 수락 — 계약 성립: careRequestIdx={}, applicationIdx={}, providerId={}, amount={}",
                 request.getIdx(), offer.getIdx(), provider.getIdx(), request.getOfferedCoins());
 
+        notificationService.createNotification(
+                requester.getIdx(),
+                NotificationType.CARE_OFFER_ACCEPTED,
+                "케어 제안이 수락되었습니다",
+                String.format("%s님이 \"%s\" 케어를 맡기로 했습니다. 케어가 시작됩니다.",
+                        provider.getUsername(), request.getTitle()),
+                request.getIdx(),
+                "CARE_REQUEST");
+
         return careApplicationConverter.toDTO(offer);
     }
 
@@ -207,6 +240,16 @@ public class CareOfferService {
 
         log.info("케어 제안 거절: applicationIdx={}, providerId={}", applicationIdx, currentUserId);
 
+        CareRequest rejected = offer.getCareRequest();
+        notificationService.createNotification(
+                rejected.getUser().getIdx(),
+                NotificationType.CARE_OFFER_REJECTED,
+                "케어 제안이 거절되었습니다",
+                String.format("%s님이 \"%s\" 케어 제안을 거절했습니다. 다른 제공자에게 제안할 수 있습니다.",
+                        offer.getProvider().getUsername(), rejected.getTitle()),
+                rejected.getIdx(),
+                "CARE_REQUEST");
+
         return careApplicationConverter.toDTO(offer);
     }
 
@@ -222,6 +265,12 @@ public class CareOfferService {
                 .toList();
     }
 
+    private boolean isLive(CareApplication offer) {
+        return offer.getStatus() == CareApplicationStatus.PENDING
+                || offer.getStatus() == CareApplicationStatus.ACCEPTED;
+    }
+
+    /** 이 제공자에게 보낸 제안. 상태와 무관하게 찾는다 — 끝난 제안도 되살릴 대상이기 때문이다. */
     private CareApplication findOfferTo(CareRequest request, Long providerId) {
         if (request.getApplications() == null) {
             return null;

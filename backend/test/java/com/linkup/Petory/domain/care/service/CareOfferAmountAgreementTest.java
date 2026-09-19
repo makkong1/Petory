@@ -107,22 +107,31 @@ class CareOfferAmountAgreementTest {
         }
     }
 
-    private void changeAmountTo(int amount) {
-        careRequestService.updateCareRequest(careRequestIdx,
-                CareRequestDTO.builder().offeredCoins(amount).build(), requester.getIdx());
+    /**
+     * 금액만 바꾼다 — 제안을 철회하지 않고.
+     *
+     * 정상 경로({@code updateCareRequest})는 금액이 바뀌면 나가 있던 제안을 철회하므로
+     * 이 어긋남이 화면에 드러나지 않는다. 그런데 {@code updateCareRequest} 는 요청 행을 잠그지
+     * 않아서, 금액 변경과 수락이 겹치면 <b>철회를 지나친 제안이 수락에 도달할 수 있다.</b>
+     * 그 경쟁을 재현하려고 철회를 건너뛰고 금액만 바꾼다.
+     */
+    private void changeAmountWithoutWithdrawing(int amount) {
+        var request = careRequestRepository.findById(careRequestIdx).orElseThrow();
+        request.changeOfferedCoins(amount);
+        careRequestRepository.save(request);
     }
 
     @Test
-    @DisplayName("제안 이후 금액이 바뀌면 수락이 거절된다")
-    void 제안_후_금액이_바뀌면_수락_거절() {
+    @DisplayName("제안 금액과 현재 금액이 어긋난 채 수락이 도달하면 거절된다 (마지막 안전망)")
+    void 금액이_어긋난_수락은_거절() {
         // Given: 제공자는 5,000 을 보고 있는데
         assertThat(careApplicationRepository.findById(offerIdx).orElseThrow().getOfferedCoins())
                 .isEqualTo(OFFERED);
 
-        // When: 요청자가 1,000 으로 내린다
-        changeAmountTo(CHANGED);
+        // When: 철회를 지나쳐 금액만 1,000 으로 바뀌었다(경쟁 재현)
+        changeAmountWithoutWithdrawing(CHANGED);
 
-        // Then: 제공자가 본 금액과 실제가 어긋나므로 수락이 막힌다
+        // Then: 수락 시점 대조가 막는다
         assertThatThrownBy(() -> careOfferService.acceptOffer(offerIdx, provider.getIdx()))
                 .as("제공자가 5,000 인 줄 알고 맡았는데 1,000 이 지급되면 안 된다")
                 .isInstanceOf(CareConflictException.class);
