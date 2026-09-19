@@ -1,5 +1,6 @@
 package com.linkup.Petory.domain.care.repository;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.context.annotation.Primary;
@@ -34,5 +35,10 @@ public class JpaCareApplicationAdapter implements CareApplicationRepository {
     @Override
     public long countCompletedByProviderId(Long providerId) {
         return jpaRepository.countCompletedByProviderId(providerId);
+    }
+
+    @Override
+    public List<CareApplication> findLiveOffersBetween(Long userA, Long userB) {
+        return jpaRepository.findLiveOffersBetween(userA, userB);
     }
 }

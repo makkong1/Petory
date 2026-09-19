@@ -129,6 +129,13 @@ npm test
   | `V10` | 공간 인덱스로 대체된 `meetup`·`missing_pet_board`의 lat/lng B-tree 인덱스 제거 |
   | `V11` | 읽는 쿼리가 없는 `locationservice` 읍면동·도로명 인덱스 제거 (3계층 모두 주석 처리된 메서드용) |
   | `V12` | `chatmessage`·`locationservice` FULLTEXT를 ngram으로 전환 — **이로써 FULLTEXT 5개 전부 ngram** |
+  | `V13` | `carerequest` 이행 완료 확인 컬럼 (요청자·제공자 각각) |
+  | `V14` | 에스크로를 거래 확정이 아니라 요청 등록 시점에 HOLD |
+  | `V15` | 확정 시 동의한 금액 기록 (시각 비교가 같은 초를 구분 못 해 샜다) |
+  | `V16` | 신고 `action_taken` 에 `BAN_USER` 추가 |
+  | `V17` | `report.target_type` 에 `CARE_REVIEW` 누락 수정 |
+  | `V18` | `careapplication.offered_coins` — 제안 시점 금액 스냅샷 (계약을 제안/수락으로 전환) |
+  | `V19` | `conversationparticipant` 확정 3컬럼 제거 — 계약이 chat 에서 care 로 옮겨감 |
 
   ⚠️ 신규 docker 볼륨은 앱을 최소 한 번 부팅해야 Flyway가 V2~V7을 적용한다. `petory_app` 계정은 SUPER 권한이 없어 binlog가 켜진 상태에서 트리거 생성(V4, V6)이 `ERROR 1419`로 실패할 수 있다 — 그럴 땐 root로 `SET GLOBAL log_bin_trust_function_creators = 1;` 실행 후 재시도.
 - **엔티티도 같이 고쳐야 한다.** `ddl-auto=validate` 가 엔티티와 실제 스키마를 대조하므로, 어긋나면 앱이 기동에 실패한다(DDL은 실행하지 않으니 데이터는 안전).

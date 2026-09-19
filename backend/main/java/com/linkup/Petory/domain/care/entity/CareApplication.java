@@ -71,6 +71,15 @@ public class CareApplication extends BaseTimeEntity {
     @Column(columnDefinition = "LONGTEXT")
     private String message;
 
+    /**
+     * 제안 시점의 제시 금액. 수락할 때 현재 금액과 대조한다 — 제안을 보낸 뒤 요청자가 금액을
+     * 바꿨으면 제공자가 본 금액과 실제로 성립할 계약이 어긋나기 때문이다.
+     *
+     * NULL 이면 제안 경로를 거치지 않은 옛 지원이라 대조를 건너뛴다(V18 참고).
+     */
+    @Column(name = "offered_coins")
+    private Integer offeredCoins;
+
     public void accept() {
         this.status = CareApplicationStatus.ACCEPTED;
     }
