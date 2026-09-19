@@ -47,4 +47,16 @@ public class CareForbiddenException extends ApiException {
     public static CareForbiddenException sanctioned() {
         return new CareForbiddenException("제재된 사용자는 이 작업을 수행할 수 없습니다.");
     }
+
+    public static CareForbiddenException cannotOfferToSelf() {
+        return new CareForbiddenException("자기 자신에게 케어를 제안할 수 없습니다.");
+    }
+
+    public static CareForbiddenException providerRoleRequired() {
+        return new CareForbiddenException("서비스 제공자에게만 케어를 제안할 수 있습니다.");
+    }
+
+    public static CareForbiddenException offerReceiverOnly() {
+        return new CareForbiddenException("제안을 받은 제공자만 수락/거절할 수 있습니다.");
+    }
 }

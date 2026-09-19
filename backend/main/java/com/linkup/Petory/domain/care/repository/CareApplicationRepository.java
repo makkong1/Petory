@@ -1,5 +1,6 @@
 package com.linkup.Petory.domain.care.repository;
 
+import java.util.List;
 import java.util.Optional;
 
 import com.linkup.Petory.domain.care.entity.CareApplication;
@@ -14,4 +15,6 @@ public interface CareApplicationRepository {
     Optional<CareApplication> findById(Long id);
 
     long countCompletedByProviderId(Long providerId);
+
+    List<CareApplication> findLiveOffersBetween(Long userA, Long userB);
 }

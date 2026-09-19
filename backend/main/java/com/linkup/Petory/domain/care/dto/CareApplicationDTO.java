@@ -22,6 +22,9 @@ public class CareApplicationDTO {
     private String status; // PENDING, ACCEPTED, REJECTED
     private LocalDateTime createdAt;
 
+    /** 제안 시점의 제시 금액. 제공자가 수락 화면에서 보는 금액이다. */
+    private Integer offeredCoins;
+
     // 지원자 정보
     private Long applicantId;
     private String applicantName;

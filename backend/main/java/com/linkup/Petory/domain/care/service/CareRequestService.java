@@ -375,6 +375,16 @@ public class CareRequestService {
             throw CareForbiddenException.ownerOrApprovedProvider();
         }
 
+        // 진행 중으로 가는 유일한 길은 제공자가 제안을 수락하는 것이다(acceptOffer). 이 경로로
+        // 들어오면 지급 대상이 비어 있는 채로 상태만 진행 중이 되고, 그 뒤 완료 정산에서
+        // 에스크로의 제공자가 null 이라 터진다. 관리자도 예외가 아니다 — 배정을 만들 수 없는 건
+        // 권한 문제가 아니라 순서 문제다.
+        // 같은 상태로의 재요청은 그대로 통과시킨다(transitionTo 와 같은 이유 — 재시도 안전).
+        if (newStatus == CareRequestStatus.IN_PROGRESS && oldStatus != CareRequestStatus.IN_PROGRESS) {
+            throw new IllegalStateException(
+                    "진행 중으로의 전환은 제공자가 제안을 수락할 때만 일어납니다. 현재 상태: " + oldStatus);
+        }
+
         if (!isAdmin() && isSettlementStatus(newStatus) && hasSanctionedCareParty(request)) {
             throw CareForbiddenException.sanctioned();
         }
