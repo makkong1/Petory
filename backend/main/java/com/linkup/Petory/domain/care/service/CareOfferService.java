@@ -176,6 +176,7 @@ public class CareOfferService {
 
         Users requester = request.getUser();
         Users provider = offer.getProvider();
+        // 이부분은 지금 그 요청마다 필터에서 확인하지않나??? 확인필요 
         SanctionGuard.check(requester, CareForbiddenException::sanctioned);
         SanctionGuard.check(provider, CareForbiddenException::sanctioned);
 

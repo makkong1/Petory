@@ -29,7 +29,6 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
   const [offers, setOffers] = useState([]);
   const [processingOfferIdx, setProcessingOfferIdx] = useState(null);
   const [myOpenRequests, setMyOpenRequests] = useState([]);
-  const [reviewedApplicationIds, setReviewedApplicationIds] = useState([]);
   const [reviewTarget, setReviewTarget] = useState(null);
   const [completingCareIdx, setCompletingCareIdx] = useState(null);
   const [showReviewModal, setShowReviewModal] = useState(false);
@@ -160,21 +159,6 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
           setMyOpenRequests([]);
         }
 
-        // 리뷰 작성 여부는 완료된 계약이 있을 때만, 한 번에 조회한다.
-        // CareApplicationDTO.reviews 는 변환 시 비어 있는 경우가 있어 작성 목록으로 교차 검증한다.
-        const needsReviewCheck = live.some(
-          o => o.careRequestStatus === 'COMPLETED' && o.requesterId === user.idx
-        );
-        if (needsReviewCheck) {
-          try {
-            const { data: written } = await careReviewApi.getReviewsByReviewer(user.idx);
-            const rows = Array.isArray(written) ? written : [];
-            setReviewedApplicationIds(rows.map(r => Number(r?.careApplicationId)));
-          } catch (e) {
-            console.warn('리뷰 작성 여부 조회 실패:', e);
-            setReviewedApplicationIds([]);
-          }
-        }
       } catch (error) {
         console.error('케어 제안 조회 실패:', error);
       }
@@ -598,9 +582,9 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
       const msg = error.response?.data?.error || error.response?.data?.message || '';
       const status = error.response?.status;
       if (status === 409 || (typeof msg === 'string' && msg.includes('이미 해당 서비스에 리뷰'))) {
-        // 이미 있는 리뷰는 목록에 반영해 버튼을 감춘다.
-        setReviewedApplicationIds(prev => [...prev, Number(reviewTarget.idx)]);
+        // 이미 썼다면 다시 받아오면 카드가 사라진다(조회가 리뷰 남은 것만 돌려준다).
         setShowReviewModal(false);
+        await fetchConversation();
         showToast(typeof msg === 'string' ? msg : '이미 해당 서비스에 리뷰를 작성하셨습니다.');
       } else {
         showToast(msg || '리뷰 작성에 실패했습니다.');
@@ -777,7 +761,6 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
           const mineConfirmed = iAmProvider
             ? Boolean(o.providerCompletedAt)
             : Boolean(o.requesterCompletedAt);
-          const reviewed = reviewedApplicationIds.includes(Number(o.idx));
           const busy = processingOfferIdx === o.idx;
 
           return (
@@ -817,19 +800,15 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
                 </OfferActions>
               )}
 
+              {/* 완료 카드는 리뷰가 남았을 때만 내려온다 — 쓰고 나면 카드째 사라진다 */}
               {o.careRequestStatus === 'COMPLETED' && (
                 <>
                   <CompletedBanner>✓ 펫케어 서비스가 완료되었습니다.</CompletedBanner>
-                  {!iAmProvider && !reviewed && (
-                    <OfferActions>
-                      <ReviewButton onClick={() => handleOpenReviewModal(o)}>
-                        ⭐ 리뷰 작성하기
-                      </ReviewButton>
-                    </OfferActions>
-                  )}
-                  {!iAmProvider && reviewed && (
-                    <ReviewCompletedBanner>✓ 리뷰를 작성하셨습니다.</ReviewCompletedBanner>
-                  )}
+                  <OfferActions>
+                    <ReviewButton onClick={() => handleOpenReviewModal(o)}>
+                      ⭐ 리뷰 작성하기
+                    </ReviewButton>
+                  </OfferActions>
                 </>
               )}
             </OfferCard>
@@ -1473,16 +1452,6 @@ const CompletedBanner = styled.div`
   padding: 12px 16px;
   background: ${({ theme }) => theme.colors.successSoft};
   color: ${({ theme }) => theme.colors.success};
-  border-top: 1px solid ${({ theme }) => theme.colors.border};
-  text-align: center;
-  font-size: ${({ theme }) => theme.typography.body2.fontSize};
-  font-weight: 600;
-`;
-
-const ReviewCompletedBanner = styled.div`
-  padding: 12px 16px;
-  background: ${({ theme }) => theme.colors.infoSoft};
-  color: ${({ theme }) => theme.colors.info};
   border-top: 1px solid ${({ theme }) => theme.colors.border};
   text-align: center;
   font-size: ${({ theme }) => theme.typography.body2.fontSize};

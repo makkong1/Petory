@@ -14,7 +14,9 @@ import com.linkup.Petory.domain.care.dto.CareRequestDTO;
 import com.linkup.Petory.domain.care.entity.CareApplicationStatus;
 import com.linkup.Petory.domain.care.entity.CareRequestStatus;
 import com.linkup.Petory.domain.care.repository.CareApplicationRepository;
+import com.linkup.Petory.domain.care.dto.CareReviewDTO;
 import com.linkup.Petory.domain.care.repository.CareRequestRepository;
+import com.linkup.Petory.domain.care.repository.SpringDataJpaCareReviewRepository;
 import com.linkup.Petory.domain.user.entity.Role;
 import com.linkup.Petory.domain.user.entity.Users;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
@@ -49,6 +51,9 @@ class CareOfferLifecycleTest {
     private CareOfferService careOfferService;
 
     @Autowired
+    private CareReviewService careReviewService;
+
+    @Autowired
     private UsersRepository usersRepository;
 
     @Autowired
@@ -56,6 +61,9 @@ class CareOfferLifecycleTest {
 
     @Autowired
     private CareApplicationRepository careApplicationRepository;
+
+    @Autowired
+    private SpringDataJpaCareReviewRepository reviewRepository;
 
     private Users requester;
     private Users provider;
@@ -94,6 +102,11 @@ class CareOfferLifecycleTest {
 
     @AfterEach
     void tearDown() {
+        // 리뷰가 제안을 FK 로 참조한다. 먼저 지우지 않으면 요청 삭제가 막힌다.
+        if (provider != null) {
+            reviewRepository.deleteAll(
+                    reviewRepository.findByRevieweeIdxOrderByCreatedAtDesc(provider.getIdx()));
+        }
         if (careRequestIdx != null) {
             careRequestRepository.deleteById(careRequestIdx);   // 에스크로는 FK CASCADE
         }
@@ -180,5 +193,46 @@ class CareOfferLifecycleTest {
         assertThat(live.get(0).getRequesterCompletedAt())
                 .as("화면이 '내가 이미 확인했는지'를 그리려면 이 값이 실려야 한다")
                 .isNotNull();
+    }
+
+    /**
+     * 채팅방 카드의 수명. 이 자리는 하루에 두 번 틀렸다.
+     *
+     * <p>처음엔 완료된 요청을 조회에서 빼서 <b>리뷰 버튼이 영영 안 떴다</b>. 넣었더니 이번엔
+     * 끝나는 조건이 없어 <b>완료 카드가 영구히 쌓였다</b>. 기준을 "아직 내가 할 게 남은 계약"
+     * 하나로 잡고 양쪽을 같이 잠근다.
+     */
+    @Test
+    @DisplayName("완료 후 리뷰가 남았으면 요청자에게는 보이고, 제공자에게는 안 보인다")
+    void 완료_후_리뷰_남은_쪽에만_보인다() {
+        careOfferService.acceptOffer(offerIdx, provider.getIdx());
+        careRequestService.confirmCompletion(careRequestIdx, provider.getIdx());
+        careRequestService.confirmCompletion(careRequestIdx, requester.getIdx());
+
+        assertThat(careOfferService.findLiveOffersBetween(requester.getIdx(), provider.getIdx()))
+                .as("요청자는 아직 리뷰를 써야 하므로 카드가 남아야 한다")
+                .hasSize(1);
+        assertThat(careOfferService.findLiveOffersBetween(provider.getIdx(), requester.getIdx()))
+                .as("제공자는 쓸 리뷰가 없다 — 완료 카드가 계속 쌓이면 안 된다")
+                .isEmpty();
+    }
+
+    @Test
+    @DisplayName("리뷰를 쓰면 완료 카드가 사라진다")
+    void 리뷰_쓰면_카드가_사라진다() {
+        careOfferService.acceptOffer(offerIdx, provider.getIdx());
+        careRequestService.confirmCompletion(careRequestIdx, provider.getIdx());
+        careRequestService.confirmCompletion(careRequestIdx, requester.getIdx());
+
+        careReviewService.createReview(CareReviewDTO.builder()
+                .careApplicationId(offerIdx)
+                .revieweeId(provider.getIdx())
+                .rating(5)
+                .comment("수명 테스트")
+                .build(), requester.getIdx());
+
+        assertThat(careOfferService.findLiveOffersBetween(requester.getIdx(), provider.getIdx()))
+                .as("쓰고 나면 할 일이 없다 — 남으면 한 상대와 거래할수록 배너가 쌓인다")
+                .isEmpty();
     }
 }
