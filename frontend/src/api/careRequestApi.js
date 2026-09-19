@@ -6,95 +6,42 @@ const api = createAuthAxios('http://localhost:8080/api/care-requests');
 
 const mockResolve = (data) => Promise.resolve({ data });
 
+/**
+ * 펫케어 요청 API.
+ *
+ * 케어는 지도 전용이다(2026-09-19 확정). 목록·검색·상세 페이지는 `d60bc05b`(2026-04-09)
+ * 에서 탭 통합과 함께 삭제됐고, 그 뒤로 여기 있던 래퍼 8개는 호출처가 0이었다 —
+ * 목록/검색/수정/삭제/상태변경/단건조회/댓글작성/댓글삭제. 남은 백엔드 엔드포인트는
+ * 관리자 화면(`/api/admin/care-requests`)과 포트폴리오 근거로 살아 있어 그대로 둔다.
+ *
+ * 계약(제안/수락)은 `careOfferApi` 가 담당한다.
+ */
 export const careRequestApi = {
-  // 전체 케어 요청 조회 (페이징 지원)
-  getAllCareRequests: (params = {}) => {
-    if (isDemoMode()) {
-      const { page = 0, size = 20, status } = params;
-      let filtered = [...DEMO_CARE_REQUESTS];
-      if (status && status !== 'ALL') {
-        filtered = filtered.filter((c) => c.status === status);
-      }
-      const start = page * size;
-      const careRequests = filtered.slice(start, start + size);
-      return mockResolve({
-        careRequests,
-        totalCount: filtered.length,
-      });
-    }
-    const { page = 0, size = 20, ...rest } = params;
-    return api.get('', { params: { page, size, ...rest } });
-  },
-
-  // 단일 케어 요청 조회
-  getCareRequest: (id) => {
-    if (isDemoMode()) {
-      const cr = DEMO_CARE_REQUESTS.find((c) => c.idx === Number(id));
-      return mockResolve(cr || DEMO_CARE_REQUESTS[0]);
-    }
-    return api.get(`/${id}`);
-  },
-  
-  // 케어 요청 생성
+  // 케어 요청 생성 (지도의 CareCreateModal)
   createCareRequest: (data) =>
     isDemoMode() ? mockResolve({ idx: 99, ...data }) : api.post('', data),
 
-  // 케어 요청 수정
-  updateCareRequest: (id, data) =>
-    isDemoMode() ? mockResolve({ idx: id, ...data }) : api.put(`/${id}`, data),
-
-  // 케어 요청 삭제
-  deleteCareRequest: (id) => (isDemoMode() ? mockResolve({}) : api.delete(`/${id}`)),
-
+  // 내 케어 요청 — 채팅방에서 "이 분께 맡기기" 후보를 고를 때 쓴다
   getMyCareRequests: () =>
     isDemoMode()
       ? mockResolve({ careRequests: DEMO_CARE_REQUESTS.filter((c) => c.userId === 1), totalCount: 1 })
       : api.get('/my-requests'),
 
-  // 상태 변경
-  updateStatus: (id, status) =>
-    isDemoMode()
-      ? mockResolve({})
-      : api.patch(`/${id}/status`, null, { params: { status } }),
-
   // 이행 완료 확인 (요청자·제공자가 각자 호출, 양쪽이 확인해야 정산된다)
   confirmCompletion: (id) =>
     isDemoMode() ? mockResolve({}) : api.post(`/${id}/complete`),
 
-  // 댓글 관련
+  // 제공자 댓글 — 지도 상세 패널에서 읽기 전용으로 보여준다(작성 UI는 없다)
   getComments: (careRequestId) =>
     isDemoMode()
       ? mockResolve([])
       : api.get(`/${careRequestId}/comments`),
-  createComment: (careRequestId, payload) =>
-    isDemoMode()
-      ? mockResolve({ idx: 1, ...payload })
-      : api.post(`/${careRequestId}/comments`, payload),
-  deleteComment: (careRequestId, commentId) =>
-    isDemoMode()
-      ? mockResolve({})
-      : api.delete(`/${careRequestId}/comments/${commentId}`),
 
-  // 반경 기반 근처 케어 요청 조회 (지도 표출용)
+  // 반경 기반 근처 케어 요청 조회 (지도 마커)
   getNearby: ({ lat, lng, radius = 5, limit }) => {
     if (isDemoMode()) return mockResolve([]);
     return api.get('/nearby', {
       params: { lat, lng, radius, ...(typeof limit === 'number' && { limit }) },
     });
   },
-
-  // 검색 (페이징 지원)
-  searchCareRequests: (keyword, page = 0, size = 20) =>
-    isDemoMode()
-      ? mockResolve({
-          careRequests: keyword
-            ? DEMO_CARE_REQUESTS.filter(
-                (c) =>
-                  (c.title && c.title.includes(keyword)) ||
-                  (c.description && c.description.includes(keyword))
-              )
-            : DEMO_CARE_REQUESTS,
-          totalCount: DEMO_CARE_REQUESTS.length,
-        })
-      : api.get('/search', { params: { keyword, page, size } }),
 };
