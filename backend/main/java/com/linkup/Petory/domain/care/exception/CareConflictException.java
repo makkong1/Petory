@@ -23,4 +23,19 @@ public class CareConflictException extends ApiException {
     public static CareConflictException alreadyReviewed() {
         return new CareConflictException("이미 해당 서비스에 리뷰를 작성하셨습니다.");
     }
+
+    public static CareConflictException offeredAmountChanged(Integer currentAmount) {
+        return new CareConflictException(
+                "제안 이후 제시 금액이 변경되었습니다. 현재 금액: " + currentAmount);
+    }
+
+    public static CareConflictException requestNotOpen(Object currentStatus) {
+        return new CareConflictException(
+                "이미 다른 제공자와 거래가 확정된 요청입니다. 현재 상태: " + currentStatus);
+    }
+
+    public static CareConflictException offerNotPending(Object currentStatus) {
+        return new CareConflictException(
+                "대기 중인 제안이 아닙니다. 현재 상태: " + currentStatus);
+    }
 }

@@ -21,6 +21,13 @@ public class CareApplicationConverter {
                 .providerId(app.getProvider().getIdx())
                 .providerName(app.getProvider().getUsername())
                 .status(app.getStatus().name())
+                .offeredCoins(app.getOfferedCoins())
+                .createdAt(app.getCreatedAt())
+                .careRequestTitle(app.getCareRequest().getTitle())
+                .careRequestStatus(app.getCareRequest().getStatus().name())
+                .requesterId(app.getCareRequest().getUser().getIdx())
+                .requesterCompletedAt(app.getCareRequest().getRequesterCompletedAt())
+                .providerCompletedAt(app.getCareRequest().getProviderCompletedAt())
                 .message(app.getMessage())
                 .message(app.getMessage())
                 .build();
