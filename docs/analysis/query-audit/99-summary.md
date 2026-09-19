@@ -101,7 +101,7 @@ MySQL 은 FULLTEXT 없이 `MATCH ... AGAINST` 를 **실행 자체를 못 한다.
 | 4 | board | **깊은 페이지 OFFSET** — 100,000행 검사 / 0행 반환 / 129ms | 🔴 | [board](board-2026-07-14.md) |
 | 5 | care | **인덱스 부재** — 목록 풀스캔 + filesort, 주변검색 선택도 **208배** 오판 | 🔴 | [care](care-2026-07-14.md) |
 | 6 | 스케줄러 | `MeetupChatRoomRecovery` **5분마다** meetup 풀스캔 / **0행 반환** | 🔴 | [etc](etc-domains-2026-07-14.md) |
-| 7 | 전역 | **자동생성 COUNT 16개** — 본문 JOIN 을 물고 COUNT (board 60,001행/호출) | 🟡 | [board](board-2026-07-14.md) |
+| 7 | 전역 | **자동생성 COUNT 16개** — 본문 JOIN 을 물고 COUNT (board 60,001행/호출) | 🟡 → 2026-09-19 재감사 결과 6개 잔존·실수정 1건 (§6-1) | [board](board-2026-07-14.md) |
 | 8 | board | `my-posts` 필수 파라미터 누락 → **500** (400이어야 함) + userId 노출 | 🐛 | [board](board-2026-07-14.md) |
 | 9 | 시드 | `PetGender` 불일치 (`MALE`/`FEMALE` ↔ enum `M`/`F`) — **12,000행** | 🐛 수정함 | [care](care-2026-07-14.md) |
 | 10 | **admin** | **`/api/admin/care-requests` 진짜 N+1** — 20건에 60쿼리, 결과 수에 1:1 비례 | 🔴 | [admin](admin-2026-07-14.md) |
@@ -149,9 +149,41 @@ MySQL 은 FULLTEXT 없이 `MATCH ... AGAINST` 를 **실행 자체를 못 한다.
 | **4** | **meetup 검색 페이징 + `maxResults` 기본값 500→20** | 한 줄 수정으로 51쿼리 → 몇 개 | ✅ **완료** |
 | **5** | **`users` 에 `created_at` 인덱스** | admin 목록이 1만 행 풀스캔+filesort | ✅ **완료** (`V4`) |
 | **6** | **care 인덱스 3종** (deleted_created / status / SPATIAL) | 목록·주변검색 풀스캔 | ✅ **완료** (`V4`) |
-| **7** | **스케줄러 범위 축소** (최근 1시간 모임만) | 하루 288회 × 1만 행 | ⬜ |
-| **8** | board 깊은 페이지 (키셋 or 지연 조인) | 크롤러 대비 | ⬜ |
-| **9** | 자동생성 COUNT 16개 (COUNT 캐싱 or `Slice`) | 가장 넓게 퍼졌으나 개별 비용은 중간 | ⬜ |
+| **7** | **스케줄러 범위 축소** (최근 1시간 모임만) | 하루 288회 × 1만 행 | ⬜ **미착수** (2026-09-19 코드 확인 — `MeetupChatRoomRecoveryScheduler` 는 여전히 `fixedDelay=300_000` + 시간 조건 없는 `findWithoutChatRoom()`) |
+| **8** | board 깊은 페이지 (키셋 or 지연 조인) | 크롤러 대비 | ✅ **완료** — 2단계 지연 조인 + 단일 테이블 COUNT (`2f824f27`, 2026-07-15). `author_visible` 비정규화(`V6`)로 COUNT 의 users 조인을 걷어냈고, 검색 쿼리의 잔여 조인도 `ac035d6c`(2026-09-09)에서 제거. 키셋은 공유 페이지네이션 UI 때문에 기각 |
+| **9** | 자동생성 COUNT 16개 (COUNT 캐싱 or `Slice`) | 가장 넓게 퍼졌으나 개별 비용은 중간 | ✅ **닫음** (2026-09-19) — 아래 §6-1 |
+
+### 6-1. 처방 9 재감사 (2026-09-19)
+
+감사 시점 16개였던 **자동생성 COUNT**(= `@Query` 는 있는데 `countQuery` 가 없어 Hibernate 가 본문 JOIN 을 그대로 물고 COUNT 를 만드는 것)를 코드로 다시 셌다. **남은 것은 6개**였고, 나머지 10개는 그동안의 수정에서 `countQuery` 가 붙거나 경로 자체가 바뀌었다.
+
+남은 6개를 하나씩 본 결과 **실제로 고칠 것은 1개**였다.
+
+| 위치 | 판정 |
+|---|---|
+| `SpringDataJpaBoardRepository.findAllByIsDeletedFalseOrderByCreatedAtDesc(Pageable)` | 🔴 **고침** (아래) |
+| `SpringDataJpaBoardRepository.searchBoardListItemsByNickname` | 조인이 닉네임 **필터**라 결과 건수를 바꾼다 → 조인 제거 불가. 자동 COUNT 가 이미 최소형 |
+| `SpringDataJpaLocationServiceReviewRepository.findReviewListItems` | `WHERE u.isDeleted = false AND u.status <> BANNED` 로 유저 조건이 건수를 바꾼다 → 조인 필수 |
+| `SpringDataJpaAttachmentFileRepository.findAllForAdmin` | 본문에 조인이 없다. COUNT 도 단일 테이블 |
+| `SpringDataJpaMeetupRepository.findAllForAdmin` | 본문에 조인 없음(`@EntityGraph` 는 COUNT 에 붙지 않는다) |
+| `SpringDataJpaReportRepository.findReportListItems` | 조인이 count-neutral(`reporter` FK `nullable=false`, `handledBy` 는 LEFT)이라 걷어낼 수는 있으나 **report 0행이라 개선을 측정할 수 없어 손대지 않았다** |
+
+**고친 1개 — `countQuery` 추가가 아니라 COUNT 자체를 없애는 것이 맞았다.**
+
+유일한 호출부 `BoardPopularityService#buildRecentBoardFallback` 이 `.getContent()` 로 **총건수를 버리고** 상위 10건만 쓰고 있었다. 그 버려지는 총건수를 만들려고 나가던 COUNT 는 (개발 DB `petory`, 2026-09-19 `EXPLAIN ANALYZE`):
+
+```
+Aggregate: count(b1_0.idx)            (actual time=136..136 rows=1)
+  -> Nested loop inner join           (actual rows=48000)
+      -> Table scan on b1_0           (actual rows=50000)   ← board 전건
+      -> index lookup on u1_0 (PRIMARY)  (loops=48000)      ← users PK 4만8천 번
+```
+
+반환 타입을 `Page<Board>` → `List<Board>` 로 바꿔 COUNT 를 발행 자체에서 없앴다(인터페이스·포트·어댑터·호출부 4곳).
+
+**검증:** 회귀 테스트 `BoardRecentListCountQueryTest` — 이 호출이 발행하는 JDBC 문이 1개(SELECT)인지 본다. `Page` 로 되돌리면 2개가 되어 실패한다. 실행 결과 `tests=1 failures=0 errors=0`, 테스트 SQL 로그에 board COUNT 0건.
+
+---
 
 > **모든 수정은 A/B/A 로 인과를 증명했다** (`00-plan.md` 원칙 5).
 > ✅ **CI 회귀 테스트 8개 추가 — 원칙 6의 2단계(①회귀 재현 → ②수정 확인)를 전부 거쳤다.**
