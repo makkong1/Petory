@@ -28,8 +28,6 @@ public class ConversationParticipantDTO {
     private String status; // ACTIVE, LEFT, KICKED, MUTED
     private LocalDateTime joinedAt;
     private LocalDateTime leftAt;
-    private Boolean dealConfirmed;
-    private LocalDateTime dealConfirmedAt;
     private Boolean isDeleted;
     private LocalDateTime deletedAt;
     private LocalDateTime createdAt;

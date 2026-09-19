@@ -36,8 +36,6 @@ public class ConversationParticipantConverter {
                         : null)
                 .joinedAt(participant.getJoinedAt())
                 .leftAt(participant.getLeftAt())
-                .dealConfirmed(participant.getDealConfirmed())
-                .dealConfirmedAt(participant.getDealConfirmedAt())
                 .isDeleted(participant.getIsDeleted())
                 .deletedAt(participant.getDeletedAt())
                 .createdAt(participant.getCreatedAt())
