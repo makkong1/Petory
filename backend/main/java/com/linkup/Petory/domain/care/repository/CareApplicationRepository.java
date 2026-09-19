@@ -17,4 +17,6 @@ public interface CareApplicationRepository {
     long countCompletedByProviderId(Long providerId);
 
     List<CareApplication> findLiveOffersBetween(Long userA, Long userB);
+
+    List<Object[]> countCompletedByProviderIdxs(List<Long> providerIdxs);
 }

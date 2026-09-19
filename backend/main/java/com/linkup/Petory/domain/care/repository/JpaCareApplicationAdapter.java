@@ -41,4 +41,9 @@ public class JpaCareApplicationAdapter implements CareApplicationRepository {
     public List<CareApplication> findLiveOffersBetween(Long userA, Long userB) {
         return jpaRepository.findLiveOffersBetween(userA, userB);
     }
+
+    @Override
+    public List<Object[]> countCompletedByProviderIdxs(List<Long> providerIdxs) {
+        return jpaRepository.countCompletedByProviderIdxs(providerIdxs);
+    }
 }

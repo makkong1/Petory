@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.linkup.Petory.domain.care.dto.CareApplicationDTO;
+import com.linkup.Petory.domain.care.dto.CareProviderDTO;
 import com.linkup.Petory.domain.care.service.CareOfferService;
 import com.linkup.Petory.global.security.AuthenticatedUserIdResolver;
 
@@ -70,5 +71,17 @@ public class CareOfferController {
             @RequestParam("otherUserIdx") Long otherUserIdx) {
         return ResponseEntity.ok(
                 careOfferService.findLiveOffersBetween(getCurrentUserId(), otherUserIdx));
+    }
+
+    /**
+     * 이 요청에 제안할 수 있는 제공자 목록(요청자 전용).
+     * 지역만 맞추고 정렬하지 않는다 — 평점·완료건수는 화면 표시용이다.
+     */
+    @GetMapping("/candidates")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<List<CareProviderDTO>> candidates(
+            @RequestParam("careRequestIdx") Long careRequestIdx) {
+        return ResponseEntity.ok(
+                careOfferService.findCandidates(careRequestIdx, getCurrentUserId()));
     }
 }

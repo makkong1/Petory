@@ -1,12 +1,18 @@
 package com.linkup.Petory.domain.care.service;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.linkup.Petory.domain.care.converter.CareApplicationConverter;
 import com.linkup.Petory.domain.care.dto.CareApplicationDTO;
+import com.linkup.Petory.domain.care.dto.CareProviderDTO;
+import com.linkup.Petory.domain.care.repository.CareReviewRepository;
 import com.linkup.Petory.domain.care.entity.CareApplication;
 import com.linkup.Petory.domain.care.entity.CareApplicationStatus;
 import com.linkup.Petory.domain.care.entity.CareRequest;
@@ -57,6 +63,7 @@ public class CareOfferService {
     private final CareApplicationConverter careApplicationConverter;
     private final PetCoinEscrowService petCoinEscrowService;
     private final NotificationService notificationService;
+    private final CareReviewRepository careReviewRepository;
 
     /**
      * 요청자가 제공자 한 명에게 케어를 제안한다.
@@ -262,6 +269,77 @@ public class CareOfferService {
         return careApplicationRepository.findLiveOffersBetween(currentUserId, otherUserId)
                 .stream()
                 .map(careApplicationConverter::toDTO)
+                .toList();
+    }
+
+    /**
+     * 이 요청에 제안할 수 있는 제공자 목록. 요청자가 먼저 움직이는 유일한 경로다.
+     *
+     * <p>그전에는 <b>제공자가 먼저 문의해 와야만</b> 요청자가 제안할 수 있었다. 등록해놓고
+     * 기다리는 것 말고 할 수 있는 게 없었고, 아무도 안 오면 거기서 끝이었다.
+     *
+     * <p>지역만 맞추고 <b>정렬하지 않는다.</b> 평점·완료건수로 줄 세우면 리뷰가 없는 신규
+     * 제공자가 영영 안 뽑혀 상위 몇 명에게만 일이 몰린다 — 두 수치는 화면에 표시만 하고,
+     * 정렬 규칙은 쏠림이 실제로 관측된 뒤에 넣는다.
+     *
+     * <p>집계는 배치로 한 번씩만 돈다(평점 1문 + 완료건수 1문). 1인당 한 번씩 부르면 목록
+     * 길이만큼 N+1 이 된다.
+     */
+    @Transactional(readOnly = true)
+    public List<CareProviderDTO> findCandidates(Long careRequestIdx, Long currentUserId) {
+        CareRequest request = careRequestRepository.findByIdWithApplications(careRequestIdx)
+                .orElseThrow(CareRequestNotFoundException::new);
+        if (Boolean.TRUE.equals(request.getIsDeleted())) {
+            throw new CareRequestNotFoundException();
+        }
+        if (!request.getUser().getIdx().equals(currentUserId)) {
+            throw CareForbiddenException.ownRequestOnly();
+        }
+
+        // 지역 기준은 요청자의 프로필이 아니라 케어가 실제로 일어나는 곳(요청 주소)이다.
+        String area = request.getAddress();
+
+        List<Users> candidates = usersRepository.findActiveServiceProviders(currentUserId).stream()
+                .filter(u -> CareProviderLocation.sameArea(area, u.getLocation()))
+                .toList();
+
+        if (candidates.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> ids = candidates.stream().map(Users::getIdx).toList();
+
+        Map<Long, double[]> ratingByProvider = new HashMap<>();
+        for (Object[] row : careReviewRepository.aggregateByRevieweeIdxs(ids)) {
+            ratingByProvider.put((Long) row[0],
+                    new double[] { ((Number) row[1]).doubleValue(), ((Number) row[2]).doubleValue() });
+        }
+
+        Map<Long, Long> completedByProvider = new HashMap<>();
+        for (Object[] row : careApplicationRepository.countCompletedByProviderIdxs(ids)) {
+            completedByProvider.put((Long) row[0], ((Number) row[1]).longValue());
+        }
+
+        Set<Long> alreadyOffered = request.getApplications() == null ? Set.of()
+                : request.getApplications().stream()
+                        .filter(this::isLive)
+                        .map(app -> app.getProvider().getIdx())
+                        .collect(Collectors.toSet());
+
+        return candidates.stream()
+                .map(u -> {
+                    double[] rating = ratingByProvider.get(u.getIdx());
+                    return CareProviderDTO.builder()
+                            .idx(u.getIdx())
+                            .username(u.getUsername())
+                            .nickname(u.getNickname())
+                            .location(u.getLocation())
+                            .averageRating(rating == null ? null : rating[0])
+                            .reviewCount(rating == null ? 0 : (int) rating[1])
+                            .completedCareCount(completedByProvider.getOrDefault(u.getIdx(), 0L))
+                            .alreadyOffered(alreadyOffered.contains(u.getIdx()))
+                            .build();
+                })
                 .toList();
     }
 

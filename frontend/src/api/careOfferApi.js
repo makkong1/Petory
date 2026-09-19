@@ -19,4 +19,7 @@ export const careOfferApi = {
 
   // 상대와 나 사이에 살아 있는 제안. 채팅방은 계약을 모르므로 상대 사용자로 찾는다.
   between: (otherUserIdx) => api.get('/between', { params: { otherUserIdx } }),
+
+  // 이 요청에 제안할 수 있는 제공자(요청자 전용). 지역만 맞추고 정렬하지 않는다.
+  candidates: (careRequestIdx) => api.get('/candidates', { params: { careRequestIdx } }),
 };

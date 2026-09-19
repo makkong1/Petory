@@ -36,4 +36,6 @@ public interface CareReviewRepository {
      * 리뷰 단건 조회 (신고 상세 미리보기용)
      */
     Optional<CareReview> findById(Long idx);
+
+    List<Object[]> aggregateByRevieweeIdxs(List<Long> revieweeIdxs);
 }

@@ -52,4 +52,9 @@ public class JpaCareReviewAdapter implements CareReviewRepository {
     public Optional<CareReview> findById(Long idx) {
         return jpaRepository.findById(idx);
     }
+
+    @Override
+    public List<Object[]> aggregateByRevieweeIdxs(List<Long> revieweeIdxs) {
+        return jpaRepository.aggregateByRevieweeIdxs(revieweeIdxs);
+    }
 }

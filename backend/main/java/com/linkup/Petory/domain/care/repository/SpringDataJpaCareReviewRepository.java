@@ -36,4 +36,16 @@ public interface SpringDataJpaCareReviewRepository extends JpaRepository<CareRev
 
     @RepositoryMethod("펫케어 리뷰: 작성 여부 확인")
     boolean existsByCareApplicationIdxAndReviewerIdx(Long careApplicationIdx, Long reviewerIdx);
+
+    /**
+     * 여러 제공자의 평점·리뷰수를 한 번에. 목록 화면에서 1인당 한 번씩 부르면 N+1 이 된다.
+     * 반환 각 행: [revieweeIdx(Long), avgRating(Double), reviewCount(Long)]
+     */
+    @Query("""
+            SELECT r.reviewee.idx, AVG(r.rating), COUNT(r)
+            FROM CareReview r
+            WHERE r.reviewee.idx IN :revieweeIdxs
+            GROUP BY r.reviewee.idx
+            """)
+    List<Object[]> aggregateByRevieweeIdxs(@Param("revieweeIdxs") List<Long> revieweeIdxs);
 }

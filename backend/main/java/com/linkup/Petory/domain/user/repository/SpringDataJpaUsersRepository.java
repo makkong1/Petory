@@ -129,4 +129,24 @@ public interface SpringDataJpaUsersRepository extends JpaRepository<Users, Long>
 
     @RepositoryMethod("사용자: 역할+기간별 통계 (신규 서비스 제공자 집계용)")
     long countByRoleAndCreatedAtBetween(Role role, LocalDateTime start, LocalDateTime end);
+
+    /**
+     * 활동 가능한 서비스 제공자 전원. 지역 일치는 호출부가 애플리케이션에서 거른다.
+     *
+     * <p>지역을 SQL 로 못 거르는 이유: 활동지역이 자유 입력이라 표기가 흔들린다
+     * ("서울 강남구" 240명 / "서울특별시 강남구" 2명). 시·도 표기를 빼고 시/군/구 토큰만
+     * 뽑아 비교해야 하는데, 그 토큰 추출을 SQL 로 옮기면 쿼리가 훨씬 어려워진다.
+     * 근본 해결은 프로필 입력을 선택식으로 고정하는 것이고, 기존 데이터 정리가 딸려와 별건이다.
+     *
+     * <p>⚠️ 천장: 제공자 전원을 읽어 앱에서 거른다. 현재 492명이라 무해하지만, 제공자가
+     * 수만 명이 되면 지역을 정규화해 컬럼으로 뽑고 인덱스를 거는 쪽으로 옮겨야 한다.
+     */
+    @Query("""
+            SELECT u FROM Users u
+            WHERE u.role = com.linkup.Petory.domain.user.entity.Role.SERVICE_PROVIDER
+              AND u.isDeleted = false
+              AND u.status = com.linkup.Petory.domain.user.entity.UserStatus.ACTIVE
+              AND u.idx <> :excludeUserIdx
+            """)
+    List<Users> findActiveServiceProviders(@Param("excludeUserIdx") Long excludeUserIdx);
 }

@@ -208,4 +208,9 @@ public class JpaUsersAdapter implements UsersRepository {
     public int markDormantUsers(LocalDateTime cutoff, LocalDateTime now) {
         return jpaRepository.markDormantUsers(cutoff, now);
     }
+
+    @Override
+    public List<Users> findActiveServiceProviders(Long excludeUserIdx) {
+        return jpaRepository.findActiveServiceProviders(excludeUserIdx);
+    }
 }

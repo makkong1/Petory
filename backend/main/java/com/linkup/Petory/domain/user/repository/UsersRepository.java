@@ -126,4 +126,6 @@ public interface UsersRepository {
      * @return 업데이트된 행 수
      */
     int markDormantUsers(LocalDateTime cutoff, LocalDateTime now);
+
+    List<Users> findActiveServiceProviders(Long excludeUserIdx);
 }

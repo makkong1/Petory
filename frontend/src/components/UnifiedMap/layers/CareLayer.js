@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import styled from 'styled-components';
 import { useAuth } from '../../../contexts/AuthContext';
 import { getOrCreateDirectConversation } from '../../../api/chatApi';
+import { careOfferApi } from '../../../api/careOfferApi';
 import { careRequestApi } from '../../../api/careRequestApi';
 import { userProfileApi } from '../../../api/userApi';
 import {
@@ -31,6 +32,10 @@ const CareLayer = ({ selectedItem, onClose }) => {
   const { user } = useAuth();
   const [chatLoading, setChatLoading] = useState(false);
   const [chatError, setChatError] = useState(null);
+  const [candidates, setCandidates] = useState([]);
+  const [candidatesLoading, setCandidatesLoading] = useState(false);
+  const [candidatesError, setCandidatesError] = useState(null);
+  const [offeringTo, setOfferingTo] = useState(null);
   const [comments, setComments] = useState([]);
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentsError, setCommentsError] = useState(null);
@@ -142,6 +147,56 @@ const CareLayer = ({ selectedItem, onClose }) => {
       cancelled = true;
     };
   }, [r.idx, loadProviderProfiles]);
+
+  // 내 요청이면 제안할 수 있는 제공자를 불러온다. 요청자가 먼저 움직이는 유일한 경로다
+  // (그전에는 제공자가 문의해 와야만 제안할 수 있었다).
+  useEffect(() => {
+    if (!isOwner || !r?.idx || r.status !== 'OPEN') {
+      setCandidates([]);
+      return;
+    }
+    let cancelled = false;
+    const load = async () => {
+      setCandidatesLoading(true);
+      setCandidatesError(null);
+      try {
+        const { data } = await careOfferApi.candidates(r.idx);
+        if (!cancelled) setCandidates(Array.isArray(data) ? data : []);
+      } catch (err) {
+        if (!cancelled) setCandidatesError('제공자 목록을 불러오지 못했습니다.');
+      } finally {
+        if (!cancelled) setCandidatesLoading(false);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [isOwner, r?.idx, r?.status]);
+
+  // 제안을 보내고 그 자리에서 채팅방까지 연다.
+  // 방을 백엔드에서 만들지 않는 이유: care -> chat 의존이 생긴다. 방금 chat -> care 의존을
+  // 0으로 만들어놨으므로 반대 방향도 뚫지 않고, 프론트에서 두 번 부르는 것으로 조합한다.
+  const handleOfferTo = async (providerIdx) => {
+    if (!r?.idx || !providerIdx || offeringTo) return;
+    if (!window.confirm('이 제공자에게 케어를 맡기시겠습니까?\n수락하면 바로 케어가 시작됩니다.')) {
+      return;
+    }
+    setOfferingTo(providerIdx);
+    setCandidatesError(null);
+    try {
+      await careOfferApi.offer(r.idx, providerIdx);
+      setCandidates(prev => prev.map(c =>
+        c.idx === providerIdx ? { ...c, alreadyOffered: true } : c));
+      const conversation = await getOrCreateDirectConversation(providerIdx);
+      if (window.openChatWidget) {
+        window.openChatWidget(conversation.idx);
+      }
+    } catch (err) {
+      setCandidatesError(
+        err.response?.data?.error || err.response?.data?.message || '제안에 실패했습니다.');
+    } finally {
+      setOfferingTo(null);
+    }
+  };
 
   const handleChat = async () => {
     const ownerId = r.userIdx || r.userId;
@@ -304,6 +359,45 @@ const CareLayer = ({ selectedItem, onClose }) => {
         </ActionRow>
       )}
       {isOwner && <OwnerBadge>✅ 내가 등록한 케어 요청</OwnerBadge>}
+      {isOwner && r.status === 'OPEN' && (
+        <CandidateSection>
+          <SectionHeader>
+            <SectionTitle>이 지역 제공자</SectionTitle>
+            <SectionMeta>{candidates.length}명</SectionMeta>
+          </SectionHeader>
+          {candidatesLoading ? (
+            <EmptyState>불러오는 중...</EmptyState>
+          ) : candidatesError ? (
+            <EmptyState>{candidatesError}</EmptyState>
+          ) : candidates.length === 0 ? (
+            <EmptyState>이 지역에서 활동하는 제공자가 아직 없습니다.</EmptyState>
+          ) : (
+            <CandidateList>
+              {candidates.map((c) => (
+                <CandidateCard key={c.idx}>
+                  <CandidateInfo>
+                    <CandidateName>{c.nickname || c.username}</CandidateName>
+                    <CandidateMeta>
+                      {formatActivityArea(c.location)}
+                      {' · '}⭐ {formatRating(c.averageRating)} ({c.reviewCount})
+                      {' · '}완료 {c.completedCareCount}건
+                    </CandidateMeta>
+                  </CandidateInfo>
+                  <PrimaryButton
+                    type="button"
+                    onClick={() => handleOfferTo(c.idx)}
+                    disabled={c.alreadyOffered || offeringTo === c.idx}
+                  >
+                    {c.alreadyOffered
+                      ? '제안함'
+                      : offeringTo === c.idx ? '보내는 중...' : '제안하기'}
+                  </PrimaryButton>
+                </CandidateCard>
+              ))}
+            </CandidateList>
+          )}
+        </CandidateSection>
+      )}
     </InfoPanel>
     {activeReviewUserId && (
       <ReviewModalOverlay onClick={() => setActiveReviewUserId(null)}>
@@ -530,6 +624,44 @@ const PrimaryButton = styled.button`
     opacity: 0.5;
     cursor: not-allowed;
   }
+`;
+
+const CandidateSection = styled.div`
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+`;
+
+const CandidateList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+`;
+
+const CandidateCard = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+`;
+
+const CandidateInfo = styled.div`
+  min-width: 0;
+`;
+
+const CandidateName = styled.div`
+  font-weight: 600;
+  font-size: 13px;
+  color: ${({ theme }) => theme.colors.textPrimary};
+`;
+
+const CandidateMeta = styled.div`
+  font-size: 11px;
+  color: ${({ theme }) => theme.colors.textSecondary};
 `;
 
 const OwnerBadge = styled.div`

@@ -51,4 +51,20 @@ public interface SpringDataJpaCareApplicationRepository extends JpaRepository<Ca
             ORDER BY ca.createdAt DESC
             """)
     List<CareApplication> findLiveOffersBetween(@Param("userA") Long userA, @Param("userB") Long userB);
+
+    /**
+     * 여러 제공자의 완료 케어 건수를 한 번에. countCompletedByProviderId 의 배치 판이다.
+     * 반환 각 행: [providerIdx(Long), completedCount(Long)]
+     */
+    @Query("""
+            SELECT ca.provider.idx, COUNT(ca)
+            FROM CareApplication ca
+            JOIN ca.careRequest cr
+            WHERE ca.provider.idx IN :providerIdxs
+              AND ca.status = com.linkup.Petory.domain.care.entity.CareApplicationStatus.ACCEPTED
+              AND cr.status = com.linkup.Petory.domain.care.entity.CareRequestStatus.COMPLETED
+              AND cr.isDeleted = false
+            GROUP BY ca.provider.idx
+            """)
+    List<Object[]> countCompletedByProviderIdxs(@Param("providerIdxs") List<Long> providerIdxs);
 }
