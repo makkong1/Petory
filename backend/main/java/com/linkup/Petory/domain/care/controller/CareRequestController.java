@@ -121,6 +121,16 @@ public class CareRequestController {
         return ResponseEntity.ok(careRequestService.confirmCompletion(id, currentUserId));
     }
 
+    /**
+     * 제공자가 이행 완료 확인을 되돌린다. 실수로 눌렀을 때 빠져나갈 길이다.
+     * 요청자에게는 이 경로가 없다 — 요청자의 확인은 곧 정산이라 되돌릴 대상이 남지 않는다.
+     */
+    @DeleteMapping("/{id}/complete")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<CareRequestDTO> cancelCompletion(@PathVariable("id") Long id) {
+        return ResponseEntity.ok(careRequestService.cancelCompletion(id, getCurrentUserId()));
+    }
+
     // 케어 요청 검색 (페이징 지원)
     @GetMapping("/search")
     public ResponseEntity<CareRequestPageResponseDTO> searchCareRequests(

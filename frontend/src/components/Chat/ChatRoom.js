@@ -520,7 +520,13 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
   const handleCompleteCare = async (offer) => {
     if (!offer?.careRequestId || !user?.idx || completingCareIdx) return;
 
-    if (!window.confirm(`"${offer.careRequestTitle}" 이행이 끝났음을 확인하시겠습니까?\n양쪽 모두 확인해야 코인이 정산됩니다.`)) {
+    // 요청자의 클릭은 그 순간 지급이다. 마지막 클릭의 무게에 맞게 금액과 상대를 박는다.
+    const iAmProvider = offer.providerId === user?.idx;
+    const amount = (offer.offeredCoins ?? 0).toLocaleString();
+    const message = iAmProvider
+      ? `"${offer.careRequestTitle}" 이행을 마쳤다고 알릴까요?\n요청자가 확인하면 ${amount} 코인을 받습니다.`
+      : `"${offer.careRequestTitle}" 이행을 확인하시겠습니까?\n\n${offer.providerName || '제공자'}님에게 ${amount} 코인이 지금 지급됩니다.\n이 작업은 되돌릴 수 없습니다.`;
+    if (!window.confirm(message)) {
       return;
     }
 
@@ -538,6 +544,24 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
     } catch (error) {
       console.error('완료 확인 실패:', error);
       showToast(error.response?.data?.error || '완료 확인에 실패했습니다.');
+    } finally {
+      setCompletingCareIdx(null);
+    }
+  };
+
+  // 제공자가 이행 완료 알림을 되돌린다 (실수 클릭 복구)
+  const handleCancelCompletion = async (offer) => {
+    if (!offer?.careRequestId || completingCareIdx) return;
+    if (!window.confirm('이행 완료 알림을 취소하시겠습니까?')) return;
+
+    setCompletingCareIdx(offer.idx);
+    try {
+      await careRequestApi.cancelCompletion(offer.careRequestId);
+      await fetchConversation();
+      showToast('이행 완료 알림을 취소했습니다.', 'success');
+    } catch (error) {
+      console.error('확인 취소 실패:', error);
+      showToast(error.response?.data?.error || '취소에 실패했습니다.');
     } finally {
       setCompletingCareIdx(null);
     }
@@ -758,9 +782,6 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
         {/* 살아 있는 계약마다 카드 하나. 한 방에 여러 건이 매달릴 수 있어 목록으로 그린다 */}
         {offers.map((o) => {
           const iAmProvider = o.providerId === user?.idx;
-          const mineConfirmed = iAmProvider
-            ? Boolean(o.providerCompletedAt)
-            : Boolean(o.requesterCompletedAt);
           const busy = processingOfferIdx === o.idx;
 
           return (
@@ -785,18 +806,45 @@ const ChatRoom = ({ conversationIdx, onClose, onBack, onAction }) => {
                 <DealConfirmStatus>✓ 제안을 보냈습니다 (제공자 수락 대기 중)</DealConfirmStatus>
               )}
 
-              {o.status === 'ACCEPTED' && o.careRequestStatus === 'IN_PROGRESS' && (
+              {/* 순서를 강제한다 — 제공자가 이행을 알리고, 요청자가 승인한다.
+                  아무나 먼저 누를 수 있으면 실수 클릭 두 번으로 이행 없이 정산된다. */}
+              {o.status === 'ACCEPTED' && o.careRequestStatus === 'IN_PROGRESS' && iAmProvider && (
                 <OfferActions>
-                  <CompleteCareButton
-                    onClick={() => handleCompleteCare(o)}
-                    disabled={completingCareIdx === o.idx || mineConfirmed}
-                  >
-                    {mineConfirmed
-                      ? '⏳ 상대방 확인 대기 중'
-                      : completingCareIdx === o.idx
+                  {o.providerCompletedAt ? (
+                    <>
+                      <DealConfirmStatus>⏳ 요청자 확인 대기 중</DealConfirmStatus>
+                      <RejectOfferButton
+                        onClick={() => handleCancelCompletion(o)}
+                        disabled={completingCareIdx === o.idx}
+                      >
+                        취소
+                      </RejectOfferButton>
+                    </>
+                  ) : (
+                    <CompleteCareButton
+                      onClick={() => handleCompleteCare(o)}
+                      disabled={completingCareIdx === o.idx}
+                    >
+                      {completingCareIdx === o.idx ? '알리는 중...' : '✅ 이행 완료 알리기'}
+                    </CompleteCareButton>
+                  )}
+                </OfferActions>
+              )}
+
+              {o.status === 'ACCEPTED' && o.careRequestStatus === 'IN_PROGRESS' && !iAmProvider && (
+                <OfferActions>
+                  {o.providerCompletedAt ? (
+                    <CompleteCareButton
+                      onClick={() => handleCompleteCare(o)}
+                      disabled={completingCareIdx === o.idx}
+                    >
+                      {completingCareIdx === o.idx
                         ? '확인 중...'
-                        : '✅ 이행 완료 확인'}
-                  </CompleteCareButton>
+                        : `✅ 이행 확인하고 ${(o.offeredCoins ?? 0).toLocaleString()} 코인 지급`}
+                    </CompleteCareButton>
+                  ) : (
+                    <DealConfirmStatus>제공자의 이행 완료를 기다리는 중입니다</DealConfirmStatus>
+                  )}
                 </OfferActions>
               )}
 

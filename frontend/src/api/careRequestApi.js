@@ -27,9 +27,13 @@ export const careRequestApi = {
       ? mockResolve({ careRequests: DEMO_CARE_REQUESTS.filter((c) => c.userId === 1), totalCount: 1 })
       : api.get('/my-requests'),
 
-  // 이행 완료 확인 (요청자·제공자가 각자 호출, 양쪽이 확인해야 정산된다)
+  // 이행 완료 확인. 제공자가 먼저 알리고 요청자가 승인한다(요청자 승인 = 즉시 정산)
   confirmCompletion: (id) =>
     isDemoMode() ? mockResolve({}) : api.post(`/${id}/complete`),
+
+  // 제공자가 자기 확인을 되돌린다 (실수 클릭 복구)
+  cancelCompletion: (id) =>
+    isDemoMode() ? mockResolve({}) : api.delete(`/${id}/complete`),
 
   // 제공자 댓글 — 지도 상세 패널에서 읽기 전용으로 보여준다(작성 UI는 없다)
   getComments: (careRequestId) =>

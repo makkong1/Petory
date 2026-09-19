@@ -149,6 +149,16 @@ public class CareRequest extends BaseTimeEntity {
         return true;
     }
 
+    /**
+     * 제공자가 자기 확인을 되돌린다.
+     *
+     * 요청자 확인에는 대응물이 없다 — 요청자가 누르는 순간 양쪽이 차서 정산이 끝나므로
+     * 되돌릴 것이 남지 않는다. 실수 복구가 필요한 쪽은 먼저 누르는 제공자다.
+     */
+    public void cancelProviderCompletion() {
+        this.providerCompletedAt = null;
+    }
+
     /** 양쪽이 모두 이행 완료를 확인했는가. 정산은 이 조건에서만 일어난다. */
     public boolean isBothCompletionConfirmed() {
         return this.requesterCompletedAt != null && this.providerCompletedAt != null;

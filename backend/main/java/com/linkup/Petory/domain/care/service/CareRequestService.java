@@ -24,6 +24,7 @@ import com.linkup.Petory.domain.care.entity.CareApplicationStatus;
 import com.linkup.Petory.domain.care.entity.CareRequest;
 import com.linkup.Petory.domain.care.entity.CareRequestStatus;
 import com.linkup.Petory.domain.care.entity.CareScheduleMode;
+import com.linkup.Petory.domain.care.exception.CareConflictException;
 import com.linkup.Petory.domain.care.exception.CareForbiddenException;
 import com.linkup.Petory.domain.care.exception.CareRequestNotFoundException;
 import com.linkup.Petory.domain.care.exception.CareValidationException;
@@ -479,6 +480,14 @@ public class CareRequestService {
             throw CareForbiddenException.sanctioned();
         }
 
+        // 순서를 강제한다: 제공자가 이행을 알리고, 요청자가 승인한다.
+        // 아무나 먼저 누를 수 있으면 양쪽이 실수로 한 번씩 누른 것만으로 이행 없이 정산된다.
+        // 돈을 내는 쪽이 마지막에 승인하는 것이 맞고, 요청자의 클릭은 그 순간 지급이라
+        // "먼저 눌러두고 기다리는" 상태를 허용할 이유도 없다.
+        if (isRequester && request.getProviderCompletedAt() == null) {
+            throw CareConflictException.providerMustConfirmFirst();
+        }
+
         // 이미 확인한 쪽이 다시 눌러도 시각을 덮어쓰지 않는다(재시도 안전).
         request.confirmCompletionBy(isRequester);
 
@@ -526,6 +535,46 @@ public class CareRequestService {
             log.info("케어 제안 철회: careRequestIdx={}, applicationIdx={}, 사유={}",
                     request.getIdx(), offer.getIdx(), reason);
         }
+    }
+
+    /**
+     * 제공자가 이행 완료 확인을 되돌린다.
+     *
+     * 실수로 눌렀을 때 빠져나갈 길이다. 요청자에게는 이 경로가 없다 — 요청자가 누르는 순간
+     * 양쪽이 차서 정산이 끝나므로 되돌릴 대상이 남지 않는다.
+     *
+     * 이미 정산된 건은 상태가 COMPLETED 라 아래 IN_PROGRESS 가드에서 걸린다.
+     */
+    @Transactional
+    public CareRequestDTO cancelCompletion(Long idx, Long currentUserId) {
+        CareRequest request = careRequestRepository.findByIdForUpdate(idx)
+                .orElseThrow(() -> new CareRequestNotFoundException());
+
+        if (Boolean.TRUE.equals(request.getIsDeleted())) {
+            throw new CareRequestNotFoundException();
+        }
+        if (request.getStatus() != CareRequestStatus.IN_PROGRESS) {
+            throw new IllegalStateException(
+                    "진행 중(IN_PROGRESS)인 케어만 확인을 되돌릴 수 있습니다. 현재 상태: "
+                            + request.getStatus());
+        }
+
+        boolean isAcceptedProvider = request.getApplications() != null
+                && request.getApplications().stream()
+                        .anyMatch(app -> app.getStatus() == CareApplicationStatus.ACCEPTED
+                                && app.getProvider().getIdx().equals(currentUserId));
+        if (!isAcceptedProvider) {
+            throw CareForbiddenException.providerCancelOnly();
+        }
+        if (request.getProviderCompletedAt() == null) {
+            throw CareConflictException.nothingToCancel();
+        }
+
+        request.cancelProviderCompletion();
+        log.info("제공자가 이행 완료 확인을 되돌림: careRequestIdx={}, providerId={}",
+                request.getIdx(), currentUserId);
+
+        return careRequestConverter.toDTO(careRequestRepository.save(request));
     }
 
     private boolean isSanctionedPreMatchRequest(CareRequest request) {

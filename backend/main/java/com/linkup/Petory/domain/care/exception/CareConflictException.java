@@ -38,4 +38,13 @@ public class CareConflictException extends ApiException {
         return new CareConflictException(
                 "대기 중인 제안이 아닙니다. 현재 상태: " + currentStatus);
     }
+
+    public static CareConflictException providerMustConfirmFirst() {
+        return new CareConflictException(
+                "제공자가 이행 완료를 알린 뒤에 확인할 수 있습니다.");
+    }
+
+    public static CareConflictException nothingToCancel() {
+        return new CareConflictException("되돌릴 이행 완료 확인이 없습니다.");
+    }
 }

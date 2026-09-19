@@ -19,6 +19,7 @@ import com.linkup.Petory.domain.care.entity.CareApplication;
 import com.linkup.Petory.domain.care.entity.CareApplicationStatus;
 import com.linkup.Petory.domain.care.entity.CareRequest;
 import com.linkup.Petory.domain.care.entity.CareRequestStatus;
+import com.linkup.Petory.domain.care.exception.CareConflictException;
 import com.linkup.Petory.domain.care.exception.CareForbiddenException;
 import com.linkup.Petory.domain.care.repository.CareApplicationRepository;
 import com.linkup.Petory.domain.care.repository.CareRequestRepository;
@@ -181,14 +182,18 @@ class CareCompletionConfirmationTest {
     }
 
     @Test
-    @DisplayName("양쪽이 동시에 확인해도 지급은 한 번만 일어난다")
+    @DisplayName("요청자가 동시에 두 번 승인해도 지급은 한 번만 일어난다")
     void 동시_확인시_이중지급_없음() throws InterruptedException {
+        // 순서가 강제되므로 "양쪽이 동시에" 는 더 이상 가능한 시나리오가 아니다.
+        // 지금 남은 경쟁은 마지막 클릭(요청자 승인 = 지급)이 겹치는 경우다.
+        careRequestService.confirmCompletion(careRequest.getIdx(), provider.getIdx());
+
         ExecutorService pool = Executors.newFixedThreadPool(2);
         CountDownLatch ready = new CountDownLatch(2);
         CountDownLatch start = new CountDownLatch(1);
         CountDownLatch done = new CountDownLatch(2);
 
-        for (Long userId : new Long[] { requester.getIdx(), provider.getIdx() }) {
+        for (Long userId : new Long[] { requester.getIdx(), requester.getIdx() }) {
             pool.submit(() -> {
                 try {
                     ready.countDown();
@@ -213,5 +218,41 @@ class CareCompletionConfirmationTest {
         assertThat(balanceOf(provider))
                 .as("지급은 정확히 한 번")
                 .isEqualTo(AMOUNT);
+    }
+
+    @Test
+    @DisplayName("제공자가 알리기 전에는 요청자가 이행을 확인할 수 없다")
+    void 요청자가_먼저_확인할_수_없다() {
+        assertThatThrownBy(
+                () -> careRequestService.confirmCompletion(careRequest.getIdx(), requester.getIdx()))
+                        .as("아무나 먼저 누를 수 있으면 실수 클릭 두 번으로 이행 없이 정산된다")
+                        .isInstanceOf(CareConflictException.class);
+
+        assertThat(escrowStatus())
+                .as("막혔는데 돈이 움직이면 안 된다")
+                .isEqualTo(EscrowStatus.HOLD);
+    }
+
+    @Test
+    @DisplayName("제공자는 알림을 되돌릴 수 있고, 되돌리면 요청자는 다시 확인할 수 없다")
+    void 제공자는_확인을_되돌릴_수_있다() {
+        careRequestService.confirmCompletion(careRequest.getIdx(), provider.getIdx());
+        careRequestService.cancelCompletion(careRequest.getIdx(), provider.getIdx());
+
+        assertThatThrownBy(
+                () -> careRequestService.confirmCompletion(careRequest.getIdx(), requester.getIdx()))
+                        .as("되돌렸는데 요청자가 승인할 수 있으면 되돌린 게 아니다")
+                        .isInstanceOf(CareConflictException.class);
+        assertThat(escrowStatus()).isEqualTo(EscrowStatus.HOLD);
+    }
+
+    @Test
+    @DisplayName("요청자는 확인을 되돌릴 수 없다 — 그 클릭은 곧 정산이라 되돌릴 대상이 없다")
+    void 요청자는_되돌릴_수_없다() {
+        careRequestService.confirmCompletion(careRequest.getIdx(), provider.getIdx());
+
+        assertThatThrownBy(
+                () -> careRequestService.cancelCompletion(careRequest.getIdx(), requester.getIdx()))
+                        .isInstanceOf(CareForbiddenException.class);
     }
 }

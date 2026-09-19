@@ -59,4 +59,8 @@ public class CareForbiddenException extends ApiException {
     public static CareForbiddenException offerReceiverOnly() {
         return new CareForbiddenException("제안을 받은 제공자만 수락/거절할 수 있습니다.");
     }
+
+    public static CareForbiddenException providerCancelOnly() {
+        return new CareForbiddenException("이행 완료 확인은 제공자만 되돌릴 수 있습니다.");
+    }
 }
