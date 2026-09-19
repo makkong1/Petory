@@ -4,6 +4,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import com.linkup.Petory.domain.care.entity.CareApplication;
@@ -82,4 +83,23 @@ public interface SpringDataJpaCareApplicationRepository extends JpaRepository<Ca
             GROUP BY ca.provider.idx
             """)
     List<Object[]> countCompletedByProviderIdxs(@Param("providerIdxs") List<Long> providerIdxs);
+
+    /**
+     * 답 없이 기간이 지난 대기 중 제안.
+     *
+     * <p>기준 시각으로 {@code updatedAt} 을 쓴다. 대기 중인 제안이 바뀌는 경우는 재전송
+     * ({@code reopen}) 하나뿐이라, 대기 중 행의 {@code updatedAt} 은 곧 "이 제안이 (다시)
+     * 나간 시각"이다. 거절·철회로 재전송한 제안의 타이머도 자연히 그때부터 다시 센다.
+     *
+     * <p>⚠️ 천장: 나중에 대기 중 제안의 다른 필드를 건드리는 코드가 생기면 타이머가 조용히
+     * 리셋된다. 그때는 보낸 시각을 별도 컬럼으로 뽑아야 한다.
+     */
+    @Query("""
+            SELECT ca FROM CareApplication ca
+            JOIN FETCH ca.careRequest cr
+            JOIN FETCH ca.provider
+            WHERE ca.status = com.linkup.Petory.domain.care.entity.CareApplicationStatus.PENDING
+              AND ca.updatedAt < :cutoff
+            """)
+    List<CareApplication> findPendingOffersBefore(@Param("cutoff") LocalDateTime cutoff);
 }

@@ -382,6 +382,44 @@ public class CareOfferService {
                 .scope(scope).areaLabel(label).total(total).providers(providers).build();
     }
 
+    /**
+     * 답 없이 기간이 지난 제안 하나를 만료시키고 요청자에게 알린다.
+     *
+     * <p>스케줄러가 아니라 여기 있는 이유는 <b>AOP 프록시</b> 때문이다. 스케줄러 클래스 안에
+     * 두고 {@code this.expireOne(...)} 으로 부르면 프록시를 거치지 않아 {@code @Transactional}
+     * 이 무시된다 — 루프 한가운데서 트랜잭션 없이 쓰기가 일어난다. 다른 빈의 메서드로 부르면
+     * 프록시를 탄다(chat 의 ConversationCreatorService 가 같은 이유로 분리돼 있다).
+     *
+     * <p>한 건씩 별도 트랜잭션인 이유: 루프 전체를 한 트랜잭션으로 묶으면 한 건이 실패할 때
+     * 나머지까지 롤백된다.
+     */
+    @Transactional
+    public void expireOffer(Long applicationIdx, int ttlDays) {
+        CareApplication offer = careApplicationRepository.findById(applicationIdx)
+                .orElseThrow(CareApplicationNotFoundException::new);
+        if (offer.getStatus() != CareApplicationStatus.PENDING) {
+            return;   // 그 사이 수락·거절됐다면 할 일이 없다
+        }
+
+        offer.expire();
+        careApplicationRepository.saveAndFlush(offer);
+
+        CareRequest request = offer.getCareRequest();
+        // 알림은 요청자에게만. 움직일 수 있는 쪽이 요청자다 — 다시 보내거나 다른 사람을 고른다.
+        // 답을 안 한 제공자에게 알려도 새로 할 일이 생기지 않는다.
+        notificationService.createNotification(
+                request.getUser().getIdx(),
+                NotificationType.CARE_OFFER_EXPIRED,
+                "케어 제안이 만료되었습니다",
+                String.format("%s님이 %d일 동안 응답하지 않아 \"%s\" 제안이 만료되었습니다. 다시 보내거나 다른 제공자를 고를 수 있습니다.",
+                        offer.getProvider().getUsername(), ttlDays, request.getTitle()),
+                request.getIdx(),
+                "CARE_REQUEST");
+
+        log.info("케어 제안 만료: applicationIdx={}, careRequestIdx={}, providerId={}",
+                offer.getIdx(), request.getIdx(), offer.getProvider().getIdx());
+    }
+
     private boolean isLive(CareApplication offer) {
         return offer.getStatus() == CareApplicationStatus.PENDING
                 || offer.getStatus() == CareApplicationStatus.ACCEPTED;

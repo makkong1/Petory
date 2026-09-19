@@ -46,4 +46,9 @@ public class JpaCareApplicationAdapter implements CareApplicationRepository {
     public List<Object[]> countCompletedByProviderIdxs(List<Long> providerIdxs) {
         return jpaRepository.countCompletedByProviderIdxs(providerIdxs);
     }
+
+    @Override
+    public List<CareApplication> findPendingOffersBefore(java.time.LocalDateTime cutoff) {
+        return jpaRepository.findPendingOffersBefore(cutoff);
+    }
 }

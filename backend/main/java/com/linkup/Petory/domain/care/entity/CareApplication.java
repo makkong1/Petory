@@ -93,6 +93,11 @@ public class CareApplication extends BaseTimeEntity {
         this.status = CareApplicationStatus.WITHDRAWN;
     }
 
+    /** 답 없이 기간이 지나 내려간다. 거절(제공자 행동)·철회(요청자 행동)와 구분한다. */
+    public void expire() {
+        this.status = CareApplicationStatus.EXPIRED;
+    }
+
     /**
      * 끝난 제안을 새 금액으로 다시 보낸다.
      *

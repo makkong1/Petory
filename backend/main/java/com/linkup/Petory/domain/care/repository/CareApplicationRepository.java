@@ -19,4 +19,6 @@ public interface CareApplicationRepository {
     List<CareApplication> findLiveOffersBetween(Long userA, Long userB);
 
     List<Object[]> countCompletedByProviderIdxs(List<Long> providerIdxs);
+
+    List<CareApplication> findPendingOffersBefore(java.time.LocalDateTime cutoff);
 }
