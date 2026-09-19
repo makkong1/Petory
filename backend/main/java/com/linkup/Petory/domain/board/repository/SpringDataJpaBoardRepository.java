@@ -32,9 +32,10 @@ public interface SpringDataJpaBoardRepository extends JpaRepository<Board, Long>
     @Query("SELECT b FROM Board b JOIN FETCH b.user u WHERE b.isDeleted = false AND u.isDeleted = false AND b.authorVisible = true ORDER BY b.createdAt DESC")
     List<Board> findAllByIsDeletedFalseOrderByCreatedAtDesc();
 
-    @RepositoryMethod("게시글: 전체 목록 페이징")
+    // 총건수를 쓰는 소비처가 없어 List 로 받는다. Page 로 받으면 버려질 COUNT 가 board 5만 행을 훑는다.
+    @RepositoryMethod("게시글: 전체 목록 상위 N건")
     @Query("SELECT b FROM Board b JOIN FETCH b.user u WHERE b.isDeleted = false AND u.isDeleted = false AND b.authorVisible = true ORDER BY b.createdAt DESC")
-    Page<Board> findAllByIsDeletedFalseOrderByCreatedAtDesc(Pageable pageable);
+    List<Board> findAllByIsDeletedFalseOrderByCreatedAtDesc(Pageable pageable);
 
     @RepositoryMethod("게시글: 카테고리별 목록 조회")
     @Query("SELECT b FROM Board b JOIN FETCH b.user u WHERE b.category = :category AND b.isDeleted = false AND u.isDeleted = false AND b.authorVisible = true ORDER BY b.createdAt DESC")

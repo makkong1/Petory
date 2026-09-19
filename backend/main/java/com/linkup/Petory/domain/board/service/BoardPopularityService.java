@@ -390,7 +390,7 @@ public class BoardPopularityService {
             PopularityPeriodType periodType, PeriodRange range) {
         log.info("인기 스냅샷 없음 — 최신 게시글 10개로 대체");
         List<Board> recent = boardRepository.findAllByIsDeletedFalseOrderByCreatedAtDesc(
-                PageRequest.of(0, 10)).getContent();
+                PageRequest.of(0, 10));
         int[] rank = {1};
         return recent.stream()
                 .map(b -> new BoardPopularitySnapshotDTO(

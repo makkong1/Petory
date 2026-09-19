@@ -49,8 +49,8 @@ public interface BoardRepository {
     // 전체 게시글 조회 (삭제되지 않은 것만, 최신순) - 작성자도 활성 상태여야 함
     List<Board> findAllByIsDeletedFalseOrderByCreatedAtDesc();
 
-    // 전체 게시글 조회 (삭제되지 않은 것만, 최신순) - 페이징 - 작성자도 활성 상태여야 함
-    Page<Board> findAllByIsDeletedFalseOrderByCreatedAtDesc(Pageable pageable);
+    // 전체 게시글 조회 (삭제되지 않은 것만, 최신순) - 상위 N건 - 작성자도 활성 상태여야 함
+    List<Board> findAllByIsDeletedFalseOrderByCreatedAtDesc(Pageable pageable);
 
     // 카테고리별 삭제되지 않은 게시글 조회 (최신순) - 작성자도 활성 상태여야 함
     List<Board> findByCategoryAndIsDeletedFalseOrderByCreatedAtDesc(String category);

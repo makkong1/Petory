@@ -93,7 +93,7 @@ public class JpaBoardAdapter implements BoardRepository {
     }
 
     @Override
-    public Page<Board> findAllByIsDeletedFalseOrderByCreatedAtDesc(Pageable pageable) {
+    public List<Board> findAllByIsDeletedFalseOrderByCreatedAtDesc(Pageable pageable) {
         return jpaRepository.findAllByIsDeletedFalseOrderByCreatedAtDesc(pageable);
     }
 
