@@ -21,11 +21,11 @@ import com.linkup.Petory.domain.user.converter.UsersConverter;
 import com.linkup.Petory.domain.user.dto.PetDTO;
 import com.linkup.Petory.domain.user.dto.UserPageResponseDTO;
 import com.linkup.Petory.domain.user.dto.UsersDTO;
-import com.linkup.Petory.domain.user.entity.EmailVerificationPurpose;
 import com.linkup.Petory.domain.user.entity.Pet;
 import com.linkup.Petory.domain.user.entity.Role;
 import com.linkup.Petory.domain.user.entity.UserStatus;
 import com.linkup.Petory.domain.user.entity.Users;
+import com.linkup.Petory.domain.user.event.UserRegisteredEvent;
 import com.linkup.Petory.domain.user.event.UserSanctionAppliedEvent;
 import com.linkup.Petory.domain.user.exception.DuplicateUserFieldException;
 import com.linkup.Petory.domain.user.exception.InvalidPasswordException;
@@ -190,20 +190,8 @@ public class UsersService {
             throw new DuplicateUserFieldException("이미 사용 중인 정보가 있습니다. 다른 값을 사용해주세요.");
         }
 
-        // 회원가입 전 이메일 인증을 완료한 경우 Redis에서 인증 상태 삭제
-        if (preVerified) {
-            emailVerificationService.removePreRegistrationVerification(dto.getEmail());
-            log.info("회원가입 완료 및 이메일 인증 상태 적용: userId={}, email={}", saved.getId(), saved.getEmail());
-        } else if (!skipInDev) {
-            // 이메일 인증 안 했으면 회원가입 후 인증 메일 발송 (개발 모드에서는 스킵)
-            try {
-                emailVerificationService.sendVerificationEmail(saved.getId(), EmailVerificationPurpose.REGISTRATION);
-                log.info("회원가입 후 이메일 인증 메일 발송: userId={}, email={}", saved.getId(), saved.getEmail());
-            } catch (Exception e) {
-                log.error("회원가입 이메일 인증 메일 발송 실패: userId={}, error={}", saved.getId(), e.getMessage(), e);
-                // 이메일 발송 실패해도 회원가입은 성공으로 처리
-            }
-        }
+        // Redis 인증 상태 삭제·인증 메일 발송은 롤백 불가라 커밋 후 리스너에서 처리
+        eventPublisher.publishEvent(new UserRegisteredEvent(saved.getId(), saved.getEmail(), preVerified));
 
         return usersConverter.toDTO(saved);
     }
