@@ -188,7 +188,7 @@ frontend/src/
 | Skill | 파일 | 핵심 기능 |
 |-------|------|----------|
 | **기본 작업 규격** | `CLAUDE.md` 상단 · `.cursor/rules/karpathy-guidelines.mdc` · `/karpathy-guidelines` | 과잉 변경 방지·단순함·외과식 수정·검증 가능 목표 (`docs/AGENT_TOOLING.md`) |
-| 코드 리뷰 | `.claude/skills/review.md` | 룰 기반 체크리스트(JPA/트랜잭션/보안) + [문제→원인→개선코드] 형식 + 점수판 |
+| 코드 리뷰 | `.claude/skills/review.md` | 메서드의 **약속**(성공·실패 시 무엇이 참인가)부터 고정 → 약속+4축(범위·파급·근거·일관성) 심문 → Petory 신호 목록은 점화용 보조. [약속→깨지는 상황→결과→근거등급→수정안] 형식 |
 | 커밋+푸시 | `.claude/skills/commit.md` | 파일 필터링(민감파일 자동제외) → type/scope 자동분류 → 도메인별 커밋 분리 제안 |
 | 문서화 | `.claude/skills/docs-sync.md` | 변경 파일 기반 영향 문서 자동 탐지 → 코드 사실 확인 → 문서 현행화 |
 | 리팩토링 | `.claude/skills/refactor.md` | 3가지 타입(구조/성능/가독성) 분류 + 측정 기준(쿼리 수, 코드량) 포함 계획 |
@@ -206,7 +206,7 @@ Skill 간 자동 연계 흐름:
 코드 수정
   │
   ▼
-/review  (룰 기반 점검)
+/review  (약속 기반 점검)
   │
   ├─ Critical 있음 → /refactor (수정) 또는 /fix (버그)
   │                      │
