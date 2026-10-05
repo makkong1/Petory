@@ -1,219 +1,144 @@
-# Test Generation Skill
+# Test Skill — 통과하는 테스트가 아니라 **결함을 잡는 테스트**
 
 ## 트리거
 
-사용자가 테스트 생성, 테스트 작성, 테스트 실행을 요청할 때 실행한다.
+사용자가 테스트 생성·작성·실행을 요청할 때 실행한다.
 `/review`, `/refactor`, `/fix` 완료 후 자동으로 제안된다.
 
-## 테스트 전략
+목표는 초록불이 아니다. **무엇이 망가지면 빨간불이 되는지 말할 수 있는 상태**다.
 
-### 변경 코드 기반 테스트 범위 자동 결정
+## ⚠️ 이 문서 사용법 — 표는 체크리스트가 아니다
 
-| 변경된 파일 | 생성할 테스트 |
-|-----------|-------------|
-| `*Service.java` | 단위 테스트 (Mockito) |
-| `*Repository.java` | 통합 테스트 (`@DataJpaTest`) |
-| `*Controller.java` | API 테스트 (`@WebMvcTest`) |
-| `*Entity.java` | 연관 테스트가 있으면 업데이트, 없으면 생성 안 함 |
-| `*.js` / `*.jsx` | Jest 단위 테스트 |
+아래 표·예시는 **점화용(priming)** 이다.
+- 표에 있는 것만 확인하고 끝내면 **실패다.** 작성·수정하는 **모든** 테스트를 §1의 4축으로 심문하라.
+- 확인 안 한 축은 "문제없음"이 아니라 **"미확인"** 이라고 적는다.
 
-### 필수 테스트 케이스 3종
-
-모든 테스트는 반드시 아래 3가지를 포함한다:
-
-```
-1. ✅ 정상 케이스 (Happy Path)
-   - 올바른 입력 → 기대 결과
-
-2. ❌ 예외 케이스 (Exception Path)
-   - 잘못된 입력, 권한 없음, 존재하지 않는 데이터
-   - 기대하는 예외 타입과 메시지 검증
-
-3. 🔲 경계값 (Boundary)
-   - null, 빈 문자열, 0, 최대값
-   - 페이징: page=0, size=1, 마지막 페이지
-```
-
-### 이 프로젝트 특화 테스트
-
-#### 동시성 테스트
-```java
-@Test
-void 동시_요청_시_데이터_정합성_보장() throws Exception {
-    int threadCount = 10;
-    ExecutorService executor = Executors.newFixedThreadPool(threadCount);
-    CountDownLatch latch = new CountDownLatch(threadCount);
-
-    for (int i = 0; i < threadCount; i++) {
-        executor.submit(() -> {
-            try {
-                // 동시 호출
-            } finally {
-                latch.countDown();
-            }
-        });
-    }
-    latch.await();
-
-    // 최종 상태 검증
-}
-```
-
-적용 대상:
-- 펫코인 충전/차감 (`@Lock(PESSIMISTIC_WRITE)`)
-- 모임 참가 인원 증가 (원자적 UPDATE)
-- 에스크로 상태 전환
-
-#### 트랜잭션 테스트
-```java
-@Test
-void 예외_발생_시_롤백_검증() {
-    assertThrows(SomeException.class, () -> service.doSomething());
-    // DB 상태가 변경 전으로 복원되었는지 검증
-}
-```
-
-적용 대상:
-- 결제 프로세스 중 실패
-- 케어 요청 상태 전환 중 실패
-
-## 동작 절차
-
-### 1단계: 테스트 대상 분석
-
-변경된 코드를 읽고 테스트가 필요한 메서드를 식별한다:
-
-```
-## 테스트 대상 분석
-
-### 변경 파일
-- `CareRequestService.java` → createCareRequest(), cancelCareRequest()
-
-### 생성할 테스트
-| # | 메서드 | 케이스 | 테스트명 |
-|---|-------|-------|---------|
-| 1 | createCareRequest | ✅ 정상 | 정상_케어요청_생성 |
-| 2 | createCareRequest | ❌ 예외 | 존재하지않는_사용자_예외 |
-| 3 | createCareRequest | ❌ 예외 | 중복_요청_예외 |
-| 4 | createCareRequest | 🔲 경계 | 설명_빈문자열_검증 |
-| 5 | cancelCareRequest | ✅ 정상 | 정상_케어요청_취소 |
-| 6 | cancelCareRequest | ❌ 예외 | 이미_취소된_요청_예외 |
-| 7 | cancelCareRequest | ❌ 예외 | 권한없는_사용자_취소_예외 |
-
-→ 생성할까? (전부 / 번호 선택)
-```
-
-### 2단계: 테스트 코드 생성
-
-#### 백엔드 테스트 위치
-```
-backend/test/java/com/linkup/Petory/domain/<domain>/
-├── service/
-│   └── <Service>Test.java          # 단위 테스트
-├── repository/
-│   └── <Repository>Test.java       # 통합 테스트
-└── controller/
-    └── <Controller>Test.java       # API 테스트
-```
-
-#### 테스트 네이밍 컨벤션
-```java
-@Test
-@DisplayName("정상: 케어 요청 생성 시 채팅방 자동 생성")
-void 정상_케어요청_생성_시_채팅방_자동생성() { }
-
-@Test
-@DisplayName("예외: 존재하지 않는 사용자로 요청 시 NotFoundException")
-void 예외_존재하지않는_사용자_요청() { }
-
-@Test
-@DisplayName("경계: 제목이 빈 문자열이면 ValidationException")
-void 경계_제목_빈문자열_검증() { }
-```
-
-### 3단계: 테스트 실행
+## Petory 실행 환경 (먼저 확정)
 
 ```bash
-# 특정 테스트 클래스 실행
-./gradlew test --tests "com.linkup.Petory.domain.care.service.CareRequestServiceTest"
-
-# 전체 테스트
-./gradlew test
+./gradlew test --tests "com.linkup.Petory.domain.user.service.UsersServiceRegisterEventTest"   # 특정 클래스
+./gradlew test --tests "com.linkup.Petory.domain.user.*"                                       # 도메인
+./gradlew test                                                                                 # 전체
 ```
 
-### 4단계: 결과 보고
+- **MySQL + Redis가 켜져 있어야 한다.** `RedisConnectionFailureException`이면 코드 문제가 아니라 환경이다 — `redis-cli ping`으로 먼저 확인.
+- 테스트 DB는 개발 DB(`petory`)가 아니라 **`petory_test`** 다. 개발 DB를 고쳐도 테스트엔 영향이 없다.
+- 실패가 내 변경 때문인지 모르겠으면 **변경 전 코드에서도 같은 실패가 나는지** 돌려본다.
+
+---
+
+## 0. 루프
 
 ```
-## 테스트 결과
-
-| # | 테스트 | 상태 | 비고 |
-|---|-------|------|------|
-| 1 | 정상_케어요청_생성 | ✅ PASS | |
-| 2 | 존재하지않는_사용자_예외 | ✅ PASS | |
-| 3 | 중복_요청_예외 | ❌ FAIL | UniqueConstraint 미적용 |
-| 4 | 설명_빈문자열_검증 | ✅ PASS | |
-
-### 실패 분석
-- **테스트 3 실패**: `CareRequest` 엔티티에 `@UniqueConstraint` 누락
-- **수정 필요**: Entity에 제약조건 추가
-
-→ 실패 항목 수정할까? (/fix로 전환)
+① 대상 정하기   "무엇이 보장돼야 하나"를 문장으로 쓴다 (메서드 이름 말고 약속·불변식)
+② 질문 생성     그 테스트를 4축으로 심문 (§1)
+③ 빨간불 먼저   수정을 되돌리거나 일부러 깨뜨려 → 실제로 실패하는지 확인
+④ 초록불        수정 복구 → 통과
+⑤ 환경 확인     단독·반복 실행, 빈 데이터에서도 같은 답인지
+⑥ 보고          실행 명령 + 통과/실패 + ③에서 무엇을 깨뜨려봤는지
 ```
 
-### 5단계: 테스트 결과 문서화
+**③이 빠지면 테스트가 아니라 장식이다.**
+예: `UsersServiceRegisterEventTest` — `UsersService`만 수정 전으로 되돌려 돌렸더니 롤백 케이스가 `NeverWantedButInvoked`로 실패 → 이 테스트가 그 버그를 실제로 잡는다는 증거.
 
-전부 통과한 경우, 결과를 `docs/test-reports/YYYY-MM-DD-<기능명>.md`에 저장하고 커밋에 포함한다.
+---
 
-#### 문서 템플릿
+## 1. 질문 생성 — 4개 축
 
-````markdown
-# 테스트 결과: <기능명>
+| 축 | 그 테스트에 던지는 질문 | 실패 신호 (예시 — 전부 아님) |
+|---|---|---|
+| **① 대상** | 검사하는 게 **결과**인가 **구현**인가? 구현을 갈아엎어도 살아남나? | 내부 호출 순서만 단언, mock 상호작용만 검증. 단 **외부로 나가는 부수효과**(메일 발송 등)는 호출 여부 자체가 결과다 |
+| **② 반증** | **무엇이 망가지면** 빨간불이 되나? 실제로 깨뜨려 확인했나? | 깨뜨려도 통과(false green), `not null`만 단언, 예외를 삼킴 |
+| **③ 환경** | 어디서 돌려도 같은 답인가? 주변 상태에 기대지 않나? | 개발 DB에만 있는 데이터 전제, 실행 순서 의존, 현재 시각, 스케줄러가 섞임 |
+| **④ 독립** | 기대값이 **프로덕션 코드에서 온 것**은 아닌가? | 같은 상수·같은 공식으로 기대값 계산(동어반복) → 프로덕션이 틀려도 같이 틀려 통과 |
 
-**일시:** YYYY-MM-DD
-**대상 파일:** `path/to/ChangedFile.java`
-**실행 명령:** `./gradlew test --tests "com.linkup.Petory..."`
+> **규칙**: 4축 각각 "확인함/미확인". **②는 말이 아니라 실행으로** 확인한다.
 
-## 테스트 상황
+### 무엇을 테스트할지 고르는 씨앗 (필수 목록 아님)
 
-왜 이 테스트가 필요한지, 어떤 변경을 검증하는지 1~3문장으로 작성한다.
-예) "CareRequest 생성 시 채팅방 자동 생성 로직을 추가했다. 정상 흐름, 중복 요청 방지, 트랜잭션 롤백 세 가지를 검증한다."
+- 정상 경로 / 예외 경로(잘못된 입력·권한 없음·없는 데이터) / 경계값(null·빈 값·0·최대값·마지막 페이지)
+- **실패 경로**: 중간에 실패하면 그 전에 한 일이 되돌아가나
+- **동시 요청**: 같은 요청 두 번이 동시에 오면
 
-## 실행 로그
+---
+
+## 2. Petory 함정 — false green 의 실제 사례 (닫힌 목록 아님)
+
+> 테스트가 초록불인 이유는 두 가지다. **코드가 맞거나, 테스트가 아무것도 안 보고 있거나.** 구분하는 유일한 방법은 깨뜨려보는 것이다.
+
+| 함정 | 무슨 일이 벌어지나 | 대응 |
+|---|---|---|
+| **클래스 `@Transactional`로 감싼 테스트** | 테스트 전체가 한 트랜잭션이라 **커밋이 안 일어난다** → `AFTER_COMMIT` 리스너는 아예 안 돌고, 동시성 테스트는 같은 트랜잭션 안의 값끼리 비교해 항상 통과 | 커밋·롤백·동시성을 보는 테스트는 클래스 `@Transactional`을 빼고 `TransactionTemplate`으로 경계를 직접 만든다. 만든 데이터는 `finally`에서 지운다 |
+| **Mockito로 JPA 동작 검증** | 락·N+1·제약조건·트랜잭션 경계는 mock이 흉내 못 낸다 → 무엇을 해도 통과 | DB가 관여하는 약속은 `@SpringBootTest` + `petory_test`로 |
+| **동어반복** | 기대값을 프로덕션 공식·상수로 계산 | 손으로 계산한 리터럴 (예: `LocationServiceScoreSchedulerTest`의 2.2) |
+| **카운터가 안 세는 것** | Hibernate Statistics가 지연 로딩·일부 쿼리를 빠뜨림 → "쿼리 수 줄었다"가 거짓 | 다른 경로(performance_schema·로그)로 교차 확인 — `/db-diagnose` |
+| **스케줄러 섞임** | 백그라운드 스케줄러가 같은 테이블을 건드림 | 측정성 테스트면 `petory.scheduling.enabled=false` |
+| **통과만 확인** | 빨간불을 한 번도 본 적 없음 | §0 ③을 건너뛰지 않는다 |
+
+### 동시성 테스트 뼈대
+
+```java
+// 출발선(start gate): 모든 스레드가 준비된 뒤 동시에 출발시킨다
+CountDownLatch ready = new CountDownLatch(threadCount);
+for (int i = 0; i < threadCount; i++) {
+    executor.submit(() -> {
+        ready.countDown();
+        ready.await();          // 다 모일 때까지 대기 → 동시에 호출
+        service.doSomething();  // 각 호출이 자기 트랜잭션으로 커밋되게 (클래스 @Transactional 금지)
+        return null;
+    });
+}
+executor.shutdown();
+executor.awaitTermination(30, TimeUnit.SECONDS);
+// 최종 상태를 DB에서 다시 읽어 검증 (잔액 음수 없음, 인원 초과 없음 등)
+```
+
+통과했다고 "안전하다"고 쓰지 않는다 — 타이밍에 따라 안 겹쳤을 수 있다. 락을 지워 빨간불을 본 적이 있어야 근거가 된다.
+
+---
+
+## 3. 위치·네이밍
 
 ```
-BUILD SUCCESSFUL in 3s
-CareRequestServiceTest > 정상_케어요청_생성 PASSED
-CareRequestServiceTest > 존재하지않는_사용자_예외 PASSED
-...
+backend/test/java/com/linkup/Petory/domain/<domain>/{service,repository,controller}/
 ```
 
-## 결과 요약
+- 메서드명은 한글로 약속을 쓴다: `가입이_롤백되면_인증_메일을_보내지_않는다()`
+- 이웃 테스트의 스타일(`@SpringBootTest`·`TransactionTemplate`·정리 방식)을 따른다.
 
-| # | 테스트명 | 케이스 | 상태 |
-|---|---------|-------|------|
-| 1 | 정상_케어요청_생성 | ✅ 정상 | PASS |
-| 2 | 존재하지않는_사용자_예외 | ❌ 예외 | PASS |
-| 3 | 설명_빈문자열_검증 | 🔲 경계 | PASS |
+---
 
-**총계:** N개 통과 / 0개 실패
-````
+## 4. 산출물 형식
 
-#### 저장 규칙
+```
+## 실행
+- 명령: ./gradlew test --tests "..."
+- 결과: 통과 N / 실패 M / 건너뜀 K  (실패가 환경 탓이면 그 근거)
 
-- 경로: `docs/test-reports/YYYY-MM-DD-<kebab-case-기능명>.md`
-- 실패 항목이 있으면 문서화하지 않고 `/fix` 먼저 진행한다.
-- 저장 후 `/commit` 시 테스트 파일과 함께 포함한다.
+## 추가·수정한 테스트
+- 파일 · 케이스명 · 이 테스트가 지키는 약속(한 문장)
+
+## 4축 확인
+- ① 대상 : 결과 검사 / 구현 검사 — (근거)
+- ② 반증 : 무엇을 깨뜨려 빨간불을 확인했나 — (실행 결과)  ← 말로만이면 "미확인"
+- ③ 환경 : 단독 / 반복 / 빈 데이터
+- ④ 독립 : 기대값 출처
+
+## 미확인
+- 확인 못 한 축·범위. "문제없음"으로 쓰지 않는다
+```
+
+---
 
 ## 워크플로우 연계
 
-- `/review` 완료 → `/test` 제안 (변경 코드 회귀 방지)
-- `/refactor` 완료 → `/test` 제안 (리팩토링 검증)
-- `/fix` 완료 → `/test` 제안 (수정 확인)
-- 테스트 전부 통과 → `/commit` 제안
+- `/fix`·`/refactor` 뒤에는 반드시 이 스킬. 전부 통과 후 `/commit`.
+- 실패가 버그면 `/fix`로, 측정이 필요하면 `/db-diagnose`로.
 
 ## 제약
 
-- 테스트는 독립적이어야 한다 (테스트 간 순서 의존 금지).
-- Mock은 필요한 최소한만 사용한다 (과도한 Mock = 의미 없는 테스트).
-- DB 테스트는 `@Transactional` + 롤백으로 데이터 격리한다.
-- 기존 테스트가 있으면 스타일을 맞춘다.
+- **초록불을 결과로 보고하지 않는다.** 무엇을 깨뜨려봤는지 함께 쓴다.
+- 표를 체크리스트로 소비하지 않는다 — 4축으로 질문을 **생성**한다.
+- 확인 못 한 범위는 **"미확인"**. 침묵은 통과가 아니다.
+- 테스트를 통과시키려고 프로덕션 코드를 느슨하게 만들지 않는다.
+- 테스트는 독립적이어야 한다(순서 의존 금지). 만든 데이터는 직접 정리한다.
