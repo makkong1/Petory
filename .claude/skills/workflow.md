@@ -13,7 +13,7 @@ Cursor / Claude Code에서 **스킬을 어떤 순서로 쓰면 되는지** 한�
 코드 수정
    │
    ▼
-① /review     … 룰 기반 점검, 점수판, Critical/Warning 분류
+① /review     … 약속(정확성)+4축 심문, Critical/Warning/Info 분류
    │
    ├─ 버그·장애·재현된 실패     → ②-A /fix   (Hotfix + Proper Fix)
    │
