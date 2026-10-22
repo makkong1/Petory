@@ -162,7 +162,7 @@ public class AdminLocationController {
 
     /**
      * 공공데이터 오픈API를 즉시 호출해 시설 데이터를 upsert 한다. [MASTER]
-     * 실행 결과 요약(상태·신규·갱신·스킵·실패 건수)을 반환한다.
+     * 실행 결과 요약(상태·신규·갱신·스킵(사유별)·실패 건수)을 반환한다.
      */
     @PostMapping("/sync-public-data")
     @PreAuthorize("hasRole('MASTER')")
@@ -174,6 +174,10 @@ public class AdminLocationController {
         body.put("inserted", result.getInserted());
         body.put("updated", result.getUpdated());
         body.put("skipped", result.getSkipped());
+        // 합계만으로는 멱등하게 잘 돈 것인지 원본·매핑이 깨져 전량 거부된 것인지 구분할 수 없다.
+        body.put("skippedInvalid", result.getSkippedInvalid());
+        body.put("skippedDuplicate", result.getSkippedDuplicate());
+        body.put("skippedUnchanged", result.getSkippedUnchanged());
         body.put("failed", result.getFailed());
         body.put("startedAt", result.getStartedAt());
         body.put("finishedAt", result.getFinishedAt());
