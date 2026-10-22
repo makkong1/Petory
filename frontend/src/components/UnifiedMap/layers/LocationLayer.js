@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { locationServiceReviewApi } from '../../../api/locationServiceReviewApi';
+import { petRecommendationApi } from '../../../api/petRecommendationApi';
 import { useAuth } from '../../../contexts/AuthContext';
 import {
   InfoPanel as BaseInfoPanel,
@@ -64,6 +65,7 @@ const LocationLayer = ({ selectedItem, onClose, docked = false }) => {
     const idx = selectedItem.raw?.idx;
     if (!idx) return;
     loadReviews(idx, 0, false);
+    petRecommendationApi.interact(idx, 'VIEW');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedItem]);
 
@@ -261,6 +263,7 @@ const LocationLayer = ({ selectedItem, onClose, docked = false }) => {
           href={`https://map.naver.com/p/search/${encodeURIComponent(selectedItem.title || '')}`}
           target="_blank"
           rel="noopener noreferrer"
+          onClick={() => petRecommendationApi.interact(r.idx, 'NAVIGATE')}
         >
           🧭 길찾기
         </ActionSecondary>
