@@ -59,19 +59,22 @@ public class PublicDataSyncService {
                     .build());
         }
 
-        int inserted = 0, updated = 0, skipped = 0, failed = 0;
+        int inserted = 0, updated = 0, failed = 0;
+        // skip 은 사유별로 센다. 합쳐 놓으면 이력만 보고 "멱등하게 잘 돌았다"와
+        // "원본·매핑이 깨져 전량 거부됐다"를 구분할 수 없다.
+        int skippedInvalid = 0, skippedDuplicate = 0, skippedUnchanged = 0;
         Set<String> seen = new HashSet<>();
         List<LocationService> insertBatch = new ArrayList<>();
         List<LocationService> updateBatch = new ArrayList<>();
 
         for (PublicDataLocationDTO dto : items) {
             if (!conversion.isValid(dto)) {
-                skipped++;
+                skippedInvalid++;
                 continue;
             }
             String dedupKey = conversion.buildDedupKey(dto);
             if (!seen.add(dedupKey)) {
-                skipped++; // 같은 실행 안 중복 행
+                skippedDuplicate++; // 같은 실행 안 중복 행
                 continue;
             }
 
@@ -79,7 +82,8 @@ public class PublicDataSyncService {
             try {
                 incoming = conversion.convertToEntity(dto);
                 if (incoming == null) {
-                    skipped++;
+                    // 변환 결과가 비는 것도 "쓸 수 없는 행"이라 invalid 로 묶는다.
+                    skippedInvalid++;
                     continue;
                 }
             } catch (Exception e) {
@@ -97,7 +101,7 @@ public class PublicDataSyncService {
             } else {
                 LocationService existing = existingOpt.get();
                 if (isSamePublicData(existing, incoming)) {
-                    skipped++;
+                    skippedUnchanged++;
                 } else {
                     copyPublicFields(incoming, existing);
                     updateBatch.add(existing);
@@ -129,9 +133,11 @@ public class PublicDataSyncService {
             failed += (updateBatch.size() - saved);
         }
 
+        int skipped = skippedInvalid + skippedDuplicate + skippedUnchanged;
         SyncStatus status = (failed > 0) ? SyncStatus.PARTIAL : SyncStatus.SUCCESS;
-        log.info("공공데이터 동기화 완료: 조회={}, 신규={}, 갱신={}, 스킵={}, 실패={}, status={}",
-                items.size(), inserted, updated, skipped, failed, status);
+        log.info("공공데이터 동기화 완료: 조회={}, 신규={}, 갱신={}, 스킵={}(무효={}, 중복={}, 동일={}), 실패={}, status={}",
+                items.size(), inserted, updated, skipped,
+                skippedInvalid, skippedDuplicate, skippedUnchanged, failed, status);
 
         return syncLogRepository.save(LocationSyncLog.builder()
                 .startedAt(startedAt)
@@ -141,6 +147,9 @@ public class PublicDataSyncService {
                 .inserted(inserted)
                 .updated(updated)
                 .skipped(skipped)
+                .skippedInvalid(skippedInvalid)
+                .skippedDuplicate(skippedDuplicate)
+                .skippedUnchanged(skippedUnchanged)
                 .failed(failed)
                 .triggerType(triggerType)
                 .build());

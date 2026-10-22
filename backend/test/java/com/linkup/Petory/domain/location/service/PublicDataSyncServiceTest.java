@@ -96,8 +96,42 @@ class PublicDataSyncServiceTest {
         LocationSyncLog log = service.syncFromApi(SyncTriggerType.MANUAL);
 
         assertThat(log.getSkipped()).isEqualTo(1);
+        // 합계만 보면 무효·중복·동일 중 어느 사유로 빠졌는지 구분이 안 된다. 사유까지 고정한다.
+        assertThat(log.getSkippedUnchanged()).isEqualTo(1);
+        assertThat(log.getSkippedInvalid()).isZero();
+        assertThat(log.getSkippedDuplicate()).isZero();
         assertThat(log.getInserted()).isZero();
         assertThat(log.getUpdated()).isZero();
+    }
+
+    @Test
+    void skip_사유가_무효_중복_동일로_나뉘고_합계가_일치한다() {
+        PublicDataLocationDTO invalid = dto("", "");                 // isValid 실패
+        PublicDataLocationDTO first = dto("병원A", "서울 강남");       // DB 에 있고 내용 동일
+        PublicDataLocationDTO again = dto("병원A", "서울 강남");       // 같은 실행 안 중복
+        LocationService existing = entity("병원A", "서울 강남", "010");
+
+        when(apiClient.fetchAll()).thenReturn(List.of(invalid, first, again));
+        when(conversion.isValid(invalid)).thenReturn(false);
+        stubValidConversion(first, entity("병원A", "서울 강남", "010"));
+        when(conversion.isValid(again)).thenReturn(true);
+        when(conversion.buildDedupKey(again)).thenReturn("병원A|서울 강남");
+        when(locationServiceRepository.findFirstByNameAndAddress("병원A", "서울 강남"))
+                .thenReturn(Optional.of(existing));
+        when(syncLogRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        LocationSyncLog log = service.syncFromApi(SyncTriggerType.MANUAL);
+
+        assertThat(log.getSkippedInvalid()).isEqualTo(1);
+        assertThat(log.getSkippedDuplicate()).isEqualTo(1);
+        assertThat(log.getSkippedUnchanged()).isEqualTo(1);
+        // skipped 는 세 사유의 합이다. 네 번째 사유가 생기고 합산을 빼먹으면 여기서 깨진다.
+        assertThat(log.getSkipped())
+                .isEqualTo(log.getSkippedInvalid() + log.getSkippedDuplicate() + log.getSkippedUnchanged())
+                .isEqualTo(3);
+        assertThat(log.getInserted()).isZero();
+        assertThat(log.getUpdated()).isZero();
+        assertThat(log.getFailed()).isZero();
     }
 
     @Test
