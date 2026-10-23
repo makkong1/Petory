@@ -16,6 +16,7 @@ import com.linkup.Petory.domain.location.exception.LocationServiceAlreadyDeleted
 import com.linkup.Petory.domain.location.exception.LocationServiceNotFoundException;
 import com.linkup.Petory.domain.location.repository.LocationServiceRepository;
 import com.linkup.Petory.domain.location.event.LocationSearchPerformedEvent;
+import com.linkup.Petory.domain.location.util.SidoNormalizer;
 import com.linkup.Petory.domain.user.repository.UsersRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -79,6 +80,9 @@ public class LocationServiceService {
 
         keyword = normalize(keyword);
         category = normalize(category);
+        // 프론트가 사용자 입력을 그대로 보내는데 findBySido 는 정확일치다. 「강원도」로 치면
+        // 886건 중 884건만, 「전북특별자치도」로 치면 902건 중 0건이 나오던 축이다.
+        sido = SidoNormalizer.normalize(sido);
         publishSearchEvent(keyword);
 
         int limit = (maxResults != null && maxResults > 0) ? maxResults : 50;
