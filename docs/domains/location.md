@@ -301,7 +301,7 @@ CSV 수동 업로드와 별개로, data.go.kr odcloud 오픈API(한국문화정�
 - **트리거 2종**: `PublicDataSyncScheduler`가 매일 03:00 자동 실행(`@Scheduled`, `SchedulingConfig`의 `petory.scheduling.enabled`가 중앙 게이팅) + 위 `POST .../sync-public-data`로 관리자 수동 실행.
 - **수집**: `PublicDataApiClient.fetchAll()`이 `page`/`perPage`로 전체 페이지를 순회한다. 응답의 한글 컬럼키(공백·괄호 포함 31개)를 정규화(`normalizeKey`)해 `PublicDataLocationDTO`로 매핑한다. 페이지 호출 실패 시 최대 2회 재시도한다. 서비스키의 `+`는 URL 인코딩(`URLEncoder` + `build(true)`)으로 공백 오해석을 막는다.
 - **upsert**: `PublicDataSyncService`가 시설명+주소(`findFirstByNameAndAddress`)로 기존 행을 조회해 없으면 INSERT, 내용이 바뀌었으면 UPDATE, 동일하면 skip 한다. UPDATE는 신규 엔티티로 덮어쓰지 않고 **공공데이터 필드만 복사**(`copyPublicFields`)해, 앱 관리 필드(`rating`, `reviewCount`, `isDeleted`, `geo_point`, `createdAt`)를 보존한다.
-- **실행이력**: run 당 1행을 `location_sync_log`(V8 마이그레이션)에 기록한다 — 시작/종료 시각, 상태(`SUCCESS`/`PARTIAL`/`FAILED`), 조회/신규/갱신/스킵/실패 건수, 트리거 종류. API 전체 실패는 `FAILED`, 일부 배치 실패는 `PARTIAL`이다.
+- **실행이력**: run 당 1행을 `location_sync_log`(V8 마이그레이션)에 기록한다 — 시작/종료 시각, 상태(`SUCCESS`/`PARTIAL`/`FAILED`), 조회/신규/갱신/스킵/실패 건수, 트리거 종류. API 전체 실패는 `FAILED`, 일부 배치 실패는 `PARTIAL`이다. **스킵은 사유별로 쪼개 기록한다**(V22) — `skipped_invalid`(쓸 수 없는 행) / `skipped_duplicate`(실행 내 중복) / `skipped_unchanged`(이미 있고 동일). 합계만으로는 멱등 정상과 전량 거부를 구분할 수 없었다.
 - **설정**: `app.public-data.base-url`(기본값 = 고정 odcloud 엔드포인트), `app.public-data.service-key`(비우면 동기화만 실패하고 앱은 정상 기동), `app.public-data.page-size`. 서비스키는 gitignore된 로컬 설정/`.env`에만 둔다.
 
 ## 13. 추천 도메인 연동
