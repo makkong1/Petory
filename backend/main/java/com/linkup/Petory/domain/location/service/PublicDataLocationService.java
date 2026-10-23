@@ -19,6 +19,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.linkup.Petory.domain.location.dto.PublicDataLocationDTO;
 import com.linkup.Petory.domain.location.entity.LocationService;
+import com.linkup.Petory.domain.location.util.SidoNormalizer;
 import com.linkup.Petory.domain.location.repository.LocationServiceRepository;
 
 import jakarta.persistence.EntityManager;
@@ -335,7 +336,7 @@ public class PublicDataLocationService {
                 .category1(dto.getCategory1())
                 .category2(dto.getCategory2())
                 .category3(dto.getCategory3() != null ? dto.getCategory3() : category) // 기본 카테고리로 사용
-                .sido(dto.getSidoName())
+                .sido(SidoNormalizer.normalize(dto.getSidoName()))
                 .sigungu(dto.getSigunguName())
                 .eupmyeondong(dto.getEupmyeondongName())
                 .roadName(dto.getRoadName())
