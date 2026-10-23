@@ -96,9 +96,18 @@ run 당 1행을 기록한다.
 | --- | --- |
 | `started_at` / `finished_at` | 실행 시작·종료 시각 |
 | `status` | `SUCCESS`(전량 성공) / `PARTIAL`(일부 배치 실패) / `FAILED`(API 조회 자체 실패) |
-| `total_fetched` / `inserted` / `updated` / `skipped` / `failed` | 건수 집계 |
+| `total_fetched` / `inserted` / `updated` / `skipped` / `failed` | 건수 집계. `skipped` 는 아래 세 사유의 합계 |
+| `skipped_invalid` | 시설명·주소가 없어 쓸 수 없던 행 → 높으면 **원본·매핑 고장** |
+| `skipped_duplicate` | 같은 실행 안에서 이미 본 행 → 높으면 **원본 품질 문제** |
+| `skipped_unchanged` | 이미 있고 내용도 같던 행 → 높으면 **멱등하게 정상 동작** |
 | `trigger_type` | `SCHEDULED` / `MANUAL` |
 | `error_message` | 실패 시 원인(최대 1000자) |
+
+> 🔴 **왜 사유를 쪼갰나 (V22, 2026-10-22)** — 기록된 6회가 전부 `inserted=0 updated=0 skipped=70650` 이었는데,
+> 이 수치로는 멱등하게 잘 돈 것인지 원본·매핑이 깨져 전량 거부된 것인지 **구분할 수 없었다.**
+> API 를 직접 호출해 보고서야 원본 70,650행 중 **66%가 `시설명|주소` 완전중복**(표본 1,000행에서 중복 518건,
+> 중복 그룹 114개가 필드까지 전부 동일)이라 24,130행만 남는 게 정상이라는 것을 확인했다.
+> 사유별 칸은 **V22 이전 행에서 `NULL`** 이다 — `0` 으로 채우면 「중복 0건이었다」는 거짓이 기록된다.
 
 ## 트리거와 설정
 

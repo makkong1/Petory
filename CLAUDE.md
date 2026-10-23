@@ -136,6 +136,9 @@ npm test
   | `V17` | `report.target_type` 에 `CARE_REVIEW` 누락 수정 |
   | `V18` | `careapplication.offered_coins` — 제안 시점 금액 스냅샷 (계약을 제안/수락으로 전환) |
   | `V19` | `conversationparticipant` 확정 3컬럼 제거 — 계약이 chat 에서 care 로 옮겨감 |
+  | `V20` | 제안 상태에 `WITHDRAWN`(철회) 추가 — 제공자 의사와 무관하게 제안이 끝나는 경우를 `REJECTED` 와 구분 |
+  | `V21` | 제안 상태에 `EXPIRED`(만료) 추가 — 아무도 아무것도 안 한 경우. 거절·철회와 뭉치면 화면 문구가 거짓이 된다 |
+  | `V22` | `location_sync_log` skip 사유 3컬럼 — 합계만으로는 멱등 정상과 전량 거부를 구분할 수 없었다 |
 
   ⚠️ 신규 docker 볼륨은 앱을 최소 한 번 부팅해야 Flyway가 V2~V7을 적용한다. `petory_app` 계정은 SUPER 권한이 없어 binlog가 켜진 상태에서 트리거 생성(V4, V6)이 `ERROR 1419`로 실패할 수 있다 — 그럴 땐 root로 `SET GLOBAL log_bin_trust_function_creators = 1;` 실행 후 재시도.
 - **엔티티도 같이 고쳐야 한다.** `ddl-auto=validate` 가 엔티티와 실제 스키마를 대조하므로, 어긋나면 앱이 기동에 실패한다(DDL은 실행하지 않으니 데이터는 안전).
