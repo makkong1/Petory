@@ -1,6 +1,11 @@
 # main 브랜치에 push되면 Docker 이미지를 빌드해서
 # GitHub Container Registry(ghcr.io)에 자동으로 올린다.
 #
+# 배포 대상이 Oracle Cloud Ampere A1(ARM64)이라 이미지도 arm64로 빌드한다.
+# public 레포라 GitHub가 arm64 러너(ubuntu-24.04-arm)를 무료로 준다 —
+# amd64 러너 + QEMU 에뮬레이션으로 빌드하면 몇 배 느리므로 네이티브 러너를 쓴다.
+# x86 서버로 옮길 일이 생기면 platforms 에 linux/amd64 를 추가한다.
+#
 # 여기까지가 지금 시점의 CD임: "코드가 main에 들어가면 최신 이미지가 항상 준비되어 있다."
 # 실제 서버에 자동 배포(ssh → docker pull → docker compose up)하는 마지막 단계는
 # 배포할 서버가 생긴 뒤에 이 워크플로우에 이어 붙인다 (아직 없음).
@@ -28,7 +33,7 @@ permissions:
 
 jobs:
   build-and-push:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     strategy:
       matrix:
         include:
@@ -54,6 +59,7 @@ jobs:
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
+          platforms: linux/arm64
           push: true
           tags: |
             ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:latest
