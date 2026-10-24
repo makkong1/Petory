@@ -70,6 +70,11 @@ public class LocationSyncLog {
     @Column(name = "trigger_type", nullable = false, length = 20)
     private SyncTriggerType triggerType;
 
+    /** 어느 데이터셋을 돌린 실행인가. V24 이전 행은 null 이고, 전부 문화시설 동기화다. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "source", length = 30)
+    private SyncSource source;
+
     @Column(name = "error_message", columnDefinition = "TEXT")
     private String errorMessage;
 
@@ -81,11 +86,16 @@ public class LocationSyncLog {
         SCHEDULED, MANUAL
     }
 
+    /** 동기화 대상 데이터셋. CULTURE_FACILITY = odcloud 반려동물 동반가능 문화시설, PET_TOUR = TourAPI 반려동물 동반여행. */
+    public enum SyncSource {
+        CULTURE_FACILITY, PET_TOUR
+    }
+
     @Builder
     private LocationSyncLog(LocalDateTime startedAt, LocalDateTime finishedAt, SyncStatus status,
             int totalFetched, int inserted, int updated, int skipped, int failed,
             Integer skippedInvalid, Integer skippedDuplicate, Integer skippedUnchanged,
-            SyncTriggerType triggerType, String errorMessage) {
+            SyncTriggerType triggerType, SyncSource source, String errorMessage) {
         this.startedAt = startedAt;
         this.finishedAt = finishedAt;
         this.status = status;
@@ -98,6 +108,7 @@ public class LocationSyncLog {
         this.skippedUnchanged = skippedUnchanged;
         this.failed = failed;
         this.triggerType = triggerType;
+        this.source = source;
         this.errorMessage = errorMessage;
     }
 }

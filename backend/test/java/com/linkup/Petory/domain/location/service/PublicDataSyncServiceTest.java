@@ -3,6 +3,8 @@ package com.linkup.Petory.domain.location.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
@@ -17,6 +19,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.linkup.Petory.domain.location.dto.PublicDataLocationDTO;
 import com.linkup.Petory.domain.location.entity.LocationService;
 import com.linkup.Petory.domain.location.entity.LocationSyncLog;
+import com.linkup.Petory.domain.location.entity.LocationSyncLog.SyncSource;
 import com.linkup.Petory.domain.location.entity.LocationSyncLog.SyncStatus;
 import com.linkup.Petory.domain.location.entity.LocationSyncLog.SyncTriggerType;
 import com.linkup.Petory.domain.location.repository.LocationServiceRepository;
@@ -159,5 +162,29 @@ class PublicDataSyncServiceTest {
 
         assertThat(log.getFailed()).isEqualTo(1);
         assertThat(log.getStatus()).isEqualTo(SyncStatus.PARTIAL);
+    }
+
+    /**
+     * 칸이 적은 데이터셋(TourAPI)이 쓰는 경로. 내용이 달라도 기존 행을 건드리지 않아야 한다 —
+     * copyPublicFields 가 필드 전체를 옮기기 때문에, 원본에 없는 칸이 null 로 덮인다.
+     */
+    @Test
+    void updateExisting이_false면_내용이_달라도_기존행을_건드리지_않는다() {
+        PublicDataLocationDTO d = dto("제주민속촌", "제주 서귀포");
+        LocationService incoming = entity("제주민속촌", "제주 서귀포", null);
+        LocationService existing = entity("제주민속촌", "제주 서귀포", "064-787-4501");
+        stubValidConversion(d, incoming);
+        when(locationServiceRepository.findFirstByNameAndAddress("제주민속촌", "제주 서귀포"))
+                .thenReturn(Optional.of(existing));
+        when(syncLogRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        LocationSyncLog log = service.sync(SyncSource.PET_TOUR, SyncTriggerType.MANUAL, () -> List.of(d),
+                (dto, e) -> {
+                }, false);
+
+        verify(batchWriter, never()).updateBatch(any());
+        assertThat(existing.getPhone()).isEqualTo("064-787-4501"); // 지워지지 않았다
+        assertThat(log.getUpdated()).isZero();
+        assertThat(log.getSkippedUnchanged()).isEqualTo(1);
     }
 }

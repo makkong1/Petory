@@ -104,6 +104,20 @@ public class LocationService {
     @Column(name = "pet_restrictions", length = 255)
     private String petRestrictions; // 반려동물 제한사항
 
+    /**
+     * 동반 가능 구역 (TourAPI {@code acmpyTypeCd}) — 「전구역 동반가능」/「일부구역 동반가능」.
+     * {@code petFriendly}(들어갈 수 있는가)와 다른 축이다. 공공데이터 CSV·odcloud 출처는 이 값을 주지 않는다.
+     */
+    @Column(name = "pet_zone_type", length = 30)
+    private String petZoneType;
+
+    /**
+     * TourAPI {@code contentid}. 적재와 동반구역 상세 조회를 나눠 돌리기 때문에
+     * (일일 한도 1,000회) 상세를 나중에 다시 부를 식별자를 행에 남긴다. 다른 출처는 null 이다.
+     */
+    @Column(name = "tour_content_id", length = 20)
+    private String tourContentId;
+
     @Column(name = "pet_extra_fee", length = 255)
     private String petExtraFee; // 애견 동반 추가 요금
 

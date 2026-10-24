@@ -26,6 +26,10 @@ export const PET_PLACE_CATEGORY_GROUPS = [
       { apiValue: "여행지", label: "여행지" },
       { apiValue: "박물관", label: "박물관" },
       { apiValue: "호텔", label: "호텔" },
+      // TourAPI 반려동물 동반여행 적재분(숙박 32 · 레포츠 28 · 문화시설 14)
+      { apiValue: "숙박", label: "숙박" },
+      { apiValue: "레포츠", label: "레포츠" },
+      { apiValue: "문화시설", label: "문화시설" },
     ],
   },
   {

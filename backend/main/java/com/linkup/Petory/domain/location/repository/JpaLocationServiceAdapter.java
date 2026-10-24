@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.context.annotation.Primary;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Repository;
 
 import com.linkup.Petory.domain.location.entity.LocationService;
@@ -61,6 +62,12 @@ public class JpaLocationServiceAdapter implements LocationServiceRepository {
     @Override
     public Optional<LocationService> findFirstByNameAndAddress(String name, String address) {
         return jpaRepository.findByNameAndAddress(name, address).stream().findFirst();
+    }
+
+    @SuppressWarnings("null")
+    @Override
+    public List<LocationService> findMissingPetZoneType(String dataSource, int limit) {
+        return jpaRepository.findMissingPetZoneType(dataSource, PageRequest.of(0, limit));
     }
 
     @Override

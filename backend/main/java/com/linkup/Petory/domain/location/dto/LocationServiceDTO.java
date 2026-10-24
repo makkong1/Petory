@@ -55,6 +55,7 @@ public class LocationServiceDTO {
     private Boolean isPetOnly;
     private String petSize;
     private String petRestrictions;
+    private String petZoneType; // 「전구역 동반가능」/「일부구역 동반가능」
     private String petExtraFee;
 
     // 장소 정보

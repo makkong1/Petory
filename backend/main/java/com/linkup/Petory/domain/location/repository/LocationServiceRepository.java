@@ -49,6 +49,12 @@ public interface LocationServiceRepository {
     Optional<LocationService> findFirstByNameAndAddress(String name, String address);
 
     /**
+     * 동반 가능 구역이 아직 비어 있는 행을 limit 개까지 조회한다(TourAPI 백필용).
+     * 적재와 상세 조회를 분리하는 이유는 {@code PetTourSyncService} 주석에 적었다.
+     */
+    List<LocationService> findMissingPetZoneType(String dataSource, int limit);
+
+    /**
      * 반경 검색 (ST_Distance_Sphere 사용, keyword·category 필터 포함)
      */
     List<LocationService> findByRadius(Double latitude, Double longitude, Double radiusInMeters,

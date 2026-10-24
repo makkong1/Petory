@@ -2,6 +2,7 @@ package com.linkup.Petory.domain.location.repository;
 
 import java.util.List;
 
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -67,6 +68,12 @@ public interface SpringDataJpaLocationServiceRepository extends JpaRepository<Lo
             + "ls.name = :name AND ls.address = :address AND "
             + "ls.isDeleted = false")
     boolean existsByNameAndAddress(@Param("name") String name, @Param("address") String address);
+
+    @RepositoryMethod("장소 서비스: 동반구역이 아직 빈 행 조회(TourAPI 백필용)")
+    @Query("SELECT ls FROM LocationService ls WHERE "
+            + "ls.dataSource = :dataSource AND ls.petZoneType IS NULL AND "
+            + "ls.tourContentId IS NOT NULL AND ls.isDeleted = false ORDER BY ls.idx")
+    List<LocationService> findMissingPetZoneType(@Param("dataSource") String dataSource, Pageable pageable);
 
     @RepositoryMethod("장소 서비스: 이름+주소로 조회(업서트용)")
     @Query("SELECT ls FROM LocationService ls WHERE "
