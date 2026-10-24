@@ -45,4 +45,5 @@ public class PublicDataLocationDTO {
     private String description; // 기본 정보_장소설명
     private String petAdditionalFee; // 애견 동반 추가 요금
     private String lastUpdatedDate; // 최종작성일
+    private String contentId; // TourAPI contentid — 상세(detailPetTour2) 조회 키. CSV·odcloud 출처는 비어 있다
 }

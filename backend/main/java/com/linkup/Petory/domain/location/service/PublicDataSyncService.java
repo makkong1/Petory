@@ -7,12 +7,15 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BiConsumer;
+import java.util.function.Supplier;
 
 import org.springframework.stereotype.Service;
 
 import com.linkup.Petory.domain.location.dto.PublicDataLocationDTO;
 import com.linkup.Petory.domain.location.entity.LocationService;
 import com.linkup.Petory.domain.location.entity.LocationSyncLog;
+import com.linkup.Petory.domain.location.entity.LocationSyncLog.SyncSource;
 import com.linkup.Petory.domain.location.entity.LocationSyncLog.SyncStatus;
 import com.linkup.Petory.domain.location.entity.LocationSyncLog.SyncTriggerType;
 import com.linkup.Petory.domain.location.repository.LocationServiceRepository;
@@ -39,22 +42,45 @@ public class PublicDataSyncService {
     private final LocationSyncLogRepository syncLogRepository;
 
     /**
-     * 공공데이터 API에서 전체 시설을 받아 upsert 하고, 실행 이력을 저장해 반환한다.
+     * 공공데이터(odcloud 동반가능 문화시설) API에서 전체 시설을 받아 upsert 하고, 실행 이력을 저장해 반환한다.
      */
     public LocationSyncLog syncFromApi(SyncTriggerType triggerType) {
+        return sync(SyncSource.CULTURE_FACILITY, triggerType, apiClient::fetchAll, (dto, entity) -> {
+        }, true);
+    }
+
+    /**
+     * 데이터셋 하나를 받아 upsert 하고 실행 이력을 남긴다.
+     *
+     * @param source    어느 데이터셋인가 (이력에 기록된다)
+     * @param fetch     전체 행을 가져오는 호출
+     * @param onInsert  <b>신규로 적재되는 행에만</b> 적용할 보정. 출처별 추가 필드가 장소당 1회
+     *                  외부 호출을 요구할 수 있어(TourAPI 상세) 이미 있는 행에는 부르지 않는다.
+     * @param updateExisting 이미 있는 장소를 이 데이터셋 값으로 덮어쓸 것인가.
+     *        🔴 <b>칸이 적은 데이터셋은 false 여야 한다.</b> {@link #copyPublicFields} 는 공공데이터
+     *        필드 전체를 통째로 옮기므로, 원본에 없는 칸이 null 로 덮인다. 2026-10-24 TourAPI
+     *        시험 적재(26건)에서 겹친 4건이 실제로 이렇게 망가졌다 — 「제주민속촌」의 홈페이지·
+     *        운영시간·입장료·입장가능크기가 지워지고 소분류가 「여행지」에서 「문화시설」로 바뀌었다.
+     *        원본(odcloud)에는 그 값들이 그대로 있었다. 즉 더 빈약한 출처가 더 나은 행을 덮었다.
+     */
+    public LocationSyncLog sync(SyncSource source, SyncTriggerType triggerType,
+            Supplier<List<PublicDataLocationDTO>> fetch,
+            BiConsumer<PublicDataLocationDTO, LocationService> onInsert,
+            boolean updateExisting) {
         LocalDateTime startedAt = LocalDateTime.now();
-        log.info("공공데이터 동기화 시작: trigger={}", triggerType);
+        log.info("위치 동기화 시작: source={}, trigger={}", source, triggerType);
 
         List<PublicDataLocationDTO> items;
         try {
-            items = apiClient.fetchAll();
+            items = fetch.get();
         } catch (Exception e) {
-            log.error("공공데이터 API 조회 실패: {}", e.getMessage(), e);
+            log.error("{} API 조회 실패: {}", source, e.getMessage(), e);
             return syncLogRepository.save(LocationSyncLog.builder()
                     .startedAt(startedAt)
                     .finishedAt(LocalDateTime.now())
                     .status(SyncStatus.FAILED)
                     .triggerType(triggerType)
+                    .source(source)
                     .errorMessage(truncate(e.getMessage()))
                     .build());
         }
@@ -97,10 +123,15 @@ public class PublicDataSyncService {
                     : locationServiceRepository.findFirstByNameAndAddress(incoming.getName(), address);
 
             if (existingOpt.isEmpty()) {
+                onInsert.accept(dto, incoming);
                 insertBatch.add(incoming);
             } else {
                 LocationService existing = existingOpt.get();
-                if (isSamePublicData(existing, incoming)) {
+                if (!updateExisting) {
+                    // 이미 아는 장소다. 이 데이터셋은 덮어쓸 자격이 없으니 그냥 둔다.
+                    // 멱등 정상 동작이므로 「이미 있고 같다」와 같은 칸에 센다.
+                    skippedUnchanged++;
+                } else if (isSamePublicData(existing, incoming)) {
                     skippedUnchanged++;
                 } else {
                     copyPublicFields(incoming, existing);
@@ -135,8 +166,8 @@ public class PublicDataSyncService {
 
         int skipped = skippedInvalid + skippedDuplicate + skippedUnchanged;
         SyncStatus status = (failed > 0) ? SyncStatus.PARTIAL : SyncStatus.SUCCESS;
-        log.info("공공데이터 동기화 완료: 조회={}, 신규={}, 갱신={}, 스킵={}(무효={}, 중복={}, 동일={}), 실패={}, status={}",
-                items.size(), inserted, updated, skipped,
+        log.info("위치 동기화 완료: source={}, 조회={}, 신규={}, 갱신={}, 스킵={}(무효={}, 중복={}, 동일={}), 실패={}, status={}",
+                source, items.size(), inserted, updated, skipped,
                 skippedInvalid, skippedDuplicate, skippedUnchanged, failed, status);
 
         return syncLogRepository.save(LocationSyncLog.builder()
@@ -152,6 +183,7 @@ public class PublicDataSyncService {
                 .skippedUnchanged(skippedUnchanged)
                 .failed(failed)
                 .triggerType(triggerType)
+                .source(source)
                 .build());
     }
 
@@ -186,7 +218,13 @@ public class PublicDataSyncService {
                 && Objects.equals(a.getLastUpdated(), b.getLastUpdated());
     }
 
-    /** incoming(신규 변환 엔티티)의 공공데이터 필드만 existing(기존 관리 엔티티)에 복사. */
+    /**
+     * incoming(신규 변환 엔티티)의 공공데이터 필드만 existing(기존 관리 엔티티)에 복사.
+     *
+     * <p>
+     * ⚠️ {@code petZoneType} 은 여기에 넣지 말 것 — onInsert 로 신규 행에만 채우는 값이라
+     * 갱신 경로의 incoming 은 항상 null 이고, 복사하면 이미 있던 값을 지운다.
+     */
     private void copyPublicFields(LocationService incoming, LocationService existing) {
         existing.setName(incoming.getName());
         existing.setCategory1(incoming.getCategory1());

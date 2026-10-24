@@ -43,6 +43,7 @@ public class LocationServiceConverter {
                 .isPetOnly(service.getIsPetOnly())
                 .petSize(service.getPetSize())
                 .petRestrictions(service.getPetRestrictions())
+                .petZoneType(service.getPetZoneType())
                 .petPolicy(service.getPetRestrictions()) // 하위 호환성
                 .petExtraFee(service.getPetExtraFee())
                 .indoor(service.getIndoor())

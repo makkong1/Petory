@@ -21,6 +21,7 @@ import com.linkup.Petory.domain.location.service.LocationServiceAdminService;
 import com.linkup.Petory.domain.location.service.LocationServiceService;
 import com.linkup.Petory.domain.location.service.PublicDataLocationService;
 import com.linkup.Petory.domain.location.service.PublicDataLocationService.BatchImportResult;
+import com.linkup.Petory.domain.location.service.PetTourSyncService;
 import com.linkup.Petory.domain.location.service.PublicDataSyncService;
 
 import lombok.RequiredArgsConstructor;
@@ -46,6 +47,7 @@ public class AdminLocationController {
     private final LocationServiceService locationServiceService;
     private final PublicDataLocationService publicDataLocationService;
     private final PublicDataSyncService publicDataSyncService;
+    private final PetTourSyncService petTourSyncService;
 
     /**
      * 지역서비스 목록 조회 (관리자용)
@@ -167,9 +169,26 @@ public class AdminLocationController {
     @PostMapping("/sync-public-data")
     @PreAuthorize("hasRole('MASTER')")
     public ResponseEntity<Map<String, Object>> syncPublicData() {
-        LocationSyncLog result = publicDataSyncService.syncFromApi(LocationSyncLog.SyncTriggerType.MANUAL);
+        return ResponseEntity.ok(toBody(publicDataSyncService.syncFromApi(LocationSyncLog.SyncTriggerType.MANUAL)));
+    }
+
+    /**
+     * TourAPI 반려동물 동반여행 장소를 즉시 동기화하고, 이어서 동반구역이 빈 행을 채운다. [MASTER]
+     * 적재는 목록 조회 11회로 끝나지만 백필은 행마다 상세 1회라 일일 한도(1,000회)에 묶인다 —
+     * 한 번에 다 못 채우면 다음 실행이 이어받는다.
+     */
+    @PostMapping("/sync-pet-tour")
+    @PreAuthorize("hasRole('MASTER')")
+    public ResponseEntity<Map<String, Object>> syncPetTour() {
+        Map<String, Object> body = toBody(petTourSyncService.sync(LocationSyncLog.SyncTriggerType.MANUAL));
+        body.put("petZoneFilled", petTourSyncService.backfillPetZoneType());
+        return ResponseEntity.ok(body);
+    }
+
+    private Map<String, Object> toBody(LocationSyncLog result) {
         Map<String, Object> body = new HashMap<>();
         body.put("status", result.getStatus().name());
+        body.put("source", result.getSource() != null ? result.getSource().name() : null);
         body.put("totalFetched", result.getTotalFetched());
         body.put("inserted", result.getInserted());
         body.put("updated", result.getUpdated());
@@ -184,6 +203,6 @@ public class AdminLocationController {
         if (result.getErrorMessage() != null) {
             body.put("errorMessage", result.getErrorMessage());
         }
-        return ResponseEntity.ok(body);
+        return body;
     }
 }
