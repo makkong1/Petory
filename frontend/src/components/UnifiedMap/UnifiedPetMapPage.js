@@ -15,6 +15,17 @@ import { fetchActiveMapItems } from "../../api/unifiedMapApi";
 import { locationServiceApi } from "../../api/locationServiceApi";
 import { petRecommendationApi } from "../../api/petRecommendationApi";
 import { geocodingApi } from "../../api/geocodingApi";
+import { GOOD_PLACE_CATEGORIES } from "../../constants/locationCategoryTree";
+
+/**
+ * 첫 화면 목록 기준. 「갈 만한 곳」이 기본값이다 — 전체 거리순으로 채우면 DB의 76%인
+ * 동물약국·병원·용품이 목록을 덮어 「데리고 갈 곳」이 안 보인다.
+ * (콜드 스타트 다음 단계는 행동 로그가 쌓인 뒤의 「요즘 자주 찾는 곳」이다.)
+ */
+const LOCATION_PRESETS = [
+  { id: "goodPlaces", label: "갈 만한 곳", title: "반려동물과 갈 만한 곳" },
+  { id: "all", label: "전체", title: "주변 시설" },
+];
 
 const SORT_LABELS = {
   stable: "추천순",
@@ -103,6 +114,7 @@ const UnifiedPetMapPage = () => {
   const [locationSort, setLocationSort] = useState("distance");
   const [hasPendingAreaChange, setHasPendingAreaChange] = useState(false);
   const [searchMode, setSearchMode] = useState("initial");
+  const [locationPreset, setLocationPreset] = useState("goodPlaces");
   const [petIntentSignals, setPetIntentSignals] = useState([]);
 
   // meetup 탭 전용
@@ -231,6 +243,14 @@ const UnifiedPetMapPage = () => {
   const effectiveFetchCenter =
     activeLayer === "location" ? searchCenter : mapViewportCenter;
 
+  // 사용자가 카테고리·검색어를 고르면 그 선택이 이기고, 아무것도 안 고른 첫 화면에서만
+  // 섹션 기준이 적용된다. 배열이면 unifiedMapApi 가 나눠 호출하고 합친다.
+  const isGoodPlacesSection =
+    locationPreset === "goodPlaces" && !locationCategory && !locationKeyword;
+  const effectiveCategory = isGoodPlacesSection
+    ? GOOD_PLACE_CATEGORIES
+    : locationCategory;
+
   useEffect(() => {
     if (effectiveFetchCenter) {
       fetchItems(
@@ -238,7 +258,7 @@ const UnifiedPetMapPage = () => {
         effectiveFetchCenter,
         radius,
         locationKeyword,
-        locationCategory,
+        effectiveCategory,
         locationSort
       );
     }
@@ -247,7 +267,7 @@ const UnifiedPetMapPage = () => {
     effectiveFetchCenter,
     radius,
     locationKeyword,
-    locationCategory,
+    effectiveCategory,
     locationSort,
     fetchItems,
   ]);
@@ -440,12 +460,19 @@ const UnifiedPetMapPage = () => {
       return null;
     }
     const sheetItems = activeLayer === "location" ? displayItems : items;
-    const locationSubtitle =
-      `${searchMode === "initial" ? "초기 검색" : "현재 검색 기준"} · 반경 ${radius}km · ${SORT_LABELS[locationSort]}`;
+    const showPresetToggle =
+      activeLayer === "location" && !locationCategory && !locationKeyword;
+    const locationTitle = LOCATION_PRESETS.find(
+      (p) => p.id === (isGoodPlacesSection ? "goodPlaces" : "all")
+    ).title;
+    const locationSubtitle = isGoodPlacesSection
+      ? `카페·식당·여행지·숙박 등 · 반경 ${radius}km · ${SORT_LABELS[locationSort]}`
+      : `${searchMode === "initial" ? "초기 검색" : "현재 검색 기준"} · 반경 ${radius}km · ${SORT_LABELS[locationSort]}`;
     const domainTitle = activeLayer === "meetup" ? "주변 모임" : "주변 펫케어";
     const domainSubtitle = `반경 ${radius}km · 지도 보는 위치 기준`;
 
-    if (loading || error || sheetItems.length === 0) {
+    // 섹션이 비었을 때 시트를 숨기면 「전체」로 돌아올 토글까지 같이 사라진다.
+    if (loading || error || (sheetItems.length === 0 && !isGoodPlacesSection)) {
       return null;
     }
 
@@ -455,13 +482,33 @@ const UnifiedPetMapPage = () => {
         <ResultSheetHeader>
           <div>
             <ResultSheetTitle>
-              {activeLayer === "location" ? "주변 시설" : domainTitle}
+              {activeLayer === "location" ? locationTitle : domainTitle}
             </ResultSheetTitle>
             <ResultSheetSubtitle>
               {activeLayer === "location" ? locationSubtitle : domainSubtitle}
             </ResultSheetSubtitle>
           </div>
-          <ResultSheetMeta>{sheetItems.length}개</ResultSheetMeta>
+          <SheetHeaderRight>
+            <ResultSheetMeta>{sheetItems.length}개</ResultSheetMeta>
+            {showPresetToggle && (
+              <PresetRow role="group" aria-label="목록 기준">
+                {LOCATION_PRESETS.map((preset) => (
+                  <PresetChip
+                    key={preset.id}
+                    type="button"
+                    $active={locationPreset === preset.id}
+                    aria-pressed={locationPreset === preset.id}
+                    onClick={() => {
+                      setLocationPreset(preset.id);
+                      setSelectedItem(null);
+                    }}
+                  >
+                    {preset.label}
+                  </PresetChip>
+                ))}
+              </PresetRow>
+            )}
+          </SheetHeaderRight>
         </ResultSheetHeader>
         <ResultList
           onWheel={(e) => {
@@ -473,6 +520,11 @@ const UnifiedPetMapPage = () => {
             }
           }}
         >
+          {sheetItems.length === 0 && (
+            <EmptyHint>
+              반경 {radius}km 안에 갈 만한 곳이 없어요. 「전체」로 보거나 반경을 넓혀 보세요.
+            </EmptyHint>
+          )}
           {sheetItems.map((item, index) => {
             const isSelected = selectedItem?.id === item.id;
             return (
@@ -714,7 +766,8 @@ const UnifiedPetMapPage = () => {
             <ErrorBanner onClick={() => setError(null)}>{error} ✕</ErrorBanner>
           )}
 
-          {emptyToast && (
+          {/* 「갈 만한 곳」 섹션은 시트 안에서 「전체로 보라」까지 안내한다 — 겹치면 문구가 서로 어긋난다 */}
+          {emptyToast && !isGoodPlacesSection && (
             <EmptyBanner>반경 {radius}km 내 결과가 없습니다.</EmptyBanner>
           )}
 
@@ -1020,6 +1073,45 @@ const ResultSheetSubtitle = styled.p`
 const ResultSheetMeta = styled.span`
   font-size: 12px;
   font-weight: 700;
+  color: ${(props) => props.theme.colors.textSecondary};
+`;
+
+const SheetHeaderRight = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+`;
+
+const PresetRow = styled.div`
+  display: flex;
+  gap: 6px;
+`;
+
+const PresetChip = styled.button`
+  padding: 5px 11px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid
+    ${(props) =>
+      props.$active
+        ? props.theme.colors.domain.location
+        : props.theme.colors.border};
+  background: ${(props) =>
+    props.$active
+      ? props.theme.colors.domain.location
+      : props.theme.colors.background};
+  color: ${(props) =>
+    props.$active ? "#fff" : props.theme.colors.textSecondary};
+`;
+
+const EmptyHint = styled.p`
+  margin: 0;
+  padding: 4px 2px;
+  font-size: 13px;
   color: ${(props) => props.theme.colors.textSecondary};
 `;
 
