@@ -61,6 +61,23 @@ const toMapItem = (type, raw) => {
   };
 };
 
+const dedupeByIdx = (services) => {
+  const seen = new Set();
+  return services.filter(s => !seen.has(s.idx) && seen.add(s.idx));
+};
+
+/**
+ * 나눠 호출한 결과는 각각만 정렬돼 있어, 합치면 순서가 깨진다.
+ * 백엔드 ORDER BY 와 같은 키로 다시 세운다 (`LocationServiceController` 참고).
+ */
+const MERGE_SORT_KEYS = { stable: 'rating', rating: 'rating', reviews: 'reviewCount', score: 'score' };
+const sortMerged = (services, sort) => {
+  const descKey = MERGE_SORT_KEYS[sort];
+  return [...services].sort(descKey
+    ? (a, b) => (b[descKey] ?? 0) - (a[descKey] ?? 0)
+    : (a, b) => (a.distance ?? Infinity) - (b.distance ?? Infinity));
+};
+
 /**
  * 활성 탭 1개의 데이터만 조회해 공통 mapItem 배열로 반환
  *
@@ -74,16 +91,20 @@ const toMapItem = (type, raw) => {
 export const fetchActiveMapItems = async ({ type, lat, lng, radius, keyword, category, sort }) => {
   if (type === 'location') {
     const radiusKm = typeof radius === 'number' && Number.isFinite(radius) ? radius : 5;
-    const res = await locationServiceApi.searchPlaces({
+    // category 가 배열이면 「갈 만한 곳」처럼 여러 중분류를 한 섹션으로 합친다.
+    // 백엔드 category 는 단일 문자열 필터라 호출을 나눈 뒤 병합한다.
+    const categories = Array.isArray(category) ? category : [category];
+    const responses = await Promise.all(categories.map(c => locationServiceApi.searchPlaces({
       latitude: lat,
       longitude: lng,
       radius: radiusKm * 1000, // km → m
       ...(keyword && { keyword }),
-      ...(category && { category }),
+      ...(c && { category: c }),
       ...(sort && { sort }),
-    });
-    const services = res?.data?.services ?? [];
-    return services.map(r => toMapItem('location', r));
+    })));
+    const services = responses.flatMap(res => res?.data?.services ?? []);
+    const merged = categories.length > 1 ? sortMerged(dedupeByIdx(services), sort) : services;
+    return merged.map(r => toMapItem('location', r));
   }
 
   if (type === 'meetup') {

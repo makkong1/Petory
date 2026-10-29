@@ -180,6 +180,8 @@ const LocationLayer = ({ selectedItem, onClose, docked = false }) => {
               <InfoValue>{r.petFriendly ? '✅ 동반 가능' : '❌ 동반 불가'}</InfoValue>
             </InfoRow>
           )}
+          {/* TourAPI 적재분만 가진 칸(「전구역 동반가능」/「일부구역 동반가능」) */}
+          {r.petZoneType && <InfoRow><InfoLabel $minWidth="70px">동반 구역</InfoLabel><InfoValue>{r.petZoneType}</InfoValue></InfoRow>}
           {r.petSize && <InfoRow><InfoLabel $minWidth="70px">입장 크기</InfoLabel><InfoValue>{r.petSize}</InfoValue></InfoRow>}
           {r.petRestrictions && <InfoRow><InfoLabel $minWidth="70px">제한사항</InfoLabel><InfoValue>{r.petRestrictions}</InfoValue></InfoRow>}
           {r.petExtraFee && <InfoRow><InfoLabel $minWidth="70px">반려동물 추가요금</InfoLabel><InfoValue>{r.petExtraFee}</InfoValue></InfoRow>}
