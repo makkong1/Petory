@@ -33,6 +33,8 @@ import com.linkup.Petory.domain.location.entity.PetNews.NewsCategory;
 import com.linkup.Petory.domain.location.repository.PetNewsRepository;
 import com.linkup.Petory.domain.notification.entity.NotificationType;
 import com.linkup.Petory.domain.notification.service.NotificationService;
+import com.linkup.Petory.domain.user.entity.Role;
+import com.linkup.Petory.domain.user.entity.Users;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -126,13 +128,9 @@ class SeoulPetNewsSyncServiceTest {
     @Test
     @DisplayName("알림은 자치구를 설정한 사용자에게, 신규 적재 때 한 번만 간다")
     void notifiesOnceForNewRowsOnly() {
-        // 자치구를 설정한 사용자 1명을 만든다. 나머지 15,000여 명은 NULL 이라 대상이 아니다.
-        Long target = em.createQuery("SELECT u.idx FROM Users u ORDER BY u.idx", Long.class)
-                .setMaxResults(1).getSingleResult();
-        em.createQuery("UPDATE Users u SET u.regionSigungu = '중랑구' WHERE u.idx = :idx")
-                .setParameter("idx", target).executeUpdate();
-        em.flush();
-        em.clear();
+        // 🔴 기존 사용자를 빌려 쓰지 않는다. CI 의 petory_test 는 Flyway V1 부터 만들어지는
+        //    빈 스키마라 users 가 0행이다(로컬엔 시드 15,000여 명이 있어 통과했었다).
+        Long target = persistUserWithRegion("중랑구");
 
         when(client.fetch(anyInt())).thenReturn(oneItem());
 
@@ -155,6 +153,23 @@ class SeoulPetNewsSyncServiceTest {
 
         verify(notificationService, never()).createNotification(
                 anyLong(), any(NotificationType.class), anyString(), anyString(), anyLong(), anyString());
+    }
+
+    /** 자치구를 설정한 사용자 1명. 테스트가 자기 데이터를 직접 만든다(환경에 기대지 않는다). */
+    private Long persistUserWithRegion(String sigungu) {
+        String unique = "petnews_" + System.nanoTime();
+        Users user = Users.builder()
+                .id(unique)
+                .username(unique)
+                .nickname(unique)
+                .email(unique + "@test.invalid")
+                .password("{noop}test")
+                .role(Role.USER)
+                .regionSigungu(sigungu)
+                .build();
+        em.persist(user);
+        em.flush();
+        return user.getIdx();
     }
 
     private PetNews newsWith(String sourceNo) {
