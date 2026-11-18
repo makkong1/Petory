@@ -23,7 +23,8 @@
     {
       "step": 4,
       "name": "Java 적재 — 멱등 upsert + LocationSyncLog + 관리자 엔드포인트 + 스케줄러",
-      "status": "pending"
+      "status": "completed",
+      "summary": "SeoulPetNewsClient(RestTemplate, pet-intent base-url 공유)·SeoulPetNewsSyncService(멱등 upsert, updated 항상 0)·관리자 POST /api/admin/location-services/sync-pet-news·스케줄러 20:10 추가. 실측 1회차 신규=8, 2·3회차 신규=0/이미있음=8. 테스트 3개(멱등·UNIQUE 제약 실재·크롤러 실패 FAILED) 통과"
     },
     {
       "step": 5,
