@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { SEOUL_DISTRICTS } from '../../constants/seoulDistricts';
 import styled from 'styled-components';
 import { useAuth } from '../../contexts/AuthContext';
 import { userProfileApi, petApiClient } from '../../api/userApi';
@@ -17,6 +18,7 @@ const UserProfileModal = ({ isOpen, userId, onClose, onUpdated }) => {
     email: '',
     phone: '',
     location: '',
+    regionSigungu: '',
   });
   const [saving, setSaving] = useState(false);
 
@@ -73,6 +75,7 @@ const UserProfileModal = ({ isOpen, userId, onClose, onUpdated }) => {
           email: response.data.user?.email || '',
           phone: response.data.user?.phone || '',
           location: response.data.user?.location || '',
+          regionSigungu: response.data.user?.regionSigungu || '',
         });
       } else {
         // 다른 사용자 프로필인 경우 getUserProfile 사용
@@ -325,6 +328,19 @@ const UserProfileModal = ({ isOpen, userId, onClose, onUpdated }) => {
                         onChange={(e) => setEditFormData(prev => ({ ...prev, location: e.target.value }))}
                         placeholder="예: 서울시 강남구"
                       />
+                    </FormField>
+                    <FormField>
+                      <Label>자치구 (서울 반려동물 소식 알림)</Label>
+                      <Select
+                        value={editFormData.regionSigungu}
+                        onChange={(e) => setEditFormData(prev => ({ ...prev, regionSigungu: e.target.value }))}
+                      >
+                        <option value="">받지 않음</option>
+                        {SEOUL_DISTRICTS.map((gu) => (
+                          <option key={gu} value={gu}>{gu}</option>
+                        ))}
+                      </Select>
+                      <FieldHint>고르면 서울시가 올리는 반려동물 행사·교육·안전 소식을 알림으로 받는다. 현재는 서울만 지원한다.</FieldHint>
                     </FormField>
                     <ButtonRow>
                       <SecondaryButton onClick={() => setIsEditMode(false)}>취소</SecondaryButton>
@@ -970,6 +986,13 @@ const Select = styled.select`
     outline: none;
     border-color: ${(props) => props.theme.colors.primary};
   }
+`;
+
+const FieldHint = styled.p`
+  margin: 0.4rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: ${(props) => props.theme.colors.textSecondary};
 `;
 
 const Textarea = styled.textarea`

@@ -23,6 +23,7 @@ import com.linkup.Petory.domain.location.service.PublicDataLocationService;
 import com.linkup.Petory.domain.location.service.PublicDataLocationService.BatchImportResult;
 import com.linkup.Petory.domain.location.service.PetTourSyncService;
 import com.linkup.Petory.domain.location.service.PublicDataSyncService;
+import com.linkup.Petory.domain.location.service.SeoulPetNewsSyncService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -48,6 +49,7 @@ public class AdminLocationController {
     private final PublicDataLocationService publicDataLocationService;
     private final PublicDataSyncService publicDataSyncService;
     private final PetTourSyncService petTourSyncService;
+    private final SeoulPetNewsSyncService seoulPetNewsSyncService;
 
     /**
      * 지역서비스 목록 조회 (관리자용)
@@ -183,6 +185,18 @@ public class AdminLocationController {
         Map<String, Object> body = toBody(petTourSyncService.sync(LocationSyncLog.SyncTriggerType.MANUAL));
         body.put("petZoneFilled", petTourSyncService.backfillPetZoneType());
         return ResponseEntity.ok(body);
+    }
+
+    /**
+     * 서울시 보도자료의 「반려동물」 소식을 즉시 수집·적재한다. [MASTER]
+     * 기본 1페이지(10건)만 본다 — 신규는 맨 앞에 쌓인다. 최초 전량 적재는 maxPages=22 로 한 번 돌린다.
+     */
+    @PostMapping("/sync-pet-news")
+    @PreAuthorize("hasRole('MASTER')")
+    public ResponseEntity<Map<String, Object>> syncPetNews(
+            @RequestParam(defaultValue = "1") int maxPages) {
+        return ResponseEntity.ok(toBody(
+                seoulPetNewsSyncService.sync(LocationSyncLog.SyncTriggerType.MANUAL, maxPages)));
     }
 
     private Map<String, Object> toBody(LocationSyncLog result) {

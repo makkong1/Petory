@@ -3,9 +3,9 @@ import asyncio
 from fastapi import FastAPI
 from app.config import settings
 from app.api.pet_intent_router import router as pet_intent_router
+from app.api.crawl_router import router as crawl_router
 from app.nlp.embedding_model import get_model
 from app.nlp.intent_classifier import warm_up
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -19,6 +19,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title=settings.app_name, lifespan=lifespan)
 app.include_router(pet_intent_router)
+app.include_router(crawl_router)
 
 
 @app.get("/health")

@@ -60,6 +60,10 @@ public class Users extends BaseTimeEntity {
 
     private String location;
 
+    /** 자치구. 지역 기반 알림 대상 판정에 쓴다. NULL = 미설정이라 알림을 보내지 않는다. */
+    @Column(name = "region_sigungu", length = 20)
+    private String regionSigungu;
+
     @Column(columnDefinition = "LONGTEXT")
     private String petInfo;
 

@@ -106,6 +106,11 @@ public class JpaUsersAdapter implements UsersRepository {
     }
 
     @Override
+    public List<Long> findIdxWithRegionSigungu() {
+        return jpaRepository.findIdxWithRegionSigungu();
+    }
+
+    @Override
     public Optional<Users> findActiveByRefreshToken(String refreshToken) {
         return jpaRepository.findActiveByRefreshToken(refreshToken);
     }

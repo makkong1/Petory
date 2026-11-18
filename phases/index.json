@@ -67,6 +67,10 @@
         {
             "dir": "public-data-location-sync",
             "status": "completed"
+        },
+        {
+            "dir": "seoul-pet-news",
+            "status": "pending"
         }
     ]
 }

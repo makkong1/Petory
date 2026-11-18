@@ -86,9 +86,12 @@ public class LocationSyncLog {
         SCHEDULED, MANUAL
     }
 
-    /** 동기화 대상 데이터셋. CULTURE_FACILITY = odcloud 반려동물 동반가능 문화시설, PET_TOUR = TourAPI 반려동물 동반여행. */
+    /**
+     * 동기화 대상 데이터셋. CULTURE_FACILITY = odcloud 반려동물 동반가능 문화시설,
+     * PET_TOUR = TourAPI 반려동물 동반여행, SEOUL_PET_NEWS = 서울시 보도자료 「반려동물」 소식.
+     */
     public enum SyncSource {
-        CULTURE_FACILITY, PET_TOUR
+        CULTURE_FACILITY, PET_TOUR, SEOUL_PET_NEWS
     }
 
     @Builder
