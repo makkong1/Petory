@@ -61,9 +61,17 @@ public class PetNews {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
-    /** 제목 키워드 룰로 매긴다. 어디에도 안 걸리면 적재하지 않는다(보도참고자료 등 잡음 제거). */
+    /**
+     * 제목 키워드 룰로 매긴다 (크롤러의 {@code classify}).
+     *
+     * <p>
+     * 제목에 반려동물 신호어가 없으면 아예 적재하지 않는다 — 검색이 본문까지 훑어서
+     * 「세텍 전시장 대관 모집」 같은 무관한 보도자료가 결과에 섞인다(2026-11-18 실측 20건 중 5건).
+     * 신호어는 있는데 분류가 안 되는 소식은 버리지 않고 {@code NEWS} 로 둔다
+     * (「서울동물행복위크 시작」, 「반려동물을 보낸 슬픔, 서울시와 함께 치유하세요」).
+     */
     public enum NewsCategory {
-        EVENT, EDUCATION, SAFETY, SUPPORT
+        EVENT, EDUCATION, SAFETY, SUPPORT, NEWS
     }
 
     @Builder
