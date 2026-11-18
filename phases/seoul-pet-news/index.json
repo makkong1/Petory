@@ -17,7 +17,8 @@
     {
       "step": 3,
       "name": "Python 크롤러 — nlp-server /crawl/seoul-pet-news (수집+룰 분류)",
-      "status": "pending"
+      "status": "completed",
+      "summary": "nlp-server 에 GET /crawl/seoul-pet-news 추가(requests+bs4, Playwright 불필요). 검색이 본문까지 훑어 무관 기사가 섞이므로 제목 반려동물 신호어 관문 + 카테고리 룰 2단 분류, 분류 안 되는 소식은 NEWS(V26). 실측 1페이지 fetched=10 → items=8"
     },
     {
       "step": 4,
