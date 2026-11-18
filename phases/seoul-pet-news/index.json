@@ -11,7 +11,8 @@
     {
       "step": 2,
       "name": "V25 스키마 + pet_news 엔티티 + users 자치구 컬럼",
-      "status": "pending"
+      "status": "completed",
+      "summary": "V25(pet_news UNIQUE(source,source_no) + users.region_sigungu) 적용, PetNews 엔티티·SyncSource.SEOUL_PET_NEWS·Users.regionSigungu 추가. Flyway v25 적용 + ddl-auto=validate 통과 확인"
     },
     {
       "step": 3,
