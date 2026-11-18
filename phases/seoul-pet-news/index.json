@@ -29,7 +29,8 @@
     {
       "step": 5,
       "name": "알림 + 지도 배너 + 프로필 자치구 입력",
-      "status": "pending"
+      "status": "completed",
+      "summary": "NotificationType.PET_NEWS + 신규 행에만 알림(3건 초과 시 요약 1건), 대상=region_sigungu 설정자. 프로필 자치구 select(서울 25구, 빈 값은 해제) · 지도 상단 PetNewsBanner(기존 알림 읽음 플래그 재사용) · GET /api/pet-news/{idx}(배너 원문 링크용, 목록 API 없음). 테스트 5개 통과, 프론트 빌드 성공"
     }
   ]
 }

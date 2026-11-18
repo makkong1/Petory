@@ -228,7 +228,10 @@ public class UsersService {
             user.setLocation(dto.getLocation());
         }
         if (dto.getRegionSigungu() != null) {
-            user.setRegionSigungu(dto.getRegionSigungu());
+            // 빈 문자열은 「설정 해제」로 본다. '' 를 그대로 저장하면 NULL 이 아니라서
+            // 자치구를 지운 사용자에게 계속 소식 알림이 간다.
+            String sigungu = dto.getRegionSigungu().isBlank() ? null : dto.getRegionSigungu();
+            user.setRegionSigungu(sigungu);
         }
         if (dto.getPetInfo() != null) {
             user.setPetInfo(dto.getPetInfo());
@@ -416,7 +419,10 @@ public class UsersService {
             user.setLocation(dto.getLocation());
         }
         if (dto.getRegionSigungu() != null) {
-            user.setRegionSigungu(dto.getRegionSigungu());
+            // 빈 문자열은 「설정 해제」로 본다. '' 를 그대로 저장하면 NULL 이 아니라서
+            // 자치구를 지운 사용자에게 계속 소식 알림이 간다.
+            String sigungu = dto.getRegionSigungu().isBlank() ? null : dto.getRegionSigungu();
+            user.setRegionSigungu(sigungu);
         }
         if (dto.getPetInfo() != null) {
             user.setPetInfo(dto.getPetInfo());
