@@ -1,0 +1,32 @@
+{
+  "task": "seoul-pet-news",
+  "description": "서울시 보도자료의 「반려동물」 소식·행사를 Python 크롤러로 수집해 서울 거주 사용자에게 알림·지도 배너로 전달",
+  "steps": [
+    {
+      "step": 1,
+      "name": "소스 확정 스파이크 — robots.txt·정적여부·데이터량 확인",
+      "status": "completed",
+      "summary": "후보 4곳 중 3곳 탈락(animal.go.kr 전면차단·중랑구청 일반봇 차단·서울시 고시공고 반려동물 2건). 서울시 보도자료 bbsNo=158 확정(217건, srchText 검색, 정적 HTML, 상세링크는 #view/<번호> 조립)"
+    },
+    {
+      "step": 2,
+      "name": "V25 스키마 + pet_news 엔티티 + users 자치구 컬럼",
+      "status": "pending"
+    },
+    {
+      "step": 3,
+      "name": "Python 크롤러 — nlp-server /crawl/seoul-pet-news (수집+룰 분류)",
+      "status": "pending"
+    },
+    {
+      "step": 4,
+      "name": "Java 적재 — 멱등 upsert + LocationSyncLog + 관리자 엔드포인트 + 스케줄러",
+      "status": "pending"
+    },
+    {
+      "step": 5,
+      "name": "알림 + 지도 배너 + 프로필 자치구 입력",
+      "status": "pending"
+    }
+  ]
+}
