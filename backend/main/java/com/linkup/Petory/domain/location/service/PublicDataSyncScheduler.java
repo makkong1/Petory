@@ -27,6 +27,10 @@ public class PublicDataSyncScheduler {
      * 정기 수집이 볼 페이지 수. 기본 1 이면 충분하다 — 신규는 맨 앞에 쌓인다.
      * 속성으로 뺀 이유는 cron 과 같다: <b>최초 전량 적재가 운영 작업</b>이라 기동 인자로
      * 정할 수 있어야 한다(22 페이지). 관리자 엔드포인트는 MASTER 토큰이 필요하다.
+     *
+     * <p>
+     * 🔴 이 값을 올리면 {@code app.pet-news.timeout-ms} 도 같이 올려야 한다 — 크롤러가
+     * 페이지마다 1초를 쉬어서 22 페이지는 25초 이상 걸리고, 기본 타임아웃 60초는 1페이지 기준이다.
      */
     @Value("${petory.location.pet-news-sync-pages:1}")
     private int petNewsSyncPages;

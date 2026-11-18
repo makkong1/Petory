@@ -2,12 +2,12 @@ package com.linkup.Petory.domain.location.service;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import com.linkup.Petory.domain.location.dto.SeoulPetNewsCrawlResponse;
 import com.linkup.Petory.domain.location.entity.LocationSyncLog;
@@ -65,7 +65,15 @@ public class SeoulPetNewsSyncService {
     // ponytail: 3건 상한. 요약 알림을 눌렀을 때 목록이 필요해지면 그때 조회 API 를 만든다.
     private static final int NOTIFY_ITEM_LIMIT = 3;
 
-    @Transactional
+    /**
+     * 🔴 <b>{@code @Transactional} 을 붙이지 않는다.</b> 이 메서드의 첫 일이 크롤러 HTTP 호출이고,
+     * 크롤러는 페이지마다 1초를 쉰다(22 페이지면 25초 이상). 트랜잭션을 걸면 그 시간 내내
+     * DB 커넥션을 쥔 채 외부 사이트를 기다리게 된다.
+     *
+     * <p>
+     * 행 단위로 독립이라 묶을 이유도 없다 — {@code save()} 는 각자 트랜잭션으로 돌고,
+     * 한 행이 실패해도 나머지는 남으며 다음 실행이 이어받는다.
+     */
     public LocationSyncLog sync(SyncTriggerType triggerType, int maxPages) {
         LocalDateTime startedAt = LocalDateTime.now();
         SeoulPetNewsCrawlResponse response = client.fetch(maxPages);
@@ -142,6 +150,9 @@ public class SeoulPetNewsSyncService {
      * 그 행을 신규로 보지 않으므로 <b>그 건의 알림은 영영 안 간다</b>. 소식 1건을 놓치는 쪽이
      * 수집 전체를 롤백하는 것보다 낫다.
      */
+    // ponytail: 대상 전체를 메모리로 올리고 1인당 1건씩 만든다. 지금은 서울 사용자가 적어
+    //           문제가 없지만, 대상이 수천 명이 되면 일 1회 N건 루프가 된다 — 그때는
+    //           사용자별 발송이 아니라 「읽을 때 합성」(소식 목록 + 마지막 확인 시각)으로 바꾼다.
     private void notifyNewRows(List<PetNews> insertedRows) {
         if (insertedRows.isEmpty()) {
             return;
@@ -152,7 +163,10 @@ public class SeoulPetNewsSyncService {
             return;
         }
 
-        PetNews latest = insertedRows.get(0);
+        // 목록이 최신순으로 오지만 그 순서에 기대지 않는다 — 요약 알림이 가리킬 1건은 날짜로 고른다.
+        PetNews latest = insertedRows.stream()
+                .max(Comparator.comparing(PetNews::getPublishedAt))
+                .orElse(insertedRows.get(0));
         boolean summarize = insertedRows.size() > NOTIFY_ITEM_LIMIT;
 
         for (Long userIdx : targets) {

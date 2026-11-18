@@ -11,6 +11,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -25,7 +26,8 @@ import lombok.NoArgsConstructor;
  * 제목·부서·등록일 같은 사실 정보만 두고 본문은 {@link #sourceUrl} 로 보낸다.
  */
 @Entity
-@Table(name = "pet_news")
+@Table(name = "pet_news", uniqueConstraints = @UniqueConstraint(
+        name = "uk_pet_news_source", columnNames = { "source", "source_no" }))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class PetNews {
