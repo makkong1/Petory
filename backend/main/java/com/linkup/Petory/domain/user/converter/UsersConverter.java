@@ -32,6 +32,7 @@ public class UsersConverter {
                 // password는 응답에 포함하지 않음
                 .role(user.getRole().name())
                 .location(user.getLocation())
+                .regionSigungu(user.getRegionSigungu())
                 .petInfo(user.getPetInfo())
                 .socialUsers(user.getSocialUsers() != null ? user.getSocialUsers().stream()
                         .map(socialUserConverter::toDTO)
@@ -61,6 +62,7 @@ public class UsersConverter {
                 // password는 Service에서 암호화 후 설정
                 .role(Role.valueOf(dto.getRole()))
                 .location(dto.getLocation())
+                .regionSigungu(dto.getRegionSigungu())
                 .petInfo(dto.getPetInfo())
                 .build();
 

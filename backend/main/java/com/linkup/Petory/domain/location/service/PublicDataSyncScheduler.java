@@ -1,5 +1,6 @@
 package com.linkup.Petory.domain.location.service;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -20,6 +21,19 @@ public class PublicDataSyncScheduler {
 
     private final PublicDataSyncService publicDataSyncService;
     private final PetTourSyncService petTourSyncService;
+    private final SeoulPetNewsSyncService seoulPetNewsSyncService;
+
+    /**
+     * 정기 수집이 볼 페이지 수. 기본 1 이면 충분하다 — 신규는 맨 앞에 쌓인다.
+     * 속성으로 뺀 이유는 cron 과 같다: <b>최초 전량 적재가 운영 작업</b>이라 기동 인자로
+     * 정할 수 있어야 한다(22 페이지). 관리자 엔드포인트는 MASTER 토큰이 필요하다.
+     *
+     * <p>
+     * 🔴 이 값을 올리면 {@code app.pet-news.timeout-ms} 도 같이 올려야 한다 — 크롤러가
+     * 페이지마다 1초를 쉬어서 22 페이지는 25초 이상 걸리고, 기본 타임아웃 60초는 1페이지 기준이다.
+     */
+    @Value("${petory.location.pet-news-sync-pages:1}")
+    private int petNewsSyncPages;
 
     /**
      * 기본 매일 18:10 실행. 스케줄러 스레드가 1개뿐이라 자정(4개)·정각(2개)·17:10·18:30 슬롯을 피한다.
@@ -49,6 +63,30 @@ public class PublicDataSyncScheduler {
      * ({@code POST /api/admin/locations/sync-pet-tour})는 MASTER 토큰이 필요한데, 적재는
      * 운영 작업이라 실행 시점을 기동 인자로 정할 수 있어야 편하다.
      */
+    /**
+     * 서울시 보도자료 「반려동물」 소식 정기 수집. 기본 매일 20:10.
+     *
+     * <p>
+     * 18:10(문화시설)·18:30(게시글 인기도)·19:10(TourAPI)과 겹치지 않게 뒀다 — 스케줄러 스레드가
+     * 1개뿐이고, 이 작업은 외부 사이트를 긁으면서 페이지마다 1초를 쉰다.
+     *
+     * <p>
+     * <b>기본 1페이지(10건)만 본다.</b> 신규는 맨 앞에 쌓이고, 이미 있는 행은 적재 단계에서
+     * {@code skippedUnchanged} 로 빠진다. 전량 적재는 관리자 엔드포인트
+     * ({@code POST /api/admin/location-services/sync-pet-news?maxPages=22})로 한 번만 한다.
+     */
+    @Scheduled(cron = "${petory.location.pet-news-sync-cron:0 10 20 * * *}")
+    public void runDailyPetNewsSync() {
+        try {
+            LocationSyncLog result = seoulPetNewsSyncService.sync(SyncTriggerType.SCHEDULED, petNewsSyncPages);
+            log.info("서울시 보도자료 정기 수집 종료: status={}, 신규={}, 스킵={}, 실패={}",
+                    result.getStatus(), result.getInserted(), result.getSkipped(), result.getFailed());
+        } catch (Exception e) {
+            // 서비스 안에서 대부분 처리되지만, 최후 방어로 스케줄러 스레드가 죽지 않게 감싼다.
+            log.error("서울시 보도자료 정기 수집 중 예외: {}", e.getMessage(), e);
+        }
+    }
+
     @Scheduled(cron = "${petory.location.pet-tour-sync-cron:0 10 19 * * *}")
     public void runDailyPetTourSync() {
         try {

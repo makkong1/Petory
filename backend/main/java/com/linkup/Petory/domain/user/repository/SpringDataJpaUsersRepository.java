@@ -59,6 +59,14 @@ public interface SpringDataJpaUsersRepository extends JpaRepository<Users, Long>
     Optional<Users> findActiveByIdString(@Param("id") String id);
 
     @RepositoryMethod("사용자: 로그인 ID(String)로 idx 스칼라 조회 (경량)")
+    /**
+     * 자치구를 설정한 사용자의 idx. 지역 기반 알림의 대상이다.
+     * NULL 은 미설정이므로 보내지 않는다 — 동의 없이 알림이 가면 안 된다.
+     */
+    @Query("SELECT u.idx FROM Users u WHERE u.regionSigungu IS NOT NULL "
+            + "AND (u.isDeleted = false OR u.isDeleted IS NULL)")
+    List<Long> findIdxWithRegionSigungu();
+
     @Query("SELECT u.idx FROM Users u WHERE u.id = :id")
     Optional<Long> findIdxByIdString(@Param("id") String id);
 

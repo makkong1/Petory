@@ -16,6 +16,7 @@ import { locationServiceApi } from "../../api/locationServiceApi";
 import { petRecommendationApi } from "../../api/petRecommendationApi";
 import { geocodingApi } from "../../api/geocodingApi";
 import { GOOD_PLACE_CATEGORIES } from "../../constants/locationCategoryTree";
+import PetNewsBanner from "./PetNewsBanner";
 
 /**
  * 첫 화면 목록 기준. 「갈 만한 곳」이 기본값이다 — 전체 거리순으로 채우면 DB의 76%인
@@ -727,6 +728,8 @@ const UnifiedPetMapPage = () => {
 
           {/* 지도 위 상단 플로팅: 도메인 전환 + 검색/필터 (전 화면 공통) */}
           <TopOverlay>
+            {/* 안 읽은 반려동물 소식이 있을 때만 한 번. 닫으면 알림이 읽음 처리된다. */}
+            <PetNewsBanner />
             <DomainTabHeader
               activeLayer={activeLayer}
               onTabChange={handleTabChange}

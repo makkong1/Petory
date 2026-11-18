@@ -26,6 +26,9 @@ public class UsersDTO {
     private String password; // 요청 시에만 사용, 응답에서는 제외됨
     private String role;
     private String location;
+
+    /** 자치구. 지역 기반 소식 알림 대상 판정에 쓴다. 미설정이면 알림이 가지 않는다. */
+    private String regionSigungu;
     private String petInfo;
     private List<SocialUserDTO> socialUsers;
     private List<PetDTO> pets; // 등록한 애완동물 목록
