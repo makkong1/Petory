@@ -227,6 +227,9 @@ public class UsersService {
         if (dto.getLocation() != null) {
             user.setLocation(dto.getLocation());
         }
+        if (dto.getRegionSigungu() != null) {
+            user.setRegionSigungu(dto.getRegionSigungu());
+        }
         if (dto.getPetInfo() != null) {
             user.setPetInfo(dto.getPetInfo());
         }
@@ -411,6 +414,9 @@ public class UsersService {
         }
         if (dto.getLocation() != null) {
             user.setLocation(dto.getLocation());
+        }
+        if (dto.getRegionSigungu() != null) {
+            user.setRegionSigungu(dto.getRegionSigungu());
         }
         if (dto.getPetInfo() != null) {
             user.setPetInfo(dto.getPetInfo());

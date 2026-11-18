@@ -1,7 +1,9 @@
 package com.linkup.Petory.domain.location.service;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import org.springframework.stereotype.Service;
@@ -16,6 +18,9 @@ import com.linkup.Petory.domain.location.entity.PetNews;
 import com.linkup.Petory.domain.location.entity.PetNews.NewsCategory;
 import com.linkup.Petory.domain.location.repository.LocationSyncLogRepository;
 import com.linkup.Petory.domain.location.repository.PetNewsRepository;
+import com.linkup.Petory.domain.notification.entity.NotificationType;
+import com.linkup.Petory.domain.notification.service.NotificationService;
+import com.linkup.Petory.domain.user.repository.UsersRepository;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -50,6 +55,15 @@ public class SeoulPetNewsSyncService {
     private final SeoulPetNewsClient client;
     private final PetNewsRepository petNewsRepository;
     private final LocationSyncLogRepository syncLogRepository;
+    private final UsersRepository usersRepository;
+    private final NotificationService notificationService;
+
+    /**
+     * 한 실행에서 신규가 이보다 많으면 건별 대신 요약 알림 1건을 보낸다.
+     * 최초 전량 적재(22페이지)에서 사용자당 수백 개가 날아가는 것을 막는다.
+     */
+    // ponytail: 3건 상한. 요약 알림을 눌렀을 때 목록이 필요해지면 그때 조회 API 를 만든다.
+    private static final int NOTIFY_ITEM_LIMIT = 3;
 
     @Transactional
     public LocationSyncLog sync(SyncTriggerType triggerType, int maxPages) {
@@ -57,6 +71,7 @@ public class SeoulPetNewsSyncService {
         SeoulPetNewsCrawlResponse response = client.fetch(maxPages);
 
         Set<String> seen = new HashSet<>();
+        List<PetNews> insertedRows = new ArrayList<>();
         int inserted = 0;
         int skippedDuplicate = 0;
         int skippedUnchanged = 0;
@@ -72,7 +87,7 @@ public class SeoulPetNewsSyncService {
                     skippedUnchanged++;
                     continue;
                 }
-                petNewsRepository.save(toEntity(item));
+                insertedRows.add(petNewsRepository.save(toEntity(item)));
                 inserted++;
             } catch (Exception e) {
                 // 한 행이 전체를 무너뜨리지 않게 한다. TourAPI 에서 긴 안내문 1건이 배치 전체를
@@ -82,6 +97,8 @@ public class SeoulPetNewsSyncService {
                         item.sourceNo(), item.title(), e.getMessage());
             }
         }
+
+        notifyNewRows(insertedRows);
 
         int skippedInvalid = response.skippedInvalid() + response.skippedUnclassified();
         int skipped = skippedInvalid + skippedDuplicate + skippedUnchanged;
@@ -106,6 +123,56 @@ public class SeoulPetNewsSyncService {
                 .failed(failed)
                 .errorMessage(response.error())
                 .build());
+    }
+
+    /**
+     * 새로 적재된 소식만 알린다.
+     *
+     * <p>
+     * <b>재발송이 구조로 막힌다</b> — 이미 있던 행은 위에서 {@code skippedUnchanged} 로 빠져
+     * 여기까지 오지 않는다. 중복 방지 로직이 따로 없는 이유다.
+     *
+     * <p>
+     * 대상은 자치구를 설정한 사용자다. 현재 소스(서울시 보도자료)는 서울시 전체 단위라
+     * 자치구로 좁히지 않고 「설정했다 = 서울 거주」로만 쓴다. 미설정(NULL)에게는 보내지 않는다 —
+     * 동의 없이 알림이 가면 안 된다.
+     *
+     * <p>
+     * 알림 생성이 실패해도 적재까지 되돌리지 않는다. 소식은 이미 들어갔고, 다음 실행은
+     * 그 행을 신규로 보지 않으므로 <b>그 건의 알림은 영영 안 간다</b>. 소식 1건을 놓치는 쪽이
+     * 수집 전체를 롤백하는 것보다 낫다.
+     */
+    private void notifyNewRows(List<PetNews> insertedRows) {
+        if (insertedRows.isEmpty()) {
+            return;
+        }
+        List<Long> targets = usersRepository.findIdxWithRegionSigungu();
+        if (targets.isEmpty()) {
+            log.info("소식 알림 대상 없음 — 자치구를 설정한 사용자가 없다. 신규={}", insertedRows.size());
+            return;
+        }
+
+        PetNews latest = insertedRows.get(0);
+        boolean summarize = insertedRows.size() > NOTIFY_ITEM_LIMIT;
+
+        for (Long userIdx : targets) {
+            try {
+                if (summarize) {
+                    notificationService.createNotification(userIdx, NotificationType.PET_NEWS,
+                            "새로운 반려동물 소식 " + insertedRows.size() + "건",
+                            latest.getTitle(), latest.getIdx(), "PET_NEWS");
+                } else {
+                    for (PetNews news : insertedRows) {
+                        notificationService.createNotification(userIdx, NotificationType.PET_NEWS,
+                                "새로운 반려동물 소식", news.getTitle(), news.getIdx(), "PET_NEWS");
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("소식 알림 발송 실패 userIdx={} error={}", userIdx, e.getMessage());
+            }
+        }
+        log.info("소식 알림 발송: 대상={}명 신규={}건 방식={}",
+                targets.size(), insertedRows.size(), summarize ? "요약 1건" : "건별");
     }
 
     /**

@@ -2,7 +2,14 @@ package com.linkup.Petory.domain.location.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.LocalDate;
@@ -24,6 +31,8 @@ import com.linkup.Petory.domain.location.entity.LocationSyncLog.SyncTriggerType;
 import com.linkup.Petory.domain.location.entity.PetNews;
 import com.linkup.Petory.domain.location.entity.PetNews.NewsCategory;
 import com.linkup.Petory.domain.location.repository.PetNewsRepository;
+import com.linkup.Petory.domain.notification.entity.NotificationType;
+import com.linkup.Petory.domain.notification.service.NotificationService;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -54,6 +63,7 @@ class SeoulPetNewsSyncServiceTest {
     @Autowired SeoulPetNewsSyncService sut;
     @Autowired PetNewsRepository petNewsRepository;
     @MockitoBean SeoulPetNewsClient client;
+    @MockitoBean NotificationService notificationService;
 
     @PersistenceContext EntityManager em;
 
@@ -111,6 +121,40 @@ class SeoulPetNewsSyncServiceTest {
         assertThat(result.getStatus()).isEqualTo(SyncStatus.FAILED);
         assertThat(result.getInserted()).isZero();
         assertThat(result.getErrorMessage()).contains("ConnectionError");
+    }
+
+    @Test
+    @DisplayName("알림은 자치구를 설정한 사용자에게, 신규 적재 때 한 번만 간다")
+    void notifiesOnceForNewRowsOnly() {
+        // 자치구를 설정한 사용자 1명을 만든다. 나머지 15,000여 명은 NULL 이라 대상이 아니다.
+        Long target = em.createQuery("SELECT u.idx FROM Users u ORDER BY u.idx", Long.class)
+                .setMaxResults(1).getSingleResult();
+        em.createQuery("UPDATE Users u SET u.regionSigungu = '중랑구' WHERE u.idx = :idx")
+                .setParameter("idx", target).executeUpdate();
+        em.flush();
+        em.clear();
+
+        when(client.fetch(anyInt())).thenReturn(oneItem());
+
+        sut.sync(SyncTriggerType.MANUAL, 1);
+        verify(notificationService, times(1)).createNotification(
+                eq(target), eq(NotificationType.PET_NEWS), anyString(), anyString(), anyLong(), eq("PET_NEWS"));
+
+        // 두 번째 실행은 신규가 없으므로 알림도 없다 — 중복 방지 로직이 아니라 구조로 막힌다.
+        sut.sync(SyncTriggerType.MANUAL, 1);
+        verify(notificationService, times(1)).createNotification(
+                anyLong(), any(NotificationType.class), anyString(), anyString(), anyLong(), anyString());
+    }
+
+    @Test
+    @DisplayName("자치구를 설정한 사용자가 없으면 알림을 만들지 않는다")
+    void noTargetsNoNotification() {
+        when(client.fetch(anyInt())).thenReturn(oneItem());
+
+        sut.sync(SyncTriggerType.MANUAL, 1);
+
+        verify(notificationService, never()).createNotification(
+                anyLong(), any(NotificationType.class), anyString(), anyString(), anyLong(), anyString());
     }
 
     private PetNews newsWith(String sourceNo) {

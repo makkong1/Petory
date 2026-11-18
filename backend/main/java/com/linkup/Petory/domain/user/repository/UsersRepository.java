@@ -68,6 +68,9 @@ public interface UsersRepository {
      */
     Optional<Long> findIdxByIdString(String id);
 
+    /** 자치구를 설정한 사용자의 idx. 지역 기반 알림 대상. */
+    List<Long> findIdxWithRegionSigungu();
+
     /**
      * Refresh Token으로 소프트 삭제되지 않은 사용자 조회
      */

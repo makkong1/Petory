@@ -15,5 +15,9 @@ public enum NotificationType {
     CARE_OFFER_ACCEPTED, // 제공자 -> 요청자: 제안을 수락, 계약 성립
     CARE_OFFER_REJECTED, // 제공자 -> 요청자: 제안을 거절
     CARE_OFFER_WITHDRAWN, // 요청자 사정으로 제안이 내려감 (금액 변경·요청 취소·삭제)
-    CARE_OFFER_EXPIRED    // 제공자가 답하지 않아 제안이 만료됨 (요청자에게)
+    CARE_OFFER_EXPIRED,   // 제공자가 답하지 않아 제안이 만료됨 (요청자에게)
+
+    // 서울시 보도자료에서 수집한 반려동물 소식. 자치구를 설정한 사용자(= 서울 거주)에게만 간다.
+    // 새로 적재된 행에만 만들므로 같은 소식이 두 번 가지 않는다(SeoulPetNewsSyncService).
+    PET_NEWS
 }
