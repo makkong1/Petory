@@ -19,6 +19,7 @@
 8. [트러블슈팅](./08-troubleshooting.md)
 9. [모바일 (Capacitor)](./09-mobile-capacitor.md)
 10. [배포 전 보안 체크리스트 (Fly.io)](./10-predeploy-security-checklist.md) — 실코드 전수 확인 기준
+11. [오라클 클라우드 배포 계획](./11-oracle-deploy-plan.md) — **미실행.** 호스트 선정 근거 · arm64 전환 · 기능 제어(데모 모드) 결정 대기
 
 ---
 
@@ -73,7 +74,7 @@
 - **캐시**: Redis 7 — `docker-compose.yml`의 `redis` 서비스
 - **NLP 서버**: `petory-nlp-server`(FastAPI, Python 3.9) — `docker-compose.yml`의 `nlp-server` 서비스. 반려생활 의도 분석(`POST /api/pet-intent/analyze`) 담당, `app`이 `PetIntentClient`로 호출 (`app.pet-intent.base-url=http://nlp-server:8000`)
 - **전체 스택 Compose**: 레포 루트 `docker-compose.yml`에 존재 (mysql·redis·nlp-server·app·nginx 5개 서비스)
-- **CI/CD**: GitHub Actions ([문서](./03-cicd-pipeline.md)) — 현재는 빌드/테스트까지, 이미지 push·서버 자동배포(CD)는 아직 없음
+- **CI/CD**: GitHub Actions ([문서](./03-cicd-pipeline.md)) — `ci.yml`(빌드/테스트) + `cd.yml`(main push 시 ghcr.io 이미지 push)까지. **서버 자동배포는 배포할 서버가 없어 아직 없음**
 
 ---
 
