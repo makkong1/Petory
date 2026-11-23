@@ -13,8 +13,8 @@
 
 | 무엇이 문제였나 | 결과 | 어떻게 | 근거 |
 |---|---|---|---|
-| 목록 조회 N+1 | Board **303문 → 3문** (561 → 55ms) · Care 303 → 6 · MissingPet 201 → 4 · Chat 31 → 4<br/>*JDBC statement 수 기준 — 이론값 1+3N 은 301* | 단건 연관은 Fetch Join, 페이징+다중 컬렉션은 `@BatchSize`로 분리 | [재검증 2026-07-12](./docs/refactoring/board/evidence/n-plus-one-reverify-2026-07-12.md) |
-| 깊은 페이지 페이징 | **133 → 24~32ms** (OFFSET 49,980) | 커버링 인덱스 단독 스캔. 키셋 페이지네이션은 공유 UI 때문에 기각 — 대안 비교를 문서에 남김 | [판단 기록](./docs/analysis/board-deep-page-2026-07.md) |
+| 목록 조회 N+1 | Board **303문 → 3문** (561 → 55ms) · Care 303 → 6 · MissingPet 201 → 4 · Chat 31 → 4<br/>*JDBC statement 수 기준 — 이론값 1+3N 은 301* | 연관의 종류에 따라 나눔 — 단건(`@ManyToOne`)은 Fetch Join. 컬렉션은 Board 반응·첨부처럼 `GROUP BY` 집계라 연관관계 자체가 없는 쪽은 ID를 `IN`으로 묶어 서비스단 배치 조회(`@BatchSize`는 선택지가 아님), Care·Meetup의 실제 컬렉션 연관은 `@BatchSize(50)` | [재검증 2026-07-12](./docs/refactoring/board/evidence/n-plus-one-reverify-2026-07-12.md) |
+| 깊은 페이지 페이징 | **133 → 24~32ms** (OFFSET 49,980) | 작성자 노출 조건을 `board.author_visible`로 비정규화(V6 · `users` AFTER UPDATE 트리거로 동기화)해 `users` 조인을 없앤 뒤, 커버링 인덱스 단독 스캔. 키셋 페이지네이션은 공유 UI 때문에 기각 — 대안 비교를 문서에 남김 | [판단 기록](./docs/analysis/board-deep-page-2026-07.md) |
 | 주변 서비스 초기 응답 | **22.4MB → 100KB** (531.8 → 50.9ms) | 반환 상한이 없어 전건을 내려보내고 있었음 | [재검증 2026-07-12](./docs/refactoring/location/evidence/initial-load-reverify-2026-07-12.md) |
 | 경고 카운트 동시성 | 5건 동시 부여 **1/5 → 5/5 반영** | 원인은 Lost Update가 아니라 S락 → X락 승격 순환 대기. X락을 먼저 확보하도록 락 순서 교정 | [동시성 전략](./docs/concurrency/concurrency-strategy-master.md) |
 
